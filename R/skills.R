@@ -1,5 +1,51 @@
 # Skill loading system for deputy agents
 
+#' Normalize provider name for comparison
+#'
+#' @param provider Provider name (e.g., "openai", "OpenAI", "anthropic")
+#' @return Lowercase normalized provider name, or NA_character_ if invalid
+#' @keywords internal
+normalize_provider_name <- function(provider) {
+  if (is.null(provider) || !is.character(provider) || length(provider) != 1) {
+    return(NA_character_)
+  }
+
+  # Convert to lowercase
+  provider <- tolower(provider)
+
+  # Handle common variations
+  provider <- switch(
+    provider,
+    "openai" = "openai",
+    "chat_openai" = "openai",
+    "gpt" = "openai",
+    "gpt-4" = "openai",
+    "gpt-4o" = "openai",
+    "anthropic" = "anthropic",
+    "chat_anthropic" = "anthropic",
+    "claude" = "anthropic",
+    "google" = "google",
+    "chat_google" = "google",
+    "gemini" = "google",
+    "ollama" = "ollama",
+    "chat_ollama" = "ollama",
+    "azure" = "azure",
+    "chat_azure" = "azure",
+    "bedrock" = "bedrock",
+    "chat_bedrock" = "bedrock",
+    "vllm" = "vllm",
+    "chat_vllm" = "vllm",
+    "openrouter" = "openrouter",
+    "chat_openrouter" = "openrouter",
+    "groq" = "groq",
+    "chat_groq" = "groq",
+    # Default: return as-is
+    provider
+  )
+
+  provider
+}
+
 #' Skill R6 Class
 #'
 #' @description
@@ -64,9 +110,13 @@ Skill <- R6::R6Class(
     #' @description
     #' Check if skill requirements are met.
     #'
-    #' @return List with `ok` (logical) and `missing` (character vector)
-    check_requirements = function() {
+    #' @param current_provider Optional current provider name for validation
+    #' @return List with `ok` (logical), `missing` (character vector), and
+    #'   `provider_mismatch` (logical)
+    check_requirements = function(current_provider = NULL) {
       missing <- character()
+      provider_mismatch <- FALSE
+      mismatched_provider <- NULL
 
       # Check required packages
       if (!is.null(self$requires$packages)) {
@@ -77,9 +127,40 @@ Skill <- R6::R6Class(
         }
       }
 
+      # Check provider requirements if current_provider is specified
+      if (!is.null(current_provider) && !is.null(self$requires$providers)) {
+        required_providers <- self$requires$providers
+        if (length(required_providers) > 0) {
+          # Normalize provider name for comparison
+          normalized_provider <- normalize_provider_name(current_provider)
+
+          # Only check if we could normalize the provider name
+          if (!is.na(normalized_provider)) {
+            # Check if current provider is in the required list
+            normalized_required <- vapply(
+              required_providers,
+              normalize_provider_name,
+              character(1),
+              USE.NAMES = FALSE
+            )
+            # Remove any NULLs that became NA
+            normalized_required <- normalized_required[!is.na(normalized_required)]
+
+            if (length(normalized_required) > 0 &&
+              !normalized_provider %in% normalized_required) {
+              provider_mismatch <- TRUE
+              mismatched_provider <- current_provider
+            }
+          }
+        }
+      }
+
       list(
-        ok = length(missing) == 0,
-        missing = missing
+        ok = length(missing) == 0 && !provider_mismatch,
+        missing = missing,
+        provider_mismatch = provider_mismatch,
+        current_provider = current_provider,
+        required_providers = self$requires$providers
       )
     },
 
@@ -433,12 +514,35 @@ Agent$set("public", "load_skill", function(skill) {
     )
   }
 
-  # Check requirements
-  req_check <- skill$check_requirements()
-  if (!req_check$ok) {
+  # Get current provider for validation
+  current_provider <- tryCatch(
+    {
+      provider_info <- self$provider()
+      # provider() returns a list with name and model
+      provider_info$name
+    },
+    error = function(e) NULL
+  )
+
+  # Check requirements with provider
+  req_check <- skill$check_requirements(current_provider)
+
+  # Report missing packages
+  if (length(req_check$missing) > 0) {
     cli_warn(c(
-      "Loading skill with unmet requirements: {.val {skill$name}}",
+      "Loading skill with missing packages: {.val {skill$name}}",
       "x" = "Missing: {.val {req_check$missing}}"
+    ))
+  }
+
+  # Report provider mismatch
+  if (isTRUE(req_check$provider_mismatch)) {
+    required <- paste(req_check$required_providers, collapse = ", ")
+    cli_warn(c(
+      "Skill {.val {skill$name}} may not work optimally with current provider",
+      "i" = "Current provider: {.val {current_provider}}",
+      "i" = "Skill requires: {.val {required}}",
+      "!" = "Some features may not work as expected"
     ))
   }
 

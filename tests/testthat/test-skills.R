@@ -149,3 +149,175 @@ test_that("skill defaults are sensible", {
   expect_equal(skill$requires, list())
   expect_null(skill$path)
 })
+
+# Provider validation tests
+test_that("normalize_provider_name handles common providers", {
+  expect_equal(normalize_provider_name("openai"), "openai")
+  expect_equal(normalize_provider_name("OpenAI"), "openai")
+  expect_equal(normalize_provider_name("OPENAI"), "openai")
+  expect_equal(normalize_provider_name("anthropic"), "anthropic")
+  expect_equal(normalize_provider_name("claude"), "anthropic")
+  expect_equal(normalize_provider_name("google"), "google")
+  expect_equal(normalize_provider_name("gemini"), "google")
+})
+
+test_that("normalize_provider_name handles edge cases", {
+  expect_true(is.na(normalize_provider_name(NULL)))
+  expect_true(is.na(normalize_provider_name(123)))
+  expect_true(is.na(normalize_provider_name(c("openai", "anthropic"))))
+  expect_equal(normalize_provider_name("unknown_provider"), "unknown_provider")
+})
+
+test_that("normalize_provider_name handles chat_* prefixes", {
+  expect_equal(normalize_provider_name("chat_openai"), "openai")
+  expect_equal(normalize_provider_name("chat_anthropic"), "anthropic")
+  expect_equal(normalize_provider_name("chat_google"), "google")
+  expect_equal(normalize_provider_name("chat_ollama"), "ollama")
+  expect_equal(normalize_provider_name("chat_azure"), "azure")
+  expect_equal(normalize_provider_name("chat_bedrock"), "bedrock")
+})
+
+test_that("check_requirements validates provider without provider arg", {
+  skill <- Skill$new(
+    name = "test",
+    requires = list(providers = c("openai", "anthropic"))
+  )
+
+  # Without provider arg, should pass (can't validate)
+  check <- skill$check_requirements()
+  expect_true(check$ok)
+  expect_false(check$provider_mismatch)
+})
+
+test_that("check_requirements validates matching provider", {
+  skill <- Skill$new(
+    name = "test",
+    requires = list(providers = c("openai", "anthropic"))
+  )
+
+  # With matching provider
+  check <- skill$check_requirements(current_provider = "openai")
+  expect_true(check$ok)
+  expect_false(check$provider_mismatch)
+
+  check2 <- skill$check_requirements(current_provider = "anthropic")
+  expect_true(check2$ok)
+  expect_false(check2$provider_mismatch)
+})
+
+test_that("check_requirements detects provider mismatch", {
+  skill <- Skill$new(
+    name = "test",
+    requires = list(providers = c("openai"))
+  )
+
+  # With mismatched provider
+  check <- skill$check_requirements(current_provider = "anthropic")
+  expect_false(check$ok)
+  expect_true(check$provider_mismatch)
+  expect_equal(check$current_provider, "anthropic")
+  expect_equal(check$required_providers, "openai")
+})
+
+test_that("check_requirements handles normalized provider names", {
+  skill <- Skill$new(
+    name = "test",
+    requires = list(providers = c("anthropic"))
+  )
+
+  # "claude" should normalize to "anthropic"
+  check <- skill$check_requirements(current_provider = "claude")
+  expect_true(check$ok)
+  expect_false(check$provider_mismatch)
+})
+
+test_that("check_requirements handles empty providers list", {
+  skill <- Skill$new(
+    name = "test",
+    requires = list(providers = list())
+  )
+
+  check <- skill$check_requirements(current_provider = "openai")
+  expect_true(check$ok)
+  expect_false(check$provider_mismatch)
+})
+
+test_that("check_requirements combines package and provider checks", {
+  skill <- Skill$new(
+    name = "test",
+    requires = list(
+      packages = c("base"),
+      providers = c("openai")
+    )
+  )
+
+  # Package ok, provider ok
+  check1 <- skill$check_requirements(current_provider = "openai")
+  expect_true(check1$ok)
+
+  # Package ok, provider mismatch
+  check2 <- skill$check_requirements(current_provider = "anthropic")
+  expect_false(check2$ok)
+  expect_true(check2$provider_mismatch)
+  expect_length(check2$missing, 0)
+
+  # Missing package (even with matching provider)
+  skill_missing <- Skill$new(
+    name = "test",
+    requires = list(
+      packages = c("nonexistent_pkg_xyz"),
+      providers = c("openai")
+    )
+  )
+  check3 <- skill_missing$check_requirements(current_provider = "openai")
+  expect_false(check3$ok)
+  expect_false(check3$provider_mismatch)
+  expect_length(check3$missing, 1)
+})
+
+test_that("Agent load_skill warns on provider mismatch", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  skill <- skill_create(
+    name = "provider_test",
+    description = "Test skill",
+    requires = list(providers = c("openai"))
+  )
+
+  # Mock provider returns "mock", which won't match "openai"
+  expect_warning(
+    agent$load_skill(skill),
+    "may not work optimally"
+  )
+})
+
+test_that("Agent load_skill succeeds without provider requirements", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  skill <- skill_create(
+    name = "no_provider_req",
+    description = "Test skill without provider requirements"
+  )
+
+  # Should succeed without warnings about provider
+  expect_no_warning(
+    agent$load_skill(skill)
+  )
+})
+
+test_that("Skill print includes provider info when present", {
+  skill <- Skill$new(
+    name = "test_skill",
+    requires = list(
+      packages = c("dplyr"),
+      providers = c("openai", "anthropic")
+    )
+  )
+
+  output <- capture.output(print(skill))
+  output_text <- paste(output, collapse = "\n")
+
+  expect_true(grepl("test_skill", output_text))
+})
