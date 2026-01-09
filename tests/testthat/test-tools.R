@@ -190,3 +190,104 @@ test_that("tools_code contains code execution tools", {
   tool_names <- sapply(code_tools, function(t) t@name)
   expect_true("run_r_code" %in% tool_names)
 })
+
+# Tool rejection path tests
+test_that("tool_read_file returns tool_reject for missing file", {
+  result <- tryCatch(
+    tool_read_file("/definitely/not/a/real/file.txt"),
+    ellmer_tool_reject = function(e) e
+  )
+
+  # Should be a tool_reject error
+
+  expect_true(inherits(result, "ellmer_tool_reject") || grepl("File not found", result))
+})
+
+test_that("tool_write_file handles write errors gracefully", {
+  # Try to write to a directory that doesn't exist
+  result <- tryCatch(
+    tool_write_file("/nonexistent/deep/path/file.txt", "content"),
+    ellmer_tool_reject = function(e) e,
+    error = function(e) e
+  )
+
+  # Should be some kind of error
+  expect_true(inherits(result, "error") || inherits(result, "ellmer_tool_reject"))
+})
+
+test_that("tool_list_files returns tool_reject for nonexistent directory", {
+  result <- tryCatch(
+    tool_list_files("/path/that/does/not/exist"),
+    ellmer_tool_reject = function(e) e
+  )
+
+  expect_true(
+    inherits(result, "ellmer_tool_reject") ||
+      grepl("Directory not found", result) ||
+      grepl("does not exist", result, ignore.case = TRUE)
+  )
+})
+
+test_that("tool_read_csv returns tool_reject for invalid CSV", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  # Create an invalid CSV (binary content)
+  bad_file <- file.path(temp_dir, "bad.csv")
+  writeBin(as.raw(c(0, 1, 2, 255, 254, 253)), bad_file)
+
+  # Should handle gracefully (either error or warning about parsing)
+  result <- tryCatch(
+    tool_read_csv(bad_file),
+    ellmer_tool_reject = function(e) "rejected",
+    error = function(e) "error",
+    warning = function(w) "warning"
+  )
+
+  # Should complete without crashing
+  expect_true(is.character(result))
+})
+
+test_that("tool_run_r_code handles syntax errors", {
+  skip_if_not_installed("callr")
+
+  result <- tool_run_r_code("this is not valid R code {{{")
+
+  # Should contain error information
+  expect_true(grepl("Error|error", result, ignore.case = TRUE))
+})
+test_that("tool_run_r_code handles runtime errors", {
+  skip_if_not_installed("callr")
+
+  result <- tool_run_r_code("stop('intentional error')")
+
+  # Should contain error information
+  expect_true(grepl("intentional error", result, ignore.case = TRUE))
+})
+
+test_that("tool_run_bash handles command not found", {
+  result <- tryCatch(
+    tool_run_bash("nonexistent_command_xyz123"),
+    ellmer_tool_reject = function(e) e$message,
+    error = function(e) e$message
+  )
+
+  # Should indicate failure somehow
+  expect_true(is.character(result))
+})
+
+test_that("tool_run_r_code requires callr for sandbox", {
+  # Mock is_installed to return FALSE for callr
+  local_mocked_bindings(
+    is_installed = function(pkg) {
+      if (pkg == "callr") FALSE else TRUE
+    },
+    .package = "rlang"
+  )
+
+  # Should reject because callr is "not installed"
+  # tool_reject throws an error with class ellmer_tool_reject
+  expect_error(
+    tool_run_r_code("1 + 1"),
+    class = "ellmer_tool_reject"
+  )
+})

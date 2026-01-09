@@ -138,9 +138,13 @@ LeadAgent <- R6::R6Class(
 
       self$sub_agent_defs <- c(self$sub_agent_defs, list(definition))
 
-      # Update system prompt
+      # Rebuild and update system prompt to include new sub-agent
+      # Extract base prompt (before sub-agent section) if possible
       current_prompt <- self$chat$get_system_prompt()
-      # This is a simplified update - in production you'd want to be smarter
+      base_prompt <- private$extract_base_prompt(current_prompt)
+      new_prompt <- private$build_lead_prompt(base_prompt, self$sub_agent_defs)
+      self$chat$set_system_prompt(new_prompt)
+
       cli_alert_info("Registered sub-agent: {.val {definition$name}}")
       invisible(self)
     },
@@ -198,6 +202,31 @@ LeadAgent <- R6::R6Class(
       }
 
       paste(lines, collapse = "\n")
+    },
+
+    # Extract base prompt (before sub-agent section) from full prompt
+    extract_base_prompt = function(full_prompt) {
+      if (is.null(full_prompt) || nchar(full_prompt) == 0) {
+        return(NULL)
+      }
+
+      # Look for the sub-agent section marker
+      marker <- "# Available Sub-Agents"
+      marker_pos <- regexpr(marker, full_prompt, fixed = TRUE)
+
+      if (marker_pos > 0) {
+        # Extract everything before the marker
+        base <- substr(full_prompt, 1, marker_pos - 1)
+        # Trim trailing whitespace
+        base <- sub("\\s+$", "", base)
+        if (nchar(base) == 0) {
+          return(NULL)
+        }
+        return(base)
+      }
+
+      # No marker found, return the full prompt as base
+      full_prompt
     },
 
     # Create the delegate_to_agent tool
@@ -273,14 +302,43 @@ LeadAgent <- R6::R6Class(
     create_sub_agent = function(def) {
       # Get the model to use
       if (def$model == "inherit") {
-        # Clone the parent's chat provider
-        # For now, we create a new chat with the same provider
-        provider <- self$chat$get_provider()
-        sub_chat <- ellmer::Chat$new(provider = provider)
+        # Get parent's provider info and create similar chat
+        parent_provider <- self$provider()
+
+        # Try to create a chat using the same provider type
+        sub_chat <- tryCatch(
+          {
+            # Use ellmer's clone method if available
+            if ("clone" %in% names(self$chat)) {
+              self$chat$clone()
+            } else {
+              # Fallback: try to create from provider string
+              # provider() returns strings like "openai", "anthropic", etc.
+              ellmer::chat(parent_provider)
+            }
+          },
+          error = function(e) {
+            cli_warn(c(
+              "Could not inherit model from parent",
+              "i" = "Using default model",
+              "x" = e$message
+            ))
+            # Ultimate fallback - use a default model
+            ellmer::chat_openai()
+          }
+        )
       } else {
-        # Use the specified model
-        # This requires parsing the model string
-        sub_chat <- ellmer::chat(def$model)
+        # Use the specified model string (e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4-5-20250929")
+        sub_chat <- tryCatch(
+          ellmer::chat(def$model),
+          error = function(e) {
+            cli_abort(c(
+              "Failed to create chat for sub-agent {.val {def$name}}",
+              "x" = "Invalid model: {.val {def$model}}",
+              "i" = e$message
+            ))
+          }
+        )
       }
 
       # Create the sub-agent

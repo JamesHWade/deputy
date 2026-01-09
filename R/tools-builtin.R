@@ -292,14 +292,13 @@ tool_run_r_code <- ellmer::tool(
           return(paste("Execution error:", e$message))
         }
       )
+    } else if (sandbox && !rlang::is_installed("callr")) {
+      # Security: Require callr for sandboxed execution - don't fall back to unsafe
+      return(ellmer::tool_reject(
+        "Cannot execute R code: package 'callr' is required for sandboxed execution. Install with install.packages('callr')"
+      ))
     } else {
-      if (sandbox && !rlang::is_installed("callr")) {
-        cli_warn(c(
-          "Package {.pkg callr} not installed",
-          "i" = "Running R code in current process (less safe)",
-          "i" = "Install with {.code install.packages('callr')}"
-        ))
-      }
+      # sandbox = FALSE (not exposed to LLM, only for internal use)
       result <- execute_r_code(code)
     }
 
@@ -356,22 +355,50 @@ tool_run_bash <- ellmer::tool(
     # Internal parameter (not exposed to LLM)
     timeout <- 30
 
-    tryCatch(
-      {
-        result <- system(command, intern = TRUE, timeout = timeout)
-        if (length(result) == 0) {
-          "Command executed successfully (no output)"
-        } else {
-          paste(result, collapse = "\n")
+    # Use callr for reliable timeout enforcement if available
+    if (rlang::is_installed("callr")) {
+      tryCatch(
+        {
+          result <- callr::r(
+            function(cmd) {
+              system(cmd, intern = TRUE)
+            },
+            args = list(cmd = command),
+            timeout = timeout
+          )
+          if (length(result) == 0) {
+            "Command executed successfully (no output)"
+          } else {
+            paste(result, collapse = "\n")
+          }
+        },
+        error = function(e) {
+          if (grepl("timeout", e$message, ignore.case = TRUE)) {
+            ellmer::tool_reject(paste("Command timed out after", timeout, "seconds"))
+          } else {
+            ellmer::tool_reject(paste("Command failed:", e$message))
+          }
         }
-      },
-      error = function(e) {
-        ellmer::tool_reject(paste("Command failed:", e$message))
-      },
-      warning = function(w) {
-        paste("Warning:", w$message)
-      }
-    )
+      )
+    } else {
+      # Fallback to system() - timeout may not be reliable
+      tryCatch(
+        {
+          result <- system(command, intern = TRUE, timeout = timeout)
+          if (length(result) == 0) {
+            "Command executed successfully (no output)"
+          } else {
+            paste(result, collapse = "\n")
+          }
+        },
+        error = function(e) {
+          ellmer::tool_reject(paste("Command failed:", e$message))
+        },
+        warning = function(w) {
+          paste("Warning:", w$message)
+        }
+      )
+    }
   },
   name = "run_bash",
   description = "Execute a bash/shell command and return the output. Use with caution - this can execute arbitrary system commands.",
