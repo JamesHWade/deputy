@@ -7,6 +7,7 @@
 #' * `"PreToolUse"` - Before a tool is executed (can deny)
 #' * `"PostToolUse"` - After a tool completes
 #' * `"Stop"` - When the agent stops
+#' * `"SubagentStop"` - When a sub-agent completes (LeadAgent only)
 #' * `"UserPromptSubmit"` - When a user prompt is submitted
 #' * `"PreCompact"` - Before conversation compaction (future)
 #'
@@ -14,7 +15,9 @@
 HookEvent <- c(
   "PreToolUse",
   "PostToolUse",
+
   "Stop",
+  "SubagentStop",
   "UserPromptSubmit",
   "PreCompact"
 )
@@ -100,6 +103,32 @@ HookResultStop <- function(handled = TRUE) {
   )
 }
 
+#' Create a SubagentStop hook result
+#'
+#' @description
+#' Return this from a SubagentStop hook callback. This hook fires when a
+#' sub-agent (delegated from a LeadAgent) completes its task.
+#'
+#' @param handled If TRUE, indicates the hook handled the sub-agent completion
+#' @return A `HookResultSubagentStop` object
+#'
+#' @examples
+#' # Basic handler
+#' HookResultSubagentStop()
+#'
+#' # Mark as handled
+#' HookResultSubagentStop(handled = TRUE)
+#'
+#' @export
+HookResultSubagentStop <- function(handled = TRUE) {
+  structure(
+    list(
+      handled = handled
+    ),
+    class = c("HookResultSubagentStop", "HookResult", "list")
+  )
+}
+
 #' Create a PreCompact hook result
 #'
 #' @description
@@ -162,6 +191,7 @@ HookMatcher <- R6::R6Class(
     #'   * PreToolUse: `function(tool_name, tool_input, context)`
     #'   * PostToolUse: `function(tool_name, tool_result, tool_error, context)`
     #'   * Stop: `function(reason, context)`
+    #'   * SubagentStop: `function(agent_name, task, result, context)`
     #'   * UserPromptSubmit: `function(prompt, context)`
     #' @param pattern Optional regex pattern to filter by tool name.
     #'   Only applies to PreToolUse and PostToolUse events.

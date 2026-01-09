@@ -281,6 +281,15 @@ LeadAgent <- R6::R6Class(
             }
           )
 
+          # Fire SubagentStop hook
+          lead_agent$hooks$fire(
+            "SubagentStop",
+            agent_name = agent_name,
+            task = task,
+            result = result,
+            context = list(working_dir = lead_agent$working_dir)
+          )
+
           result
         },
         name = "delegate_to_agent",

@@ -328,3 +328,50 @@ test_that("agent_with_delegation accepts custom permissions", {
 
   expect_identical(lead$permissions, perms)
 })
+
+# Tests for SubagentStop hook
+test_that("SubagentStop hook event exists", {
+  expect_true("SubagentStop" %in% HookEvent)
+})
+
+test_that("HookResultSubagentStop creates correct structure", {
+  result <- HookResultSubagentStop()
+
+  expect_s3_class(result, "HookResultSubagentStop")
+  expect_s3_class(result, "HookResult")
+  expect_true(result$handled)
+
+  result_unhandled <- HookResultSubagentStop(handled = FALSE)
+  expect_false(result_unhandled$handled)
+})
+
+test_that("LeadAgent can add SubagentStop hook", {
+  mock_chat <- create_mock_chat()
+  sub_agent <- agent_definition(
+    name = "helper",
+    description = "A helper agent",
+    prompt = "You help with tasks"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(sub_agent)
+  )
+
+  # Add SubagentStop hook
+  hook_fired <- FALSE
+  captured_agent_name <- NULL
+  captured_task <- NULL
+
+  lead$add_hook(HookMatcher$new(
+    event = "SubagentStop",
+    callback = function(agent_name, task, result, context) {
+      hook_fired <<- TRUE
+      captured_agent_name <<- agent_name
+      captured_task <<- task
+      HookResultSubagentStop()
+    }
+  ))
+
+  expect_equal(lead$hooks$count(), 1)
+})
