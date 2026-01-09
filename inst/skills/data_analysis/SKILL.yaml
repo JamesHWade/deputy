@@ -1,0 +1,16 @@
+name: data_analysis
+version: "1.0.0"
+description: Expert data analysis capabilities for exploring and summarizing datasets
+
+requires:
+  packages:
+    - dplyr
+    - ggplot2
+
+tools:
+  - name: eda_summary
+    file: tools.R
+    function: tool_eda_summary
+  - name: describe_column
+    file: tools.R
+    function: tool_describe_column

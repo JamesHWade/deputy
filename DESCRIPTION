@@ -1,0 +1,34 @@
+Package: deputy
+Title: Agentic AI Workflows for R
+Version: 0.0.0.9000
+Authors@R:
+    person("James", "Wade", , "github@jameshwade.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-9740-1905"))
+Description: A provider-agnostic framework for building agentic AI workflows
+    in R. Built on ellmer, it enables multi-step reasoning with tool use,
+    permissions, hooks, and human-in-the-loop capabilities. Works with any
+    LLM provider that ellmer supports including OpenAI, Anthropic, Google,
+    and local models via Ollama.
+URL: https://github.com/JamesHWade/deputy
+BugReports: https://github.com/JamesHWade/deputy/issues
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Suggests:
+    callr,
+    knitr,
+    readr,
+    rmarkdown,
+    testthat (>= 3.0.0),
+    withr,
+    yaml
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Imports:
+    cli,
+    coro,
+    digest,
+    ellmer (>= 0.3.0),
+    R6,
+    rlang

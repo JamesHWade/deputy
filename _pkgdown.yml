@@ -1,0 +1,72 @@
+url: https://jameshwade.github.io/deputy/
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+
+navbar:
+  structure:
+    left: [intro, reference, articles]
+    right: [search, github]
+  components:
+    articles:
+      text: Articles
+      menu:
+      - text: Getting Started
+        href: articles/getting-started.html
+
+reference:
+- title: Agent
+
+  desc: Core agent class for agentic AI workflows
+  contents:
+  - Agent
+  - AgentResult
+  - AgentEvent
+
+- title: Tools
+  desc: Built-in tools and tool bundles
+  contents:
+  - starts_with("tool_")
+  - starts_with("tools_")
+
+- title: Permissions
+
+  desc: Control what agents can do
+  contents:
+  - Permissions
+  - PermissionMode
+  - PermissionResultAllow
+  - PermissionResultDeny
+  - starts_with("permissions_")
+
+- title: Hooks
+  desc: Intercept and customize agent behavior
+  contents:
+  - HookMatcher
+  - HookRegistry
+  - HookEvent
+  - starts_with("HookResult")
+  - starts_with("hook_")
+
+- title: Skills
+  desc: Extend agents with specialized capabilities
+  contents:
+  - Skill
+  - skill_load
+  - skill_create
+  - skills_list
+
+- title: Multi-Agent
+
+  desc: Coordinate multiple specialized agents
+  contents:
+  - LeadAgent
+  - agent_definition
+  - agent_with_delegation
+
+articles:
+- title: Getting Started
+  navbar: ~
+  contents:
+  - getting-started
