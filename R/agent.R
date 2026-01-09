@@ -131,22 +131,30 @@ Agent <- R6::R6Class(
       events <- list()
 
       # Iterate through the generator
-      tryCatch(
-        {
-          repeat {
-            event <- gen()
-            if (is.null(event)) {
-              break
+      # Note: coro generators return coro::exhausted() when done, not NULL
+      repeat {
+        event <- tryCatch(
+          gen(),
+          error = function(e) {
+            if (grepl("generator has been exhausted", e$message, fixed = TRUE)) {
+              return(coro::exhausted())
             }
-            events <- c(events, list(event))
-          }
-        },
-        error = function(e) {
-          if (!grepl("generator has been exhausted", e$message, fixed = TRUE)) {
             stop(e)
           }
+        )
+
+        # Check for exhaustion (coro returns special exhausted symbol, not NULL)
+        if (coro::is_exhausted(event)) {
+          break
         }
-      )
+
+        events <- c(events, list(event))
+
+        # Also break on stop event to avoid extra generator call
+        if (inherits(event, "AgentEvent") && event$type == "stop") {
+          break
+        }
+      }
 
       # Find the stop event for metadata
       stop_event <- Find(function(e) e$type == "stop", events)
