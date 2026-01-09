@@ -449,27 +449,132 @@ hook_log_tools <- function(verbose = FALSE) {
 #'
 #' @description
 #' Convenience function to create a PreToolUse hook that blocks potentially
-#' dangerous bash commands like `rm -rf`, `sudo`, etc.
+#' dangerous bash commands. Default patterns include:
 #'
-#' @param patterns Character vector of regex patterns to block
+#' **File system destruction:**
+#' `rm -rf`, `mkfs`, `dd if=`, writes to `/dev/`
+#'
+#' **Privilege escalation:**
+#' `sudo`, `su -`, `chmod 777`, `chown`, `setuid`
+#'
+#' **Code execution:**
+#' `eval`, `exec`, `source` (with variables), backticks
+#'
+#' **Process manipulation:**
+#' `kill -9`, `killall`, `pkill`, fork bombs
+#'
+#' **System modification:**
+#' `crontab`, `systemctl`, `/etc/passwd`, `/etc/shadow`
+#'
+#' **Network exfiltration:**
+#' `curl -X POST`, `wget --post`, `nc -e`, `netcat`, reverse shells
+#'
+#' @param patterns Character vector of regex patterns to block.
+#'   Default includes comprehensive dangerous patterns.
+#' @param additional_patterns Optional character vector of additional
+#'   patterns to block alongside defaults.
 #' @return A [HookMatcher] object
 #'
 #' @examples
 #' \dontrun{
+#' # Use default patterns
 #' agent$add_hook(hook_block_dangerous_bash())
+#'
+#' # Add custom patterns
+#' agent$add_hook(hook_block_dangerous_bash(
+#'   additional_patterns = c("my_custom_pattern", "another_pattern")
+#' ))
 #' }
 #'
 #' @export
 hook_block_dangerous_bash <- function(
-  patterns = c(
+  patterns = NULL,
+  additional_patterns = NULL
+) {
+  # Default dangerous patterns
+  default_patterns <- c(
+    # File system destruction
     "rm\\s+-rf",
-    "sudo",
-    "chmod\\s+777",
+    "rm\\s+-fr",
+    "rm\\s+--no-preserve-root",
     "mkfs",
     "dd\\s+if=",
-    ">\\s*/dev/"
+    ">\\s*/dev/",
+    "shred\\s",
+
+    # Privilege escalation
+    "sudo\\s",
+    "su\\s+-",
+    "chmod\\s+777",
+    "chmod\\s+\\+s",
+    "chown\\s+root",
+    "setuid",
+    "setgid",
+
+    # Code execution patterns
+    "\\beval\\s",
+    "\\bexec\\s",
+    "source\\s+\\$",
+    "`.*`",
+    "\\$\\(.*\\)",
+
+    # Process manipulation
+    "kill\\s+-9",
+    "killall\\s",
+    "pkill\\s+-9",
+    ":\\s*\\(\\s*\\)\\s*\\{",
+    "\\|\\s*:\\s*&",
+
+    # System modification
+    "crontab\\s+-e",
+    "crontab\\s.*<",
+    "systemctl\\s+(disable|stop|mask)",
+    "/etc/passwd",
+    "/etc/shadow",
+    "/etc/sudoers",
+    "visudo",
+    "usermod",
+    "useradd.*-o",
+
+    # Network exfiltration/reverse shells
+    "curl\\s.*-X\\s*POST",
+    "curl\\s.*--data",
+    "curl\\s.*-d\\s",
+    "wget\\s+--post",
+    "nc\\s+-e",
+    "nc\\s.*-c",
+    "netcat",
+    "ncat\\s+-e",
+    "/dev/tcp/",
+    "/dev/udp/",
+    "bash\\s+-i\\s+>&",
+    "python.*socket",
+    "perl.*socket",
+
+    # Environment/credential access
+    "\\benv\\b.*=.*\\bexport\\b",
+    "printenv",
+    "cat\\s+.*\\.ssh/",
+    "cat\\s+.*\\.aws/",
+    "cat\\s+.*\\.env",
+    "base64\\s+-d",
+
+    # History manipulation
+    "history\\s+-c",
+    "unset\\s+HISTFILE",
+    "export\\s+HISTFILE=/dev/null"
   )
-) {
+
+  # Use provided patterns or defaults
+  if (is.null(patterns)) {
+    patterns <- default_patterns
+  }
+
+  # Add any additional patterns
+  if (!is.null(additional_patterns)) {
+    patterns <- c(patterns, additional_patterns)
+  }
+
   combined_pattern <- paste(patterns, collapse = "|")
 
   HookMatcher$new(
