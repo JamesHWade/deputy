@@ -245,3 +245,102 @@ test_that("generate_fallback_summary creates text summary", {
   expect_true(grepl("User msg", fallback))
   expect_true(grepl("Asst msg", fallback))
 })
+
+# Tool data extraction tests
+test_that("extract_tool_request_data handles NULL request", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Access private method - should warn and return defaults
+  result <- NULL
+  expect_warning(
+    result <- agent$.__enclos_env__$private$extract_tool_request_data(NULL),
+    "NULL request"
+  )
+
+  expect_equal(result$tool_name, "unknown")
+  expect_equal(result$tool_input, list())
+  expect_null(result$tool_annotations)
+})
+
+test_that("extract_tool_request_data handles list-style request", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Create a list-style request (not S7)
+  list_request <- list(
+    name = "test_tool",
+    arguments = list(arg1 = "value1"),
+    tool = list(annotations = list(read_only_hint = TRUE))
+  )
+
+  result <- NULL
+  expect_warning(
+    result <- agent$.__enclos_env__$private$extract_tool_request_data(list_request),
+    "not a ContentToolRequest"
+  )
+
+  expect_equal(result$tool_name, "test_tool")
+  expect_equal(result$tool_input, list(arg1 = "value1"))
+  expect_equal(result$tool_annotations, list(read_only_hint = TRUE))
+})
+
+test_that("extract_tool_result_data handles NULL result", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Access private method - should warn and return defaults
+  result <- NULL
+  expect_warning(
+    result <- agent$.__enclos_env__$private$extract_tool_result_data(NULL),
+    "NULL result"
+  )
+
+  expect_equal(result$tool_name, "unknown")
+  expect_null(result$tool_result)
+  expect_equal(result$tool_error, "NULL result received")
+})
+
+test_that("extract_tool_result_data handles list-style result", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Create a list-style result (not S7)
+  list_result <- list(
+    value = "tool output",
+    error = NULL,
+    request = list(name = "test_tool")
+  )
+
+  result <- NULL
+  expect_warning(
+    result <- agent$.__enclos_env__$private$extract_tool_result_data(list_result),
+    "not a ContentToolResult"
+  )
+
+  expect_equal(result$tool_name, "test_tool")
+  expect_equal(result$tool_result, "tool output")
+  expect_null(result$tool_error)
+})
+
+test_that("extract_tool_result_data handles result with error", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Create a list-style result with error
+  list_result <- list(
+    value = NULL,
+    error = "Something went wrong",
+    request = list(name = "failing_tool")
+  )
+
+  result <- NULL
+  expect_warning(
+    result <- agent$.__enclos_env__$private$extract_tool_result_data(list_result),
+    "not a ContentToolResult"
+  )
+
+  expect_equal(result$tool_name, "failing_tool")
+  expect_null(result$tool_result)
+  expect_equal(result$tool_error, "Something went wrong")
+})

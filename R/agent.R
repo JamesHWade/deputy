@@ -543,17 +543,11 @@ Agent <- R6::R6Class(
 
     # Callback for tool requests (permission checking + hooks)
     on_tool_request = function(request) {
-      tool_name <- request@name
-      tool_input <- request@arguments
-
-      # Extract tool annotations if available
-      tool_annotations <- NULL
-      if (!is.null(request@tool)) {
-        tool_annotations <- tryCatch(
-          request@tool@annotations,
-          error = function(e) NULL
-        )
-      }
+      # Validate and extract request data safely
+      extracted <- private$extract_tool_request_data(request)
+      tool_name <- extracted$tool_name
+      tool_input <- extracted$tool_input
+      tool_annotations <- extracted$tool_annotations
 
       context <- list(
         working_dir = self$working_dir,
@@ -593,15 +587,10 @@ Agent <- R6::R6Class(
 
     # Callback for tool results (hooks)
     on_tool_result = function(result) {
-      # ContentToolResult has: value, error, extra, request
+      # Validate and extract tool result data safely
+      # ContentToolResult (S7) has: value, error, extra, request
       # request is ContentToolRequest with: id, name, arguments, tool, extra
-      tool_name <- if (!is.null(result@request)) {
-        result@request@name
-      } else {
-        "unknown"
-      }
-      tool_result <- result@value
-      tool_error <- result@error
+      extracted <- private$extract_tool_result_data(result)
 
       context <- list(
         working_dir = self$working_dir
@@ -610,9 +599,9 @@ Agent <- R6::R6Class(
       # Fire PostToolUse hooks
       hook_result <- self$hooks$fire(
         "PostToolUse",
-        tool_name = tool_name,
-        tool_result = tool_result,
-        tool_error = tool_error,
+        tool_name = extracted$tool_name,
+        tool_result = extracted$tool_result,
+        tool_error = extracted$tool_error,
         context = context
       )
 
@@ -625,6 +614,169 @@ Agent <- R6::R6Class(
       }
 
       invisible(NULL)
+    },
+
+    # Safely extract data from a tool request (handles S7 and malformed objects)
+    extract_tool_request_data = function(request) {
+      # Default values if extraction fails
+      tool_name <- "unknown"
+      tool_input <- list()
+      tool_annotations <- NULL
+
+      # Check if we have a valid request object
+      if (is.null(request)) {
+        cli_warn("Tool request callback received NULL request")
+        return(list(
+          tool_name = tool_name,
+          tool_input = tool_input,
+          tool_annotations = tool_annotations
+        ))
+      }
+
+      # Check if it's a ContentToolRequest (S7 class)
+      if (!inherits(request, "ContentToolRequest")) {
+        cli_warn(c(
+          "Tool request is not a ContentToolRequest",
+          "i" = "Got class: {.cls {class(request)}}"
+        ))
+
+        # Attempt list-style access for backwards compatibility
+        if (is.list(request)) {
+          tool_name <- request$name %||% "unknown"
+          tool_input <- request$arguments %||% list()
+          if (!is.null(request$tool) && is.list(request$tool)) {
+            tool_annotations <- request$tool$annotations
+          }
+        }
+
+        return(list(
+          tool_name = tool_name,
+          tool_input = tool_input,
+          tool_annotations = tool_annotations
+        ))
+      }
+
+      # Extract from S7 object with error handling
+      # Tool name
+      tool_name <- tryCatch(
+        request@name %||% "unknown",
+        error = function(e) {
+          cli_warn("Failed to extract tool name from request: {e$message}")
+          "unknown"
+        }
+      )
+
+      # Tool arguments
+      tool_input <- tryCatch(
+        request@arguments %||% list(),
+        error = function(e) {
+          cli_warn("Failed to extract tool arguments from request: {e$message}")
+          list()
+        }
+      )
+
+      # Tool annotations
+      tool_annotations <- tryCatch(
+        {
+          if (!is.null(request@tool)) {
+            request@tool@annotations
+          } else {
+            NULL
+          }
+        },
+        error = function(e) {
+          # Annotations are optional, don't warn
+          NULL
+        }
+      )
+
+      list(
+        tool_name = tool_name,
+        tool_input = tool_input,
+        tool_annotations = tool_annotations
+      )
+    },
+
+    # Safely extract data from a tool result (handles S7 and malformed objects)
+    extract_tool_result_data = function(result) {
+      # Default values if extraction fails
+      tool_name <- "unknown"
+      tool_result <- NULL
+      tool_error <- NULL
+
+      # Check if we have a valid result object
+      if (is.null(result)) {
+        cli_warn("Tool result callback received NULL result")
+        return(list(
+          tool_name = tool_name,
+          tool_result = tool_result,
+          tool_error = "NULL result received"
+        ))
+      }
+
+      # Check if it's a ContentToolResult (S7 class)
+      if (!inherits(result, "ContentToolResult")) {
+        # Try to handle as a list-like object for backwards compatibility
+        cli_warn(c(
+          "Tool result is not a ContentToolResult",
+          "i" = "Got class: {.cls {class(result)}}"
+        ))
+
+        # Attempt list-style access
+        if (is.list(result)) {
+          tool_result <- result$value
+          tool_error <- result$error
+          if (!is.null(result$request)) {
+            tool_name <- result$request$name %||% "unknown"
+          }
+        }
+
+        return(list(
+          tool_name = tool_name,
+          tool_result = tool_result,
+          tool_error = tool_error
+        ))
+      }
+
+      # Extract from S7 object with error handling
+      # Tool name from request
+      tool_name <- tryCatch(
+        {
+          if (!is.null(result@request)) {
+            result@request@name %||% "unknown"
+          } else {
+            "unknown"
+          }
+        },
+        error = function(e) {
+          cli_warn("Failed to extract tool name from result: {e$message}")
+          "unknown"
+        }
+      )
+
+      # Tool result value
+      tool_result <- tryCatch(
+        result@value,
+        error = function(e) {
+          cli_warn("Failed to extract tool result value: {e$message}")
+          NULL
+        }
+      )
+
+      # Tool error
+      tool_error <- tryCatch(
+        result@error,
+        error = function(e) {
+          cli_warn("Failed to extract tool error: {e$message}")
+          NULL
+        }
+      )
+
+      list(
+        tool_name = tool_name,
+        tool_result = tool_result,
+        tool_error = tool_error
+      )
     },
 
     # Create a true coro generator for streaming events
