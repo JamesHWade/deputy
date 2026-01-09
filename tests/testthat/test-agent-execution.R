@@ -1,9 +1,10 @@
 # Tests for Agent run()/run_sync() execution flow
-# Note: These tests are limited because the mock chat doesn't provide
-# proper S7 Turn objects that the generator expects. More comprehensive
-# testing requires real API calls or a more sophisticated mock.
-
-# Note: create_mock_chat is defined in helper-mocks.R
+# The mock chat now provides proper S7 Turn objects for testing.
+# Helper functions for S7 mocks are defined in helper-mocks.R:
+# - create_mock_assistant_turn()
+# - create_mock_user_turn()
+# - create_mock_tool_request()
+# - create_mock_turn_with_tool_request()
 
 test_that("run_sync exists and is callable", {
   mock_chat <- create_mock_chat(responses = list("Test response"))
@@ -178,4 +179,95 @@ test_that("Agent run method returns a callable generator", {
 
   # Should be a function (generator)
   expect_true(is.function(gen))
+})
+
+# S7 Turn mock tests
+# Note: S7 classes use namespaced names like "ellmer::AssistantTurn"
+test_that("create_mock_assistant_turn creates valid S7 object", {
+  turn <- create_mock_assistant_turn(text = "Hello world")
+
+  # S7 objects have namespaced class names
+  expect_true(inherits(turn, "ellmer::AssistantTurn"))
+  expect_equal(turn@text, "Hello world")
+  expect_true(length(turn@contents) >= 1)
+  expect_true(inherits(turn@contents[[1]], "ellmer::ContentText"))
+})
+
+test_that("create_mock_user_turn creates valid S7 object", {
+  turn <- create_mock_user_turn(text = "User message")
+
+  expect_true(inherits(turn, "ellmer::UserTurn"))
+  expect_equal(turn@text, "User message")
+})
+
+test_that("create_mock_tool_request creates valid S7 object", {
+  request <- create_mock_tool_request(
+    id = "call_abc",
+    name = "read_file",
+    arguments = list(path = "test.txt")
+  )
+
+  expect_true(inherits(request, "ellmer::ContentToolRequest"))
+  expect_equal(request@id, "call_abc")
+  expect_equal(request@name, "read_file")
+  expect_equal(request@arguments$path, "test.txt")
+})
+
+test_that("create_mock_turn_with_tool_request creates turn with tool", {
+  turn <- create_mock_turn_with_tool_request(
+    tool_name = "write_file",
+    tool_args = list(path = "out.txt", content = "data")
+  )
+
+  expect_true(inherits(turn, "ellmer::AssistantTurn"))
+
+  # Find the tool request in contents using namespaced class
+  tool_requests <- Filter(
+    function(c) inherits(c, "ellmer::ContentToolRequest"),
+    turn@contents
+  )
+
+  expect_length(tool_requests, 1)
+  expect_equal(tool_requests[[1]]@name, "write_file")
+})
+
+test_that("mock chat last_turn returns proper S7 AssistantTurn", {
+  mock_chat <- create_mock_chat(responses = list("Test response"))
+  agent <- Agent$new(chat = mock_chat)
+
+  # Call chat to populate response
+  mock_chat$chat("prompt")
+
+  # Verify last_turn returns S7 object
+  last <- mock_chat$last_turn()
+  expect_true(inherits(last, "ellmer::AssistantTurn"))
+  expect_equal(last@text, "Test response")
+})
+
+test_that("mock chat stream returns ContentText objects", {
+  mock_chat <- create_mock_chat(responses = list("Streamed text"))
+
+  # Get stream iterator
+  stream_iter <- mock_chat$stream("prompt")
+
+  # First call should return ContentText
+  content <- stream_iter()
+  expect_true(inherits(content, "ellmer::ContentText"))
+  expect_equal(content@text, "Streamed text")
+
+  # Second call should be exhausted
+  next_val <- stream_iter()
+  expect_true(coro::is_exhausted(next_val))
+})
+
+test_that("Agent can access S7 turn properties via @ accessor", {
+  mock_chat <- create_mock_chat(responses = list("Response text"))
+  agent <- Agent$new(chat = mock_chat)
+
+  mock_chat$chat("prompt")
+  last <- agent$chat$last_turn()
+
+  # Should be able to access S7 properties
+  expect_equal(last@text, "Response text")
+  expect_true(is.list(last@contents))
 })

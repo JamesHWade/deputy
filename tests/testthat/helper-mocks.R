@@ -1,5 +1,70 @@
 # Shared test helpers for deputy
 
+# Helper to create a proper S7 AssistantTurn
+# Uses ellmer's actual constructors for compatibility
+create_mock_assistant_turn <- function(
+  text = "Hello!",
+  contents = NULL,
+  tokens = c(100, 50, 0),
+  cost = 0.001
+) {
+  # If no contents provided, create a ContentText
+
+  if (is.null(contents)) {
+    contents <- list(ellmer::ContentText(text))
+  }
+
+  ellmer::AssistantTurn(
+    contents = contents,
+    tokens = tokens,
+    cost = cost
+  )
+}
+
+# Helper to create a proper S7 UserTurn
+create_mock_user_turn <- function(text = "Hello") {
+  ellmer::UserTurn(
+    contents = list(ellmer::ContentText(text))
+  )
+}
+
+# Helper to create a ContentToolRequest
+create_mock_tool_request <- function(
+  id = "call_123",
+  name = "test_tool",
+  arguments = list()
+) {
+  ellmer::ContentToolRequest(
+    id = id,
+    name = name,
+    arguments = arguments
+  )
+}
+
+# Helper to create an AssistantTurn with a tool request
+create_mock_turn_with_tool_request <- function(
+  tool_name = "test_tool",
+  tool_args = list(),
+  text = ""
+) {
+  tool_request <- create_mock_tool_request(
+    id = paste0("call_", sample(1000:9999, 1)),
+    name = tool_name,
+    arguments = tool_args
+  )
+
+  contents <- list(tool_request)
+  if (nchar(text) > 0) {
+    contents <- c(list(ellmer::ContentText(text)), contents)
+  }
+
+  ellmer::AssistantTurn(
+    contents = contents,
+    tokens = c(100, 50, 0),
+    cost = 0.001
+  )
+}
+
 # Helper to create a mock Chat object for testing
 # This avoids the need for real API calls
 create_mock_chat <- function(responses = list("Hello!")) {
@@ -25,7 +90,7 @@ create_mock_chat <- function(responses = list("Hello!")) {
         if (response_idx > length(responses)) {
           response_idx <<- length(responses)
         }
-        # Return a simple iterator
+        # Return an iterator that yields ContentText objects
         text <- responses[[response_idx]]
         yielded <- FALSE
         function() {
@@ -33,7 +98,8 @@ create_mock_chat <- function(responses = list("Hello!")) {
             return(coro::exhausted())
           }
           yielded <<- TRUE
-          text
+          # Return a proper ContentText S7 object
+          ellmer::ContentText(text)
         }
       },
       get_turns = function() turns,
@@ -62,11 +128,9 @@ create_mock_chat <- function(responses = list("Hello!")) {
         list(name = "mock", model = "test-model")
       },
       last_turn = function(role = "assistant") {
-        # Return a mock turn with no tool requests
-        structure(
-          list(text = responses[[min(response_idx, length(responses))]]),
-          class = "AssistantTurn"
-        )
+        # Return a proper S7 AssistantTurn
+        text <- responses[[min(response_idx, length(responses))]]
+        create_mock_assistant_turn(text = text)
       },
       on_tool_request = function(callback) {
         tool_request_callback <<- callback
