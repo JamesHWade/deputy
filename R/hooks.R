@@ -13,7 +13,7 @@
 #' Callback signature: `function(tool_name, tool_input, context)`
 #' - `tool_name`: Name of the tool being called (character)
 #' - `tool_input`: Named list of arguments passed to the tool
-#' - `context`: List containing `working_dir` (current directory)
+#' - `context`: List containing `working_dir` and `tool_annotations` (if available)
 #' - Return: [HookResultPreToolUse()] to allow/deny
 #'
 #' **PostToolUse** - After a tool completes
@@ -48,20 +48,22 @@
 #' - `context`: List containing `working_dir`
 #' - Return: NULL (informational only)
 #'
-#' **PreCompact** - Before conversation compaction (future)
+#' **PreCompact** - Before conversation compaction
 #'
-#' Callback signature: `function(turns, context)`
-#' - `turns`: List of turns to be compacted
-#' - `context`: List containing `working_dir`, `token_count`
+#' Callback signature: `function(turns_to_compact, turns_to_keep, context)`
+#' - `turns_to_compact`: List of turns that will be compacted into a summary
+#' - `turns_to_keep`: List of recent turns that will be preserved
+#' - `context`: List containing `working_dir`, `total_turns`, `compact_count`
 #' - Return: [HookResultPreCompact()] to allow/cancel or provide custom summary
 #'
 #' @section Context Structure:
 #'
 #' The context parameter is always a named list. Common fields:
 #' - `working_dir`: The agent's current working directory
-#' - `total_turns`: (Stop only) Number of turns in the conversation
+#' - `tool_annotations`: (PreToolUse only) Tool annotations from ellmer if available
+#' - `total_turns`: (Stop, PreCompact) Number of turns in the conversation
 #' - `cost`: (Stop only) List with `total`, `input_tokens`, `output_tokens`
-#' - `token_count`: (PreCompact only) Current token count
+#' - `compact_count`: (PreCompact only) Number of turns being compacted
 #'
 #' @examples
 #' \dontrun{

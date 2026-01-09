@@ -521,7 +521,17 @@ Agent$set("public", "load_skill", function(skill) {
       # provider() returns a list with name and model
       provider_info$name
     },
-    error = function(e) NULL
+    error = function(e) {
+      # Log unexpected errors (not just "no provider configured")
+      if (!grepl("no provider|not configured", e$message, ignore.case = TRUE)) {
+        cli_warn(c(
+          "Could not determine provider for skill validation",
+          "x" = e$message,
+          "i" = "Provider compatibility check will be skipped"
+        ))
+      }
+      NULL
+    }
   )
 
   # Check requirements with provider
@@ -557,7 +567,24 @@ Agent$set("public", "load_skill", function(skill) {
       skill$tools,
       function(t) {
         # Handle both S7 (@ access) and list-style tools
-        tryCatch(t@name, error = function(e) t$name %||% "unknown")
+        tryCatch(
+          t@name,
+          error = function(e1) {
+            tryCatch(
+              t$name %||% {
+                cli_warn("Could not determine tool name for conflict detection")
+                "unknown"
+              },
+              error = function(e2) {
+                cli_warn(c(
+                  "Failed to extract tool name",
+                  "x" = e1$message
+                ))
+                "unknown"
+              }
+            )
+          }
+        )
       },
       character(1)
     )

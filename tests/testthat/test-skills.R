@@ -448,3 +448,49 @@ test_that("Skill with no tools does not trigger conflict check", {
     agent$load_skill(skill)
   )
 })
+
+test_that("Conflicting tool is actually replaced after load_skill", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Register original tool with description "Original"
+  tool1 <- ellmer::tool(
+    fun = function() "original_result",
+    name = "test_tool",
+    description = "Original"
+  )
+  mock_chat$register_tool(tool1)
+
+  # Verify original is registered
+  tools_before <- mock_chat$get_tools()
+  expect_true("test_tool" %in% names(tools_before))
+
+  # Load skill with replacement tool having description "Replacement"
+  tool2 <- ellmer::tool(
+    fun = function() "replacement_result",
+    name = "test_tool",
+    description = "Replacement"
+  )
+  skill <- skill_create(
+    name = "replace_skill",
+    tools = list(tool2)
+  )
+
+  suppressWarnings(agent$load_skill(skill))
+
+  # Verify the tool was actually replaced by checking the description
+  tools_after <- mock_chat$get_tools()
+  expect_true("test_tool" %in% names(tools_after))
+
+  # The new tool should have the "Replacement" description
+  # Access via S7 @description property
+  replaced_tool <- tools_after[["test_tool"]]
+  expect_true(inherits(replaced_tool, "ellmer::ToolDef"))
+
+  # Use tryCatch to handle potential S7 access differences
+  desc <- tryCatch(
+    replaced_tool@description,
+    error = function(e) replaced_tool$description
+  )
+  expect_equal(desc, "Replacement")
+})

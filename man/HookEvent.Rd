@@ -23,7 +23,7 @@ Callback signature: \verb{function(tool_name, tool_input, context)}
 \itemize{
 \item \code{tool_name}: Name of the tool being called (character)
 \item \code{tool_input}: Named list of arguments passed to the tool
-\item \code{context}: List containing \code{working_dir} (current directory)
+\item \code{context}: List containing \code{working_dir} and \code{tool_annotations} (if available)
 \item Return: \code{\link[=HookResultPreToolUse]{HookResultPreToolUse()}} to allow/deny
 }
 
@@ -67,12 +67,13 @@ Callback signature: \verb{function(prompt, context)}
 \item Return: NULL (informational only)
 }
 
-\strong{PreCompact} - Before conversation compaction (future)
+\strong{PreCompact} - Before conversation compaction
 
-Callback signature: \verb{function(turns, context)}
+Callback signature: \verb{function(turns_to_compact, turns_to_keep, context)}
 \itemize{
-\item \code{turns}: List of turns to be compacted
-\item \code{context}: List containing \code{working_dir}, \code{token_count}
+\item \code{turns_to_compact}: List of turns that will be compacted into a summary
+\item \code{turns_to_keep}: List of recent turns that will be preserved
+\item \code{context}: List containing \code{working_dir}, \code{total_turns}, \code{compact_count}
 \item Return: \code{\link[=HookResultPreCompact]{HookResultPreCompact()}} to allow/cancel or provide custom summary
 }
 }
@@ -83,9 +84,10 @@ Callback signature: \verb{function(turns, context)}
 The context parameter is always a named list. Common fields:
 \itemize{
 \item \code{working_dir}: The agent's current working directory
-\item \code{total_turns}: (Stop only) Number of turns in the conversation
+\item \code{tool_annotations}: (PreToolUse only) Tool annotations from ellmer if available
+\item \code{total_turns}: (Stop, PreCompact) Number of turns in the conversation
 \item \code{cost}: (Stop only) List with \code{total}, \code{input_tokens}, \code{output_tokens}
-\item \code{token_count}: (PreCompact only) Current token count
+\item \code{compact_count}: (PreCompact only) Number of turns being compacted
 }
 }
 

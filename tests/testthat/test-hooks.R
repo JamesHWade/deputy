@@ -411,6 +411,33 @@ test_that("hook_block_dangerous_bash accepts additional patterns", {
   )
 })
 
+test_that("hook_block_dangerous_bash is case-insensitive", {
+  hook <- hook_block_dangerous_bash()
+
+  # Uppercase variations should still be blocked
+  dangerous_uppercase <- c(
+    "SUDO apt install",
+    "RM -RF /tmp",
+    "CHMOD 777 file",
+    "SU - root",
+    "KILL -9 1234"
+  )
+
+  for (cmd in dangerous_uppercase) {
+    result <- hook$callback("run_bash", list(command = cmd), list())
+    expect_equal(
+      result$permission, "deny",
+      info = paste("Uppercase command should be blocked:", cmd)
+    )
+  }
+
+  # Mixed case
+  expect_equal(
+    hook$callback("run_bash", list(command = "SuDo rm -rf /"), list())$permission,
+    "deny"
+  )
+})
+
 test_that("hook_limit_file_writes restricts directory", {
   withr::local_tempdir(pattern = "deputy-test") -> temp_dir
   # Normalize to handle macOS /var -> /private/var symlink
@@ -572,6 +599,16 @@ test_that("HookResultPreCompact has correct structure", {
   )
   expect_false(result_with_summary$continue)
   expect_equal(result_with_summary$summary, "Custom summary")
+})
+
+test_that("HookResultSubagentStop has correct structure", {
+  result <- HookResultSubagentStop()
+  expect_s3_class(result, "HookResultSubagentStop")
+  expect_s3_class(result, "HookResult")
+  expect_true(result$handled)
+
+  result_unhandled <- HookResultSubagentStop(handled = FALSE)
+  expect_false(result_unhandled$handled)
 })
 
 test_that("Multiple hooks are called in order until non-NULL result", {
