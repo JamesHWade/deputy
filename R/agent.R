@@ -430,17 +430,26 @@ Agent <- R6::R6Class(
     #' @description
     #' Compact the conversation history to reduce context size.
     #'
-    #' This method fires the PreCompact hook before compacting, allowing
-    #' hooks to save important context or perform cleanup.
+    #' This method uses the LLM to generate a meaningful summary of older
+    #' conversation turns, then replaces them with the summary appended to
+    #' the system prompt. This preserves important context while reducing
+    #' token usage.
     #'
     #' @param keep_last Number of recent turns to keep uncompacted (default: 4)
-    #' @param summary Optional custom summary to use instead of auto-generating
+    #' @param summary Optional custom summary to use instead of auto-generating.
+    #'   If NULL, the LLM will generate a summary focusing on key decisions,
+    #'   findings, files discussed, and task progress.
     #' @return Invisible self
     #'
     #' @details
-    #' Compaction replaces older turns with a summary, reducing token usage
-    #' while preserving context. The PreCompact hook fires before this happens,
-    #' receiving the turns that will be compacted.
+    #' The compaction process:
+    #' 1. Fires the PreCompact hook (can cancel or provide custom summary)
+    #' 2. If no custom summary, uses LLM to summarize compacted turns
+    #' 3. Appends summary to system prompt under "Previous Conversation Summary"
+    #' 4. Keeps only the most recent `keep_last` turns
+    #'
+    #' If LLM summarization fails (e.g., no API key), falls back to a simple
+    #' text-based summary with truncated turn contents.
     compact = function(keep_last = 4, summary = NULL) {
       turns <- self$chat$get_turns()
 
@@ -476,32 +485,16 @@ Agent <- R6::R6Class(
 
       # Generate summary if not provided
       if (is.null(summary)) {
-        # Create a simple text summary of compacted turns
-        summary_parts <- vapply(
-          turns_to_compact,
-          function(turn) {
-            role <- if (inherits(turn, "UserTurn")) "User" else "Assistant"
-            text <- turn@text %||% "[no text]"
-            if (nchar(text) > 200) {
-              text <- paste0(substr(text, 1, 197), "...")
-            }
-            paste0(role, ": ", text)
-          },
-          character(1)
-        )
-
-        summary <- paste0(
-          "[Compacted ",
-          compact_count,
-          " earlier turns]\n\n",
-          paste(summary_parts, collapse = "\n\n")
-        )
+        # Check if hook provided a custom summary
+        if (!is.null(hook_result) && !is.null(hook_result$summary)) {
+          summary <- hook_result$summary
+        } else {
+          # Use LLM to generate a meaningful summary
+          summary <- private$generate_compaction_summary(turns_to_compact)
+        }
       }
 
-      # Create a new system turn with the summary and keep recent turns
-      # Note: This is a simplified approach - full implementation would
-
-      # use the LLM to generate a proper summary
+      # Add summary to system prompt and keep only recent turns
       current_system <- self$chat$get_system_prompt() %||% ""
       new_system <- paste0(
         current_system,
@@ -849,6 +842,146 @@ Agent <- R6::R6Class(
         return(NULL)
       }
       last@text
+    },
+
+    # Generate a summary of turns using the LLM
+    generate_compaction_summary = function(turns) {
+      # Helper to get turn text (handles both S7 and list objects)
+      get_turn_text <- function(turn) {
+        tryCatch(turn@text, error = function(e) turn$text) %||% "[no text]"
+      }
+
+      # Helper to get turn contents (handles both S7 and list objects)
+      get_turn_contents <- function(turn) {
+        tryCatch(turn@contents, error = function(e) turn$contents) %||% list()
+      }
+
+      # Format turns for summarization
+      turn_texts <- vapply(
+        turns,
+        function(turn) {
+          role <- if (inherits(turn, "UserTurn")) "User" else "Assistant"
+          text <- get_turn_text(turn)
+
+          # Include tool information if present
+          tool_info <- ""
+          if (inherits(turn, "AssistantTurn")) {
+            contents <- get_turn_contents(turn)
+            tool_requests <- Filter(
+              function(c) inherits(c, "ContentToolRequest"),
+              contents
+            )
+            if (length(tool_requests) > 0) {
+              tool_names <- vapply(
+                tool_requests,
+                function(t) tryCatch(t@name, error = function(e) t$name) %||% "unknown",
+                character(1)
+              )
+              tool_info <- paste0(" [Tools: ", paste(tool_names, collapse = ", "), "]")
+            }
+          }
+
+          paste0(role, tool_info, ": ", text)
+        },
+        character(1)
+      )
+
+      conversation_text <- paste(turn_texts, collapse = "\n\n")
+
+      # Create summarization prompt
+      summarization_prompt <- paste0(
+        "Summarize the following conversation excerpt concisely. ",
+        "Focus on:\n",
+        "1. Key decisions made\n",
+        "2. Important findings or results\n",
+        "3. Files created, modified, or discussed\n",
+        "4. Any errors encountered and how they were resolved\n",
+        "5. Current state/progress of the task\n\n",
+        "Keep the summary under 500 words. Be factual and specific.\n\n",
+        "Conversation to summarize:\n",
+        "---\n",
+        conversation_text,
+        "\n---\n\n",
+        "Summary:"
+      )
+
+      # Try to use the LLM for summarization
+      summary <- tryCatch(
+        {
+          # Create a temporary chat for summarization
+          # Use the same provider as the main chat
+          provider_info <- self$provider()
+
+          temp_chat <- tryCatch(
+            {
+              # Try to create a chat with the same provider
+              if (provider_info$name == "openai") {
+                ellmer::chat_openai(model = provider_info$model %||% "gpt-4o-mini")
+              } else if (provider_info$name == "anthropic") {
+                ellmer::chat_anthropic(model = provider_info$model %||% "claude-sonnet-4-5-20250929")
+              } else if (provider_info$name == "google") {
+                ellmer::chat_google(model = provider_info$model %||% "gemini-2.0-flash")
+              } else {
+                # Fallback to a default provider
+                ellmer::chat_openai(model = "gpt-4o-mini")
+              }
+            },
+            error = function(e) {
+              cli_warn(c(
+                "Could not create summarization chat",
+                "i" = "Falling back to text-based summary",
+                "x" = e$message
+              ))
+              NULL
+            }
+          )
+
+          if (is.null(temp_chat)) {
+            return(private$generate_fallback_summary(turns))
+          }
+
+          # Generate summary
+          response <- temp_chat$chat(summarization_prompt)
+          response
+        },
+        error = function(e) {
+          cli_warn(c(
+            "LLM summarization failed",
+            "i" = "Falling back to text-based summary",
+            "x" = e$message
+          ))
+          private$generate_fallback_summary(turns)
+        }
+      )
+
+      summary
+    },
+
+    # Fallback summary when LLM is unavailable
+    generate_fallback_summary = function(turns) {
+      summary_parts <- vapply(
+        turns,
+        function(turn) {
+          role <- if (inherits(turn, "UserTurn")) "User" else "Assistant"
+          # Handle both S7 objects (with @) and regular lists (with $)
+          text <- tryCatch(
+            turn@text,
+            error = function(e) turn$text
+          ) %||% "[no text]"
+          if (nchar(text) > 200) {
+            text <- paste0(substr(text, 1, 197), "...")
+          }
+          paste0(role, ": ", text)
+        },
+        character(1)
+      )
+
+      paste0(
+        "[Compacted ",
+        length(turns),
+        " earlier turns - LLM summary unavailable]\n\n",
+        paste(summary_parts, collapse = "\n\n")
+      )
     },
 
     # Storage for loaded skills

@@ -178,3 +178,70 @@ test_that("Agent print works", {
   expect_true(any(grepl("provider", output)))
   expect_true(any(grepl("mock", output)))
 })
+
+# Compaction tests
+test_that("compact method exists", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  expect_true("compact" %in% names(agent))
+  expect_true(is.function(agent$compact))
+})
+
+test_that("compact does nothing when not enough turns", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # With no turns, compact should do nothing
+  output <- capture.output(
+    result <- agent$compact(keep_last = 4),
+    type = "message"
+  )
+
+  expect_identical(result, agent)
+})
+
+test_that("compact accepts custom summary", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Add mock turns
+  mock_turns <- list(
+    structure(list(text = "Hello", contents = list()), class = c("UserTurn", "Turn")),
+    structure(list(text = "Hi", contents = list()), class = c("AssistantTurn", "Turn")),
+    structure(list(text = "Q1", contents = list()), class = c("UserTurn", "Turn")),
+    structure(list(text = "A1", contents = list()), class = c("AssistantTurn", "Turn")),
+    structure(list(text = "Q2", contents = list()), class = c("UserTurn", "Turn")),
+    structure(list(text = "A2", contents = list()), class = c("AssistantTurn", "Turn"))
+  )
+  mock_chat$set_turns(mock_turns)
+
+  # Compact with custom summary
+  suppressMessages({
+    agent$compact(keep_last = 2, summary = "Custom summary here")
+  })
+
+  # Verify system prompt was updated with custom summary
+  prompt <- mock_chat$get_system_prompt()
+  expect_true(grepl("Custom summary here", prompt))
+})
+
+test_that("generate_fallback_summary creates text summary", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Create mock turns (text inside the list, not as attribute)
+  mock_turns <- list(
+    structure(list(text = "User msg", contents = list()), class = c("UserTurn", "Turn")),
+    structure(list(text = "Asst msg", contents = list()), class = c("AssistantTurn", "Turn"))
+  )
+
+  # Access private method
+  fallback <- agent$.__enclos_env__$private$generate_fallback_summary(mock_turns)
+
+  expect_true(is.character(fallback))
+  expect_true(grepl("Compacted", fallback))
+  expect_true(grepl("2 earlier turns", fallback))
+  expect_true(grepl("User msg", fallback))
+  expect_true(grepl("Asst msg", fallback))
+})
