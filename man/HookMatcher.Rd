@@ -69,6 +69,7 @@ Create a new HookMatcher.
 \item PreToolUse: \verb{function(tool_name, tool_input, context)}
 \item PostToolUse: \verb{function(tool_name, tool_result, tool_error, context)}
 \item Stop: \verb{function(reason, context)}
+\item SubagentStop: \verb{function(agent_name, task, result, context)}
 \item UserPromptSubmit: \verb{function(prompt, context)}
 }}
 

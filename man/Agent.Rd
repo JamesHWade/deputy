@@ -390,8 +390,10 @@ Invisible self
 \subsection{Method \code{compact()}}{
 Compact the conversation history to reduce context size.
 
-This method fires the PreCompact hook before compacting, allowing
-hooks to save important context or perform cleanup.
+This method uses the LLM to generate a meaningful summary of older
+conversation turns, then replaces them with the summary appended to
+the system prompt. This preserves important context while reducing
+token usage.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Agent$compact(keep_last = 4, summary = NULL)}\if{html}{\out{</div>}}
 }
@@ -401,14 +403,23 @@ hooks to save important context or perform cleanup.
 \describe{
 \item{\code{keep_last}}{Number of recent turns to keep uncompacted (default: 4)}
 
-\item{\code{summary}}{Optional custom summary to use instead of auto-generating}
+\item{\code{summary}}{Optional custom summary to use instead of auto-generating.
+If NULL, the LLM will generate a summary focusing on key decisions,
+findings, files discussed, and task progress.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Details}{
-Compaction replaces older turns with a summary, reducing token usage
-while preserving context. The PreCompact hook fires before this happens,
-receiving the turns that will be compacted.
+The compaction process:
+\enumerate{
+\item Fires the PreCompact hook (can cancel or provide custom summary)
+\item If no custom summary, uses LLM to summarize compacted turns
+\item Appends summary to system prompt under "Previous Conversation Summary"
+\item Keeps only the most recent \code{keep_last} turns
+}
+
+If LLM summarization fails (e.g., no API key), falls back to a simple
+text-based summary with truncated turn contents.
 }
 
 \subsection{Returns}{

@@ -5,19 +5,112 @@
 \alias{HookEvent}
 \title{Hook events supported by deputy}
 \format{
-An object of class \code{character} of length 5.
+An object of class \code{character} of length 6.
 }
 \usage{
 HookEvent
 }
 \description{
-Hook events are fired at specific points during agent execution:
-\itemize{
-\item \code{"PreToolUse"} - Before a tool is executed (can deny)
-\item \code{"PostToolUse"} - After a tool completes
-\item \code{"Stop"} - When the agent stops
-\item \code{"UserPromptSubmit"} - When a user prompt is submitted
-\item \code{"PreCompact"} - Before conversation compaction (future)
+Hook events are fired at specific points during agent execution. Each event
+type has a specific callback signature and context structure.
 }
+\section{Event Types}{
+
+
+\strong{PreToolUse} - Before a tool is executed (can deny)
+
+Callback signature: \verb{function(tool_name, tool_input, context)}
+\itemize{
+\item \code{tool_name}: Name of the tool being called (character)
+\item \code{tool_input}: Named list of arguments passed to the tool
+\item \code{context}: List containing \code{working_dir} (current directory)
+\item Return: \code{\link[=HookResultPreToolUse]{HookResultPreToolUse()}} to allow/deny
+}
+
+\strong{PostToolUse} - After a tool completes
+
+Callback signature: \verb{function(tool_name, tool_result, tool_error, context)}
+\itemize{
+\item \code{tool_name}: Name of the tool that was called (character)
+\item \code{tool_result}: Result returned by the tool (or NULL on error)
+\item \code{tool_error}: Error message if tool failed (or NULL on success)
+\item \code{context}: List containing \code{working_dir} (current directory)
+\item Return: \code{\link[=HookResultPostToolUse]{HookResultPostToolUse()}} to continue/stop
+}
+
+\strong{Stop} - When the agent stops
+
+Callback signature: \verb{function(reason, context)}
+\itemize{
+\item \code{reason}: Why the agent stopped ("complete", "max_turns", "error")
+\item \code{context}: List containing \code{working_dir}, \code{total_turns}, \code{cost}
+\item Return: \code{\link[=HookResultStop]{HookResultStop()}}
+}
+
+\strong{SubagentStop} - When a sub-agent completes (LeadAgent only)
+
+Callback signature: \verb{function(agent_name, task, result, context)}
+\itemize{
+\item \code{agent_name}: Name of the sub-agent that completed (character)
+\item \code{task}: The task that was delegated (character)
+\item \code{result}: Result returned by the sub-agent
+\item \code{context}: List containing \code{working_dir}
+\item Return: \code{\link[=HookResultSubagentStop]{HookResultSubagentStop()}}
+}
+
+\strong{UserPromptSubmit} - When a user prompt is submitted
+
+Callback signature: \verb{function(prompt, context)}
+\itemize{
+\item \code{prompt}: The user's prompt text (character)
+\item \code{context}: List containing \code{working_dir}
+\item Return: NULL (informational only)
+}
+
+\strong{PreCompact} - Before conversation compaction (future)
+
+Callback signature: \verb{function(turns, context)}
+\itemize{
+\item \code{turns}: List of turns to be compacted
+\item \code{context}: List containing \code{working_dir}, \code{token_count}
+\item Return: \code{\link[=HookResultPreCompact]{HookResultPreCompact()}} to allow/cancel or provide custom summary
+}
+}
+
+\section{Context Structure}{
+
+
+The context parameter is always a named list. Common fields:
+\itemize{
+\item \code{working_dir}: The agent's current working directory
+\item \code{total_turns}: (Stop only) Number of turns in the conversation
+\item \code{cost}: (Stop only) List with \code{total}, \code{input_tokens}, \code{output_tokens}
+\item \code{token_count}: (PreCompact only) Current token count
+}
+}
+
+\examples{
+\dontrun{
+# PreToolUse callback example
+agent$add_hook(HookMatcher$new(
+  event = "PreToolUse",
+  callback = function(tool_name, tool_input, context) {
+    message("Tool: ", tool_name, " in ", context$working_dir)
+    HookResultPreToolUse(permission = "allow")
+  }
+))
+
+# PostToolUse callback example
+agent$add_hook(HookMatcher$new(
+  event = "PostToolUse",
+  callback = function(tool_name, tool_result, tool_error, context) {
+    if (!is.null(tool_error)) {
+      warning("Tool failed: ", tool_error)
+    }
+    HookResultPostToolUse()
+  }
+))
+}
+
 }
 \keyword{datasets}

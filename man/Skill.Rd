@@ -81,11 +81,19 @@ A new \code{Skill} object
 \subsection{Method \code{check_requirements()}}{
 Check if skill requirements are met.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Skill$check_requirements()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Skill$check_requirements(current_provider = NULL)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{current_provider}}{Optional current provider name for validation}
+}
+\if{html}{\out{</div>}}
+}
 \subsection{Returns}{
-List with \code{ok} (logical) and \code{missing} (character vector)
+List with \code{ok} (logical), \code{missing} (character vector), and
+\code{provider_mismatch} (logical)
 }
 }
 \if{html}{\out{<hr>}}

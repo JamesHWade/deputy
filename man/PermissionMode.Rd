@@ -19,4 +19,63 @@ Permission modes control the overall behavior of tool permission checking:
 \item \code{"bypassPermissions"} - Allow all tools (dangerous, use with caution)
 }
 }
+\section{Tool Annotations}{
+
+
+Permissions use tool annotations (from \code{\link[ellmer:tool_annotations]{ellmer::tool_annotations()}}) to
+determine tool behavior. Available annotations:
+
+\strong{read_only_hint} (logical, default: FALSE)
+
+Indicates the tool only reads data and doesn't modify state.
+Tools with \code{read_only_hint = TRUE} are allowed in \code{"readonly"} mode.
+Examples: \code{tool_read_file}, \code{tool_list_files}, \code{tool_search}
+
+\strong{destructive_hint} (logical, default: TRUE)
+
+Indicates the tool may cause destructive/irreversible changes.
+Tools with \code{destructive_hint = TRUE} require explicit permission.
+Examples: \code{tool_write_file}, \code{tool_delete_file}, \code{tool_run_bash}
+
+\strong{open_world_hint} (logical, default: FALSE)
+
+Indicates the tool may interact with external systems.
+Used for network calls, package installation, etc.
+Examples: \code{tool_web_search}, \code{tool_install_package}
+
+\strong{idempotent_hint} (logical, default: FALSE)
+
+Indicates repeated calls produce the same result.
+Safe to retry on failure.
+}
+
+\section{Creating Tools with Annotations}{
+
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{# Read-only tool
+tool_search <- ellmer::tool(
+  fun = function(pattern) grep(pattern, files),
+  name = "search",
+  description = "Search for pattern",
+  arguments = list(pattern = ellmer::type_string("Search pattern")),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = TRUE,
+    destructive_hint = FALSE
+  )
+)
+
+# Destructive tool
+tool_delete <- ellmer::tool(
+  fun = function(path) unlink(path),
+  name = "delete",
+  description = "Delete a file",
+  arguments = list(path = ellmer::type_string("File path")),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = FALSE,
+    destructive_hint = TRUE
+  )
+)
+}\if{html}{\out{</div>}}
+}
+
 \keyword{datasets}

@@ -3,13 +3,88 @@
 #' Hook events supported by deputy
 #'
 #' @description
-#' Hook events are fired at specific points during agent execution:
-#' * `"PreToolUse"` - Before a tool is executed (can deny)
-#' * `"PostToolUse"` - After a tool completes
-#' * `"Stop"` - When the agent stops
-#' * `"SubagentStop"` - When a sub-agent completes (LeadAgent only)
-#' * `"UserPromptSubmit"` - When a user prompt is submitted
-#' * `"PreCompact"` - Before conversation compaction (future)
+#' Hook events are fired at specific points during agent execution. Each event
+#' type has a specific callback signature and context structure.
+#'
+#' @section Event Types:
+#'
+#' **PreToolUse** - Before a tool is executed (can deny)
+#'
+#' Callback signature: `function(tool_name, tool_input, context)`
+#' - `tool_name`: Name of the tool being called (character)
+#' - `tool_input`: Named list of arguments passed to the tool
+#' - `context`: List containing `working_dir` (current directory)
+#' - Return: [HookResultPreToolUse()] to allow/deny
+#'
+#' **PostToolUse** - After a tool completes
+#'
+#' Callback signature: `function(tool_name, tool_result, tool_error, context)`
+#' - `tool_name`: Name of the tool that was called (character)
+#' - `tool_result`: Result returned by the tool (or NULL on error)
+#' - `tool_error`: Error message if tool failed (or NULL on success)
+#' - `context`: List containing `working_dir` (current directory)
+#' - Return: [HookResultPostToolUse()] to continue/stop
+#'
+#' **Stop** - When the agent stops
+#'
+#' Callback signature: `function(reason, context)`
+#' - `reason`: Why the agent stopped ("complete", "max_turns", "error")
+#' - `context`: List containing `working_dir`, `total_turns`, `cost`
+#' - Return: [HookResultStop()]
+#'
+#' **SubagentStop** - When a sub-agent completes (LeadAgent only)
+#'
+#' Callback signature: `function(agent_name, task, result, context)`
+#' - `agent_name`: Name of the sub-agent that completed (character)
+#' - `task`: The task that was delegated (character)
+#' - `result`: Result returned by the sub-agent
+#' - `context`: List containing `working_dir`
+#' - Return: [HookResultSubagentStop()]
+#'
+#' **UserPromptSubmit** - When a user prompt is submitted
+#'
+#' Callback signature: `function(prompt, context)`
+#' - `prompt`: The user's prompt text (character)
+#' - `context`: List containing `working_dir`
+#' - Return: NULL (informational only)
+#'
+#' **PreCompact** - Before conversation compaction (future)
+#'
+#' Callback signature: `function(turns, context)`
+#' - `turns`: List of turns to be compacted
+#' - `context`: List containing `working_dir`, `token_count`
+#' - Return: [HookResultPreCompact()] to allow/cancel or provide custom summary
+#'
+#' @section Context Structure:
+#'
+#' The context parameter is always a named list. Common fields:
+#' - `working_dir`: The agent's current working directory
+#' - `total_turns`: (Stop only) Number of turns in the conversation
+#' - `cost`: (Stop only) List with `total`, `input_tokens`, `output_tokens`
+#' - `token_count`: (PreCompact only) Current token count
+#'
+#' @examples
+#' \dontrun{
+#' # PreToolUse callback example
+#' agent$add_hook(HookMatcher$new(
+#'   event = "PreToolUse",
+#'   callback = function(tool_name, tool_input, context) {
+#'     message("Tool: ", tool_name, " in ", context$working_dir)
+#'     HookResultPreToolUse(permission = "allow")
+#'   }
+#' ))
+#'
+#' # PostToolUse callback example
+#' agent$add_hook(HookMatcher$new(
+#'   event = "PostToolUse",
+#'   callback = function(tool_name, tool_result, tool_error, context) {
+#'     if (!is.null(tool_error)) {
+#'       warning("Tool failed: ", tool_error)
+#'     }
+#'     HookResultPostToolUse()
+#'   }
+#' ))
+#' }
 #'
 #' @export
 HookEvent <- c(

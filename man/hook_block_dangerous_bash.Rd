@@ -4,24 +4,49 @@
 \alias{hook_block_dangerous_bash}
 \title{Create a hook that blocks dangerous bash commands}
 \usage{
-hook_block_dangerous_bash(
-  patterns = c("rm\\\\s+-rf", "sudo", "chmod\\\\s+777", "mkfs", "dd\\\\s+if=",
-    ">\\\\s*/dev/")
-)
+hook_block_dangerous_bash(patterns = NULL, additional_patterns = NULL)
 }
 \arguments{
-\item{patterns}{Character vector of regex patterns to block}
+\item{patterns}{Character vector of regex patterns to block.
+Default includes comprehensive dangerous patterns.}
+
+\item{additional_patterns}{Optional character vector of additional
+patterns to block alongside defaults.}
 }
 \value{
 A \link{HookMatcher} object
 }
 \description{
 Convenience function to create a PreToolUse hook that blocks potentially
-dangerous bash commands like \code{rm -rf}, \code{sudo}, etc.
+dangerous bash commands. Default patterns include:
+
+\strong{File system destruction:}
+\code{rm -rf}, \code{mkfs}, \verb{dd if=}, writes to \verb{/dev/}
+
+\strong{Privilege escalation:}
+\code{sudo}, \verb{su -}, \verb{chmod 777}, \code{chown}, \code{setuid}
+
+\strong{Code execution:}
+\code{eval}, \code{exec}, \code{source} (with variables), backticks
+
+\strong{Process manipulation:}
+\code{kill -9}, \code{killall}, \code{pkill}, fork bombs
+
+\strong{System modification:}
+\code{crontab}, \code{systemctl}, \verb{/etc/passwd}, \verb{/etc/shadow}
+
+\strong{Network exfiltration:}
+\verb{curl -X POST}, \code{wget --post}, \code{nc -e}, \code{netcat}, reverse shells
 }
 \examples{
 \dontrun{
+# Use default patterns
 agent$add_hook(hook_block_dangerous_bash())
+
+# Add custom patterns
+agent$add_hook(hook_block_dangerous_bash(
+  additional_patterns = c("my_custom_pattern", "another_pattern")
+))
 }
 
 }
