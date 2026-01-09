@@ -109,19 +109,20 @@ test_that("tool_list_files handles empty directory", {
 
 test_that("tool_run_r_code executes code", {
   skip_on_cran()
-  result <- tool_run_r_code("1 + 1", sandbox = FALSE)
+  # Note: sandbox parameter is no longer exposed (security fix)
+  result <- tool_run_r_code("1 + 1")
   expect_true(grepl("2", result))
 })
 
 test_that("tool_run_r_code captures output", {
   skip_on_cran()
-  result <- tool_run_r_code("print('hello')", sandbox = FALSE)
+  result <- tool_run_r_code("print('hello')")
   expect_true(grepl("hello", result))
 })
 
 test_that("tool_run_r_code handles errors", {
   skip_on_cran()
-  result <- tool_run_r_code("stop('test error')", sandbox = FALSE)
+  result <- tool_run_r_code("stop('test error')")
   expect_true(grepl("Error", result) || grepl("error", result))
 })
 

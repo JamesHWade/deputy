@@ -37,7 +37,11 @@ AgentEvent <- function(type, ...) {
       ),
       data
     ),
-    class = c(paste0("AgentEvent", tools::toTitleCase(type)), "AgentEvent", "list")
+    class = c(
+      paste0("AgentEvent", tools::toTitleCase(type)),
+      "AgentEvent",
+      "list"
+    )
   )
 }
 

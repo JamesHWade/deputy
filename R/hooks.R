@@ -12,8 +12,8 @@
 #'
 #' @export
 HookEvent <- c(
-"PreToolUse",
-"PostToolUse",
+  "PreToolUse",
+  "PostToolUse",
   "Stop",
   "UserPromptSubmit",
   "PreCompact"
@@ -226,7 +226,11 @@ HookMatcher <- R6::R6Class(
     print = function() {
       cat("<HookMatcher>\n")
       cat("  event:", self$event, "\n")
-      cat("  pattern:", if (is.null(self$pattern)) "<any>" else self$pattern, "\n")
+      cat(
+        "  pattern:",
+        if (is.null(self$pattern)) "<any>" else self$pattern,
+        "\n"
+      )
       cat("  timeout:", self$timeout, "seconds\n")
       invisible(self)
     }
@@ -314,6 +318,13 @@ HookRegistry <- R6::R6Class(
               "Hook {.val {event}} failed",
               "x" = e$message
             ))
+            # Fail-safe: deny for PreToolUse, NULL for others
+            if (event == "PreToolUse") {
+              return(HookResultPreToolUse(
+                permission = "deny",
+                reason = paste("Hook error:", e$message)
+              ))
+            }
             NULL
           }
         )
@@ -383,10 +394,15 @@ HookRegistry <- R6::R6Class(
 hook_log_tools <- function(verbose = FALSE) {
   HookMatcher$new(
     event = "PostToolUse",
-    timeout = 0,  # Run in main process for cli output
+    timeout = 0, # Run in main process for cli output
     callback = function(tool_name, tool_result, tool_error, context) {
       if (!is.null(tool_error)) {
-        cli::cli_alert_danger(paste0("Tool ", tool_name, " failed: ", tool_error))
+        cli::cli_alert_danger(paste0(
+          "Tool ",
+          tool_name,
+          " failed: ",
+          tool_error
+        ))
       } else {
         cli::cli_alert_success(paste0("Tool ", tool_name, " completed"))
         if (verbose && !is.null(tool_result)) {
@@ -415,14 +431,21 @@ hook_log_tools <- function(verbose = FALSE) {
 #'
 #' @export
 hook_block_dangerous_bash <- function(
-  patterns = c("rm\\s+-rf", "sudo", "chmod\\s+777", "mkfs", "dd\\s+if=", ">\\s*/dev/")
+  patterns = c(
+    "rm\\s+-rf",
+    "sudo",
+    "chmod\\s+777",
+    "mkfs",
+    "dd\\s+if=",
+    ">\\s*/dev/"
+  )
 ) {
   combined_pattern <- paste(patterns, collapse = "|")
 
   HookMatcher$new(
     event = "PreToolUse",
     pattern = "^(run_bash|bash|tool_run_bash)$",
-    timeout = 0,  # Run in main process
+    timeout = 0, # Run in main process
     callback = function(tool_name, tool_input, context) {
       command <- tool_input$command %||% ""
 
@@ -459,7 +482,7 @@ hook_limit_file_writes <- function(allowed_dir) {
   HookMatcher$new(
     event = "PreToolUse",
     pattern = "^(write_file|tool_write_file)$",
-    timeout = 0,  # Run in main process
+    timeout = 0, # Run in main process
     callback = function(tool_name, tool_input, context) {
       path <- tool_input$path %||% tool_input$file_path %||% ""
       full_path <- normalizePath(path, mustWork = FALSE)

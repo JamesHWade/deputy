@@ -176,7 +176,8 @@ LeadAgent <- R6::R6Class(
       }
 
       if (length(sub_agents) > 0) {
-        lines <- c(lines,
+        lines <- c(
+          lines,
           "# Available Sub-Agents",
           "",
           "You can delegate specialized tasks to these sub-agents using the",
@@ -185,14 +186,11 @@ LeadAgent <- R6::R6Class(
         )
 
         for (def in sub_agents) {
-          lines <- c(lines,
-            paste0("## ", def$name),
-            def$description,
-            ""
-          )
+          lines <- c(lines, paste0("## ", def$name), def$description, "")
         }
 
-        lines <- c(lines,
+        lines <- c(
+          lines,
           "When delegating, provide a clear task description. The sub-agent",
           "will complete the task and return results to you.",
           ""
@@ -221,8 +219,11 @@ LeadAgent <- R6::R6Class(
           if (is.null(def)) {
             available <- lead_agent$available_sub_agents()
             ellmer::tool_reject(paste0(
-              "Unknown agent: ", agent_name, ". ",
-              "Available agents: ", paste(available, collapse = ", ")
+              "Unknown agent: ",
+              agent_name,
+              ". ",
+              "Available agents: ",
+              paste(available, collapse = ", ")
             ))
           }
 
@@ -232,19 +233,33 @@ LeadAgent <- R6::R6Class(
           # Run the task
           cli::cli_alert_info("Delegating to {.val {agent_name}}: {task}")
 
-          result <- tryCatch({
-            sub_result <- sub_agent$run_sync(task)
-            sub_result$response
-          }, error = function(e) {
-            paste("Sub-agent error:", e$message)
-          })
+          result <- tryCatch(
+            {
+              sub_result <- sub_agent$run_sync(task)
+              sub_result$response
+            },
+            error = function(e) {
+              cli::cli_alert_danger(
+                "Sub-agent {.val {agent_name}} failed: {e$message}"
+              )
+              ellmer::tool_reject(paste0(
+                "Sub-agent '",
+                agent_name,
+                "' failed.\n",
+                "Error: ",
+                e$message
+              ))
+            }
+          )
 
           result
         },
         name = "delegate_to_agent",
         description = "Delegate a task to a specialized sub-agent. The sub-agent will complete the task and return results.",
         arguments = list(
-          agent_name = ellmer::type_string("Name of the sub-agent to delegate to"),
+          agent_name = ellmer::type_string(
+            "Name of the sub-agent to delegate to"
+          ),
           task = ellmer::type_string("The task to delegate to the sub-agent")
         ),
         annotations = ellmer::tool_annotations(

@@ -97,7 +97,10 @@ test_that("skill_load reads SKILL.md", {
   withr::local_tempdir(pattern = "deputy-test") -> temp_dir
 
   writeLines("name: test", file.path(temp_dir, "SKILL.yaml"))
-  writeLines("You are a helpful assistant.\n\nBe kind.", file.path(temp_dir, "SKILL.md"))
+  writeLines(
+    "You are a helpful assistant.\n\nBe kind.",
+    file.path(temp_dir, "SKILL.md")
+  )
 
   skill <- skill_load(temp_dir, check_requirements = FALSE)
 

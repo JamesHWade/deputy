@@ -7,12 +7,10 @@
 A tool definition created with \code{ellmer::tool()}.
 }
 \usage{
-tool_run_bash(command, timeout = 30)
+tool_run_bash(command)
 }
 \arguments{
 \item{command}{The bash command to execute (tool argument)}
-
-\item{timeout}{Timeout in seconds (tool argument)}
 }
 \description{
 A tool that executes bash/shell commands and returns the output.

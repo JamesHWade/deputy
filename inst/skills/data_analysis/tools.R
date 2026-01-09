@@ -8,11 +8,14 @@ tool_eda_summary <- ellmer::tool(
     # Get the data from the global environment
     # Note: This uses get() to access data by variable name, which is
     # necessary for the LLM to reference user's data frames
-    data <- tryCatch({
-      get(data_var, envir = globalenv())
-    }, error = function(e) {
-      ellmer::tool_reject(paste("Could not find data frame:", data_var))
-    })
+    data <- tryCatch(
+      {
+        get(data_var, envir = globalenv())
+      },
+      error = function(e) {
+        ellmer::tool_reject(paste("Could not find data frame:", data_var))
+      }
+    )
 
     if (!is.data.frame(data)) {
       ellmer::tool_reject("Input must be a data frame")
@@ -36,21 +39,31 @@ tool_eda_summary <- ellmer::tool(
 
       if (is.numeric(col_data)) {
         na_count <- sum(is.na(col_data))
-        lines <- c(lines, sprintf(
-          "  %s (%s): min=%.2f, max=%.2f, mean=%.2f, NA=%d",
-          col, col_class,
-          min(col_data, na.rm = TRUE),
-          max(col_data, na.rm = TRUE),
-          mean(col_data, na.rm = TRUE),
-          na_count
-        ))
+        lines <- c(
+          lines,
+          sprintf(
+            "  %s (%s): min=%.2f, max=%.2f, mean=%.2f, NA=%d",
+            col,
+            col_class,
+            min(col_data, na.rm = TRUE),
+            max(col_data, na.rm = TRUE),
+            mean(col_data, na.rm = TRUE),
+            na_count
+          )
+        )
       } else if (is.character(col_data) || is.factor(col_data)) {
         n_unique <- length(unique(col_data))
         na_count <- sum(is.na(col_data))
-        lines <- c(lines, sprintf(
-          "  %s (%s): %d unique values, NA=%d",
-          col, col_class, n_unique, na_count
-        ))
+        lines <- c(
+          lines,
+          sprintf(
+            "  %s (%s): %d unique values, NA=%d",
+            col,
+            col_class,
+            n_unique,
+            na_count
+          )
+        )
       } else {
         lines <- c(lines, sprintf("  %s (%s)", col, col_class))
       }
@@ -75,11 +88,14 @@ tool_eda_summary <- ellmer::tool(
 tool_describe_column <- ellmer::tool(
   fun = function(data_var, column) {
     # Get the data from global environment by variable name
-    data <- tryCatch({
-      get(data_var, envir = globalenv())
-    }, error = function(e) {
-      ellmer::tool_reject(paste("Could not find data frame:", data_var))
-    })
+    data <- tryCatch(
+      {
+        get(data_var, envir = globalenv())
+      },
+      error = function(e) {
+        ellmer::tool_reject(paste("Could not find data frame:", data_var))
+      }
+    )
 
     if (!is.data.frame(data)) {
       ellmer::tool_reject("Input must be a data frame")
@@ -107,7 +123,8 @@ tool_describe_column <- ellmer::tool(
     if (is.numeric(col_data)) {
       valid_data <- col_data[!is.na(col_data)]
       if (length(valid_data) > 0) {
-        lines <- c(lines,
+        lines <- c(
+          lines,
           "Numeric Statistics:",
           paste("  Min:", min(valid_data)),
           paste("  Max:", max(valid_data)),
@@ -126,7 +143,8 @@ tool_describe_column <- ellmer::tool(
       freq <- sort(table(valid_data), decreasing = TRUE)
       n_unique <- length(freq)
 
-      lines <- c(lines,
+      lines <- c(
+        lines,
         paste("Unique values:", n_unique),
         "",
         "Top values (frequency):"
@@ -147,11 +165,16 @@ tool_describe_column <- ellmer::tool(
     } else if (inherits(col_data, "Date") || inherits(col_data, "POSIXt")) {
       valid_data <- col_data[!is.na(col_data)]
       if (length(valid_data) > 0) {
-        lines <- c(lines,
+        lines <- c(
+          lines,
           "Date Range:",
           paste("  Earliest:", min(valid_data)),
           paste("  Latest:", max(valid_data)),
-          paste("  Span:", difftime(max(valid_data), min(valid_data), units = "days"), "days")
+          paste(
+            "  Span:",
+            difftime(max(valid_data), min(valid_data), units = "days"),
+            "days"
+          )
         )
       }
     }

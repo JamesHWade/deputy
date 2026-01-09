@@ -109,7 +109,7 @@ test_that("HookRegistry filters by tool name", {
   ))
   registry$add(HookMatcher$new(
     event = "PreToolUse",
-    callback = function(...) NULL  # No pattern - matches all
+    callback = function(...) NULL # No pattern - matches all
   ))
 
   # Should get write hook + universal hook
@@ -131,12 +131,14 @@ test_that("HookRegistry fire returns first non-NULL result", {
   registry$add(HookMatcher$new(
     event = "PreToolUse",
     timeout = 0,
-    callback = function(...) NULL  # Returns NULL
+    callback = function(...) NULL # Returns NULL
   ))
   registry$add(HookMatcher$new(
     event = "PreToolUse",
     timeout = 0,
-    callback = function(...) HookResultPreToolUse(permission = "deny", reason = "test")
+    callback = function(...) {
+      HookResultPreToolUse(permission = "deny", reason = "test")
+    }
   ))
 
   result <- registry$fire("PreToolUse", tool_name = "test")

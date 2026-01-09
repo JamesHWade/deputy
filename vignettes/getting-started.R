@@ -15,13 +15,13 @@ knitr::opts_chunk$set(
 
 ## -----------------------------------------------------------------------------
 # library(deputy)
-# 
+#
 # # Create an agent with file tools
 # agent <- Agent$new(
 #   chat = ellmer::chat("openai/gpt-4o"),
 #   tools = tools_file()
 # )
-# 
+#
 # # Run a task
 # result <- agent$run_sync("What R files are in the current directory?")
 # cat(result$response)
@@ -59,7 +59,7 @@ knitr::opts_chunk$set(
 #     paste("Weather in", location, "is sunny, 72F")
 #   }
 # )
-# 
+#
 # agent <- Agent$new(
 #   chat = ellmer::chat("openai/gpt-4o"),
 #   tools = list(tool_weather)
@@ -94,14 +94,14 @@ knitr::opts_chunk$set(
 # perms <- Permissions$new(
 #   file_read = TRUE,
 #   file_write = "/path/to/allowed/dir",  # Restrict to specific directory
-# 
+#
 #   bash = FALSE,
 #   r_code = TRUE,
 #   web = FALSE,
 #   max_turns = 10,
 #   max_cost_usd = 0.50
 # )
-# 
+#
 # agent <- Agent$new(
 #   chat = ellmer::chat("openai/gpt-4o"),
 #   permissions = perms
@@ -150,11 +150,11 @@ knitr::opts_chunk$set(
 ## -----------------------------------------------------------------------------
 # # Save the current session
 # agent$save_session("my_session.rds")
-# 
+#
 # # Later, restore it
 # agent2 <- Agent$new(chat = ellmer::chat("openai/gpt-4o"))
 # agent2$load_session("my_session.rds")
-# 
+#
 # # Continue the conversation
 # result <- agent2$run_sync("Continue where we left off...")
 
@@ -166,30 +166,30 @@ knitr::opts_chunk$set(
 #   prompt = "You are an expert R programmer. Analyze code for best practices.",
 #   tools = tools_file()
 # )
-# 
+#
 # data_agent <- agent_definition(
 #   name = "data_analyst",
 #   description = "Analyzes data files and provides statistical summaries",
 #   prompt = "You are a data analyst. Provide clear statistical insights.",
 #   tools = tools_data()
 # )
-# 
+#
 # # Create a lead agent that can delegate
 # lead <- LeadAgent$new(
 #   chat = ellmer::chat("openai/gpt-4o"),
 #   sub_agents = list(code_agent, data_agent),
 #   system_prompt = "You coordinate between specialized agents to complete tasks."
 # )
-# 
+#
 # # The lead agent will automatically delegate to sub-agents as needed
 # result <- lead$run_sync("Review the R code in src/ and analyze the data in data/")
 
 ## -----------------------------------------------------------------------------
 # result <- agent$run_sync("Analyze this project")
-# 
+#
 # # The final response
 # cat(result$response)
-# 
+#
 # # Cost information
 # result$cost
 # #> $input
@@ -198,15 +198,15 @@ knitr::opts_chunk$set(
 # #> [1] 450
 # #> $total
 # #> [1] 0.0045
-# 
+#
 # # Execution duration
 # result$duration
 # #> [1] 3.45  # seconds
-# 
+#
 # # Stop reason
 # result$stop_reason
 # #> [1] "complete"
-# 
+#
 # # All events (for detailed analysis)
 # length(result$events)
 # #> [1] 12
@@ -214,13 +214,13 @@ knitr::opts_chunk$set(
 ## -----------------------------------------------------------------------------
 # # OpenAI
 # agent <- Agent$new(chat = ellmer::chat("openai/gpt-4o"))
-# 
+#
 # # Anthropic
 # agent <- Agent$new(chat = ellmer::chat("anthropic/claude-sonnet-4-5-20250929"))
-# 
+#
 # # Google
 # agent <- Agent$new(chat = ellmer::chat("google/gemini-1.5-pro"))
-# 
+#
 # # Local models via Ollama
 # agent <- Agent$new(chat = ellmer::chat("ollama/llama3.1"))
 
@@ -235,7 +235,7 @@ knitr::opts_chunk$set(
 #     max_cost_usd = 1.00
 #   )
 # )
-# 
+#
 # agent$add_hook(HookMatcher$new(
 #   event = "PostToolUse",
 #   callback = function(tool_name, tool_result, context) {
@@ -243,8 +243,7 @@ knitr::opts_chunk$set(
 #     HookResultPostToolUse()
 #   }
 # ))
-# 
+#
 # for (event in agent$run("Organize the files in this directory")) {
 #   if (event$type == "text") cat(event$text)
 # }
-

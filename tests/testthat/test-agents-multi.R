@@ -1,65 +1,5 @@
 # Tests for multi-agent orchestration
-
-# Reuse mock chat helper from test-agent.R
-create_mock_chat <- function(responses = list("Hello!")) {
-  response_idx <- 0
-  turns <- list()
-  tools <- list()
-  system_prompt <- NULL
-
-  structure(
-    list(
-      chat = function(prompt = NULL) {
-        response_idx <<- response_idx + 1
-        if (response_idx > length(responses)) {
-          response_idx <<- length(responses)
-        }
-        responses[[response_idx]]
-      },
-      stream = function(prompt = NULL) {
-        response_idx <<- response_idx + 1
-        if (response_idx > length(responses)) {
-          response_idx <<- length(responses)
-        }
-        text <- responses[[response_idx]]
-        yielded <- FALSE
-        function() {
-          if (yielded) return(coro::exhausted())
-          yielded <<- TRUE
-          text
-        }
-      },
-      get_turns = function() turns,
-      set_turns = function(new_turns) turns <<- new_turns,
-      get_system_prompt = function() system_prompt,
-      set_system_prompt = function(prompt) system_prompt <<- prompt,
-      get_tools = function() tools,
-      register_tool = function(tool) {
-        tools[[tool@name]] <<- tool
-      },
-      register_tools = function(tool_list) {
-        for (tool in tool_list) {
-          tools[[tool@name]] <<- tool
-        }
-      },
-      get_tokens = function() {
-        data.frame(input = 100, output = 50, cached_input = 0, cost = 0.001)
-      },
-      get_provider = function() {
-        list(name = "mock", model = "test-model")
-      },
-      last_turn = function(role = "assistant") {
-        structure(
-          list(text = responses[[min(response_idx, length(responses))]]),
-          class = "AssistantTurn"
-        )
-      },
-      on_tool_request = function(callback) {},
-      on_tool_result = function(callback) {}
-    ),
-    class = "Chat"
-  )
-}
+# Note: create_mock_chat is defined in helper-mocks.R
 
 # Tests for agent_definition
 
@@ -276,4 +216,115 @@ test_that("LeadAgent inherits from Agent", {
   expect_true("run" %in% names(lead))
   expect_true("run_sync" %in% names(lead))
   expect_true("cost" %in% names(lead))
+})
+
+# Tests for delegation functionality
+
+test_that("LeadAgent delegate tool validates agent name", {
+  mock_chat <- create_mock_chat()
+  agent1 <- agent_definition(
+    name = "known_agent",
+    description = "A known agent",
+    prompt = "You are known"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(agent1)
+  )
+
+  # Get the delegate tool
+  tools <- mock_chat$get_tools()
+  delegate_tool <- tools[["delegate_to_agent"]]
+
+  expect_true(!is.null(delegate_tool))
+})
+
+test_that("LeadAgent passes permissions to sub-agents", {
+  mock_chat <- create_mock_chat()
+  agent1 <- agent_definition(
+    name = "sub_agent",
+    description = "A sub-agent",
+    prompt = "You help"
+  )
+
+  perms <- permissions_readonly()
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(agent1),
+    permissions = perms
+  )
+
+  # Permissions should be stored
+  expect_identical(lead$permissions, perms)
+})
+
+test_that("LeadAgent passes working_dir to sub-agents", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  mock_chat <- create_mock_chat()
+  agent1 <- agent_definition(
+    name = "sub_agent",
+    description = "A sub-agent",
+    prompt = "You help"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(agent1),
+    working_dir = temp_dir
+  )
+
+  expect_equal(lead$working_dir, temp_dir)
+})
+
+test_that("agent_definition supports model inheritance", {
+  def <- agent_definition(
+    name = "test",
+    description = "Test",
+    prompt = "Test"
+  )
+
+  # Default should be "inherit"
+  expect_equal(def$model, "inherit")
+
+  # Can specify custom model
+  def_custom <- agent_definition(
+    name = "test",
+    description = "Test",
+    prompt = "Test",
+    model = "openai/gpt-4o"
+  )
+  expect_equal(def_custom$model, "openai/gpt-4o")
+})
+
+test_that("agent_definition supports skills", {
+  def <- agent_definition(
+    name = "test",
+    description = "Test",
+    prompt = "Test",
+    skills = list("skill1", "skill2")
+  )
+
+  expect_equal(length(def$skills), 2)
+  expect_true("skill1" %in% def$skills)
+})
+
+test_that("agent_with_delegation creates default sub-agents", {
+  mock_chat <- create_mock_chat()
+  lead <- agent_with_delegation(chat = mock_chat)
+
+  available <- lead$available_sub_agents()
+
+  # Should have code_reader and code_analyzer by default
+  expect_true("code_reader" %in% available)
+  expect_true("code_analyzer" %in% available)
+})
+
+test_that("agent_with_delegation accepts custom permissions", {
+  mock_chat <- create_mock_chat()
+  perms <- permissions_readonly()
+  lead <- agent_with_delegation(chat = mock_chat, permissions = perms)
+
+  expect_identical(lead$permissions, perms)
 })

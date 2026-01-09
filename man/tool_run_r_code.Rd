@@ -7,14 +7,10 @@
 A tool definition created with \code{ellmer::tool()}.
 }
 \usage{
-tool_run_r_code(code, sandbox = TRUE, timeout = 30)
+tool_run_r_code(code)
 }
 \arguments{
 \item{code}{R code to execute (tool argument)}
-
-\item{sandbox}{If TRUE, run in a subprocess (tool argument)}
-
-\item{timeout}{Maximum execution time in seconds (tool argument)}
 }
 \description{
 A tool that executes R code and returns the result. By default, runs in

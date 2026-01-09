@@ -18,9 +18,14 @@ knitr::opts_chunk$set(
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/JamesHWade/deputy/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/JamesHWade/deputy/actions/workflows/R-CMD-check.yaml)
+[![pkgdown](https://github.com/JamesHWade/deputy/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/JamesHWade/deputy/actions/workflows/pkgdown.yaml)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![Codecov test coverage](https://codecov.io/gh/JamesHWade/deputy/graph/badge.svg)](https://app.codecov.io/gh/JamesHWade/deputy)
 <!-- badges: end -->
-deputy is an agentic AI framework for R built on [ellmer](https://ellmer.tidyverse.org/). It enables you to create AI agents that can use tools to accomplish multi-step tasks, with built-in support for permissions, hooks, and streaming output.
+
+deputy is an R implementation of [Anthropic's Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk), built on [ellmer](https://ellmer.tidyverse.org/). It enables you to create AI agents that can use tools to accomplish multi-step tasks, with built-in support for permissions, hooks, and streaming output.
+
+> **Note:** This package aims to bring the patterns and capabilities of the Claude Agent SDK to the R ecosystem. While inspired by Anthropic's SDK, deputy is provider-agnostic and works with any LLM that ellmer supports.
 
 ## Features
 - **Provider-agnostic** - Works with OpenAI, Anthropic, Google, Ollama, and any provider ellmer supports

@@ -61,9 +61,17 @@ test_that("AgentResult detects non-success states", {
 test_that("AgentResult tool_calls extracts correct events", {
   events <- list(
     AgentEvent("start", task = "test"),
-    AgentEvent("tool_start", tool_name = "read_file", tool_input = list(path = "test.txt")),
+    AgentEvent(
+      "tool_start",
+      tool_name = "read_file",
+      tool_input = list(path = "test.txt")
+    ),
     AgentEvent("text", text = "Reading file..."),
-    AgentEvent("tool_start", tool_name = "write_file", tool_input = list(path = "out.txt")),
+    AgentEvent(
+      "tool_start",
+      tool_name = "write_file",
+      tool_input = list(path = "out.txt")
+    ),
     AgentEvent("stop", reason = "complete")
   )
 

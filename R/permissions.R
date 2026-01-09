@@ -194,9 +194,23 @@ Permissions <- R6::R6Class(
 
       # Custom callback takes precedence
       if (!is.null(self$can_use_tool)) {
-        result <- self$can_use_tool(tool_name, tool_input, context)
+        result <- tryCatch(
+          self$can_use_tool(tool_name, tool_input, context),
+          error = function(e) {
+            cli_warn(c(
+              "Permission callback failed, denying for safety",
+              "x" = e$message
+            ))
+            PermissionResultDeny(reason = "Permission callback error")
+          }
+        )
         if (inherits(result, "PermissionResult")) {
           return(result)
+        } else {
+          cli_warn(
+            "Permission callback returned invalid type, denying for safety"
+          )
+          return(PermissionResultDeny(reason = "Invalid callback result"))
         }
       }
 
@@ -210,12 +224,20 @@ Permissions <- R6::R6Class(
       cat("<Permissions>\n")
       cat("  mode:", self$mode, "\n")
       cat("  file_read:", self$file_read, "\n")
-      cat("  file_write:", if (is.null(self$file_write)) "NULL" else self$file_write, "\n")
+      cat(
+        "  file_write:",
+        if (is.null(self$file_write)) "NULL" else self$file_write,
+        "\n"
+      )
       cat("  bash:", self$bash, "\n")
       cat("  r_code:", self$r_code, "\n")
       cat("  web:", self$web, "\n")
       cat("  max_turns:", self$max_turns, "\n")
-      cat("  max_cost_usd:", if (is.null(self$max_cost_usd)) "unlimited" else self$max_cost_usd, "\n")
+      cat(
+        "  max_cost_usd:",
+        if (is.null(self$max_cost_usd)) "unlimited" else self$max_cost_usd,
+        "\n"
+      )
       invisible(self)
     }
   ),
@@ -224,10 +246,15 @@ Permissions <- R6::R6Class(
     # Check if a tool is a write/execute tool
     is_write_tool = function(tool_name) {
       write_tools <- c(
-        "write_file", "tool_write_file",
-        "run_bash", "tool_run_bash", "bash",
-        "run_r_code", "tool_run_r_code",
-        "install_package", "tool_install_package"
+        "write_file",
+        "tool_write_file",
+        "run_bash",
+        "tool_run_bash",
+        "bash",
+        "run_r_code",
+        "tool_run_r_code",
+        "install_package",
+        "tool_install_package"
       )
       tool_name %in% write_tools
     },
@@ -235,7 +262,10 @@ Permissions <- R6::R6Class(
     # Tool-specific permission checks
     check_tool_specific = function(tool_name, tool_input, context) {
       # File read tools
-      if (tool_name %in% c("read_file", "tool_read_file", "list_files", "tool_list_files")) {
+      if (
+        tool_name %in%
+          c("read_file", "tool_read_file", "list_files", "tool_list_files")
+      ) {
         if (!self$file_read) {
           return(PermissionResultDeny(reason = "File reading is not allowed"))
         }
@@ -278,7 +308,9 @@ Permissions <- R6::R6Class(
       # Bash tools
       if (tool_name %in% c("run_bash", "tool_run_bash", "bash")) {
         if (!self$bash) {
-          return(PermissionResultDeny(reason = "Bash command execution is not allowed"))
+          return(PermissionResultDeny(
+            reason = "Bash command execution is not allowed"
+          ))
         }
         return(PermissionResultAllow())
       }
@@ -286,13 +318,18 @@ Permissions <- R6::R6Class(
       # R code tools
       if (tool_name %in% c("run_r_code", "tool_run_r_code")) {
         if (!self$r_code) {
-          return(PermissionResultDeny(reason = "R code execution is not allowed"))
+          return(PermissionResultDeny(
+            reason = "R code execution is not allowed"
+          ))
         }
         return(PermissionResultAllow())
       }
 
       # Web tools
-      if (tool_name %in% c("web_search", "tool_web_search", "web_fetch", "tool_web_fetch")) {
+      if (
+        tool_name %in%
+          c("web_search", "tool_web_search", "web_fetch", "tool_web_fetch")
+      ) {
         if (!self$web) {
           return(PermissionResultDeny(reason = "Web access is not allowed"))
         }
@@ -302,7 +339,9 @@ Permissions <- R6::R6Class(
       # Package installation
       if (tool_name %in% c("install_package", "tool_install_package")) {
         if (!self$install_packages) {
-          return(PermissionResultDeny(reason = "Package installation is not allowed"))
+          return(PermissionResultDeny(
+            reason = "Package installation is not allowed"
+          ))
         }
         return(PermissionResultAllow())
       }
@@ -381,7 +420,11 @@ permissions_readonly <- function(max_turns = 25) {
 #' perms$check("write_file", list(path = "output.txt"))
 #'
 #' @export
-permissions_standard <- function(working_dir = getwd(), max_turns = 25, max_cost_usd = NULL) {
+permissions_standard <- function(
+  working_dir = getwd(),
+  max_turns = 25,
+  max_cost_usd = NULL
+) {
   Permissions$new(
     mode = "default",
     file_read = TRUE,

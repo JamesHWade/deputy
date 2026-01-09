@@ -33,12 +33,16 @@ is_path_within <- function(path, dir) {
       # Reconstruct path piece by piece to find existing prefix
       for (i in seq_along(parts)) {
         prefix <- paste(parts[1:i], collapse = "/")
-        if (nchar(prefix) == 0) prefix <- "/"
+        if (nchar(prefix) == 0) {
+          prefix <- "/"
+        }
         if (!file.exists(prefix)) {
           # Previous prefix was the last existing one
           if (i > 1) {
             existing <- paste(parts[1:(i - 1)], collapse = "/")
-            if (nchar(existing) == 0) existing <- "/"
+            if (nchar(existing) == 0) {
+              existing <- "/"
+            }
             remaining <- paste(parts[i:length(parts)], collapse = "/")
             existing_normalized <- tryCatch(
               normalizePath(existing, mustWork = TRUE, winslash = "/"),
@@ -83,12 +87,12 @@ is_path_within <- function(path, dir) {
 #' @noRd
 has_path_traversal <- function(path) {
   if (is.null(path) || !is.character(path)) {
-    return(TRUE)  # Invalid input, treat as suspicious
+    return(TRUE) # Invalid input, treat as suspicious
   }
   # Check for traversal patterns that could escape directories
   # Note: Absolute paths are allowed and checked by is_path_within()
-  grepl("\\.\\.", path) ||  # Parent directory references (../escape.txt)
-    grepl("^~", path)       # Home directory expansion (~user/escape.txt)
+  grepl("\\.\\.", path) || # Parent directory references (../escape.txt)
+    grepl("^~", path) # Home directory expansion (~user/escape.txt)
 }
 
 #' Format cost as dollars

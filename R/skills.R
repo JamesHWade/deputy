@@ -156,7 +156,7 @@ skill_load <- function(path, check_requirements = TRUE) {
 
   # Check for SKILL.yaml
 
-yaml_path <- file.path(path, "SKILL.yaml")
+  yaml_path <- file.path(path, "SKILL.yaml")
   if (!file.exists(yaml_path)) {
     # Also check for skill.yaml (lowercase)
     yaml_path <- file.path(path, "skill.yaml")
@@ -255,39 +255,42 @@ load_skill_tools <- function(skill_path, tool_specs) {
     # Source the file in an environment that has access to ellmer
     # We use the deputy namespace as parent so ellmer is available
     tool_env <- new.env(parent = asNamespace("deputy"))
-    tryCatch({
-      source(tool_file, local = tool_env)
+    tryCatch(
+      {
+        source(tool_file, local = tool_env)
 
-      # Get the tool function
-      fn_name <- spec$`function`
-      if (!exists(fn_name, envir = tool_env)) {
+        # Get the tool function
+        fn_name <- spec$`function`
+        if (!exists(fn_name, envir = tool_env)) {
+          cli_warn(c(
+            "Function {.fn {fn_name}} not found in {.path {spec$file}}",
+            "i" = "Skipping tool: {.val {spec$name %||% fn_name}}"
+          ))
+          next
+        }
+
+        tool <- get(fn_name, envir = tool_env)
+        # Check for S7 ToolDef class (ellmer uses S7)
+        tool_class <- class(tool)
+        is_tool <- any(grepl("ToolDef", tool_class))
+        if (!is_tool) {
+          cli_warn(c(
+            "{.fn {fn_name}} is not a tool definition",
+            "i" = "Use {.fn ellmer::tool} to create tools",
+            "i" = "Skipping tool: {.val {spec$name %||% fn_name}}"
+          ))
+          next
+        }
+
+        tools <- c(tools, list(tool))
+      },
+      error = function(e) {
         cli_warn(c(
-          "Function {.fn {fn_name}} not found in {.path {spec$file}}",
-          "i" = "Skipping tool: {.val {spec$name %||% fn_name}}"
+          "Error loading tool from {.path {spec$file}}",
+          "x" = e$message
         ))
-        next
       }
-
-      tool <- get(fn_name, envir = tool_env)
-      # Check for S7 ToolDef class (ellmer uses S7)
-      tool_class <- class(tool)
-      is_tool <- any(grepl("ToolDef", tool_class))
-      if (!is_tool) {
-        cli_warn(c(
-          "{.fn {fn_name}} is not a tool definition",
-          "i" = "Use {.fn ellmer::tool} to create tools",
-          "i" = "Skipping tool: {.val {spec$name %||% fn_name}}"
-        ))
-        next
-      }
-
-      tools <- c(tools, list(tool))
-    }, error = function(e) {
-      cli_warn(c(
-        "Error loading tool from {.path {spec$file}}",
-        "x" = e$message
-      ))
-    })
+    )
   }
 
   tools
@@ -384,20 +387,30 @@ skills_list <- function(path = "skills") {
     if (file.exists(yaml_path)) {
       # Try to get the name from YAML
       name <- basename(dir)
-      tryCatch({
-        if (rlang::is_installed("yaml")) {
-          meta <- yaml::read_yaml(yaml_path)
-          name <- meta$name %||% basename(dir)
+      tryCatch(
+        {
+          if (rlang::is_installed("yaml")) {
+            meta <- yaml::read_yaml(yaml_path)
+            name <- meta$name %||% basename(dir)
+          }
+        },
+        error = function(e) {
+          cli_warn(c(
+            "Failed to parse SKILL.yaml in {.path {dir}}",
+            "x" = e$message,
+            "i" = "Using directory name as skill name"
+          ))
         }
-      }, error = function(e) {
-        # Use directory name as fallback
-      })
+      )
 
-      skills <- rbind(skills, data.frame(
-        name = name,
-        path = dir,
-        stringsAsFactors = FALSE
-      ))
+      skills <- rbind(
+        skills,
+        data.frame(
+          name = name,
+          path = dir,
+          stringsAsFactors = FALSE
+        )
+      )
     }
   }
 
@@ -409,13 +422,15 @@ skills_list <- function(path = "skills") {
 # Note: These methods are dynamically added and documented in the Agent class
 
 Agent$set("public", "load_skill", function(skill) {
-if (is.character(skill)) {
+  if (is.character(skill)) {
     # Load from path
     skill <- skill_load(skill)
   }
 
   if (!inherits(skill, "Skill")) {
-    cli_abort("{.arg skill} must be a Skill object or path to a skill directory")
+    cli_abort(
+      "{.arg skill} must be a Skill object or path to a skill directory"
+    )
   }
 
   # Check requirements

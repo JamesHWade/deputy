@@ -56,14 +56,16 @@ test_that("permission check blocks writes outside working_dir", {
   context <- list(working_dir = temp_dir)
 
   # Write inside working_dir - should allow
-  inside_result <- perms$check("write_file",
+  inside_result <- perms$check(
+    "write_file",
     list(path = file.path(temp_dir, "test.txt")),
     context
   )
   expect_s3_class(inside_result, "PermissionResultAllow")
 
   # Write outside working_dir - should deny
-  outside_result <- perms$check("write_file",
+  outside_result <- perms$check(
+    "write_file",
     list(path = "/tmp/outside.txt"),
     context
   )
@@ -77,10 +79,7 @@ test_that("permission check blocks path traversal", {
   context <- list(working_dir = temp_dir)
 
   # Path with .. should be denied
-  result <- perms$check("write_file",
-    list(path = "../escape.txt"),
-    context
-  )
+  result <- perms$check("write_file", list(path = "../escape.txt"), context)
   expect_s3_class(result, "PermissionResultDeny")
   expect_true(grepl("traversal", result$reason, ignore.case = TRUE))
 })
@@ -146,12 +145,18 @@ test_that("readonly mode uses annotations when available", {
   context <- list(working_dir = getwd())
 
   # Tool with read_only_hint should be allowed
-  read_only_context <- c(context, list(tool_annotations = list(read_only_hint = TRUE)))
+  read_only_context <- c(
+    context,
+    list(tool_annotations = list(read_only_hint = TRUE))
+  )
   result <- perms$check("unknown_tool", list(), read_only_context)
   expect_s3_class(result, "PermissionResultAllow")
 
   # Tool with destructive_hint should be denied
-  destructive_context <- c(context, list(tool_annotations = list(destructive_hint = TRUE)))
+  destructive_context <- c(
+    context,
+    list(tool_annotations = list(destructive_hint = TRUE))
+  )
   result <- perms$check("unknown_tool", list(), destructive_context)
   expect_s3_class(result, "PermissionResultDeny")
 })
@@ -161,12 +166,18 @@ test_that("default mode uses annotations for unknown tools", {
   context <- list(working_dir = getwd())
 
   # Unknown read-only tool should be allowed
-  read_only_context <- c(context, list(tool_annotations = list(read_only_hint = TRUE)))
+  read_only_context <- c(
+    context,
+    list(tool_annotations = list(read_only_hint = TRUE))
+  )
   result <- perms$check("custom_read_tool", list(), read_only_context)
   expect_s3_class(result, "PermissionResultAllow")
 
   # Open-world tool with web disabled should be denied
-  open_world_context <- c(context, list(tool_annotations = list(open_world_hint = TRUE)))
+  open_world_context <- c(
+    context,
+    list(tool_annotations = list(open_world_hint = TRUE))
+  )
   result <- perms$check("custom_web_tool", list(), open_world_context)
   expect_s3_class(result, "PermissionResultDeny")
 })

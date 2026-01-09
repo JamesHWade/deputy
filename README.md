@@ -1,24 +1,27 @@
+---
+output: github_document
+---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
+
+
 
 # deputy
 
 <!-- badges: start -->
-
 [![R-CMD-check](https://github.com/JamesHWade/deputy/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/JamesHWade/deputy/actions/workflows/R-CMD-check.yaml)
-[![Lifecycle:
-experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
-<!-- badges: end --> deputy is an agentic AI framework for R built on
-[ellmer](https://ellmer.tidyverse.org/). It enables you to create AI
-agents that can use tools to accomplish multi-step tasks, with built-in
-support for permissions, hooks, and streaming output.
+[![pkgdown](https://github.com/JamesHWade/deputy/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/JamesHWade/deputy/actions/workflows/pkgdown.yaml)
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![Codecov test coverage](https://codecov.io/gh/JamesHWade/deputy/graph/badge.svg)](https://app.codecov.io/gh/JamesHWade/deputy)
+<!-- badges: end -->
+
+deputy is an R implementation of [Anthropic's Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk), built on [ellmer](https://ellmer.tidyverse.org/). It enables you to create AI agents that can use tools to accomplish multi-step tasks, with built-in support for permissions, hooks, and streaming output.
+
+> **Note:** This package aims to bring the patterns and capabilities of the Claude Agent SDK to the R ecosystem. While inspired by Anthropic's SDK, deputy is provider-agnostic and works with any LLM that ellmer supports.
 
 ## Features
-
-- **Provider-agnostic** - Works with OpenAI, Anthropic, Google, Ollama,
-  and any provider ellmer supports
-- **Tool bundles** - Pre-built tools for file operations, code
-  execution, and data analysis
+- **Provider-agnostic** - Works with OpenAI, Anthropic, Google, Ollama, and any provider ellmer supports
+- **Tool bundles** - Pre-built tools for file operations, code execution, and data analysis
 - **Permission system** - Fine-grained control over what agents can do
 - **Hooks** - Intercept and customize agent behavior at key points
 - **Streaming output** - Real-time feedback as agents work
@@ -28,21 +31,21 @@ support for permissions, hooks, and streaming output.
 ## Installation
 
 You can install the development version of deputy from GitHub:
-
-``` r
+```r
 # install.packages("pak")
 pak::pak("JamesHWade/deputy")
 ```
 
-You’ll also need ellmer:
+You'll also need ellmer:
 
-``` r
+```r
 pak::pak("tidyverse/ellmer")
 ```
 
 ## Quick Start
 
 ### Create an Agent
+
 
 ``` r
 library(deputy)
@@ -62,6 +65,7 @@ cat(result$response)
 
 For real-time feedback as the agent works:
 
+
 ``` r
 for (event in agent$run("Analyze the structure of this project")) {
   switch(event$type,
@@ -75,6 +79,7 @@ for (event in agent$run("Analyze the structure of this project")) {
 ### Tools
 
 deputy provides convenient tool bundles:
+
 
 ``` r
 # File operations: read_file, write_file, list_files
@@ -93,6 +98,7 @@ tools_all()
 ### Permissions
 
 Control what your agent can do:
+
 
 ``` r
 # Read-only: no writes, no code execution
@@ -128,6 +134,7 @@ agent <- Agent$new(
 
 Intercept agent behavior:
 
+
 ``` r
 # Log all tool calls
 agent$add_hook(HookMatcher$new(
@@ -156,6 +163,7 @@ agent$add_hook(HookMatcher$new(
 
 Coordinate specialized agents:
 
+
 ``` r
 # Define sub-agents
 code_agent <- agent_definition(
@@ -178,6 +186,7 @@ result <- lead$run_sync("Review the R code in this project")
 
 deputy works with any LLM provider that ellmer supports:
 
+
 ``` r
 # OpenAI
 Agent$new(chat = ellmer::chat("openai/gpt-4o"))
@@ -195,8 +204,7 @@ Agent$new(chat = ellmer::chat("ollama/llama3.1"))
 ## Learn More
 
 - `vignette("getting-started")` - Comprehensive introduction
-- [ellmer documentation](https://ellmer.tidyverse.org/) - Underlying LLM
-  framework
+- [ellmer documentation](https://ellmer.tidyverse.org/) - Underlying LLM framework
 
 ## License
 
