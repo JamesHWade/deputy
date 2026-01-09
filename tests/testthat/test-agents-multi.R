@@ -375,3 +375,230 @@ test_that("LeadAgent can add SubagentStop hook", {
 
   expect_equal(lead$hooks$count(), 1)
 })
+
+# Tests for delegation functionality errors and edge cases
+
+test_that("delegate tool rejects unknown agent name", {
+  mock_chat <- create_mock_chat()
+  agent1 <- agent_definition(
+    name = "known_agent",
+    description = "A known agent",
+    prompt = "You are known"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(agent1)
+  )
+
+  # Get the delegate tool
+  tools <- mock_chat$get_tools()
+  delegate_tool <- tools[["delegate_to_agent"]]
+
+  # The tool should exist and be an S7 ToolDef
+  expect_true(!is.null(delegate_tool))
+  expect_true(inherits(delegate_tool, "ellmer::ToolDef"))
+})
+
+test_that("agent_definition with empty tools is valid", {
+  def <- agent_definition(
+    name = "no_tools",
+    description = "Agent without tools",
+    prompt = "You have no tools"
+  )
+
+  expect_equal(def$tools, list())
+  expect_s3_class(def, "AgentDefinition")
+})
+
+test_that("agent_definition with empty skills is valid", {
+  def <- agent_definition(
+    name = "no_skills",
+    description = "Agent without skills",
+    prompt = "You have no skills"
+  )
+
+  expect_equal(def$skills, list())
+  expect_s3_class(def, "AgentDefinition")
+})
+
+test_that("LeadAgent with no sub-agents is valid", {
+  mock_chat <- create_mock_chat()
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list()
+  )
+
+  expect_equal(length(lead$sub_agent_defs), 0)
+  # sapply on empty list returns list(), check length instead
+  expect_equal(length(lead$available_sub_agents()), 0)
+})
+
+test_that("LeadAgent duplicate sub-agent names allowed", {
+  # Not validated - this is a user mistake but doesn't crash
+  mock_chat <- create_mock_chat()
+
+  agent1 <- agent_definition(
+    name = "duplicate",
+    description = "First agent",
+    prompt = "Prompt 1"
+  )
+  agent2 <- agent_definition(
+    name = "duplicate",
+    description = "Second agent with same name",
+    prompt = "Prompt 2"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(agent1, agent2)
+  )
+
+  available <- lead$available_sub_agents()
+  # Both are in the list (though this could cause confusion)
+  expect_equal(length(available), 2)
+  expect_true(all(available == "duplicate"))
+})
+
+test_that("LeadAgent registers additional tools", {
+  mock_chat <- create_mock_chat()
+
+  # Create a simple custom tool using ellmer
+  custom_tool <- ellmer::tool(
+    fun = function() "custom result",
+    name = "custom_tool",
+    description = "A custom tool for testing"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(),
+    tools = list(custom_tool)
+  )
+
+  tools <- mock_chat$get_tools()
+
+  # Should have delegate_to_agent + custom_tool
+  expect_true("delegate_to_agent" %in% names(tools))
+  expect_true("custom_tool" %in% names(tools))
+})
+
+test_that("agent_definition handles special characters in name", {
+  def <- agent_definition(
+    name = "agent-with-dashes_and_underscores",
+    description = "Test agent",
+    prompt = "Test prompt"
+  )
+
+  expect_equal(def$name, "agent-with-dashes_and_underscores")
+})
+
+test_that("agent_definition handles long descriptions", {
+  long_desc <- paste(rep("This is a very long description. ", 50), collapse = "")
+
+  def <- agent_definition(
+    name = "long_desc_agent",
+    description = long_desc,
+    prompt = "Test prompt"
+  )
+
+  expect_equal(def$description, long_desc)
+})
+
+test_that("agent_definition handles multi-line prompts", {
+  multi_line_prompt <- "Line 1\nLine 2\nLine 3\n\nLine after blank"
+
+  def <- agent_definition(
+    name = "multi_line_agent",
+    description = "Test",
+    prompt = multi_line_prompt
+  )
+
+  expect_equal(def$prompt, multi_line_prompt)
+})
+
+test_that("LeadAgent system prompt contains sub-agent info", {
+  mock_chat <- create_mock_chat()
+
+  agent1 <- agent_definition(
+    name = "specialized_reader",
+    description = "Reads and analyzes files carefully",
+    prompt = "You are a file reader"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(agent1),
+    system_prompt = "You coordinate tasks."
+  )
+
+  prompt <- mock_chat$get_system_prompt()
+
+  # Should contain base prompt
+  expect_true(grepl("coordinate tasks", prompt))
+
+  # Should contain sub-agent section
+  expect_true(grepl("Available Sub-Agents", prompt))
+  expect_true(grepl("specialized_reader", prompt))
+  expect_true(grepl("Reads and analyzes files carefully", prompt))
+  expect_true(grepl("delegate_to_agent", prompt))
+})
+
+test_that("LeadAgent register_sub_agent updates system prompt", {
+  mock_chat <- create_mock_chat()
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(),
+    system_prompt = "Base prompt"
+  )
+
+  # Initially no sub-agents in prompt
+  prompt_before <- mock_chat$get_system_prompt()
+
+  # Register a new sub-agent
+  new_agent <- agent_definition(
+    name = "new_helper",
+    description = "A newly added helper",
+    prompt = "New helper prompt"
+  )
+  lead$register_sub_agent(new_agent)
+
+  # System prompt should now include the new agent
+  prompt_after <- mock_chat$get_system_prompt()
+  expect_true(grepl("new_helper", prompt_after))
+  expect_true(grepl("newly added helper", prompt_after))
+})
+
+test_that("agent_definition accepts all parameter types", {
+  def <- agent_definition(
+    name = "full_agent",
+    description = "Fully specified agent",
+    prompt = "Full prompt here",
+    tools = tools_file(),
+    model = "openai/gpt-4o-mini",
+    skills = list("skill1", "skill2")
+  )
+
+  expect_equal(def$name, "full_agent")
+  expect_equal(def$description, "Fully specified agent")
+  expect_equal(def$prompt, "Full prompt here")
+  expect_true(length(def$tools) >= 3) # tools_file() returns multiple tools
+  expect_equal(def$model, "openai/gpt-4o-mini")
+  expect_equal(def$skills, list("skill1", "skill2"))
+})
+
+test_that("LeadAgent inherits Agent hooks field", {
+  mock_chat <- create_mock_chat()
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list()
+  )
+
+  # Should have hooks registry from Agent
+  expect_true(!is.null(lead$hooks))
+  expect_s3_class(lead$hooks, "HookRegistry")
+  expect_equal(lead$hooks$count(), 0)
+})

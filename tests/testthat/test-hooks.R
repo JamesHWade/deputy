@@ -223,3 +223,227 @@ test_that("hook_limit_file_writes restricts directory", {
   )
   expect_equal(outside_result$permission, "deny")
 })
+
+# Hook timeout tests
+test_that("HookMatcher stores timeout value", {
+  hook <- HookMatcher$new(
+    event = "PreToolUse",
+    callback = function(...) NULL,
+    timeout = 10
+  )
+
+  expect_equal(hook$timeout, 10)
+
+  # Default timeout
+  hook_default <- HookMatcher$new(
+    event = "PreToolUse",
+    callback = function(...) NULL
+  )
+  expect_equal(hook_default$timeout, 30)
+})
+
+test_that("HookMatcher with timeout=0 runs in main process", {
+  # timeout=0 means run in main process (no callr)
+  # We test this by checking that side effects work
+  side_effect <- NULL
+
+  hook <- HookMatcher$new(
+    event = "PreToolUse",
+    timeout = 0,
+    callback = function(tool_name, tool_input, context) {
+      side_effect <<- "modified"
+      HookResultPreToolUse(permission = "allow")
+    }
+  )
+
+  registry <- HookRegistry$new()
+  registry$add(hook)
+  registry$fire("PreToolUse", tool_name = "test", tool_input = list(), context = list())
+
+  # Side effect should work with timeout=0 (main process)
+  expect_equal(side_effect, "modified")
+})
+
+test_that("Hook callback error returns deny for PreToolUse", {
+  hook <- HookMatcher$new(
+    event = "PreToolUse",
+    timeout = 0,
+    callback = function(...) {
+      stop("Callback error!")
+    }
+  )
+
+  registry <- HookRegistry$new()
+  registry$add(hook)
+
+  # Should get deny result with error message (and warning)
+  result <- NULL
+  expect_warning(
+    result <- registry$fire("PreToolUse", tool_name = "test", tool_input = list(), context = list()),
+    "Hook.*failed"
+  )
+
+  expect_s3_class(result, "HookResultPreToolUse")
+  expect_equal(result$permission, "deny")
+  expect_true(grepl("Callback error", result$reason))
+})
+
+test_that("Hook callback error returns NULL for PostToolUse", {
+  hook <- HookMatcher$new(
+    event = "PostToolUse",
+    timeout = 0,
+    callback = function(...) {
+      stop("PostToolUse error!")
+    }
+  )
+
+  registry <- HookRegistry$new()
+  registry$add(hook)
+
+  # PostToolUse errors return NULL (fail-safe)
+  result <- "not_null"
+  expect_warning(
+    result <- registry$fire(
+      "PostToolUse",
+      tool_name = "test",
+      tool_result = "result",
+      tool_error = NULL,
+      context = list()
+    ),
+    "Hook.*failed"
+  )
+
+  expect_null(result)
+})
+
+test_that("Hook callback error returns NULL for Stop event", {
+  hook <- HookMatcher$new(
+    event = "Stop",
+    timeout = 0,
+    callback = function(...) {
+      stop("Stop hook error!")
+    }
+  )
+
+  registry <- HookRegistry$new()
+  registry$add(hook)
+
+  # Stop hook errors return NULL
+  result <- "not_null"
+  expect_warning(
+    result <- registry$fire("Stop", reason = "complete", context = list()),
+    "Hook.*failed"
+  )
+
+  expect_null(result)
+})
+
+test_that("HookResultStop has correct structure", {
+  result <- HookResultStop()
+  expect_s3_class(result, "HookResultStop")
+  expect_s3_class(result, "HookResult")
+  expect_true(result$handled)
+
+  result_unhandled <- HookResultStop(handled = FALSE)
+  expect_false(result_unhandled$handled)
+})
+
+test_that("HookResultPreCompact has correct structure", {
+  result <- HookResultPreCompact()
+  expect_s3_class(result, "HookResultPreCompact")
+  expect_s3_class(result, "HookResult")
+  expect_true(result$continue)
+  expect_null(result$summary)
+
+  result_with_summary <- HookResultPreCompact(
+    continue = FALSE,
+    summary = "Custom summary"
+  )
+  expect_false(result_with_summary$continue)
+  expect_equal(result_with_summary$summary, "Custom summary")
+})
+
+test_that("Multiple hooks are called in order until non-NULL result", {
+  call_order <- c()
+
+  hook1 <- HookMatcher$new(
+    event = "PreToolUse",
+    timeout = 0,
+    callback = function(...) {
+      call_order <<- c(call_order, "hook1")
+      NULL # Return NULL to continue to next hook
+    }
+  )
+
+  hook2 <- HookMatcher$new(
+    event = "PreToolUse",
+    timeout = 0,
+    callback = function(...) {
+      call_order <<- c(call_order, "hook2")
+      HookResultPreToolUse(permission = "deny")
+    }
+  )
+
+  hook3 <- HookMatcher$new(
+    event = "PreToolUse",
+    timeout = 0,
+    callback = function(...) {
+      call_order <<- c(call_order, "hook3")
+      HookResultPreToolUse(permission = "allow")
+    }
+  )
+
+  registry <- HookRegistry$new()
+  registry$add(hook1)
+  registry$add(hook2)
+  registry$add(hook3)
+
+  result <- registry$fire("PreToolUse", tool_name = "test", tool_input = list(), context = list())
+
+  # hook3 should NOT be called because hook2 returned non-NULL
+  expect_equal(call_order, c("hook1", "hook2"))
+  expect_equal(result$permission, "deny")
+})
+
+test_that("HookRegistry print method works", {
+  registry <- HookRegistry$new()
+
+  registry$add(HookMatcher$new(
+    event = "PreToolUse",
+    callback = function(...) NULL
+  ))
+  registry$add(HookMatcher$new(
+    event = "PreToolUse",
+    callback = function(...) NULL
+  ))
+  registry$add(HookMatcher$new(
+    event = "PostToolUse",
+    callback = function(...) NULL
+  ))
+
+  output <- capture.output(print(registry))
+  output_text <- paste(output, collapse = "\n")
+
+  expect_true(grepl("HookRegistry", output_text))
+  expect_true(grepl("hooks:", output_text))
+  expect_true(grepl("3 registered", output_text))
+  expect_true(grepl("PreToolUse", output_text))
+  expect_true(grepl("PostToolUse", output_text))
+})
+
+test_that("HookMatcher print method works", {
+  hook <- HookMatcher$new(
+    event = "PreToolUse",
+    pattern = "^write",
+    callback = function(...) NULL,
+    timeout = 15
+  )
+
+  output <- capture.output(print(hook))
+  output_text <- paste(output, collapse = "\n")
+
+  expect_true(grepl("HookMatcher", output_text))
+  expect_true(grepl("PreToolUse", output_text))
+  expect_true(grepl("write", output_text))
+  expect_true(grepl("15", output_text))
+})
