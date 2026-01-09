@@ -321,3 +321,130 @@ test_that("Skill print includes provider info when present", {
 
   expect_true(grepl("test_skill", output_text))
 })
+
+# Tool name conflict detection tests
+test_that("Agent load_skill warns on tool name conflicts", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Create a tool with a specific name
+  tool1 <- ellmer::tool(
+    fun = function() "result1",
+    name = "conflicting_tool",
+    description = "First version"
+  )
+
+  # Register it directly
+  mock_chat$register_tool(tool1)
+
+  # Create a skill with the same tool name
+  tool2 <- ellmer::tool(
+    fun = function() "result2",
+    name = "conflicting_tool",
+    description = "Second version"
+  )
+
+  skill <- skill_create(
+    name = "conflict_skill",
+    tools = list(tool2)
+  )
+
+  # Should warn about the conflict
+  expect_warning(
+    agent$load_skill(skill),
+    "overwrites existing"
+  )
+})
+
+test_that("Agent load_skill does not warn without conflicts", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Create a tool
+  tool1 <- ellmer::tool(
+    fun = function() "result1",
+    name = "unique_tool_1",
+    description = "First tool"
+  )
+
+  skill <- skill_create(
+    name = "no_conflict_skill",
+    tools = list(tool1)
+  )
+
+  # Should succeed without conflict warnings
+  expect_no_warning(
+    agent$load_skill(skill)
+  )
+})
+
+test_that("Tool conflict detection reports all conflicts", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Register multiple tools
+  tool_a <- ellmer::tool(
+    fun = function() "a",
+    name = "tool_a",
+    description = "Tool A"
+  )
+  tool_b <- ellmer::tool(
+    fun = function() "b",
+    name = "tool_b",
+    description = "Tool B"
+  )
+
+  mock_chat$register_tools(list(tool_a, tool_b))
+
+  # Create a skill that conflicts with both
+  skill_tool_a <- ellmer::tool(
+    fun = function() "new_a",
+    name = "tool_a",
+    description = "New Tool A"
+  )
+  skill_tool_b <- ellmer::tool(
+    fun = function() "new_b",
+    name = "tool_b",
+    description = "New Tool B"
+  )
+  skill_tool_c <- ellmer::tool(
+    fun = function() "c",
+    name = "tool_c",
+    description = "Tool C (no conflict)"
+  )
+
+  skill <- skill_create(
+    name = "multi_conflict_skill",
+    tools = list(skill_tool_a, skill_tool_b, skill_tool_c)
+  )
+
+  # Should warn about both conflicts
+  warning_msg <- capture_warnings(agent$load_skill(skill))
+  expect_true(length(warning_msg) > 0)
+  expect_true(any(grepl("tool_a", warning_msg)))
+  expect_true(any(grepl("tool_b", warning_msg)))
+})
+
+test_that("Skill with no tools does not trigger conflict check", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Register a tool
+  tool1 <- ellmer::tool(
+    fun = function() "result",
+    name = "existing_tool",
+    description = "Existing tool"
+  )
+  mock_chat$register_tool(tool1)
+
+  # Create a skill without tools
+  skill <- skill_create(
+    name = "no_tools_skill",
+    description = "Skill without tools"
+  )
+
+  # Should succeed without warnings
+  expect_no_warning(
+    agent$load_skill(skill)
+  )
+})

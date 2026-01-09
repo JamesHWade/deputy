@@ -546,8 +546,32 @@ Agent$set("public", "load_skill", function(skill) {
     ))
   }
 
-  # Register tools
+  # Register tools with conflict detection
   if (length(skill$tools) > 0) {
+    # Get current tool names to detect conflicts
+    current_tools <- self$chat$get_tools()
+    current_tool_names <- names(current_tools)
+
+    # Get names of tools being registered
+    new_tool_names <- vapply(
+      skill$tools,
+      function(t) {
+        # Handle both S7 (@ access) and list-style tools
+        tryCatch(t@name, error = function(e) t$name %||% "unknown")
+      },
+      character(1)
+    )
+
+    # Check for conflicts
+    conflicts <- new_tool_names[new_tool_names %in% current_tool_names]
+    if (length(conflicts) > 0) {
+      cli_warn(c(
+        "Skill {.val {skill$name}} overwrites existing tool(s)",
+        "!" = "Conflicting tools: {.val {conflicts}}",
+        "i" = "Previous definitions will be replaced"
+      ))
+    }
+
     self$chat$register_tools(skill$tools)
   }
 
