@@ -75,7 +75,8 @@ For real-time feedback as the agent works:
 
 ``` r
 for (event in agent$run("Analyze the structure of this project")) {
-  switch(event$type,
+  switch(
+    event$type,
     "text" = cat(event$text),
     "tool_start" = message("Calling ", event$tool_name, "..."),
     "stop" = message("\nDone! Cost: $", round(event$cost$total, 4))
@@ -115,7 +116,7 @@ agent <- Agent$new(
 
 # Standard: file read/write in working dir, R code, no bash
 agent <- Agent$new(
- chat = ellmer::chat("openai"),
+  chat = ellmer::chat("openai"),
   tools = tools_file(),
   permissions = permissions_standard()
 )
@@ -177,6 +178,26 @@ agent$add_hook(HookMatcher$new(
     HookResultSessionEnd()
   }
 ))
+```
+
+### Error Handling
+
+deputy provides structured error types for programmatic error handling:
+
+``` r
+# Catch specific error types
+tryCatch(
+  agent$run_sync("task"),
+  deputy_budget_exceeded = function(e) {
+    message("Budget exceeded: $", e$current_cost, " > $", e$max_cost)
+  },
+  deputy_session_load = function(e) {
+    message("Failed to load session from: ", e$path)
+  },
+  deputy_error = function(e) {
+    message("Deputy error: ", conditionMessage(e))
+  }
+)
 ```
 
 ### Multi-Agent Systems

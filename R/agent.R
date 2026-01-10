@@ -325,17 +325,24 @@ Agent <- R6::R6Class(
     load_session = function(path, restore_tools = TRUE) {
       # Validate file exists
       if (!file.exists(path)) {
-        cli_abort("Session file not found: {.path {path}}")
+        abort_session_load(
+          "Session file not found: {.path {path}}",
+          path = path
+        )
       }
 
       # Load with error handling
       session <- tryCatch(
         readRDS(path),
         error = function(e) {
-          cli_abort(c(
-            "Failed to load session file",
-            "x" = e$message
-          ))
+          abort_session_load(
+            c(
+              "Failed to load session file",
+              "x" = e$message
+            ),
+            path = path,
+            parent = e
+          )
         }
       )
 
@@ -348,10 +355,13 @@ Agent <- R6::R6Class(
       )
       missing <- setdiff(required_fields, names(session))
       if (length(missing) > 0) {
-        cli_abort(c(
-          "Invalid session file - missing required fields",
-          "x" = "Missing: {.val {missing}}"
-        ))
+        abort_session_load(
+          c(
+            "Invalid session file - missing required fields",
+            "x" = "Missing: {.val {missing}}"
+          ),
+          path = path
+        )
       }
 
       # Check version compatibility
