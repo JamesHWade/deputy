@@ -7,7 +7,8 @@
 #'
 #' @param path Path to resolve
 #' @param max_depth Maximum recursion depth (default 20)
-#' @return Resolved path, or original path if not a symlink or resolution fails
+#' @return Resolved path, or `NA_character_` if path doesn't exist or resolution
+#'   fails. Callers should check for NA before using the result.
 #' @noRd
 resolve_symlinks <- function(path, max_depth = 20) {
   if (max_depth <= 0) {
@@ -15,9 +16,9 @@ resolve_symlinks <- function(path, max_depth = 20) {
     return(NA_character_)
   }
 
-  # Check if path exists and is a symlink
+ # Return NA if path doesn't exist - don't return unverified paths
   if (!file.exists(path)) {
-    return(path)
+    return(NA_character_)
   }
 
   info <- tryCatch(
@@ -25,8 +26,9 @@ resolve_symlinks <- function(path, max_depth = 20) {
     error = function(e) NULL
   )
 
+  # Return NA on any failure (permission denied, network issues, etc.)
   if (is.null(info) || is.na(info$isdir)) {
-    return(path)
+    return(NA_character_)
   }
 
   # Use Sys.readlink to check if it's a symlink

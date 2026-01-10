@@ -158,10 +158,10 @@ test_that("resolve_symlinks follows symlink chains", {
   expect_equal(normalizePath(resolved), normalizePath(real_file))
 })
 
-test_that("resolve_symlinks handles non-existent paths", {
-  # Non-existent path should return the path unchanged
+test_that("resolve_symlinks returns NA for non-existent paths", {
+  # Non-existent path should return NA (security: don't return unverified paths)
   result <- resolve_symlinks("/nonexistent/path")
-  expect_equal(result, "/nonexistent/path")
+  expect_true(is.na(result))
 })
 
 test_that("is_path_within blocks symlinks escaping directory", {
