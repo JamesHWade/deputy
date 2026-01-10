@@ -29,6 +29,15 @@ reference:
   contents:
   - starts_with("tool_")
   - starts_with("tools_")
+  - ToolPresets
+  - list_presets
+  - set_ask_user_callback
+
+- title: MCP Integration
+  desc: Model Context Protocol server support
+  contents:
+  - mcp_available
+  - mcp_servers
 
 - title: Permissions
 
@@ -64,6 +73,13 @@ reference:
   - LeadAgent
   - agent_definition
   - agent_with_delegation
+
+- title: Errors
+  desc: Error classes and constructors
+  contents:
+  - deputy-errors
+  - is_deputy_error
+  - starts_with("abort_")
 
 articles:
 - title: Getting Started
