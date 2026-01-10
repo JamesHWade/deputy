@@ -18,6 +18,7 @@ RoxygenNote: 7.3.3
 Suggests:
     callr,
     knitr,
+    Rapp,
     readr,
     rmarkdown,
     testthat (>= 3.0.0),
