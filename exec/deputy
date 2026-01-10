@@ -72,7 +72,20 @@ if (no_color) {
 }
 
 # Create chat object based on provider
+# Returns an ellmer chat object configured for the specified provider
 create_chat <- function(provider, model) {
+  known_providers <- c("anthropic", "openai", "google", "ollama")
+
+  # Warn about unknown providers
+
+  if (!provider %in% known_providers) {
+    cli::cli_warn(c(
+      "Unknown provider {.val {provider}}",
+      "i" = "Known providers: {.val {known_providers}}",
+      "i" = "Attempting generic chat interface..."
+    ))
+  }
+
   # Set default models per provider if not specified
   if (is.null(model)) {
     model <- switch(provider,
@@ -80,7 +93,7 @@ create_chat <- function(provider, model) {
       openai = "gpt-4o",
       google = "gemini-2.0-flash",
       ollama = "llama3.2",
-      model  # fallback to whatever was specified
+      "default"
     )
   }
 
@@ -107,12 +120,13 @@ get_tools <- function(preset, include_ask = TRUE) {
 }
 
 # Get permissions based on mode
-get_permissions <- function(mode, working_dir) {
+# Pass max_turns and max_cost during construction (Permissions are immutable after creation)
+get_permissions <- function(mode, working_dir, max_turns = 25L, max_cost = NULL) {
   switch(mode,
-    standard = permissions_standard(working_dir),
-    readonly = permissions_readonly(),
-    full = permissions_full(),
-    permissions_standard(working_dir)  # default
+    standard = permissions_standard(working_dir, max_turns = max_turns, max_cost_usd = max_cost),
+    readonly = permissions_readonly(max_turns = max_turns),
+    full = permissions_full(max_turns = max_turns, max_cost_usd = max_cost),
+    permissions_standard(working_dir, max_turns = max_turns, max_cost_usd = max_cost)
   )
 }
 
@@ -150,8 +164,7 @@ print_welcome <- function(agent, provider, model_name, tools_preset, perm_mode) 
     "*" = "Working dir: {.path {agent$working_dir}}"
   ))
   cli::cli_text("")
-  cli::cli_alert_info("Type your message and press Enter. Type {.kbd /quit} to exit.")
-  cli::cli_alert_info("Commands: {.kbd /quit}, {.kbd /save <path>}, {.kbd /clear}, {.kbd /help}")
+  cli::cli_alert_info("Type your message and press Enter. Type {.kbd /help} for commands.")
   cli::cli_text("")
 }
 
@@ -179,7 +192,16 @@ process_command <- function(input, agent) {
       } else {
         path <- args[1]
       }
-      agent$save_session(path)
+      tryCatch(
+        {
+          agent$save_session(path)
+          cli::cli_alert_success("Session saved to {.path {path}}")
+        },
+        error = function(e) {
+          cli::cli_alert_danger("Failed to save session: {e$message}")
+          cli::cli_alert_info("Check the path is writable: {.path {path}}")
+        }
+      )
       return(list(is_command = TRUE, action = "continue"))
     },
 
@@ -190,8 +212,24 @@ process_command <- function(input, agent) {
     },
 
     "/compact" = {
-      keep <- if (length(args) > 0) as.integer(args[1]) else 4L
-      agent$compact(keep_last = keep)
+      keep <- 4L
+      if (length(args) > 0) {
+        parsed <- suppressWarnings(as.integer(args[1]))
+        if (is.na(parsed) || parsed < 1) {
+          cli::cli_alert_warning("Invalid keep value: {.val {args[1]}}. Using default (4)")
+        } else {
+          keep <- parsed
+        }
+      }
+      tryCatch(
+        {
+          agent$compact(keep_last = keep)
+          cli::cli_alert_success("Conversation compacted (kept {.val {keep}} recent turns)")
+        },
+        error = function(e) {
+          cli::cli_alert_danger("Compaction failed: {e$message}")
+        }
+      )
       return(list(is_command = TRUE, action = "continue"))
     },
 
@@ -217,9 +255,9 @@ process_command <- function(input, agent) {
       cli::cli_h3("Available Commands")
       cli::cli_bullets(c(
         "*" = "{.kbd /quit} or {.kbd /exit} - Exit the CLI",
-        "*" = "{.kbd /save [path]} - Save session to file",
+        "*" = "{.kbd /save [path]} - Save session (default: deputy_session_<timestamp>.rds)",
         "*" = "{.kbd /clear} - Clear conversation history",
-        "*" = "{.kbd /compact [keep]} - Compact conversation (keep N recent turns)",
+        "*" = "{.kbd /compact [n]} - Compact conversation, keep n recent turns (default: 4)",
         "*" = "{.kbd /cost} - Show cost summary",
         "*" = "{.kbd /turns} - Show turn count",
         "*" = "{.kbd /help} - Show this help"
@@ -250,8 +288,11 @@ run_task <- function(agent, task_text, verbose) {
         }
       },
       "tool_end" = {
-        if (verbose && !is.null(event$error)) {
-          cli::cli_alert_danger("Tool error: {event$error}")
+        # Always show tool errors, not just in verbose mode
+        if (!is.null(event$error)) {
+          cli::cli_alert_danger("Tool {.fn {event$tool_name}} failed: {event$error}")
+        } else if (verbose) {
+          cli::cli_alert_success("Done: {.fn {event$tool_name}}")
         }
       },
       "stop" = {
@@ -269,16 +310,21 @@ run_task <- function(agent, task_text, verbose) {
 # Interactive chat loop
 run_interactive <- function(agent, verbose) {
   repeat {
-    # Read user input
+    # Read user input with improved error handling
     input <- tryCatch(
       readline(prompt = cli::col_cyan("> ")),
       error = function(e) {
-        # Handle EOF (Ctrl+D)
+        # Check for EOF-like errors
+        if (grepl("EOF|end of file|connection", e$message, ignore.case = TRUE)) {
+          return(NULL)
+        }
+        # Log unexpected errors before treating as exit
+        cli::cli_alert_warning("Input error: {e$message}")
         return(NULL)
       }
     )
 
-    # Handle EOF
+    # Handle EOF or input error
     if (is.null(input)) {
       cli::cli_text("")
       cli::cli_alert_info("Goodbye!")
@@ -314,12 +360,11 @@ run_interactive <- function(agent, verbose) {
           }
         },
         "tool_end" = {
-          if (verbose) {
-            if (!is.null(event$error)) {
-              cli::cli_alert_danger("Error: {event$error}")
-            } else {
-              cli::cli_alert_success("Done: {.fn {event$tool_name}}")
-            }
+          # Always show tool errors, not just in verbose mode
+          if (!is.null(event$error)) {
+            cli::cli_alert_danger("Tool {.fn {event$tool_name}} failed: {event$error}")
+          } else if (verbose) {
+            cli::cli_alert_success("Done: {.fn {event$tool_name}}")
           }
         },
         "stop" = {
@@ -337,58 +382,51 @@ run_interactive <- function(agent, verbose) {
 
 # --- Main execution ---
 
-# Build the agent
-tryCatch({
-  chat <- create_chat(provider, model)
-  agent_tools <- get_tools(tools, include_ask = !no_ask)
-  agent_permissions <- get_permissions(permissions, dir)
-
-  # Apply max cost if specified
-  if (!is.null(max_cost)) {
-    agent_permissions$max_cost_usd <- max_cost
+# Create chat object (wrap in tryCatch for credential errors)
+chat <- tryCatch(
+  create_chat(provider, model),
+  error = function(e) {
+    cli::cli_abort(c(
+      "Failed to connect to provider",
+      "x" = e$message,
+      "i" = "Check your provider credentials and configuration"
+    ))
   }
-  agent_permissions$max_turns <- max_turns
+)
 
-  # Get system prompt
-  sys_prompt <- get_system_prompt(system_prompt, system_prompt_file)
+# Build components
+agent_tools <- get_tools(tools, include_ask = !no_ask)
+agent_permissions <- get_permissions(permissions, dir, max_turns = max_turns, max_cost = max_cost)
+sys_prompt <- get_system_prompt(system_prompt, system_prompt_file)
 
-  # Create agent
-  agent <- Agent$new(
-    chat = chat,
-    tools = agent_tools,
-    system_prompt = sys_prompt,
-    permissions = agent_permissions,
-    working_dir = dir
-  )
+# Create agent
+agent <- Agent$new(
+  chat = chat,
+  tools = agent_tools,
+  system_prompt = sys_prompt,
+  permissions = agent_permissions,
+  working_dir = dir
+)
 
-  # Load session if specified
-  if (!is.null(session)) {
-    if (file.exists(session)) {
-      agent$load_session(session)
-    } else {
-      cli::cli_alert_warning("Session file not found: {.path {session}}")
-    }
+# Load session if specified
+if (!is.null(session)) {
+  if (!file.exists(session)) {
+    cli::cli_abort("Session file not found: {.path {session}}")
   }
+  agent$load_session(session)
+}
 
-  # Run in appropriate mode
-  if (!is.null(task)) {
-    # Single task mode
-    run_task(agent, task, verbose)
-  } else {
-    # Interactive mode
-    print_welcome(agent, provider, model, tools, permissions)
-    run_interactive(agent, verbose)
-  }
+# Run in appropriate mode
+if (!is.null(task)) {
+  # Single task mode
+  run_task(agent, task, verbose)
+} else {
+  # Interactive mode
+  print_welcome(agent, provider, model, tools, permissions)
+  run_interactive(agent, verbose)
+}
 
-  # Save session on exit if specified
-  if (!is.null(save_session)) {
-    agent$save_session(save_session)
-  }
-
-}, error = function(e) {
-  cli::cli_abort(c(
-    "Failed to start deputy",
-    "x" = e$message,
-    "i" = "Check your provider credentials and configuration"
-  ))
-})
+# Save session on exit if specified
+if (!is.null(save_session)) {
+  agent$save_session(save_session)
+}

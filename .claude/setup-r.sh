@@ -12,7 +12,15 @@ sudo apt-get update -qq
 sudo apt-get install -y -qq r-base r-base-dev
 
 # Install Air (R formatter from Posit)
-curl -LsSf https://github.com/posit-dev/air/releases/latest/download/air-installer.sh | sh
+# Download first, then execute (safer than curl|sh)
+air_installer="/tmp/air-installer.sh"
+if curl -LsSf https://github.com/posit-dev/air/releases/latest/download/air-installer.sh -o "$air_installer"; then
+  chmod +x "$air_installer"
+  "$air_installer"
+  rm -f "$air_installer"
+else
+  echo "Warning: Failed to download Air installer" >&2
+fi
 
 # Persist PATH for subsequent bash commands in this session
 if [ -n "$CLAUDE_ENV_FILE" ]; then
