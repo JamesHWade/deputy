@@ -55,6 +55,17 @@ the agent can request clarification or choices from the user.</p>
     <p>A tool definition created with <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code>.</p>
     </div>
     <div class="section level2">
+    <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
+
+
+<dl><dt id="arg-questions">questions<a class="anchor" aria-label="anchor" href="#arg-questions"></a></dt>
+<dd><p>JSON string or list of question objects following the SDK format.
+Each question should have: <code>question</code> (string), <code>header</code> (string, max 12 chars),
+<code>options</code> (list of objects with <code>label</code> and <code>description</code>), and optionally
+<code>multiSelect</code> (logical).</p></dd>
+
+</dl></div>
+    <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>This tool follows the Anthropic Agent SDK format:</p>
 <p><strong>Input format:</strong></p><ul><li><p><code>questions</code>: Array of 1-4 question objects</p></li>
