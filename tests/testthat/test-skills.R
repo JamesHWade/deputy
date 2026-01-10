@@ -323,7 +323,7 @@ test_that("Skill print includes provider info when present", {
 })
 
 # Tool name conflict detection tests
-test_that("Agent load_skill warns on tool name conflicts", {
+test_that("Agent load_skill errors on tool name conflicts by default", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)
 
@@ -349,9 +349,42 @@ test_that("Agent load_skill warns on tool name conflicts", {
     tools = list(tool2)
   )
 
-  # Should warn about the conflict
-  expect_warning(
+  # Should error about the conflict by default
+  expect_error(
     agent$load_skill(skill),
+    "conflicts with existing"
+  )
+})
+
+test_that("Agent load_skill warns and proceeds with allow_conflicts = TRUE", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  # Create a tool with a specific name
+  tool1 <- ellmer::tool(
+    fun = function() "result1",
+    name = "conflicting_tool",
+    description = "First version"
+  )
+
+  # Register it directly
+  mock_chat$register_tool(tool1)
+
+  # Create a skill with the same tool name
+  tool2 <- ellmer::tool(
+    fun = function() "result2",
+    name = "conflicting_tool",
+    description = "Second version"
+  )
+
+  skill <- skill_create(
+    name = "conflict_skill",
+    tools = list(tool2)
+  )
+
+  # Should warn about the conflict when allow_conflicts = TRUE
+  expect_warning(
+    agent$load_skill(skill, allow_conflicts = TRUE),
     "overwrites existing"
   )
 })
@@ -378,7 +411,7 @@ test_that("Agent load_skill does not warn without conflicts", {
   )
 })
 
-test_that("Tool conflict detection reports all conflicts", {
+test_that("Tool conflict detection reports all conflicts in error", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)
 
@@ -418,11 +451,11 @@ test_that("Tool conflict detection reports all conflicts", {
     tools = list(skill_tool_a, skill_tool_b, skill_tool_c)
   )
 
-  # Should warn about both conflicts
-  warning_msg <- capture_warnings(agent$load_skill(skill))
-  expect_true(length(warning_msg) > 0)
-  expect_true(any(grepl("tool_a", warning_msg)))
-  expect_true(any(grepl("tool_b", warning_msg)))
+  # Should error and mention both conflicts
+  expect_error(
+    agent$load_skill(skill),
+    "tool_a.*tool_b|tool_b.*tool_a"
+  )
 })
 
 test_that("Skill with no tools does not trigger conflict check", {
@@ -449,7 +482,7 @@ test_that("Skill with no tools does not trigger conflict check", {
   )
 })
 
-test_that("Conflicting tool is actually replaced after load_skill", {
+test_that("Conflicting tool is actually replaced with allow_conflicts = TRUE", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)
 
@@ -476,7 +509,7 @@ test_that("Conflicting tool is actually replaced after load_skill", {
     tools = list(tool2)
   )
 
-  suppressWarnings(agent$load_skill(skill))
+  suppressWarnings(agent$load_skill(skill, allow_conflicts = TRUE))
 
   # Verify the tool was actually replaced by checking the description
   tools_after <- mock_chat$get_tools()

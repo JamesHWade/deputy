@@ -11,9 +11,11 @@
 #' The following methods are added dynamically when the package loads:
 #'
 #' \describe{
-#'   \item{`$load_skill(skill)`}{Load a [Skill] into the agent. The `skill`
-#'     parameter can be a Skill object or a path to a skill directory.
-#'     Returns invisible self.}
+#'   \item{`$load_skill(skill, allow_conflicts = FALSE)`}{Load a [Skill] into
+#'     the agent. The `skill` parameter can be a Skill object or path to a
+#'     skill directory. If `allow_conflicts` is FALSE (default), an error is
+#'     thrown when skill tools conflict with existing tools. Set to TRUE to
+#'     allow overwriting. Returns invisible self.}
 #'   \item{`$skills()`}{Get a named list of loaded [Skill] objects.}
 #' }
 #'

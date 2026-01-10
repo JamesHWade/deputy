@@ -502,7 +502,7 @@ skills_list <- function(path = "skills") {
 # This is added here to keep skill-related code together
 # Note: These methods are dynamically added and documented in the Agent class
 
-Agent$set("public", "load_skill", function(skill) {
+Agent$set("public", "load_skill", function(skill, allow_conflicts = FALSE) {
   if (is.character(skill)) {
     # Load from path
     skill <- skill_load(skill)
@@ -592,11 +592,19 @@ Agent$set("public", "load_skill", function(skill) {
     # Check for conflicts
     conflicts <- new_tool_names[new_tool_names %in% current_tool_names]
     if (length(conflicts) > 0) {
-      cli_warn(c(
-        "Skill {.val {skill$name}} overwrites existing tool(s)",
-        "!" = "Conflicting tools: {.val {conflicts}}",
-        "i" = "Previous definitions will be replaced"
-      ))
+      if (isTRUE(allow_conflicts)) {
+        cli_warn(c(
+          "Skill {.val {skill$name}} overwrites existing tool(s)",
+          "!" = "Conflicting tools: {.val {conflicts}}",
+          "i" = "Previous definitions will be replaced"
+        ))
+      } else {
+        cli_abort(c(
+          "Skill {.val {skill$name}} conflicts with existing tool(s)",
+          "!" = "Conflicting tools: {.val {conflicts}}",
+          "i" = "Use {.code allow_conflicts = TRUE} to overwrite existing tools"
+        ))
+      }
     }
 
     self$chat$register_tools(skill$tools)
