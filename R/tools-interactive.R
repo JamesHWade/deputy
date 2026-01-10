@@ -211,6 +211,11 @@ validate_questions <- function(questions) {
 #' receive their responses. This enables human-in-the-loop workflows where
 #' the agent can request clarification or choices from the user.
 #'
+#' @param questions JSON string or list of question objects following the SDK format.
+#'   Each question should have: `question` (string), `header` (string, max 12 chars),
+#'   `options` (list of objects with `label` and `description`), and optionally
+#'   `multiSelect` (logical).
+#'
 #' @format A tool definition created with `ellmer::tool()`.
 #'
 #' @details

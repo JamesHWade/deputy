@@ -9,6 +9,12 @@ A tool definition created with \code{ellmer::tool()}.
 \usage{
 tool_ask_user(questions)
 }
+\arguments{
+\item{questions}{JSON string or list of question objects following the SDK format.
+Each question should have: \code{question} (string), \code{header} (string, max 12 chars),
+\code{options} (list of objects with \code{label} and \code{description}), and optionally
+\code{multiSelect} (logical).}
+}
 \description{
 A tool that allows the agent to ask the user clarifying questions and
 receive their responses. This enables human-in-the-loop workflows where
