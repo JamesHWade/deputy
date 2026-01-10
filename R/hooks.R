@@ -468,6 +468,12 @@ HookRegistry <- R6::R6Class(
     #' @description
     #' Fire hooks for an event and return the first non-NULL result.
     #'
+    #' Hook errors are handled as follows:
+
+    #' - **PreToolUse**: Errors result in denial (fail-safe security behavior)
+    #' - **Other events**: Errors are logged prominently and stored in the
+    #'   `last_errors` field, but execution continues to prevent cascade failures
+    #'
     #' @param event The event type
     #' @param tool_name Optional tool name for filtering (also passed to callback)
     #' @param ... Arguments to pass to the callback
@@ -496,17 +502,45 @@ HookRegistry <- R6::R6Class(
             }
           },
           error = function(e) {
-            cli_warn(c(
-              "Hook {.val {event}} failed",
-              "x" = e$message
-            ))
-            # Fail-safe: deny for PreToolUse, NULL for others
+            # Track the error for programmatic access
+            error_info <- list(
+              event = event,
+              tool_name = tool_name,
+              error = e$message,
+              timestamp = Sys.time()
+            )
+            private$hook_errors <- c(private$hook_errors, list(error_info))
+
+            # Use prominent error logging for all hook failures
+            # PreToolUse failures are security-critical
             if (event == "PreToolUse") {
+              cli::cli_alert_danger(c(
+                "PreToolUse hook failed - denying tool for safety",
+                "x" = e$message
+              ))
               return(HookResultPreToolUse(
                 permission = "deny",
                 reason = paste("Hook error:", e$message)
               ))
             }
+
+            # For other events, log prominently but continue execution
+            # These could be logging/audit hooks that shouldn't crash the agent
+            severity <- switch(
+              event,
+              "PostToolUse" = "PostToolUse hook failed (audit/logging may be incomplete)",
+              "Stop" = "Stop hook failed (cleanup may be incomplete)",
+              "SessionEnd" = "SessionEnd hook failed (state may not be saved)",
+              "SessionStart" = "SessionStart hook failed (initialization may be incomplete)",
+              paste0(event, " hook failed")
+            )
+
+            cli::cli_alert_danger(c(
+              severity,
+              "x" = e$message,
+              "i" = "Use registry$last_errors to inspect hook failures"
+            ))
+
             NULL
           }
         )
@@ -518,6 +552,24 @@ HookRegistry <- R6::R6Class(
       }
 
       NULL
+    },
+
+    #' @description
+    #' Get errors from recent hook executions.
+    #'
+    #' Useful for programmatic checking of hook health, especially for
+    #' audit/logging hooks where failures are logged but not fatal.
+    #'
+    #' @return List of error records, each containing event, tool_name, error, timestamp
+    last_errors = function() {
+      private$hook_errors
+    },
+
+    #' @description
+    #' Clear the error history.
+    clear_errors = function() {
+      private$hook_errors <- list()
+      invisible(self)
     },
 
     #' @description
@@ -554,7 +606,8 @@ HookRegistry <- R6::R6Class(
   ),
 
   private = list(
-    hooks = list()
+    hooks = list(),
+    hook_errors = list()
   )
 )
 

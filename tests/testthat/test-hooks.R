@@ -613,11 +613,11 @@ test_that("Hook callback error returns deny for PreToolUse", {
   registry <- HookRegistry$new()
   registry$add(hook)
 
-  # Should get deny result with error message (and warning)
+  # Should get deny result with error message (and alert)
   result <- NULL
-  expect_warning(
+  expect_message(
     result <- registry$fire("PreToolUse", tool_name = "test", tool_input = list(), context = list()),
-    "Hook.*failed"
+    "PreToolUse hook failed"
   )
 
   expect_s3_class(result, "HookResultPreToolUse")
@@ -639,7 +639,7 @@ test_that("Hook callback error returns NULL for PostToolUse", {
 
   # PostToolUse errors return NULL (fail-safe)
   result <- "not_null"
-  expect_warning(
+  expect_message(
     result <- registry$fire(
       "PostToolUse",
       tool_name = "test",
@@ -647,7 +647,7 @@ test_that("Hook callback error returns NULL for PostToolUse", {
       tool_error = NULL,
       context = list()
     ),
-    "Hook.*failed"
+    "PostToolUse hook failed"
   )
 
   expect_null(result)
@@ -667,9 +667,9 @@ test_that("Hook callback error returns NULL for Stop event", {
 
   # Stop hook errors return NULL
   result <- "not_null"
-  expect_warning(
+  expect_message(
     result <- registry$fire("Stop", reason = "complete", context = list()),
-    "Hook.*failed"
+    "Stop hook failed"
   )
 
   expect_null(result)
@@ -967,9 +967,9 @@ test_that("Hook callback error returns NULL for SessionStart", {
 
   # SessionStart errors return NULL (fail-safe)
   result <- "not_null"
-  expect_warning(
+  expect_message(
     result <- registry$fire("SessionStart", context = list()),
-    "Hook.*failed"
+    "SessionStart hook failed"
   )
 
   expect_null(result)
@@ -987,12 +987,119 @@ test_that("Hook callback error returns NULL for SessionEnd", {
   registry <- HookRegistry$new()
   registry$add(hook)
 
-  # SessionEnd errors return NULL (fail-safe)
+  # SessionEnd errors return NULL (fail-safe) and produce message
   result <- "not_null"
-  expect_warning(
+  expect_message(
     result <- registry$fire("SessionEnd", reason = "complete", context = list()),
-    "Hook.*failed"
+    "SessionEnd hook failed"
   )
 
   expect_null(result)
+})
+
+# Tests for hook error tracking
+
+test_that("HookRegistry tracks errors in last_errors()", {
+  hook <- HookMatcher$new(
+    event = "PostToolUse",
+    timeout = 0,
+    callback = function(tool_name, tool_input, tool_result, context) {
+      stop("Logging failed!")
+    }
+  )
+
+  registry <- HookRegistry$new()
+  registry$add(hook)
+
+  # Clear any existing errors
+  registry$clear_errors()
+  expect_length(registry$last_errors(), 0)
+
+  # Fire the hook (will error)
+  suppressMessages(
+    registry$fire(
+      "PostToolUse",
+      tool_name = "test_tool",
+      tool_input = list(),
+      tool_result = "result",
+      context = list()
+    )
+  )
+
+  # Check error was tracked
+  errors <- registry$last_errors()
+  expect_length(errors, 1)
+  expect_equal(errors[[1]]$event, "PostToolUse")
+  expect_equal(errors[[1]]$tool_name, "test_tool")
+  expect_true(grepl("Logging failed", errors[[1]]$error))
+  expect_s3_class(errors[[1]]$timestamp, "POSIXct")
+})
+
+test_that("HookRegistry clear_errors removes tracked errors", {
+  hook <- HookMatcher$new(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(context) {
+      stop("Init failed!")
+    }
+  )
+
+  registry <- HookRegistry$new()
+  registry$add(hook)
+
+  # Generate an error
+  suppressMessages(
+    registry$fire("SessionStart", context = list())
+  )
+  expect_length(registry$last_errors(), 1)
+
+  # Clear errors
+  registry$clear_errors()
+  expect_length(registry$last_errors(), 0)
+})
+
+test_that("Hook errors show context-specific messages", {
+  # PostToolUse error message
+  hook <- HookMatcher$new(
+    event = "PostToolUse",
+    timeout = 0,
+    callback = function(...) stop("error")
+  )
+  registry <- HookRegistry$new()
+  registry$add(hook)
+
+  expect_message(
+    registry$fire("PostToolUse", tool_name = "x", tool_input = list(),
+                  tool_result = "", context = list()),
+    "audit/logging may be incomplete"
+  )
+})
+
+test_that("PreToolUse errors still deny and use cli_alert_danger", {
+  hook <- HookMatcher$new(
+    event = "PreToolUse",
+    timeout = 0,
+    callback = function(tool_name, tool_input, context) {
+      stop("Security check failed!")
+    }
+  )
+
+  registry <- HookRegistry$new()
+  registry$add(hook)
+
+  # Should still deny even with cli_alert_danger
+  result <- NULL
+  expect_message(
+    result <- registry$fire("PreToolUse", tool_name = "bash",
+                            tool_input = list(), context = list()),
+    "denying tool for safety"
+  )
+
+  expect_equal(result$permission, "deny")
+  expect_true(grepl("Security check failed", result$reason))
+
+  # Error should also be tracked
+  errors <- registry$last_errors()
+  expect_length(errors, 1)
+  expect_equal(errors[[1]]$event, "PreToolUse")
 })
