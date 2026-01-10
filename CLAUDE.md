@@ -304,6 +304,8 @@ When in doubt, prefer beads—persistence you don't need beats lost context.
 
 ## Feature Branch + PR Workflow
 
+> **⚠️ All changes must go through Pull Requests.** Never commit directly to main. Create a feature branch, make your changes, and open a PR for review.
+
 ### Before Creating a PR
 
 **IMPORTANT**: Review and update CLAUDE.md if your changes affect:
