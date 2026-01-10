@@ -11,15 +11,16 @@ tools_mcp(config = NULL, servers = NULL)
 mcptools default location (\verb{~/.config/mcptools/config.json}).}
 
 \item{servers}{Optional character vector of server names to load tools from.
-If NULL (default), loads tools from all configured servers.}
+If NULL (default), loads tools from all configured servers. Filtering is
+based on pattern matching against tool names.}
 }
 \value{
 A list of tool definitions compatible with \code{Agent$register_tools()}.
 Returns an empty list if mcptools is not installed or no tools are available.
 }
 \description{
-Fetches tools from configured MCP servers and converts them to ellmer-compatible
-tool definitions for use with deputy agents.
+Fetches ellmer-compatible tools from configured MCP servers using the
+mcptools package for use with deputy agents.
 
 MCP (Model Context Protocol) allows agents to access tools from external services
 like GitHub, Slack, Google Drive, and more. Tools are discovered dynamically
@@ -46,7 +47,7 @@ mcp_tools <- tools_mcp()
 
 # Create agent with MCP tools
 agent <- Agent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-4-5-20250929"),
+  chat = ellmer::chat_anthropic(),
   tools = c(tools_file(), mcp_tools)
 )
 

@@ -459,6 +459,9 @@ Print the agent configuration.
 \if{latex}{\out{\hypertarget{method-Agent-load_mcp}{}}}
 \subsection{Method \code{load_mcp()}}{
 Load tools from MCP (Model Context Protocol) servers.
+
+Requires the mcptools package. Issues a warning if not installed or if
+tool fetching fails.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Agent$load_mcp(config = NULL, servers = NULL)}\if{html}{\out{</div>}}
 }

@@ -430,9 +430,12 @@ agent <- Agent$new(
 
 # Load MCP tools if enabled
 if (mcp) {
-  # Parse server list if provided
+  # Parse server list if provided, filtering out empty strings
   servers_list <- if (!is.null(mcp_servers)) {
-    trimws(strsplit(mcp_servers, ",")[[1]])
+    parsed <- trimws(strsplit(mcp_servers, ",")[[1]])
+    # Filter out empty strings from parsing
+    parsed <- parsed[nchar(parsed) > 0]
+    if (length(parsed) == 0) NULL else parsed
   } else {
     NULL
   }

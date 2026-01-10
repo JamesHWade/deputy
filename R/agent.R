@@ -576,6 +576,9 @@ Agent <- R6::R6Class(
     #' @description
     #' Load tools from MCP (Model Context Protocol) servers.
     #'
+    #' Requires the mcptools package. Issues a warning if not installed or if
+    #' tool fetching fails.
+    #'
     #' @param config Path to MCP configuration file. If NULL (default), uses
     #'   the mcptools default location (`~/.config/mcptools/config.json`).
     #' @param servers Optional character vector of server names to load from.
@@ -585,11 +588,33 @@ Agent <- R6::R6Class(
       mcp_tools_list <- tools_mcp(config = config, servers = servers)
 
       if (length(mcp_tools_list) > 0) {
-        self$chat$register_tools(mcp_tools_list)
+        # Register tools with error handling
+        tryCatch(
+          {
+            self$chat$register_tools(mcp_tools_list)
+          },
+          error = function(e) {
+            cli::cli_abort(c(
+              "Failed to register MCP tools",
+              "x" = e$message,
+              "i" = "Check for tool name conflicts with existing tools"
+            ))
+          }
+        )
 
-        # Track loaded MCP tools
-        tool_names <- vapply(mcp_tools_list, function(t) {
-          tryCatch(t@name, error = function(e) "unknown")
+        # Track loaded MCP tools with warnings for extraction failures
+        tool_names <- vapply(seq_along(mcp_tools_list), function(i) {
+          t <- mcp_tools_list[[i]]
+          tryCatch(
+            t@name %||% paste0("<unnamed_", i, ">"),
+            error = function(e) {
+              cli::cli_warn(c(
+                "Could not read name from MCP tool {.val {i}}",
+                "x" = e$message
+              ))
+              paste0("<unknown_", i, ">")
+            }
+          )
         }, character(1))
         private$loaded_mcp_tools <- c(private$loaded_mcp_tools, tool_names)
       }

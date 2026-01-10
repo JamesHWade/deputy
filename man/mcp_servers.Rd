@@ -7,11 +7,13 @@
 mcp_servers(config = NULL)
 }
 \arguments{
-\item{config}{Path to MCP configuration file. If NULL (default), uses the
-mcptools default location.}
+\item{config}{Path to MCP configuration file. If NULL (default), uses
+\verb{~/.config/mcptools/config.json}.}
 }
 \value{
-A character vector of server names, or NULL if no servers configured.
+A character vector of server names. Returns \code{character(0)} if config
+exists but has no servers. Returns NULL on error (mcptools not installed,
+config file missing, or parse error).
 }
 \description{
 Lists the MCP servers configured in the mcptools configuration file.
