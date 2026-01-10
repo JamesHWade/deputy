@@ -85,20 +85,23 @@ for (event in agent$run("Analyze the structure of this project")) {
 
 ### Tools
 
-deputy provides convenient tool bundles:
+deputy provides tool presets for common use cases:
 
 ```{r tools}
-# File operations: read_file, write_file, list_files
-tools_file()
+# Use presets for quick setup
+tools_preset("minimal")   # read_file, list_files
+tools_preset("standard")  # + write_file, run_r_code
+tools_preset("data")      # read_file, list_files, read_csv, run_r_code
+tools_preset("full")      # all tools
 
-# Code execution: run_r_code, run_bash
-tools_code()
+# Or use individual bundles
+tools_file()  # File operations
+tools_code()  # Code execution
+tools_data()  # Data reading
+tools_all()   # Everything
 
-# Data reading: read_csv, read_file
-tools_data()
-
-# All built-in tools
-tools_all()
+# List available presets
+list_presets()
 ```
 
 ### Permissions

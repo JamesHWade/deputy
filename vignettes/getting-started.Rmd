@@ -41,7 +41,7 @@ library(deputy)
 
 # Create an agent with file tools
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai"),
   tools = tools_file()
 )
 
@@ -56,7 +56,8 @@ For real-time feedback, use the `run()` method which returns a generator:
 
 ```{r}
 for (event in agent$run("Analyze the structure of this project")) {
-  switch(event$type,
+  switch(
+    event$type,
     "text" = cat(event$text),
     "tool_start" = cli::cli_alert_info("Calling {event$tool_name}..."),
     "tool_end" = cli::cli_alert_success("Done"),
@@ -79,7 +80,7 @@ deputy provides built-in tools in convenient bundles:
 ```{r}
 # Combine multiple tool bundles
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai"),
   tools = c(tools_file(), tools_code())
 )
 ```
@@ -106,7 +107,7 @@ tool_weather <- ellmer::tool(
 )
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai"),
   tools = list(tool_weather)
 )
 ```
@@ -121,7 +122,7 @@ Permissions control what an agent is allowed to do. deputy provides three preset
 # Allows: file read/write (in working dir), R code execution
 # Denies: bash commands, web access, package installation
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai"),
   tools = tools_file(),
   permissions = permissions_standard()
 )
@@ -132,7 +133,7 @@ agent <- Agent$new(
 ```{r}
 # Only allows reading files - no writes, no code execution
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai"),
   tools = tools_file(),
   permissions = permissions_readonly()
 )
@@ -143,7 +144,7 @@ agent <- Agent$new(
 ```{r}
 # Allows everything - use with caution!
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai"),
   tools = tools_all(),
   permissions = permissions_full()
 )
@@ -156,7 +157,7 @@ For fine-grained control:
 ```{r}
 perms <- Permissions$new(
   file_read = TRUE,
-  file_write = "/path/to/allowed/dir",  # Restrict to specific directory
+  file_write = "/path/to/allowed/dir", # Restrict to specific directory
 
   bash = FALSE,
   r_code = TRUE,
@@ -166,7 +167,7 @@ perms <- Permissions$new(
 )
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai"),
   permissions = perms
 )
 ```
@@ -222,7 +223,7 @@ agent$add_hook(HookMatcher$new(
 ```{r}
 agent$add_hook(HookMatcher$new(
   event = "PreToolUse",
-  pattern = "^run_bash$",  # Only match bash tool
+  pattern = "^run_bash$", # Only match bash tool
   callback = function(tool_name, tool_input, context) {
     if (grepl("rm -rf|sudo|chmod 777", tool_input$command)) {
       HookResultPreToolUse(
@@ -245,7 +246,7 @@ Save and restore agent sessions:
 agent$save_session("my_session.rds")
 
 # Later, restore it
-agent2 <- Agent$new(chat = ellmer::chat("openai/gpt-4o"))
+agent2 <- Agent$new(chat = ellmer::chat("openai"))
 agent2$load_session("my_session.rds")
 
 # Continue the conversation
@@ -274,13 +275,15 @@ data_agent <- agent_definition(
 
 # Create a lead agent that can delegate
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai"),
   sub_agents = list(code_agent, data_agent),
   system_prompt = "You coordinate between specialized agents to complete tasks."
 )
 
 # The lead agent will automatically delegate to sub-agents as needed
-result <- lead$run_sync("Review the R code in src/ and analyze the data in data/")
+result <- lead$run_sync(
+  "Review the R code in src/ and analyze the data in data/"
+)
 ```
 
 ## Working with Results
@@ -321,7 +324,7 @@ deputy works with any LLM provider that ellmer supports:
 
 ```{r}
 # OpenAI
-agent <- Agent$new(chat = ellmer::chat("openai/gpt-4o"))
+agent <- Agent$new(chat = ellmer::chat("openai"))
 
 # Anthropic
 agent <- Agent$new(chat = ellmer::chat("anthropic/claude-sonnet-4-5-20250929"))
@@ -347,7 +350,7 @@ agent <- Agent$new(chat = ellmer::chat("ollama/llama3.1"))
 ```{r}
 # Example combining best practices
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai"),
   tools = tools_file(),
   permissions = Permissions$new(
     file_write = getwd(),

@@ -291,3 +291,79 @@ test_that("tool_run_r_code requires callr for sandbox", {
     class = "ellmer_tool_reject"
   )
 })
+
+# Tool preset tests
+
+test_that("ToolPresets contains expected presets", {
+  expect_equal(
+    ToolPresets,
+    c("minimal", "standard", "full", "data")
+  )
+})
+
+test_that("tools_preset returns correct tools for minimal", {
+  tools <- tools_preset("minimal")
+  expect_type(tools, "list")
+  expect_length(tools, 2)
+
+  # Check tool names
+  tool_names <- vapply(tools, function(t) t@name, character(1))
+  expect_true("read_file" %in% tool_names)
+  expect_true("list_files" %in% tool_names)
+})
+
+test_that("tools_preset returns correct tools for standard", {
+  tools <- tools_preset("standard")
+  expect_type(tools, "list")
+  expect_length(tools, 4)
+
+  tool_names <- vapply(tools, function(t) t@name, character(1))
+  expect_true("read_file" %in% tool_names)
+  expect_true("write_file" %in% tool_names)
+  expect_true("list_files" %in% tool_names)
+  expect_true("run_r_code" %in% tool_names)
+})
+
+test_that("tools_preset returns correct tools for full", {
+  tools <- tools_preset("full")
+  expect_type(tools, "list")
+  expect_length(tools, 6)
+
+  tool_names <- vapply(tools, function(t) t@name, character(1))
+  expect_true("read_file" %in% tool_names)
+  expect_true("write_file" %in% tool_names)
+  expect_true("list_files" %in% tool_names)
+  expect_true("run_r_code" %in% tool_names)
+  expect_true("run_bash" %in% tool_names)
+  expect_true("read_csv" %in% tool_names)
+})
+
+test_that("tools_preset returns correct tools for data", {
+  tools <- tools_preset("data")
+  expect_type(tools, "list")
+  expect_length(tools, 4)
+
+  tool_names <- vapply(tools, function(t) t@name, character(1))
+  expect_true("read_file" %in% tool_names)
+  expect_true("list_files" %in% tool_names)
+  expect_true("read_csv" %in% tool_names)
+  expect_true("run_r_code" %in% tool_names)
+})
+
+test_that("tools_preset errors on invalid preset name", {
+  expect_error(
+    tools_preset("invalid"),
+    "Unknown tool preset"
+  )
+})
+
+test_that("list_presets returns data frame with preset info", {
+  presets <- list_presets()
+
+  expect_s3_class(presets, "data.frame")
+  expect_equal(nrow(presets), 4)
+  expect_true("name" %in% names(presets))
+  expect_true("description" %in% names(presets))
+  expect_true("tools" %in% names(presets))
+  expect_equal(presets$name, c("minimal", "standard", "full", "data"))
+})
