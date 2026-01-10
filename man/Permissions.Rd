@@ -7,29 +7,33 @@
 Controls what an agent is allowed to do. Permissions can be configured
 with fine-grained controls for different tool types, or with a custom
 callback for complex logic.
+
+\strong{Security Note:} Permission fields are immutable after construction.
+This prevents adversarial code from modifying permissions at runtime.
+All fields use active bindings that reject modification attempts.
 }
-\section{Public fields}{
-\if{html}{\out{<div class="r6-fields">}}
+\section{Active bindings}{
+\if{html}{\out{<div class="r6-active-bindings">}}
 \describe{
-\item{\code{mode}}{Permission mode (see \link{PermissionMode})}
+\item{\code{mode}}{Permission mode (see \link{PermissionMode}). Read-only after construction.}
 
-\item{\code{file_read}}{Allow file reading}
+\item{\code{file_read}}{Allow file reading. Read-only after construction.}
 
-\item{\code{file_write}}{Allow file writing. Can be TRUE, FALSE, or a directory path.}
+\item{\code{file_write}}{Allow file writing. Can be TRUE, FALSE, or a directory path. Read-only after construction.}
 
-\item{\code{bash}}{Allow bash command execution}
+\item{\code{bash}}{Allow bash command execution. Read-only after construction.}
 
-\item{\code{r_code}}{Allow R code execution}
+\item{\code{r_code}}{Allow R code execution. Read-only after construction.}
 
-\item{\code{web}}{Allow web requests}
+\item{\code{web}}{Allow web requests. Read-only after construction.}
 
-\item{\code{install_packages}}{Allow package installation}
+\item{\code{install_packages}}{Allow package installation. Read-only after construction.}
 
-\item{\code{max_turns}}{Maximum number of turns before stopping}
+\item{\code{max_turns}}{Maximum number of turns before stopping. Read-only after construction.}
 
-\item{\code{max_cost_usd}}{Maximum cost in USD before stopping}
+\item{\code{max_cost_usd}}{Maximum cost in USD before stopping. Read-only after construction.}
 
-\item{\code{can_use_tool}}{Custom permission callback}
+\item{\code{can_use_tool}}{Custom permission callback. Read-only after construction.}
 }
 \if{html}{\out{</div>}}
 }

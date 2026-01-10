@@ -181,3 +181,130 @@ test_that("default mode uses annotations for unknown tools", {
   result <- perms$check("custom_web_tool", list(), open_world_context)
   expect_s3_class(result, "PermissionResultDeny")
 })
+
+# Tests for immutability (security feature)
+
+test_that("permissions mode is immutable after construction", {
+  perms <- permissions_standard()
+
+  # Reading should work
+  expect_equal(perms$mode, "default")
+
+  # Writing should error
+
+  expect_error(
+    perms$mode <- "bypassPermissions",
+    "immutable after construction"
+  )
+
+  # Original value should be unchanged
+  expect_equal(perms$mode, "default")
+})
+
+test_that("permissions file_write is immutable after construction", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  perms <- permissions_standard(working_dir = temp_dir)
+
+  # Reading should work
+  expect_equal(perms$file_write, temp_dir)
+
+  # Writing should error
+  expect_error(
+    perms$file_write <- TRUE,
+    "immutable after construction"
+  )
+
+  # Original value should be unchanged
+  expect_equal(perms$file_write, temp_dir)
+})
+
+test_that("permissions bash is immutable after construction", {
+  perms <- permissions_standard()
+
+  # Reading should work
+  expect_false(perms$bash)
+
+  # Writing should error
+  expect_error(
+    perms$bash <- TRUE,
+    "immutable after construction"
+  )
+
+  # Original value should be unchanged
+  expect_false(perms$bash)
+})
+
+test_that("permissions max_turns is immutable after construction", {
+  perms <- permissions_standard(max_turns = 10)
+
+  # Reading should work
+  expect_equal(perms$max_turns, 10)
+
+  # Writing should error
+  expect_error(
+    perms$max_turns <- 1000,
+    "immutable after construction"
+  )
+
+  # Original value should be unchanged
+  expect_equal(perms$max_turns, 10)
+})
+
+test_that("permissions max_cost_usd is immutable after construction", {
+  perms <- permissions_standard(max_cost_usd = 1.0)
+
+  # Reading should work
+  expect_equal(perms$max_cost_usd, 1.0)
+
+  # Writing should error
+  expect_error(
+    perms$max_cost_usd <- 1000.0,
+    "immutable after construction"
+  )
+
+  # Original value should be unchanged
+  expect_equal(perms$max_cost_usd, 1.0)
+})
+
+test_that("permissions can_use_tool is immutable after construction", {
+  callback <- function(tool_name, tool_input, context) PermissionResultAllow()
+  perms <- Permissions$new(can_use_tool = callback)
+
+  # Reading should work
+  expect_true(is.function(perms$can_use_tool))
+
+  # Writing should error
+  expect_error(
+    perms$can_use_tool <- function(...) PermissionResultDeny("blocked"),
+    "immutable after construction"
+  )
+
+  # Original callback should be unchanged (call it to verify)
+  result <- perms$can_use_tool("test", list(), list())
+  expect_s3_class(result, "PermissionResultAllow")
+})
+
+test_that("all permission fields reject modification attempts", {
+  perms <- permissions_full()
+
+  # All these should error
+  expect_error(perms$mode <- "readonly", "immutable")
+  expect_error(perms$file_read <- FALSE, "immutable")
+  expect_error(perms$file_write <- FALSE, "immutable")
+  expect_error(perms$bash <- FALSE, "immutable")
+  expect_error(perms$r_code <- FALSE, "immutable")
+  expect_error(perms$web <- FALSE, "immutable")
+  expect_error(perms$install_packages <- FALSE, "immutable")
+  expect_error(perms$max_turns <- 1, "immutable")
+  expect_error(perms$max_cost_usd <- 0.01, "immutable")
+  expect_error(perms$can_use_tool <- function(...) NULL, "immutable")
+})
+
+test_that("permissions print works with active bindings", {
+  perms <- permissions_standard()
+
+  # Should not error
+  expect_output(print(perms), "<Permissions>")
+  expect_output(print(perms), "mode: default")
+  expect_output(print(perms), "file_read: TRUE")
+})

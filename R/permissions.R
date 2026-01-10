@@ -129,41 +129,15 @@ PermissionResultDeny <- function(reason, interrupt = FALSE) {
 #' with fine-grained controls for different tool types, or with a custom
 #' callback for complex logic.
 #'
+#' **Security Note:** Permission fields are immutable after construction.
+#' This prevents adversarial code from modifying permissions at runtime.
+#' All fields use active bindings that reject modification attempts.
+#'
 #' @export
 Permissions <- R6::R6Class(
   "Permissions",
 
   public = list(
-    #' @field mode Permission mode (see [PermissionMode])
-    mode = "default",
-
-    #' @field file_read Allow file reading
-    file_read = TRUE,
-
-    #' @field file_write Allow file writing. Can be TRUE, FALSE, or a directory path.
-    file_write = NULL,
-
-    #' @field bash Allow bash command execution
-    bash = FALSE,
-
-    #' @field r_code Allow R code execution
-    r_code = TRUE,
-
-    #' @field web Allow web requests
-    web = FALSE,
-
-    #' @field install_packages Allow package installation
-    install_packages = FALSE,
-
-    #' @field max_turns Maximum number of turns before stopping
-    max_turns = 25,
-
-    #' @field max_cost_usd Maximum cost in USD before stopping
-    max_cost_usd = NULL,
-
-    #' @field can_use_tool Custom permission callback
-    can_use_tool = NULL,
-
     #' @description
     #' Create a new Permissions object.
     #'
@@ -197,16 +171,18 @@ Permissions <- R6::R6Class(
         ))
       }
 
-      self$mode <- mode
-      self$file_read <- file_read
-      self$file_write <- file_write
-      self$bash <- bash
-      self$r_code <- r_code
-      self$web <- web
-      self$install_packages <- install_packages
-      self$max_turns <- max_turns
-      self$max_cost_usd <- max_cost_usd
-      self$can_use_tool <- can_use_tool
+      # Store values in private fields (immutable after construction)
+      private$.mode <- mode
+      private$.file_read <- file_read
+      private$.file_write <- file_write
+      private$.bash <- bash
+      private$.r_code <- r_code
+      private$.web <- web
+      private$.install_packages <- install_packages
+      private$.max_turns <- max_turns
+      private$.max_cost_usd <- max_cost_usd
+      private$.can_use_tool <- can_use_tool
+      private$.frozen <- TRUE
     },
 
     #' @description
@@ -298,7 +274,112 @@ Permissions <- R6::R6Class(
     }
   ),
 
+  active = list(
+    #' @field mode Permission mode (see [PermissionMode]). Read-only after construction.
+    mode = function(value) {
+      if (missing(value)) return(private$.mode)
+      if (isTRUE(private$.frozen)) {
+        cli_abort("Cannot modify permissions: mode is immutable after construction")
+      }
+      private$.mode <- value
+    },
+
+    #' @field file_read Allow file reading. Read-only after construction.
+    file_read = function(value) {
+      if (missing(value)) return(private$.file_read)
+      if (isTRUE(private$.frozen)) {
+        cli_abort("Cannot modify permissions: file_read is immutable after construction")
+      }
+      private$.file_read <- value
+    },
+
+    #' @field file_write Allow file writing. Can be TRUE, FALSE, or a directory path. Read-only after construction.
+    file_write = function(value) {
+      if (missing(value)) return(private$.file_write)
+      if (isTRUE(private$.frozen)) {
+        cli_abort("Cannot modify permissions: file_write is immutable after construction")
+      }
+      private$.file_write <- value
+    },
+
+    #' @field bash Allow bash command execution. Read-only after construction.
+    bash = function(value) {
+      if (missing(value)) return(private$.bash)
+      if (isTRUE(private$.frozen)) {
+        cli_abort("Cannot modify permissions: bash is immutable after construction")
+      }
+      private$.bash <- value
+    },
+
+    #' @field r_code Allow R code execution. Read-only after construction.
+    r_code = function(value) {
+      if (missing(value)) return(private$.r_code)
+      if (isTRUE(private$.frozen)) {
+        cli_abort("Cannot modify permissions: r_code is immutable after construction")
+      }
+      private$.r_code <- value
+    },
+
+    #' @field web Allow web requests. Read-only after construction.
+    web = function(value) {
+      if (missing(value)) return(private$.web)
+      if (isTRUE(private$.frozen)) {
+        cli_abort("Cannot modify permissions: web is immutable after construction")
+      }
+      private$.web <- value
+    },
+
+    #' @field install_packages Allow package installation. Read-only after construction.
+    install_packages = function(value) {
+      if (missing(value)) return(private$.install_packages)
+      if (isTRUE(private$.frozen)) {
+        cli_abort("Cannot modify permissions: install_packages is immutable after construction")
+      }
+      private$.install_packages <- value
+    },
+
+    #' @field max_turns Maximum number of turns before stopping. Read-only after construction.
+    max_turns = function(value) {
+      if (missing(value)) return(private$.max_turns)
+      if (isTRUE(private$.frozen)) {
+        cli_abort("Cannot modify permissions: max_turns is immutable after construction")
+      }
+      private$.max_turns <- value
+    },
+
+    #' @field max_cost_usd Maximum cost in USD before stopping. Read-only after construction.
+    max_cost_usd = function(value) {
+      if (missing(value)) return(private$.max_cost_usd)
+      if (isTRUE(private$.frozen)) {
+        cli_abort("Cannot modify permissions: max_cost_usd is immutable after construction")
+      }
+      private$.max_cost_usd <- value
+    },
+
+    #' @field can_use_tool Custom permission callback. Read-only after construction.
+    can_use_tool = function(value) {
+      if (missing(value)) return(private$.can_use_tool)
+      if (isTRUE(private$.frozen)) {
+        cli_abort("Cannot modify permissions: can_use_tool is immutable after construction")
+      }
+      private$.can_use_tool <- value
+    }
+  ),
+
   private = list(
+    # Private storage for immutable fields
+    .mode = NULL,
+    .file_read = NULL,
+    .file_write = NULL,
+    .bash = NULL,
+    .r_code = NULL,
+    .web = NULL,
+    .install_packages = NULL,
+    .max_turns = NULL,
+    .max_cost_usd = NULL,
+    .can_use_tool = NULL,
+    .frozen = FALSE,
+
     # Check if a tool is a write/execute tool
     is_write_tool = function(tool_name) {
       write_tools <- c(
