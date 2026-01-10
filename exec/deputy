@@ -45,6 +45,16 @@ system_prompt_file <- NULL
 #| description: Disable ask_user tool (human-in-the-loop questions)
 no_ask <- FALSE
 
+# MCP (Model Context Protocol) servers
+#| description: Enable MCP server tools from config
+mcp <- FALSE
+
+#| description: Path to MCP config file (default: ~/.config/mcptools/config.json)
+mcp_config <- NULL
+
+#| description: Comma-separated list of MCP server names to load (default: all)
+mcp_servers <- NULL
+
 # Working directory
 #| description: Working directory for file operations
 #| short: d
@@ -152,17 +162,27 @@ format_cost <- function(cost) {
 # Print welcome message
 print_welcome <- function(agent, provider, model_name, tools_preset, perm_mode) {
   provider_info <- agent$provider()
+  mcp_tools <- agent$mcp_tools()
 
   cli::cli_h1("deputy")
   cli::cli_text("Interactive AI Agent for R")
   cli::cli_text("")
-  cli::cli_bullets(c(
+
+  bullets <- c(
     "*" = "Provider: {.val {provider_info$name}}",
     "*" = "Model: {.val {provider_info$model}}",
     "*" = "Tools: {.val {tools_preset}}",
     "*" = "Permissions: {.val {perm_mode}}",
     "*" = "Working dir: {.path {agent$working_dir}}"
-  ))
+  )
+
+  # Add MCP info if tools are loaded
+
+  if (length(mcp_tools) > 0) {
+    bullets <- c(bullets, "*" = "MCP tools: {.val {length(mcp_tools)}}")
+  }
+
+  cli::cli_bullets(bullets)
   cli::cli_text("")
   cli::cli_alert_info("Type your message and press Enter. Type {.kbd /help} for commands.")
   cli::cli_text("")
@@ -407,6 +427,17 @@ agent <- Agent$new(
   permissions = agent_permissions,
   working_dir = dir
 )
+
+# Load MCP tools if enabled
+if (mcp) {
+  # Parse server list if provided
+  servers_list <- if (!is.null(mcp_servers)) {
+    trimws(strsplit(mcp_servers, ",")[[1]])
+  } else {
+    NULL
+  }
+  agent$load_mcp(config = mcp_config, servers = servers_list)
+}
 
 # Load session if specified
 if (!is.null(session)) {

@@ -19,6 +19,18 @@
 #'   \item{`$skills()`}{Get a named list of loaded [Skill] objects.}
 #' }
 #'
+#' @section MCP Methods:
+#' The following methods manage MCP (Model Context Protocol) server tools:
+#'
+#' \describe{
+#'   \item{`$load_mcp(config = NULL, servers = NULL)`}{Load tools from MCP
+#'     servers. The `config` parameter specifies the path to the MCP config
+#'     file (defaults to `~/.config/mcptools/config.json`). The `servers`
+#'     parameter optionally filters to specific server names. Requires the
+#'     mcptools package. Returns invisible self.}
+#'   \item{`$mcp_tools()`}{Get names of loaded MCP tools.}
+#' }
+#'
 #' @export
 #'
 #' @examples
@@ -559,6 +571,38 @@ Agent <- R6::R6Class(
     # See @section Skill Methods in class documentation.
     skills = function() {
       list()
+    },
+
+    #' @description
+    #' Load tools from MCP (Model Context Protocol) servers.
+    #'
+    #' @param config Path to MCP configuration file. If NULL (default), uses
+    #'   the mcptools default location (`~/.config/mcptools/config.json`).
+    #' @param servers Optional character vector of server names to load from.
+    #'   If NULL, loads from all configured servers.
+    #' @return Invisible self for chaining
+    load_mcp = function(config = NULL, servers = NULL) {
+      mcp_tools_list <- tools_mcp(config = config, servers = servers)
+
+      if (length(mcp_tools_list) > 0) {
+        self$chat$register_tools(mcp_tools_list)
+
+        # Track loaded MCP tools
+        tool_names <- vapply(mcp_tools_list, function(t) {
+          tryCatch(t@name, error = function(e) "unknown")
+        }, character(1))
+        private$loaded_mcp_tools <- c(private$loaded_mcp_tools, tool_names)
+      }
+
+      invisible(self)
+    },
+
+    #' @description
+    #' Get names of loaded MCP tools.
+    #'
+    #' @return Character vector of MCP tool names
+    mcp_tools = function() {
+      private$loaded_mcp_tools
     }
   ),
 
@@ -1185,6 +1229,9 @@ Agent <- R6::R6Class(
     },
 
     # Storage for loaded skills
-    loaded_skills = list()
+    loaded_skills = list(),
+
+    # Storage for loaded MCP tool names
+    loaded_mcp_tools = character()
   )
 )

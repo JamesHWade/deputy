@@ -35,8 +35,10 @@ sub-agents based on registered AgentDefinitions.
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href='../../deputy/html/Agent.html#method-Agent-compact'><code>deputy::Agent$compact()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href='../../deputy/html/Agent.html#method-Agent-cost'><code>deputy::Agent$cost()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_turn"><a href='../../deputy/html/Agent.html#method-Agent-last_turn'><code>deputy::Agent$last_turn()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_mcp"><a href='../../deputy/html/Agent.html#method-Agent-load_mcp'><code>deputy::Agent$load_mcp()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_session"><a href='../../deputy/html/Agent.html#method-Agent-load_session'><code>deputy::Agent$load_session()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_skill"><a href='../../deputy/html/Agent.html#method-Agent-load_skill'><code>deputy::Agent$load_skill()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_tools"><a href='../../deputy/html/Agent.html#method-Agent-mcp_tools'><code>deputy::Agent$mcp_tools()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="provider"><a href='../../deputy/html/Agent.html#method-Agent-provider'><code>deputy::Agent$provider()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tool"><a href='../../deputy/html/Agent.html#method-Agent-register_tool'><code>deputy::Agent$register_tool()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tools"><a href='../../deputy/html/Agent.html#method-Agent-register_tools'><code>deputy::Agent$register_tools()</code></a></span></li>

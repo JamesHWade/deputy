@@ -22,6 +22,20 @@ allow overwriting. Returns invisible self.}
 }
 }
 
+\section{MCP Methods}{
+
+The following methods manage MCP (Model Context Protocol) server tools:
+
+\describe{
+\item{\verb{$load_mcp(config = NULL, servers = NULL)}}{Load tools from MCP
+servers. The \code{config} parameter specifies the path to the MCP config
+file (defaults to \verb{~/.config/mcptools/config.json}). The \code{servers}
+parameter optionally filters to specific server names. Requires the
+mcptools package. Returns invisible self.}
+\item{\verb{$mcp_tools()}}{Get names of loaded MCP tools.}
+}
+}
+
 \examples{
 \dontrun{
 # Create an agent with file tools
@@ -89,6 +103,8 @@ agent$add_hook(HookMatcher$new(
 \item \href{#method-Agent-load_session}{\code{Agent$load_session()}}
 \item \href{#method-Agent-compact}{\code{Agent$compact()}}
 \item \href{#method-Agent-print}{\code{Agent$print()}}
+\item \href{#method-Agent-load_mcp}{\code{Agent$load_mcp()}}
+\item \href{#method-Agent-mcp_tools}{\code{Agent$mcp_tools()}}
 \item \href{#method-Agent-load_skill}{\code{Agent$load_skill()}}
 \item \href{#method-Agent-skills}{\code{Agent$skills()}}
 \item \href{#method-Agent-clone}{\code{Agent$clone()}}
@@ -437,6 +453,43 @@ Print the agent configuration.
 \if{html}{\out{<div class="r">}}\preformatted{Agent$print()}\if{html}{\out{</div>}}
 }
 
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-load_mcp"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-load_mcp}{}}}
+\subsection{Method \code{load_mcp()}}{
+Load tools from MCP (Model Context Protocol) servers.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Agent$load_mcp(config = NULL, servers = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{config}}{Path to MCP configuration file. If NULL (default), uses
+the mcptools default location (\verb{~/.config/mcptools/config.json}).}
+
+\item{\code{servers}}{Optional character vector of server names to load from.
+If NULL, loads from all configured servers.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Invisible self for chaining
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-mcp_tools"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-mcp_tools}{}}}
+\subsection{Method \code{mcp_tools()}}{
+Get names of loaded MCP tools.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Agent$mcp_tools()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Character vector of MCP tool names
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-load_skill"></a>}}

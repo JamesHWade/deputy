@@ -31,7 +31,11 @@ This tool follows the Anthropic Agent SDK format:
 
 \strong{Output format:}
 \itemize{
-\item Returns \code{answers} as a named list mapping question text to selected label(s)
+\item Returns a list with two elements:
+\itemize{
+\item \code{questions}: The original questions array (echoed back)
+\item \code{answers}: Named list mapping question text to selected label(s)
+}
 \item For multi-select, labels are joined with ", "
 \item Users can also type free-form responses
 }

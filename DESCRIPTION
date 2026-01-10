@@ -18,6 +18,7 @@ RoxygenNote: 7.3.3
 Suggests:
     callr,
     knitr,
+    mcptools,
     Rapp,
     readr,
     rmarkdown,
