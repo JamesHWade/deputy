@@ -327,13 +327,11 @@ LeadAgent <- R6::R6Class(
             }
           },
           error = function(e) {
-            cli_warn(c(
-              "Could not inherit model from parent",
-              "i" = "Using default model",
-              "x" = e$message
+            cli_abort(c(
+              "Could not inherit model from parent for sub-agent {.val {def$name}}",
+              "x" = e$message,
+              "i" = "Please specify an explicit {.arg model} in {.fn agent_definition}"
             ))
-            # Ultimate fallback - use a default model
-            ellmer::chat_openai()
           }
         )
       } else {
