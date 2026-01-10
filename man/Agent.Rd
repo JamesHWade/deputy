@@ -10,12 +10,14 @@ multi-turn execution, permission enforcement, and streaming output.
 }
 \section{Skill Methods}{
 
-The following methods are added dynamically when the package loads:
+The following methods manage skills:
 
 \describe{
-\item{\verb{$load_skill(skill)}}{Load a \link{Skill} into the agent. The \code{skill}
-parameter can be a Skill object or a path to a skill directory.
-Returns invisible self.}
+\item{\verb{$load_skill(skill, allow_conflicts = FALSE)}}{Load a \link{Skill} into
+the agent. The \code{skill} parameter can be a Skill object or path to a
+skill directory. If \code{allow_conflicts} is FALSE (default), an error is
+thrown when skill tools conflict with existing tools. Set to TRUE to
+allow overwriting. Returns invisible self.}
 \item{\verb{$skills()}}{Get a named list of loaded \link{Skill} objects.}
 }
 }
@@ -441,7 +443,7 @@ Print the agent configuration.
 \if{latex}{\out{\hypertarget{method-Agent-load_skill}{}}}
 \subsection{Method \code{load_skill()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$load_skill(skill)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Agent$load_skill(skill, allow_conflicts = FALSE)}\if{html}{\out{</div>}}
 }
 
 }

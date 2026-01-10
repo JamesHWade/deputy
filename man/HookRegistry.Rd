@@ -14,6 +14,8 @@ matching, and execution of hooks.
 \item \href{#method-HookRegistry-add}{\code{HookRegistry$add()}}
 \item \href{#method-HookRegistry-get_hooks}{\code{HookRegistry$get_hooks()}}
 \item \href{#method-HookRegistry-fire}{\code{HookRegistry$fire()}}
+\item \href{#method-HookRegistry-last_errors}{\code{HookRegistry$last_errors()}}
+\item \href{#method-HookRegistry-clear_errors}{\code{HookRegistry$clear_errors()}}
 \item \href{#method-HookRegistry-count}{\code{HookRegistry$count()}}
 \item \href{#method-HookRegistry-print}{\code{HookRegistry$print()}}
 \item \href{#method-HookRegistry-clone}{\code{HookRegistry$clone()}}
@@ -76,6 +78,13 @@ List of matching HookMatcher objects
 \if{latex}{\out{\hypertarget{method-HookRegistry-fire}{}}}
 \subsection{Method \code{fire()}}{
 Fire hooks for an event and return the first non-NULL result.
+
+Hook errors are handled as follows:
+\itemize{
+\item \strong{PreToolUse}: Errors result in denial (fail-safe security behavior)
+\item \strong{Other events}: Errors are logged prominently and stored in the
+\code{last_errors} field, but execution continues to prevent cascade failures
+}
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{HookRegistry$fire(event, tool_name = NULL, ...)}\if{html}{\out{</div>}}
 }
@@ -94,6 +103,32 @@ Fire hooks for an event and return the first non-NULL result.
 \subsection{Returns}{
 The first non-NULL hook result, or NULL
 }
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-HookRegistry-last_errors"></a>}}
+\if{latex}{\out{\hypertarget{method-HookRegistry-last_errors}{}}}
+\subsection{Method \code{last_errors()}}{
+Get errors from recent hook executions.
+
+Useful for programmatic checking of hook health, especially for
+audit/logging hooks where failures are logged but not fatal.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$last_errors()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+List of error records, each containing event, tool_name, error, timestamp
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-HookRegistry-clear_errors"></a>}}
+\if{latex}{\out{\hypertarget{method-HookRegistry-clear_errors}{}}}
+\subsection{Method \code{clear_errors()}}{
+Clear the error history.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$clear_errors()}\if{html}{\out{</div>}}
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HookRegistry-count"></a>}}

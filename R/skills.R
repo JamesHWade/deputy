@@ -502,7 +502,7 @@ skills_list <- function(path = "skills") {
 # This is added here to keep skill-related code together
 # Note: These methods are dynamically added and documented in the Agent class
 
-Agent$set("public", "load_skill", function(skill, allow_conflicts = FALSE) {
+Agent$set("public", "load_skill", overwrite = TRUE, value = function(skill, allow_conflicts = FALSE) {
   if (is.character(skill)) {
     # Load from path
     skill <- skill_load(skill)
@@ -633,7 +633,7 @@ Agent$set("public", "load_skill", function(skill, allow_conflicts = FALSE) {
   invisible(self)
 })
 
-Agent$set("public", "skills", function() {
+Agent$set("public", "skills", overwrite = TRUE, value = function() {
   if (is.null(private$loaded_skills)) {
     return(list())
   }

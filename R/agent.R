@@ -8,7 +8,7 @@
 #' multi-turn execution, permission enforcement, and streaming output.
 #'
 #' @section Skill Methods:
-#' The following methods are added dynamically when the package loads:
+#' The following methods manage skills:
 #'
 #' \describe{
 #'   \item{`$load_skill(skill, allow_conflicts = FALSE)`}{Load a [Skill] into
@@ -545,6 +545,20 @@ Agent <- R6::R6Class(
       cat("    mode:", self$permissions$mode, "\n")
       cat("    max_turns:", self$permissions$max_turns, "\n")
       invisible(self)
+    },
+
+    # load_skill(skill, allow_conflicts = FALSE)
+    # Load a skill into the agent. Implemented via Agent$set() in skills.R.
+    # See @section Skill Methods in class documentation.
+    load_skill = function(skill, allow_conflicts = FALSE) {
+      cli::cli_abort("load_skill not yet initialized - this is a bug")
+    },
+
+    # skills()
+    # Get loaded skills. Implemented via Agent$set() in skills.R.
+    # See @section Skill Methods in class documentation.
+    skills = function() {
+      list()
     }
   ),
 

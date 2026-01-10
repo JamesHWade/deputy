@@ -85,7 +85,7 @@ expand_and_normalize <- function(path) {
 #' **Security Note:** This function is subject to TOCTOU (time-of-check-time-of-use)
 #' race conditions. The filesystem state may change between the check and actual
 #' file operations. For critical security:
-#' 1. Use [validate_path_at_operation()] which performs check immediately before I/O
+#' 1. Use `validate_path_at_operation()` which performs check immediately before I/O
 #' 2. Call this function as close to the file operation as possible
 #' 3. Consider sandboxed execution environments for high-security scenarios
 #'
