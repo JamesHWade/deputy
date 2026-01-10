@@ -9,7 +9,7 @@ Description: A provider-agnostic framework for building agentic AI workflows
     permissions, hooks, and human-in-the-loop capabilities. Works with any
     LLM provider that ellmer supports including OpenAI, Anthropic, Google,
     and local models via Ollama.
-URL: https://github.com/JamesHWade/deputy
+URL: https://github.com/JamesHWade/deputy, https://jameshwade.github.io/deputy/
 BugReports: https://github.com/JamesHWade/deputy/issues
 License: MIT + file LICENSE
 Encoding: UTF-8
