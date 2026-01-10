@@ -11,11 +11,13 @@ tools_preset(name)
 \itemize{
 \item \code{"minimal"} - Read-only tools for safe exploration
 (\code{read_file}, \code{list_files})
-\item \code{"standard"} - Balanced toolset for typical tasks
+\item \code{"standard"} - Balanced toolset for R development
 (\code{read_file}, \code{write_file}, \code{list_files}, \code{run_r_code})
-\item \code{"full"} - All available tools (requires appropriate permissions)
+\item \code{"dev"} - Full development with shell access
+(\code{read_file}, \code{write_file}, \code{list_files}, \code{run_r_code}, \code{run_bash})
 \item \code{"data"} - Data analysis focused tools
 (\code{read_file}, \code{list_files}, \code{read_csv}, \code{run_r_code})
+\item \code{"full"} - All available tools (requires appropriate permissions)
 }}
 }
 \value{

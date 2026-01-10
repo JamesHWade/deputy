@@ -297,7 +297,7 @@ test_that("tool_run_r_code requires callr for sandbox", {
 test_that("ToolPresets contains expected presets", {
   expect_equal(
     ToolPresets,
-    c("minimal", "standard", "full", "data")
+    c("minimal", "standard", "dev", "data", "full")
   )
 })
 
@@ -322,6 +322,19 @@ test_that("tools_preset returns correct tools for standard", {
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
   expect_true("run_r_code" %in% tool_names)
+})
+
+test_that("tools_preset returns correct tools for dev", {
+  tools <- tools_preset("dev")
+  expect_type(tools, "list")
+  expect_length(tools, 5)
+
+  tool_names <- vapply(tools, function(t) t@name, character(1))
+  expect_true("read_file" %in% tool_names)
+  expect_true("write_file" %in% tool_names)
+  expect_true("list_files" %in% tool_names)
+  expect_true("run_r_code" %in% tool_names)
+  expect_true("run_bash" %in% tool_names)
 })
 
 test_that("tools_preset returns correct tools for full", {
@@ -361,9 +374,9 @@ test_that("list_presets returns data frame with preset info", {
   presets <- list_presets()
 
   expect_s3_class(presets, "data.frame")
-  expect_equal(nrow(presets), 4)
+  expect_equal(nrow(presets), 5)
   expect_true("name" %in% names(presets))
   expect_true("description" %in% names(presets))
   expect_true("tools" %in% names(presets))
-  expect_equal(presets$name, c("minimal", "standard", "full", "data"))
+  expect_equal(presets$name, c("minimal", "standard", "dev", "data", "full"))
 })

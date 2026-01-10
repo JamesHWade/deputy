@@ -92,6 +92,7 @@ deputy provides tool presets for common use cases:
 # Use presets for quick setup
 tools_preset("minimal")   # read_file, list_files
 tools_preset("standard")  # + write_file, run_r_code
+tools_preset("dev")       # + run_bash (full development)
 tools_preset("data")      # read_file, list_files, read_csv, run_r_code
 tools_preset("full")      # all tools
 

@@ -120,7 +120,7 @@ tools_all <- function() {
 #' Character vector of valid preset names for [tools_preset()].
 #'
 #' @export
-ToolPresets <- c("minimal", "standard", "full", "data")
+ToolPresets <- c("minimal", "standard", "dev", "data", "full")
 
 #' Get a tool preset by name
 #'
@@ -131,11 +131,13 @@ ToolPresets <- c("minimal", "standard", "full", "data")
 #' @param name The preset name. One of:
 #'   * `"minimal"` - Read-only tools for safe exploration
 #'     (`read_file`, `list_files`)
-#'   * `"standard"` - Balanced toolset for typical tasks
+#'   * `"standard"` - Balanced toolset for R development
 #'     (`read_file`, `write_file`, `list_files`, `run_r_code`)
-#'   * `"full"` - All available tools (requires appropriate permissions)
+#'   * `"dev"` - Full development with shell access
+#'     (`read_file`, `write_file`, `list_files`, `run_r_code`, `run_bash`)
 #'   * `"data"` - Data analysis focused tools
 #'     (`read_file`, `list_files`, `read_csv`, `run_r_code`)
+#'   * `"full"` - All available tools (requires appropriate permissions)
 #'
 #' @return A list of tool definitions
 #'
@@ -182,13 +184,20 @@ tools_preset <- function(name) {
       tool_list_files,
       tool_run_r_code
     ),
-    full = tools_all(),
+    dev = list(
+      tool_read_file,
+      tool_write_file,
+      tool_list_files,
+      tool_run_r_code,
+      tool_run_bash
+    ),
     data = list(
       tool_read_file,
       tool_list_files,
       tool_read_csv,
       tool_run_r_code
-    )
+    ),
+    full = tools_all()
   )
 }
 
@@ -206,18 +215,20 @@ tools_preset <- function(name) {
 #' @export
 list_presets <- function() {
   data.frame(
-    name = c("minimal", "standard", "full", "data"),
+    name = c("minimal", "standard", "dev", "data", "full"),
     description = c(
       "Read-only tools for safe exploration",
-      "Balanced toolset for typical tasks",
-      "All available tools",
-      "Data analysis focused tools"
+      "Balanced toolset for R development",
+      "Full development with shell access",
+      "Data analysis focused tools",
+      "All available tools"
     ),
     tools = c(
       "read_file, list_files",
       "read_file, write_file, list_files, run_r_code",
-      "read_file, write_file, list_files, run_r_code, run_bash, read_csv",
-      "read_file, list_files, read_csv, run_r_code"
+      "read_file, write_file, list_files, run_r_code, run_bash",
+      "read_file, list_files, read_csv, run_r_code",
+      "read_file, write_file, list_files, run_r_code, run_bash, read_csv"
     ),
     stringsAsFactors = FALSE
   )
