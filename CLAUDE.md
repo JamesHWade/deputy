@@ -251,16 +251,218 @@ test_that("descriptive test name", {
 - `Rapp` - CLI framework
 - `knitr` - Vignettes
 
-## Issue Tracking
+## Issue Tracking with Beads
 
-This project uses **beads (bd)** for issue tracking. See `AGENTS.md` for workflow details.
+This project uses **bd** (beads) for issue tracking. Issues are stored in `.beads/` and synced via git.
+
+### Git Integration
+
+Beads integrates with git via:
+- **JSONL sync**: Issues stored in `.beads/issues.jsonl` (git-tracked)
+- **Merge driver**: Intelligent JSONL conflict resolution (auto-configured)
+- **Hooks**: Auto-sync on git operations
+
+Files that should be committed: `.beads/.gitignore`, `.gitattributes`
+Files that are gitignored: `.beads/beads.db`, daemon files
+
+### Essential Commands
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress
-bd close <id>
-bd sync               # Sync with git
+# Finding work
+bd ready                              # Show issues ready to work (no blockers)
+bd list --status=open                 # All open issues
+bd show <id>                          # Detailed issue view with dependencies
+
+# Working on issues
+bd update <id> --status=in_progress   # Claim work
+bd close <id>                         # Mark complete
+bd close <id1> <id2> ...              # Close multiple issues
+
+# Creating issues (always include description for context)
+bd create "Fix bug" --description="Details here" -t bug -p 1
+
+# Dependencies
+bd dep add <issue> <depends-on>       # Add dependency
+bd blocked                            # Show blocked issues
+bd dep tree <id>                      # View dependency tree
+
+# Sync
+bd sync                               # Sync with git remote
+bd sync --status                      # Check sync status
+```
+
+### When to Use Beads vs TodoWrite
+
+| Use **Beads (`bd`)** for | Use **TodoWrite** for |
+|--------------------------|----------------------|
+| Multi-session work | Single-session execution |
+| Work with dependencies | Simple task checklists |
+| Discovered work needing tracking | Immediate step-by-step tasks |
+| Collaborative/handed-off work | Personal progress tracking |
+
+When in doubt, prefer beads—persistence you don't need beats lost context.
+
+## Feature Branch + PR Workflow
+
+### Before Creating a PR
+
+**IMPORTANT**: Review and update CLAUDE.md if your changes affect:
+- New directories or files that should be documented
+- New code conventions or patterns
+- New commands or workflows
+- Changes to architecture or dependencies
+
+### 1. Find Work and Create Feature Branch
+
+**⚠️ IMPORTANT: Create the feature branch BEFORE claiming the issue or writing any code.**
+
+```bash
+bd ready                              # Find available work
+bd show <id>                          # Review issue details
+
+# CREATE BRANCH FIRST - before any code changes!
+git checkout -b feature/<short-description>
+# or: git checkout -b fix/<short-description>
+
+bd update <id> --status=in_progress   # Now claim the work
+```
+
+### 2. Work and Sync
+
+```bash
+# Make changes...
+bd sync                               # Sync beads periodically
+```
+
+### 3. Run Quality Gates
+
+```bash
+# Format ALL code with air (R/ and tests/)
+air format R/ tests/testthat/
+
+# Lint with jarl
+jarl check R/
+
+# Run tests
+Rscript -e "devtools::test()"
+
+# Run R CMD check
+Rscript -e "devtools::check()"
+
+# Build pkgdown site
+Rscript -e "devtools::document(); pkgdown::build_site(preview = FALSE)"
+```
+
+### 4. Create PR and Close Issue
+
+When code is complete and ready for review:
+
+```bash
+git add .
+git commit -m "feat: description (deputy-xxx)"  # Include beads issue ID!
+bd close <id>                         # Close beads issue - work is done
+bd sync
+git push -u origin HEAD
+gh pr create --title "..." --body "Resolves deputy-XXX"
+```
+
+**Important**: Close the beads issue when the *work* is complete, not when the PR is merged. The issue tracks your work; the PR tracks the review/merge process.
+
+### 5. Human Reviews and Merges PR
+
+Agents create PRs but **do not merge them**. Humans review and merge PRs to main.
+
+### 6. After PR Merged (Cleanup)
+
+```bash
+git checkout main
+git pull
+git branch -d feature/<short-description>
+```
+
+Or use:
+```r
+usethis::pr_finish()
+```
+
+## Session Completion Protocol
+
+**CRITICAL**: Before ending a session, complete ALL steps. Work is NOT complete until `git push` succeeds.
+
+### Mandatory Checklist (Feature Branch Workflow)
+
+```bash
+# 1. Verify you're on a feature branch (NOT main!)
+git branch --show-current  # Should NOT be 'main'
+
+# 2. File issues for remaining work
+bd create "Follow-up task" --description="..." -t task -p 2
+
+# 3. Run quality gates (if code changed)
+air format R/ tests/testthat/
+jarl check R/
+Rscript -e "devtools::check()"
+
+# 4. Update issue status
+bd close <completed-issues>           # Include reason if helpful
+bd update <in-progress-issues> --status=open  # If not finished
+
+# 5. Commit with beads issue ID
+git add .
+git commit -m "feat: description (deputy-xxx)"  # Always include issue ID!
+bd sync
+git push -u origin HEAD
+
+# 6. Create PR (if not already created)
+gh pr create --title "..." --body "Resolves deputy-xxx"
+
+# 7. Verify
+git status  # Should show "up to date with origin"
+```
+
+### Critical Rules
+
+- **NEVER commit directly to main** - always use feature branches
+- Work is NOT complete until `git push` succeeds
+- NEVER stop before pushing—that leaves work stranded locally
+- NEVER say "ready to push when you are"—YOU must push
+- If push fails, resolve and retry until it succeeds
+- Always run `bd sync` before ending session
+- Always include beads issue ID in commit messages (enables `bd doctor` to detect orphans)
+
+## Parallel Sessions & Worktrees
+
+This project supports parallel work via git worktrees. The beads daemon commits changes to a dedicated branch, preventing conflicts when multiple Claude sessions run simultaneously.
+
+### Creating Worktrees for Parallel Features
+
+```bash
+# From main repo, create worktree for a feature
+git worktree add ../deputy-feature-x -b feature/feature-x
+cd ../deputy-feature-x
+
+# Beads commands work normally - shared database, safe daemon
+bd ready
+bd create "Implement feature" -t task -p 2
+bd sync
+```
+
+All worktrees share the same `.beads` database in the main repo. Changes are immediately visible across sessions.
+
+### Cleanup After PR Merged
+
+```bash
+git worktree remove ../deputy-feature-x
+git worktree prune
+```
+
+### Troubleshooting: "Branch already checked out"
+
+If git says a branch is checked out in a beads worktree:
+
+```bash
+rm -rf .git/beads-worktrees
+git worktree prune
 ```
 
 ## CI/CD
