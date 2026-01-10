@@ -498,6 +498,15 @@ HookRegistry <- R6::R6Class(
                 timeout = hook$timeout
               )
             } else {
+              # Warn once if timeout requested but callr not installed
+              if (hook$timeout > 0 && !rlang::is_installed("callr") && !isTRUE(private$callr_warned)) {
+                private$callr_warned <- TRUE
+                cli::cli_warn(c(
+                  "Hook timeout ignored: {.pkg callr} not installed",
+                  "i" = "Install {.pkg callr} to enforce timeout: {.code install.packages('callr')}",
+                  "i" = "Or set {.code timeout = 0} to suppress this warning"
+                ))
+              }
               do.call(hook$callback, args)
             }
           },
@@ -607,7 +616,8 @@ HookRegistry <- R6::R6Class(
 
   private = list(
     hooks = list(),
-    hook_errors = list()
+    hook_errors = list(),
+    callr_warned = FALSE
   )
 )
 

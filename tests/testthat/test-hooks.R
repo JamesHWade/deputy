@@ -1103,3 +1103,35 @@ test_that("PreToolUse errors still deny and use cli_alert_danger", {
   expect_length(errors, 1)
   expect_equal(errors[[1]]$event, "PreToolUse")
 })
+
+test_that("Hook timeout warns once when callr not installed", {
+  # Mock rlang::is_installed to return FALSE for callr
+  local_mocked_bindings(
+    is_installed = function(pkg) {
+      if (pkg == "callr") FALSE else TRUE
+    },
+    .package = "rlang"
+  )
+
+  hook <- HookMatcher$new(
+    event = "PostToolUse",
+    timeout = 5,  # timeout > 0 triggers the check
+    callback = function(...) NULL
+  )
+
+  registry <- HookRegistry$new()
+  registry$add(hook)
+
+  # First call should warn
+  expect_warning(
+    registry$fire("PostToolUse", tool_name = "test", tool_input = list(),
+                  tool_result = "result", context = list()),
+    "callr.*not installed"
+  )
+
+  # Second call should NOT warn (only warns once)
+  expect_no_warning(
+    registry$fire("PostToolUse", tool_name = "test", tool_input = list(),
+                  tool_result = "result", context = list())
+  )
+})
