@@ -196,3 +196,144 @@ test_that("expand_and_normalize expands home directory", {
   # Empty string should return NA
   expect_true(is.na(expand_and_normalize("")))
 })
+
+# Tests for TOCTOU mitigation functions
+
+test_that("validate_path_at_operation performs validation and operation atomically", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  # Create a test file
+  test_file <- file.path(temp_dir, "test.txt")
+  writeLines("hello", test_file)
+
+  # Operation should succeed for valid path
+  result <- validate_path_at_operation(
+    path = test_file,
+    allowed_dir = temp_dir,
+    operation = function(normalized_path) {
+      paste(readLines(normalized_path), collapse = "\n")
+    }
+  )
+  expect_equal(result, "hello")
+})
+
+test_that("validate_path_at_operation rejects path traversal", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  # Path with .. should be rejected
+  expect_error(
+    validate_path_at_operation(
+      path = file.path(temp_dir, "..", "escape.txt"),
+      allowed_dir = temp_dir,
+      operation = function(p) p
+    ),
+    "Path traversal detected"
+  )
+
+  # Path with ~ should be rejected
+  expect_error(
+    validate_path_at_operation(
+      path = "~/escape.txt",
+      allowed_dir = temp_dir,
+      operation = function(p) p
+    ),
+    "Path traversal detected"
+  )
+})
+
+test_that("validate_path_at_operation rejects paths outside allowed directory", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  expect_error(
+    validate_path_at_operation(
+      path = "/etc/passwd",
+      allowed_dir = temp_dir,
+      operation = function(p) p
+    ),
+    "Path outside allowed directory"
+  )
+})
+
+test_that("validate_path_at_operation rejects invalid paths", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  # NULL path
+  expect_error(
+    validate_path_at_operation(
+      path = NULL,
+      allowed_dir = temp_dir,
+      operation = function(p) p
+    ),
+    "Invalid path"
+  )
+
+  # Empty path
+  expect_error(
+    validate_path_at_operation(
+      path = "",
+      allowed_dir = temp_dir,
+      operation = function(p) p
+    ),
+    "Invalid path"
+  )
+})
+
+test_that("secure_write_file writes content safely", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  test_file <- file.path(temp_dir, "output.txt")
+
+  # Write should succeed for valid path
+  secure_write_file(test_file, "test content", allowed_dir = temp_dir)
+  expect_true(file.exists(test_file))
+  expect_equal(readLines(test_file), "test content")
+})
+
+test_that("secure_write_file creates parent directories", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  nested_file <- file.path(temp_dir, "sub", "dir", "file.txt")
+
+  secure_write_file(nested_file, "nested", allowed_dir = temp_dir)
+  expect_true(file.exists(nested_file))
+  expect_equal(readLines(nested_file), "nested")
+})
+
+test_that("secure_write_file rejects path outside allowed directory", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  expect_error(
+    secure_write_file("/tmp/evil.txt", "content", allowed_dir = temp_dir),
+    "Path outside allowed directory"
+  )
+})
+
+test_that("secure_read_file reads content safely", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  test_file <- file.path(temp_dir, "test.txt")
+  writeLines(c("line 1", "line 2"), test_file)
+
+  result <- secure_read_file(test_file, allowed_dir = temp_dir)
+  expect_equal(result, "line 1\nline 2")
+})
+
+test_that("secure_read_file rejects path outside allowed directory", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  expect_error(
+    secure_read_file("/etc/passwd", allowed_dir = temp_dir),
+    "Path outside allowed directory"
+  )
+})
+
+test_that("secure_read_file errors on non-existent file", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  nonexistent <- file.path(temp_dir, "nonexistent.txt")
+
+  expect_error(
+    secure_read_file(nonexistent, allowed_dir = temp_dir),
+    "File not found"
+  )
+})

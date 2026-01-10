@@ -438,6 +438,105 @@ test_that("hook_block_dangerous_bash is case-insensitive", {
   )
 })
 
+test_that("hook_block_dangerous_bash blocks obfuscation attempts", {
+  hook <- hook_block_dangerous_bash()
+
+  # Variable-based command execution
+  obfuscated_commands <- c(
+    "CMD=rm; $CMD -rf /",                    # Variable assignment then use
+    "X=sudo; $X apt install evil",           # sudo via variable
+    "${CMD} -rf /tmp",                       # ${VAR} syntax with flags
+    "VAR='rm'; $VAR -rf /"                   # Quoted variable assignment
+  )
+
+  for (cmd in obfuscated_commands) {
+    result <- hook$callback("run_bash", list(command = cmd), list())
+    expect_equal(
+      result$permission, "deny",
+      info = paste("Variable obfuscation should be blocked:", cmd)
+    )
+  }
+})
+
+test_that("hook_block_dangerous_bash blocks base64 and encoding attacks", {
+  hook <- hook_block_dangerous_bash()
+
+  encoding_attacks <- c(
+    "echo 'cm0gLXJmIC8=' | base64 -d | bash",    # base64 to bash
+    "base64 -d payload.txt | sh",                 # base64 to sh
+    "cat script.b64 | base64 -d | /bin/bash",    # pipe to /bin/bash
+    "xxd -r -p payload | bash",                   # hex decode to bash
+    "echo evil | bash"                            # anything | bash
+  )
+
+  for (cmd in encoding_attacks) {
+    result <- hook$callback("run_bash", list(command = cmd), list())
+    expect_equal(
+      result$permission, "deny",
+      info = paste("Encoding attack should be blocked:", cmd)
+    )
+  }
+})
+
+test_that("hook_block_dangerous_bash blocks hex and escape sequences", {
+  hook <- hook_block_dangerous_bash()
+
+  escape_attacks <- c(
+    "$'\\x72\\x6d' -rf /",                  # $'\x72\x6d' = rm
+    "$'\\162\\155' -rf /",                  # octal escapes
+    "echo -e '\\x72\\x6d' | sh",            # echo -e with hex
+    "IFS=: cmd",                            # IFS manipulation
+    "${IFS}rm${IFS}-rf"                     # IFS variable usage
+  )
+
+  for (cmd in escape_attacks) {
+    result <- hook$callback("run_bash", list(command = cmd), list())
+    expect_equal(
+      result$permission, "deny",
+      info = paste("Escape sequence attack should be blocked:", cmd)
+    )
+  }
+})
+
+test_that("hook_block_dangerous_bash blocks shell escape patterns", {
+  hook <- hook_block_dangerous_bash()
+
+  shell_escapes <- c(
+    "find / -exec bash -c 'rm -rf' \\;",    # find -exec bash
+    "xargs bash -c 'evil'",                  # xargs to bash
+    "awk '{system(\"rm -rf\")}'",            # awk system()
+    "perl -e 'exec(\"rm -rf /\")'",          # perl one-liner
+    "python -c 'import os; os.system(\"rm -rf /\")'",  # python one-liner
+    "ruby -e 'system(\"rm -rf /\")'"         # ruby one-liner
+  )
+
+  for (cmd in shell_escapes) {
+    result <- hook$callback("run_bash", list(command = cmd), list())
+    expect_equal(
+      result$permission, "deny",
+      info = paste("Shell escape should be blocked:", cmd)
+    )
+  }
+})
+
+test_that("hook_block_dangerous_bash blocks alias and function evasion", {
+  hook <- hook_block_dangerous_bash()
+
+  evasion_attempts <- c(
+    "alias r='rm -rf'; r /",                # alias definition
+    "function evil() { rm -rf /; }; evil",  # function definition
+    "<<<'rm -rf /' bash"                    # here-string to bash
+  )
+
+  for (cmd in evasion_attempts) {
+    result <- hook$callback("run_bash", list(command = cmd), list())
+    expect_equal(
+      result$permission, "deny",
+      info = paste("Evasion attempt should be blocked:", cmd)
+    )
+  }
+})
+
 test_that("hook_limit_file_writes restricts directory", {
   withr::local_tempdir(pattern = "deputy-test") -> temp_dir
   # Normalize to handle macOS /var -> /private/var symlink

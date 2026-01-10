@@ -37,6 +37,18 @@ dangerous bash commands. Default patterns include:
 
 \strong{Network exfiltration:}
 \verb{curl -X POST}, \code{wget --post}, \code{nc -e}, \code{netcat}, reverse shells
+
+\strong{Obfuscation detection:}
+Variable expansion in commands, base64 piping, hex/octal escapes,
+quote splitting, backslash escapes
+
+\strong{Security Note:} This is defense-in-depth and cannot catch all possible
+obfuscation techniques. For high-security environments, consider:
+\enumerate{
+\item Using sandboxed execution (Docker, firejail)
+\item Disabling bash entirely via \link{Permissions}
+\item Using a command whitelist instead of blacklist
+}
 }
 \examples{
 \dontrun{

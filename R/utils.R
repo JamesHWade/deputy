@@ -81,10 +81,11 @@ expand_and_normalize <- function(path) {
 #' paths before comparison.
 #'
 #' **Security Note:** This function is subject to TOCTOU (time-of-check-time-of-use)
-
 #' race conditions. The filesystem state may change between the check and actual
-#' file operations. For critical security, consider using file descriptors or
-#' performing checks in a sandboxed environment.
+#' file operations. For critical security:
+#' 1. Use [validate_path_at_operation()] which performs check immediately before I/O
+#' 2. Call this function as close to the file operation as possible
+#' 3. Consider sandboxed execution environments for high-security scenarios
 #'
 #' @param path Path to check
 #' @param dir Directory to check against
@@ -205,6 +206,128 @@ has_path_traversal <- function(path) {
   # Note: Absolute paths are allowed and checked by is_path_within()
   grepl("\\.\\.", path) || # Parent directory references (../escape.txt)
     grepl("^~", path) # Home directory expansion (~user/escape.txt)
+}
+
+#' Validate path and perform operation atomically (TOCTOU mitigation)
+#'
+#' This function reduces the TOCTOU window by performing the path validation
+#' immediately before the file operation. It should be used instead of
+#' separating the check from the operation.
+#'
+#' @param path Path to validate
+#' @param allowed_dir Directory the path must be within (NULL to skip check)
+#' @param operation Function to perform if validation passes. Receives the
+#'   normalized path as its first argument.
+#' @param ... Additional arguments passed to operation
+#' @return Result of operation, or throws error if validation fails
+#' @noRd
+validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
+  # Validate path format
+
+  if (is.null(path) || !is.character(path) || nchar(path) == 0) {
+    cli_abort(c(
+      "Invalid path",
+      "x" = "Path must be a non-empty string"
+    ))
+  }
+
+  # Check for path traversal patterns
+  if (has_path_traversal(path)) {
+    cli_abort(c(
+      "Path traversal detected",
+      "x" = "Path contains potentially dangerous patterns (.. or ~)",
+      "i" = "Use absolute paths within the allowed directory"
+    ))
+  }
+
+  # Expand and normalize the path
+  normalized <- expand_and_normalize(path)
+  if (is.na(normalized)) {
+    cli_abort(c(
+      "Path normalization failed",
+      "x" = "Could not normalize path: {.path {path}}"
+    ))
+  }
+
+  # If allowed_dir is specified, validate containment
+  if (!is.null(allowed_dir)) {
+    # Re-resolve symlinks RIGHT BEFORE the check (minimize TOCTOU window)
+    if (file.exists(normalized)) {
+      resolved <- resolve_symlinks(normalized)
+      if (!is.na(resolved)) {
+        normalized <- resolved
+      }
+    }
+
+    if (!is_path_within(normalized, allowed_dir)) {
+      cli_abort(c(
+        "Path outside allowed directory",
+        "x" = "Path {.path {path}} is not within {.path {allowed_dir}}",
+        "i" = "File operations are restricted to the allowed directory"
+      ))
+    }
+  }
+
+  # Perform the operation immediately after validation
+  operation(normalized, ...)
+}
+
+#' Secure file write with atomic path validation
+#'
+#' Writes content to a file with path validation performed immediately
+#' before the write operation to minimize TOCTOU window.
+#'
+#' @param path Path to write to
+#' @param content Content to write
+#' @param allowed_dir Directory the path must be within (NULL to skip check)
+#' @param append Whether to append to existing file
+#' @return Invisible NULL on success, throws error on failure
+#' @noRd
+secure_write_file <- function(path, content, allowed_dir = NULL, append = FALSE) {
+  validate_path_at_operation(
+    path = path,
+    allowed_dir = allowed_dir,
+    operation = function(normalized_path) {
+      # Create directory if needed
+      dir <- dirname(normalized_path)
+      if (!dir.exists(dir)) {
+        dir.create(dir, recursive = TRUE)
+      }
+
+      # Perform the write immediately after validation
+      if (append) {
+        cat(content, file = normalized_path, append = TRUE)
+      } else {
+        writeLines(content, normalized_path)
+      }
+      invisible(NULL)
+    }
+  )
+}
+
+#' Secure file read with atomic path validation
+#'
+#' Reads content from a file with path validation performed immediately
+#' before the read operation to minimize TOCTOU window.
+#'
+#' @param path Path to read from
+#' @param allowed_dir Directory the path must be within (NULL to skip check)
+#' @return File contents as character vector
+#' @noRd
+secure_read_file <- function(path, allowed_dir = NULL) {
+  validate_path_at_operation(
+    path = path,
+    allowed_dir = allowed_dir,
+    operation = function(normalized_path) {
+      if (!file.exists(normalized_path)) {
+        cli_abort(c(
+          "File not found",
+          "x" = "File does not exist: {.path {normalized_path}}"
+        ))
+      }
+      paste(readLines(normalized_path, warn = FALSE), collapse = "\n")
+    }
+  )
 }
 
 #' Format cost as dollars
