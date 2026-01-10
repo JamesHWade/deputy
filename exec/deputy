@@ -1,0 +1,394 @@
+#!/usr/bin/env Rapp
+#| title: deputy
+#| description: Interactive AI agent CLI for R
+
+# Provider configuration
+#| description: LLM provider to use (anthropic, openai, google, ollama)
+#| short: p
+provider <- "anthropic"
+
+#| description: Model to use (provider-specific, e.g., claude-sonnet-4-5-20250929, gpt-4o, gemini-2.0-flash)
+#| short: m
+model <- NULL
+
+# Tool configuration
+#| description: Tool preset (minimal, standard, dev, data, full)
+#| short: t
+tools <- "standard"
+
+# Permission configuration
+#| description: Permission mode (standard, readonly, full)
+permissions <- "standard"
+
+#| description: Maximum number of turns before stopping
+max_turns <- 25L
+
+#| description: Maximum cost in USD before stopping
+max_cost <- NULL
+
+# Session management
+#| description: Path to session file to load/resume
+#| short: s
+session <- NULL
+
+#| description: Path to save session on exit
+save_session <- NULL
+
+# System prompt
+#| description: Custom system prompt to use
+system_prompt <- NULL
+
+#| description: Path to file containing system prompt
+system_prompt_file <- NULL
+
+# Human-in-the-loop
+#| description: Disable ask_user tool (human-in-the-loop questions)
+no_ask <- FALSE
+
+# Working directory
+#| description: Working directory for file operations
+#| short: d
+dir <- getwd()
+
+# Output options
+#| description: Show verbose output including tool calls
+#| short: v
+verbose <- FALSE
+
+#| description: Disable colored output
+no_color <- FALSE
+
+# Single task mode
+#| description: Run a single task and exit (non-interactive)
+task <- NULL
+
+# --- Main application ---
+
+library(deputy)
+
+# Handle color setting
+if (no_color) {
+  options(cli.num_colors = 1)
+}
+
+# Create chat object based on provider
+create_chat <- function(provider, model) {
+  # Set default models per provider if not specified
+  if (is.null(model)) {
+    model <- switch(provider,
+      anthropic = "claude-sonnet-4-5-20250929",
+      openai = "gpt-4o",
+      google = "gemini-2.0-flash",
+      ollama = "llama3.2",
+      model  # fallback to whatever was specified
+    )
+  }
+
+  chat <- switch(provider,
+    anthropic = ellmer::chat_anthropic(model = model),
+    openai = ellmer::chat_openai(model = model),
+    google = ellmer::chat_google(model = model),
+    ollama = ellmer::chat_ollama(model = model),
+    # Try generic chat() for other providers
+    ellmer::chat(paste0(provider, "/", model))
+  )
+
+  chat
+}
+
+# Get tools based on preset
+get_tools <- function(preset, include_ask = TRUE) {
+  base_tools <- tools_preset(preset)
+  if (include_ask) {
+    c(base_tools, list(tool_ask_user))
+  } else {
+    base_tools
+  }
+}
+
+# Get permissions based on mode
+get_permissions <- function(mode, working_dir) {
+  switch(mode,
+    standard = permissions_standard(working_dir),
+    readonly = permissions_readonly(),
+    full = permissions_full(),
+    permissions_standard(working_dir)  # default
+  )
+}
+
+# Read system prompt from file if specified
+get_system_prompt <- function(system_prompt, system_prompt_file) {
+  if (!is.null(system_prompt_file)) {
+    if (!file.exists(system_prompt_file)) {
+      cli::cli_abort("System prompt file not found: {.path {system_prompt_file}}")
+    }
+    return(paste(readLines(system_prompt_file, warn = FALSE), collapse = "\n"))
+  }
+  system_prompt
+}
+
+# Format cost for display
+format_cost <- function(cost) {
+  if (is.null(cost) || is.na(cost$total) || cost$total == 0) {
+    return("")
+  }
+  sprintf(" ($%.4f)", cost$total)
+}
+
+# Print welcome message
+print_welcome <- function(agent, provider, model_name, tools_preset, perm_mode) {
+  provider_info <- agent$provider()
+
+  cli::cli_h1("deputy")
+  cli::cli_text("Interactive AI Agent for R")
+  cli::cli_text("")
+  cli::cli_bullets(c(
+    "*" = "Provider: {.val {provider_info$name}}",
+    "*" = "Model: {.val {provider_info$model}}",
+    "*" = "Tools: {.val {tools_preset}}",
+    "*" = "Permissions: {.val {perm_mode}}",
+    "*" = "Working dir: {.path {agent$working_dir}}"
+  ))
+  cli::cli_text("")
+  cli::cli_alert_info("Type your message and press Enter. Type {.kbd /quit} to exit.")
+  cli::cli_alert_info("Commands: {.kbd /quit}, {.kbd /save <path>}, {.kbd /clear}, {.kbd /help}")
+  cli::cli_text("")
+}
+
+# Process special commands
+process_command <- function(input, agent) {
+  if (!startsWith(input, "/")) {
+    return(list(is_command = FALSE))
+  }
+
+  parts <- strsplit(trimws(input), "\\s+")[[1]]
+  cmd <- tolower(parts[1])
+  args <- parts[-1]
+
+
+  switch(cmd,
+    "/quit" = ,
+    "/exit" = ,
+    "/q" = {
+      return(list(is_command = TRUE, action = "quit"))
+    },
+
+    "/save" = {
+      if (length(args) == 0) {
+        path <- paste0("deputy_session_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
+      } else {
+        path <- args[1]
+      }
+      agent$save_session(path)
+      return(list(is_command = TRUE, action = "continue"))
+    },
+
+    "/clear" = {
+      agent$chat$set_turns(list())
+      cli::cli_alert_success("Conversation cleared")
+      return(list(is_command = TRUE, action = "continue"))
+    },
+
+    "/compact" = {
+      keep <- if (length(args) > 0) as.integer(args[1]) else 4L
+      agent$compact(keep_last = keep)
+      return(list(is_command = TRUE, action = "continue"))
+    },
+
+    "/cost" = {
+      cost <- agent$cost()
+      cli::cli_h3("Cost Summary")
+      cli::cli_bullets(c(
+        "*" = "Input tokens: {.val {cost$input}}",
+        "*" = "Output tokens: {.val {cost$output}}",
+        "*" = "Cached tokens: {.val {cost$cached}}",
+        "*" = "Total cost: {.val {sprintf('$%.4f', cost$total)}}"
+      ))
+      return(list(is_command = TRUE, action = "continue"))
+    },
+
+    "/turns" = {
+      turns <- agent$turns()
+      cli::cli_alert_info("Conversation has {.val {length(turns)}} turns")
+      return(list(is_command = TRUE, action = "continue"))
+    },
+
+    "/help" = {
+      cli::cli_h3("Available Commands")
+      cli::cli_bullets(c(
+        "*" = "{.kbd /quit} or {.kbd /exit} - Exit the CLI",
+        "*" = "{.kbd /save [path]} - Save session to file",
+        "*" = "{.kbd /clear} - Clear conversation history",
+        "*" = "{.kbd /compact [keep]} - Compact conversation (keep N recent turns)",
+        "*" = "{.kbd /cost} - Show cost summary",
+        "*" = "{.kbd /turns} - Show turn count",
+        "*" = "{.kbd /help} - Show this help"
+      ))
+      return(list(is_command = TRUE, action = "continue"))
+    },
+
+    {
+      cli::cli_alert_warning("Unknown command: {.val {cmd}}. Type {.kbd /help} for available commands.")
+      return(list(is_command = TRUE, action = "continue"))
+    }
+  )
+}
+
+# Run a single task (non-interactive mode)
+run_task <- function(agent, task_text, verbose) {
+  cli::cli_alert_info("Running task: {.val {task_text}}")
+  cli::cli_text("")
+
+  for (event in agent$run(task_text)) {
+    switch(event$type,
+      "text" = {
+        cat(event$text)
+      },
+      "tool_start" = {
+        if (verbose) {
+          cli::cli_alert_info("Tool: {.fn {event$tool_name}}")
+        }
+      },
+      "tool_end" = {
+        if (verbose && !is.null(event$error)) {
+          cli::cli_alert_danger("Tool error: {event$error}")
+        }
+      },
+      "stop" = {
+        cat("\n")
+        cost <- event$cost
+        if (!is.null(cost) && !is.na(cost$total) && cost$total > 0) {
+          cli::cli_alert_info("Cost: {.val {sprintf('$%.4f', cost$total)}}")
+        }
+        cli::cli_alert_success("Completed in {.val {event$total_turns}} turn(s)")
+      }
+    )
+  }
+}
+
+# Interactive chat loop
+run_interactive <- function(agent, verbose) {
+  repeat {
+    # Read user input
+    input <- tryCatch(
+      readline(prompt = cli::col_cyan("> ")),
+      error = function(e) {
+        # Handle EOF (Ctrl+D)
+        return(NULL)
+      }
+    )
+
+    # Handle EOF
+    if (is.null(input)) {
+      cli::cli_text("")
+      cli::cli_alert_info("Goodbye!")
+      break
+    }
+
+    # Skip empty input
+    input <- trimws(input)
+    if (nchar(input) == 0) {
+      next
+    }
+
+    # Process commands
+    cmd_result <- process_command(input, agent)
+    if (cmd_result$is_command) {
+      if (identical(cmd_result$action, "quit")) {
+        cli::cli_alert_info("Goodbye!")
+        break
+      }
+      next
+    }
+
+    # Run the agent
+    cli::cli_text("")
+    for (event in agent$run(input)) {
+      switch(event$type,
+        "text" = {
+          cat(event$text)
+        },
+        "tool_start" = {
+          if (verbose) {
+            cli::cli_alert_info("Calling: {.fn {event$tool_name}}")
+          }
+        },
+        "tool_end" = {
+          if (verbose) {
+            if (!is.null(event$error)) {
+              cli::cli_alert_danger("Error: {event$error}")
+            } else {
+              cli::cli_alert_success("Done: {.fn {event$tool_name}}")
+            }
+          }
+        },
+        "stop" = {
+          cat("\n")
+          cost <- event$cost
+          if (verbose && !is.null(cost) && !is.na(cost$total) && cost$total > 0) {
+            cli::cli_text(cli::col_grey(sprintf("[%d turns, $%.4f]", event$total_turns, cost$total)))
+          }
+        }
+      )
+    }
+    cli::cli_text("")
+  }
+}
+
+# --- Main execution ---
+
+# Build the agent
+tryCatch({
+  chat <- create_chat(provider, model)
+  agent_tools <- get_tools(tools, include_ask = !no_ask)
+  agent_permissions <- get_permissions(permissions, dir)
+
+  # Apply max cost if specified
+  if (!is.null(max_cost)) {
+    agent_permissions$max_cost_usd <- max_cost
+  }
+  agent_permissions$max_turns <- max_turns
+
+  # Get system prompt
+  sys_prompt <- get_system_prompt(system_prompt, system_prompt_file)
+
+  # Create agent
+  agent <- Agent$new(
+    chat = chat,
+    tools = agent_tools,
+    system_prompt = sys_prompt,
+    permissions = agent_permissions,
+    working_dir = dir
+  )
+
+  # Load session if specified
+  if (!is.null(session)) {
+    if (file.exists(session)) {
+      agent$load_session(session)
+    } else {
+      cli::cli_alert_warning("Session file not found: {.path {session}}")
+    }
+  }
+
+  # Run in appropriate mode
+  if (!is.null(task)) {
+    # Single task mode
+    run_task(agent, task, verbose)
+  } else {
+    # Interactive mode
+    print_welcome(agent, provider, model, tools, permissions)
+    run_interactive(agent, verbose)
+  }
+
+  # Save session on exit if specified
+  if (!is.null(save_session)) {
+    agent$save_session(save_session)
+  }
+
+}, error = function(e) {
+  cli::cli_abort(c(
+    "Failed to start deputy",
+    "x" = e$message,
+    "i" = "Check your provider credentials and configuration"
+  ))
+})
