@@ -6,6 +6,8 @@
 \alias{deputy}
 \title{deputy: Agentic AI Workflows for R}
 \description{
+\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+
 A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.
 
 A provider-agnostic framework for building agentic AI workflows in R.

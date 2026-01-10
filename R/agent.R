@@ -796,6 +796,17 @@ Agent <- R6::R6Class(
         # Yield start event
         coro::yield(AgentEvent("start", task = task))
 
+        # Fire SessionStart hook (before first turn begins)
+        agent$hooks$fire(
+          "SessionStart",
+          context = list(
+            working_dir = agent$working_dir,
+            permissions = agent$permissions,
+            provider = agent$provider(),
+            tools_count = length(agent$chat$get_tools())
+          )
+        )
+
         # Fire UserPromptSubmit hook
         agent$hooks$fire(
           "UserPromptSubmit",
@@ -953,6 +964,17 @@ Agent <- R6::R6Class(
         # Fire Stop hook
         agent$hooks$fire(
           "Stop",
+          reason = stop_reason,
+          context = list(
+            working_dir = agent$working_dir,
+            total_turns = turn_num,
+            cost = agent$cost()
+          )
+        )
+
+        # Fire SessionEnd hook (after agent stops for any reason)
+        agent$hooks$fire(
+          "SessionEnd",
           reason = stop_reason,
           context = list(
             working_dir = agent$working_dir,

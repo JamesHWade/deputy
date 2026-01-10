@@ -14,7 +14,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-# deputy
+# deputy <a href="https://jameshwade.github.io/deputy/"><img src="man/figures/logo.png" align="right" height="138" alt="deputy website" /></a>
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/JamesHWade/deputy/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/JamesHWade/deputy/actions/workflows/R-CMD-check.yaml)
@@ -158,6 +158,23 @@ agent$add_hook(HookMatcher$new(
     } else {
       HookResultPreToolUse(permission = "allow")
     }
+  }
+))
+
+# Track session lifecycle for metrics/logging
+agent$add_hook(HookMatcher$new(
+  event = "SessionStart",
+  callback = function(context) {
+    message("Session started with ", context$tools_count, " tools")
+    HookResultSessionStart()
+  }
+))
+
+agent$add_hook(HookMatcher$new(
+  event = "SessionEnd",
+  callback = function(reason, context) {
+    message("Session ended: ", reason, " after ", context$total_turns, " turns")
+    HookResultSessionEnd()
   }
 ))
 ```

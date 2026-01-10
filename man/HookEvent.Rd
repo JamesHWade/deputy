@@ -5,7 +5,7 @@
 \alias{HookEvent}
 \title{Hook events supported by deputy}
 \format{
-An object of class \code{character} of length 6.
+An object of class \code{character} of length 8.
 }
 \usage{
 HookEvent
@@ -76,6 +76,23 @@ Callback signature: \verb{function(turns_to_compact, turns_to_keep, context)}
 \item \code{context}: List containing \code{working_dir}, \code{total_turns}, \code{compact_count}
 \item Return: \code{\link[=HookResultPreCompact]{HookResultPreCompact()}} to allow/cancel or provide custom summary
 }
+
+\strong{SessionStart} - When an agent session begins
+
+Callback signature: \verb{function(context)}
+\itemize{
+\item \code{context}: List containing \code{working_dir}, \code{permissions}, \code{provider}, \code{tools_count}
+\item Return: \code{\link[=HookResultSessionStart]{HookResultSessionStart()}}
+}
+
+\strong{SessionEnd} - When an agent session ends
+
+Callback signature: \verb{function(reason, context)}
+\itemize{
+\item \code{reason}: Why the agent stopped ("complete", "max_turns", "cost_limit", "hook_requested_stop")
+\item \code{context}: List containing \code{working_dir}, \code{total_turns}, \code{cost}
+\item Return: \code{\link[=HookResultSessionEnd]{HookResultSessionEnd()}}
+}
 }
 
 \section{Context Structure}{
@@ -85,9 +102,12 @@ The context parameter is always a named list. Common fields:
 \itemize{
 \item \code{working_dir}: The agent's current working directory
 \item \code{tool_annotations}: (PreToolUse only) Tool annotations from ellmer if available
-\item \code{total_turns}: (Stop, PreCompact) Number of turns in the conversation
-\item \code{cost}: (Stop only) List with \code{total}, \code{input_tokens}, \code{output_tokens}
+\item \code{total_turns}: (Stop, PreCompact, SessionEnd) Number of turns in the conversation
+\item \code{cost}: (Stop, SessionEnd) List with \code{total}, \code{input_tokens}, \code{output_tokens}
 \item \code{compact_count}: (PreCompact only) Number of turns being compacted
+\item \code{permissions}: (SessionStart only) The agent's permissions configuration
+\item \code{provider}: (SessionStart only) List with \code{name} and \code{model}
+\item \code{tools_count}: (SessionStart only) Number of registered tools
 }
 }
 

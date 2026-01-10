@@ -56,14 +56,30 @@
 #' - `context`: List containing `working_dir`, `total_turns`, `compact_count`
 #' - Return: [HookResultPreCompact()] to allow/cancel or provide custom summary
 #'
+#' **SessionStart** - When an agent session begins
+#'
+#' Callback signature: `function(context)`
+#' - `context`: List containing `working_dir`, `permissions`, `provider`, `tools_count`
+#' - Return: [HookResultSessionStart()]
+#'
+#' **SessionEnd** - When an agent session ends
+#'
+#' Callback signature: `function(reason, context)`
+#' - `reason`: Why the agent stopped ("complete", "max_turns", "cost_limit", "hook_requested_stop")
+#' - `context`: List containing `working_dir`, `total_turns`, `cost`
+#' - Return: [HookResultSessionEnd()]
+#'
 #' @section Context Structure:
 #'
 #' The context parameter is always a named list. Common fields:
 #' - `working_dir`: The agent's current working directory
 #' - `tool_annotations`: (PreToolUse only) Tool annotations from ellmer if available
-#' - `total_turns`: (Stop, PreCompact) Number of turns in the conversation
-#' - `cost`: (Stop only) List with `total`, `input_tokens`, `output_tokens`
+#' - `total_turns`: (Stop, PreCompact, SessionEnd) Number of turns in the conversation
+#' - `cost`: (Stop, SessionEnd) List with `total`, `input_tokens`, `output_tokens`
 #' - `compact_count`: (PreCompact only) Number of turns being compacted
+#' - `permissions`: (SessionStart only) The agent's permissions configuration
+#' - `provider`: (SessionStart only) List with `name` and `model`
+#' - `tools_count`: (SessionStart only) Number of registered tools
 #'
 #' @examples
 #' \dontrun{
@@ -96,7 +112,10 @@ HookEvent <- c(
   "Stop",
   "SubagentStop",
   "UserPromptSubmit",
-  "PreCompact"
+  "PreCompact",
+
+  "SessionStart",
+  "SessionEnd"
 )
 
 #' Create a PreToolUse hook result
@@ -228,12 +247,65 @@ HookResultSubagentStop <- function(handled = TRUE) {
 #'
 #' @export
 HookResultPreCompact <- function(continue = TRUE, summary = NULL) {
+
   structure(
     list(
       continue = continue,
       summary = summary
     ),
     class = c("HookResultPreCompact", "HookResult", "list")
+  )
+}
+
+#' Create a SessionStart hook result
+#'
+#' @description
+#' Return this from a SessionStart hook callback. This hook fires once at the
+#' beginning of an agent session, before the first turn begins.
+#'
+#' @param handled If TRUE, indicates the hook handled the session start event
+#' @return A `HookResultSessionStart` object
+#'
+#' @examples
+#' # Log session start
+#' HookResultSessionStart()
+#'
+#' # Mark as handled
+#' HookResultSessionStart(handled = TRUE)
+#'
+#' @export
+HookResultSessionStart <- function(handled = TRUE) {
+  structure(
+    list(
+      handled = handled
+    ),
+    class = c("HookResultSessionStart", "HookResult", "list")
+  )
+}
+
+#' Create a SessionEnd hook result
+#'
+#' @description
+#' Return this from a SessionEnd hook callback. This hook fires once at the
+#' end of an agent session, after the agent stops for any reason.
+#'
+#' @param handled If TRUE, indicates the hook handled the session end event
+#' @return A `HookResultSessionEnd` object
+#'
+#' @examples
+#' # Log session end
+#' HookResultSessionEnd()
+#'
+#' # Mark as handled
+#' HookResultSessionEnd(handled = TRUE)
+#'
+#' @export
+HookResultSessionEnd <- function(handled = TRUE) {
+  structure(
+    list(
+      handled = handled
+    ),
+    class = c("HookResultSessionEnd", "HookResult", "list")
   )
 }
 
@@ -270,6 +342,9 @@ HookMatcher <- R6::R6Class(
     #'   * Stop: `function(reason, context)`
     #'   * SubagentStop: `function(agent_name, task, result, context)`
     #'   * UserPromptSubmit: `function(prompt, context)`
+    #'   * PreCompact: `function(turns_to_compact, turns_to_keep, context)`
+    #'   * SessionStart: `function(context)`
+    #'   * SessionEnd: `function(reason, context)`
     #' @param pattern Optional regex pattern to filter by tool name.
     #'   Only applies to PreToolUse and PostToolUse events.
     #' @param timeout Maximum callback execution time in seconds
