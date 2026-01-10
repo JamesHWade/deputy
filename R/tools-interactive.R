@@ -225,7 +225,9 @@ validate_questions <- function(questions) {
 #'   - `multiSelect`: Whether multiple selections are allowed
 #'
 #' **Output format:**
-#' - Returns `answers` as a named list mapping question text to selected label(s)
+#' - Returns a list with two elements:
+#'   - `questions`: The original questions array (echoed back)
+#'   - `answers`: Named list mapping question text to selected label(s)
 #' - For multi-select, labels are joined with ", "
 #' - Users can also type free-form responses
 #'
@@ -268,13 +270,17 @@ tool_ask_user <- ellmer::tool(
           ellmer::tool_reject(paste("Failed to parse questions JSON:", e$message))
         }
       )
+      # Guard against unexpected NULL from parsing
+      if (is.null(parsed)) {
+        ellmer::tool_reject("JSON parsing returned NULL unexpectedly")
+      }
       questions <- parsed
     }
 
     # Validate the questions structure
     validate_questions(questions)
 
-    # Get user answers
+    # Get user answers with specific error handling
     tryCatch(
       {
         answers <- ask_user_impl(questions)
@@ -285,8 +291,17 @@ tool_ask_user <- ellmer::tool(
           answers = answers
         )
       },
+      interrupt = function(e) {
+        # Let user interrupts (Ctrl+C) propagate normally
+        stop(e)
+      },
       error = function(e) {
-        ellmer::tool_reject(paste("Failed to get user input:", e$message))
+        # Include error class for debugging callback issues
+        error_class <- paste(class(e), collapse = ", ")
+        ellmer::tool_reject(paste0(
+          "Failed to get user input: ", e$message,
+          " [", error_class, "]"
+        ))
       }
     )
   },

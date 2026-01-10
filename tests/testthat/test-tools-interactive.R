@@ -333,3 +333,128 @@ test_that("parse_user_response handles multi-selection", {
   # Free text still works
   expect_equal(parse_user_response("all of them", options, TRUE), "all of them")
 })
+
+# JSON string input tests (critical for LLM integration)
+test_that("tool_ask_user handles valid JSON string input", {
+  set_ask_user_callback(function(questions) {
+    list("What format?" = "JSON")
+  })
+ withr::defer(set_ask_user_callback(NULL))
+
+  json_input <- '[{"question": "What format?", "header": "Format", "options": [{"label": "JSON", "description": "JS Object Notation"}, {"label": "YAML", "description": "YAML format"}]}]'
+
+  result <- tool_ask_user(json_input)
+  expect_equal(result$answers[["What format?"]], "JSON")
+  expect_true("questions" %in% names(result))
+})
+
+test_that("tool_ask_user rejects malformed JSON", {
+  set_ask_user_callback(function(questions) list())
+  withr::defer(set_ask_user_callback(NULL))
+
+  expect_error(
+    tool_ask_user("{ invalid json }"),
+    "Failed to parse questions JSON"
+  )
+})
+
+test_that("tool_ask_user rejects empty JSON array", {
+  set_ask_user_callback(function(questions) list())
+  withr::defer(set_ask_user_callback(NULL))
+
+  expect_error(
+    tool_ask_user("[]"),
+    "non-empty array"
+  )
+})
+
+# Callback error propagation tests
+test_that("tool_ask_user handles callback errors gracefully", {
+  set_ask_user_callback(function(questions) {
+    stop("Callback error: modal cancelled")
+  })
+  withr::defer(set_ask_user_callback(NULL))
+
+  test_questions <- list(list(
+    question = "Q?", header = "H",
+    options = list(
+      list(label = "A", description = "A"),
+      list(label = "B", description = "B")
+    )
+  ))
+
+  expect_error(
+    tool_ask_user(test_questions),
+    "Failed to get user input.*Callback error"
+  )
+})
+
+# Edge case tests for parse_user_response
+test_that("parse_user_response handles out-of-range indices", {
+  options <- list(
+    list(label = "A", description = "Option A"),
+    list(label = "B", description = "Option B")
+  )
+
+  # Out-of-range falls back to free text
+  expect_equal(parse_user_response("5", options, FALSE), "5")
+  expect_equal(parse_user_response("0", options, FALSE), "0")
+  expect_equal(parse_user_response("-1", options, FALSE), "-1")
+})
+
+test_that("parse_user_response handles mixed valid/invalid multi-select", {
+  options <- list(
+    list(label = "A", description = "Option A"),
+    list(label = "B", description = "Option B")
+  )
+
+  # "1,5" - 5 is invalid, only valid indices are used
+  expect_equal(parse_user_response("1,5", options, TRUE), "A")
+
+  # All invalid falls back to free text
+  expect_equal(parse_user_response("5,6", options, TRUE), "5,6")
+})
+
+# Multiple questions workflow test
+test_that("tool_ask_user handles multiple questions", {
+  captured <- NULL
+  set_ask_user_callback(function(questions) {
+    captured <<- questions
+    list(
+      "First question?" = "Option A",
+      "Second question?" = "Option X"
+    )
+  })
+  withr::defer(set_ask_user_callback(NULL))
+
+  questions <- list(
+    list(
+      question = "First question?",
+      header = "Q1",
+      options = list(
+        list(label = "Option A", description = "First option"),
+        list(label = "Option B", description = "Second option")
+      )
+    ),
+    list(
+      question = "Second question?",
+      header = "Q2",
+      options = list(
+        list(label = "Option X", description = "X option"),
+        list(label = "Option Y", description = "Y option")
+      )
+    )
+  )
+
+  result <- tool_ask_user(questions)
+
+  # Verify callback received both questions
+  expect_equal(length(captured), 2)
+
+  # Verify both answers are in result
+  expect_equal(result$answers[["First question?"]], "Option A")
+  expect_equal(result$answers[["Second question?"]], "Option X")
+
+  # Verify questions are echoed back
+  expect_equal(length(result$questions), 2)
+})
