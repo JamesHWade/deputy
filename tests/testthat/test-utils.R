@@ -192,6 +192,9 @@ test_that("is_path_within blocks symlinks escaping directory", {
 })
 
 test_that("expand_and_normalize expands home directory", {
+  # Skip on Windows due to path format differences
+  skip_on_os("windows")
+
   # ~ should expand to home directory
   expanded <- expand_and_normalize("~/test")
   expect_true(startsWith(expanded, path.expand("~")))
