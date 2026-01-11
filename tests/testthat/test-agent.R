@@ -207,12 +207,30 @@ test_that("compact accepts custom summary", {
 
   # Add mock turns
   mock_turns <- list(
-    structure(list(text = "Hello", contents = list()), class = c("UserTurn", "Turn")),
-    structure(list(text = "Hi", contents = list()), class = c("AssistantTurn", "Turn")),
-    structure(list(text = "Q1", contents = list()), class = c("UserTurn", "Turn")),
-    structure(list(text = "A1", contents = list()), class = c("AssistantTurn", "Turn")),
-    structure(list(text = "Q2", contents = list()), class = c("UserTurn", "Turn")),
-    structure(list(text = "A2", contents = list()), class = c("AssistantTurn", "Turn"))
+    structure(
+      list(text = "Hello", contents = list()),
+      class = c("UserTurn", "Turn")
+    ),
+    structure(
+      list(text = "Hi", contents = list()),
+      class = c("AssistantTurn", "Turn")
+    ),
+    structure(
+      list(text = "Q1", contents = list()),
+      class = c("UserTurn", "Turn")
+    ),
+    structure(
+      list(text = "A1", contents = list()),
+      class = c("AssistantTurn", "Turn")
+    ),
+    structure(
+      list(text = "Q2", contents = list()),
+      class = c("UserTurn", "Turn")
+    ),
+    structure(
+      list(text = "A2", contents = list()),
+      class = c("AssistantTurn", "Turn")
+    )
   )
   mock_chat$set_turns(mock_turns)
 
@@ -232,12 +250,20 @@ test_that("generate_fallback_summary creates text summary", {
 
   # Create mock turns (text inside the list, not as attribute)
   mock_turns <- list(
-    structure(list(text = "User msg", contents = list()), class = c("UserTurn", "Turn")),
-    structure(list(text = "Asst msg", contents = list()), class = c("AssistantTurn", "Turn"))
+    structure(
+      list(text = "User msg", contents = list()),
+      class = c("UserTurn", "Turn")
+    ),
+    structure(
+      list(text = "Asst msg", contents = list()),
+      class = c("AssistantTurn", "Turn")
+    )
   )
 
   # Access private method
-  fallback <- agent$.__enclos_env__$private$generate_fallback_summary(mock_turns)
+  fallback <- agent$.__enclos_env__$private$generate_fallback_summary(
+    mock_turns
+  )
 
   expect_true(is.character(fallback))
   expect_true(grepl("Compacted", fallback))
@@ -276,7 +302,9 @@ test_that("extract_tool_request_data handles list-style request", {
 
   result <- NULL
   expect_warning(
-    result <- agent$.__enclos_env__$private$extract_tool_request_data(list_request),
+    result <- agent$.__enclos_env__$private$extract_tool_request_data(
+      list_request
+    ),
     "not a ContentToolRequest"
   )
 
@@ -314,7 +342,9 @@ test_that("extract_tool_result_data handles list-style result", {
 
   result <- NULL
   expect_warning(
-    result <- agent$.__enclos_env__$private$extract_tool_result_data(list_result),
+    result <- agent$.__enclos_env__$private$extract_tool_result_data(
+      list_result
+    ),
     "not a ContentToolResult"
   )
 
@@ -336,7 +366,9 @@ test_that("extract_tool_result_data handles result with error", {
 
   result <- NULL
   expect_warning(
-    result <- agent$.__enclos_env__$private$extract_tool_result_data(list_result),
+    result <- agent$.__enclos_env__$private$extract_tool_result_data(
+      list_result
+    ),
     "not a ContentToolResult"
   )
 

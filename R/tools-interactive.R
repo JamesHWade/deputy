@@ -79,7 +79,11 @@ parse_user_response <- function(response, options, multi_select = FALSE) {
       # All parts are valid numbers
       valid_indices <- indices[indices >= 1 & indices <= length(options)]
       if (length(valid_indices) > 0) {
-        labels <- vapply(valid_indices, function(i) options[[i]]$label, character(1))
+        labels <- vapply(
+          valid_indices,
+          function(i) options[[i]]$label,
+          character(1)
+        )
         return(paste(labels, collapse = ", "))
       }
     }
@@ -129,7 +133,9 @@ ask_user_impl <- function(questions) {
 
     # Show instructions
     if (isTRUE(q$multiSelect)) {
-      cli::cli_text("  (Enter numbers separated by commas, or type your own answer)")
+      cli::cli_text(
+        "  (Enter numbers separated by commas, or type your own answer)"
+      )
     } else {
       cli::cli_text("  (Enter a number, or type your own answer)")
     }
@@ -140,7 +146,11 @@ ask_user_impl <- function(questions) {
       response_trimmed <- trimws(response)
 
       if (nchar(response_trimmed) > 0) {
-        answer <- parse_user_response(response_trimmed, options, isTRUE(q$multiSelect))
+        answer <- parse_user_response(
+          response_trimmed,
+          options,
+          isTRUE(q$multiSelect)
+        )
         answers[[q$question]] <- answer
         break
       }
@@ -194,7 +204,10 @@ validate_questions <- function(questions) {
       opt <- q$options[[j]]
       if (is.null(opt$label) || is.null(opt$description)) {
         ellmer::tool_reject(paste(
-          "Question", i, "option", j,
+          "Question",
+          i,
+          "option",
+          j,
           "must have 'label' and 'description'"
         ))
       }
@@ -272,7 +285,10 @@ tool_ask_user <- ellmer::tool(
       parsed <- tryCatch(
         jsonlite::fromJSON(questions, simplifyVector = FALSE),
         error = function(e) {
-          ellmer::tool_reject(paste("Failed to parse questions JSON:", e$message))
+          ellmer::tool_reject(paste(
+            "Failed to parse questions JSON:",
+            e$message
+          ))
         }
       )
       # Guard against unexpected NULL from parsing
@@ -304,8 +320,11 @@ tool_ask_user <- ellmer::tool(
         # Include error class for debugging callback issues
         error_class <- paste(class(e), collapse = ", ")
         ellmer::tool_reject(paste0(
-          "Failed to get user input: ", e$message,
-          " [", error_class, "]"
+          "Failed to get user input: ",
+          e$message,
+          " [",
+          error_class,
+          "]"
         ))
       }
     )

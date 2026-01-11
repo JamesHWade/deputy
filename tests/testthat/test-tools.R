@@ -200,7 +200,9 @@ test_that("tool_read_file returns tool_reject for missing file", {
 
   # Should be a tool_reject error
 
-  expect_true(inherits(result, "ellmer_tool_reject") || grepl("File not found", result))
+  expect_true(
+    inherits(result, "ellmer_tool_reject") || grepl("File not found", result)
+  )
 })
 
 test_that("tool_write_file handles write errors gracefully", {
@@ -215,7 +217,9 @@ test_that("tool_write_file handles write errors gracefully", {
   )
 
   # Should be some kind of error
-  expect_true(inherits(result, "error") || inherits(result, "ellmer_tool_reject"))
+  expect_true(
+    inherits(result, "error") || inherits(result, "ellmer_tool_reject")
+  )
 })
 
 test_that("tool_list_files returns tool_reject for nonexistent directory", {

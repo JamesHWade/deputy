@@ -121,36 +121,49 @@ tools_mcp <- function(config = NULL, servers = NULL) {
   # Note: Filtering is based on tool name pattern matching since mcptools
   # tools may not expose server origin metadata consistently
   if (!is.null(servers) && length(servers) > 0 && length(tools) > 0) {
-    tools <- Filter(function(tool) {
-      # Get tool name for filtering
-      tool_name <- tryCatch(
-        tool@name %||% "unknown",
-        error = function(e) "unknown"
-      )
-      # Check if tool name matches any requested server pattern
-      any(vapply(servers, function(s) {
-        grepl(s, tool_name, ignore.case = TRUE)
-      }, logical(1)))
-    }, tools)
+    tools <- Filter(
+      function(tool) {
+        # Get tool name for filtering
+        tool_name <- tryCatch(
+          tool@name %||% "unknown",
+          error = function(e) "unknown"
+        )
+        # Check if tool name matches any requested server pattern
+        any(vapply(
+          servers,
+          function(s) {
+            grepl(s, tool_name, ignore.case = TRUE)
+          },
+          logical(1)
+        ))
+      },
+      tools
+    )
   }
 
   if (length(tools) == 0) {
     cli::cli_alert_info("No MCP tools available")
   } else {
-    tool_names <- vapply(seq_along(tools), function(i) {
-      t <- tools[[i]]
-      tryCatch(
-        t@name %||% paste0("<unnamed_", i, ">"),
-        error = function(e) {
-          cli::cli_warn(c(
-            "Could not read name from MCP tool {.val {i}}",
-            "x" = e$message
-          ))
-          paste0("<unknown_", i, ">")
-        }
-      )
-    }, character(1))
-    cli::cli_alert_success("Loaded {length(tools)} MCP tool{?s}: {.val {tool_names}}")
+    tool_names <- vapply(
+      seq_along(tools),
+      function(i) {
+        t <- tools[[i]]
+        tryCatch(
+          t@name %||% paste0("<unnamed_", i, ">"),
+          error = function(e) {
+            cli::cli_warn(c(
+              "Could not read name from MCP tool {.val {i}}",
+              "x" = e$message
+            ))
+            paste0("<unknown_", i, ">")
+          }
+        )
+      },
+      character(1)
+    )
+    cli::cli_alert_success(
+      "Loaded {length(tools)} MCP tool{?s}: {.val {tool_names}}"
+    )
   }
 
   tools
@@ -182,10 +195,13 @@ mcp_servers <- function(config = NULL) {
   }
 
   # Use provided config or fall back to standard mcptools config location
-  config_path <- config %||% file.path(
-    Sys.getenv("HOME"),
-    ".config", "mcptools", "config.json"
-  )
+  config_path <- config %||%
+    file.path(
+      Sys.getenv("HOME"),
+      ".config",
+      "mcptools",
+      "config.json"
+    )
 
   if (!file.exists(config_path)) {
     cli::cli_alert_info("No MCP config found at {.path {config_path}}")

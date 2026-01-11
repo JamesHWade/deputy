@@ -374,7 +374,11 @@ tool_run_bash <- ellmer::tool(
         },
         error = function(e) {
           if (grepl("timeout", e$message, ignore.case = TRUE)) {
-            ellmer::tool_reject(paste("Command timed out after", timeout, "seconds"))
+            ellmer::tool_reject(paste(
+              "Command timed out after",
+              timeout,
+              "seconds"
+            ))
           } else {
             ellmer::tool_reject(paste("Command failed:", e$message))
           }

@@ -45,7 +45,9 @@ tool_web_fetch <- ellmer::tool(
         # Fetch the page
         resp <- httr2::request(url) |>
           httr2::req_timeout(30) |>
-          httr2::req_user_agent("deputy R package (https://github.com/JamesHWade/deputy)") |>
+          httr2::req_user_agent(
+            "deputy R package (https://github.com/JamesHWade/deputy)"
+          ) |>
           httr2::req_perform()
 
         content_type <- httr2::resp_content_type(resp)
@@ -57,8 +59,12 @@ tool_web_fetch <- ellmer::tool(
             body <- paste0(substr(body, 1, 50000), "\n... [truncated]")
           }
           return(paste0(
-            "URL: ", url, "\n",
-            "Content-Type: ", content_type, "\n\n",
+            "URL: ",
+            url,
+            "\n",
+            "Content-Type: ",
+            content_type,
+            "\n\n",
             body
           ))
         }
@@ -67,7 +73,9 @@ tool_web_fetch <- ellmer::tool(
         content <- extract_web_content(body, url)
 
         paste0(
-          "<web_page url=\"", url, "\">\n",
+          "<web_page url=\"",
+          url,
+          "\">\n",
           content,
           "\n</web_page>"
         )
@@ -80,7 +88,9 @@ tool_web_fetch <- ellmer::tool(
   name = "web_fetch",
   description = "Fetch the content of a web page and return it as text. Use this to read articles, documentation, or other web content.",
   arguments = list(
-    url = ellmer::type_string("The URL of the web page to fetch (must start with http:// or https://)")
+    url = ellmer::type_string(
+      "The URL of the web page to fetch (must start with http:// or https://)"
+    )
   ),
 
   annotations = ellmer::tool_annotations(
@@ -135,7 +145,9 @@ tool_web_search <- ellmer::tool(
 
         resp <- httr2::request(search_url) |>
           httr2::req_timeout(30) |>
-          httr2::req_user_agent("deputy R package (https://github.com/JamesHWade/deputy)") |>
+          httr2::req_user_agent(
+            "deputy R package (https://github.com/JamesHWade/deputy)"
+          ) |>
           httr2::req_perform()
 
         body <- httr2::resp_body_string(resp)
@@ -148,17 +160,29 @@ tool_web_search <- ellmer::tool(
         }
 
         # Format results
-        formatted <- vapply(seq_along(results), function(i) {
-          r <- results[[i]]
-          paste0(
-            i, ". ", r$title, "\n",
-            "   URL: ", r$url, "\n",
-            "   ", r$snippet
-          )
-        }, character(1))
+        formatted <- vapply(
+          seq_along(results),
+          function(i) {
+            r <- results[[i]]
+            paste0(
+              i,
+              ". ",
+              r$title,
+              "\n",
+              "   URL: ",
+              r$url,
+              "\n",
+              "   ",
+              r$snippet
+            )
+          },
+          character(1)
+        )
 
         paste0(
-          "Search results for: ", query, "\n\n",
+          "Search results for: ",
+          query,
+          "\n\n",
           paste(formatted, collapse = "\n\n")
         )
       },
@@ -194,7 +218,7 @@ tool_web_search <- ellmer::tool(
 extract_web_content <- function(html, url) {
   # Try rvest for better HTML parsing
 
-if (rlang::is_installed("rvest") && rlang::is_installed("xml2")) {
+  if (rlang::is_installed("rvest") && rlang::is_installed("xml2")) {
     tryCatch(
       {
         doc <- xml2::read_html(html)
@@ -208,7 +232,10 @@ if (rlang::is_installed("rvest") && rlang::is_installed("xml2")) {
         xml2::xml_remove(xml2::xml_find_all(doc, "//header"))
 
         # Try to find main content
-        main_content <- xml2::xml_find_first(doc, "//main | //article | //*[@role='main'] | //*[@id='content'] | //*[@class='content']")
+        main_content <- xml2::xml_find_first(
+          doc,
+          "//main | //article | //*[@role='main'] | //*[@id='content'] | //*[@class='content']"
+        )
 
         if (is.na(main_content)) {
           main_content <- xml2::xml_find_first(doc, "//body")
@@ -245,8 +272,20 @@ if (rlang::is_installed("rvest") && rlang::is_installed("xml2")) {
 #' @noRd
 simple_html_to_text <- function(html) {
   # Remove script and style content
-  html <- gsub("<script[^>]*>.*?</script>", "", html, ignore.case = TRUE, perl = TRUE)
-  html <- gsub("<style[^>]*>.*?</style>", "", html, ignore.case = TRUE, perl = TRUE)
+  html <- gsub(
+    "<script[^>]*>.*?</script>",
+    "",
+    html,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+  html <- gsub(
+    "<style[^>]*>.*?</style>",
+    "",
+    html,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
 
   # Remove HTML tags
   text <- gsub("<[^>]+>", " ", html)
@@ -351,14 +390,23 @@ parse_duckduckgo_results <- function(html, max_results = 10) {
         doc <- xml2::read_html(html)
 
         # Find result containers
-        result_nodes <- xml2::xml_find_all(doc, "//div[contains(@class, 'result')]")
+        result_nodes <- xml2::xml_find_all(
+          doc,
+          "//div[contains(@class, 'result')]"
+        )
 
         for (i in seq_len(min(length(result_nodes), max_results))) {
           node <- result_nodes[[i]]
 
           # Extract title and URL
-          title_node <- xml2::xml_find_first(node, ".//a[contains(@class, 'result__a')]")
-          snippet_node <- xml2::xml_find_first(node, ".//a[contains(@class, 'result__snippet')]")
+          title_node <- xml2::xml_find_first(
+            node,
+            ".//a[contains(@class, 'result__a')]"
+          )
+          snippet_node <- xml2::xml_find_first(
+            node,
+            ".//a[contains(@class, 'result__snippet')]"
+          )
 
           if (!is.na(title_node)) {
             title <- xml2::xml_text(title_node)
@@ -372,7 +420,11 @@ parse_duckduckgo_results <- function(html, max_results = 10) {
               }
             }
 
-            snippet <- if (!is.na(snippet_node)) xml2::xml_text(snippet_node) else ""
+            snippet <- if (!is.na(snippet_node)) {
+              xml2::xml_text(snippet_node)
+            } else {
+              ""
+            }
 
             results[[length(results) + 1]] <- list(
               title = trimws(title),

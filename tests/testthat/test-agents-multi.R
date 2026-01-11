@@ -495,7 +495,10 @@ test_that("agent_definition handles special characters in name", {
 })
 
 test_that("agent_definition handles long descriptions", {
-  long_desc <- paste(rep("This is a very long description. ", 50), collapse = "")
+  long_desc <- paste(
+    rep("This is a very long description. ", 50),
+    collapse = ""
+  )
 
   def <- agent_definition(
     name = "long_desc_agent",

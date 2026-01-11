@@ -144,7 +144,8 @@ tools_web <- function(chat = NULL, use_native = TRUE) {
   provider_name <- get_provider_name(chat)
 
   # Return provider-specific tools when available
-  switch(provider_name,
+  switch(
+    provider_name,
     "Anthropic" = {
       cli_inform(c(
         "i" = "Using Claude's native web tools (higher quality, extra cost)",
@@ -172,7 +173,7 @@ tools_web <- function(chat = NULL, use_native = TRUE) {
       ))
       list(
         ellmer::openai_tool_web_search(),
-        tool_web_fetch  # OpenAI doesn't have native fetch
+        tool_web_fetch # OpenAI doesn't have native fetch
       )
     },
     # Default: universal tools
@@ -192,7 +193,7 @@ get_provider_name <- function(chat) {
     return("unknown")
   }
 
- tryCatch(
+  tryCatch(
     {
       provider <- chat$get_provider()
       provider@name
@@ -292,7 +293,8 @@ tools_preset <- function(name) {
     ))
   }
 
-  switch(name,
+  switch(
+    name,
     minimal = list(
       tool_read_file,
       tool_list_files

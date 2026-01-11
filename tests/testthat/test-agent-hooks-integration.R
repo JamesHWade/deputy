@@ -237,3 +237,122 @@ test_that("Permission check occurs before PreToolUse hooks", {
   expect_s3_class(perm_result, "PermissionResultDeny")
   expect_equal(perm_result$reason, "File reading is not allowed")
 })
+
+test_that("Agent stops when PostToolUse hook returns continue=FALSE", {
+  # This test verifies the full execution loop stops when a PostToolUse hook
+  # returns continue=FALSE (agent.R lines 704-708 set should_stop,
+  # lines 1038-1040 check it and stop)
+
+  # Track which call we're on
+  call_count <- 0
+  last_turn_with_tool <- NULL
+  tool_request_callback <- NULL
+  tool_result_callback <- NULL
+  captured_tool_request <- NULL
+
+  # Create mock chat
+  mock_chat <- create_mock_chat()
+
+  # Capture the tool request callback when agent registers it
+  original_on_tool_request <- mock_chat$on_tool_request
+  mock_chat$on_tool_request <- function(callback) {
+    tool_request_callback <<- callback
+    original_on_tool_request(callback)
+  }
+
+  # Capture the tool result callback when agent registers it
+  original_on_tool_result <- mock_chat$on_tool_result
+  mock_chat$on_tool_result <- function(callback) {
+    tool_result_callback <<- callback
+    original_on_tool_result(callback)
+  }
+
+  # Override stream to return text, then have last_turn return a turn with tool
+  original_stream <- mock_chat$stream
+  mock_chat$stream <- function(prompt = NULL) {
+    call_count <<- call_count + 1
+
+    if (call_count == 1) {
+      # First call: return text, but prepare a turn with tool request
+      last_turn_with_tool <<- create_mock_turn_with_tool_request(
+        tool_name = "read_file",
+        tool_args = list(path = "test.txt"),
+        text = "I'll read the file"
+      )
+
+      # Return text iterator (stream returns strings, not ContentText)
+      yielded <- FALSE
+      function() {
+        if (yielded) {
+          return(coro::exhausted())
+        }
+        yielded <<- TRUE
+        "I'll read the file"
+      }
+    } else {
+      # Subsequent calls: return normal text
+      original_stream(prompt)
+    }
+  }
+
+  # Override last_turn to return the turn with tool on first call
+  mock_chat$last_turn <- function(role = "assistant") {
+    if (!is.null(last_turn_with_tool)) {
+      turn <- last_turn_with_tool
+
+      # Trigger tool request and result callbacks if registered
+      if (!is.null(tool_request_callback) && !is.null(tool_result_callback)) {
+        # Find tool requests in the turn contents
+        # The turn has text first, then tool request second
+        for (content in turn@contents) {
+          if (inherits(content, "ellmer::ContentToolRequest")) {
+            # Call the request callback
+            tool_request_callback(content)
+
+            # Simulate tool execution by calling result callback
+            # Create a mock tool result
+            tool_result <- ellmer::ContentToolResult(
+              request = content,
+              value = "file contents",
+              error = NULL
+            )
+            tool_result_callback(tool_result)
+          }
+        }
+      }
+
+      last_turn_with_tool <<- NULL # Clear after first use
+      return(turn)
+    }
+    # Return a simple assistant turn with the last text
+    create_mock_assistant_turn(text = "I'll read the file")
+  }
+
+  # Track hook execution
+  hook_executed <- FALSE
+
+  agent <- Agent$new(
+    chat = mock_chat,
+    tools = list(tool_read_file),
+    permissions = Permissions$new(file_read = TRUE)
+  )
+
+  # Add PostToolUse hook that returns continue=FALSE
+  agent$hooks$add(HookMatcher$new(
+    event = "PostToolUse",
+    timeout = 0,
+    callback = function(tool_name, tool_result, tool_error, context) {
+      hook_executed <<- TRUE
+      HookResultPostToolUse(continue = FALSE)
+    }
+  ))
+
+  # Run the agent - it should stop after the tool executes
+  result <- agent$run_sync("Read test.txt")
+
+  # Verify hook was executed
+  expect_true(hook_executed)
+
+  # Verify agent stopped due to hook
+  expect_equal(result$stop_reason, "hook_requested_stop")
+})

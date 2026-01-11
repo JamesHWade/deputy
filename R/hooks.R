@@ -247,7 +247,6 @@ HookResultSubagentStop <- function(handled = TRUE) {
 #'
 #' @export
 HookResultPreCompact <- function(continue = TRUE, summary = NULL) {
-
   structure(
     list(
       continue = continue,
@@ -499,7 +498,11 @@ HookRegistry <- R6::R6Class(
               )
             } else {
               # Warn once if timeout requested but callr not installed
-              if (hook$timeout > 0 && !rlang::is_installed("callr") && !isTRUE(private$callr_warned)) {
+              if (
+                hook$timeout > 0 &&
+                  !rlang::is_installed("callr") &&
+                  !isTRUE(private$callr_warned)
+              ) {
                 private$callr_warned <- TRUE
                 cli::cli_warn(c(
                   "Hook timeout ignored: {.pkg callr} not installed",
@@ -792,65 +795,65 @@ hook_block_dangerous_bash <- function(
     # === OBFUSCATION DETECTION ===
 
     # Variable-based command execution (CMD=rm; $CMD -rf)
-    "\\$[A-Za-z_][A-Za-z0-9_]*\\s*-",  # $VAR followed by flags
-    "\\$\\{[^}]+\\}\\s*-",              # ${VAR} followed by flags
+    "\\$[A-Za-z_][A-Za-z0-9_]*\\s*-", # $VAR followed by flags
+    "\\$\\{[^}]+\\}\\s*-", # ${VAR} followed by flags
 
     # Dangerous variable assignments followed by execution
-    "=['\"]?rm['\"]?\\s*[;&|]",        # VAR=rm; or VAR='rm' &&
+    "=['\"]?rm['\"]?\\s*[;&|]", # VAR=rm; or VAR='rm' &&
     "=['\"]?sudo['\"]?\\s*[;&|]",
     "=['\"]?dd['\"]?\\s*[;&|]",
     "=['\"]?chmod['\"]?\\s*[;&|]",
     "=['\"]?mkfs['\"]?\\s*[;&|]",
 
     # Base64/encoding piping to shell
-    "base64.*\\|.*\\b(ba)?sh\\b",       # base64 -d | bash
+    "base64.*\\|.*\\b(ba)?sh\\b", # base64 -d | bash
     "base64.*\\|.*\\bsh\\b",
-    "\\|\\s*(ba)?sh\\s*$",              # anything | bash at end
-    "\\|\\s*/bin/(ba)?sh",              # pipe to /bin/bash
-    "xxd.*\\|.*\\b(ba)?sh\\b",          # xxd -r | bash (hex decoding)
-    "printf.*\\\\x.*\\|",               # printf with hex escapes piped
+    "\\|\\s*(ba)?sh\\s*$", # anything | bash at end
+    "\\|\\s*/bin/(ba)?sh", # pipe to /bin/bash
+    "xxd.*\\|.*\\b(ba)?sh\\b", # xxd -r | bash (hex decoding)
+    "printf.*\\\\x.*\\|", # printf with hex escapes piped
 
     # Quote splitting obfuscation (r"m" or 'r''m')
-    "['\"][a-z]['\"]['\"]?[a-z]",       # "r""m" style splitting
-    "\\\\[a-z]",                        # \r\m backslash escaping in commands
+    "['\"][a-z]['\"]['\"]?[a-z]", # "r""m" style splitting
+    "\\\\[a-z]", # \r\m backslash escaping in commands
 
     # Hex/octal escape sequences in commands
-    "\\$'\\\\x[0-9a-fA-F]",             # $'\x72\x6d' style
-    "\\$'\\\\[0-7]{3}",                 # $'\162\155' octal style
-    "echo\\s+-e.*\\\\x",                # echo -e with hex
-    "printf.*%s.*\\\\x",                # printf with hex
+    "\\$'\\\\x[0-9a-fA-F]", # $'\x72\x6d' style
+    "\\$'\\\\[0-7]{3}", # $'\162\155' octal style
+    "echo\\s+-e.*\\\\x", # echo -e with hex
+    "printf.*%s.*\\\\x", # printf with hex
 
     # IFS manipulation (space replacement attacks)
-    "IFS=",                              # IFS manipulation
-    "\\$\\{IFS\\}",                      # ${IFS} usage
+    "IFS=", # IFS manipulation
+    "\\$\\{IFS\\}", # ${IFS} usage
 
     # Brace expansion attacks
-    "\\{[a-z],[a-z]\\}",                # {r,m} style
+    "\\{[a-z],[a-z]\\}", # {r,m} style
 
     # Here-string/here-doc to shell
-    "<<<.*\\b(ba)?sh\\b",               # <<< to bash
-    "<<\\s*['\"]?EOF",                  # heredoc markers (suspicious in single commands)
+    "<<<.*\\b(ba)?sh\\b", # <<< to bash
+    "<<\\s*['\"]?EOF", # heredoc markers (suspicious in single commands)
 
     # Aliases and functions for evasion
-    "alias\\s+[a-z]+=",                 # alias definitions
-    "function\\s+[a-z]+\\s*\\(",        # function definitions
+    "alias\\s+[a-z]+=", # alias definitions
+    "function\\s+[a-z]+\\s*\\(", # function definitions
 
     # Network data exfiltration via DNS/other channels
-    "dig\\s+.*\\$",                     # DNS exfiltration with variables
+    "dig\\s+.*\\$", # DNS exfiltration with variables
     "nslookup\\s+.*\\$",
     "host\\s+.*\\$",
 
     # Additional shell escapes
-    "xargs.*\\b(ba)?sh\\b",             # xargs feeding to shell
-    "find.*-exec.*\\b(ba)?sh\\b",       # find -exec bash
-    "awk.*system\\s*\\(",               # awk system() calls
-    "perl\\s+-e",                       # perl one-liners
-    "python\\s+-c",                     # python one-liners
-    "ruby\\s+-e",                       # ruby one-liners
+    "xargs.*\\b(ba)?sh\\b", # xargs feeding to shell
+    "find.*-exec.*\\b(ba)?sh\\b", # find -exec bash
+    "awk.*system\\s*\\(", # awk system() calls
+    "perl\\s+-e", # perl one-liners
+    "python\\s+-c", # python one-liners
+    "ruby\\s+-e", # ruby one-liners
 
     # Process substitution attacks
-    "<\\(.*\\b(ba)?sh\\b",              # <(bash ...) process substitution
-    ">\\(.*\\b(ba)?sh\\b"               # >(bash ...) process substitution
+    "<\\(.*\\b(ba)?sh\\b", # <(bash ...) process substitution
+    ">\\(.*\\b(ba)?sh\\b" # >(bash ...) process substitution
   )
 
   # Use provided patterns or defaults
