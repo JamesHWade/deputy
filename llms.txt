@@ -271,6 +271,10 @@ Built-in tools and tool bundles
   : Execute bash commands
 - [`tool_run_r_code()`](https://jameshwade.github.io/deputy/reference/tool_run_r_code.md)
   : Execute R code
+- [`tool_web_fetch()`](https://jameshwade.github.io/deputy/reference/tool_web_fetch.md)
+  : Fetch web page content
+- [`tool_web_search()`](https://jameshwade.github.io/deputy/reference/tool_web_search.md)
+  : Search the web
 - [`tool_write_file()`](https://jameshwade.github.io/deputy/reference/tool_write_file.md)
   : Write content to a file
 - [`tools_all()`](https://jameshwade.github.io/deputy/reference/tools_all.md)
@@ -287,6 +291,8 @@ Built-in tools and tool bundles
   : Get tools from MCP servers
 - [`tools_preset()`](https://jameshwade.github.io/deputy/reference/tools_preset.md)
   : Get a tool preset by name
+- [`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md)
+  : Web tools
 - [`ToolPresets`](https://jameshwade.github.io/deputy/reference/ToolPresets.md)
   : Available tool preset names
 - [`list_presets()`](https://jameshwade.github.io/deputy/reference/list_presets.md)
