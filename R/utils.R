@@ -142,6 +142,11 @@ is_path_within <- function(path, dir) {
       error = function(e) NA_character_
     )
 
+    # Explicitly convert any remaining backslashes to forward slashes
+    if (!is.na(normalized)) {
+      normalized <- gsub("\\\\", "/", normalized)
+    }
+
     # If the path doesn't exist, normalizePath won't resolve symlinks
     # in the non-existing portion. Find the longest existing prefix.
     # Use normalized path for checks to handle Windows backslashes correctly
@@ -172,6 +177,8 @@ is_path_within <- function(path, dir) {
               normalizePath(existing, mustWork = TRUE, winslash = "/"),
               error = function(e) existing
             )
+            # Explicitly convert any remaining backslashes
+            existing_normalized <- gsub("\\\\", "/", existing_normalized)
             return(paste(existing_normalized, remaining, sep = "/"))
           }
           break
