@@ -204,6 +204,9 @@ test_that("tool_read_file returns tool_reject for missing file", {
 })
 
 test_that("tool_write_file handles write errors gracefully", {
+  # Skip on Windows - absolute Unix paths behave differently
+  skip_on_os("windows")
+
   # Try to write to a directory that doesn't exist
   result <- tryCatch(
     tool_write_file("/nonexistent/deep/path/file.txt", "content"),

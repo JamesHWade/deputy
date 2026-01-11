@@ -47,6 +47,7 @@ for (event in agent$run("List files in current directory")) \{
 Useful links:
 \itemize{
   \item \url{https://github.com/JamesHWade/deputy}
+  \item \url{https://jameshwade.github.io/deputy/}
   \item Report bugs at \url{https://github.com/JamesHWade/deputy/issues}
 }
 

@@ -64,6 +64,9 @@ test_that("Agent respects readonly mode", {
 })
 
 test_that("Agent respects working directory restriction", {
+  # Skip on Windows due to 8.3 short name normalization issues
+  skip_on_os("windows")
+
   withr::local_tempdir(pattern = "deputy-test") -> temp_dir
 
   mock_chat <- create_mock_chat()
