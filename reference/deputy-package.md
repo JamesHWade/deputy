@@ -48,6 +48,8 @@ Useful links:
 
 - <https://github.com/JamesHWade/deputy>
 
+- <https://jameshwade.github.io/deputy/>
+
 - Report bugs at <https://github.com/JamesHWade/deputy/issues>
 
 ## Author
