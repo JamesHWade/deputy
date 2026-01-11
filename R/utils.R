@@ -70,10 +70,18 @@ expand_and_normalize <- function(path) {
   expanded <- path.expand(path)
 
   # Normalize the path (handles . and ..)
-  tryCatch(
+  normalized <- tryCatch(
     normalizePath(expanded, mustWork = FALSE, winslash = "/"),
     error = function(e) NA_character_
   )
+
+  # Explicitly convert any remaining backslashes to forward slashes
+  # (Windows paths sometimes have mixed separators that normalizePath doesn't fix)
+  if (!is.na(normalized)) {
+    normalized <- gsub("\\\\", "/", normalized)
+  }
+
+  normalized
 }
 
 #' Check if a path is within a directory (secure)
