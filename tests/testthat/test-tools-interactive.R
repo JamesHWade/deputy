@@ -1,7 +1,6 @@
 # Tests for interactive tools
 
 test_that("tool_ask_user has correct structure", {
-
   expect_true(inherits(tool_ask_user, "ellmer::ToolDef"))
 
   # Check name - matches Anthropic SDK naming
@@ -207,19 +206,25 @@ test_that("tool_ask_user validates question structure", {
 
   # Missing question field
   expect_error(
-    tool_ask_user(list(list(header = "H", options = list(
-      list(label = "A", description = "A"),
-      list(label = "B", description = "B")
-    )))),
+    tool_ask_user(list(list(
+      header = "H",
+      options = list(
+        list(label = "A", description = "A"),
+        list(label = "B", description = "B")
+      )
+    ))),
     "missing 'question'"
   )
 
   # Missing header field
   expect_error(
-    tool_ask_user(list(list(question = "Q?", options = list(
-      list(label = "A", description = "A"),
-      list(label = "B", description = "B")
-    )))),
+    tool_ask_user(list(list(
+      question = "Q?",
+      options = list(
+        list(label = "A", description = "A"),
+        list(label = "B", description = "B")
+      )
+    ))),
     "missing 'header'"
   )
 
@@ -316,7 +321,10 @@ test_that("parse_user_response handles single selection", {
   expect_equal(parse_user_response("2", options, FALSE), "YAML")
 
   # Free text response
-  expect_equal(parse_user_response("custom answer", options, FALSE), "custom answer")
+  expect_equal(
+    parse_user_response("custom answer", options, FALSE),
+    "custom answer"
+  )
 })
 
 test_that("parse_user_response handles multi-selection", {
@@ -339,7 +347,7 @@ test_that("tool_ask_user handles valid JSON string input", {
   set_ask_user_callback(function(questions) {
     list("What format?" = "JSON")
   })
- withr::defer(set_ask_user_callback(NULL))
+  withr::defer(set_ask_user_callback(NULL))
 
   json_input <- '[{"question": "What format?", "header": "Format", "options": [{"label": "JSON", "description": "JS Object Notation"}, {"label": "YAML", "description": "YAML format"}]}]'
 
@@ -376,7 +384,8 @@ test_that("tool_ask_user handles callback errors gracefully", {
   withr::defer(set_ask_user_callback(NULL))
 
   test_questions <- list(list(
-    question = "Q?", header = "H",
+    question = "Q?",
+    header = "H",
     options = list(
       list(label = "A", description = "A"),
       list(label = "B", description = "B")

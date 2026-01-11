@@ -16,7 +16,7 @@ resolve_symlinks <- function(path, max_depth = 20) {
     return(NA_character_)
   }
 
- # Return NA if path doesn't exist - don't return unverified paths
+  # Return NA if path doesn't exist - don't return unverified paths
   if (!file.exists(path)) {
     return(NA_character_)
   }
@@ -301,7 +301,12 @@ validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
 #' @param append Whether to append to existing file
 #' @return Invisible NULL on success, throws error on failure
 #' @noRd
-secure_write_file <- function(path, content, allowed_dir = NULL, append = FALSE) {
+secure_write_file <- function(
+  path,
+  content,
+  allowed_dir = NULL,
+  append = FALSE
+) {
   validate_path_at_operation(
     path = path,
     allowed_dir = allowed_dir,

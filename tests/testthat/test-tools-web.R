@@ -7,9 +7,13 @@ test_that("tools_web returns universal tools by default", {
   expect_length(tools, 2)
 
   # Should be our universal tools (functions, not ToolBuiltIn)
-  tool_names <- vapply(tools, function(t) {
-    if (inherits(t, "ellmer::ToolDef")) t@name else "builtin"
-  }, character(1))
+  tool_names <- vapply(
+    tools,
+    function(t) {
+      if (inherits(t, "ellmer::ToolDef")) t@name else "builtin"
+    },
+    character(1)
+  )
   expect_true("web_fetch" %in% tool_names)
   expect_true("web_search" %in% tool_names)
 })
@@ -19,9 +23,13 @@ test_that("tools_web returns universal tools when use_native = FALSE", {
   tools <- tools_web(mock_chat, use_native = FALSE)
   expect_length(tools, 2)
 
-  tool_names <- vapply(tools, function(t) {
-    if (inherits(t, "ellmer::ToolDef")) t@name else "builtin"
-  }, character(1))
+  tool_names <- vapply(
+    tools,
+    function(t) {
+      if (inherits(t, "ellmer::ToolDef")) t@name else "builtin"
+    },
+    character(1)
+  )
   expect_true("web_fetch" %in% tool_names)
   expect_true("web_search" %in% tool_names)
 })

@@ -277,90 +277,130 @@ Permissions <- R6::R6Class(
   active = list(
     #' @field mode Permission mode (see [PermissionMode]). Read-only after construction.
     mode = function(value) {
-      if (missing(value)) return(private$.mode)
+      if (missing(value)) {
+        return(private$.mode)
+      }
       if (isTRUE(private$.frozen)) {
-        cli_abort("Cannot modify permissions: mode is immutable after construction")
+        cli_abort(
+          "Cannot modify permissions: mode is immutable after construction"
+        )
       }
       private$.mode <- value
     },
 
     #' @field file_read Allow file reading. Read-only after construction.
     file_read = function(value) {
-      if (missing(value)) return(private$.file_read)
+      if (missing(value)) {
+        return(private$.file_read)
+      }
       if (isTRUE(private$.frozen)) {
-        cli_abort("Cannot modify permissions: file_read is immutable after construction")
+        cli_abort(
+          "Cannot modify permissions: file_read is immutable after construction"
+        )
       }
       private$.file_read <- value
     },
 
     #' @field file_write Allow file writing. Can be TRUE, FALSE, or a directory path. Read-only after construction.
     file_write = function(value) {
-      if (missing(value)) return(private$.file_write)
+      if (missing(value)) {
+        return(private$.file_write)
+      }
       if (isTRUE(private$.frozen)) {
-        cli_abort("Cannot modify permissions: file_write is immutable after construction")
+        cli_abort(
+          "Cannot modify permissions: file_write is immutable after construction"
+        )
       }
       private$.file_write <- value
     },
 
     #' @field bash Allow bash command execution. Read-only after construction.
     bash = function(value) {
-      if (missing(value)) return(private$.bash)
+      if (missing(value)) {
+        return(private$.bash)
+      }
       if (isTRUE(private$.frozen)) {
-        cli_abort("Cannot modify permissions: bash is immutable after construction")
+        cli_abort(
+          "Cannot modify permissions: bash is immutable after construction"
+        )
       }
       private$.bash <- value
     },
 
     #' @field r_code Allow R code execution. Read-only after construction.
     r_code = function(value) {
-      if (missing(value)) return(private$.r_code)
+      if (missing(value)) {
+        return(private$.r_code)
+      }
       if (isTRUE(private$.frozen)) {
-        cli_abort("Cannot modify permissions: r_code is immutable after construction")
+        cli_abort(
+          "Cannot modify permissions: r_code is immutable after construction"
+        )
       }
       private$.r_code <- value
     },
 
     #' @field web Allow web requests. Read-only after construction.
     web = function(value) {
-      if (missing(value)) return(private$.web)
+      if (missing(value)) {
+        return(private$.web)
+      }
       if (isTRUE(private$.frozen)) {
-        cli_abort("Cannot modify permissions: web is immutable after construction")
+        cli_abort(
+          "Cannot modify permissions: web is immutable after construction"
+        )
       }
       private$.web <- value
     },
 
     #' @field install_packages Allow package installation. Read-only after construction.
     install_packages = function(value) {
-      if (missing(value)) return(private$.install_packages)
+      if (missing(value)) {
+        return(private$.install_packages)
+      }
       if (isTRUE(private$.frozen)) {
-        cli_abort("Cannot modify permissions: install_packages is immutable after construction")
+        cli_abort(
+          "Cannot modify permissions: install_packages is immutable after construction"
+        )
       }
       private$.install_packages <- value
     },
 
     #' @field max_turns Maximum number of turns before stopping. Read-only after construction.
     max_turns = function(value) {
-      if (missing(value)) return(private$.max_turns)
+      if (missing(value)) {
+        return(private$.max_turns)
+      }
       if (isTRUE(private$.frozen)) {
-        cli_abort("Cannot modify permissions: max_turns is immutable after construction")
+        cli_abort(
+          "Cannot modify permissions: max_turns is immutable after construction"
+        )
       }
       private$.max_turns <- value
     },
 
     #' @field max_cost_usd Maximum cost in USD before stopping. Read-only after construction.
     max_cost_usd = function(value) {
-      if (missing(value)) return(private$.max_cost_usd)
+      if (missing(value)) {
+        return(private$.max_cost_usd)
+      }
       if (isTRUE(private$.frozen)) {
-        cli_abort("Cannot modify permissions: max_cost_usd is immutable after construction")
+        cli_abort(
+          "Cannot modify permissions: max_cost_usd is immutable after construction"
+        )
       }
       private$.max_cost_usd <- value
     },
 
     #' @field can_use_tool Custom permission callback. Read-only after construction.
     can_use_tool = function(value) {
-      if (missing(value)) return(private$.can_use_tool)
+      if (missing(value)) {
+        return(private$.can_use_tool)
+      }
       if (isTRUE(private$.frozen)) {
-        cli_abort("Cannot modify permissions: can_use_tool is immutable after construction")
+        cli_abort(
+          "Cannot modify permissions: can_use_tool is immutable after construction"
+        )
       }
       private$.can_use_tool <- value
     }

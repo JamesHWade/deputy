@@ -150,7 +150,9 @@ Agent <- R6::R6Class(
         event <- tryCatch(
           gen(),
           error = function(e) {
-            if (grepl("generator has been exhausted", e$message, fixed = TRUE)) {
+            if (
+              grepl("generator has been exhausted", e$message, fixed = TRUE)
+            ) {
               return(coro::exhausted())
             }
             stop(e)
@@ -603,19 +605,23 @@ Agent <- R6::R6Class(
         )
 
         # Track loaded MCP tools with warnings for extraction failures
-        tool_names <- vapply(seq_along(mcp_tools_list), function(i) {
-          t <- mcp_tools_list[[i]]
-          tryCatch(
-            t@name %||% paste0("<unnamed_", i, ">"),
-            error = function(e) {
-              cli::cli_warn(c(
-                "Could not read name from MCP tool {.val {i}}",
-                "x" = e$message
-              ))
-              paste0("<unknown_", i, ">")
-            }
-          )
-        }, character(1))
+        tool_names <- vapply(
+          seq_along(mcp_tools_list),
+          function(i) {
+            t <- mcp_tools_list[[i]]
+            tryCatch(
+              t@name %||% paste0("<unnamed_", i, ">"),
+              error = function(e) {
+                cli::cli_warn(c(
+                  "Could not read name from MCP tool {.val {i}}",
+                  "x" = e$message
+                ))
+                paste0("<unknown_", i, ">")
+              }
+            )
+          },
+          character(1)
+        )
         private$loaded_mcp_tools <- c(private$loaded_mcp_tools, tool_names)
       }
 
@@ -1143,10 +1149,16 @@ Agent <- R6::R6Class(
             if (length(tool_requests) > 0) {
               tool_names <- vapply(
                 tool_requests,
-                function(t) tryCatch(t@name, error = function(e) t$name) %||% "unknown",
+                function(t) {
+                  tryCatch(t@name, error = function(e) t$name) %||% "unknown"
+                },
                 character(1)
               )
-              tool_info <- paste0(" [Tools: ", paste(tool_names, collapse = ", "), "]")
+              tool_info <- paste0(
+                " [Tools: ",
+                paste(tool_names, collapse = ", "),
+                "]"
+              )
             }
           }
 
@@ -1185,11 +1197,17 @@ Agent <- R6::R6Class(
             {
               # Try to create a chat with the same provider
               if (provider_info$name == "openai") {
-                ellmer::chat_openai(model = provider_info$model %||% "gpt-4o-mini")
+                ellmer::chat_openai(
+                  model = provider_info$model %||% "gpt-4o-mini"
+                )
               } else if (provider_info$name == "anthropic") {
-                ellmer::chat_anthropic(model = provider_info$model %||% "claude-sonnet-4-5-20250929")
+                ellmer::chat_anthropic(
+                  model = provider_info$model %||% "claude-sonnet-4-5-20250929"
+                )
               } else if (provider_info$name == "google") {
-                ellmer::chat_google(model = provider_info$model %||% "gemini-2.0-flash")
+                ellmer::chat_google(
+                  model = provider_info$model %||% "gemini-2.0-flash"
+                )
               } else {
                 # Fallback to a default provider
                 ellmer::chat_openai(model = "gpt-4o-mini")
@@ -1236,7 +1254,8 @@ Agent <- R6::R6Class(
           text <- tryCatch(
             turn@text,
             error = function(e) turn$text
-          ) %||% "[no text]"
+          ) %||%
+            "[no text]"
           if (nchar(text) > 200) {
             text <- paste0(substr(text, 1, 197), "...")
           }
