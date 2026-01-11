@@ -128,7 +128,7 @@ is_path_within <- function(path, dir) {
       }
     }
 
-    # Normalize the path
+    # Normalize the path (converts backslashes to forward slashes on Windows)
     normalized <- tryCatch(
       normalizePath(p, mustWork = FALSE, winslash = "/"),
       error = function(e) NA_character_
@@ -136,8 +136,9 @@ is_path_within <- function(path, dir) {
 
     # If the path doesn't exist, normalizePath won't resolve symlinks
     # in the non-existing portion. Find the longest existing prefix.
-    if (!file.exists(p)) {
-      parts <- strsplit(p, "/")[[1]]
+    # Use normalized path for checks to handle Windows backslashes correctly
+    if (!file.exists(normalized)) {
+      parts <- strsplit(normalized, "/")[[1]]
       # Reconstruct path piece by piece to find existing prefix
       for (i in seq_along(parts)) {
         prefix <- paste(parts[1:i], collapse = "/")
