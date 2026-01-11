@@ -1,5 +1,46 @@
 # Tests for web tools
 
+# Provider detection tests ------------------------------------------------
+
+test_that("tools_web returns universal tools by default", {
+  tools <- tools_web()
+  expect_length(tools, 2)
+
+  # Should be our universal tools (functions, not ToolBuiltIn)
+  tool_names <- vapply(tools, function(t) {
+    if (inherits(t, "ellmer::ToolDef")) t@name else "builtin"
+  }, character(1))
+  expect_true("web_fetch" %in% tool_names)
+  expect_true("web_search" %in% tool_names)
+})
+
+test_that("tools_web returns universal tools when use_native = FALSE", {
+  mock_chat <- create_mock_chat()
+  tools <- tools_web(mock_chat, use_native = FALSE)
+  expect_length(tools, 2)
+
+  tool_names <- vapply(tools, function(t) {
+    if (inherits(t, "ellmer::ToolDef")) t@name else "builtin"
+  }, character(1))
+  expect_true("web_fetch" %in% tool_names)
+  expect_true("web_search" %in% tool_names)
+})
+
+test_that("get_provider_name handles invalid input", {
+  expect_equal(deputy:::get_provider_name(NULL), "unknown")
+  expect_equal(deputy:::get_provider_name("not a chat"), "unknown")
+  expect_equal(deputy:::get_provider_name(list()), "unknown")
+})
+
+test_that("get_provider_name extracts provider from mock chat", {
+  mock_chat <- create_mock_chat()
+  # Our mock chat doesn't have a real provider, should return "unknown"
+  result <- deputy:::get_provider_name(mock_chat)
+  expect_type(result, "character")
+})
+
+# Tool structure tests ---------------------------------------------------
+
 test_that("tool_web_fetch has correct structure", {
   expect_true(inherits(tool_web_fetch, "ellmer::ToolDef"))
   expect_equal(tool_web_fetch@name, "web_fetch")

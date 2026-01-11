@@ -87,30 +87,117 @@ tools_data <- function() {
 #' Web tools
 #'
 #' @description
-#' Returns a list of tools for web operations:
-#' * `web_fetch` - Fetch web page content
-#' * `web_search` - Search the web
+#' Returns a list of tools for web operations. When a `chat` object is provided,
+#' automatically selects the best tools for that provider:
 #'
-#' **Note:** These tools require the `web` permission to be enabled
-#' and the httr2 package to be installed.
+#' * **Claude (Anthropic)**: Uses native `claude_tool_web_search()` and
+#'   `claude_tool_web_fetch()` for higher quality results (requires admin
+#'   enablement and incurs extra cost)
+#' * **Google (Gemini/Vertex)**: Uses native `google_tool_web_search()` and
+#'   `google_tool_web_fetch()`
+#' * **OpenAI**: Uses native `openai_tool_web_search()`
+#' * **Other providers**: Falls back to universal tools using httr2 and DuckDuckGo
+#'
+#' Without a `chat` argument, returns universal tools that work with any provider.
+#'
+#' @param chat Optional ellmer Chat object. If provided, returns provider-specific
+#'   tools when available for better quality results.
+#' @param use_native Logical. If `TRUE` (default), use native provider tools when
+#'   available. Set to `FALSE` to always use universal tools.
 #'
 #' @return A list of tool definitions
 #'
 #' @examples
 #' \dontrun{
+#' # Universal tools (work with any provider)
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat_ollama(),
 #'   tools = tools_web(),
+#'   permissions = Permissions$new(web = TRUE)
+#' )
+#'
+#' # Provider-specific tools (auto-detected)
+#' chat <- ellmer::chat_claude()
+#' agent <- Agent$new(
+#'   chat = chat,
+#'   tools = tools_web(chat),  # Uses Claude's native web tools
+#'   permissions = Permissions$new(web = TRUE)
+#' )
+#'
+#' # Force universal tools even with Claude
+#' agent <- Agent$new(
+#'   chat = chat,
+#'   tools = tools_web(chat, use_native = FALSE),
 #'   permissions = Permissions$new(web = TRUE)
 #' )
 #' }
 #'
 #' @seealso [tool_web_fetch], [tool_web_search]
 #' @export
-tools_web <- function() {
-  list(
-    tool_web_fetch,
-    tool_web_search
+tools_web <- function(chat = NULL, use_native = TRUE) {
+  # If no chat provided or native disabled, return universal tools
+  if (is.null(chat) || !use_native) {
+    return(list(tool_web_fetch, tool_web_search))
+  }
+
+  # Detect provider from chat
+  provider_name <- get_provider_name(chat)
+
+  # Return provider-specific tools when available
+  switch(provider_name,
+    "Anthropic" = {
+      cli_inform(c(
+        "i" = "Using Claude's native web tools (higher quality, extra cost)",
+        "i" = "Set {.code use_native = FALSE} for free universal tools"
+      ))
+      list(
+        ellmer::claude_tool_web_search(),
+        ellmer::claude_tool_web_fetch()
+      )
+    },
+    "Google/Gemini" = ,
+    "Google/Vertex" = {
+      cli_inform(c(
+        "i" = "Using Google's native web tools"
+      ))
+      list(
+        ellmer::google_tool_web_search(),
+        ellmer::google_tool_web_fetch()
+      )
+    },
+    "OpenAI" = {
+      cli_inform(c(
+        "i" = "Using OpenAI's native web search (fetch not available)",
+        "i" = "Adding universal web_fetch as fallback"
+      ))
+      list(
+        ellmer::openai_tool_web_search(),
+        tool_web_fetch  # OpenAI doesn't have native fetch
+      )
+    },
+    # Default: universal tools
+    {
+      list(tool_web_fetch, tool_web_search)
+    }
+  )
+}
+
+#' Get provider name from a Chat object
+#'
+#' @param chat An ellmer Chat object
+#' @return Provider name string, or "unknown" if detection fails
+#' @noRd
+get_provider_name <- function(chat) {
+  if (!inherits(chat, "Chat")) {
+    return("unknown")
+  }
+
+ tryCatch(
+    {
+      provider <- chat$get_provider()
+      provider@name
+    },
+    error = function(e) "unknown"
   )
 }
 

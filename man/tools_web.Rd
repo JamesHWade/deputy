@@ -4,26 +4,54 @@
 \alias{tools_web}
 \title{Web tools}
 \usage{
-tools_web()
+tools_web(chat = NULL, use_native = TRUE)
+}
+\arguments{
+\item{chat}{Optional ellmer Chat object. If provided, returns provider-specific
+tools when available for better quality results.}
+
+\item{use_native}{Logical. If \code{TRUE} (default), use native provider tools when
+available. Set to \code{FALSE} to always use universal tools.}
 }
 \value{
 A list of tool definitions
 }
 \description{
-Returns a list of tools for web operations:
+Returns a list of tools for web operations. When a \code{chat} object is provided,
+automatically selects the best tools for that provider:
 \itemize{
-\item \code{web_fetch} - Fetch web page content
-\item \code{web_search} - Search the web
+\item \strong{Claude (Anthropic)}: Uses native \code{claude_tool_web_search()} and
+\code{claude_tool_web_fetch()} for higher quality results (requires admin
+enablement and incurs extra cost)
+\item \strong{Google (Gemini/Vertex)}: Uses native \code{google_tool_web_search()} and
+\code{google_tool_web_fetch()}
+\item \strong{OpenAI}: Uses native \code{openai_tool_web_search()}
+\item \strong{Other providers}: Falls back to universal tools using httr2 and DuckDuckGo
 }
 
-\strong{Note:} These tools require the \code{web} permission to be enabled
-and the httr2 package to be installed.
+Without a \code{chat} argument, returns universal tools that work with any provider.
 }
 \examples{
 \dontrun{
+# Universal tools (work with any provider)
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat_ollama(),
   tools = tools_web(),
+  permissions = Permissions$new(web = TRUE)
+)
+
+# Provider-specific tools (auto-detected)
+chat <- ellmer::chat_claude()
+agent <- Agent$new(
+  chat = chat,
+  tools = tools_web(chat),  # Uses Claude's native web tools
+  permissions = Permissions$new(web = TRUE)
+)
+
+# Force universal tools even with Claude
+agent <- Agent$new(
+  chat = chat,
+  tools = tools_web(chat, use_native = FALSE),
   permissions = Permissions$new(web = TRUE)
 )
 }
