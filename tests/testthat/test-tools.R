@@ -343,7 +343,7 @@ test_that("tools_preset returns correct tools for dev", {
 test_that("tools_preset returns correct tools for full", {
   tools <- tools_preset("full")
   expect_type(tools, "list")
-  expect_length(tools, 6)
+  expect_length(tools, 8)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
@@ -352,6 +352,8 @@ test_that("tools_preset returns correct tools for full", {
   expect_true("run_r_code" %in% tool_names)
   expect_true("run_bash" %in% tool_names)
   expect_true("read_csv" %in% tool_names)
+  expect_true("web_fetch" %in% tool_names)
+  expect_true("web_search" %in% tool_names)
 })
 
 test_that("tools_preset returns correct tools for data", {

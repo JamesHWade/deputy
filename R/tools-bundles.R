@@ -84,6 +84,36 @@ tools_data <- function() {
   )
 }
 
+#' Web tools
+#'
+#' @description
+#' Returns a list of tools for web operations:
+#' * `web_fetch` - Fetch web page content
+#' * `web_search` - Search the web
+#'
+#' **Note:** These tools require the `web` permission to be enabled
+#' and the httr2 package to be installed.
+#'
+#' @return A list of tool definitions
+#'
+#' @examples
+#' \dontrun{
+#' agent <- Agent$new(
+#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   tools = tools_web(),
+#'   permissions = Permissions$new(web = TRUE)
+#' )
+#' }
+#'
+#' @seealso [tool_web_fetch], [tool_web_search]
+#' @export
+tools_web <- function() {
+  list(
+    tool_web_fetch,
+    tool_web_search
+  )
+}
+
 #' All built-in tools
 #'
 #' @description
@@ -110,7 +140,9 @@ tools_all <- function() {
     tool_list_files,
     tool_run_r_code,
     tool_run_bash,
-    tool_read_csv
+    tool_read_csv,
+    tool_web_fetch,
+    tool_web_search
   )
 }
 
@@ -228,7 +260,7 @@ list_presets <- function() {
       "read_file, write_file, list_files, run_r_code",
       "read_file, write_file, list_files, run_r_code, run_bash",
       "read_file, list_files, read_csv, run_r_code",
-      "read_file, write_file, list_files, run_r_code, run_bash, read_csv"
+      "read_file, write_file, list_files, run_r_code, run_bash, read_csv, web_fetch, web_search"
     ),
     stringsAsFactors = FALSE
   )

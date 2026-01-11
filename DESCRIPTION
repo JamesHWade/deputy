@@ -17,14 +17,17 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Suggests:
     callr,
+    httr2,
     jsonlite,
     knitr,
     mcptools,
     Rapp,
     readr,
     rmarkdown,
+    rvest,
     testthat (>= 3.0.0),
     withr,
+    xml2,
     yaml
 VignetteBuilder: knitr
 Config/testthat/edition: 3
