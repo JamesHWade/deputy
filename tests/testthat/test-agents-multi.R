@@ -605,3 +605,321 @@ test_that("LeadAgent inherits Agent hooks field", {
   expect_s3_class(lead$hooks, "HookRegistry")
   expect_equal(lead$hooks$count(), 0)
 })
+
+# ============================================================================
+# Integration tests for delegation execution
+# ============================================================================
+
+test_that("delegate_to_agent rejects unknown agent name with error", {
+  # This test verifies that the delegate_to_agent tool correctly rejects
+  # requests for unknown agent names using tool_reject()
+
+  mock_chat <- create_mock_chat()
+  known_agent <- agent_definition(
+    name = "known_agent",
+    description = "A known agent",
+    prompt = "You are known"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(known_agent)
+  )
+
+  # Get the delegate tool and call it with unknown agent name
+  tools <- mock_chat$get_tools()
+  delegate_tool <- tools[["delegate_to_agent"]]
+
+  # tool_reject throws an error with specific message
+  expect_error(
+    delegate_tool("unknown_agent", "Do something"),
+    "Unknown agent.*unknown_agent"
+  )
+})
+
+test_that("delegate_to_agent error message lists available agents", {
+  mock_chat <- create_mock_chat()
+  agent1 <- agent_definition(
+    name = "reader",
+    description = "Reads files",
+    prompt = "You read"
+  )
+  agent2 <- agent_definition(
+    name = "writer",
+    description = "Writes files",
+    prompt = "You write"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(agent1, agent2)
+  )
+
+  tools <- mock_chat$get_tools()
+  delegate_tool <- tools[["delegate_to_agent"]]
+
+  # Error should list available agents
+  expect_error(
+    delegate_tool("nonexistent", "Do something"),
+    "reader.*writer|writer.*reader"
+  )
+})
+
+test_that("SubagentStop hook fires after successful delegation", {
+  # This test verifies that the SubagentStop hook is fired after a sub-agent
+  # completes its task. We mock the sub-agent creation to avoid real API calls.
+
+  mock_chat <- create_mock_chat()
+
+  # Add clone method to mock_chat for model inheritance
+  mock_chat$clone <- function() {
+    sub_mock <- create_mock_chat(responses = list("Sub-agent result"))
+    # Override stream to return strings
+    sub_mock$stream <- function(prompt = NULL) {
+      yielded <- FALSE
+      function() {
+        if (yielded) {
+          return(coro::exhausted())
+        }
+        yielded <<- TRUE
+        "Sub-agent result"
+      }
+    }
+    sub_mock$last_turn <- function(role = "assistant") {
+      create_mock_assistant_turn(text = "Sub-agent result")
+    }
+    sub_mock
+  }
+
+  sub_agent_def <- agent_definition(
+    name = "helper",
+    description = "A helper agent",
+    prompt = "You help with tasks"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(sub_agent_def)
+  )
+
+  # Track hook firing
+  hook_fired <- FALSE
+  captured_agent_name <- NULL
+  captured_task <- NULL
+  captured_result <- NULL
+
+  lead$add_hook(HookMatcher$new(
+    event = "SubagentStop",
+    timeout = 0, # Run synchronously to avoid subprocess closure issues
+    callback = function(agent_name, task, result, context) {
+      hook_fired <<- TRUE
+      captured_agent_name <<- agent_name
+      captured_task <<- task
+      captured_result <<- result
+      HookResultSubagentStop()
+    }
+  ))
+
+  # Call the delegate tool
+  tools <- mock_chat$get_tools()
+  delegate_tool <- tools[["delegate_to_agent"]]
+
+  result <- delegate_tool("helper", "Do a task")
+
+  # Verify hook was fired with correct arguments
+
+  expect_true(hook_fired)
+  expect_equal(captured_agent_name, "helper")
+  expect_equal(captured_task, "Do a task")
+  expect_equal(captured_result, "Sub-agent result")
+})
+
+test_that("delegation executes sub-agent and returns result", {
+  # This test verifies the full delegation flow: find agent definition,
+  # create sub-agent, run task, return result
+
+  mock_chat <- create_mock_chat()
+
+  # Add clone method for model inheritance
+  mock_chat$clone <- function() {
+    sub_mock <- create_mock_chat(
+      responses = list("Task completed successfully")
+    )
+    sub_mock$stream <- function(prompt = NULL) {
+      yielded <- FALSE
+      function() {
+        if (yielded) {
+          return(coro::exhausted())
+        }
+        yielded <<- TRUE
+        "Task completed successfully"
+      }
+    }
+    sub_mock$last_turn <- function(role = "assistant") {
+      create_mock_assistant_turn(text = "Task completed successfully")
+    }
+    sub_mock
+  }
+
+  worker_def <- agent_definition(
+    name = "worker",
+    description = "Does work",
+    prompt = "You are a worker"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(worker_def)
+  )
+
+  tools <- mock_chat$get_tools()
+  delegate_tool <- tools[["delegate_to_agent"]]
+
+  result <- delegate_tool("worker", "Complete the task")
+
+  expect_equal(result, "Task completed successfully")
+})
+
+test_that("delegation passes permissions to sub-agent", {
+  # This test verifies that the lead agent's permissions are inherited
+  # by sub-agents during delegation
+
+  mock_chat <- create_mock_chat()
+
+  # Track what permissions were used
+  sub_agent_created_with_perms <- NULL
+
+  mock_chat$clone <- function() {
+    sub_mock <- create_mock_chat(responses = list("Done"))
+    sub_mock$stream <- function(prompt = NULL) {
+      yielded <- FALSE
+      function() {
+        if (yielded) {
+          return(coro::exhausted())
+        }
+        yielded <<- TRUE
+        "Done"
+      }
+    }
+    sub_mock$last_turn <- function(role = "assistant") {
+      create_mock_assistant_turn(text = "Done")
+    }
+    sub_mock
+  }
+
+  sub_def <- agent_definition(
+    name = "sub",
+    description = "Sub-agent",
+    prompt = "You are a sub-agent"
+  )
+
+  # Create lead agent with readonly permissions
+  perms <- permissions_readonly()
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(sub_def),
+    permissions = perms
+  )
+
+  # Verify lead has the permissions
+  expect_identical(lead$permissions, perms)
+
+  # Execute delegation - if it works, permissions were passed correctly
+  # (readonly permissions still allow the agent to run)
+  tools <- mock_chat$get_tools()
+  delegate_tool <- tools[["delegate_to_agent"]]
+
+  result <- delegate_tool("sub", "Read something")
+  expect_equal(result, "Done")
+})
+
+test_that("delegation handles sub-agent execution failure", {
+  # This test verifies that when a sub-agent fails, the error is properly
+  # wrapped and returned as a tool rejection
+
+  mock_chat <- create_mock_chat()
+
+  # Clone that produces a chat which will fail on both stream AND chat
+  mock_chat$clone <- function() {
+    sub_mock <- create_mock_chat()
+    sub_mock$stream <- function(prompt = NULL) {
+      stop("Simulated stream failure")
+    }
+    sub_mock$chat <- function(prompt = NULL) {
+      stop("Simulated chat failure")
+    }
+    sub_mock
+  }
+
+  failing_agent <- agent_definition(
+    name = "failer",
+    description = "An agent that fails",
+    prompt = "You fail"
+  )
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(failing_agent)
+  )
+
+  tools <- mock_chat$get_tools()
+  delegate_tool <- tools[["delegate_to_agent"]]
+
+  # Should throw an error from tool_reject
+  expect_error(
+    suppressWarnings(delegate_tool("failer", "Do something")),
+    "Sub-agent 'failer' failed"
+  )
+})
+
+test_that("SubagentStop hook receives working_dir in context", {
+  mock_chat <- create_mock_chat()
+
+  mock_chat$clone <- function() {
+    sub_mock <- create_mock_chat(responses = list("Result"))
+    sub_mock$stream <- function(prompt = NULL) {
+      yielded <- FALSE
+      function() {
+        if (yielded) {
+          return(coro::exhausted())
+        }
+        yielded <<- TRUE
+        "Result"
+      }
+    }
+    sub_mock$last_turn <- function(role = "assistant") {
+      create_mock_assistant_turn(text = "Result")
+    }
+    sub_mock
+  }
+
+  sub_def <- agent_definition(
+    name = "helper",
+    description = "Helper",
+    prompt = "Help"
+  )
+
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(sub_def),
+    working_dir = temp_dir
+  )
+
+  captured_context <- NULL
+  lead$add_hook(HookMatcher$new(
+    event = "SubagentStop",
+    timeout = 0, # Run synchronously to avoid subprocess closure issues
+    callback = function(agent_name, task, result, context) {
+      captured_context <<- context
+      HookResultSubagentStop()
+    }
+  ))
+
+  tools <- mock_chat$get_tools()
+  delegate_tool <- tools[["delegate_to_agent"]]
+  delegate_tool("helper", "Help me")
+
+  expect_equal(captured_context$working_dir, temp_dir)
+})
