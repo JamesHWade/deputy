@@ -735,7 +735,7 @@ Agent <- R6::R6Class(
       }
 
       # Check if it's a ContentToolRequest (S7 class)
-      if (!inherits(request, "ContentToolRequest")) {
+      if (!inherits(request, "ellmer::ContentToolRequest")) {
         cli_warn(c(
           "Tool request is not a ContentToolRequest",
           "i" = "Got class: {.cls {class(request)}}"
@@ -816,7 +816,7 @@ Agent <- R6::R6Class(
       }
 
       # Check if it's a ContentToolResult (S7 class)
-      if (!inherits(result, "ContentToolResult")) {
+      if (!inherits(result, "ellmer::ContentToolResult")) {
         # Try to handle as a list-like object for backwards compatibility
         cli_warn(c(
           "Tool result is not a ContentToolResult",
@@ -1109,7 +1109,7 @@ Agent <- R6::R6Class(
       # Check contents for tool requests
       contents <- turn@contents
       for (content in contents) {
-        if (inherits(content, "ContentToolRequest")) {
+        if (inherits(content, "ellmer::ContentToolRequest")) {
           return(TRUE)
         }
       }
@@ -1141,15 +1141,19 @@ Agent <- R6::R6Class(
       turn_texts <- vapply(
         turns,
         function(turn) {
-          role <- if (inherits(turn, "UserTurn")) "User" else "Assistant"
+          role <- if (inherits(turn, "ellmer::UserTurn")) {
+            "User"
+          } else {
+            "Assistant"
+          }
           text <- get_turn_text(turn)
 
           # Include tool information if present
           tool_info <- ""
-          if (inherits(turn, "AssistantTurn")) {
+          if (inherits(turn, "ellmer::AssistantTurn")) {
             contents <- get_turn_contents(turn)
             tool_requests <- Filter(
-              function(c) inherits(c, "ContentToolRequest"),
+              function(c) inherits(c, "ellmer::ContentToolRequest"),
               contents
             )
             if (length(tool_requests) > 0) {
@@ -1255,7 +1259,11 @@ Agent <- R6::R6Class(
       summary_parts <- vapply(
         turns,
         function(turn) {
-          role <- if (inherits(turn, "UserTurn")) "User" else "Assistant"
+          role <- if (inherits(turn, "ellmer::UserTurn")) {
+            "User"
+          } else {
+            "Assistant"
+          }
           # Handle both S7 objects (with @) and regular lists (with $)
           text <- tryCatch(
             turn@text,

@@ -373,7 +373,7 @@ format_cost <- function(cost) {
 #' @return The annotation value or default
 #' @noRd
 get_tool_annotation <- function(tool, annotation, default = NULL) {
-  if (!inherits(tool, "ToolDef")) {
+  if (!inherits(tool, "ellmer::ToolDef")) {
     return(default)
   }
 
