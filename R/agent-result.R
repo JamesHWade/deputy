@@ -15,7 +15,9 @@
 #' * `"tool_start"` - Tool execution starting. Contains: `tool_name`, `tool_input`
 #' * `"tool_end"` - Tool execution completed. Contains: `tool_name`, `tool_result`, `tool_error`
 #' * `"text"` - Text chunk from LLM. Contains: `text`, `is_complete`
+#' * `"text_complete"` - Full text response. Contains: `text`
 #' * `"turn"` - Turn completed. Contains: `turn`, `turn_number`
+#' * `"warning"` - Warning condition occurred. Contains: `message`, `details`
 #' * `"stop"` - Agent stopped. Contains: `reason`, `total_turns`, `cost`
 #'
 #' @examples

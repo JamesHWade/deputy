@@ -999,6 +999,12 @@ Agent <- R6::R6Class(
                 "Streaming failed, falling back to non-streaming",
                 "x" = stream_error$message
               ))
+              # Emit warning event so applications can surface this to users
+              coro::yield(AgentEvent(
+                "warning",
+                message = "Streaming failed, falling back to non-streaming",
+                details = stream_error$message
+              ))
             }
             response <- agent$chat$chat(prompt)
             if (!is.null(response) && nchar(response) > 0) {

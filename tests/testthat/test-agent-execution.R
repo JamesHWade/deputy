@@ -271,3 +271,101 @@ test_that("Agent can access S7 turn properties via @ accessor", {
   expect_equal(last@text, "Response text")
   expect_true(is.list(last@contents))
 })
+
+# ============================================================================
+# Streaming fallback warning event tests
+# ============================================================================
+
+test_that("run emits warning event when streaming fails and falls back", {
+  # This test verifies that when streaming fails, the agent emits a "warning"
+
+  # AgentEvent that applications can use to surface the degraded mode to users
+
+  mock_chat <- create_mock_chat(responses = list("Fallback response"))
+
+  # Override stream to fail
+  mock_chat$stream <- function(prompt = NULL) {
+    stop("Simulated streaming failure")
+  }
+
+  # Override chat (fallback) to succeed
+  mock_chat$chat <- function(prompt = NULL) {
+    "Fallback response"
+  }
+
+  # Override last_turn
+  mock_chat$last_turn <- function(role = "assistant") {
+    create_mock_assistant_turn(text = "Fallback response")
+  }
+
+  agent <- Agent$new(chat = mock_chat)
+
+  # Collect events from the generator
+  events <- list()
+  gen <- agent$run("Test task")
+  suppressWarnings({
+    while (!coro::is_exhausted(e <- gen())) {
+      events <- c(events, list(e))
+    }
+  })
+
+  # Find warning events
+  warning_events <- Filter(function(e) e$type == "warning", events)
+
+  # Should have at least one warning event
+
+  expect_true(length(warning_events) >= 1)
+
+  # Warning event should contain relevant information
+  warning_event <- warning_events[[1]]
+  expect_equal(
+    warning_event$message,
+    "Streaming failed, falling back to non-streaming"
+  )
+  expect_true(grepl("Simulated streaming failure", warning_event$details))
+})
+
+test_that("run_sync collects warning events in result", {
+  # This test verifies that warning events are collected in the AgentResult
+  # so applications using run_sync can also access them
+
+  mock_chat <- create_mock_chat(responses = list("Fallback response"))
+
+  # Override stream to fail
+  mock_chat$stream <- function(prompt = NULL) {
+    stop("Stream error")
+  }
+
+  # Override chat (fallback) to succeed
+  mock_chat$chat <- function(prompt = NULL) {
+    "Fallback response"
+  }
+
+  # Override last_turn
+  mock_chat$last_turn <- function(role = "assistant") {
+    create_mock_assistant_turn(text = "Fallback response")
+  }
+
+  agent <- Agent$new(chat = mock_chat)
+
+  result <- suppressWarnings(agent$run_sync("Test task"))
+
+  # Result should contain events including the warning
+  warning_events <- Filter(function(e) e$type == "warning", result$events)
+  expect_true(length(warning_events) >= 1)
+})
+
+test_that("AgentEvent warning type has correct structure", {
+  event <- AgentEvent(
+    "warning",
+    message = "Test warning",
+    details = "Some details"
+  )
+
+  expect_s3_class(event, "AgentEvent")
+  expect_s3_class(event, "AgentEventWarning")
+  expect_equal(event$type, "warning")
+  expect_equal(event$message, "Test warning")
+  expect_equal(event$details, "Some details")
+  expect_true(!is.null(event$timestamp))
+})
