@@ -1106,8 +1106,19 @@ Agent <- R6::R6Class(
         return(FALSE)
       }
 
-      # Check contents for tool requests
-      contents <- turn@contents
+      # Check contents for tool requests (with defensive error handling)
+      contents <- tryCatch(
+        turn@contents,
+        error = function(e) {
+          cli_warn(c(
+            "Failed to access turn contents for tool request check",
+            "i" = "Turn class: {.cls {class(turn)}}",
+            "x" = e$message
+          ))
+          list()
+        }
+      )
+
       for (content in contents) {
         if (inherits(content, "ellmer::ContentToolRequest")) {
           return(TRUE)
@@ -1143,8 +1154,15 @@ Agent <- R6::R6Class(
         function(turn) {
           role <- if (inherits(turn, "ellmer::UserTurn")) {
             "User"
-          } else {
+          } else if (inherits(turn, "ellmer::AssistantTurn")) {
             "Assistant"
+          } else {
+            cli_warn(c(
+              "Unknown turn type in compaction summary",
+              "i" = "Got class: {.cls {class(turn)}}",
+              "i" = "Defaulting to 'Unknown'"
+            ))
+            "Unknown"
           }
           text <- get_turn_text(turn)
 
@@ -1261,8 +1279,15 @@ Agent <- R6::R6Class(
         function(turn) {
           role <- if (inherits(turn, "ellmer::UserTurn")) {
             "User"
-          } else {
+          } else if (inherits(turn, "ellmer::AssistantTurn")) {
             "Assistant"
+          } else {
+            cli_warn(c(
+              "Unknown turn type in fallback summary",
+              "i" = "Got class: {.cls {class(turn)}}",
+              "i" = "Defaulting to 'Unknown'"
+            ))
+            "Unknown"
           }
           # Handle both S7 objects (with @) and regular lists (with $)
           text <- tryCatch(

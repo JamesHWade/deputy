@@ -377,7 +377,18 @@ get_tool_annotation <- function(tool, annotation, default = NULL) {
     return(default)
   }
 
-  annotations <- tool@annotations
+  annotations <- tryCatch(
+    tool@annotations,
+    error = function(e) {
+      cli::cli_warn(c(
+        "Failed to access tool annotations",
+        "i" = "Tool class: {.cls {class(tool)}}",
+        "x" = e$message
+      ))
+      NULL
+    }
+  )
+
   if (is.null(annotations)) {
     return(default)
   }
