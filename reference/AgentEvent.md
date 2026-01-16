@@ -35,7 +35,12 @@ An `AgentEvent` object
 
 - `"text"` - Text chunk from LLM. Contains: `text`, `is_complete`
 
+- `"text_complete"` - Full text response. Contains: `text`
+
 - `"turn"` - Turn completed. Contains: `turn`, `turn_number`
+
+- `"warning"` - Warning condition occurred. Contains: `message`,
+  `details`
 
 - `"stop"` - Agent stopped. Contains: `reason`, `total_turns`, `cost`
 
@@ -45,14 +50,14 @@ An `AgentEvent` object
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-01-12 03:24:22 
+#>   timestamp: 2026-01-16 01:02:56 
 #>   task: Analyze data.csv
 
 # Create a text event
 AgentEvent("text", text = "Hello", is_complete = FALSE
 )
 #> <AgentEvent: text >
-#>   timestamp: 2026-01-12 03:24:22 
+#>   timestamp: 2026-01-16 01:02:56 
 #>   text: Hello
 #>   is_complete: FALSE
 ```

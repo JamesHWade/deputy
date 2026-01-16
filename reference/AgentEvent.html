@@ -71,7 +71,9 @@ updates on agent progress.</p>
 <li><p><code>"tool_start"</code> - Tool execution starting. Contains: <code>tool_name</code>, <code>tool_input</code></p></li>
 <li><p><code>"tool_end"</code> - Tool execution completed. Contains: <code>tool_name</code>, <code>tool_result</code>, <code>tool_error</code></p></li>
 <li><p><code>"text"</code> - Text chunk from LLM. Contains: <code>text</code>, <code>is_complete</code></p></li>
+<li><p><code>"text_complete"</code> - Full text response. Contains: <code>text</code></p></li>
 <li><p><code>"turn"</code> - Turn completed. Contains: <code>turn</code>, <code>turn_number</code></p></li>
+<li><p><code>"warning"</code> - Warning condition occurred. Contains: <code>message</code>, <code>details</code></p></li>
 <li><p><code>"stop"</code> - Agent stopped. Contains: <code>reason</code>, <code>total_turns</code>, <code>cost</code></p></li>
 </ul></div>
 
@@ -80,14 +82,14 @@ updates on agent progress.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Create a start event</span></span></span>
 <span class="r-in"><span><span class="fu">AgentEvent</span><span class="op">(</span><span class="st">"start"</span>, task <span class="op">=</span> <span class="st">"Analyze data.csv"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;AgentEvent: start &gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   timestamp: 2026-01-12 03:24:22 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   timestamp: 2026-01-16 01:02:56 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   task: Analyze data.csv</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Create a text event</span></span></span>
 <span class="r-in"><span><span class="fu">AgentEvent</span><span class="op">(</span><span class="st">"text"</span>, text <span class="op">=</span> <span class="st">"Hello"</span>, is_complete <span class="op">=</span> <span class="cn">FALSE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;AgentEvent: text &gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   timestamp: 2026-01-12 03:24:22 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   timestamp: 2026-01-16 01:02:56 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   text: Hello</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   is_complete: FALSE</span>
 <span class="r-in"><span></span></span>
