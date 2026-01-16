@@ -90,7 +90,7 @@ create_mock_chat <- function(responses = list("Hello!")) {
         if (response_idx > length(responses)) {
           response_idx <<- length(responses)
         }
-        # Return an iterator that yields ContentText objects
+        # Return an iterator that yields strings (agent expects strings, not ContentText)
         text <- responses[[response_idx]]
         yielded <- FALSE
         function() {
@@ -98,8 +98,7 @@ create_mock_chat <- function(responses = list("Hello!")) {
             return(coro::exhausted())
           }
           yielded <<- TRUE
-          # Return a proper ContentText S7 object
-          ellmer::ContentText(text)
+          text
         }
       },
       get_turns = function() turns,
