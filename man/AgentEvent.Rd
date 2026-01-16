@@ -25,7 +25,9 @@ updates on agent progress.
 \item \code{"tool_start"} - Tool execution starting. Contains: \code{tool_name}, \code{tool_input}
 \item \code{"tool_end"} - Tool execution completed. Contains: \code{tool_name}, \code{tool_result}, \code{tool_error}
 \item \code{"text"} - Text chunk from LLM. Contains: \code{text}, \code{is_complete}
+\item \code{"text_complete"} - Full text response. Contains: \code{text}
 \item \code{"turn"} - Turn completed. Contains: \code{turn}, \code{turn_number}
+\item \code{"warning"} - Warning condition occurred. Contains: \code{message}, \code{details}
 \item \code{"stop"} - Agent stopped. Contains: \code{reason}, \code{total_turns}, \code{cost}
 }
 }
