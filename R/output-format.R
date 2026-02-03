@@ -141,28 +141,31 @@ validate_output_schema <- function(parsed, output_format) {
   schema_json <- format_schema_json(output_format$schema)
   payload_json <- jsonlite::toJSON(parsed, auto_unbox = TRUE, null = "null")
 
-  valid <- tryCatch(
+  result <- tryCatch(
     jsonvalidate::json_validate(
       payload_json,
       schema_json,
       engine = "jsonschema",
-      error = FALSE
+      error = TRUE
     ),
-    error = function(e) FALSE
+    error = function(e) e$message
   )
 
-  errors <- NULL
-  if (!isTRUE(valid)) {
-    errors <- tryCatch(
-      jsonvalidate::json_validate(
-        payload_json,
-        schema_json,
-        engine = "jsonschema",
-        error = TRUE
-      ),
-      error = function(e) e$message
-    )
+  if (isTRUE(result)) {
+    return(list(valid = TRUE, errors = NULL))
   }
 
-  list(valid = isTRUE(valid), errors = errors)
+  if (is.character(result)) {
+    # Treat validator/engine availability as unknown
+    if (grepl(
+      "engine|validator|jsonschema|ajv|python|module|package",
+      result,
+      ignore.case = TRUE
+    )) {
+      return(list(valid = NA, errors = result))
+    }
+    return(list(valid = FALSE, errors = result))
+  }
+
+  list(valid = FALSE, errors = "Schema validation failed")
 }

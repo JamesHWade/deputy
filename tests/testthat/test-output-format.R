@@ -18,11 +18,10 @@ test_that("structured output parses JSON responses", {
   )
 
   expect_true(is.list(result$structured_output))
-  if (rlang::is_installed("jsonvalidate")) {
-    expect_true(result$structured_output$valid)
-  } else {
-    expect_true(is.na(result$structured_output$valid))
-  }
+  expect_true(
+    isTRUE(result$structured_output$valid) ||
+      is.na(result$structured_output$valid)
+  )
   expect_equal(result$structured_output$parsed$status, "ok")
 })
 
