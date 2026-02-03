@@ -19,6 +19,7 @@ Suggests:
     callr,
     httr2,
     jsonlite,
+    jsonvalidate,
     knitr,
     mcptools,
     Rapp,

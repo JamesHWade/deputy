@@ -94,6 +94,9 @@ AgentResult <- R6::R6Class(
     #' @field stop_reason Reason the agent stopped
     stop_reason = NULL,
 
+    #' @field structured_output Parsed/validated structured output (if requested)
+    structured_output = NULL,
+
     #' @description
     #' Create a new AgentResult object.
     #'
@@ -103,6 +106,7 @@ AgentResult <- R6::R6Class(
     #' @param events List of AgentEvent objects
     #' @param duration Execution duration in seconds
     #' @param stop_reason Reason for stopping
+    #' @param structured_output Parsed structured output (if any)
     #' @return A new `AgentResult` object
     initialize = function(
       response = NULL,
@@ -110,7 +114,8 @@ AgentResult <- R6::R6Class(
       cost = list(input = 0, output = 0, cached = 0, total = 0),
       events = list(),
       duration = NULL,
-      stop_reason = "complete"
+      stop_reason = "complete",
+      structured_output = NULL
     ) {
       self$response <- response
       self$turns <- turns
@@ -118,6 +123,7 @@ AgentResult <- R6::R6Class(
       self$events <- events
       self$duration <- duration
       self$stop_reason <- stop_reason
+      self$structured_output <- structured_output
     },
 
     #' @description
@@ -167,6 +173,13 @@ AgentResult <- R6::R6Class(
 
       if (!is.null(self$response)) {
         cat("  response:", truncate_string(self$response, 60), "\n")
+      }
+      if (!is.null(self$structured_output)) {
+        cat(
+          "  structured_output:",
+          ifelse(self$structured_output$valid, "valid", "invalid"),
+          "\n"
+        )
       }
 
       invisible(self)

@@ -195,15 +195,16 @@ Skill <- R6::R6Class(
 #' Load a skill from a directory
 #'
 #' @description
-#' Loads a skill from a directory containing `SKILL.yaml` (metadata) and
-#' optionally `SKILL.md` (system prompt extension).
+#' Loads a skill from a directory containing `SKILL.yaml` (metadata) and/or
+#' `SKILL.md` (system prompt extension). You can also pass a direct path to
+#' a `SKILL.md` file.
 #'
 #' @param path Path to the skill directory
 #' @param check_requirements If TRUE (default), verify requirements are met
 #' @return A [Skill] object
 #'
 #' @details
-#' The skill directory should contain:
+#' The skill directory should contain one of:
 #'
 #' **SKILL.yaml** (required):
 #' ```yaml
@@ -219,9 +220,17 @@ Skill <- R6::R6Class(
 #'     function: tool_my_tool
 #' ```
 #'
-#' **SKILL.md** (optional):
+#' **SKILL.md** (optional, or standalone file):
 #' Markdown content that will be appended to the agent's system prompt
-#' when this skill is loaded.
+#' when this skill is loaded. Frontmatter is supported:
+#' ```yaml
+#' ---
+#' name: my_skill
+#' description: Optional description
+#' requires:
+#'   packages: [dplyr]
+#' ---
+#' ```
 #'
 #' **tools.R** (optional):
 #' R file containing tool definitions referenced in SKILL.yaml.
@@ -239,46 +248,73 @@ Skill <- R6::R6Class(
 skill_load <- function(path, check_requirements = TRUE) {
   path <- normalizePath(path, mustWork = TRUE)
 
-  # Check for SKILL.yaml
+  info <- file.info(path)
+  if (is.na(info$isdir)) {
+    cli_abort("Skill path is not accessible: {.path {path}}")
+  }
 
-  yaml_path <- file.path(path, "SKILL.yaml")
-  if (!file.exists(yaml_path)) {
-    # Also check for skill.yaml (lowercase)
-    yaml_path <- file.path(path, "skill.yaml")
-    if (!file.exists(yaml_path)) {
-      cli_abort(c(
-        "Skill directory must contain SKILL.yaml",
-        "x" = "Not found in: {.path {path}}"
-      ))
+  # Support loading directly from a SKILL.md file
+  if (!isTRUE(info$isdir)) {
+    if (!grepl("\\.md$", path, ignore.case = TRUE)) {
+      cli_abort("Skill file must be a Markdown file: {.path {path}}")
     }
+    skill <- load_skill_from_markdown(path)
+    if (check_requirements) {
+      req_check <- skill$check_requirements()
+      if (!req_check$ok) {
+        cli_warn(c(
+          "Skill {.val {skill$name}} has unmet requirements",
+          "x" = "Missing: {.val {req_check$missing}}"
+        ))
+      }
+    }
+    return(skill)
   }
 
-  # Parse YAML
-  if (!rlang::is_installed("yaml")) {
-    cli_abort(c(
-      "Package {.pkg yaml} is required to load skills",
-      "i" = "Install with: {.code install.packages('yaml')}"
-    ))
-  }
-
-  meta <- yaml::read_yaml(yaml_path)
-
-  # Validate required fields
-  if (is.null(meta$name)) {
-    cli_abort("SKILL.yaml must contain a 'name' field")
-  }
-
-  # Load SKILL.md if present
-  prompt <- NULL
+  # Check for SKILL.yaml or SKILL.md in directory
+  yaml_path <- file.path(path, "SKILL.yaml")
   md_path <- file.path(path, "SKILL.md")
+  if (!file.exists(yaml_path)) {
+    yaml_path <- file.path(path, "skill.yaml")
+  }
   if (!file.exists(md_path)) {
     md_path <- file.path(path, "skill.md")
   }
-  if (file.exists(md_path)) {
-    prompt <- paste(readLines(md_path, warn = FALSE), collapse = "\n")
+
+  if (!file.exists(yaml_path) && !file.exists(md_path)) {
+    cli_abort(c(
+      "Skill directory must contain SKILL.yaml or SKILL.md",
+      "x" = "Not found in: {.path {path}}"
+    ))
   }
 
-  # Load tools if specified
+  meta <- list()
+  prompt <- NULL
+
+  # Parse SKILL.yaml when present
+  if (file.exists(yaml_path)) {
+    if (!rlang::is_installed("yaml")) {
+      cli_abort(c(
+        "Package {.pkg yaml} is required to load SKILL.yaml",
+        "i" = "Install with: {.code install.packages('yaml')}"
+      ))
+    }
+    meta <- yaml::read_yaml(yaml_path)
+    if (is.null(meta$name)) {
+      cli_abort("SKILL.yaml must contain a 'name' field")
+    }
+  }
+
+  # Load SKILL.md if present (with optional frontmatter)
+  if (file.exists(md_path)) {
+    parsed <- parse_markdown_frontmatter(md_path)
+    prompt <- parsed$body
+    if (length(parsed$meta) > 0) {
+      meta <- merge_named_lists(meta, parsed$meta)
+    }
+  }
+
+  # Load tools if specified (SKILL.yaml)
   tools <- list()
   if (!is.null(meta$tools) && length(meta$tools) > 0) {
     tools <- load_skill_tools(path, meta$tools)
@@ -286,7 +322,7 @@ skill_load <- function(path, check_requirements = TRUE) {
 
   # Create skill object
   skill <- Skill$new(
-    name = meta$name,
+    name = meta$name %||% basename(path),
     version = meta$version %||% "0.0.0",
     description = meta$description,
     prompt = prompt,
@@ -305,6 +341,25 @@ skill_load <- function(path, check_requirements = TRUE) {
       ))
     }
   }
+
+  skill
+}
+
+# Load a skill directly from a SKILL.md file
+load_skill_from_markdown <- function(path) {
+  parsed <- parse_markdown_frontmatter(path)
+  meta <- parsed$meta %||% list()
+  prompt <- parsed$body
+
+  skill <- Skill$new(
+    name = meta$name %||% tools::file_path_sans_ext(basename(path)),
+    version = meta$version %||% "0.0.0",
+    description = meta$description,
+    prompt = prompt,
+    tools = list(),
+    requires = meta$requires %||% list(),
+    path = dirname(path)
+  )
 
   skill
 }
@@ -455,8 +510,10 @@ skills_list <- function(path = "skills") {
     ))
   }
 
-  # Find subdirectories with SKILL.yaml
+  # Find subdirectories with SKILL.yaml or SKILL.md
   subdirs <- list.dirs(path, recursive = FALSE, full.names = TRUE)
+  md_files <- list.files(path, pattern = "\\.md$", full.names = TRUE)
+
   skills <- data.frame(
     name = character(),
     path = character(),
@@ -468,25 +525,32 @@ skills_list <- function(path = "skills") {
     if (!file.exists(yaml_path)) {
       yaml_path <- file.path(dir, "skill.yaml")
     }
+    md_path <- file.path(dir, "SKILL.md")
+    if (!file.exists(md_path)) {
+      md_path <- file.path(dir, "skill.md")
+    }
 
-    if (file.exists(yaml_path)) {
-      # Try to get the name from YAML
+    if (file.exists(yaml_path) || file.exists(md_path)) {
+      # Try to get the name from YAML/frontmatter
       name <- basename(dir)
-      tryCatch(
-        {
-          if (rlang::is_installed("yaml")) {
+      if (file.exists(yaml_path) && rlang::is_installed("yaml")) {
+        tryCatch(
+          {
             meta <- yaml::read_yaml(yaml_path)
             name <- meta$name %||% basename(dir)
+          },
+          error = function(e) {
+            cli_warn(c(
+              "Failed to parse SKILL.yaml in {.path {dir}}",
+              "x" = e$message,
+              "i" = "Using directory name as skill name"
+            ))
           }
-        },
-        error = function(e) {
-          cli_warn(c(
-            "Failed to parse SKILL.yaml in {.path {dir}}",
-            "x" = e$message,
-            "i" = "Using directory name as skill name"
-          ))
-        }
-      )
+        )
+      } else if (file.exists(md_path)) {
+        parsed <- parse_markdown_frontmatter(md_path)
+        name <- parsed$meta$name %||% basename(dir)
+      }
 
       skills <- rbind(
         skills,
@@ -497,6 +561,21 @@ skills_list <- function(path = "skills") {
         )
       )
     }
+  }
+
+  # Include standalone markdown skills in the root
+  for (md_path in md_files) {
+    parsed <- parse_markdown_frontmatter(md_path)
+    name <- parsed$meta$name %||%
+      tools::file_path_sans_ext(basename(md_path))
+    skills <- rbind(
+      skills,
+      data.frame(
+        name = name,
+        path = md_path,
+        stringsAsFactors = FALSE
+      )
+    )
   }
 
   skills

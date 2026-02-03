@@ -79,13 +79,20 @@ Agent <- R6::R6Class(
     #'   Defaults to [permissions_standard()].
     #' @param working_dir Working directory for file operations. Defaults to
     #'   current directory.
+    #' @param setting_sources Optional character vector of Claude-style
+    #'   setting sources (e.g., "project", "user") used to load memory, skills,
+    #'   and slash commands.
+    #' @param settings Optional pre-loaded settings list from
+    #'   [claude_settings_load()]. If provided, bypasses `setting_sources`.
     #' @return A new `Agent` object
     initialize = function(
       chat,
       tools = list(),
       system_prompt = NULL,
       permissions = NULL,
-      working_dir = getwd()
+      working_dir = getwd(),
+      setting_sources = NULL,
+      settings = NULL
     ) {
       validate_chat(chat)
 
@@ -108,6 +115,13 @@ Agent <- R6::R6Class(
       self$chat$on_tool_request(private$on_tool_request)
       self$chat$on_tool_result(private$on_tool_result)
 
+      # Apply Claude-style settings (memory, skills, slash commands)
+      if (!is.null(setting_sources) || !is.null(settings)) {
+        settings <- settings %||%
+          claude_settings_load(setting_sources, working_dir)
+        claude_settings_apply(self, settings)
+      }
+
       invisible(self)
     },
 
@@ -120,12 +134,26 @@ Agent <- R6::R6Class(
     #'
     #' @param task The task for the agent to perform
     #' @param max_turns Maximum number of turns (default: from permissions)
+    #' @param include_partial_messages If TRUE (default), yield partial text
+    #'   chunks as they stream. If FALSE, only yield `text_complete`.
+    #' @param output_format Optional output format spec (e.g. JSON schema) to
+    #'   guide and validate structured responses.
     #' @return A generator yielding [AgentEvent] objects
-    run = function(task, max_turns = NULL) {
+    run = function(
+      task,
+      max_turns = NULL,
+      include_partial_messages = TRUE,
+      output_format = NULL
+    ) {
       max_turns <- max_turns %||% self$permissions$max_turns %||% 25
 
       # Create and return the generator
-      private$create_run_generator(task, max_turns)
+      private$create_run_generator(
+        task,
+        max_turns,
+        include_partial_messages = include_partial_messages,
+        output_format = output_format
+      )
     },
 
     #' @description
@@ -136,12 +164,26 @@ Agent <- R6::R6Class(
     #'
     #' @param task The task for the agent to perform
     #' @param max_turns Maximum number of turns (default: from permissions)
+    #' @param include_partial_messages If TRUE (default), keep partial text
+    #'   events. If FALSE, suppress partials.
+    #' @param output_format Optional output format spec (e.g. JSON schema) to
+    #'   guide and validate structured responses.
     #' @return An [AgentResult] object
-    run_sync = function(task, max_turns = NULL) {
+    run_sync = function(
+      task,
+      max_turns = NULL,
+      include_partial_messages = TRUE,
+      output_format = NULL
+    ) {
       start_time <- Sys.time()
 
       # Collect all events from the generator
-      gen <- self$run(task, max_turns)
+      gen <- self$run(
+        task,
+        max_turns,
+        include_partial_messages = include_partial_messages,
+        output_format = output_format
+      )
       events <- list()
 
       # Iterate through the generator
@@ -177,13 +219,22 @@ Agent <- R6::R6Class(
 
       duration <- as.numeric(Sys.time() - start_time, units = "secs")
 
+      structured_output <- NULL
+      if (!is.null(output_format)) {
+        structured_output <- parse_structured_output(
+          private$get_last_response(),
+          output_format
+        )
+      }
+
       AgentResult$new(
         response = private$get_last_response(),
         turns = self$chat$get_turns(),
         cost = stop_event$cost %||% self$cost(),
         events = events,
         duration = duration,
-        stop_reason = stop_event$reason %||% "complete"
+        stop_reason = stop_event$reason %||% "complete",
+        structured_output = structured_output
       )
     },
 
@@ -709,6 +760,22 @@ Agent <- R6::R6Class(
     },
 
     #' @description
+    #' Get registered slash commands.
+    #'
+    #' @return Named list of slash command definitions
+    slash_commands = function() {
+      private$slash_commands_data %||% list()
+    },
+
+    #' @description
+    #' Get applied Claude-style settings.
+    #'
+    #' @return Settings list returned by [claude_settings_load()]
+    settings = function() {
+      private$settings_data
+    },
+
+    #' @description
     #' Load tools from MCP (Model Context Protocol) servers.
     #'
     #' Requires the mcptools package. Issues a warning if not installed or if
@@ -1014,7 +1081,12 @@ Agent <- R6::R6Class(
     },
 
     # Create a true coro generator for streaming events
-    create_run_generator = function(task, max_turns) {
+    create_run_generator = function(
+      task,
+      max_turns,
+      include_partial_messages = TRUE,
+      output_format = NULL
+    ) {
       agent <- self
 
       # Note: We use .__enclos_env__$private access inside the generator because
@@ -1027,6 +1099,17 @@ Agent <- R6::R6Class(
 
       # Create the generator using coro
       coro::generator(function() {
+        # Resolve slash commands before starting
+        resolved <- agent$.__enclos_env__$private$resolve_slash_command(task)
+        if (!is.null(resolved)) {
+          task <- resolved
+        }
+
+        # Apply output format instructions
+        if (!is.null(output_format)) {
+          task <- apply_output_format_instructions(task, output_format)
+        }
+
         # Yield start event
         coro::yield(AgentEvent("start", task = task))
 
@@ -1118,11 +1201,13 @@ Agent <- R6::R6Class(
               }
               if (!is.null(chunk) && nchar(chunk) > 0) {
                 text_chunks <- c(text_chunks, chunk)
-                coro::yield(AgentEvent(
-                  "text",
-                  text = chunk,
-                  is_complete = FALSE
-                ))
+                if (isTRUE(include_partial_messages)) {
+                  coro::yield(AgentEvent(
+                    "text",
+                    text = chunk,
+                    is_complete = FALSE
+                  ))
+                }
               }
             }
           } else {
@@ -1142,11 +1227,13 @@ Agent <- R6::R6Class(
             response <- agent$chat$chat(prompt)
             if (!is.null(response) && nchar(response) > 0) {
               text_chunks <- response
-              coro::yield(AgentEvent(
-                "text",
-                text = response,
-                is_complete = TRUE
-              ))
+              if (isTRUE(include_partial_messages)) {
+                coro::yield(AgentEvent(
+                  "text",
+                  text = response,
+                  is_complete = TRUE
+                ))
+              }
             }
           }
 
@@ -1258,6 +1345,44 @@ Agent <- R6::R6Class(
         }
       }
       FALSE
+    },
+
+    # Resolve slash commands in user task input
+    resolve_slash_command = function(task) {
+      if (is.null(task) || !is.character(task) || length(task) != 1) {
+        return(NULL)
+      }
+
+      if (is.null(private$slash_commands_data) ||
+        length(private$slash_commands_data) == 0) {
+        return(NULL)
+      }
+
+      match <- regexec("^\\s*/([A-Za-z0-9:_-]+)\\b\\s*(.*)$", task)
+      parts <- regmatches(task, match)[[1]]
+      if (length(parts) == 0) {
+        return(NULL)
+      }
+
+      cmd_name <- parts[2]
+      cmd_args <- trimws(parts[3] %||% "")
+      cmd <- private$slash_commands_data[[cmd_name]]
+      if (is.null(cmd)) {
+        return(NULL)
+      }
+
+      prompt <- cmd$prompt %||% ""
+      if (nchar(cmd_args) > 0) {
+        prompt <- paste(
+          prompt,
+          "",
+          "User input:",
+          cmd_args,
+          sep = "\n"
+        )
+      }
+
+      paste0("Slash command /", cmd_name, ":\n", prompt)
     },
 
     # Get the last response text
@@ -1448,6 +1573,12 @@ Agent <- R6::R6Class(
     loaded_skills = list(),
 
     # Storage for loaded MCP tool names
-    loaded_mcp_tools = character()
+    loaded_mcp_tools = character(),
+
+    # Storage for slash commands
+    slash_commands_data = list(),
+
+    # Storage for applied settings
+    settings_data = NULL
   )
 )

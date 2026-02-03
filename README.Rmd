@@ -209,6 +209,41 @@ custom <- skill_create(
 agent$load_skill(custom)
 ```
 
+### Claude Settings (settingSources)
+
+deputy can load Claude-style settings from `.claude` directories, including
+`CLAUDE.md` memory, `.claude/skills`, and `.claude/commands` slash commands.
+
+```{r settings}
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_file(),
+  setting_sources = c("project", "user")
+)
+
+# Inspect loaded slash commands
+agent$slash_commands()
+```
+
+### Structured Output
+
+Request JSON output that matches a schema:
+
+```{r structured_output}
+schema <- list(
+  type = "object",
+  properties = list(status = list(type = "string")),
+  required = list("status")
+)
+
+result <- agent$run_sync(
+  "Respond with status = ok",
+  output_format = list(type = "json_schema", schema = schema)
+)
+
+result$structured_output
+```
+
 ### Error Handling
 
 deputy provides structured error types for programmatic error handling:
