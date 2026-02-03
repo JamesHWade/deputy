@@ -612,8 +612,13 @@ Agent <- R6::R6Class(
       invisible(self)
     },
 
-    # load_skill(skill, allow_conflicts = FALSE)
-    # Load a skill into the agent. See @section Skill Methods in class docs.
+    #' @description
+    #' Load a [Skill] into the agent.
+    #'
+    #' @param skill A [Skill] object or path to a skill directory.
+    #' @param allow_conflicts If FALSE (default), error on tool name conflicts.
+    #'   Set TRUE to allow overwriting existing tools.
+    #' @return Invisible self for chaining.
     load_skill = function(skill, allow_conflicts = FALSE) {
       if (is.character(skill)) {
         # Load from path
@@ -750,8 +755,10 @@ Agent <- R6::R6Class(
       invisible(self)
     },
 
-    # skills()
-    # Get loaded skills. See @section Skill Methods in class docs.
+    #' @description
+    #' Get loaded skills.
+    #'
+    #' @return Named list of loaded [Skill] objects.
     skills = function() {
       if (is.null(private$loaded_skills)) {
         return(list())

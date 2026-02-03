@@ -77,7 +77,7 @@ format_schema_json <- function(schema) {
     return(jsonlite::toJSON(schema, auto_unbox = TRUE, pretty = TRUE))
   }
   # Fallback string for display when jsonlite is missing
-  paste(capture.output(str(schema)), collapse = "\n")
+  paste(utils::capture.output(utils::str(schema)), collapse = "\n")
 }
 
 # Extract JSON from a response string
@@ -157,11 +157,13 @@ validate_output_schema <- function(parsed, output_format) {
 
   if (is.character(result)) {
     # Treat validator/engine availability as unknown
-    if (grepl(
-      "engine|validator|jsonschema|ajv|python|module|package",
-      result,
-      ignore.case = TRUE
-    )) {
+    if (
+      grepl(
+        "engine|validator|jsonschema|ajv|python|module|package",
+        result,
+        ignore.case = TRUE
+      )
+    ) {
       return(list(valid = NA, errors = result))
     }
     return(list(valid = FALSE, errors = result))

@@ -45,7 +45,9 @@ sub-agents based on registered AgentDefinitions.
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run"><a href='../../deputy/html/Agent.html#method-Agent-run'><code>deputy::Agent$run()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_sync"><a href='../../deputy/html/Agent.html#method-Agent-run_sync'><code>deputy::Agent$run_sync()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="save_session"><a href='../../deputy/html/Agent.html#method-Agent-save_session'><code>deputy::Agent$save_session()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="settings"><a href='../../deputy/html/Agent.html#method-Agent-settings'><code>deputy::Agent$settings()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="skills"><a href='../../deputy/html/Agent.html#method-Agent-skills'><code>deputy::Agent$skills()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="slash_commands"><a href='../../deputy/html/Agent.html#method-Agent-slash_commands'><code>deputy::Agent$slash_commands()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="turns"><a href='../../deputy/html/Agent.html#method-Agent-turns'><code>deputy::Agent$turns()</code></a></span></li>
 </ul>
 </details>

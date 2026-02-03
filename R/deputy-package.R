@@ -7,6 +7,7 @@
 #' @importFrom cli cli_alert cli_alert_info cli_alert_success cli_alert_warning
 #' @importFrom cli cli_alert_danger cli_abort cli_warn cli_inform
 #' @importFrom digest digest
+#' @importFrom coro generator exhausted is_exhausted
 ## usethis namespace: end
 NULL
 
