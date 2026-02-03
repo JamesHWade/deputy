@@ -175,11 +175,13 @@ AgentResult <- R6::R6Class(
         cat("  response:", truncate_string(self$response, 60), "\n")
       }
       if (!is.null(self$structured_output)) {
-        cat(
-          "  structured_output:",
-          ifelse(self$structured_output$valid, "valid", "invalid"),
-          "\n"
-        )
+        status <- "unknown"
+        if (isTRUE(self$structured_output$valid)) {
+          status <- "valid"
+        } else if (identical(self$structured_output$valid, FALSE)) {
+          status <- "invalid"
+        }
+        cat("  structured_output:", status, "\n")
       }
 
       invisible(self)

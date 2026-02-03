@@ -133,8 +133,8 @@ validate_output_schema <- function(parsed, output_format) {
 
   if (!rlang::is_installed("jsonvalidate")) {
     return(list(
-      valid = TRUE,
-      errors = "jsonvalidate not installed; skipping schema validation"
+      valid = NA,
+      errors = "jsonvalidate not installed; schema validation skipped"
     ))
   }
 
