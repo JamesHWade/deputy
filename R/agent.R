@@ -1353,8 +1353,10 @@ Agent <- R6::R6Class(
         return(NULL)
       }
 
-      if (is.null(private$slash_commands_data) ||
-        length(private$slash_commands_data) == 0) {
+      if (
+        is.null(private$slash_commands_data) ||
+          length(private$slash_commands_data) == 0
+      ) {
         return(NULL)
       }
 
