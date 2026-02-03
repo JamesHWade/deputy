@@ -66,6 +66,12 @@ reference:
   - skill_create
   - skills_list
 
+- title: Settings
+  desc: Claude-style settings sources
+  contents:
+  - claude_settings_load
+  - claude_settings_apply
+
 - title: Multi-Agent
 
   desc: Coordinate multiple specialized agents
