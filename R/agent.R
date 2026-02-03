@@ -562,17 +562,150 @@ Agent <- R6::R6Class(
     },
 
     # load_skill(skill, allow_conflicts = FALSE)
-    # Load a skill into the agent. Implemented via Agent$set() in skills.R.
-    # See @section Skill Methods in class documentation.
+    # Load a skill into the agent. See @section Skill Methods in class docs.
     load_skill = function(skill, allow_conflicts = FALSE) {
-      cli::cli_abort("load_skill not yet initialized - this is a bug")
+      if (is.character(skill)) {
+        # Load from path
+        skill <- skill_load(skill)
+      }
+
+      if (!inherits(skill, "Skill")) {
+        cli_abort(
+          "{.arg skill} must be a Skill object or path to a skill directory"
+        )
+      }
+
+      # Get current provider for validation
+      current_provider <- tryCatch(
+        {
+          provider_info <- self$provider()
+          # provider() returns a list with name and model
+          provider_info$name
+        },
+        error = function(e) {
+          # Log unexpected errors (not just "no provider configured")
+          if (
+            !grepl("no provider|not configured", e$message, ignore.case = TRUE)
+          ) {
+            cli_warn(c(
+              "Could not determine provider for skill validation",
+              "x" = e$message,
+              "i" = "Provider compatibility check will be skipped"
+            ))
+          }
+          NULL
+        }
+      )
+
+      # Check requirements with provider
+      req_check <- skill$check_requirements(current_provider)
+
+      # Report missing packages
+      if (length(req_check$missing) > 0) {
+        cli_warn(c(
+          "Loading skill with missing packages: {.val {skill$name}}",
+          "x" = "Missing: {.val {req_check$missing}}"
+        ))
+      }
+
+      # Report provider mismatch
+      if (isTRUE(req_check$provider_mismatch)) {
+        required <- paste(req_check$required_providers, collapse = ", ")
+        cli_warn(c(
+          "Skill {.val {skill$name}} may not work optimally with current provider",
+          "i" = "Current provider: {.val {current_provider}}",
+          "i" = "Skill requires: {.val {required}}",
+          "!" = "Some features may not work as expected"
+        ))
+      }
+
+      # Register tools with conflict detection
+      if (length(skill$tools) > 0) {
+        # Get current tool names to detect conflicts
+        current_tools <- self$chat$get_tools()
+        current_tool_names <- names(current_tools)
+
+        # Get names of tools being registered
+        new_tool_names <- vapply(
+          skill$tools,
+          function(t) {
+            # Handle both S7 (@ access) and list-style tools
+            tryCatch(
+              t@name,
+              error = function(e1) {
+                tryCatch(
+                  t$name %||%
+                    {
+                      cli_warn(
+                        "Could not determine tool name for conflict detection"
+                      )
+                      "unknown"
+                    },
+                  error = function(e2) {
+                    cli_warn(c(
+                      "Failed to extract tool name",
+                      "x" = e1$message
+                    ))
+                    "unknown"
+                  }
+                )
+              }
+            )
+          },
+          character(1)
+        )
+
+        # Check for conflicts
+        conflicts <- new_tool_names[new_tool_names %in% current_tool_names]
+        if (length(conflicts) > 0) {
+          if (isTRUE(allow_conflicts)) {
+            cli_warn(c(
+              "Skill {.val {skill$name}} overwrites existing tool(s)",
+              "!" = "Conflicting tools: {.val {conflicts}}",
+              "i" = "Previous definitions will be replaced"
+            ))
+          } else {
+            cli_abort(c(
+              "Skill {.val {skill$name}} conflicts with existing tool(s)",
+              "!" = "Conflicting tools: {.val {conflicts}}",
+              "i" = "Use {.code allow_conflicts = TRUE} to overwrite existing tools"
+            ))
+          }
+        }
+
+        self$chat$register_tools(skill$tools)
+      }
+
+      # Append prompt to system prompt
+      if (!is.null(skill$prompt) && nchar(skill$prompt) > 0) {
+        current_prompt <- self$chat$get_system_prompt() %||% ""
+        new_prompt <- paste(
+          current_prompt,
+          "",
+          paste0("# Skill: ", skill$name),
+          skill$prompt,
+          sep = "\n"
+        )
+        self$chat$set_system_prompt(new_prompt)
+      }
+
+      # Store reference to loaded skill
+      if (is.null(private$loaded_skills)) {
+        private$loaded_skills <- list()
+      }
+      private$loaded_skills[[skill$name]] <- skill
+
+      cli_alert_success("Loaded skill: {.val {skill$name}}")
+      invisible(self)
     },
 
     # skills()
-    # Get loaded skills. Implemented via Agent$set() in skills.R.
-    # See @section Skill Methods in class documentation.
+    # Get loaded skills. See @section Skill Methods in class docs.
     skills = function() {
-      list()
+      if (is.null(private$loaded_skills)) {
+        return(list())
+      }
+      private$loaded_skills
     },
 
     #' @description

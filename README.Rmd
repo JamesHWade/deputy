@@ -183,6 +183,32 @@ agent$add_hook(HookMatcher$new(
 ))
 ```
 
+### Skills
+
+Skills bundle tools and prompt extensions. You can load them from disk or create
+them programmatically. deputy ships with a built-in example skill under
+`inst/skills`.
+
+```{r skills}
+# Discover bundled skills
+skills_dir <- system.file("skills", package = "deputy")
+skills_list(skills_dir)
+
+# Load a skill by path
+agent$load_skill(file.path(skills_dir, "data_analysis"))
+
+# Inspect loaded skills
+agent$skills()
+
+# Create and load a skill programmatically
+custom <- skill_create(
+  name = "my_skill",
+  description = "Custom helpers",
+  prompt = "You are a focused assistant for project-specific tasks."
+)
+agent$load_skill(custom)
+```
+
 ### Error Handling
 
 deputy provides structured error types for programmatic error handling:
