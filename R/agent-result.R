@@ -181,7 +181,11 @@ AgentResult <- R6::R6Class(
         } else if (identical(self$structured_output$valid, FALSE)) {
           status <- "invalid"
         }
-        cat("  structured_output:", status, "\n")
+        if (isTRUE(self$structured_output$schema_validation_skipped)) {
+          cat("  structured_output:", status, "(validation skipped)\n")
+        } else {
+          cat("  structured_output:", status, "\n")
+        }
       }
 
       invisible(self)

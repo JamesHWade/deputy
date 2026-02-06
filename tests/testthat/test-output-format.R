@@ -22,6 +22,13 @@ test_that("structured output parses JSON responses", {
     isTRUE(result$structured_output$valid) ||
       is.na(result$structured_output$valid)
   )
+  expect_true(is.logical(result$structured_output$schema_validation_skipped))
+  expect_length(result$structured_output$schema_validation_skipped, 1)
+  if (is.na(result$structured_output$valid)) {
+    expect_true(result$structured_output$schema_validation_skipped)
+  } else {
+    expect_false(result$structured_output$schema_validation_skipped)
+  }
   expect_equal(result$structured_output$parsed$status, "ok")
 })
 

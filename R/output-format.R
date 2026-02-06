@@ -57,7 +57,8 @@ parse_structured_output <- function(text, output_format) {
       raw = text,
       parsed = NULL,
       valid = FALSE,
-      errors = parsed$error %||% "Failed to parse JSON output"
+      errors = parsed$error %||% "Failed to parse JSON output",
+      schema_validation_skipped = FALSE
     ))
   }
 
@@ -68,7 +69,8 @@ parse_structured_output <- function(text, output_format) {
     raw = text,
     parsed = parsed$parsed,
     valid = validation$valid,
-    errors = validation$errors
+    errors = validation$errors,
+    schema_validation_skipped = validation$skipped %||% FALSE
   )
 }
 
@@ -128,13 +130,14 @@ extract_json_from_text <- function(text) {
 # Validate against a JSON schema when available
 validate_output_schema <- function(parsed, output_format) {
   if (!identical(output_format$type, "json_schema")) {
-    return(list(valid = TRUE, errors = NULL))
+    return(list(valid = TRUE, errors = NULL, skipped = FALSE))
   }
 
   if (!rlang::is_installed("jsonvalidate")) {
     return(list(
       valid = NA,
-      errors = "jsonvalidate not installed; schema validation skipped"
+      errors = "jsonvalidate not installed; schema validation skipped",
+      skipped = TRUE
     ))
   }
 
@@ -152,7 +155,7 @@ validate_output_schema <- function(parsed, output_format) {
   )
 
   if (isTRUE(result)) {
-    return(list(valid = TRUE, errors = NULL))
+    return(list(valid = TRUE, errors = NULL, skipped = FALSE))
   }
 
   if (is.character(result)) {
@@ -164,10 +167,10 @@ validate_output_schema <- function(parsed, output_format) {
         ignore.case = TRUE
       )
     ) {
-      return(list(valid = NA, errors = result))
+      return(list(valid = NA, errors = result, skipped = TRUE))
     }
-    return(list(valid = FALSE, errors = result))
+    return(list(valid = FALSE, errors = result, skipped = FALSE))
   }
 
-  list(valid = FALSE, errors = "Schema validation failed")
+  list(valid = FALSE, errors = "Schema validation failed", skipped = FALSE)
 }
