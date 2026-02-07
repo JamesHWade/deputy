@@ -569,7 +569,18 @@ Permissions <- R6::R6Class(
       }
       normalized <- tolower(trimws(as.character(name[[1]])))
       normalized <- sub("^tool_", "", normalized)
-      gsub("[^a-z0-9]+", "", normalized)
+      normalized <- gsub("[^a-z0-9]+", "", normalized)
+
+      # Canonicalize built-in aliases so gating policies match equivalent tools
+      alias_map <- c(
+        bash = "runbash"
+      )
+      aliased <- unname(alias_map[normalized])
+      if (length(aliased) == 0 || is.na(aliased)) {
+        normalized
+      } else {
+        aliased
+      }
     },
 
     tool_name_in_list = function(tool_name, names_vec) {

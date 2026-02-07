@@ -136,7 +136,9 @@ claude_settings_apply <- function(
       } else {
         existing$tool_denylist
       },
-      permission_prompt_tool_name = if (isTRUE(tool_policy$prompt_tool_present)) {
+      permission_prompt_tool_name = if (
+        isTRUE(tool_policy$prompt_tool_present)
+      ) {
         tool_policy$permission_prompt_tool_name
       } else {
         existing$permission_prompt_tool_name
