@@ -137,7 +137,22 @@ agent <- Agent$new(
     max_cost_usd = 0.50
   )
 )
+
+# Claude SDK-style tool policy gates
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_all(),
+  permissions = Permissions$new(
+    tool_allowlist = c("read_file", "list_files", "run_r_code"),
+    tool_denylist = c("run_bash"),
+    permission_prompt_tool_name = "AskUserQuestion"
+  )
+)
 ```
+
+When both are set, `tool_denylist` takes precedence over
+`tool_allowlist`. `permission_prompt_tool_name` is always allowed and is
+included in deny messages so the model can request explicit approval.
 
 ### Hooks
 
@@ -186,9 +201,9 @@ agent$add_hook(HookMatcher$new(
 
 ### Skills
 
-Skills bundle tools and prompt extensions. You can load them from disk or create
-them programmatically. deputy ships with a built-in example skill under
-`inst/skills`.
+Skills bundle tools and prompt extensions. You can load them from disk
+or create them programmatically. deputy ships with a built-in example
+skill under `inst/skills`.
 
 ``` r
 # Discover bundled skills
@@ -212,8 +227,11 @@ agent$load_skill(custom)
 
 ### Claude Settings (settingSources)
 
-deputy can load Claude-style settings from `.claude` directories, including
-`CLAUDE.md` memory, `.claude/skills`, and `.claude/commands` slash commands.
+deputy can load Claude-style settings from `.claude` directories,
+including `CLAUDE.md` memory, `.claude/skills`, and `.claude/commands`
+slash commands. Tool policy settings from `settings.json` are also
+applied to `agent$permissions` (`allowedTools`, `disallowedTools`, and
+`permissionPromptToolName`).
 
 ``` r
 agent <- Agent$new(
@@ -224,6 +242,16 @@ agent <- Agent$new(
 
 # Inspect loaded slash commands
 agent$slash_commands()
+```
+
+Example `.claude/settings.json` tool policy:
+
+``` json
+{
+  "allowedTools": ["read_file", "list_files", "run_r_code"],
+  "disallowedTools": ["run_bash"],
+  "permissionPromptToolName": "AskUserQuestion"
+}
 ```
 
 ### Structured Output

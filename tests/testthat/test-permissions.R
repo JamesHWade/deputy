@@ -298,6 +298,12 @@ test_that("all permission fields reject modification attempts", {
   expect_error(perms$max_turns <- 1, "immutable")
   expect_error(perms$max_cost_usd <- 0.01, "immutable")
   expect_error(perms$can_use_tool <- function(...) NULL, "immutable")
+  expect_error(perms$tool_allowlist <- "read_file", "immutable")
+  expect_error(perms$tool_denylist <- "run_bash", "immutable")
+  expect_error(
+    perms$permission_prompt_tool_name <- "AskUserQuestion",
+    "immutable"
+  )
 })
 
 test_that("permissions print works with active bindings", {
@@ -307,4 +313,103 @@ test_that("permissions print works with active bindings", {
   expect_output(print(perms), "<Permissions>")
   expect_output(print(perms), "mode: default")
   expect_output(print(perms), "file_read: TRUE")
+})
+
+test_that("tool denylist blocks tools before mode checks", {
+  perms <- Permissions$new(
+    mode = "bypassPermissions",
+    file_read = TRUE,
+    file_write = TRUE,
+    bash = TRUE,
+    r_code = TRUE,
+    tool_denylist = "run_bash"
+  )
+
+  result <- perms$check("run_bash", list(command = "pwd"), list())
+  expect_s3_class(result, "PermissionResultDeny")
+  expect_match(result$reason, "denylist")
+})
+
+test_that("tool allowlist restricts tools when configured", {
+  perms <- Permissions$new(
+    file_read = TRUE,
+    file_write = TRUE,
+    bash = TRUE,
+    r_code = TRUE,
+    tool_allowlist = "read_file"
+  )
+
+  allow_result <- perms$check("read_file", list(path = "x.txt"), list())
+  deny_result <- perms$check("write_file", list(path = "x.txt"), list())
+
+  expect_s3_class(allow_result, "PermissionResultAllow")
+  expect_s3_class(deny_result, "PermissionResultDeny")
+  expect_match(deny_result$reason, "allowlist")
+})
+
+test_that("denylist takes precedence over allowlist", {
+  perms <- Permissions$new(
+    mode = "bypassPermissions",
+    file_read = TRUE,
+    file_write = TRUE,
+    bash = TRUE,
+    r_code = TRUE,
+    tool_allowlist = "run_bash",
+    tool_denylist = "run_bash"
+  )
+
+  result <- perms$check("run_bash", list(command = "pwd"), list())
+  expect_s3_class(result, "PermissionResultDeny")
+  expect_match(result$reason, "denylist")
+})
+
+test_that("permission prompt tool is always allowed and referenced in denies", {
+  perms <- Permissions$new(
+    file_read = TRUE,
+    file_write = TRUE,
+    bash = FALSE,
+    r_code = TRUE,
+    tool_allowlist = "read_file",
+    permission_prompt_tool_name = "AskUserQuestion"
+  )
+
+  prompt_result <- perms$check(
+    "ask_user_question",
+    list(question = "Allow?"),
+    list()
+  )
+  deny_result <- perms$check("write_file", list(path = "x.txt"), list())
+
+  expect_s3_class(prompt_result, "PermissionResultAllow")
+  expect_s3_class(deny_result, "PermissionResultDeny")
+  expect_match(deny_result$reason, "AskUserQuestion", fixed = TRUE)
+})
+
+test_that("tool name matching ignores case and optional tool_ prefix", {
+  perms <- Permissions$new(
+    mode = "bypassPermissions",
+    file_read = TRUE,
+    file_write = TRUE,
+    bash = TRUE,
+    r_code = TRUE,
+    tool_denylist = "RUN_BASH"
+  )
+
+  result <- perms$check("tool_run_bash", list(command = "pwd"), list())
+  expect_s3_class(result, "PermissionResultDeny")
+})
+
+test_that("run_bash policy also matches bash alias", {
+  perms <- Permissions$new(
+    mode = "bypassPermissions",
+    file_read = TRUE,
+    file_write = TRUE,
+    bash = TRUE,
+    r_code = TRUE,
+    tool_denylist = "run_bash"
+  )
+
+  result <- perms$check("bash", list(command = "pwd"), list())
+  expect_s3_class(result, "PermissionResultDeny")
+  expect_match(result$reason, "denylist")
 })

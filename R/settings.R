@@ -106,10 +106,162 @@ claude_settings_apply <- function(
     )
   }
 
+  # Apply settings-based tool gating to permissions
+  tool_policy <- extract_tool_policy_settings(settings$settings)
+  if (
+    isTRUE(tool_policy$allowlist_present) ||
+      isTRUE(tool_policy$denylist_present) ||
+      isTRUE(tool_policy$prompt_tool_present)
+  ) {
+    existing <- agent$permissions
+
+    agent$permissions <- Permissions$new(
+      mode = existing$mode,
+      file_read = existing$file_read,
+      file_write = existing$file_write,
+      bash = existing$bash,
+      r_code = existing$r_code,
+      web = existing$web,
+      install_packages = existing$install_packages,
+      max_turns = existing$max_turns,
+      max_cost_usd = existing$max_cost_usd,
+      can_use_tool = existing$can_use_tool,
+      tool_allowlist = if (isTRUE(tool_policy$allowlist_present)) {
+        tool_policy$allowlist
+      } else {
+        existing$tool_allowlist
+      },
+      tool_denylist = if (isTRUE(tool_policy$denylist_present)) {
+        tool_policy$denylist
+      } else {
+        existing$tool_denylist
+      },
+      permission_prompt_tool_name = if (
+        isTRUE(tool_policy$prompt_tool_present)
+      ) {
+        tool_policy$permission_prompt_tool_name
+      } else {
+        existing$permission_prompt_tool_name
+      }
+    )
+  }
+
   # Store settings for inspection
   agent$.__enclos_env__$private$settings_data <- settings
 
   invisible(agent)
+}
+
+# Extract tool gating policy from settings payload
+extract_tool_policy_settings <- function(settings_data) {
+  if (is.null(settings_data) || !is.list(settings_data)) {
+    return(list(
+      allowlist_present = FALSE,
+      allowlist = NULL,
+      denylist_present = FALSE,
+      denylist = NULL,
+      prompt_tool_present = FALSE,
+      permission_prompt_tool_name = NULL
+    ))
+  }
+
+  get_nested <- function(x, path) {
+    out <- x
+    for (key in path) {
+      if (!is.list(out) || is.null(out[[key]])) {
+        return(NULL)
+      }
+      out <- out[[key]]
+    }
+    out
+  }
+
+  first_non_null <- function(...) {
+    values <- list(...)
+    for (value in values) {
+      if (!is.null(value)) {
+        return(value)
+      }
+    }
+    NULL
+  }
+
+  parse_tool_list <- function(value) {
+    if (is.null(value)) {
+      return(list(present = FALSE, value = NULL))
+    }
+
+    values <- value
+    if (is.character(values) && length(values) == 1 && grepl(",", values)) {
+      values <- strsplit(values, ",", fixed = TRUE)[[1]]
+    }
+    if (is.list(values)) {
+      values <- unlist(values, recursive = TRUE, use.names = FALSE)
+    }
+    values <- trimws(as.character(values))
+    values <- unique(values[nchar(values) > 0])
+
+    list(present = TRUE, value = values)
+  }
+
+  parse_optional_string <- function(value) {
+    if (is.null(value)) {
+      return(list(present = FALSE, value = NULL))
+    }
+
+    if (is.list(value)) {
+      value <- unlist(value, recursive = TRUE, use.names = FALSE)
+    }
+
+    value <- as.character(value)
+    normalized <- if (length(value) == 0 || is.na(value[[1]])) {
+      ""
+    } else {
+      trimws(value[[1]])
+    }
+    list(
+      present = TRUE,
+      value = if (nchar(normalized) > 0) normalized else NULL
+    )
+  }
+
+  allowlist <- parse_tool_list(first_non_null(
+    get_nested(settings_data, c("allowedTools")),
+    get_nested(settings_data, c("allowed_tools")),
+    get_nested(settings_data, c("tools", "allow")),
+    get_nested(settings_data, c("tools", "allowed")),
+    get_nested(settings_data, c("permissions", "allow")),
+    get_nested(settings_data, c("permissions", "allowedTools"))
+  ))
+
+  denylist <- parse_tool_list(first_non_null(
+    get_nested(settings_data, c("disallowedTools")),
+    get_nested(settings_data, c("disallowed_tools")),
+    get_nested(settings_data, c("tools", "deny")),
+    get_nested(settings_data, c("tools", "disallow")),
+    get_nested(settings_data, c("tools", "disallowed")),
+    get_nested(settings_data, c("permissions", "deny")),
+    get_nested(settings_data, c("permissions", "disallowedTools"))
+  ))
+
+  prompt_tool <- parse_optional_string(first_non_null(
+    get_nested(settings_data, c("permissionPromptToolName")),
+    get_nested(settings_data, c("permission_prompt_tool_name")),
+    get_nested(settings_data, c("permissionPromptTool")),
+    get_nested(settings_data, c("permission_prompt_tool")),
+    get_nested(settings_data, c("permissions", "permissionPromptToolName")),
+    get_nested(settings_data, c("permissions", "permissionPromptTool")),
+    get_nested(settings_data, c("permissions", "permission_prompt_tool_name"))
+  ))
+
+  list(
+    allowlist_present = allowlist$present,
+    allowlist = allowlist$value,
+    denylist_present = denylist$present,
+    denylist = denylist$value,
+    prompt_tool_present = prompt_tool$present,
+    permission_prompt_tool_name = prompt_tool$value
+  )
 }
 
 # Normalize settingSources input
