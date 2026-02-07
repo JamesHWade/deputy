@@ -100,7 +100,7 @@ The `LeadAgent` coordinates the reviewers. It has a `delegate_to_agent`
 tool that lets it assign tasks to any registered sub-agent:
 
 ```{r create-lead}
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+chat <- ellmer::chat_anthropic()
 
 lead <- LeadAgent$new(
   chat = chat,
@@ -124,7 +124,12 @@ lead$available_sub_agents()
 
 ## Add Monitoring Hooks
 
-Hooks give visibility into what each sub-agent does and how much it costs:
+Hooks give visibility into what each sub-agent does and how much it costs.
+
+**Note:** We set `timeout = 0` so hooks run in the main R process. By
+default, hooks run in a callr subprocess (for safety), which means `<<-`
+assignments can't reach the parent environment. Use `timeout = 0` when your
+hook needs to modify external state:
 
 ```{r monitoring-hooks}
 # Track sub-agent costs
@@ -132,6 +137,7 @@ sub_agent_costs <- list()
 
 hook_cost_tracker <- HookMatcher$new(
   event = "SubagentStop",
+  timeout = 0, # Run in main process so <<- works
   callback = function(agent_name, task, result, context) {
     sub_agent_costs[[agent_name]] <<- list(
       agent = agent_name,
@@ -148,6 +154,7 @@ tool_audit <- list()
 
 hook_audit_trail <- HookMatcher$new(
   event = "PostToolUse",
+  timeout = 0, # Run in main process so <<- works
   callback = function(tool_name, tool_result, tool_error, context) {
     tool_audit[[length(tool_audit) + 1]] <<- list(
       tool = tool_name,
@@ -204,15 +211,21 @@ review_schema <- list(
           suggestion = list(type = "string"),
           reviewer = list(type = "string")
         ),
-        required = c("severity", "category", "file", "issue",
-          "suggestion", "reviewer")
+        required = c(
+          "severity",
+          "category",
+          "file",
+          "issue",
+          "suggestion",
+          "reviewer"
+        )
       )
     )
   ),
   required = c("summary", "total_findings", "findings")
 )
 
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+chat <- ellmer::chat_anthropic()
 
 lead <- LeadAgent$new(
   chat = chat,

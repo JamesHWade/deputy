@@ -150,6 +150,7 @@ tool_log <- list()
 
 hook_audit <- HookMatcher$new(
   event = "PostToolUse",
+  timeout = 0, # Run in main process so <<- works
   callback = function(tool_name, tool_result, tool_error, context) {
     tool_log[[length(tool_log) + 1]] <<- list(
       tool = tool_name,
