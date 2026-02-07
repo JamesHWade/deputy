@@ -11,9 +11,8 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = deputy:::eval_vignette()
+  eval = FALSE
 )
-vcr::setup_knitr()
 ```
 
 Permissions control what an agent is allowed to do. They sit between the LLM
@@ -145,7 +144,7 @@ It must return `PermissionResultAllow()` or `PermissionResultDeny(reason)`.
 
 A read-only agent can explore files but cannot change anything:
 
-```{r permissions-readonly-demo, cassette = TRUE}
+```{r permissions-readonly-demo}
 library(deputy)
 
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")

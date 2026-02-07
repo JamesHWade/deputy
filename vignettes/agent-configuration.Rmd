@@ -11,9 +11,8 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = deputy:::eval_vignette()
+  eval = FALSE
 )
-vcr::setup_knitr()
 ```
 
 This vignette covers the many ways to configure an agent: system prompts,
@@ -124,7 +123,7 @@ left off.
 
 Every call to `run_sync()` returns an `AgentResult` with rich metadata:
 
-```{r agent-result-demo, cassette = TRUE}
+```{r agent-result-demo}
 library(deputy)
 
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")

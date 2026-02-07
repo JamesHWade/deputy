@@ -11,9 +11,8 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = deputy:::eval_vignette()
+  eval = FALSE
 )
-vcr::setup_knitr()
 ```
 
 Sometimes you need the agent to return data in a specific format rather than
@@ -24,7 +23,7 @@ parameter, which tells the LLM to return valid JSON matching a schema.
 
 The simplest form asks the LLM to return a JSON object:
 
-```{r structured-json-object, cassette = TRUE}
+```{r structured-json-object}
 library(deputy)
 
 chat <- ellmer::chat_openai(model = "gpt-4o-mini")
@@ -46,7 +45,7 @@ str(parsed)
 For stricter control, provide a JSON Schema. The LLM will be constrained to
 produce output matching the schema:
 
-```{r structured-json-schema, cassette = TRUE}
+```{r structured-json-schema}
 schema <- list(
   type = "object",
   properties = list(
@@ -123,7 +122,7 @@ empty. The parsed output is still available.
 
 Structured output is especially useful for data extraction tasks:
 
-```{r structured-extraction, cassette = TRUE}
+```{r structured-extraction}
 schema <- list(
   type = "object",
   properties = list(

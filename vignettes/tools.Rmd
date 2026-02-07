@@ -11,9 +11,8 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = deputy:::eval_vignette()
+  eval = FALSE
 )
-vcr::setup_knitr()
 ```
 
 Tools are how agents interact with the world. deputy provides built-in tools
@@ -112,7 +111,7 @@ system about the tool's behaviour:
 
 ### Using a Custom Tool
 
-```{r tools-custom-demo, cassette = TRUE}
+```{r tools-custom-demo}
 library(deputy)
 
 tool_dice <- ellmer::tool(

@@ -11,9 +11,8 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = deputy:::eval_vignette()
+  eval = FALSE
 )
-vcr::setup_knitr()
 ```
 
 Hooks let you intercept agent behaviour at key points in the execution
@@ -82,7 +81,7 @@ deputy includes several ready-made hooks:
 
 `hook_log_tools()` logs every tool call using cli:
 
-```{r hooks-log-demo, cassette = TRUE}
+```{r hooks-log-demo}
 library(deputy)
 
 chat <- ellmer::chat_openai(model = "gpt-4o-mini")
@@ -146,7 +145,7 @@ hook_no_secrets <- HookMatcher$new(
 `PostToolUse` hooks run after a tool completes. Use them for auditing,
 metrics, or conditional stopping:
 
-```{r hooks-audit-demo, cassette = TRUE}
+```{r hooks-audit-demo}
 tool_log <- list()
 
 hook_audit <- HookMatcher$new(

@@ -11,9 +11,8 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = deputy:::eval_vignette()
+  eval = FALSE
 )
-vcr::setup_knitr()
 ```
 
 For complex tasks, deputy supports a **lead agent** that delegates work to
@@ -90,7 +89,7 @@ When the lead agent decides to delegate, it calls `delegate_to_agent`
 internally. The sub-agent runs to completion and returns its result to the
 lead:
 
-```{r multi-agent-demo, cassette = TRUE}
+```{r multi-agent-demo}
 library(deputy)
 
 code_reviewer <- agent_definition(

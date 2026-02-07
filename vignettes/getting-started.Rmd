@@ -11,9 +11,8 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = deputy:::eval_vignette()
+  eval = FALSE
 )
-vcr::setup_knitr()
 ```
 
 deputy is an agentic AI framework for R that builds on
@@ -33,7 +32,7 @@ pak::pak("JamesHWade/deputy")
 An agent wraps an ellmer chat object and gives it tools, permissions, and
 lifecycle hooks:
 
-```{r getting-started-quickstart, cassette = TRUE}
+```{r getting-started-quickstart}
 library(deputy)
 
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")

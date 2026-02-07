@@ -29,7 +29,6 @@ Suggests:
     rmarkdown,
     rvest,
     testthat (>= 3.0.0),
-    vcr,
     withr,
     xml2,
     yaml
