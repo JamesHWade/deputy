@@ -129,6 +129,13 @@ PermissionResultDeny <- function(reason, interrupt = FALSE) {
 #' with fine-grained controls for different tool types, or with a custom
 #' callback for complex logic.
 #'
+#' Tool gating fields:
+#' - `tool_allowlist`: Optional list of tools that are allowed. When set,
+#'   tools not in the list are denied.
+#' - `tool_denylist`: Optional list of tools that are always denied.
+#' - `permission_prompt_tool_name`: Optional tool name to mention in deny
+#'   messages for gated tools (e.g., "AskUserQuestion").
+#'
 #' **Security Note:** Permission fields are immutable after construction.
 #' This prevents adversarial code from modifying permissions at runtime.
 #' All fields use active bindings that reject modification attempts.
@@ -151,6 +158,10 @@ Permissions <- R6::R6Class(
     #' @param max_turns Maximum turns
     #' @param max_cost_usd Maximum cost
     #' @param can_use_tool Custom callback function
+    #' @param tool_allowlist Optional character vector of allowed tool names
+    #' @param tool_denylist Optional character vector of denied tool names
+    #' @param permission_prompt_tool_name Optional tool name to suggest in
+    #'   permission deny messages for gated tools
     #' @return A new `Permissions` object
     initialize = function(
       mode = "default",
@@ -162,13 +173,41 @@ Permissions <- R6::R6Class(
       install_packages = FALSE,
       max_turns = 25,
       max_cost_usd = NULL,
-      can_use_tool = NULL
+      can_use_tool = NULL,
+      tool_allowlist = NULL,
+      tool_denylist = NULL,
+      permission_prompt_tool_name = NULL
     ) {
       if (!mode %in% PermissionMode) {
         cli_abort(c(
           "Invalid permission mode: {.val {mode}}",
           "i" = "Valid modes are: {.val {PermissionMode}}"
         ))
+      }
+
+      if (!is.null(tool_allowlist) && !is.character(tool_allowlist)) {
+        cli_abort("{.arg tool_allowlist} must be NULL or a character vector")
+      }
+
+      if (!is.null(tool_denylist) && !is.character(tool_denylist)) {
+        cli_abort("{.arg tool_denylist} must be NULL or a character vector")
+      }
+
+      if (
+        !is.null(permission_prompt_tool_name) &&
+          (!is.character(permission_prompt_tool_name) ||
+            length(permission_prompt_tool_name) != 1)
+      ) {
+        cli_abort(
+          "{.arg permission_prompt_tool_name} must be NULL or a length-1 character string"
+        )
+      }
+
+      tool_allowlist <- private$normalize_tool_names(tool_allowlist)
+      tool_denylist <- private$normalize_tool_names(tool_denylist)
+      permission_prompt_tool_name <- trimws(permission_prompt_tool_name %||% "")
+      if (nchar(permission_prompt_tool_name) == 0) {
+        permission_prompt_tool_name <- NULL
       }
 
       # Store values in private fields (immutable after construction)
@@ -182,6 +221,9 @@ Permissions <- R6::R6Class(
       private$.max_turns <- max_turns
       private$.max_cost_usd <- max_cost_usd
       private$.can_use_tool <- can_use_tool
+      private$.tool_allowlist <- tool_allowlist
+      private$.tool_denylist <- tool_denylist
+      private$.permission_prompt_tool_name <- permission_prompt_tool_name
       private$.frozen <- TRUE
     },
 
@@ -193,6 +235,17 @@ Permissions <- R6::R6Class(
     #' @param context Additional context (e.g., working_dir, tool_annotations)
     #' @return A [PermissionResultAllow] or [PermissionResultDeny]
     check = function(tool_name, tool_input, context = list()) {
+      # Allow prompt tool so gated workflows can request approval
+      if (private$is_permission_prompt_tool(tool_name)) {
+        return(PermissionResultAllow())
+      }
+
+      # Explicit tool gating (denylist/allowlist) takes precedence
+      gating_result <- private$check_tool_gating(tool_name)
+      if (!is.null(gating_result)) {
+        return(gating_result)
+      }
+
       # Mode-based shortcuts
       if (self$mode == "bypassPermissions") {
         return(PermissionResultAllow())
@@ -264,6 +317,35 @@ Permissions <- R6::R6Class(
       cat("  bash:", self$bash, "\n")
       cat("  r_code:", self$r_code, "\n")
       cat("  web:", self$web, "\n")
+      cat(
+        "  tool_allowlist:",
+        if (
+          is.null(self$tool_allowlist) ||
+            length(self$tool_allowlist) == 0
+        ) {
+          "NULL"
+        } else {
+          paste(self$tool_allowlist, collapse = ", ")
+        },
+        "\n"
+      )
+      cat(
+        "  tool_denylist:",
+        if (
+          is.null(self$tool_denylist) ||
+            length(self$tool_denylist) == 0
+        ) {
+          "NULL"
+        } else {
+          paste(self$tool_denylist, collapse = ", ")
+        },
+        "\n"
+      )
+      cat(
+        "  permission_prompt_tool_name:",
+        self$permission_prompt_tool_name %||% "NULL",
+        "\n"
+      )
       cat("  max_turns:", self$max_turns, "\n")
       cat(
         "  max_cost_usd:",
@@ -403,6 +485,55 @@ Permissions <- R6::R6Class(
         )
       }
       private$.can_use_tool <- value
+    },
+
+    #' @field tool_allowlist Optional character vector of allowed tool names. Read-only after construction.
+    tool_allowlist = function(value) {
+      if (missing(value)) {
+        return(private$.tool_allowlist)
+      }
+      if (isTRUE(private$.frozen)) {
+        cli_abort(
+          "Cannot modify permissions: tool_allowlist is immutable after construction"
+        )
+      }
+      private$.tool_allowlist <- private$normalize_tool_names(value)
+    },
+
+    #' @field tool_denylist Optional character vector of denied tool names. Read-only after construction.
+    tool_denylist = function(value) {
+      if (missing(value)) {
+        return(private$.tool_denylist)
+      }
+      if (isTRUE(private$.frozen)) {
+        cli_abort(
+          "Cannot modify permissions: tool_denylist is immutable after construction"
+        )
+      }
+      private$.tool_denylist <- private$normalize_tool_names(value)
+    },
+
+    #' @field permission_prompt_tool_name Optional tool name used in gating deny messages. Read-only after construction.
+    permission_prompt_tool_name = function(value) {
+      if (missing(value)) {
+        return(private$.permission_prompt_tool_name)
+      }
+      if (isTRUE(private$.frozen)) {
+        cli_abort(
+          "Cannot modify permissions: permission_prompt_tool_name is immutable after construction"
+        )
+      }
+      if (!is.null(value) && (!is.character(value) || length(value) != 1)) {
+        cli_abort(
+          "{.arg permission_prompt_tool_name} must be NULL or a length-1 character string"
+        )
+      }
+      normalized <- trimws(value %||% "")
+      private$.permission_prompt_tool_name <- if (nchar(normalized) > 0) {
+        normalized
+      } else {
+        NULL
+      }
     }
   ),
 
@@ -418,7 +549,97 @@ Permissions <- R6::R6Class(
     .max_turns = NULL,
     .max_cost_usd = NULL,
     .can_use_tool = NULL,
+    .tool_allowlist = NULL,
+    .tool_denylist = NULL,
+    .permission_prompt_tool_name = NULL,
     .frozen = FALSE,
+
+    normalize_tool_names = function(names_vec) {
+      if (is.null(names_vec)) {
+        return(NULL)
+      }
+      out <- trimws(as.character(names_vec))
+      out <- out[nchar(out) > 0]
+      unique(out)
+    },
+
+    normalize_tool_id = function(name) {
+      if (is.null(name) || length(name) == 0) {
+        return(NA_character_)
+      }
+      normalized <- tolower(trimws(as.character(name[[1]])))
+      normalized <- sub("^tool_", "", normalized)
+      gsub("[^a-z0-9]+", "", normalized)
+    },
+
+    tool_name_in_list = function(tool_name, names_vec) {
+      if (is.null(names_vec) || length(names_vec) == 0) {
+        return(FALSE)
+      }
+      tool_id <- private$normalize_tool_id(tool_name)
+      if (is.na(tool_id)) {
+        return(FALSE)
+      }
+      candidate_ids <- unique(vapply(
+        names_vec,
+        private$normalize_tool_id,
+        character(1)
+      ))
+      tool_id %in% candidate_ids
+    },
+
+    is_permission_prompt_tool = function(tool_name) {
+      if (is.null(private$.permission_prompt_tool_name)) {
+        return(FALSE)
+      }
+      private$tool_name_in_list(
+        tool_name,
+        private$.permission_prompt_tool_name
+      )
+    },
+
+    gating_reason = function(tool_name, base_reason) {
+      reason <- base_reason
+      if (!is.null(private$.permission_prompt_tool_name)) {
+        reason <- paste0(
+          reason,
+          " Use ",
+          private$.permission_prompt_tool_name,
+          " to request approval."
+        )
+      }
+      reason
+    },
+
+    check_tool_gating = function(tool_name) {
+      if (private$tool_name_in_list(tool_name, private$.tool_denylist)) {
+        return(PermissionResultDeny(
+          reason = private$gating_reason(
+            tool_name,
+            paste0(
+              "Tool not allowed by denylist: ",
+              tool_name
+            )
+          )
+        ))
+      }
+
+      if (!is.null(private$.tool_allowlist)) {
+        if (!private$tool_name_in_list(tool_name, private$.tool_allowlist)) {
+          return(PermissionResultDeny(
+            reason = private$gating_reason(
+              tool_name,
+              paste0(
+                "Tool not in allowlist: ",
+                tool_name
+              )
+            )
+          ))
+        }
+      }
+
+      NULL
+    },
 
     # Check if a tool is a write/execute tool
     is_write_tool = function(tool_name) {

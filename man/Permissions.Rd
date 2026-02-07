@@ -8,6 +8,15 @@ Controls what an agent is allowed to do. Permissions can be configured
 with fine-grained controls for different tool types, or with a custom
 callback for complex logic.
 
+Tool gating fields:
+\itemize{
+\item \code{tool_allowlist}: Optional list of tools that are allowed. When set,
+tools not in the list are denied.
+\item \code{tool_denylist}: Optional list of tools that are always denied.
+\item \code{permission_prompt_tool_name}: Optional tool name to mention in deny
+messages for gated tools (e.g., "AskUserQuestion").
+}
+
 \strong{Security Note:} Permission fields are immutable after construction.
 This prevents adversarial code from modifying permissions at runtime.
 All fields use active bindings that reject modification attempts.
@@ -34,6 +43,12 @@ All fields use active bindings that reject modification attempts.
 \item{\code{max_cost_usd}}{Maximum cost in USD before stopping. Read-only after construction.}
 
 \item{\code{can_use_tool}}{Custom permission callback. Read-only after construction.}
+
+\item{\code{tool_allowlist}}{Optional character vector of allowed tool names. Read-only after construction.}
+
+\item{\code{tool_denylist}}{Optional character vector of denied tool names. Read-only after construction.}
+
+\item{\code{permission_prompt_tool_name}}{Optional tool name used in gating deny messages. Read-only after construction.}
 }
 \if{html}{\out{</div>}}
 }
@@ -62,7 +77,10 @@ Create a new Permissions object.
   install_packages = FALSE,
   max_turns = 25,
   max_cost_usd = NULL,
-  can_use_tool = NULL
+  can_use_tool = NULL,
+  tool_allowlist = NULL,
+  tool_denylist = NULL,
+  permission_prompt_tool_name = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -88,6 +106,13 @@ Create a new Permissions object.
 \item{\code{max_cost_usd}}{Maximum cost}
 
 \item{\code{can_use_tool}}{Custom callback function}
+
+\item{\code{tool_allowlist}}{Optional character vector of allowed tool names}
+
+\item{\code{tool_denylist}}{Optional character vector of denied tool names}
+
+\item{\code{permission_prompt_tool_name}}{Optional tool name to suggest in
+permission deny messages for gated tools}
 }
 \if{html}{\out{</div>}}
 }

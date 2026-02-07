@@ -192,6 +192,53 @@ perms <- Permissions$new(
 )
 ```
 
+### Tool Allow/Deny Lists (Claude SDK-style)
+
+Use allow/deny lists when you want an explicit tool policy that is separate from
+the broader mode flags:
+
+```{r}
+perms <- Permissions$new(
+  mode = "default",
+  tool_allowlist = c("read_file", "list_files", "run_r_code"),
+  tool_denylist = c("run_bash"),
+  permission_prompt_tool_name = "AskUserQuestion"
+)
+
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_all(),
+  permissions = perms
+)
+```
+
+If both lists are present, `tool_denylist` wins. The
+`permission_prompt_tool_name` tool is always allowed and appears in deny reasons
+so the model can request approval.
+
+### Applying Tool Policy from `.claude/settings.json`
+
+`setting_sources` now maps Claude-style tool policy keys directly into
+permissions:
+
+```{r}
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_all(),
+  setting_sources = "project"
+)
+```
+
+Example `.claude/settings.json`:
+
+```json
+{
+  "allowedTools": ["read_file", "list_files", "run_r_code"],
+  "disallowedTools": ["run_bash"],
+  "permissionPromptToolName": "AskUserQuestion"
+}
+```
+
 ## Hooks
 
 Hooks let you intercept and customize agent behavior at key points:
