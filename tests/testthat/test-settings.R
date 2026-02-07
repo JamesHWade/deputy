@@ -80,3 +80,64 @@ test_that("slash commands expand in run", {
   expect_match(event$task, "Slash command /summarize")
   expect_match(event$task, "recent work")
 })
+
+test_that("extract_tool_policy_settings parses aliases and list/csv values", {
+  policy <- extract_tool_policy_settings(list(
+    tools = list(allow = "read_file, run_bash"),
+    disallowedTools = list("write_file"),
+    permissions = list(permissionPromptTool = "AskUserQuestion")
+  ))
+
+  expect_true(policy$allowlist_present)
+  expect_setequal(policy$allowlist, c("read_file", "run_bash"))
+  expect_true(policy$denylist_present)
+  expect_equal(policy$denylist, "write_file")
+  expect_true(policy$prompt_tool_present)
+  expect_equal(policy$permission_prompt_tool_name, "AskUserQuestion")
+})
+
+test_that("extract_tool_policy_settings handles empty prompt tool values", {
+  policy <- extract_tool_policy_settings(list(
+    permissionPromptToolName = character()
+  ))
+
+  expect_true(policy$prompt_tool_present)
+  expect_null(policy$permission_prompt_tool_name)
+})
+
+test_that("claude_settings_apply injects tool policy into permissions", {
+  chat <- create_mock_chat()
+  initial_perms <- Permissions$new(
+    mode = "default",
+    file_read = TRUE,
+    file_write = TRUE,
+    bash = TRUE,
+    r_code = TRUE,
+    web = FALSE,
+    install_packages = FALSE,
+    tool_denylist = "install_package"
+  )
+
+  agent <- Agent$new(
+    chat = chat,
+    tools = list(),
+    permissions = initial_perms
+  )
+
+  settings <- list(
+    settings = list(
+      allowedTools = c("read_file", "run_bash"),
+      permissionPromptToolName = "AskUserQuestion"
+    ),
+    memory = character(),
+    skills = list(),
+    commands = list()
+  )
+
+  claude_settings_apply(agent, settings)
+
+  expect_setequal(agent$permissions$tool_allowlist, c("read_file", "run_bash"))
+  expect_equal(agent$permissions$tool_denylist, "install_package")
+  expect_equal(agent$permissions$permission_prompt_tool_name, "AskUserQuestion")
+  expect_true(agent$permissions$bash)
+})
