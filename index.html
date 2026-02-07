@@ -184,7 +184,19 @@
 <span>    max_turns <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>    max_cost_usd <span class="op">=</span> <span class="fl">0.50</span></span>
 <span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Claude SDK-style tool policy gates</span></span>
+<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="va"><a href="reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>    tool_allowlist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"read_file"</span>, <span class="st">"list_files"</span>, <span class="st">"run_r_code"</span><span class="op">)</span>,</span>
+<span>    tool_denylist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"run_bash"</span><span class="op">)</span>,</span>
+<span>    permission_prompt_tool_name <span class="op">=</span> <span class="st">"AskUserQuestion"</span></span>
+<span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>When both are set, <code>tool_denylist</code> takes precedence over <code>tool_allowlist</code>. <code>permission_prompt_tool_name</code> is always allowed and is included in deny messages so the model can request explicit approval.</p>
 </div>
 <div class="section level3">
 <h3 id="hooks">Hooks<a class="anchor" aria-label="anchor" href="#hooks"></a>
@@ -256,7 +268,7 @@
 <div class="section level3">
 <h3 id="claude-settings-settingsources">Claude Settings (settingSources)<a class="anchor" aria-label="anchor" href="#claude-settings-settingsources"></a>
 </h3>
-<p>deputy can load Claude-style settings from <code>.claude</code> directories, including <code>CLAUDE.md</code> memory, <code>.claude/skills</code>, and <code>.claude/commands</code> slash commands.</p>
+<p>deputy can load Claude-style settings from <code>.claude</code> directories, including <code>CLAUDE.md</code> memory, <code>.claude/skills</code>, and <code>.claude/commands</code> slash commands. Tool policy settings from <code>settings.json</code> are also applied to <code>agent$permissions</code> (<code>allowedTools</code>, <code>disallowedTools</code>, and <code>permissionPromptToolName</code>).</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
@@ -266,12 +278,18 @@
 <span></span>
 <span><span class="co"># Inspect loaded slash commands</span></span>
 <span><span class="va">agent</span><span class="op">$</span><span class="fu">slash_commands</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>Example <code>.claude/settings.json</code> tool policy:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  <span class="dt">"allowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"read_file"</span><span class="ot">,</span> <span class="st">"list_files"</span><span class="ot">,</span> <span class="st">"run_r_code"</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="dt">"disallowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"run_bash"</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="dt">"permissionPromptToolName"</span><span class="fu">:</span> <span class="st">"AskUserQuestion"</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="structured-output">Structured Output<a class="anchor" aria-label="anchor" href="#structured-output"></a>
 </h3>
 <p>Request JSON output that matches a schema:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">schema</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  type <span class="op">=</span> <span class="st">"object"</span>,</span>
 <span>  properties <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>status <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"string"</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -289,7 +307,7 @@
 <h3 id="error-handling">Error Handling<a class="anchor" aria-label="anchor" href="#error-handling"></a>
 </h3>
 <p>deputy provides structured error types for programmatic error handling:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Catch specific error types</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span></span>
 <span>  <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"task"</span><span class="op">)</span>,</span>
@@ -308,7 +326,7 @@
 <h3 id="multi-agent-systems">Multi-Agent Systems<a class="anchor" aria-label="anchor" href="#multi-agent-systems"></a>
 </h3>
 <p>Coordinate specialized agents:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Define sub-agents</span></span>
 <span><span class="va">code_agent</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"code_analyst"</span>,</span>
@@ -330,7 +348,7 @@
 <h2 id="provider-support">Provider Support<a class="anchor" aria-label="anchor" href="#provider-support"></a>
 </h2>
 <p>deputy works with any LLM provider that ellmer supports:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># OpenAI</span></span>
 <span><span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>

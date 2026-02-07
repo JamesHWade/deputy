@@ -4,6 +4,16 @@ Controls what an agent is allowed to do. Permissions can be configured
 with fine-grained controls for different tool types, or with a custom
 callback for complex logic.
 
+Tool gating fields:
+
+- `tool_allowlist`: Optional list of tools that are allowed. When set,
+  tools not in the list are denied.
+
+- `tool_denylist`: Optional list of tools that are always denied.
+
+- `permission_prompt_tool_name`: Optional tool name to mention in deny
+  messages for gated tools (e.g., "AskUserQuestion").
+
 **Security Note:** Permission fields are immutable after construction.
 This prevents adversarial code from modifying permissions at runtime.
 All fields use active bindings that reject modification attempts.
@@ -53,6 +63,21 @@ All fields use active bindings that reject modification attempts.
 
   Custom permission callback. Read-only after construction.
 
+- `tool_allowlist`:
+
+  Optional character vector of allowed tool names. Read-only after
+  construction.
+
+- `tool_denylist`:
+
+  Optional character vector of denied tool names. Read-only after
+  construction.
+
+- `permission_prompt_tool_name`:
+
+  Optional tool name used in gating deny messages. Read-only after
+  construction.
+
 ## Methods
 
 ### Public methods
@@ -83,7 +108,10 @@ Create a new Permissions object.
       install_packages = FALSE,
       max_turns = 25,
       max_cost_usd = NULL,
-      can_use_tool = NULL
+      can_use_tool = NULL,
+      tool_allowlist = NULL,
+      tool_denylist = NULL,
+      permission_prompt_tool_name = NULL
     )
 
 #### Arguments
@@ -127,6 +155,19 @@ Create a new Permissions object.
 - `can_use_tool`:
 
   Custom callback function
+
+- `tool_allowlist`:
+
+  Optional character vector of allowed tool names
+
+- `tool_denylist`:
+
+  Optional character vector of denied tool names
+
+- `permission_prompt_tool_name`:
+
+  Optional tool name to suggest in permission deny messages for gated
+  tools
 
 #### Returns
 
