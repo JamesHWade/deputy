@@ -311,20 +311,13 @@ LeadAgent <- R6::R6Class(
     create_sub_agent = function(def) {
       # Get the model to use
       if (def$model == "inherit") {
-        # Get parent's provider info and create similar chat
-        parent_provider <- self$provider()
-
-        # Try to create a chat using the same provider type
+        # Clone the parent chat to get the same provider/model config,
+        # then clear conversation history so the sub-agent starts fresh.
         sub_chat <- tryCatch(
           {
-            # Use ellmer's clone method if available
-            if ("clone" %in% names(self$chat)) {
-              self$chat$clone()
-            } else {
-              # Fallback: try to create from provider string
-              # provider() returns strings like "openai", "anthropic", etc.
-              ellmer::chat(parent_provider)
-            }
+            cloned <- self$chat$clone()
+            cloned$set_turns(list())
+            cloned
           },
           error = function(e) {
             cli_abort(c(

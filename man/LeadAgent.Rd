@@ -43,6 +43,7 @@ sub-agents based on registered AgentDefinitions.
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tool"><a href='../../deputy/html/Agent.html#method-Agent-register_tool'><code>deputy::Agent$register_tool()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tools"><a href='../../deputy/html/Agent.html#method-Agent-register_tools'><code>deputy::Agent$register_tools()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run"><a href='../../deputy/html/Agent.html#method-Agent-run'><code>deputy::Agent$run()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_shiny"><a href='../../deputy/html/Agent.html#method-Agent-run_shiny'><code>deputy::Agent$run_shiny()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_sync"><a href='../../deputy/html/Agent.html#method-Agent-run_sync'><code>deputy::Agent$run_sync()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="save_session"><a href='../../deputy/html/Agent.html#method-Agent-save_session'><code>deputy::Agent$save_session()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="settings"><a href='../../deputy/html/Agent.html#method-Agent-settings'><code>deputy::Agent$settings()</code></a></span></li>

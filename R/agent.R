@@ -841,6 +841,76 @@ Agent <- R6::R6Class(
     #' @return Character vector of MCP tool names
     mcp_tools = function() {
       private$loaded_mcp_tools
+    },
+
+    #' @description
+    #' Run an agentic task for use in Shiny applications with shinychat.
+    #'
+    #' Returns an async content stream suitable for passing to
+    #' `shinychat::chat_append()`. Unlike `run()` and `run_sync()`, the
+    #' multi-turn loop is driven by ellmer's `stream_async()` rather than
+    #' deputy's own generator. Deputy's permissions, hooks, and tool call
+    #' limits are still enforced via the `on_tool_request` callback.
+    #'
+    #' @param prompt The user message to send
+    #' @param max_tool_calls Maximum number of tool calls before stopping.
+    #'   Defaults to `permissions$max_turns` or 25. Note this counts individual
+    #'   tool call requests, not LLM turns (one turn can have multiple parallel
+    #'   tool calls).
+    #' @return A promise that resolves when the stream is complete, suitable
+    #'   for `shinychat::chat_append()`.
+    run_shiny = function(prompt, max_tool_calls = NULL) {
+      rlang::check_installed("promises", reason = "for run_shiny()")
+
+      max_tool_calls <- max_tool_calls %||%
+        self$permissions$max_turns %||%
+        25L
+
+      # Reset counters and activate callback-based limits
+      private$tool_call_count <- 0L
+      private$tool_call_limit <- as.integer(max_tool_calls)
+
+      # Fire session hooks synchronously before streaming
+      self$hooks$fire(
+        "SessionStart",
+        context = list(
+          working_dir = self$working_dir,
+          permissions = self$permissions,
+          provider = self$provider(),
+          tools_count = length(self$chat$get_tools())
+        )
+      )
+      self$hooks$fire(
+        "UserPromptSubmit",
+        prompt = prompt,
+        context = list(working_dir = self$working_dir)
+      )
+
+      # Get the async content stream -- ellmer drives the multi-turn loop
+      stream <- self$chat$stream_async(prompt, stream = "content")
+
+      # Cleanup: fire Stop/SessionEnd hooks, deactivate limits
+      agent <- self
+      promises::finally(stream, function() {
+        agent$hooks$fire(
+          "Stop",
+          reason = "complete",
+          context = list(
+            working_dir = agent$working_dir,
+            cost = agent$cost()
+          )
+        )
+        agent$hooks$fire(
+          "SessionEnd",
+          reason = "complete",
+          context = list(
+            working_dir = agent$working_dir,
+            cost = agent$cost()
+          )
+        )
+        # Deactivate callback-based limits
+        agent$.__enclos_env__$private$tool_call_limit <- NULL
+      })
     }
   ),
 
@@ -886,6 +956,29 @@ Agent <- R6::R6Class(
         if (!is.null(hook_result$continue) && !hook_result$continue) {
           private$should_stop <- TRUE
           private$stop_reason_from_hook <- "hook_requested_stop"
+        }
+      }
+
+      # Enforce callback-based limits (active during run_shiny; NULL during
+      # run/run_sync which have their own turn-level loop controls)
+      if (!is.null(private$tool_call_limit)) {
+        private$tool_call_count <- private$tool_call_count + 1L
+        if (private$tool_call_count > private$tool_call_limit) {
+          ellmer::tool_reject(
+            "Tool call limit reached. Please provide your final answer with the information gathered so far."
+          )
+        }
+        # Cost limit
+        if (!is.null(self$permissions$max_cost_usd)) {
+          current_cost <- self$cost()$total
+          if (
+            !is.na(current_cost) &&
+              current_cost >= self$permissions$max_cost_usd
+          ) {
+            ellmer::tool_reject(
+              "Cost limit reached. Please provide your final answer with the information gathered so far."
+            )
+          }
         }
       }
 
@@ -1588,6 +1681,12 @@ Agent <- R6::R6Class(
     slash_commands_data = list(),
 
     # Storage for applied settings
-    settings_data = NULL
+    settings_data = NULL,
+
+    # Tool call counter for run_shiny() callback-based limits
+    tool_call_count = 0L,
+
+    # Tool call limit for run_shiny() -- NULL means inactive (run/run_sync path)
+    tool_call_limit = NULL
   )
 )

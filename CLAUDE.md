@@ -33,6 +33,7 @@ deputy/
 │   └── utils.R             # Internal utilities
 ├── tests/testthat/         # Unit tests (testthat edition 3)
 ├── inst/skills/            # Built-in skills with YAML metadata
+├── inst/examples/          # Example apps (e.g., shiny-chat)
 ├── exec/deputy             # Terminal CLI using Rapp
 ├── vignettes/              # User documentation (R Markdown)
 ├── man/                    # Auto-generated roxygen2 docs
@@ -229,7 +230,7 @@ test_that("descriptive test name", {
 
 | File | Purpose |
 |------|---------|
-| `R/agent.R` | Main Agent class with run/run_sync |
+| `R/agent.R` | Main Agent class with run/run_sync/run_shiny |
 | `R/permissions.R` | Permission system and tool annotations |
 | `R/hooks.R` | HookRegistry and event system |
 | `R/tools-builtin.R` | Built-in tools implementation |
@@ -250,6 +251,11 @@ test_that("descriptive test name", {
 - `testthat` (>= 3.0.0) - Testing
 - `Rapp` - CLI framework
 - `knitr` - Vignettes
+
+**Shiny Integration** (in Suggests):
+- `promises` - Async support for `run_shiny()`
+- `shiny` - Shiny framework
+- `shinychat` - Chat UI component
 
 ## Issue Tracking with Beads
 
