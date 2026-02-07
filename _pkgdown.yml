@@ -28,6 +28,14 @@ navbar:
         href: articles/structured-output.html
       - text: Agent Configuration
         href: articles/agent-configuration.html
+      - text: "---"
+      - text: "Examples"
+      - text: Data Analysis Agent
+        href: articles/example-data-analysis.html
+      - text: Extraction Pipeline
+        href: articles/example-extraction-pipeline.html
+      - text: Code Review (Multi-Agent)
+        href: articles/example-code-review.html
 
 reference:
 - title: Agent
@@ -116,3 +124,8 @@ articles:
   - multi-agent
   - structured-output
   - agent-configuration
+- title: Examples
+  contents:
+  - example-data-analysis
+  - example-extraction-pipeline
+  - example-code-review
