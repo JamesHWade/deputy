@@ -183,6 +183,67 @@ agent$add_hook(HookMatcher$new(
 ))
 ```
 
+### Skills
+
+Skills bundle tools and prompt extensions. You can load them from disk or create
+them programmatically. deputy ships with a built-in example skill under
+`inst/skills`.
+
+```{r skills}
+# Discover bundled skills
+skills_dir <- system.file("skills", package = "deputy")
+skills_list(skills_dir)
+
+# Load a skill by path
+agent$load_skill(file.path(skills_dir, "data_analysis"))
+
+# Inspect loaded skills
+agent$skills()
+
+# Create and load a skill programmatically
+custom <- skill_create(
+  name = "my_skill",
+  description = "Custom helpers",
+  prompt = "You are a focused assistant for project-specific tasks."
+)
+agent$load_skill(custom)
+```
+
+### Claude Settings (settingSources)
+
+deputy can load Claude-style settings from `.claude` directories, including
+`CLAUDE.md` memory, `.claude/skills`, and `.claude/commands` slash commands.
+
+```{r settings}
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_file(),
+  setting_sources = c("project", "user")
+)
+
+# Inspect loaded slash commands
+agent$slash_commands()
+```
+
+### Structured Output
+
+Request JSON output that matches a schema:
+
+```{r structured_output}
+schema <- list(
+  type = "object",
+  properties = list(status = list(type = "string")),
+  required = list("status")
+)
+
+result <- agent$run_sync(
+  "Respond with status = ok",
+  output_format = list(type = "json_schema", schema = schema)
+)
+
+result$structured_output
+```
+
 ### Error Handling
 
 deputy provides structured error types for programmatic error handling:

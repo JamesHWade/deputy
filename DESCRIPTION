@@ -4,6 +4,8 @@ Version: 0.0.0.9000
 Authors@R:
     person("James", "Wade", , "github@jameshwade.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-9740-1905"))
+Author: James Wade [aut, cre] (ORCID: <https://orcid.org/0000-0002-9740-1905>)
+Maintainer: James Wade <github@jameshwade.com>
 Description: A provider-agnostic framework for building agentic AI workflows
     in R. Built on ellmer, it enables multi-step reasoning with tool use,
     permissions, hooks, and human-in-the-loop capabilities. Works with any
@@ -19,6 +21,7 @@ Suggests:
     callr,
     httr2,
     jsonlite,
+    jsonvalidate,
     knitr,
     mcptools,
     Rapp,

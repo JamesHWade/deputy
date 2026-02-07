@@ -2,9 +2,12 @@
 ^[.]?air[.]toml$
 ^\.vscode$
 ^README\.Rmd$
+^AGENTS\.md$
+^CLAUDE\.md$
 ^\.github$
 ^_pkgdown\.yml$
 ^docs$
 ^pkgdown$
 ^codecov\.yml$
 ^\.claude$
+^\.beads$

@@ -15,11 +15,12 @@ skill_load(path, check_requirements = TRUE)
 A \link{Skill} object
 }
 \description{
-Loads a skill from a directory containing \code{SKILL.yaml} (metadata) and
-optionally \code{SKILL.md} (system prompt extension).
+Loads a skill from a directory containing \code{SKILL.yaml} (metadata) and/or
+\code{SKILL.md} (system prompt extension). You can also pass a direct path to
+a \code{SKILL.md} file.
 }
 \details{
-The skill directory should contain:
+The skill directory should contain one of:
 
 \strong{SKILL.yaml} (required):
 
@@ -35,9 +36,17 @@ tools:
     function: tool_my_tool
 }\if{html}{\out{</div>}}
 
-\strong{SKILL.md} (optional):
+\strong{SKILL.md} (optional, or standalone file):
 Markdown content that will be appended to the agent's system prompt
-when this skill is loaded.
+when this skill is loaded. Frontmatter is supported:
+
+\if{html}{\out{<div class="sourceCode yaml">}}\preformatted{---
+name: my_skill
+description: Optional description
+requires:
+  packages: [dplyr]
+---
+}\if{html}{\out{</div>}}
 
 \strong{tools.R} (optional):
 R file containing tool definitions referenced in SKILL.yaml.

@@ -103,10 +103,12 @@ agent$add_hook(HookMatcher$new(
 \item \href{#method-Agent-load_session}{\code{Agent$load_session()}}
 \item \href{#method-Agent-compact}{\code{Agent$compact()}}
 \item \href{#method-Agent-print}{\code{Agent$print()}}
-\item \href{#method-Agent-load_mcp}{\code{Agent$load_mcp()}}
-\item \href{#method-Agent-mcp_tools}{\code{Agent$mcp_tools()}}
 \item \href{#method-Agent-load_skill}{\code{Agent$load_skill()}}
 \item \href{#method-Agent-skills}{\code{Agent$skills()}}
+\item \href{#method-Agent-slash_commands}{\code{Agent$slash_commands()}}
+\item \href{#method-Agent-settings}{\code{Agent$settings()}}
+\item \href{#method-Agent-load_mcp}{\code{Agent$load_mcp()}}
+\item \href{#method-Agent-mcp_tools}{\code{Agent$mcp_tools()}}
 \item \href{#method-Agent-clone}{\code{Agent$clone()}}
 }
 }
@@ -121,7 +123,9 @@ Create a new Agent.
   tools = list(),
   system_prompt = NULL,
   permissions = NULL,
-  working_dir = getwd()
+  working_dir = getwd(),
+  setting_sources = NULL,
+  settings = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -142,6 +146,13 @@ Defaults to \code{\link[=permissions_standard]{permissions_standard()}}.}
 
 \item{\code{working_dir}}{Working directory for file operations. Defaults to
 current directory.}
+
+\item{\code{setting_sources}}{Optional character vector of Claude-style
+setting sources (e.g., "project", "user") used to load memory, skills,
+and slash commands.}
+
+\item{\code{settings}}{Optional pre-loaded settings list from
+\code{\link[=claude_settings_load]{claude_settings_load()}}. If provided, bypasses \code{setting_sources}.}
 }
 \if{html}{\out{</div>}}
 }
@@ -159,7 +170,12 @@ Returns a generator that yields \link{AgentEvent} objects as the agent works.
 The agent will continue until the task is complete, max_turns is reached,
 or the cost limit is exceeded.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$run(task, max_turns = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Agent$run(
+  task,
+  max_turns = NULL,
+  include_partial_messages = TRUE,
+  output_format = NULL
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -168,6 +184,12 @@ or the cost limit is exceeded.
 \item{\code{task}}{The task for the agent to perform}
 
 \item{\code{max_turns}}{Maximum number of turns (default: from permissions)}
+
+\item{\code{include_partial_messages}}{If TRUE (default), yield partial text
+chunks as they stream. If FALSE, only yield \code{text_complete}.}
+
+\item{\code{output_format}}{Optional output format spec (e.g. JSON schema) to
+guide and validate structured responses.}
 }
 \if{html}{\out{</div>}}
 }
@@ -184,7 +206,12 @@ Run an agentic task and block until completion.
 Convenience wrapper around \code{run()} that collects all events and returns
 an \link{AgentResult}.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$run_sync(task, max_turns = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Agent$run_sync(
+  task,
+  max_turns = NULL,
+  include_partial_messages = TRUE,
+  output_format = NULL
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -193,6 +220,12 @@ an \link{AgentResult}.
 \item{\code{task}}{The task for the agent to perform}
 
 \item{\code{max_turns}}{Maximum number of turns (default: from permissions)}
+
+\item{\code{include_partial_messages}}{If TRUE (default), keep partial text
+events. If FALSE, suppress partials.}
+
+\item{\code{output_format}}{Optional output format spec (e.g. JSON schema) to
+guide and validate structured responses.}
 }
 \if{html}{\out{</div>}}
 }
@@ -455,6 +488,68 @@ Print the agent configuration.
 
 }
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-load_skill"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-load_skill}{}}}
+\subsection{Method \code{load_skill()}}{
+Load a \link{Skill} into the agent.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Agent$load_skill(skill, allow_conflicts = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{skill}}{A \link{Skill} object or path to a skill directory.}
+
+\item{\code{allow_conflicts}}{If FALSE (default), error on tool name conflicts.
+Set TRUE to allow overwriting existing tools.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Invisible self for chaining.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-skills"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-skills}{}}}
+\subsection{Method \code{skills()}}{
+Get loaded skills.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Agent$skills()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Named list of loaded \link{Skill} objects.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-slash_commands"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-slash_commands}{}}}
+\subsection{Method \code{slash_commands()}}{
+Get registered slash commands.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Agent$slash_commands()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Named list of slash command definitions
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-settings"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-settings}{}}}
+\subsection{Method \code{settings()}}{
+Get applied Claude-style settings.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Agent$settings()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Settings list returned by \code{\link[=claude_settings_load]{claude_settings_load()}}
+}
+}
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-load_mcp"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-load_mcp}{}}}
 \subsection{Method \code{load_mcp()}}{
@@ -493,24 +588,6 @@ Get names of loaded MCP tools.
 \subsection{Returns}{
 Character vector of MCP tool names
 }
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-Agent-load_skill"></a>}}
-\if{latex}{\out{\hypertarget{method-Agent-load_skill}{}}}
-\subsection{Method \code{load_skill()}}{
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$load_skill(skill, allow_conflicts = FALSE)}\if{html}{\out{</div>}}
-}
-
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-Agent-skills"></a>}}
-\if{latex}{\out{\hypertarget{method-Agent-skills}{}}}
-\subsection{Method \code{skills()}}{
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$skills()}\if{html}{\out{</div>}}
-}
-
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-clone"></a>}}

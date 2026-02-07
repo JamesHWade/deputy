@@ -22,6 +22,8 @@ execution.
 \item{\code{duration}}{Execution duration in seconds}
 
 \item{\code{stop_reason}}{Reason the agent stopped}
+
+\item{\code{structured_output}}{Parsed/validated structured output (if requested)}
 }
 \if{html}{\out{</div>}}
 }
@@ -49,7 +51,8 @@ Create a new AgentResult object.
   cost = list(input = 0, output = 0, cached = 0, total = 0),
   events = list(),
   duration = NULL,
-  stop_reason = "complete"
+  stop_reason = "complete",
+  structured_output = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -67,6 +70,8 @@ Create a new AgentResult object.
 \item{\code{duration}}{Execution duration in seconds}
 
 \item{\code{stop_reason}}{Reason for stopping}
+
+\item{\code{structured_output}}{Parsed structured output (if any)}
 }
 \if{html}{\out{</div>}}
 }

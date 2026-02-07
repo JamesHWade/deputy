@@ -457,3 +457,48 @@ list_get <- function(x, name, default = NULL) {
   }
   x[[name]]
 }
+
+#' Parse Markdown frontmatter
+#'
+#' @param path Path to a Markdown file
+#' @return List with `meta` (list) and `body` (character)
+#' @keywords internal
+parse_markdown_frontmatter <- function(path) {
+  lines <- readLines(path, warn = FALSE)
+  if (length(lines) == 0) {
+    return(list(meta = list(), body = ""))
+  }
+
+  if (trimws(lines[1]) != "---") {
+    return(list(meta = list(), body = paste(lines, collapse = "\n")))
+  }
+
+  end_idx <- which(trimws(lines[-1]) == "---")
+  if (length(end_idx) == 0) {
+    return(list(meta = list(), body = paste(lines, collapse = "\n")))
+  }
+
+  # Adjust for offset (lines[-1])
+  end_idx <- end_idx[1] + 1
+  meta_lines <- lines[2:(end_idx - 1)]
+  body_lines <- lines[(end_idx + 1):length(lines)]
+
+  meta <- list()
+  if (rlang::is_installed("yaml")) {
+    meta <- tryCatch(
+      yaml::read_yaml(text = paste(meta_lines, collapse = "\n")),
+      error = function(e) {
+        cli::cli_warn(c(
+          "Failed to parse YAML frontmatter in {.path {path}}",
+          "x" = e$message
+        ))
+        list()
+      }
+    )
+  }
+
+  list(
+    meta = meta %||% list(),
+    body = paste(body_lines, collapse = "\n")
+  )
+}

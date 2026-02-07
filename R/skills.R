@@ -195,15 +195,16 @@ Skill <- R6::R6Class(
 #' Load a skill from a directory
 #'
 #' @description
-#' Loads a skill from a directory containing `SKILL.yaml` (metadata) and
-#' optionally `SKILL.md` (system prompt extension).
+#' Loads a skill from a directory containing `SKILL.yaml` (metadata) and/or
+#' `SKILL.md` (system prompt extension). You can also pass a direct path to
+#' a `SKILL.md` file.
 #'
 #' @param path Path to the skill directory
 #' @param check_requirements If TRUE (default), verify requirements are met
 #' @return A [Skill] object
 #'
 #' @details
-#' The skill directory should contain:
+#' The skill directory should contain one of:
 #'
 #' **SKILL.yaml** (required):
 #' ```yaml
@@ -219,9 +220,17 @@ Skill <- R6::R6Class(
 #'     function: tool_my_tool
 #' ```
 #'
-#' **SKILL.md** (optional):
+#' **SKILL.md** (optional, or standalone file):
 #' Markdown content that will be appended to the agent's system prompt
-#' when this skill is loaded.
+#' when this skill is loaded. Frontmatter is supported:
+#' ```yaml
+#' ---
+#' name: my_skill
+#' description: Optional description
+#' requires:
+#'   packages: [dplyr]
+#' ---
+#' ```
 #'
 #' **tools.R** (optional):
 #' R file containing tool definitions referenced in SKILL.yaml.
@@ -239,46 +248,73 @@ Skill <- R6::R6Class(
 skill_load <- function(path, check_requirements = TRUE) {
   path <- normalizePath(path, mustWork = TRUE)
 
-  # Check for SKILL.yaml
+  info <- file.info(path)
+  if (is.na(info$isdir)) {
+    cli_abort("Skill path is not accessible: {.path {path}}")
+  }
 
-  yaml_path <- file.path(path, "SKILL.yaml")
-  if (!file.exists(yaml_path)) {
-    # Also check for skill.yaml (lowercase)
-    yaml_path <- file.path(path, "skill.yaml")
-    if (!file.exists(yaml_path)) {
-      cli_abort(c(
-        "Skill directory must contain SKILL.yaml",
-        "x" = "Not found in: {.path {path}}"
-      ))
+  # Support loading directly from a SKILL.md file
+  if (!isTRUE(info$isdir)) {
+    if (!grepl("\\.md$", path, ignore.case = TRUE)) {
+      cli_abort("Skill file must be a Markdown file: {.path {path}}")
     }
+    skill <- load_skill_from_markdown(path)
+    if (check_requirements) {
+      req_check <- skill$check_requirements()
+      if (!req_check$ok) {
+        cli_warn(c(
+          "Skill {.val {skill$name}} has unmet requirements",
+          "x" = "Missing: {.val {req_check$missing}}"
+        ))
+      }
+    }
+    return(skill)
   }
 
-  # Parse YAML
-  if (!rlang::is_installed("yaml")) {
-    cli_abort(c(
-      "Package {.pkg yaml} is required to load skills",
-      "i" = "Install with: {.code install.packages('yaml')}"
-    ))
-  }
-
-  meta <- yaml::read_yaml(yaml_path)
-
-  # Validate required fields
-  if (is.null(meta$name)) {
-    cli_abort("SKILL.yaml must contain a 'name' field")
-  }
-
-  # Load SKILL.md if present
-  prompt <- NULL
+  # Check for SKILL.yaml or SKILL.md in directory
+  yaml_path <- file.path(path, "SKILL.yaml")
   md_path <- file.path(path, "SKILL.md")
+  if (!file.exists(yaml_path)) {
+    yaml_path <- file.path(path, "skill.yaml")
+  }
   if (!file.exists(md_path)) {
     md_path <- file.path(path, "skill.md")
   }
-  if (file.exists(md_path)) {
-    prompt <- paste(readLines(md_path, warn = FALSE), collapse = "\n")
+
+  if (!file.exists(yaml_path) && !file.exists(md_path)) {
+    cli_abort(c(
+      "Skill directory must contain SKILL.yaml or SKILL.md",
+      "x" = "Not found in: {.path {path}}"
+    ))
   }
 
-  # Load tools if specified
+  meta <- list()
+  prompt <- NULL
+
+  # Parse SKILL.yaml when present
+  if (file.exists(yaml_path)) {
+    if (!rlang::is_installed("yaml")) {
+      cli_abort(c(
+        "Package {.pkg yaml} is required to load SKILL.yaml",
+        "i" = "Install with: {.code install.packages('yaml')}"
+      ))
+    }
+    meta <- yaml::read_yaml(yaml_path)
+    if (is.null(meta$name)) {
+      cli_abort("SKILL.yaml must contain a 'name' field")
+    }
+  }
+
+  # Load SKILL.md if present (with optional frontmatter)
+  if (file.exists(md_path)) {
+    parsed <- parse_markdown_frontmatter(md_path)
+    prompt <- parsed$body
+    if (length(parsed$meta) > 0) {
+      meta <- merge_named_lists(meta, parsed$meta)
+    }
+  }
+
+  # Load tools if specified (SKILL.yaml)
   tools <- list()
   if (!is.null(meta$tools) && length(meta$tools) > 0) {
     tools <- load_skill_tools(path, meta$tools)
@@ -286,7 +322,7 @@ skill_load <- function(path, check_requirements = TRUE) {
 
   # Create skill object
   skill <- Skill$new(
-    name = meta$name,
+    name = meta$name %||% basename(path),
     version = meta$version %||% "0.0.0",
     description = meta$description,
     prompt = prompt,
@@ -305,6 +341,25 @@ skill_load <- function(path, check_requirements = TRUE) {
       ))
     }
   }
+
+  skill
+}
+
+# Load a skill directly from a SKILL.md file
+load_skill_from_markdown <- function(path) {
+  parsed <- parse_markdown_frontmatter(path)
+  meta <- parsed$meta %||% list()
+  prompt <- parsed$body
+
+  skill <- Skill$new(
+    name = meta$name %||% tools::file_path_sans_ext(basename(path)),
+    version = meta$version %||% "0.0.0",
+    description = meta$description,
+    prompt = prompt,
+    tools = list(),
+    requires = meta$requires %||% list(),
+    path = dirname(path)
+  )
 
   skill
 }
@@ -455,8 +510,10 @@ skills_list <- function(path = "skills") {
     ))
   }
 
-  # Find subdirectories with SKILL.yaml
+  # Find subdirectories with SKILL.yaml or SKILL.md
   subdirs <- list.dirs(path, recursive = FALSE, full.names = TRUE)
+  md_files <- list.files(path, pattern = "\\.md$", full.names = TRUE)
+
   skills <- data.frame(
     name = character(),
     path = character(),
@@ -468,25 +525,32 @@ skills_list <- function(path = "skills") {
     if (!file.exists(yaml_path)) {
       yaml_path <- file.path(dir, "skill.yaml")
     }
+    md_path <- file.path(dir, "SKILL.md")
+    if (!file.exists(md_path)) {
+      md_path <- file.path(dir, "skill.md")
+    }
 
-    if (file.exists(yaml_path)) {
-      # Try to get the name from YAML
+    if (file.exists(yaml_path) || file.exists(md_path)) {
+      # Try to get the name from YAML/frontmatter
       name <- basename(dir)
-      tryCatch(
-        {
-          if (rlang::is_installed("yaml")) {
+      if (file.exists(yaml_path) && rlang::is_installed("yaml")) {
+        tryCatch(
+          {
             meta <- yaml::read_yaml(yaml_path)
             name <- meta$name %||% basename(dir)
+          },
+          error = function(e) {
+            cli_warn(c(
+              "Failed to parse SKILL.yaml in {.path {dir}}",
+              "x" = e$message,
+              "i" = "Using directory name as skill name"
+            ))
           }
-        },
-        error = function(e) {
-          cli_warn(c(
-            "Failed to parse SKILL.yaml in {.path {dir}}",
-            "x" = e$message,
-            "i" = "Using directory name as skill name"
-          ))
-        }
-      )
+        )
+      } else if (file.exists(md_path)) {
+        parsed <- parse_markdown_frontmatter(md_path)
+        name <- parsed$meta$name %||% basename(dir)
+      }
 
       skills <- rbind(
         skills,
@@ -499,157 +563,20 @@ skills_list <- function(path = "skills") {
     }
   }
 
+  # Include standalone markdown skills in the root
+  for (md_path in md_files) {
+    parsed <- parse_markdown_frontmatter(md_path)
+    name <- parsed$meta$name %||%
+      tools::file_path_sans_ext(basename(md_path))
+    skills <- rbind(
+      skills,
+      data.frame(
+        name = name,
+        path = md_path,
+        stringsAsFactors = FALSE
+      )
+    )
+  }
+
   skills
 }
-
-# Add load_skill method to Agent class
-# This is added here to keep skill-related code together
-# Note: These methods are dynamically added and documented in the Agent class
-
-Agent$set(
-  "public",
-  "load_skill",
-  overwrite = TRUE,
-  value = function(skill, allow_conflicts = FALSE) {
-    if (is.character(skill)) {
-      # Load from path
-      skill <- skill_load(skill)
-    }
-
-    if (!inherits(skill, "Skill")) {
-      cli_abort(
-        "{.arg skill} must be a Skill object or path to a skill directory"
-      )
-    }
-
-    # Get current provider for validation
-    current_provider <- tryCatch(
-      {
-        provider_info <- self$provider()
-        # provider() returns a list with name and model
-        provider_info$name
-      },
-      error = function(e) {
-        # Log unexpected errors (not just "no provider configured")
-        if (
-          !grepl("no provider|not configured", e$message, ignore.case = TRUE)
-        ) {
-          cli_warn(c(
-            "Could not determine provider for skill validation",
-            "x" = e$message,
-            "i" = "Provider compatibility check will be skipped"
-          ))
-        }
-        NULL
-      }
-    )
-
-    # Check requirements with provider
-    req_check <- skill$check_requirements(current_provider)
-
-    # Report missing packages
-    if (length(req_check$missing) > 0) {
-      cli_warn(c(
-        "Loading skill with missing packages: {.val {skill$name}}",
-        "x" = "Missing: {.val {req_check$missing}}"
-      ))
-    }
-
-    # Report provider mismatch
-    if (isTRUE(req_check$provider_mismatch)) {
-      required <- paste(req_check$required_providers, collapse = ", ")
-      cli_warn(c(
-        "Skill {.val {skill$name}} may not work optimally with current provider",
-        "i" = "Current provider: {.val {current_provider}}",
-        "i" = "Skill requires: {.val {required}}",
-        "!" = "Some features may not work as expected"
-      ))
-    }
-
-    # Register tools with conflict detection
-    if (length(skill$tools) > 0) {
-      # Get current tool names to detect conflicts
-      current_tools <- self$chat$get_tools()
-      current_tool_names <- names(current_tools)
-
-      # Get names of tools being registered
-      new_tool_names <- vapply(
-        skill$tools,
-        function(t) {
-          # Handle both S7 (@ access) and list-style tools
-          tryCatch(
-            t@name,
-            error = function(e1) {
-              tryCatch(
-                t$name %||%
-                  {
-                    cli_warn(
-                      "Could not determine tool name for conflict detection"
-                    )
-                    "unknown"
-                  },
-                error = function(e2) {
-                  cli_warn(c(
-                    "Failed to extract tool name",
-                    "x" = e1$message
-                  ))
-                  "unknown"
-                }
-              )
-            }
-          )
-        },
-        character(1)
-      )
-
-      # Check for conflicts
-      conflicts <- new_tool_names[new_tool_names %in% current_tool_names]
-      if (length(conflicts) > 0) {
-        if (isTRUE(allow_conflicts)) {
-          cli_warn(c(
-            "Skill {.val {skill$name}} overwrites existing tool(s)",
-            "!" = "Conflicting tools: {.val {conflicts}}",
-            "i" = "Previous definitions will be replaced"
-          ))
-        } else {
-          cli_abort(c(
-            "Skill {.val {skill$name}} conflicts with existing tool(s)",
-            "!" = "Conflicting tools: {.val {conflicts}}",
-            "i" = "Use {.code allow_conflicts = TRUE} to overwrite existing tools"
-          ))
-        }
-      }
-
-      self$chat$register_tools(skill$tools)
-    }
-
-    # Append prompt to system prompt
-    if (!is.null(skill$prompt) && nchar(skill$prompt) > 0) {
-      current_prompt <- self$chat$get_system_prompt() %||% ""
-      new_prompt <- paste(
-        current_prompt,
-        "",
-        paste0("# Skill: ", skill$name),
-        skill$prompt,
-        sep = "\n"
-      )
-      self$chat$set_system_prompt(new_prompt)
-    }
-
-    # Store reference to loaded skill
-    if (is.null(private$loaded_skills)) {
-      private$loaded_skills <- list()
-    }
-    private$loaded_skills[[skill$name]] <- skill
-
-    cli_alert_success("Loaded skill: {.val {skill$name}}")
-    invisible(self)
-  }
-)
-
-Agent$set("public", "skills", overwrite = TRUE, value = function() {
-  if (is.null(private$loaded_skills)) {
-    return(list())
-  }
-  private$loaded_skills
-})
