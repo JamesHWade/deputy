@@ -109,6 +109,7 @@ agent$add_hook(HookMatcher$new(
 \item \href{#method-Agent-settings}{\code{Agent$settings()}}
 \item \href{#method-Agent-load_mcp}{\code{Agent$load_mcp()}}
 \item \href{#method-Agent-mcp_tools}{\code{Agent$mcp_tools()}}
+\item \href{#method-Agent-run_shiny}{\code{Agent$run_shiny()}}
 \item \href{#method-Agent-clone}{\code{Agent$clone()}}
 }
 }
@@ -587,6 +588,38 @@ Get names of loaded MCP tools.
 
 \subsection{Returns}{
 Character vector of MCP tool names
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-run_shiny"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-run_shiny}{}}}
+\subsection{Method \code{run_shiny()}}{
+Run an agentic task for use in Shiny applications with shinychat.
+
+Returns an async content stream suitable for passing to
+\code{shinychat::chat_append()}. Unlike \code{run()} and \code{run_sync()}, the
+multi-turn loop is driven by ellmer's \code{stream_async()} rather than
+deputy's own generator. Deputy's permissions, hooks, and tool call
+limits are still enforced via the \code{on_tool_request} callback.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Agent$run_shiny(prompt, max_tool_calls = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{prompt}}{The user message to send}
+
+\item{\code{max_tool_calls}}{Maximum number of tool calls before stopping.
+Defaults to \code{permissions$max_turns} or 25. Note this counts individual
+tool call requests, not LLM turns (one turn can have multiple parallel
+tool calls).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A promise that resolves when the stream is complete, suitable
+for \code{shinychat::chat_append()}.
 }
 }
 \if{html}{\out{<hr>}}

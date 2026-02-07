@@ -7,14 +7,13 @@ ui <- bslib::page_fluid(
 )
 
 server <- function(input, output, session) {
-  chat <- ellmer::chat_anthropic(
-    model = "claude-sonnet-4-20250514",
+  chat <- ellmer::chat_openai(
+    model = "gpt-4o-mini",
     system_prompt = "You are a helpful assistant that can read and analyse
       files. Be concise."
   )
 
   # Deputy adds permissions and hooks on top of the ellmer chat
-
   agent <- Agent$new(
     chat = chat,
     tools = c(tools_file(), tools_data()),
@@ -27,9 +26,11 @@ server <- function(input, output, session) {
   )
   agent$add_hook(hook_log_tools(verbose = TRUE))
 
-  # shinychat drives the loop; deputy's permissions/hooks still fire
+  # run_shiny() returns a content stream with deputy's permissions, hooks,
+
+  # and tool call limits enforced
   observeEvent(input$chat_user_input, {
-    stream <- agent$chat$stream_async(input$chat_user_input, stream = "content")
+    stream <- agent$run_shiny(input$chat_user_input)
     chat_append("chat", stream)
   })
 }

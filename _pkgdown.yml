@@ -36,6 +36,8 @@ navbar:
         href: articles/example-extraction-pipeline.html
       - text: Code Review (Multi-Agent)
         href: articles/example-code-review.html
+      - text: Shiny Chat
+        href: articles/example-shiny-chat.html
 
 reference:
 - title: Agent
@@ -129,3 +131,4 @@ articles:
   - example-data-analysis
   - example-extraction-pipeline
   - example-code-review
+  - example-shiny-chat
