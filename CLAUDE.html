@@ -19,6 +19,20 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="articles/getting-started.html">Getting Started</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="articles/tools.html">Tools and Tool Bundles</a></li>
+    <li><a class="dropdown-item" href="articles/permissions.html">Permissions and Safety</a></li>
+    <li><a class="dropdown-item" href="articles/hooks.html">Hooks</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="articles/multi-agent.html">Multi-Agent Orchestration</a></li>
+    <li><a class="dropdown-item" href="articles/structured-output.html">Structured Output</a></li>
+    <li><a class="dropdown-item" href="articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
+    <li><a class="dropdown-item" href="articles/example-data-analysis.html">Data Analysis Agent</a></li>
+    <li><a class="dropdown-item" href="articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
+    <li><a class="dropdown-item" href="articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><a class="dropdown-item" href="articles/example-shiny-chat.html">Shiny Chat</a></li>
   </ul></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="search.json"></form></li>
@@ -59,6 +73,7 @@
 │   └── utils.R             # Internal utilities
 ├── tests/testthat/         # Unit tests (testthat edition 3)
 ├── inst/skills/            # Built-in skills with YAML metadata
+├── inst/examples/          # Example apps (e.g., shiny-chat)
 ├── exec/deputy             # Terminal CLI using Rapp
 ├── vignettes/              # User documentation (R Markdown)
 ├── man/                    # Auto-generated roxygen2 docs
@@ -269,7 +284,7 @@
 <table class="table"><thead><tr class="header"><th>File</th>
 <th>Purpose</th>
 </tr></thead><tbody><tr class="odd"><td><code>R/agent.R</code></td>
-<td>Main Agent class with run/run_sync</td>
+<td>Main Agent class with run/run_sync/run_shiny</td>
 </tr><tr class="even"><td><code>R/permissions.R</code></td>
 <td>Permission system and tool annotations</td>
 </tr><tr class="odd"><td><code>R/hooks.R</code></td>
@@ -285,6 +300,7 @@
 <h2 id="dependencies">Dependencies<a class="anchor" aria-label="anchor" href="#dependencies"></a></h2>
 <p><strong>Core</strong> (in Imports): - <code>ellmer</code> (&gt;= 0.3.0) - LLM abstraction layer - <code>R6</code> - Object-oriented programming - <code>cli</code> - CLI formatting - <code>rlang</code> - Language utilities - <code>coro</code> - Coroutines for streaming - <code>digest</code> - Hashing</p>
 <p><strong>Development</strong> (in Suggests): - <code>testthat</code> (&gt;= 3.0.0) - Testing - <code>Rapp</code> - CLI framework - <code>knitr</code> - Vignettes</p>
+<p><strong>Shiny Integration</strong> (in Suggests): - <code>promises</code> - Async support for <code>run_shiny()</code> - <code>shiny</code> - Shiny framework - <code>shinychat</code> - Chat UI component</p>
 </div>
 <div class="section level2">
 <h2 id="issue-tracking-with-beads">Issue Tracking with Beads<a class="anchor" aria-label="anchor" href="#issue-tracking-with-beads"></a></h2>

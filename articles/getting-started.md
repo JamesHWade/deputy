@@ -2,122 +2,89 @@
 
 deputy is an agentic AI framework for R that builds on
 [ellmer](https://ellmer.tidyverse.org/). It enables you to create AI
-agents that can use tools to accomplish multi-step tasks, with built-in
+agents that use tools to accomplish multi-step tasks, with built-in
 support for permissions, hooks, and streaming output.
 
 ## Installation
 
 ``` r
 # Install from GitHub
-# install.packages("pak")
 pak::pak("JamesHWade/deputy")
-```
-
-You’ll also need ellmer for the underlying LLM functionality:
-
-``` r
-pak::pak("tidyverse/ellmer")
 ```
 
 ## Quick Start
 
-### Creating an Agent
-
-An agent combines an LLM (via ellmer) with tools and permissions:
+An agent wraps an ellmer chat object and gives it tools, permissions,
+and lifecycle hooks:
 
 ``` r
 library(deputy)
 
-# Create an agent with file tools
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_file()
-)
+chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+agent <- Agent$new(chat = chat, tools = tools_file())
 
-# Run a task
-result <- agent$run_sync("What R files are in the current directory?")
+result <- agent$run_sync("List the files in the current directory")
 cat(result$response)
 ```
 
-### Streaming Output
+The agent sends your task to the LLM, which may call tools, and loops
+until the task is complete. `run_sync()` blocks until done and returns
+an `AgentResult`.
 
-For real-time feedback, use the `run()` method which returns a
-generator:
+## Tool Bundles
 
-``` r
-for (event in agent$run("Analyze the structure of this project")) {
-  switch(
-    event$type,
-    "text" = cat(event$text),
-    "tool_start" = cli::cli_alert_info("Calling {event$tool_name}..."),
-    "tool_end" = cli::cli_alert_success("Done"),
-    "stop" = cli::cli_alert("Finished! Cost: ${event$cost$total}")
-  )
-}
-```
-
-## Tools
-
-deputy provides built-in tools in convenient bundles:
+deputy organises built-in tools into bundles you can mix and match:
 
 | Bundle                                                                        | Tools                                   | Purpose         |
 |-------------------------------------------------------------------------------|-----------------------------------------|-----------------|
 | [`tools_file()`](https://jameshwade.github.io/deputy/reference/tools_file.md) | `read_file`, `write_file`, `list_files` | File operations |
 | [`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md) | `run_r_code`, `run_bash`                | Code execution  |
 | [`tools_data()`](https://jameshwade.github.io/deputy/reference/tools_data.md) | `read_csv`, `read_file`                 | Data reading    |
+| [`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md)   | `web_fetch`, `web_search`               | Web access      |
 | [`tools_all()`](https://jameshwade.github.io/deputy/reference/tools_all.md)   | All of the above                        | Everything      |
 
 ``` r
-# Combine multiple tool bundles
+# Combine bundles
 agent <- Agent$new(
-  chat = ellmer::chat("openai"),
+  chat = ellmer::chat_anthropic(),
   tools = c(tools_file(), tools_code())
 )
 ```
 
-### Custom Tools
-
-You can create custom tools using ellmer’s `tool()` function:
+There are also named presets available via
+[`tools_preset()`](https://jameshwade.github.io/deputy/reference/tools_preset.md):
 
 ``` r
-# Create a custom tool
-tool_weather <- ellmer::tool(
-  name = "get_weather",
-  description = "Get the current weather for a location",
-  arguments = list(
-    location = ellmer::tool_arg(
-      type = "string",
-      description = "City name"
-    )
-  ),
-  .fun = function(location) {
-    # Your implementation here
-    paste("Weather in", location, "is sunny, 72F")
-  }
-)
-
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = list(tool_weather)
-)
+list_presets()
+tools_preset("dev")
 ```
+
+See
+[`vignette("tools")`](https://jameshwade.github.io/deputy/articles/tools.md)
+for custom tools, web tools, MCP integration, and human-in-the-loop.
+
+## Streaming
+
+For real-time feedback, use `run()` which returns a generator:
+
+``` r
+chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+agent <- Agent$new(chat = chat, tools = tools_file())
+
+for (event in agent$run("What is the name of this package?")) {
+  switch(event$type,
+    "text" = cat(event$text),
+    "tool_start" = cli::cli_alert_info("Calling {event$tool_name}..."),
+    "tool_end" = cli::cli_alert_success("Done"),
+    "stop" = cli::cli_alert("Finished!")
+  )
+}
+```
+
+Events stream as they happen – you see text tokens arrive, tool calls
+start and finish, and a final stop event.
 
 ## Permissions
-
-Permissions control what an agent is allowed to do. deputy provides
-three preset configurations:
-
-### Standard Permissions (default)
-
-``` r
-# Allows: file read/write (in working dir), R code execution
-# Denies: bash commands, web access, package installation
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_file(),
-  permissions = permissions_standard()
-)
-```
 
 ### Read-Only Permissions
 
@@ -406,22 +373,19 @@ agent <- Agent$new(
     max_cost_usd = 1.00
   )
 )
-
-agent$add_hook(HookMatcher$new(
-  event = "PostToolUse",
-  callback = function(tool_name, tool_result, context) {
-    message(sprintf("[%s] %s", Sys.time(), tool_name))
-    HookResultPostToolUse()
-  }
-))
-
-for (event in agent$run("Organize the files in this directory")) {
-  if (event$type == "text") cat(event$text)
-}
 ```
 
 ## Next Steps
 
-- See `vignette("tools")` for creating custom tools
-- See `vignette("hooks")` for advanced hook patterns
-- See `vignette("multi-agent")` for complex agent orchestration
+- [`vignette("tools")`](https://jameshwade.github.io/deputy/articles/tools.md)
+  – Custom tools, web tools, MCP, and human-in-the-loop
+- [`vignette("permissions")`](https://jameshwade.github.io/deputy/articles/permissions.md)
+  – Permission presets, modes, and custom policies
+- [`vignette("hooks")`](https://jameshwade.github.io/deputy/articles/hooks.md)
+  – Lifecycle hooks for logging, blocking, and auditing
+- [`vignette("multi-agent")`](https://jameshwade.github.io/deputy/articles/multi-agent.md)
+  – Multi-agent delegation with LeadAgent
+- [`vignette("structured-output")`](https://jameshwade.github.io/deputy/articles/structured-output.md)
+  – JSON schema output and validation
+- [`vignette("agent-configuration")`](https://jameshwade.github.io/deputy/articles/agent-configuration.md)
+  – Settings, skills, sessions, and AgentResult

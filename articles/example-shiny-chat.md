@@ -1,0 +1,121 @@
+# Example: Shiny Chat with shinychat
+
+This example shows how to use deputy with
+[shinychat](https://posit-dev.github.io/shinychat/) to build an
+interactive chat application with permissions, hooks, and tool call
+limits.
+
+## The Problem
+
+shinychat’s
+[`chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html)
+expects an ellmer content stream from `chat$stream_async()`. Deputy’s
+`run()` and `run_sync()` methods return `AgentEvent` objects instead.
+Calling `agent$chat$stream_async()` directly works but bypasses deputy’s
+turn-level controls like `max_turns` and `max_cost_usd`.
+
+`run_shiny()` bridges this gap: it returns a content stream that
+shinychat understands while still enforcing deputy’s permissions, hooks,
+and limits.
+
+## What `run_shiny()` Enforces
+
+| Feature                             | Enforced? | How                                                         |
+|-------------------------------------|-----------|-------------------------------------------------------------|
+| Permissions (file_read, bash, etc.) | Yes       | `on_tool_request` callback                                  |
+| PreToolUse / PostToolUse hooks      | Yes       | `on_tool_request` / `on_tool_result` callbacks              |
+| Tool call limit                     | Yes       | Counter in `on_tool_request`, rejects with graceful message |
+| Cost limit (`max_cost_usd`)         | Yes       | Checked in `on_tool_request`                                |
+| SessionStart / SessionEnd hooks     | Yes       | Fired before/after the stream                               |
+| Stall detection                     | No        | Requires deputy’s own loop                                  |
+| `output_format` (structured output) | No        | Requires deputy’s own loop                                  |
+
+## Basic Setup
+
+``` r
+library(shiny)
+library(deputy)
+library(shinychat)
+
+ui <- bslib::page_fluid(
+  chat_ui("chat", fill = TRUE)
+)
+
+server <- function(input, output, session) {
+  chat <- ellmer::chat_openai(
+    model = "gpt-4o-mini",
+    system_prompt = "You are a helpful assistant. Be concise."
+  )
+
+  agent <- Agent$new(
+    chat = chat,
+    tools = tools_file()
+  )
+
+  observeEvent(input$chat_user_input, {
+    stream <- agent$run_shiny(input$chat_user_input)
+    chat_append("chat", stream)
+  })
+}
+
+shinyApp(ui, server)
+```
+
+## With Permissions and Hooks
+
+Deputy’s permissions and hooks fire on every tool call, even though
+shinychat drives the streaming loop:
+
+``` r
+server <- function(input, output, session) {
+  chat <- ellmer::chat_anthropic(
+    model = "claude-sonnet-4-5-20250929",
+    system_prompt = "You are a data analyst. Be concise."
+  )
+
+  agent <- Agent$new(
+    chat = chat,
+    tools = c(tools_file(), tools_data()),
+    permissions = Permissions$new(
+      file_read = TRUE,
+      file_write = FALSE,
+      r_code = FALSE,
+      bash = FALSE,
+      max_cost_usd = 0.50
+    )
+  )
+
+  # Hooks still fire normally
+  agent$add_hook(hook_log_tools(verbose = TRUE))
+
+  observeEvent(input$chat_user_input, {
+    # max_tool_calls limits how many tool calls the agent can make
+    stream <- agent$run_shiny(
+      input$chat_user_input,
+      max_tool_calls = 10
+    )
+    chat_append("chat", stream)
+  })
+}
+```
+
+## How Limits Work
+
+When a tool call limit or cost limit is reached, deputy calls
+[`ellmer::tool_reject()`](https://ellmer.tidyverse.org/reference/tool_reject.html)
+with a message asking the LLM to wrap up. The LLM receives this as a
+tool error and generates a final response. The user sees a complete,
+coherent message rather than a truncated stream.
+
+The `max_tool_calls` parameter counts individual tool call requests, not
+LLM turns. One turn can include multiple parallel tool calls (e.g., the
+LLM reads three files at once), each counting separately. This is more
+precise than turn counting for controlling resource usage.
+
+## Running the Example
+
+A complete example app is included in the package:
+
+``` r
+shiny::runApp(system.file("examples/shiny-chat", package = "deputy"))
+```

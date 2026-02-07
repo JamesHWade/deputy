@@ -2,8 +2,18 @@ pandoc: 3.1.11
 pkgdown: 2.2.0
 pkgdown_sha: ~
 articles:
+  agent-configuration: agent-configuration.html
+  example-code-review: example-code-review.html
+  example-data-analysis: example-data-analysis.html
+  example-extraction-pipeline: example-extraction-pipeline.html
+  example-shiny-chat: example-shiny-chat.html
   getting-started: getting-started.html
-last_built: 2026-02-07T01:43Z
+  hooks: hooks.html
+  multi-agent: multi-agent.html
+  permissions: permissions.html
+  structured-output: structured-output.html
+  tools: tools.html
+last_built: 2026-02-07T18:51Z
 urls:
   reference: https://jameshwade.github.io/deputy/reference
   article: https://jameshwade.github.io/deputy/articles

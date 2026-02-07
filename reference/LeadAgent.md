@@ -43,6 +43,7 @@ Inherited methods
 - [`deputy::Agent$register_tool()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-register_tool)
 - [`deputy::Agent$register_tools()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-register_tools)
 - [`deputy::Agent$run()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run)
+- [`deputy::Agent$run_shiny()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_shiny)
 - [`deputy::Agent$run_sync()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_sync)
 - [`deputy::Agent$save_session()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-save_session)
 - [`deputy::Agent$settings()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-settings)

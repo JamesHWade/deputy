@@ -23,6 +23,20 @@ multi-turn execution, permission enforcement, and streaming output."><meta prope
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+    <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
+    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
   </ul></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
@@ -126,6 +140,7 @@ mcptools package. Returns invisible self.</p></dd>
 <li><p><a href="#method-Agent-settings"><code>Agent$settings()</code></a></p></li>
 <li><p><a href="#method-Agent-load_mcp"><code>Agent$load_mcp()</code></a></p></li>
 <li><p><a href="#method-Agent-mcp_tools"><code>Agent$mcp_tools()</code></a></p></li>
+<li><p><a href="#method-Agent-run_shiny"><code>Agent$run_shiny()</code></a></p></li>
 <li><p><a href="#method-Agent-clone"><code>Agent$clone()</code></a></p></li>
 </ul></div><p></p><hr><a id="method-Agent-new"></a><div class="section">
 <h3 id="method-new-">Method <code>new()</code><a class="anchor" aria-label="anchor" href="#method-new-"></a></h3>
@@ -616,15 +631,48 @@ If NULL, loads from all configured servers.</p></dd>
 <p>Character vector of MCP tool names</p>
 </div>
 
-</div><p></p><hr><a id="method-Agent-clone"></a><div class="section">
-<h3 id="method-clone-">Method <code>clone()</code><a class="anchor" aria-label="anchor" href="#method-clone-"></a></h3>
-<p>The objects of this class are cloneable with this method.</p><div class="section">
+</div><p></p><hr><a id="method-Agent-run_shiny"></a><div class="section">
+<h3 id="method-run-shiny-">Method <code>run_shiny()</code><a class="anchor" aria-label="anchor" href="#method-run-shiny-"></a></h3>
+<p>Run an agentic task for use in Shiny applications with shinychat.</p>
+<p>Returns an async content stream suitable for passing to
+<code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">shinychat::chat_append()</a></code>. Unlike <code>run()</code> and <code>run_sync()</code>, the
+multi-turn loop is driven by ellmer's <code>stream_async()</code> rather than
+deputy's own generator. Deputy's permissions, hooks, and tool call
+limits are still enforced via the <code>on_tool_request</code> callback.</p><div class="section">
 <h4 id="usage-20">Usage<a class="anchor" aria-label="anchor" href="#usage-20"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run_shiny</span><span class="op">(</span><span class="va">prompt</span>, max_tool_calls <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
 <div class="section">
 <h4 id="arguments-12">Arguments<a class="anchor" aria-label="anchor" href="#arguments-12"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>prompt</code></dt>
+<dd><p>The user message to send</p></dd>
+
+
+<dt><code>max_tool_calls</code></dt>
+<dd><p>Maximum number of tool calls before stopping.
+Defaults to <code>permissions$max_turns</code> or 25. Note this counts individual
+tool call requests, not LLM turns (one turn can have multiple parallel
+tool calls).</p></dd>
+
+
+</dl><p></p></div>
+</div>
+<div class="section">
+<h4 id="returns-19">Returns<a class="anchor" aria-label="anchor" href="#returns-19"></a></h4>
+<p>A promise that resolves when the stream is complete, suitable
+for <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">shinychat::chat_append()</a></code>.</p>
+</div>
+
+</div><p></p><hr><a id="method-Agent-clone"></a><div class="section">
+<h3 id="method-clone-">Method <code>clone()</code><a class="anchor" aria-label="anchor" href="#method-clone-"></a></h3>
+<p>The objects of this class are cloneable with this method.</p><div class="section">
+<h4 id="usage-21">Usage<a class="anchor" aria-label="anchor" href="#usage-21"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div>
+
+<div class="section">
+<h4 id="arguments-13">Arguments<a class="anchor" aria-label="anchor" href="#arguments-13"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

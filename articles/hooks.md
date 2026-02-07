@@ -1,0 +1,190 @@
+# Hooks
+
+Hooks let you intercept agent behaviour at key points in the execution
+lifecycle. Use them for logging, auditing, blocking dangerous actions,
+or injecting custom logic.
+
+## Hook Events
+
+deputy fires hooks at these events:
+
+| Event              | Callback Signature                                      | Purpose                             |
+|--------------------|---------------------------------------------------------|-------------------------------------|
+| `PreToolUse`       | `function(tool_name, tool_input, context)`              | Before a tool runs (can allow/deny) |
+| `PostToolUse`      | `function(tool_name, tool_result, tool_error, context)` | After a tool completes              |
+| `Stop`             | `function(reason, context)`                             | When the agent finishes             |
+| `SubagentStop`     | `function(agent_name, task, result, context)`           | When a sub-agent finishes           |
+| `UserPromptSubmit` | `function(prompt, context)`                             | When user submits input             |
+| `PreCompact`       | `function(context)`                                     | Before conversation compaction      |
+| `SessionStart`     | `function(context)`                                     | When a session starts               |
+| `SessionEnd`       | `function(context)`                                     | When a session ends                 |
+
+## Creating Hooks
+
+Hooks are created with `HookMatcher$new()`:
+
+``` r
+library(deputy)
+
+hook <- HookMatcher$new(
+  event = "PostToolUse",
+  callback = function(tool_name, tool_result, tool_error, context) {
+    cli::cli_alert_info("Tool {tool_name} completed")
+    HookResultPostToolUse()
+  }
+)
+```
+
+Add hooks to an agent with `add_hook()`:
+
+``` r
+agent$add_hook(hook)
+```
+
+### Filtering by Tool Name
+
+The optional `pattern` argument is a regex that filters which tools the
+hook applies to:
+
+``` r
+# Only fires for bash commands
+HookMatcher$new(
+  event = "PreToolUse",
+  pattern = "^run_bash$",
+  callback = function(tool_name, tool_input, context) {
+    cli::cli_alert_warning("Bash command: {tool_input$command}")
+    HookResultPreToolUse(permission = "allow")
+  }
+)
+```
+
+## Pre-Built Hooks
+
+deputy includes several ready-made hooks:
+
+### Logging Tool Calls
+
+[`hook_log_tools()`](https://jameshwade.github.io/deputy/reference/hook_log_tools.md)
+logs every tool call using cli:
+
+``` r
+library(deputy)
+
+chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+agent <- Agent$new(
+  chat = chat,
+  tools = tools_file(),
+  permissions = permissions_readonly()
+)
+agent$add_hook(hook_log_tools(verbose = TRUE))
+
+result <- agent$run_sync("What files are in the current directory?")
+```
+
+### Blocking Dangerous Bash Commands
+
+[`hook_block_dangerous_bash()`](https://jameshwade.github.io/deputy/reference/hook_block_dangerous_bash.md)
+blocks patterns like `rm -rf`, `sudo`, `chmod 777`, and more:
+
+``` r
+agent$add_hook(hook_block_dangerous_bash())
+
+# Optionally add your own patterns
+agent$add_hook(hook_block_dangerous_bash(
+  additional_patterns = c("DROP\\s+TABLE", "TRUNCATE")
+))
+```
+
+### Limiting File Writes
+
+[`hook_limit_file_writes()`](https://jameshwade.github.io/deputy/reference/hook_limit_file_writes.md)
+restricts writes to a specific directory:
+
+``` r
+agent$add_hook(hook_limit_file_writes(allowed_dir = "/safe/output/dir"))
+```
+
+## Custom PreToolUse Hooks
+
+`PreToolUse` hooks can allow or deny tool calls. Return
+[`HookResultPreToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.md)
+with `permission = "allow"` or `"deny"`:
+
+``` r
+hook_no_secrets <- HookMatcher$new(
+  event = "PreToolUse",
+  pattern = "^write_file$",
+  callback = function(tool_name, tool_input, context) {
+    path <- tool_input$path %||% ""
+    if (grepl("\\.env$|secrets", path)) {
+      HookResultPreToolUse(
+        permission = "deny",
+        reason = "Cannot write to secret files"
+      )
+    } else {
+      HookResultPreToolUse(permission = "allow")
+    }
+  }
+)
+```
+
+## Custom PostToolUse Hooks
+
+`PostToolUse` hooks run after a tool completes. Use them for logging,
+metrics, or conditional stopping:
+
+``` r
+hook_audit <- HookMatcher$new(
+  event = "PostToolUse",
+  callback = function(tool_name, tool_result, tool_error, context) {
+    if (!is.null(tool_error)) {
+      cli::cli_alert_danger("{tool_name} failed: {tool_error}")
+    } else {
+      cli::cli_alert_success("{tool_name} completed")
+    }
+    HookResultPostToolUse()
+  }
+)
+
+chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+agent <- Agent$new(
+  chat = chat,
+  tools = tools_file(),
+  permissions = permissions_readonly()
+)
+agent$add_hook(hook_audit)
+
+result <- agent$run_sync("What files are in the current directory?")
+
+# For post-hoc analysis, use AgentResult instead of hook state:
+result$tool_calls()
+```
+
+Set `continue = FALSE` to stop the agent after a tool call:
+
+``` r
+HookResultPostToolUse(continue = FALSE)
+```
+
+## Session Lifecycle Hooks
+
+Session hooks fire at the start and end of a session:
+
+``` r
+HookMatcher$new(
+  event = "SessionStart",
+  callback = function(context) {
+    message("Session started at ", Sys.time())
+    HookResultSessionStart()
+  }
+)
+```
+
+## Error Handling in Hooks
+
+If a hook callback throws an error, the agent logs it and continues. The
+error does not crash the agent. You can inspect recent hook errors with:
+
+``` r
+agent$hooks$last_errors()
+```

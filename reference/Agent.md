@@ -100,6 +100,8 @@ The following methods manage MCP (Model Context Protocol) server tools:
 
 - [`Agent$mcp_tools()`](#method-Agent-mcp_tools)
 
+- [`Agent$run_shiny()`](#method-Agent-run_shiny)
+
 - [`Agent$clone()`](#method-Agent-clone)
 
 ------------------------------------------------------------------------
@@ -642,6 +644,41 @@ Get names of loaded MCP tools.
 #### Returns
 
 Character vector of MCP tool names
+
+------------------------------------------------------------------------
+
+### Method `run_shiny()`
+
+Run an agentic task for use in Shiny applications with shinychat.
+
+Returns an async content stream suitable for passing to
+[`shinychat::chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
+Unlike `run()` and `run_sync()`, the multi-turn loop is driven by
+ellmer's `stream_async()` rather than deputy's own generator. Deputy's
+permissions, hooks, and tool call limits are still enforced via the
+`on_tool_request` callback.
+
+#### Usage
+
+    Agent$run_shiny(prompt, max_tool_calls = NULL)
+
+#### Arguments
+
+- `prompt`:
+
+  The user message to send
+
+- `max_tool_calls`:
+
+  Maximum number of tool calls before stopping. Defaults to
+  `permissions$max_turns` or 25. Note this counts individual tool call
+  requests, not LLM turns (one turn can have multiple parallel tool
+  calls).
+
+#### Returns
+
+A promise that resolves when the stream is complete, suitable for
+[`shinychat::chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
 
 ------------------------------------------------------------------------
 
