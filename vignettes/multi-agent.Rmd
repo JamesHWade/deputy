@@ -1,0 +1,143 @@
+---
+title: "Multi-Agent Orchestration"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Multi-Agent Orchestration}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = deputy:::eval_vignette()
+)
+vcr::setup_knitr()
+```
+
+For complex tasks, deputy supports a **lead agent** that delegates work to
+specialised **sub-agents**. Each sub-agent has its own tools, prompt, and
+(optionally) model. The lead agent decides when to delegate and synthesises
+the results.
+
+## When to Use Multi-Agent
+
+Multi-agent orchestration is useful when:
+
+- Different parts of a task need different tools (e.g., code analysis vs.
+  data analysis)
+- You want to isolate sub-tasks with their own system prompts
+- Sub-agents should run with restricted permissions
+- You need audit trails per sub-agent via `SubagentStop` hooks
+
+For simpler tasks, a single `Agent` with the right tools is usually enough.
+
+## Defining Sub-Agents
+
+Use `agent_definition()` to describe a sub-agent:
+
+```{r, eval = FALSE}
+library(deputy)
+
+code_reviewer <- agent_definition(
+  name = "code_reviewer",
+  description = "Reviews R code for best practices and potential issues",
+  prompt = "You are an expert R developer. Review code for correctness,
+    style, and potential bugs. Be specific and actionable.",
+  tools = tools_file()
+)
+
+data_analyst <- agent_definition(
+  name = "data_analyst",
+  description = "Analyses data files and produces statistical summaries",
+  prompt = "You are a data analyst. Read data files and provide clear,
+    concise statistical summaries with key insights.",
+  tools = tools_data()
+)
+```
+
+Fields:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Unique identifier (used by the lead to delegate) |
+| `description` | What this agent does (shown to the lead LLM) |
+| `prompt` | System prompt for the sub-agent |
+| `tools` | Tools available to the sub-agent |
+| `model` | `"inherit"` (default) or a specific model name |
+| `skills` | Optional list of skills to load |
+
+## Creating a LeadAgent
+
+`LeadAgent` extends `Agent` with a built-in `delegate_to_agent` tool:
+
+```{r, eval = FALSE}
+lead <- LeadAgent$new(
+  chat = ellmer::chat_anthropic(),
+  sub_agents = list(code_reviewer, data_analyst),
+  system_prompt = "You coordinate analysis tasks. Delegate to the
+    appropriate specialist and synthesise their findings."
+)
+
+lead$available_sub_agents()
+#> [1] "code_reviewer" "data_analyst"
+```
+
+## Running a Delegation Task
+
+When the lead agent decides to delegate, it calls `delegate_to_agent`
+internally. The sub-agent runs to completion and returns its result to the
+lead:
+
+```{r multi-agent-demo, cassette = TRUE}
+library(deputy)
+
+code_reviewer <- agent_definition(
+  name = "code_reviewer",
+  description = "Reviews R code and suggests improvements",
+  prompt = "You are an R code reviewer. Be concise.",
+  tools = tools_file()
+)
+
+chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+lead <- LeadAgent$new(
+  chat = chat,
+  sub_agents = list(code_reviewer)
+)
+
+result <- lead$run_sync(
+  "Ask the code reviewer to look at the DESCRIPTION file and
+   summarise what this package does."
+)
+cat(result$response)
+```
+
+## Convenience Constructor
+
+`agent_with_delegation()` creates a lead agent with one line:
+
+```{r, eval = FALSE}
+lead <- agent_with_delegation(
+  chat = ellmer::chat_anthropic(),
+  sub_agents = list(code_reviewer, data_analyst),
+  tools = tools_file()
+)
+```
+
+## Monitoring with SubagentStop Hooks
+
+Use a `SubagentStop` hook to log or inspect sub-agent results:
+
+```{r, eval = FALSE}
+hook_monitor <- HookMatcher$new(
+  event = "SubagentStop",
+  callback = function(agent_name, task, result, context) {
+    cli::cli_alert_info("Sub-agent {agent_name} finished")
+    cli::cli_alert("Cost: {result$cost$total}")
+    HookResultSubagentStop()
+  }
+)
+
+lead$add_hook(hook_monitor)
+```

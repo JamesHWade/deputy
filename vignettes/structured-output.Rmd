@@ -1,0 +1,146 @@
+---
+title: "Structured Output"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Structured Output}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = deputy:::eval_vignette()
+)
+vcr::setup_knitr()
+```
+
+Sometimes you need the agent to return data in a specific format rather than
+free-form text. deputy supports **structured output** via the `output_format`
+parameter, which tells the LLM to return valid JSON matching a schema.
+
+## JSON Object Format
+
+The simplest form asks the LLM to return a JSON object:
+
+```{r structured-json-object, cassette = TRUE}
+library(deputy)
+
+chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+agent <- Agent$new(chat = chat)
+
+result <- agent$run_sync(
+  "List three popular R packages for data manipulation.
+   Return a JSON object with a 'packages' array where each
+   element has 'name' and 'description' fields.",
+  output_format = list(type = "json_object")
+)
+
+parsed <- result$structured_output$parsed
+str(parsed)
+```
+
+## JSON Schema Format
+
+For stricter control, provide a JSON Schema. The LLM will be constrained to
+produce output matching the schema:
+
+```{r structured-json-schema, cassette = TRUE}
+schema <- list(
+  type = "object",
+  properties = list(
+    packages = list(
+      type = "array",
+      items = list(
+        type = "object",
+        properties = list(
+          name = list(type = "string"),
+          description = list(type = "string"),
+          category = list(
+            type = "string",
+            enum = c("data", "visualization", "modeling", "infrastructure")
+          )
+        ),
+        required = c("name", "description", "category")
+      )
+    )
+  ),
+  required = c("packages")
+)
+
+chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+agent <- Agent$new(chat = chat)
+
+result <- agent$run_sync(
+  "List three popular R packages and categorise them.",
+  output_format = list(type = "json_schema", schema = schema)
+)
+
+parsed <- result$structured_output$parsed
+str(parsed)
+```
+
+## Accessing Structured Output
+
+The `structured_output` field on `AgentResult` contains:
+
+| Field | Description |
+|-------|-------------|
+| `$parsed` | Parsed R list from the JSON response |
+| `$raw` | Raw JSON string |
+| `$valid` | `TRUE`, `FALSE`, or `NA` (if validation was skipped) |
+| `$errors` | Validation error messages (if any) |
+| `$format` | The `output_format` spec that was used |
+
+```{r, eval = FALSE}
+result$structured_output$valid
+#> [1] TRUE
+
+result$structured_output$parsed$packages[[1]]$name
+#> [1] "dplyr"
+```
+
+## Schema Validation
+
+When you provide a JSON Schema and the
+[jsonvalidate](https://docs.ropensci.org/jsonvalidate/) package is installed,
+deputy automatically validates the output:
+
+```{r, eval = FALSE}
+# If validation fails:
+result$structured_output$valid
+#> [1] FALSE
+
+result$structured_output$errors
+#> [1] "data/packages/0: must have required property 'category'"
+```
+
+Without jsonvalidate installed, `$valid` will be `NA` and `$errors` will be
+empty. The parsed output is still available.
+
+## Extraction Example
+
+Structured output is especially useful for data extraction tasks:
+
+```{r structured-extraction, cassette = TRUE}
+schema <- list(
+  type = "object",
+  properties = list(
+    language = list(type = "string"),
+    purpose = list(type = "string"),
+    first_release_year = list(type = "integer")
+  ),
+  required = c("language", "purpose", "first_release_year")
+)
+
+chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+agent <- Agent$new(chat = chat)
+
+result <- agent$run_sync(
+  "Extract structured information about the R programming language.",
+  output_format = list(type = "json_schema", schema = schema)
+)
+
+result$structured_output$parsed
+```

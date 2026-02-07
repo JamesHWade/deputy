@@ -502,3 +502,20 @@ parse_markdown_frontmatter <- function(path) {
     body = paste(body_lines, collapse = "\n")
   )
 }
+
+#' Check if vignette code should be evaluated
+#'
+#' Returns `TRUE` if VCR cassettes exist for the current vignette or if
+#' API credentials are available. Used in vignette setup chunks with
+#' `eval = deputy:::eval_vignette()`.
+#'
+#' @return Logical
+#' @noRd
+eval_vignette <- function() {
+  name <- tools::file_path_sans_ext(knitr::current_input())
+  cassettes <- dir("_vcr", pattern = paste0(name, "*"))
+  has_cassette <- length(cassettes) > 0
+  has_key <- ellmer::has_credentials("openai") ||
+    ellmer::has_credentials("claude")
+  has_key || has_cassette
+}

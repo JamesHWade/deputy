@@ -14,6 +14,20 @@ navbar:
       menu:
       - text: Getting Started
         href: articles/getting-started.html
+      - text: "---"
+      - text: Tools and Tool Bundles
+        href: articles/tools.html
+      - text: Permissions and Safety
+        href: articles/permissions.html
+      - text: Hooks
+        href: articles/hooks.html
+      - text: "---"
+      - text: Multi-Agent Orchestration
+        href: articles/multi-agent.html
+      - text: Structured Output
+        href: articles/structured-output.html
+      - text: Agent Configuration
+        href: articles/agent-configuration.html
 
 reference:
 - title: Agent
@@ -92,3 +106,13 @@ articles:
   navbar: ~
   contents:
   - getting-started
+- title: Core Concepts
+  contents:
+  - tools
+  - permissions
+  - hooks
+- title: Advanced
+  contents:
+  - multi-agent
+  - structured-output
+  - agent-configuration

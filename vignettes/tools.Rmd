@@ -1,0 +1,202 @@
+---
+title: "Tools and Tool Bundles"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Tools and Tool Bundles}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = deputy:::eval_vignette()
+)
+vcr::setup_knitr()
+```
+
+Tools are how agents interact with the world. deputy provides built-in tools
+for common tasks and makes it easy to create your own.
+
+## Built-in Tools
+
+deputy includes the following tools out of the box:
+
+| Tool | Description | Annotations |
+|------|-------------|-------------|
+| `tool_read_file` | Read a file's contents | read-only |
+| `tool_write_file` | Write or append to a file | destructive |
+| `tool_list_files` | List files in a directory | read-only |
+| `tool_run_r_code` | Execute R code | open-world |
+| `tool_run_bash` | Execute a bash command | destructive, open-world |
+| `tool_read_csv` | Read and summarise a CSV | read-only |
+| `tool_web_fetch` | Fetch a web page | read-only, open-world |
+| `tool_web_search` | Search the web | read-only, open-world |
+
+Each tool carries **annotations** that the permission system uses to decide
+whether the agent is allowed to use it. See `vignette("permissions")` for
+details.
+
+## Tool Bundles
+
+Bundles group related tools together:
+
+```{r, eval = FALSE}
+library(deputy)
+
+tools_file()  # read_file, write_file, list_files
+tools_code()  # run_r_code, run_bash
+tools_data()  # read_csv, read_file
+tools_web()   # web_fetch, web_search (provider-aware)
+tools_all()   # everything
+```
+
+Combine bundles by concatenating:
+
+```{r, eval = FALSE}
+tools <- c(tools_file(), tools_code())
+agent <- Agent$new(chat = ellmer::chat_openai(), tools = tools)
+```
+
+## Tool Presets
+
+Presets are named collections with opinionated defaults:
+
+```{r, eval = FALSE}
+list_presets()
+#> # A tibble: 5 x 3
+#>   name     n_tools description
+#>   <chr>      <int> <chr>
+#> 1 minimal        2 read_file, list_files
+#> 2 standard       4 read_file, write_file, list_files, run_r_code
+#> 3 dev            5 standard + run_bash
+#> 4 data           4 read_file, list_files, read_csv, run_r_code
+#> 5 full           8 all built-in tools
+
+tools_preset("dev")
+```
+
+## Creating Custom Tools
+
+Use `ellmer::tool()` to define custom tools with type-safe arguments and
+annotations:
+
+```{r, eval = FALSE}
+tool_lookup_user <- ellmer::tool(
+  fun = function(user_id) {
+    # your implementation
+    list(name = "Alice", email = "alice@example.com")
+  },
+  name = "lookup_user",
+  description = "Look up a user by their ID",
+  arguments = list(
+    user_id = ellmer::type_string("The user ID to look up")
+  ),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = TRUE,
+    destructive_hint = FALSE,
+    open_world_hint = FALSE,
+    idempotent_hint = TRUE
+  )
+)
+```
+
+The `annotations` are optional but recommended. They tell the permission
+system about the tool's behaviour:
+
+- `read_only_hint` -- Tool does not change state
+- `destructive_hint` -- Tool may delete or overwrite data
+- `open_world_hint` -- Tool accesses external systems (network, APIs)
+- `idempotent_hint` -- Safe to call multiple times with same input
+
+### Using a Custom Tool
+
+```{r tools-custom-demo, cassette = TRUE}
+library(deputy)
+
+tool_dice <- ellmer::tool(
+  fun = function(n = 1, sides = 6) {
+    rolls <- sample(sides, n, replace = TRUE)
+    paste("Rolled:", paste(rolls, collapse = ", "))
+  },
+  name = "roll_dice",
+  description = "Roll one or more dice",
+  arguments = list(
+    n = ellmer::type_integer("Number of dice to roll"),
+    sides = ellmer::type_integer("Number of sides per die")
+  )
+)
+
+chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+agent <- Agent$new(chat = chat, tools = list(tool_dice))
+result <- agent$run_sync("Roll 2d20 for me")
+cat(result$response)
+```
+
+## Web Tools
+
+deputy provides web tools that are **provider-aware**. When you call
+`tools_web()`, deputy checks whether the provider has built-in web search
+(e.g., Claude's tool use, Google's grounding) and uses the native version
+when available:
+
+```{r, eval = FALSE}
+# Automatically uses provider's native web tools when available
+agent <- Agent$new(
+  chat = ellmer::chat_anthropic(),
+  tools = tools_web()
+)
+```
+
+For providers without native support, deputy falls back to `tool_web_fetch`
+(fetches a URL and extracts text) and `tool_web_search` (searches via
+DuckDuckGo).
+
+## MCP Integration
+
+deputy can load tools from
+[Model Context Protocol](https://modelcontextprotocol.io/) servers via
+the [mcptools](https://github.com/tidyverse/mcptools) package:
+
+```{r, eval = FALSE}
+# Check if MCP is available
+mcp_available()
+
+# List configured servers
+mcp_servers()
+
+# Load MCP tools into an agent
+agent <- Agent$new(
+  chat = ellmer::chat_anthropic(),
+  tools = tools_mcp()
+)
+```
+
+MCP servers are configured in `~/.config/mcptools/config.json`. See the
+mcptools documentation for setup instructions.
+
+## Human-in-the-Loop
+
+The `tool_ask_user` tool lets an agent ask the user a question during
+execution. This is useful for confirmations, clarifications, or collecting
+input:
+
+```{r, eval = FALSE}
+agent <- Agent$new(
+  chat = ellmer::chat_openai(),
+  tools = c(tools_file(), tools_interactive())
+)
+
+# In interactive sessions, a readline prompt appears.
+# For non-interactive use, set a custom callback:
+set_ask_user_callback(function(questions) {
+  # Return answers matching the question structure
+  list(
+    questions = questions,
+    answers = list(list(answer = "Yes, proceed"))
+  )
+})
+```
+
+The `tools_interactive()` function returns a list containing `tool_ask_user`.
