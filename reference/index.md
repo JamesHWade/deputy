@@ -128,6 +128,15 @@ Extend agents with specialized capabilities
 - [`skills_list()`](https://jameshwade.github.io/deputy/reference/skills_list.md)
   : List available skills in a directory
 
+## Settings
+
+Claude-style settings sources
+
+- [`claude_settings_load()`](https://jameshwade.github.io/deputy/reference/claude_settings_load.md)
+  : Load Claude-style settings from settingSources
+- [`claude_settings_apply()`](https://jameshwade.github.io/deputy/reference/claude_settings_apply.md)
+  : Apply Claude-style settings to an Agent
+
 ## Multi-Agent
 
 Coordinate multiple specialized agents

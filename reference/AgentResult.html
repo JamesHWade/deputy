@@ -72,6 +72,10 @@ execution.</p>
 <dd><p>Reason the agent stopped</p></dd>
 
 
+<dt><code>structured_output</code></dt>
+<dd><p>Parsed/validated structured output (if requested)</p></dd>
+
+
 </dl><p></p></div>
     </div>
     <div class="section level2">
@@ -97,7 +101,8 @@ execution.</p>
 <span>  cost <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>input <span class="op">=</span> <span class="fl">0</span>, output <span class="op">=</span> <span class="fl">0</span>, cached <span class="op">=</span> <span class="fl">0</span>, total <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>,</span>
 <span>  events <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  duration <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  stop_reason <span class="op">=</span> <span class="st">"complete"</span></span>
+<span>  stop_reason <span class="op">=</span> <span class="st">"complete"</span>,</span>
+<span>  structured_output <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -125,6 +130,10 @@ execution.</p>
 
 <dt><code>stop_reason</code></dt>
 <dd><p>Reason for stopping</p></dd>
+
+
+<dt><code>structured_output</code></dt>
+<dd><p>Parsed structured output (if any)</p></dd>
 
 
 </dl><p></p></div>

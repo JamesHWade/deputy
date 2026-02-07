@@ -120,10 +120,12 @@ mcptools package. Returns invisible self.</p></dd>
 <li><p><a href="#method-Agent-load_session"><code>Agent$load_session()</code></a></p></li>
 <li><p><a href="#method-Agent-compact"><code>Agent$compact()</code></a></p></li>
 <li><p><a href="#method-Agent-print"><code>Agent$print()</code></a></p></li>
-<li><p><a href="#method-Agent-load_mcp"><code>Agent$load_mcp()</code></a></p></li>
-<li><p><a href="#method-Agent-mcp_tools"><code>Agent$mcp_tools()</code></a></p></li>
 <li><p><a href="#method-Agent-load_skill"><code>Agent$load_skill()</code></a></p></li>
 <li><p><a href="#method-Agent-skills"><code>Agent$skills()</code></a></p></li>
+<li><p><a href="#method-Agent-slash_commands"><code>Agent$slash_commands()</code></a></p></li>
+<li><p><a href="#method-Agent-settings"><code>Agent$settings()</code></a></p></li>
+<li><p><a href="#method-Agent-load_mcp"><code>Agent$load_mcp()</code></a></p></li>
+<li><p><a href="#method-Agent-mcp_tools"><code>Agent$mcp_tools()</code></a></p></li>
 <li><p><a href="#method-Agent-clone"><code>Agent$clone()</code></a></p></li>
 </ul></div><p></p><hr><a id="method-Agent-new"></a><div class="section">
 <h3 id="method-new-">Method <code>new()</code><a class="anchor" aria-label="anchor" href="#method-new-"></a></h3>
@@ -134,7 +136,9 @@ mcptools package. Returns invisible self.</p></dd>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  system_prompt <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  working_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  working_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  setting_sources <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  settings <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -165,6 +169,17 @@ Defaults to <code><a href="permissions_standard.html">permissions_standard()</a>
 current directory.</p></dd>
 
 
+<dt><code>setting_sources</code></dt>
+<dd><p>Optional character vector of Claude-style
+setting sources (e.g., "project", "user") used to load memory, skills,
+and slash commands.</p></dd>
+
+
+<dt><code>settings</code></dt>
+<dd><p>Optional pre-loaded settings list from
+<code><a href="claude_settings_load.html">claude_settings_load()</a></code>. If provided, bypasses <code>setting_sources</code>.</p></dd>
+
+
 </dl><p></p></div>
 </div>
 <div class="section">
@@ -179,7 +194,12 @@ current directory.</p></dd>
 The agent will continue until the task is complete, max_turns is reached,
 or the cost limit is exceeded.</p><div class="section">
 <h4 id="usage-1">Usage<a class="anchor" aria-label="anchor" href="#usage-1"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span><span class="va">task</span>, max_turns <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span></span>
+<span>  <span class="va">task</span>,</span>
+<span>  max_turns <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  include_partial_messages <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  output_format <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
 <div class="section">
@@ -190,6 +210,16 @@ or the cost limit is exceeded.</p><div class="section">
 
 <dt><code>max_turns</code></dt>
 <dd><p>Maximum number of turns (default: from permissions)</p></dd>
+
+
+<dt><code>include_partial_messages</code></dt>
+<dd><p>If TRUE (default), yield partial text
+chunks as they stream. If FALSE, only yield <code>text_complete</code>.</p></dd>
+
+
+<dt><code>output_format</code></dt>
+<dd><p>Optional output format spec (e.g. JSON schema) to
+guide and validate structured responses.</p></dd>
 
 
 </dl><p></p></div>
@@ -205,7 +235,12 @@ or the cost limit is exceeded.</p><div class="section">
 <p>Convenience wrapper around <code>run()</code> that collects all events and returns
 an <a href="AgentResult.html">AgentResult</a>.</p><div class="section">
 <h4 id="usage-2">Usage<a class="anchor" aria-label="anchor" href="#usage-2"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="va">task</span>, max_turns <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
+<span>  <span class="va">task</span>,</span>
+<span>  max_turns <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  include_partial_messages <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  output_format <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
 <div class="section">
@@ -216,6 +251,16 @@ an <a href="AgentResult.html">AgentResult</a>.</p><div class="section">
 
 <dt><code>max_turns</code></dt>
 <dd><p>Maximum number of turns (default: from permissions)</p></dd>
+
+
+<dt><code>include_partial_messages</code></dt>
+<dd><p>If TRUE (default), keep partial text
+events. If FALSE, suppress partials.</p></dd>
+
+
+<dt><code>output_format</code></dt>
+<dd><p>Optional output format spec (e.g. JSON schema) to
+guide and validate structured responses.</p></dd>
 
 
 </dl><p></p></div>
@@ -470,17 +515,78 @@ text-based summary with truncated turn contents.</p>
 </div>
 
 
+</div><p></p><hr><a id="method-Agent-load_skill"></a><div class="section">
+<h3 id="method-load-skill-">Method <code>load_skill()</code><a class="anchor" aria-label="anchor" href="#method-load-skill-"></a></h3>
+<p>Load a <a href="Skill.html">Skill</a> into the agent.</p><div class="section">
+<h4 id="usage-14">Usage<a class="anchor" aria-label="anchor" href="#usage-14"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_skill</span><span class="op">(</span><span class="va">skill</span>, allow_conflicts <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div>
+
+<div class="section">
+<h4 id="arguments-10">Arguments<a class="anchor" aria-label="anchor" href="#arguments-10"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>skill</code></dt>
+<dd><p>A <a href="Skill.html">Skill</a> object or path to a skill directory.</p></dd>
+
+
+<dt><code>allow_conflicts</code></dt>
+<dd><p>If FALSE (default), error on tool name conflicts.
+Set TRUE to allow overwriting existing tools.</p></dd>
+
+
+</dl><p></p></div>
+</div>
+<div class="section">
+<h4 id="returns-13">Returns<a class="anchor" aria-label="anchor" href="#returns-13"></a></h4>
+<p>Invisible self for chaining.</p>
+</div>
+
+</div><p></p><hr><a id="method-Agent-skills"></a><div class="section">
+<h3 id="method-skills-">Method <code>skills()</code><a class="anchor" aria-label="anchor" href="#method-skills-"></a></h3>
+<p>Get loaded skills.</p><div class="section">
+<h4 id="usage-15">Usage<a class="anchor" aria-label="anchor" href="#usage-15"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">skills</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div>
+
+<div class="section">
+<h4 id="returns-14">Returns<a class="anchor" aria-label="anchor" href="#returns-14"></a></h4>
+<p>Named list of loaded <a href="Skill.html">Skill</a> objects.</p>
+</div>
+
+</div><p></p><hr><a id="method-Agent-slash_commands"></a><div class="section">
+<h3 id="method-slash-commands-">Method <code>slash_commands()</code><a class="anchor" aria-label="anchor" href="#method-slash-commands-"></a></h3>
+<p>Get registered slash commands.</p><div class="section">
+<h4 id="usage-16">Usage<a class="anchor" aria-label="anchor" href="#usage-16"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">slash_commands</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div>
+
+<div class="section">
+<h4 id="returns-15">Returns<a class="anchor" aria-label="anchor" href="#returns-15"></a></h4>
+<p>Named list of slash command definitions</p>
+</div>
+
+</div><p></p><hr><a id="method-Agent-settings"></a><div class="section">
+<h3 id="method-settings-">Method <code>settings()</code><a class="anchor" aria-label="anchor" href="#method-settings-"></a></h3>
+<p>Get applied Claude-style settings.</p><div class="section">
+<h4 id="usage-17">Usage<a class="anchor" aria-label="anchor" href="#usage-17"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">settings</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div>
+
+<div class="section">
+<h4 id="returns-16">Returns<a class="anchor" aria-label="anchor" href="#returns-16"></a></h4>
+<p>Settings list returned by <code><a href="claude_settings_load.html">claude_settings_load()</a></code></p>
+</div>
+
 </div><p></p><hr><a id="method-Agent-load_mcp"></a><div class="section">
 <h3 id="method-load-mcp-">Method <code>load_mcp()</code><a class="anchor" aria-label="anchor" href="#method-load-mcp-"></a></h3>
 <p>Load tools from MCP (Model Context Protocol) servers.</p>
 <p>Requires the mcptools package. Issues a warning if not installed or if
 tool fetching fails.</p><div class="section">
-<h4 id="usage-14">Usage<a class="anchor" aria-label="anchor" href="#usage-14"></a></h4>
+<h4 id="usage-18">Usage<a class="anchor" aria-label="anchor" href="#usage-18"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_mcp</span><span class="op">(</span>config <span class="op">=</span> <span class="cn">NULL</span>, servers <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
 <div class="section">
-<h4 id="arguments-10">Arguments<a class="anchor" aria-label="anchor" href="#arguments-10"></a></h4>
+<h4 id="arguments-11">Arguments<a class="anchor" aria-label="anchor" href="#arguments-11"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>config</code></dt>
 <dd><p>Path to MCP configuration file. If NULL (default), uses
 the mcptools default location (<code>~/.config/mcptools/config.json</code>).</p></dd>
@@ -494,49 +600,31 @@ If NULL, loads from all configured servers.</p></dd>
 </dl><p></p></div>
 </div>
 <div class="section">
-<h4 id="returns-13">Returns<a class="anchor" aria-label="anchor" href="#returns-13"></a></h4>
+<h4 id="returns-17">Returns<a class="anchor" aria-label="anchor" href="#returns-17"></a></h4>
 <p>Invisible self for chaining</p>
 </div>
 
 </div><p></p><hr><a id="method-Agent-mcp_tools"></a><div class="section">
 <h3 id="method-mcp-tools-">Method <code>mcp_tools()</code><a class="anchor" aria-label="anchor" href="#method-mcp-tools-"></a></h3>
 <p>Get names of loaded MCP tools.</p><div class="section">
-<h4 id="usage-15">Usage<a class="anchor" aria-label="anchor" href="#usage-15"></a></h4>
+<h4 id="usage-19">Usage<a class="anchor" aria-label="anchor" href="#usage-19"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">mcp_tools</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
 <div class="section">
-<h4 id="returns-14">Returns<a class="anchor" aria-label="anchor" href="#returns-14"></a></h4>
+<h4 id="returns-18">Returns<a class="anchor" aria-label="anchor" href="#returns-18"></a></h4>
 <p>Character vector of MCP tool names</p>
 </div>
-
-</div><p></p><hr><a id="method-Agent-load_skill"></a><div class="section">
-<h3 id="method-load-skill-">Method <code>load_skill()</code><a class="anchor" aria-label="anchor" href="#method-load-skill-"></a></h3>
-
-<div class="section">
-<h4 id="usage-16">Usage<a class="anchor" aria-label="anchor" href="#usage-16"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_skill</span><span class="op">(</span><span class="va">skill</span>, allow_conflicts <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div>
-
-
-</div><p></p><hr><a id="method-Agent-skills"></a><div class="section">
-<h3 id="method-skills-">Method <code>skills()</code><a class="anchor" aria-label="anchor" href="#method-skills-"></a></h3>
-
-<div class="section">
-<h4 id="usage-17">Usage<a class="anchor" aria-label="anchor" href="#usage-17"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">skills</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div>
-
 
 </div><p></p><hr><a id="method-Agent-clone"></a><div class="section">
 <h3 id="method-clone-">Method <code>clone()</code><a class="anchor" aria-label="anchor" href="#method-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-18">Usage<a class="anchor" aria-label="anchor" href="#usage-18"></a></h4>
+<h4 id="usage-20">Usage<a class="anchor" aria-label="anchor" href="#usage-20"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
 <div class="section">
-<h4 id="arguments-11">Arguments<a class="anchor" aria-label="anchor" href="#arguments-11"></a></h4>
+<h4 id="arguments-12">Arguments<a class="anchor" aria-label="anchor" href="#arguments-12"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

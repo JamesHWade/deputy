@@ -88,13 +88,17 @@ The following methods manage MCP (Model Context Protocol) server tools:
 
 - [`Agent$print()`](#method-Agent-print)
 
-- [`Agent$load_mcp()`](#method-Agent-load_mcp)
-
-- [`Agent$mcp_tools()`](#method-Agent-mcp_tools)
-
 - [`Agent$load_skill()`](#method-Agent-load_skill)
 
 - [`Agent$skills()`](#method-Agent-skills)
+
+- [`Agent$slash_commands()`](#method-Agent-slash_commands)
+
+- [`Agent$settings()`](#method-Agent-settings)
+
+- [`Agent$load_mcp()`](#method-Agent-load_mcp)
+
+- [`Agent$mcp_tools()`](#method-Agent-mcp_tools)
 
 - [`Agent$clone()`](#method-Agent-clone)
 
@@ -111,7 +115,9 @@ Create a new Agent.
       tools = list(),
       system_prompt = NULL,
       permissions = NULL,
-      working_dir = getwd()
+      working_dir = getwd(),
+      setting_sources = NULL,
+      settings = NULL
     )
 
 #### Arguments
@@ -149,6 +155,17 @@ Create a new Agent.
 
   Working directory for file operations. Defaults to current directory.
 
+- `setting_sources`:
+
+  Optional character vector of Claude-style setting sources (e.g.,
+  "project", "user") used to load memory, skills, and slash commands.
+
+- `settings`:
+
+  Optional pre-loaded settings list from
+  [`claude_settings_load()`](https://jameshwade.github.io/deputy/reference/claude_settings_load.md).
+  If provided, bypasses `setting_sources`.
+
 #### Returns
 
 A new `Agent` object
@@ -166,7 +183,12 @@ complete, max_turns is reached, or the cost limit is exceeded.
 
 #### Usage
 
-    Agent$run(task, max_turns = NULL)
+    Agent$run(
+      task,
+      max_turns = NULL,
+      include_partial_messages = TRUE,
+      output_format = NULL
+    )
 
 #### Arguments
 
@@ -177,6 +199,16 @@ complete, max_turns is reached, or the cost limit is exceeded.
 - `max_turns`:
 
   Maximum number of turns (default: from permissions)
+
+- `include_partial_messages`:
+
+  If TRUE (default), yield partial text chunks as they stream. If FALSE,
+  only yield `text_complete`.
+
+- `output_format`:
+
+  Optional output format spec (e.g. JSON schema) to guide and validate
+  structured responses.
 
 #### Returns
 
@@ -196,7 +228,12 @@ an
 
 #### Usage
 
-    Agent$run_sync(task, max_turns = NULL)
+    Agent$run_sync(
+      task,
+      max_turns = NULL,
+      include_partial_messages = TRUE,
+      output_format = NULL
+    )
 
 #### Arguments
 
@@ -207,6 +244,16 @@ an
 - `max_turns`:
 
   Maximum number of turns (default: from permissions)
+
+- `include_partial_messages`:
+
+  If TRUE (default), keep partial text events. If FALSE, suppress
+  partials.
+
+- `output_format`:
+
+  Optional output format spec (e.g. JSON schema) to guide and validate
+  structured responses.
 
 #### Returns
 
@@ -484,6 +531,77 @@ Print the agent configuration.
 
 ------------------------------------------------------------------------
 
+### Method `load_skill()`
+
+Load a [Skill](https://jameshwade.github.io/deputy/reference/Skill.md)
+into the agent.
+
+#### Usage
+
+    Agent$load_skill(skill, allow_conflicts = FALSE)
+
+#### Arguments
+
+- `skill`:
+
+  A [Skill](https://jameshwade.github.io/deputy/reference/Skill.md)
+  object or path to a skill directory.
+
+- `allow_conflicts`:
+
+  If FALSE (default), error on tool name conflicts. Set TRUE to allow
+  overwriting existing tools.
+
+#### Returns
+
+Invisible self for chaining.
+
+------------------------------------------------------------------------
+
+### Method `skills()`
+
+Get loaded skills.
+
+#### Usage
+
+    Agent$skills()
+
+#### Returns
+
+Named list of loaded
+[Skill](https://jameshwade.github.io/deputy/reference/Skill.md) objects.
+
+------------------------------------------------------------------------
+
+### Method `slash_commands()`
+
+Get registered slash commands.
+
+#### Usage
+
+    Agent$slash_commands()
+
+#### Returns
+
+Named list of slash command definitions
+
+------------------------------------------------------------------------
+
+### Method `settings()`
+
+Get applied Claude-style settings.
+
+#### Usage
+
+    Agent$settings()
+
+#### Returns
+
+Settings list returned by
+[`claude_settings_load()`](https://jameshwade.github.io/deputy/reference/claude_settings_load.md)
+
+------------------------------------------------------------------------
+
 ### Method `load_mcp()`
 
 Load tools from MCP (Model Context Protocol) servers.
@@ -524,22 +642,6 @@ Get names of loaded MCP tools.
 #### Returns
 
 Character vector of MCP tool names
-
-------------------------------------------------------------------------
-
-### Method `load_skill()`
-
-#### Usage
-
-    Agent$load_skill(skill, allow_conflicts = FALSE)
-
-------------------------------------------------------------------------
-
-### Method `skills()`
-
-#### Usage
-
-    Agent$skills()
 
 ------------------------------------------------------------------------
 

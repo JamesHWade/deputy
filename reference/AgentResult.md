@@ -30,6 +30,10 @@ occurred during execution.
 
   Reason the agent stopped
 
+- `structured_output`:
+
+  Parsed/validated structured output (if requested)
+
 ## Methods
 
 ### Public methods
@@ -62,7 +66,8 @@ Create a new AgentResult object.
       cost = list(input = 0, output = 0, cached = 0, total = 0),
       events = list(),
       duration = NULL,
-      stop_reason = "complete"
+      stop_reason = "complete",
+      structured_output = NULL
     )
 
 #### Arguments
@@ -90,6 +95,10 @@ Create a new AgentResult object.
 - `stop_reason`:
 
   Reason for stopping
+
+- `structured_output`:
+
+  Parsed structured output (if any)
 
 #### Returns
 

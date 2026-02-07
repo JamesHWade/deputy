@@ -45,7 +45,9 @@ Inherited methods
 - [`deputy::Agent$run()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run)
 - [`deputy::Agent$run_sync()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_sync)
 - [`deputy::Agent$save_session()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-save_session)
+- [`deputy::Agent$settings()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-settings)
 - [`deputy::Agent$skills()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-skills)
+- [`deputy::Agent$slash_commands()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-slash_commands)
 - [`deputy::Agent$turns()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-turns)
 
 ------------------------------------------------------------------------
