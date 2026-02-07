@@ -100,7 +100,7 @@ The `LeadAgent` coordinates the reviewers. It has a `delegate_to_agent`
 tool that lets it assign tasks to any registered sub-agent:
 
 ```{r create-lead}
-chat <- ellmer::chat_anthropic()
+chat <- ellmer::chat_openai()
 
 lead <- LeadAgent$new(
   chat = chat,
@@ -124,49 +124,22 @@ lead$available_sub_agents()
 
 ## Add Monitoring Hooks
 
-Hooks give visibility into what each sub-agent does and how much it costs.
-
-**Note:** We set `timeout = 0` so hooks run in the main R process. By
-default, hooks run in a callr subprocess (for safety), which means `<<-`
-assignments can't reach the parent environment. Use `timeout = 0` when your
-hook needs to modify external state:
+Hooks provide real-time visibility as the agent works. Use them for logging
+and blocking; use `AgentResult` for post-hoc analysis.
 
 ```{r monitoring-hooks}
-# Track sub-agent costs
-sub_agent_costs <- list()
-
-hook_cost_tracker <- HookMatcher$new(
+# Log when each sub-agent finishes
+hook_sub_agent_log <- HookMatcher$new(
   event = "SubagentStop",
-  timeout = 0, # Run in main process so <<- works
   callback = function(agent_name, task, result, context) {
-    sub_agent_costs[[agent_name]] <<- list(
-      agent = agent_name,
-      task = task,
-      time = Sys.time()
-    )
     cli::cli_alert_info("Sub-agent {.val {agent_name}} finished")
     HookResultSubagentStop()
   }
 )
 
-# Log all tool calls for audit trail
-tool_audit <- list()
-
-hook_audit_trail <- HookMatcher$new(
-  event = "PostToolUse",
-  timeout = 0, # Run in main process so <<- works
-  callback = function(tool_name, tool_result, tool_error, context) {
-    tool_audit[[length(tool_audit) + 1]] <<- list(
-      tool = tool_name,
-      time = Sys.time(),
-      had_error = !is.null(tool_error)
-    )
-    HookResultPostToolUse()
-  }
-)
-
-lead$add_hook(hook_cost_tracker)
-lead$add_hook(hook_audit_trail)
+# Log tool calls with the built-in hook
+lead$add_hook(hook_sub_agent_log)
+lead$add_hook(hook_log_tools(verbose = TRUE))
 ```
 
 ## Run the Review
@@ -225,7 +198,7 @@ review_schema <- list(
   required = c("summary", "total_findings", "findings")
 )
 
-chat <- ellmer::chat_anthropic()
+chat <- ellmer::chat_openai()
 
 lead <- LeadAgent$new(
   chat = chat,
@@ -282,21 +255,19 @@ table(findings_df$category, findings_df$severity)
 
 ## Cost and Performance
 
-After the review, inspect per-agent and total costs:
+`AgentResult` captures cost and tool usage for post-hoc analysis:
 
 ```{r costs}
-# Total cost
+# Total cost and duration
 result$cost
+result$duration
 
-# Per-agent tracking (from our hook)
-for (entry in sub_agent_costs) {
-  cli::cli_alert_info("{entry$agent}: completed at {entry$time}")
-}
+# All tool calls made during the review
+tool_calls <- result$tool_calls()
+cli::cli_alert_info("Total tool calls: {length(tool_calls)}")
 
-# Tool audit trail
-cli::cli_alert_info("Total tool calls: {length(tool_audit)}")
-tool_names <- vapply(tool_audit, function(t) t$tool, character(1))
-table(tool_names)
+# How many turns did it take?
+result$n_turns()
 ```
 
 ## Next Steps

@@ -142,21 +142,18 @@ hook_no_secrets <- HookMatcher$new(
 
 ## Custom PostToolUse Hooks
 
-`PostToolUse` hooks run after a tool completes. Use them for auditing,
+`PostToolUse` hooks run after a tool completes. Use them for logging,
 metrics, or conditional stopping:
 
 ```{r hooks-audit-demo}
-tool_log <- list()
-
 hook_audit <- HookMatcher$new(
   event = "PostToolUse",
-  timeout = 0, # Run in main process so <<- works
   callback = function(tool_name, tool_result, tool_error, context) {
-    tool_log[[length(tool_log) + 1]] <<- list(
-      tool = tool_name,
-      time = Sys.time(),
-      error = tool_error
-    )
+    if (!is.null(tool_error)) {
+      cli::cli_alert_danger("{tool_name} failed: {tool_error}")
+    } else {
+      cli::cli_alert_success("{tool_name} completed")
+    }
     HookResultPostToolUse()
   }
 )
@@ -170,7 +167,9 @@ agent <- Agent$new(
 agent$add_hook(hook_audit)
 
 result <- agent$run_sync("What files are in the current directory?")
-length(tool_log)
+
+# For post-hoc analysis, use AgentResult instead of hook state:
+result$tool_calls()
 ```
 
 Set `continue = FALSE` to stop the agent after a tool call:
