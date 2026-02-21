@@ -247,7 +247,10 @@ tool_read_markdown <- ellmer::tool(
     tryCatch(
       convert_to_markdown_markitdown(path),
       error = function(e) {
-        ellmer::tool_reject(paste("Error converting file to markdown:", e$message))
+        ellmer::tool_reject(paste(
+          "Error converting file to markdown:",
+          e$message
+        ))
       }
     )
   },

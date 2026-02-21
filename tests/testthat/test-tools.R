@@ -33,13 +33,12 @@ test_that("tool_read_file validates malformed PDF page selectors", {
   text(0.5, 0.5, "page one")
   grDevices::dev.off()
 
-  backend_available <- rlang::is_installed("pdftools") || (
-    rlang::is_installed("reticulate") &&
+  backend_available <- rlang::is_installed("pdftools") ||
+    (rlang::is_installed("reticulate") &&
       tryCatch(
         reticulate::py_module_available("pypdf"),
         error = function(e) FALSE
-      )
-  )
+      ))
   skip_if_not(backend_available, "PDF backend not available")
 
   expect_error(
@@ -60,13 +59,12 @@ test_that("tool_read_file returns structured output for PDF page selection", {
   text(0.5, 0.5, "page two")
   grDevices::dev.off()
 
-  backend_available <- rlang::is_installed("pdftools") || (
-    rlang::is_installed("reticulate") &&
+  backend_available <- rlang::is_installed("pdftools") ||
+    (rlang::is_installed("reticulate") &&
       tryCatch(
         reticulate::py_module_available("pypdf"),
         error = function(e) FALSE
-      )
-  )
+      ))
   skip_if_not(backend_available, "PDF backend not available")
 
   result <- tool_read_file(pdf_file, pages = "2")

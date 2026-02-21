@@ -7,10 +7,13 @@
 A tool definition created with \code{ellmer::tool()}.
 }
 \usage{
-tool_read_file(path)
+tool_read_file(path, pages = NULL)
 }
 \arguments{
 \item{path}{Path to the file to read (tool argument, not R function argument)}
+
+\item{pages}{Optional PDF page selection. Accepts comma-separated pages and
+ranges (e.g. \code{"1,3-5"}). Only supported for PDF files.}
 }
 \description{
 A tool that reads the contents of a file and returns it as a string.
