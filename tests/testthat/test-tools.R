@@ -13,11 +13,121 @@ test_that("tool_read_file reads existing files", {
   expect_equal(result, "Hello\nWorld")
 })
 
+test_that("tool_read_file rejects pages for non-PDF files", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  test_file <- file.path(temp_dir, "test.txt")
+  writeLines("Hello\nWorld", test_file)
+
+  expect_error(
+    tool_read_file(test_file, pages = "1"),
+    "only supported for PDF files",
+    class = "ellmer_tool_reject"
+  )
+})
+
+test_that("tool_read_file validates malformed PDF page selectors", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  pdf_file <- file.path(temp_dir, "sample.pdf")
+  grDevices::pdf(pdf_file)
+  plot.new()
+  text(0.5, 0.5, "page one")
+  grDevices::dev.off()
+
+  backend_available <- rlang::is_installed("pdftools") || (
+    rlang::is_installed("reticulate") &&
+      tryCatch(
+        reticulate::py_module_available("pypdf"),
+        error = function(e) FALSE
+      )
+  )
+  skip_if_not(backend_available, "PDF backend not available")
+
+  expect_error(
+    tool_read_file(pdf_file, pages = "abc"),
+    "Invalid page selector token",
+    class = "ellmer_tool_reject"
+  )
+})
+
+test_that("tool_read_file returns structured output for PDF page selection", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  pdf_file <- file.path(temp_dir, "sample.pdf")
+
+  grDevices::pdf(pdf_file)
+  plot.new()
+  text(0.5, 0.5, "page one")
+  plot.new()
+  text(0.5, 0.5, "page two")
+  grDevices::dev.off()
+
+  backend_available <- rlang::is_installed("pdftools") || (
+    rlang::is_installed("reticulate") &&
+      tryCatch(
+        reticulate::py_module_available("pypdf"),
+        error = function(e) FALSE
+      )
+  )
+  skip_if_not(backend_available, "PDF backend not available")
+
+  result <- tool_read_file(pdf_file, pages = "2")
+
+  expect_type(result, "list")
+  expect_equal(result$type, "pdf")
+  expect_equal(result$page_count, 2L)
+  expect_equal(result$pages, 2L)
+  expect_length(result$parts, 1)
+  expect_equal(result$parts[[1]]$page, 2L)
+  expect_true(is.character(result$parts[[1]]$text))
+})
+
 test_that("tool_read_file rejects missing files", {
   expect_error(
     tool_read_file("/nonexistent/path/file.txt"),
     "File not found"
   )
+})
+
+test_that("tool_read_markdown rejects missing files", {
+  expect_error(
+    tool_read_markdown("/nonexistent/path/file.txt"),
+    "File not found"
+  )
+})
+
+test_that("tool_read_markdown rejects when reticulate is unavailable", {
+  local_mocked_bindings(
+    is_installed = function(pkg) {
+      if (pkg == "reticulate") FALSE else TRUE
+    },
+    .package = "rlang"
+  )
+
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  test_file <- file.path(temp_dir, "test.md")
+  writeLines("# hello", test_file)
+
+  expect_error(
+    tool_read_markdown(test_file),
+    "reticulate",
+    class = "ellmer_tool_reject"
+  )
+})
+
+test_that("tool_read_markdown converts files with MarkItDown when available", {
+  backend_available <- rlang::is_installed("reticulate") &&
+    tryCatch(
+      reticulate::py_module_available("markitdown"),
+      error = function(e) FALSE
+    )
+  skip_if_not(backend_available, "MarkItDown backend not available")
+
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  test_file <- file.path(temp_dir, "test.txt")
+  writeLines(c("Hello", "World"), test_file)
+
+  result <- tool_read_markdown(test_file)
+  expect_type(result, "character")
+  expect_true(nchar(result) > 0)
 })
 
 test_that("tool_write_file creates new files", {
@@ -165,6 +275,8 @@ test_that("tools have correct annotations", {
   # Read-only tools
   expect_true(tool_read_file@annotations$read_only_hint)
   expect_false(tool_read_file@annotations$destructive_hint)
+  expect_true(tool_read_markdown@annotations$read_only_hint)
+  expect_false(tool_read_markdown@annotations$destructive_hint)
 
   expect_true(tool_list_files@annotations$read_only_hint)
   expect_true(tool_read_csv@annotations$read_only_hint)
