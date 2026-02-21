@@ -289,11 +289,12 @@ test_that("tools have correct annotations", {
 
 test_that("tool bundles contain expected tools", {
   file_tools <- tools_file()
-  expect_true(length(file_tools) >= 3)
+  expect_true(length(file_tools) >= 4)
 
   # Check tool names are present
   tool_names <- sapply(file_tools, function(t) t@name)
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
 })
@@ -426,21 +427,23 @@ test_that("ToolPresets contains expected presets", {
 test_that("tools_preset returns correct tools for minimal", {
   tools <- tools_preset("minimal")
   expect_type(tools, "list")
-  expect_length(tools, 2)
+  expect_length(tools, 3)
 
   # Check tool names
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("list_files" %in% tool_names)
 })
 
 test_that("tools_preset returns correct tools for standard", {
   tools <- tools_preset("standard")
   expect_type(tools, "list")
-  expect_length(tools, 4)
+  expect_length(tools, 5)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
   expect_true("run_r_code" %in% tool_names)
@@ -449,10 +452,11 @@ test_that("tools_preset returns correct tools for standard", {
 test_that("tools_preset returns correct tools for dev", {
   tools <- tools_preset("dev")
   expect_type(tools, "list")
-  expect_length(tools, 5)
+  expect_length(tools, 6)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
   expect_true("run_r_code" %in% tool_names)
@@ -462,10 +466,11 @@ test_that("tools_preset returns correct tools for dev", {
 test_that("tools_preset returns correct tools for full", {
   tools <- tools_preset("full")
   expect_type(tools, "list")
-  expect_length(tools, 8)
+  expect_length(tools, 9)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
   expect_true("run_r_code" %in% tool_names)
@@ -478,10 +483,11 @@ test_that("tools_preset returns correct tools for full", {
 test_that("tools_preset returns correct tools for data", {
   tools <- tools_preset("data")
   expect_type(tools, "list")
-  expect_length(tools, 4)
+  expect_length(tools, 5)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("list_files" %in% tool_names)
   expect_true("read_csv" %in% tool_names)
   expect_true("run_r_code" %in% tool_names)
