@@ -13,11 +13,119 @@ test_that("tool_read_file reads existing files", {
   expect_equal(result, "Hello\nWorld")
 })
 
+test_that("tool_read_file rejects pages for non-PDF files", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  test_file <- file.path(temp_dir, "test.txt")
+  writeLines("Hello\nWorld", test_file)
+
+  expect_error(
+    tool_read_file(test_file, pages = "1"),
+    "only supported for PDF files",
+    class = "ellmer_tool_reject"
+  )
+})
+
+test_that("tool_read_file validates malformed PDF page selectors", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  pdf_file <- file.path(temp_dir, "sample.pdf")
+  grDevices::pdf(pdf_file)
+  plot.new()
+  text(0.5, 0.5, "page one")
+  grDevices::dev.off()
+
+  backend_available <- rlang::is_installed("pdftools") ||
+    (rlang::is_installed("reticulate") &&
+      tryCatch(
+        reticulate::py_module_available("pypdf"),
+        error = function(e) FALSE
+      ))
+  skip_if_not(backend_available, "PDF backend not available")
+
+  expect_error(
+    tool_read_file(pdf_file, pages = "abc"),
+    "Invalid page selector token",
+    class = "ellmer_tool_reject"
+  )
+})
+
+test_that("tool_read_file returns structured output for PDF page selection", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  pdf_file <- file.path(temp_dir, "sample.pdf")
+
+  grDevices::pdf(pdf_file)
+  plot.new()
+  text(0.5, 0.5, "page one")
+  plot.new()
+  text(0.5, 0.5, "page two")
+  grDevices::dev.off()
+
+  backend_available <- rlang::is_installed("pdftools") ||
+    (rlang::is_installed("reticulate") &&
+      tryCatch(
+        reticulate::py_module_available("pypdf"),
+        error = function(e) FALSE
+      ))
+  skip_if_not(backend_available, "PDF backend not available")
+
+  result <- tool_read_file(pdf_file, pages = "2")
+
+  expect_type(result, "list")
+  expect_equal(result$type, "pdf")
+  expect_equal(result$page_count, 2L)
+  expect_equal(result$pages, 2L)
+  expect_length(result$parts, 1)
+  expect_equal(result$parts[[1]]$page, 2L)
+  expect_true(is.character(result$parts[[1]]$text))
+})
+
 test_that("tool_read_file rejects missing files", {
   expect_error(
     tool_read_file("/nonexistent/path/file.txt"),
     "File not found"
   )
+})
+
+test_that("tool_read_markdown rejects missing files", {
+  expect_error(
+    tool_read_markdown("/nonexistent/path/file.txt"),
+    "File not found"
+  )
+})
+
+test_that("tool_read_markdown rejects when reticulate is unavailable", {
+  local_mocked_bindings(
+    is_installed = function(pkg) {
+      if (pkg == "reticulate") FALSE else TRUE
+    },
+    .package = "rlang"
+  )
+
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  test_file <- file.path(temp_dir, "test.md")
+  writeLines("# hello", test_file)
+
+  expect_error(
+    tool_read_markdown(test_file),
+    "reticulate",
+    class = "ellmer_tool_reject"
+  )
+})
+
+test_that("tool_read_markdown converts files with MarkItDown when available", {
+  backend_available <- rlang::is_installed("reticulate") &&
+    tryCatch(
+      reticulate::py_module_available("markitdown"),
+      error = function(e) FALSE
+    )
+  skip_if_not(backend_available, "MarkItDown backend not available")
+
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  test_file <- file.path(temp_dir, "test.txt")
+  writeLines(c("Hello", "World"), test_file)
+
+  result <- tool_read_markdown(test_file)
+  expect_type(result, "character")
+  expect_true(nchar(result) > 0)
 })
 
 test_that("tool_write_file creates new files", {
@@ -165,6 +273,8 @@ test_that("tools have correct annotations", {
   # Read-only tools
   expect_true(tool_read_file@annotations$read_only_hint)
   expect_false(tool_read_file@annotations$destructive_hint)
+  expect_true(tool_read_markdown@annotations$read_only_hint)
+  expect_false(tool_read_markdown@annotations$destructive_hint)
 
   expect_true(tool_list_files@annotations$read_only_hint)
   expect_true(tool_read_csv@annotations$read_only_hint)
@@ -177,11 +287,12 @@ test_that("tools have correct annotations", {
 
 test_that("tool bundles contain expected tools", {
   file_tools <- tools_file()
-  expect_true(length(file_tools) >= 3)
+  expect_true(length(file_tools) >= 4)
 
   # Check tool names are present
   tool_names <- sapply(file_tools, function(t) t@name)
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
 })
@@ -314,21 +425,23 @@ test_that("ToolPresets contains expected presets", {
 test_that("tools_preset returns correct tools for minimal", {
   tools <- tools_preset("minimal")
   expect_type(tools, "list")
-  expect_length(tools, 2)
+  expect_length(tools, 3)
 
   # Check tool names
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("list_files" %in% tool_names)
 })
 
 test_that("tools_preset returns correct tools for standard", {
   tools <- tools_preset("standard")
   expect_type(tools, "list")
-  expect_length(tools, 4)
+  expect_length(tools, 5)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
   expect_true("run_r_code" %in% tool_names)
@@ -337,10 +450,11 @@ test_that("tools_preset returns correct tools for standard", {
 test_that("tools_preset returns correct tools for dev", {
   tools <- tools_preset("dev")
   expect_type(tools, "list")
-  expect_length(tools, 5)
+  expect_length(tools, 6)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
   expect_true("run_r_code" %in% tool_names)
@@ -350,10 +464,11 @@ test_that("tools_preset returns correct tools for dev", {
 test_that("tools_preset returns correct tools for full", {
   tools <- tools_preset("full")
   expect_type(tools, "list")
-  expect_length(tools, 8)
+  expect_length(tools, 9)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
   expect_true("run_r_code" %in% tool_names)
@@ -366,10 +481,11 @@ test_that("tools_preset returns correct tools for full", {
 test_that("tools_preset returns correct tools for data", {
   tools <- tools_preset("data")
   expect_type(tools, "list")
-  expect_length(tools, 4)
+  expect_length(tools, 5)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
+  expect_true("read_markdown" %in% tool_names)
   expect_true("list_files" %in% tool_names)
   expect_true("read_csv" %in% tool_names)
   expect_true("run_r_code" %in% tool_names)

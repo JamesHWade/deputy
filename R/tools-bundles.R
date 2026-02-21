@@ -24,6 +24,7 @@
 tools_file <- function() {
   list(
     tool_read_file,
+    tool_read_markdown,
     tool_write_file,
     tool_list_files
   )
@@ -80,7 +81,8 @@ tools_code <- function() {
 tools_data <- function() {
   list(
     tool_read_csv,
-    tool_read_file
+    tool_read_file,
+    tool_read_markdown
   )
 }
 
@@ -224,6 +226,7 @@ get_provider_name <- function(chat) {
 tools_all <- function() {
   list(
     tool_read_file,
+    tool_read_markdown,
     tool_write_file,
     tool_list_files,
     tool_run_r_code,
@@ -250,13 +253,13 @@ ToolPresets <- c("minimal", "standard", "dev", "data", "full")
 #'
 #' @param name The preset name. One of:
 #'   * `"minimal"` - Read-only tools for safe exploration
-#'     (`read_file`, `list_files`)
+#'     (`read_file`, `read_markdown`, `list_files`)
 #'   * `"standard"` - Balanced toolset for R development
-#'     (`read_file`, `write_file`, `list_files`, `run_r_code`)
+#'     (`read_file`, `read_markdown`, `write_file`, `list_files`, `run_r_code`)
 #'   * `"dev"` - Full development with shell access
-#'     (`read_file`, `write_file`, `list_files`, `run_r_code`, `run_bash`)
+#'     (`read_file`, `read_markdown`, `write_file`, `list_files`, `run_r_code`, `run_bash`)
 #'   * `"data"` - Data analysis focused tools
-#'     (`read_file`, `list_files`, `read_csv`, `run_r_code`)
+#'     (`read_file`, `read_markdown`, `list_files`, `read_csv`, `run_r_code`)
 #'   * `"full"` - All available tools (requires appropriate permissions)
 #'
 #' @return A list of tool definitions
@@ -297,16 +300,19 @@ tools_preset <- function(name) {
     name,
     minimal = list(
       tool_read_file,
+      tool_read_markdown,
       tool_list_files
     ),
     standard = list(
       tool_read_file,
+      tool_read_markdown,
       tool_write_file,
       tool_list_files,
       tool_run_r_code
     ),
     dev = list(
       tool_read_file,
+      tool_read_markdown,
       tool_write_file,
       tool_list_files,
       tool_run_r_code,
@@ -314,6 +320,7 @@ tools_preset <- function(name) {
     ),
     data = list(
       tool_read_file,
+      tool_read_markdown,
       tool_list_files,
       tool_read_csv,
       tool_run_r_code
@@ -345,11 +352,11 @@ list_presets <- function() {
       "All available tools"
     ),
     tools = c(
-      "read_file, list_files",
-      "read_file, write_file, list_files, run_r_code",
-      "read_file, write_file, list_files, run_r_code, run_bash",
-      "read_file, list_files, read_csv, run_r_code",
-      "read_file, write_file, list_files, run_r_code, run_bash, read_csv, web_fetch, web_search"
+      "read_file, read_markdown, list_files",
+      "read_file, read_markdown, write_file, list_files, run_r_code",
+      "read_file, read_markdown, write_file, list_files, run_r_code, run_bash",
+      "read_file, read_markdown, list_files, read_csv, run_r_code",
+      "read_file, read_markdown, write_file, list_files, run_r_code, run_bash, read_csv, web_fetch, web_search"
     ),
     stringsAsFactors = FALSE
   )

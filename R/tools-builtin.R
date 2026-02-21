@@ -1,5 +1,130 @@
 # Built-in tools for deputy agents
 
+# Parse a page selector string like "1,3-5" into integer page numbers
+parse_pdf_page_selector <- function(pages, page_count) {
+  if (is.null(pages) || identical(pages, "")) {
+    return(seq_len(page_count))
+  }
+
+  if (is.numeric(pages)) {
+    nums <- as.integer(pages)
+  } else if (is.character(pages) && length(pages) == 1) {
+    tokens <- trimws(unlist(strsplit(pages, ",", fixed = TRUE)))
+    tokens <- tokens[nzchar(tokens)]
+    if (length(tokens) == 0) {
+      stop("No valid pages specified")
+    }
+    nums <- integer()
+    for (token in tokens) {
+      if (grepl("^[0-9]+$", token)) {
+        nums <- c(nums, as.integer(token))
+      } else if (grepl("^[0-9]+-[0-9]+$", token)) {
+        bounds <- as.integer(strsplit(token, "-", fixed = TRUE)[[1]])
+        start <- bounds[1]
+        end <- bounds[2]
+        if (start > end) {
+          stop("Invalid page range: ", token)
+        }
+        nums <- c(nums, seq.int(start, end))
+      } else {
+        stop("Invalid page selector token: ", token)
+      }
+    }
+  } else {
+    stop("pages must be NULL, numeric, or a selector string like '1,3-5'")
+  }
+
+  if (any(is.na(nums)) || any(nums < 1)) {
+    stop("Page numbers must be positive integers")
+  }
+  if (any(nums > page_count)) {
+    stop("Page selection exceeds document length (", page_count, " pages)")
+  }
+
+  sort(unique(nums))
+}
+
+# Read PDF text using pdftools if available, otherwise reticulate + pypdf.
+read_pdf_text_pages <- function(path) {
+  if (rlang::is_installed("pdftools")) {
+    return(pdftools::pdf_text(path))
+  }
+
+  if (rlang::is_installed("reticulate")) {
+    if (!reticulate::py_module_available("pypdf")) {
+      stop(
+        "Python module 'pypdf' not available. Install pypdf or R package 'pdftools'."
+      )
+    }
+
+    pypdf <- reticulate::import("pypdf", delay_load = FALSE)
+    reader <- pypdf$PdfReader(path)
+    page_count <- as.integer(reticulate::py_len(reader$pages))
+
+    text <- vapply(
+      seq_len(page_count),
+      function(i) {
+        extracted <- reader$pages[[as.integer(i - 1)]]$extract_text()
+        if (is.null(extracted)) "" else as.character(extracted)
+      },
+      character(1)
+    )
+
+    return(text)
+  }
+
+  stop(
+    "Reading PDF content requires either package 'pdftools' or package 'reticulate' with Python module 'pypdf'."
+  )
+}
+
+# Convert a local file to markdown using Python MarkItDown via reticulate
+convert_to_markdown_markitdown <- function(path) {
+  if (!rlang::is_installed("reticulate")) {
+    stop("Package 'reticulate' is required for MarkItDown conversion.")
+  }
+
+  available <- tryCatch(
+    reticulate::py_module_available("markitdown"),
+    error = function(e) FALSE
+  )
+  if (!available) {
+    stop(
+      "Python module 'markitdown' is not available. Install with: pip install 'markitdown[all]'"
+    )
+  }
+
+  markitdown <- reticulate::import("markitdown", delay_load = FALSE)
+  converter <- markitdown$MarkItDown()
+  result <- converter$convert(path)
+
+  text <- tryCatch(
+    reticulate::py_to_r(result$text_content),
+    error = function(e) NULL
+  )
+  if (is.null(text)) {
+    text <- tryCatch(
+      reticulate::py_to_r(result$markdown),
+      error = function(e) NULL
+    )
+  }
+
+  if (is.null(text)) {
+    stop("MarkItDown conversion did not return markdown text.")
+  }
+
+  if (length(text) > 1) {
+    text <- paste(as.character(text), collapse = "\n")
+  }
+
+  text <- as.character(text[[1]])
+  if (!nzchar(text)) {
+    stop("MarkItDown conversion returned empty markdown.")
+  }
+
+  text
+}
+
 #' Read file contents
 #'
 #' @description
@@ -8,6 +133,8 @@
 #' @format A tool definition created with `ellmer::tool()`.
 #'
 #' @param path Path to the file to read (tool argument, not R function argument)
+#' @param pages Optional PDF page selection. Accepts comma-separated pages and
+#'   ranges (e.g. `"1,3-5"`). Only supported for PDF files.
 #'
 #' @examples
 #' \dontrun{
@@ -19,22 +146,118 @@
 #'
 #' @export
 tool_read_file <- ellmer::tool(
-  fun = function(path) {
+  fun = function(path, pages = NULL) {
     if (!file.exists(path)) {
       ellmer::tool_reject(paste("File not found:", path))
     }
 
+    is_pdf <- tolower(tools::file_ext(path)) == "pdf"
+
+    if (!is_pdf && !is.null(pages) && !identical(pages, "")) {
+      ellmer::tool_reject(
+        "The pages argument is only supported for PDF files."
+      )
+    }
+
     tryCatch(
-      paste(readLines(path, warn = FALSE), collapse = "\n"),
+      {
+        if (!is_pdf) {
+          return(paste(readLines(path, warn = FALSE), collapse = "\n"))
+        }
+
+        page_text <- read_pdf_text_pages(path)
+        page_count <- length(page_text)
+        selected <- parse_pdf_page_selector(pages, page_count)
+
+        # Preserve historical behavior: plain string for full-file reads.
+        if (is.null(pages) || identical(pages, "")) {
+          combined <- paste(page_text, collapse = "\n\n--- page break ---\n\n")
+          return(combined)
+        }
+
+        selected_text <- unname(page_text[selected])
+        parts <- lapply(
+          seq_along(selected),
+          function(i) {
+            list(
+              page = as.integer(selected[[i]]),
+              text = selected_text[[i]]
+            )
+          }
+        )
+
+        list(
+          path = normalizePath(path, mustWork = FALSE),
+          type = "pdf",
+          page_count = as.integer(page_count),
+          pages = as.integer(selected),
+          parts = parts,
+          text = paste(selected_text, collapse = "\n\n--- page break ---\n\n")
+        )
+      },
       error = function(e) {
         ellmer::tool_reject(paste("Error reading file:", e$message))
       }
     )
   },
   name = "read_file",
-  description = "Read the contents of a file and return as text.",
+  description = "Read a file and return its contents as text. For PDF files, you can optionally select specific pages with the pages argument (e.g., '1,3-5').",
   arguments = list(
-    path = ellmer::type_string("Path to the file to read")
+    path = ellmer::type_string("Path to the file to read"),
+    pages = ellmer::type_string(
+      "Optional PDF page selector like '1,3-5'. Only valid for PDF files.",
+      required = FALSE
+    )
+  ),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = TRUE,
+    destructive_hint = FALSE
+  )
+)
+
+#' Convert a file to markdown using MarkItDown
+#'
+#' @description
+#' Converts a local file to markdown text using Python
+#' [MarkItDown](https://github.com/microsoft/markitdown) via `reticulate`.
+#' This is useful for rich formats (e.g. DOCX, PPTX, PDF, HTML) when you want
+#' a markdown representation instead of raw file text.
+#'
+#' @format A tool definition created with `ellmer::tool()`.
+#'
+#' @param path Path to the file to convert (tool argument, not R function argument)
+#'
+#' @details
+#' Requires:
+#' - R package `reticulate`
+#' - Python module `markitdown` (e.g., `pip install 'markitdown[all]'`)
+#'
+#' @examples
+#' \dontrun{
+#' tool_read_markdown("report.pdf")
+#' }
+#'
+#' @export
+tool_read_markdown <- ellmer::tool(
+  fun = function(path) {
+    if (!file.exists(path)) {
+      ellmer::tool_reject(paste("File not found:", path))
+    }
+
+    tryCatch(
+      convert_to_markdown_markitdown(path),
+      error = function(e) {
+        ellmer::tool_reject(paste(
+          "Error converting file to markdown:",
+          e$message
+        ))
+      }
+    )
+  },
+  name = "read_markdown",
+  description = "Convert a local file to markdown using MarkItDown. Useful for rich document formats.",
+  arguments = list(
+    path = ellmer::type_string("Path to the file to convert")
   ),
   annotations = ellmer::tool_annotations(
     read_only_hint = TRUE,
