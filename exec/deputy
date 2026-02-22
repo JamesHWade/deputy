@@ -9,7 +9,7 @@ provider <- "anthropic"
 
 #| description: Model to use (provider-specific, e.g., claude-sonnet-4-5-20250929, gpt-4o, gemini-2.0-flash)
 #| short: m
-model <- NULL
+model <- NA_character_
 
 # Tool configuration
 #| description: Tool preset (minimal, standard, dev, data, full)
@@ -18,42 +18,58 @@ tools <- "standard"
 
 # Permission configuration
 #| description: Permission mode (standard, readonly, full)
+#| short: P
 permissions <- "standard"
 
 #| description: Maximum number of turns before stopping
+#| short: n
 max_turns <- 25L
 
 #| description: Maximum cost in USD before stopping
-max_cost <- NULL
+#| short: c
+max_cost <- NA_real_
 
 # Session management
 #| description: Path to session file to load/resume
 #| short: s
-session <- NULL
+session <- NA_character_
 
 #| description: Path to save session on exit
-save_session <- NULL
+#| short: S
+save_session <- NA_character_
 
 # System prompt
 #| description: Custom system prompt to use
-system_prompt <- NULL
+#| short: y
+system_prompt <- NA_character_
 
 #| description: Path to file containing system prompt
-system_prompt_file <- NULL
+#| short: f
+system_prompt_file <- NA_character_
 
 # Human-in-the-loop
 #| description: Disable ask_user tool (human-in-the-loop questions)
+#| short: A
 no_ask <- FALSE
 
 # MCP (Model Context Protocol) servers
 #| description: Enable MCP server tools from config
+#| short: M
 mcp <- FALSE
 
 #| description: Path to MCP config file (default: ~/.config/mcptools/config.json)
-mcp_config <- NULL
+#| short: C
+mcp_config <- NA_character_
 
-#| description: Comma-separated list of MCP server names to load (default: all)
-mcp_servers <- NULL
+#| description: MCP server name to load (repeatable; default: all)
+mcp_server <- c()
+
+#| description: [Deprecated] Comma-separated list of MCP server names to load (default: all)
+mcp_servers <- NA_character_
+
+# Claude settings
+#| description: Claude setting source (repeatable: project, user, or settings.json path)
+setting_source <- c()
 
 # Working directory
 #| description: Working directory for file operations
@@ -68,13 +84,97 @@ verbose <- FALSE
 #| description: Disable colored output
 no_color <- FALSE
 
+#| description: Enable debug logging for CLI diagnostics
+#| short: g
+debug <- FALSE
+
+#| description: Path to write debug logs (enables debug mode automatically)
+#| short: G
+debug_file <- NA_character_
+
 # Single task mode
 #| description: Run a single task and exit (non-interactive)
+#| required: false
+#| short: x
 task <- NULL
 
 # --- Main application ---
 
 library(deputy)
+
+# Rapp 0.3: NULL assignments are positional by default; use typed NAs for
+# optional flags and normalize them back to NULL before runtime logic.
+null_if_na <- function(x) {
+  if (is.null(x)) {
+    return(NULL)
+  }
+  if (length(x) == 1 && is.atomic(x) && is.na(x)) {
+    return(NULL)
+  }
+  x
+}
+
+split_csv_values <- function(values) {
+  if (is.null(values) || length(values) == 0) {
+    return(character())
+  }
+  if (is.list(values)) {
+    values <- unlist(values, recursive = TRUE, use.names = FALSE)
+  }
+  values <- as.character(values)
+  parts <- unlist(strsplit(values, ",", fixed = TRUE), use.names = FALSE)
+  parts <- trimws(parts)
+  parts[nzchar(parts)]
+}
+
+model <- null_if_na(model)
+max_cost <- null_if_na(max_cost)
+session <- null_if_na(session)
+save_session <- null_if_na(save_session)
+system_prompt <- null_if_na(system_prompt)
+system_prompt_file <- null_if_na(system_prompt_file)
+mcp_config <- null_if_na(mcp_config)
+mcp_servers <- null_if_na(mcp_servers)
+debug_file <- null_if_na(debug_file)
+
+create_debug_logger <- function(enabled = FALSE, path = NULL) {
+  if (!enabled) {
+    return(structure(
+      function(...) invisible(NULL),
+      close = function() invisible(NULL)
+    ))
+  }
+
+  con <- NULL
+  if (!is.null(path)) {
+    con <- file(path, open = "a")
+  }
+
+  logger <- function(...) {
+    msg <- paste(..., collapse = "")
+    line <- paste0(
+      format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+      " [deputy-debug] ",
+      msg
+    )
+    if (is.null(con)) {
+      cat(line, "\n", file = stderr())
+    } else {
+      writeLines(line, con = con)
+      flush(con)
+    }
+    invisible(NULL)
+  }
+
+  attr(logger, "close") <- function() {
+    if (!is.null(con)) {
+      close(con)
+    }
+    invisible(NULL)
+  }
+
+  logger
+}
 
 # Handle color setting
 if (no_color) {
@@ -293,9 +393,12 @@ process_command <- function(input, agent) {
 }
 
 # Run a single task (non-interactive mode)
-run_task <- function(agent, task_text, verbose) {
+run_task <- function(agent, task_text, verbose, debug_log = NULL) {
   cli::cli_alert_info("Running task: {.val {task_text}}")
   cli::cli_text("")
+  if (!is.null(debug_log)) {
+    debug_log("run_task started")
+  }
 
   for (event in agent$run(task_text)) {
     switch(event$type,
@@ -303,11 +406,23 @@ run_task <- function(agent, task_text, verbose) {
         cat(event$text)
       },
       "tool_start" = {
+        if (!is.null(debug_log)) {
+          tool_name <- if (is.null(event$tool_name)) "<unknown>" else event$tool_name
+          debug_log("tool_start: ", tool_name)
+        }
         if (verbose) {
           cli::cli_alert_info("Tool: {.fn {event$tool_name}}")
         }
       },
       "tool_end" = {
+        if (!is.null(debug_log)) {
+          tool_name <- if (is.null(event$tool_name)) "<unknown>" else event$tool_name
+          if (!is.null(event$error)) {
+            debug_log("tool_end error: ", tool_name, " -> ", event$error)
+          } else {
+            debug_log("tool_end success: ", tool_name)
+          }
+        }
         # Always show tool errors, not just in verbose mode
         if (!is.null(event$error)) {
           cli::cli_alert_danger("Tool {.fn {event$tool_name}} failed: {event$error}")
@@ -316,6 +431,10 @@ run_task <- function(agent, task_text, verbose) {
         }
       },
       "stop" = {
+        if (!is.null(debug_log)) {
+          turns <- if (is.null(event$total_turns)) "NA" else as.character(event$total_turns)
+          debug_log("run_task stop: turns=", turns)
+        }
         cat("\n")
         cost <- event$cost
         if (!is.null(cost) && !is.na(cost$total) && cost$total > 0) {
@@ -328,7 +447,10 @@ run_task <- function(agent, task_text, verbose) {
 }
 
 # Interactive chat loop
-run_interactive <- function(agent, verbose) {
+run_interactive <- function(agent, verbose, debug_log = NULL) {
+  if (!is.null(debug_log)) {
+    debug_log("run_interactive started")
+  }
   repeat {
     # Read user input with improved error handling
     input <- tryCatch(
@@ -360,6 +482,9 @@ run_interactive <- function(agent, verbose) {
     # Process commands
     cmd_result <- process_command(input, agent)
     if (cmd_result$is_command) {
+      if (!is.null(debug_log)) {
+        debug_log("command: ", input)
+      }
       if (identical(cmd_result$action, "quit")) {
         cli::cli_alert_info("Goodbye!")
         break
@@ -375,11 +500,23 @@ run_interactive <- function(agent, verbose) {
           cat(event$text)
         },
         "tool_start" = {
+          if (!is.null(debug_log)) {
+            tool_name <- if (is.null(event$tool_name)) "<unknown>" else event$tool_name
+            debug_log("tool_start: ", tool_name)
+          }
           if (verbose) {
             cli::cli_alert_info("Calling: {.fn {event$tool_name}}")
           }
         },
         "tool_end" = {
+          if (!is.null(debug_log)) {
+            tool_name <- if (is.null(event$tool_name)) "<unknown>" else event$tool_name
+            if (!is.null(event$error)) {
+              debug_log("tool_end error: ", tool_name, " -> ", event$error)
+            } else {
+              debug_log("tool_end success: ", tool_name)
+            }
+          }
           # Always show tool errors, not just in verbose mode
           if (!is.null(event$error)) {
             cli::cli_alert_danger("Tool {.fn {event$tool_name}} failed: {event$error}")
@@ -401,6 +538,12 @@ run_interactive <- function(agent, verbose) {
 }
 
 # --- Main execution ---
+debug_enabled <- isTRUE(debug) || !is.null(debug_file)
+debug_log <- create_debug_logger(enabled = debug_enabled, path = debug_file)
+on.exit(attr(debug_log, "close")(), add = TRUE)
+if (debug_enabled) {
+  debug_log("Debug mode enabled")
+}
 
 # Create chat object (wrap in tryCatch for credential errors)
 chat <- tryCatch(
@@ -413,11 +556,22 @@ chat <- tryCatch(
     ))
   }
 )
+if (debug_enabled) {
+  model_name <- if (is.null(model)) "<default>" else model
+  debug_log("Chat initialized for provider=", provider, " model=", model_name)
+}
 
 # Build components
 agent_tools <- get_tools(tools, include_ask = !no_ask)
 agent_permissions <- get_permissions(permissions, dir, max_turns = max_turns, max_cost = max_cost)
 sys_prompt <- get_system_prompt(system_prompt, system_prompt_file)
+setting_sources <- unique(split_csv_values(setting_source))
+if (length(setting_sources) == 0) {
+  setting_sources <- NULL
+}
+if (debug_enabled && !is.null(setting_sources)) {
+  debug_log("Setting sources: ", paste(setting_sources, collapse = ","))
+}
 
 # Create agent
 agent <- Agent$new(
@@ -425,19 +579,32 @@ agent <- Agent$new(
   tools = agent_tools,
   system_prompt = sys_prompt,
   permissions = agent_permissions,
-  working_dir = dir
+  working_dir = dir,
+  setting_sources = setting_sources
 )
+if (debug_enabled) {
+  debug_log("Agent created with tool preset=", tools, " and permission mode=", permissions)
+}
 
 # Load MCP tools if enabled
 if (mcp) {
-  # Parse server list if provided, filtering out empty strings
-  servers_list <- if (!is.null(mcp_servers)) {
-    parsed <- trimws(strsplit(mcp_servers, ",")[[1]])
-    # Filter out empty strings from parsing
-    parsed <- parsed[nchar(parsed) > 0]
-    if (length(parsed) == 0) NULL else parsed
-  } else {
-    NULL
+  servers_repeatable <- split_csv_values(mcp_server)
+  servers_legacy <- split_csv_values(mcp_servers)
+  if (length(servers_legacy) > 0) {
+    cli::cli_warn(c(
+      "{.arg --mcp-servers} is deprecated",
+      "i" = "Use repeated {.arg --mcp-server} instead"
+    ))
+  }
+  servers_list <- unique(c(servers_repeatable, servers_legacy))
+  if (length(servers_list) == 0) {
+    servers_list <- NULL
+  }
+  if (debug_enabled) {
+    debug_log(
+      "Loading MCP tools with servers=",
+      if (is.null(servers_list)) "<all>" else paste(servers_list, collapse = ",")
+    )
   }
   agent$load_mcp(config = mcp_config, servers = servers_list)
 }
@@ -453,11 +620,11 @@ if (!is.null(session)) {
 # Run in appropriate mode
 if (!is.null(task)) {
   # Single task mode
-  run_task(agent, task, verbose)
+  run_task(agent, task, verbose, debug_log = if (debug_enabled) debug_log else NULL)
 } else {
   # Interactive mode
   print_welcome(agent, provider, model, tools, permissions)
-  run_interactive(agent, verbose)
+  run_interactive(agent, verbose, debug_log = if (debug_enabled) debug_log else NULL)
 }
 
 # Save session on exit if specified

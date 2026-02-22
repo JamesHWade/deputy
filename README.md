@@ -84,6 +84,39 @@ for (event in agent$run("Analyze the structure of this project")) {
 }
 ```
 
+### CLI (`exec/deputy`)
+
+deputy ships an executable CLI app at `exec/deputy` (Rapp front-end).
+Install launchers with:
+
+``` r
+Rapp::install_pkg_cli_apps("deputy")
+```
+
+Then run:
+
+``` bash
+deputy --provider openai --model gpt-4o --tools standard
+```
+
+Single-task mode (non-interactive):
+
+``` bash
+deputy -x "Summarize the R files in this project"
+```
+
+Common options include short aliases (`-p`, `-m`, `-t`, `-P`, `-n`, `-c`,
+`-d`, `-v`, etc.), and repeatable flags for Rapp 0.3 style inputs:
+
+``` bash
+deputy --setting-source project --setting-source user
+deputy --mcp-server github --mcp-server slack
+deputy --debug --debug-file /tmp/deputy-debug.log
+```
+
+`--mcp-servers "github,slack"` is still accepted for backward
+compatibility, but `--mcp-server` is preferred.
+
 ### Tools
 
 deputy provides tool presets for common use cases:
@@ -104,7 +137,17 @@ tools_all()   # Everything
 
 # List available presets
 list_presets()
+
+# Optional: read selected pages from a PDF
+tool_read_file("report.pdf", pages = "1,3-5")
+
+# Optional: convert rich docs to markdown with MarkItDown
+tool_read_markdown("slides.pptx")
 ```
+
+PDF page extraction uses `pdftools` when available, with a fallback to
+`reticulate` + Python `pypdf`.
+`tool_read_markdown()` uses `reticulate` + Python `markitdown`.
 
 ### Permissions
 
