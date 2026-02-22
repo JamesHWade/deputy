@@ -23,6 +23,8 @@ Built-in tools and tool bundles
   : Read a CSV file
 - [`tool_read_file()`](https://jameshwade.github.io/deputy/reference/tool_read_file.md)
   : Read file contents
+- [`tool_read_markdown()`](https://jameshwade.github.io/deputy/reference/tool_read_markdown.md)
+  : Convert a file to markdown using MarkItDown
 - [`tool_run_bash()`](https://jameshwade.github.io/deputy/reference/tool_run_bash.md)
   : Execute bash commands
 - [`tool_run_r_code()`](https://jameshwade.github.io/deputy/reference/tool_run_r_code.md)

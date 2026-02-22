@@ -148,10 +148,26 @@
 <span><span class="op">}</span></span></code></pre></div>
 </div>
 <div class="section level3">
+<h3 id="cli-execdeputy">CLI (<code>exec/deputy</code>)<a class="anchor" aria-label="anchor" href="#cli-execdeputy"></a>
+</h3>
+<p>deputy ships an executable CLI app at <code>exec/deputy</code> (Rapp front-end). Install launchers with:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">Rapp</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Rapp/man/install_pkg_cli_apps.html" class="external-link">install_pkg_cli_apps</a></span><span class="op">(</span><span class="st">"deputy"</span><span class="op">)</span></span></code></pre></div>
+<p>Then run:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--provider</span> openai <span class="at">--model</span> gpt-4o <span class="at">--tools</span> standard</span></code></pre></div>
+<p>Single-task mode (non-interactive):</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">-x</span> <span class="st">"Summarize the R files in this project"</span></span></code></pre></div>
+<p>Common options include short aliases (<code>-p</code>, <code>-m</code>, <code>-t</code>, <code>-P</code>, <code>-n</code>, <code>-c</code>, <code>-d</code>, <code>-v</code>, etc.), and repeatable flags for Rapp 0.3 style inputs:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--setting-source</span> project <span class="at">--setting-source</span> user</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--mcp-server</span> github <span class="at">--mcp-server</span> slack</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--debug</span> <span class="at">--debug-file</span> /tmp/deputy-debug.log</span></code></pre></div>
+<p><code>--mcp-servers "github,slack"</code> is still accepted for backward compatibility, but <code>--mcp-server</code> is preferred.</p>
+</div>
+<div class="section level3">
 <h3 id="tools">Tools<a class="anchor" aria-label="anchor" href="#tools"></a>
 </h3>
 <p>deputy provides tool presets for common use cases:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Use presets for quick setup</span></span>
 <span><span class="fu"><a href="reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span>   <span class="co"># read_file, list_files</span></span>
 <span><span class="fu"><a href="reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"standard"</span><span class="op">)</span>  <span class="co"># + write_file, run_r_code</span></span>
@@ -166,13 +182,20 @@
 <span><span class="fu"><a href="reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># Everything</span></span>
 <span></span>
 <span><span class="co"># List available presets</span></span>
-<span><span class="fu"><a href="reference/list_presets.html">list_presets</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="reference/list_presets.html">list_presets</a></span><span class="op">(</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Optional: read selected pages from a PDF</span></span>
+<span><span class="fu"><a href="reference/tool_read_file.html">tool_read_file</a></span><span class="op">(</span><span class="st">"report.pdf"</span>, pages <span class="op">=</span> <span class="st">"1,3-5"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Optional: convert rich docs to markdown with MarkItDown</span></span>
+<span><span class="fu"><a href="reference/tool_read_markdown.html">tool_read_markdown</a></span><span class="op">(</span><span class="st">"slides.pptx"</span><span class="op">)</span></span></code></pre></div>
+<p>PDF page extraction uses <code>pdftools</code> when available, with a fallback to <code>reticulate</code> + Python <code>pypdf</code>. <code><a href="reference/tool_read_markdown.html">tool_read_markdown()</a></code> uses <code>reticulate</code> + Python <code>markitdown</code>.</p>
 </div>
 <div class="section level3">
 <h3 id="permissions">Permissions<a class="anchor" aria-label="anchor" href="#permissions"></a>
 </h3>
 <p>Control what your agent can do:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Read-only: no writes, no code execution</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
@@ -216,7 +239,7 @@
 <h3 id="hooks">Hooks<a class="anchor" aria-label="anchor" href="#hooks"></a>
 </h3>
 <p>Intercept agent behavior:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Log all tool calls</span></span>
 <span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va"><a href="reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PostToolUse"</span>,</span>
@@ -260,7 +283,7 @@
 <h3 id="skills">Skills<a class="anchor" aria-label="anchor" href="#skills"></a>
 </h3>
 <p>Skills bundle tools and prompt extensions. You can load them from disk or create them programmatically. deputy ships with a built-in example skill under <code>inst/skills</code>.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Discover bundled skills</span></span>
 <span><span class="va">skills_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"skills"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/skills_list.html">skills_list</a></span><span class="op">(</span><span class="va">skills_dir</span><span class="op">)</span></span>
@@ -283,7 +306,7 @@
 <h3 id="claude-settings-settingsources">Claude Settings (settingSources)<a class="anchor" aria-label="anchor" href="#claude-settings-settingsources"></a>
 </h3>
 <p>deputy can load Claude-style settings from <code>.claude</code> directories, including <code>CLAUDE.md</code> memory, <code>.claude/skills</code>, and <code>.claude/commands</code> slash commands. Tool policy settings from <code>settings.json</code> are also applied to <code>agent$permissions</code> (<code>allowedTools</code>, <code>disallowedTools</code>, and <code>permissionPromptToolName</code>).</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -293,17 +316,17 @@
 <span><span class="co"># Inspect loaded slash commands</span></span>
 <span><span class="va">agent</span><span class="op">$</span><span class="fu">slash_commands</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>Example <code>.claude/settings.json</code> tool policy:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  <span class="dt">"allowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"read_file"</span><span class="ot">,</span> <span class="st">"list_files"</span><span class="ot">,</span> <span class="st">"run_r_code"</span><span class="ot">]</span><span class="fu">,</span></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="dt">"disallowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"run_bash"</span><span class="ot">]</span><span class="fu">,</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="dt">"permissionPromptToolName"</span><span class="fu">:</span> <span class="st">"AskUserQuestion"</span></span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="dt">"allowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"read_file"</span><span class="ot">,</span> <span class="st">"list_files"</span><span class="ot">,</span> <span class="st">"run_r_code"</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="dt">"disallowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"run_bash"</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="dt">"permissionPromptToolName"</span><span class="fu">:</span> <span class="st">"AskUserQuestion"</span></span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="structured-output">Structured Output<a class="anchor" aria-label="anchor" href="#structured-output"></a>
 </h3>
 <p>Request JSON output that matches a schema:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">schema</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  type <span class="op">=</span> <span class="st">"object"</span>,</span>
 <span>  properties <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>status <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"string"</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -321,7 +344,7 @@
 <h3 id="error-handling">Error Handling<a class="anchor" aria-label="anchor" href="#error-handling"></a>
 </h3>
 <p>deputy provides structured error types for programmatic error handling:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Catch specific error types</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span></span>
 <span>  <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"task"</span><span class="op">)</span>,</span>
@@ -340,7 +363,7 @@
 <h3 id="multi-agent-systems">Multi-Agent Systems<a class="anchor" aria-label="anchor" href="#multi-agent-systems"></a>
 </h3>
 <p>Coordinate specialized agents:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Define sub-agents</span></span>
 <span><span class="va">code_agent</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"code_analyst"</span>,</span>
@@ -362,7 +385,7 @@
 <h2 id="provider-support">Provider Support<a class="anchor" aria-label="anchor" href="#provider-support"></a>
 </h2>
 <p>deputy works with any LLM provider that ellmer supports:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># OpenAI</span></span>
 <span><span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>

@@ -5,7 +5,7 @@ A tool that reads the contents of a file and returns it as a string.
 ## Usage
 
 ``` r
-tool_read_file(path)
+tool_read_file(path, pages = NULL)
 ```
 
 ## Format
@@ -18,6 +18,11 @@ A tool definition created with
 - path:
 
   Path to the file to read (tool argument, not R function argument)
+
+- pages:
+
+  Optional PDF page selection. Accepts comma-separated pages and ranges
+  (e.g. `"1,3-5"`). Only supported for PDF files.
 
 ## Examples
 

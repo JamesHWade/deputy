@@ -16,16 +16,17 @@ tools_preset(name)
   The preset name. One of:
 
   - `"minimal"` - Read-only tools for safe exploration (`read_file`,
-    `list_files`)
+    `read_markdown`, `list_files`)
 
   - `"standard"` - Balanced toolset for R development (`read_file`,
-    `write_file`, `list_files`, `run_r_code`)
+    `read_markdown`, `write_file`, `list_files`, `run_r_code`)
 
   - `"dev"` - Full development with shell access (`read_file`,
-    `write_file`, `list_files`, `run_r_code`, `run_bash`)
+    `read_markdown`, `write_file`, `list_files`, `run_r_code`,
+    `run_bash`)
 
-  - `"data"` - Data analysis focused tools (`read_file`, `list_files`,
-    `read_csv`, `run_r_code`)
+  - `"data"` - Data analysis focused tools (`read_file`,
+    `read_markdown`, `list_files`, `read_csv`, `run_r_code`)
 
   - `"full"` - All available tools (requires appropriate permissions)
 
