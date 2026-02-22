@@ -64,7 +64,7 @@ read_pdf_text_pages <- function(path) {
     text <- vapply(
       seq_len(page_count),
       function(i) {
-        extracted <- reader$pages[[as.integer(i - 1)]]$extract_text()
+        extracted <- reader$pages[[as.integer(i)]]$extract_text()
         if (is.null(extracted)) "" else as.character(extracted)
       },
       character(1)

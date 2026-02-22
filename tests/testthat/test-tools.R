@@ -78,6 +78,38 @@ test_that("tool_read_file returns structured output for PDF page selection", {
   expect_true(is.character(result$parts[[1]]$text))
 })
 
+test_that("read_pdf_text_pages reticulate fallback indexes pages correctly", {
+  skip_if_not_installed("reticulate")
+
+  pages <- list(
+    list(extract_text = function() "page one"),
+    list(extract_text = function() "page two")
+  )
+
+  local_mocked_bindings(
+    is_installed = function(pkg) {
+      if (pkg == "pdftools") return(FALSE)
+      if (pkg == "reticulate") return(TRUE)
+      TRUE
+    },
+    .package = "rlang"
+  )
+
+  local_mocked_bindings(
+    py_module_available = function(module) identical(module, "pypdf"),
+    import = function(module, delay_load = FALSE) {
+      if (!identical(module, "pypdf")) stop("unexpected module")
+      list(PdfReader = function(path) list(pages = pages))
+    },
+    py_len = function(x) length(x),
+    .package = "reticulate"
+  )
+
+  result <- read_pdf_text_pages("dummy.pdf")
+
+  expect_equal(result, c("page one", "page two"))
+})
+
 test_that("tool_read_file rejects missing files", {
   expect_error(
     tool_read_file("/nonexistent/path/file.txt"),
