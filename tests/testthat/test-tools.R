@@ -88,8 +88,12 @@ test_that("read_pdf_text_pages reticulate fallback indexes pages correctly", {
 
   local_mocked_bindings(
     is_installed = function(pkg) {
-      if (pkg == "pdftools") return(FALSE)
-      if (pkg == "reticulate") return(TRUE)
+      if (pkg == "pdftools") {
+        return(FALSE)
+      }
+      if (pkg == "reticulate") {
+        return(TRUE)
+      }
       TRUE
     },
     .package = "rlang"
