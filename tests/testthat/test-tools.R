@@ -102,7 +102,9 @@ test_that("read_pdf_text_pages reticulate fallback indexes pages correctly", {
   local_mocked_bindings(
     py_module_available = function(module) identical(module, "pypdf"),
     import = function(module, delay_load = FALSE) {
-      if (!identical(module, "pypdf")) stop("unexpected module")
+      if (!identical(module, "pypdf")) {
+        stop("unexpected module")
+      }
       list(PdfReader = function(path) list(pages = pages))
     },
     py_len = function(x) length(x),
