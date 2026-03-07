@@ -71,6 +71,7 @@ Create a new HookMatcher.
 \item Stop: \verb{function(reason, context)}
 \item SubagentStop: \verb{function(agent_name, task, result, context)}
 \item UserPromptSubmit: \verb{function(prompt, context)}
+\item Notification: \verb{function(message, context)}
 \item PreCompact: \verb{function(turns_to_compact, turns_to_keep, context)}
 \item SessionStart: \verb{function(context)}
 \item SessionEnd: \verb{function(reason, context)}

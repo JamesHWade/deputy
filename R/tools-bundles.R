@@ -228,10 +228,16 @@ tools_all <- function() {
     tool_read_file,
     tool_read_markdown,
     tool_write_file,
+    tool_edit_file,
+    tool_multi_edit,
     tool_list_files,
+    tool_glob_files,
+    tool_grep_files,
     tool_run_r_code,
     tool_run_bash,
     tool_read_csv,
+    tool_todo_read,
+    tool_todo_write,
     tool_web_fetch,
     tool_web_search
   )
@@ -356,7 +362,26 @@ list_presets <- function() {
       "read_file, read_markdown, write_file, list_files, run_r_code",
       "read_file, read_markdown, write_file, list_files, run_r_code, run_bash",
       "read_file, read_markdown, list_files, read_csv, run_r_code",
-      "read_file, read_markdown, write_file, list_files, run_r_code, run_bash, read_csv, web_fetch, web_search"
+      paste(
+        c(
+          "read_file",
+          "read_markdown",
+          "write_file",
+          "edit_file",
+          "multi_edit",
+          "list_files",
+          "glob_files",
+          "grep_files",
+          "run_r_code",
+          "run_bash",
+          "read_csv",
+          "todo_read",
+          "todo_write",
+          "web_fetch",
+          "web_search"
+        ),
+        collapse = ", "
+      )
     ),
     stringsAsFactors = FALSE
   )

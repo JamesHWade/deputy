@@ -12,17 +12,20 @@ claude_settings_load(setting_sources, working_dir = getwd())
 \item{working_dir}{Working directory used for project sources.}
 }
 \value{
-A list with \code{settings}, \code{memory}, \code{skills}, \code{commands}, and metadata.
+A list with \code{settings}, \code{memory}, \code{skills}, \code{commands}, \code{agents},
+and metadata.
 }
 \description{
 Loads Claude-style settings from a list of \code{setting_sources}, mirroring the
 Claude Agent SDK behavior. Supports project and user sources, and returns
-memory, skills, and slash commands discovered in \code{.claude} directories.
+memory, skills, slash commands, and custom agents discovered in \code{.claude}
+directories.
 
 Supported sources:
 \itemize{
-\item \code{"project"}: loads project \code{.claude} settings, skills, commands, and memory
-\item \code{"user"}: loads \verb{~/.claude} settings, skills, commands, and memory
+\item \code{"project"}: loads project \code{.claude} settings, skills, commands, agents,
+and memory
+\item \code{"user"}: loads \verb{~/.claude} settings, skills, commands, agents, and memory
 \item explicit file paths to \code{.json} settings files
 }
 }

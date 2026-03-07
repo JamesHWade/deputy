@@ -6,6 +6,7 @@
 #' Permission modes control the overall behavior of tool permission checking:
 #' * `"default"` - Check each tool against the permission policy
 #' * `"acceptEdits"` - Auto-accept file write tools
+#' * `"plan"` - Allow only annotated read-only tools and human approval prompts
 #' * `"readonly"` - Deny all write/execute tools
 #' * `"bypassPermissions"` - Allow all tools (dangerous, use with caution)
 #'
@@ -66,7 +67,13 @@
 #' ```
 #'
 #' @export
-PermissionMode <- c("default", "acceptEdits", "readonly", "bypassPermissions")
+PermissionMode <- c(
+  "default",
+  "acceptEdits",
+  "plan",
+  "readonly",
+  "bypassPermissions"
+)
 
 #' Create an allow permission result
 #'
@@ -275,6 +282,13 @@ Permissions <- R6::R6Class(
           ))
         }
         return(PermissionResultAllow())
+      }
+
+      if (self$mode == "plan") {
+        plan_result <- private$check_plan_mode(tool_name, tool_input, context)
+        if (!is.null(plan_result)) {
+          return(plan_result)
+        }
       }
 
       # Custom callback takes precedence
@@ -781,6 +795,41 @@ Permissions <- R6::R6Class(
 
       # Default: allow unknown tools without destructive annotations
       PermissionResultAllow()
+    },
+
+    check_plan_mode = function(tool_name, tool_input, context) {
+      annotations <- context$tool_annotations
+
+      # Plan mode is intentionally conservative: no annotation means deny.
+      if (is.null(annotations)) {
+        return(PermissionResultDeny(
+          reason = paste0(
+            "Plan mode only allows annotated read-only tools. ",
+            tool_name,
+            " has no compatible annotations."
+          )
+        ))
+      }
+
+      if (isTRUE(annotations$destructive_hint)) {
+        return(PermissionResultDeny(
+          reason = paste0(
+            "Plan mode does not allow destructive tools: ",
+            tool_name
+          )
+        ))
+      }
+
+      if (!isTRUE(annotations$read_only_hint)) {
+        return(PermissionResultDeny(
+          reason = paste0(
+            "Plan mode only allows read-only tools: ",
+            tool_name
+          )
+        ))
+      }
+
+      PermissionResultAllow()
     }
   )
 )
@@ -844,6 +893,42 @@ permissions_standard <- function(
     install_packages = FALSE,
     max_turns = max_turns,
     max_cost_usd = max_cost_usd
+  )
+}
+
+#' Create a planning permission policy
+#'
+#' @description
+#' Creates a permission policy for planning-oriented sessions.
+#' Only tools annotated as read-only are allowed, plus the permission prompt
+#' tool when configured.
+#'
+#' @param max_turns Maximum number of turns (default 25)
+#' @param max_cost_usd Maximum cost in USD (default NULL = unlimited)
+#' @param permission_prompt_tool_name Optional tool name that the model can use
+#'   to request explicit approval. Defaults to `"AskUserQuestion"`.
+#' @return A [Permissions] object
+#'
+#' @examples
+#' perms <- permissions_plan()
+#'
+#' @export
+permissions_plan <- function(
+  max_turns = 25,
+  max_cost_usd = NULL,
+  permission_prompt_tool_name = "AskUserQuestion"
+) {
+  Permissions$new(
+    mode = "plan",
+    file_read = TRUE,
+    file_write = FALSE,
+    bash = FALSE,
+    r_code = FALSE,
+    web = TRUE,
+    install_packages = FALSE,
+    max_turns = max_turns,
+    max_cost_usd = max_cost_usd,
+    permission_prompt_tool_name = permission_prompt_tool_name
   )
 }
 

@@ -97,6 +97,12 @@ AgentResult <- R6::R6Class(
     #' @field structured_output Parsed/validated structured output (if requested)
     structured_output = NULL,
 
+    #' @field session_id Compat session identifier when Claude SDK mode is active
+    session_id = NULL,
+
+    #' @field snapshot_path Latest compat snapshot path when session persistence is active
+    snapshot_path = NULL,
+
     #' @description
     #' Create a new AgentResult object.
     #'
@@ -107,6 +113,8 @@ AgentResult <- R6::R6Class(
     #' @param duration Execution duration in seconds
     #' @param stop_reason Reason for stopping
     #' @param structured_output Parsed structured output (if any)
+    #' @param session_id Compat session identifier (if any)
+    #' @param snapshot_path Latest compat snapshot path (if any)
     #' @return A new `AgentResult` object
     initialize = function(
       response = NULL,
@@ -115,7 +123,9 @@ AgentResult <- R6::R6Class(
       events = list(),
       duration = NULL,
       stop_reason = "complete",
-      structured_output = NULL
+      structured_output = NULL,
+      session_id = NULL,
+      snapshot_path = NULL
     ) {
       self$response <- response
       self$turns <- turns
@@ -124,6 +134,8 @@ AgentResult <- R6::R6Class(
       self$duration <- duration
       self$stop_reason <- stop_reason
       self$structured_output <- structured_output
+      self$session_id <- session_id
+      self$snapshot_path <- snapshot_path
     },
 
     #' @description
@@ -173,6 +185,9 @@ AgentResult <- R6::R6Class(
 
       if (!is.null(self$response)) {
         cat("  response:", truncate_string(self$response, 60), "\n")
+      }
+      if (!is.null(self$session_id)) {
+        cat("  session_id:", self$session_id, "\n")
       }
       if (!is.null(self$structured_output)) {
         status <- "unknown"

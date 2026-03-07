@@ -21,6 +21,9 @@ tools <- "standard"
 #| short: P
 permissions <- "standard"
 
+#| description: Claude-style permission mode override (default, acceptEdits, plan, readonly, bypassPermissions)
+permission_mode <- NA_character_
+
 #| description: Maximum number of turns before stopping
 #| short: n
 max_turns <- 25L
@@ -37,6 +40,18 @@ session <- NA_character_
 #| description: Path to save session on exit
 #| short: S
 save_session <- NA_character_
+
+#| description: Persist compat session snapshots to disk
+persist_session <- FALSE
+
+#| description: Resume a persisted compat session by id
+resume_session_id <- NA_character_
+
+#| description: Resume a compat session at or before a timestamp
+resume_session_at <- NA_character_
+
+#| description: Fork a resumed compat session into a new session id
+fork_session <- FALSE
 
 # System prompt
 #| description: Custom system prompt to use
@@ -128,9 +143,12 @@ split_csv_values <- function(values) {
 }
 
 model <- null_if_na(model)
+permission_mode <- null_if_na(permission_mode)
 max_cost <- null_if_na(max_cost)
 session <- null_if_na(session)
 save_session <- null_if_na(save_session)
+resume_session_id <- null_if_na(resume_session_id)
+resume_session_at <- null_if_na(resume_session_at)
 system_prompt <- null_if_na(system_prompt)
 system_prompt_file <- null_if_na(system_prompt_file)
 mcp_config <- null_if_na(mcp_config)
@@ -234,8 +252,32 @@ get_tools <- function(preset, include_ask = TRUE) {
 get_permissions <- function(mode, working_dir, max_turns = 25L, max_cost = NULL) {
   switch(mode,
     standard = permissions_standard(working_dir, max_turns = max_turns, max_cost_usd = max_cost),
+    plan = permissions_plan(max_turns = max_turns, max_cost_usd = max_cost),
     readonly = permissions_readonly(max_turns = max_turns),
     full = permissions_full(max_turns = max_turns, max_cost_usd = max_cost),
+    default = Permissions$new(
+      mode = "default",
+      file_read = TRUE,
+      file_write = working_dir,
+      bash = FALSE,
+      r_code = TRUE,
+      web = FALSE,
+      install_packages = FALSE,
+      max_turns = max_turns,
+      max_cost_usd = max_cost
+    ),
+    acceptEdits = Permissions$new(
+      mode = "acceptEdits",
+      file_read = TRUE,
+      file_write = working_dir,
+      bash = FALSE,
+      r_code = TRUE,
+      web = FALSE,
+      install_packages = FALSE,
+      max_turns = max_turns,
+      max_cost_usd = max_cost
+    ),
+    bypassPermissions = permissions_full(max_turns = max_turns, max_cost_usd = max_cost),
     permissions_standard(working_dir, max_turns = max_turns, max_cost_usd = max_cost)
   )
 }
@@ -563,11 +605,20 @@ if (debug_enabled) {
 
 # Build components
 agent_tools <- get_tools(tools, include_ask = !no_ask)
-agent_permissions <- get_permissions(permissions, dir, max_turns = max_turns, max_cost = max_cost)
+effective_permission_mode <- permission_mode %||% permissions
+agent_permissions <- get_permissions(
+  effective_permission_mode,
+  dir,
+  max_turns = max_turns,
+  max_cost = max_cost
+)
 sys_prompt <- get_system_prompt(system_prompt, system_prompt_file)
 setting_sources <- unique(split_csv_values(setting_source))
 if (length(setting_sources) == 0) {
   setting_sources <- NULL
+}
+if (!is.null(resume_session_at) && is.null(resume_session_id)) {
+  cli::cli_abort("{.arg --resume-session-at} requires {.arg --resume-session-id}")
 }
 if (debug_enabled && !is.null(setting_sources)) {
   debug_log("Setting sources: ", paste(setting_sources, collapse = ","))
@@ -583,7 +634,12 @@ agent <- Agent$new(
   setting_sources = setting_sources
 )
 if (debug_enabled) {
-  debug_log("Agent created with tool preset=", tools, " and permission mode=", permissions)
+  debug_log(
+    "Agent created with tool preset=",
+    tools,
+    " and permission mode=",
+    effective_permission_mode
+  )
 }
 
 # Load MCP tools if enabled
@@ -617,13 +673,57 @@ if (!is.null(session)) {
   agent$load_session(session)
 }
 
+# Configure Claude-compatible persisted sessions if requested
+compat_session_enabled <- isTRUE(persist_session) || !is.null(resume_session_id)
+if (compat_session_enabled) {
+  active_session_id <- if (is.null(resume_session_id)) generate_session_id() else resume_session_id
+  if (isTRUE(fork_session) && !is.null(resume_session_id)) {
+    active_session_id <- generate_session_id()
+  }
+
+  agent$configure_sdk_compat(list(
+    persist_session = TRUE,
+    session_store_dir = session_store_default_dir(),
+    session_id = active_session_id
+  ))
+
+  if (!is.null(resume_session_id)) {
+    snapshot <- session_store_select_snapshot(
+      root = session_store_default_dir(),
+      session_id = resume_session_id,
+      at = resume_session_at
+    )
+    agent$load_session(snapshot$path)
+    agent$configure_sdk_compat(list(
+      persist_session = TRUE,
+      session_store_dir = session_store_default_dir(),
+      session_id = active_session_id
+    ))
+    agent$.__enclos_env__$private$notify(
+      if (isTRUE(fork_session)) {
+        paste0("Forked compat session ", resume_session_id, " into ", active_session_id, ".")
+      } else {
+        paste0("Resumed compat session ", resume_session_id, ".")
+      },
+      level = "info",
+      code = if (isTRUE(fork_session)) "session_forked" else "session_resumed",
+      source_session_id = resume_session_id,
+      active_session_id = active_session_id,
+      snapshot_path = snapshot$path
+    )
+    if (isTRUE(fork_session)) {
+      agent$.__enclos_env__$private$snapshot_compat_state(reason = "fork_restore")
+    }
+  }
+}
+
 # Run in appropriate mode
 if (!is.null(task)) {
   # Single task mode
   run_task(agent, task, verbose, debug_log = if (debug_enabled) debug_log else NULL)
 } else {
   # Interactive mode
-  print_welcome(agent, provider, model, tools, permissions)
+  print_welcome(agent, provider, model, tools, effective_permission_mode)
   run_interactive(agent, verbose, debug_log = if (debug_enabled) debug_log else NULL)
 }
 

@@ -5,17 +5,20 @@
 #' @description
 #' Loads Claude-style settings from a list of `setting_sources`, mirroring the
 #' Claude Agent SDK behavior. Supports project and user sources, and returns
-#' memory, skills, and slash commands discovered in `.claude` directories.
+#' memory, skills, slash commands, and custom agents discovered in `.claude`
+#' directories.
 #'
 #' Supported sources:
-#' - `"project"`: loads project `.claude` settings, skills, commands, and memory
-#' - `"user"`: loads `~/.claude` settings, skills, commands, and memory
+#' - `"project"`: loads project `.claude` settings, skills, commands, agents,
+#'   and memory
+#' - `"user"`: loads `~/.claude` settings, skills, commands, agents, and memory
 #' - explicit file paths to `.json` settings files
 #'
 #' @param setting_sources Character vector of sources, e.g. `c("project", "user")`.
 #' @param working_dir Working directory used for project sources.
 #'
-#' @return A list with `settings`, `memory`, `skills`, `commands`, and metadata.
+#' @return A list with `settings`, `memory`, `skills`, `commands`, `agents`,
+#'   and metadata.
 #' @export
 claude_settings_load <- function(setting_sources, working_dir = getwd()) {
   if (is.null(setting_sources) || length(setting_sources) == 0) {
@@ -24,6 +27,7 @@ claude_settings_load <- function(setting_sources, working_dir = getwd()) {
       memory = character(),
       skills = list(),
       commands = list(),
+      agents = list(),
       sources = list()
     ))
   }
@@ -35,12 +39,14 @@ claude_settings_load <- function(setting_sources, working_dir = getwd()) {
   memory <- load_memory_files(resolved$memory_files)
   skills <- load_skills_from_dirs(resolved$skill_dirs)
   commands <- load_commands_from_dirs(resolved$command_dirs)
+  agents <- load_agents_from_dirs(resolved$agent_dirs, skills = skills)
 
   list(
     settings = settings,
     memory = memory,
     skills = skills,
     commands = commands,
+    agents = agents,
     sources = resolved
   )
 }
@@ -56,6 +62,8 @@ claude_settings_load <- function(setting_sources, working_dir = getwd()) {
 #' @param apply_memory Logical. If TRUE (default), append memory to system prompt.
 #' @param load_skills Logical. If TRUE (default), load skills into the agent.
 #' @param load_commands Logical. If TRUE (default), register slash commands.
+#' @param load_agents Logical. If TRUE (default), register settings-defined
+#'   agents on [LeadAgent] objects.
 #'
 #' @return Invisibly returns the agent.
 #' @export
@@ -64,7 +72,8 @@ claude_settings_apply <- function(
   settings,
   apply_memory = TRUE,
   load_skills = TRUE,
-  load_commands = TRUE
+  load_commands = TRUE,
+  load_agents = TRUE
 ) {
   if (!inherits(agent, "Agent")) {
     cli::cli_abort("{.arg agent} must be an Agent object")
@@ -104,6 +113,19 @@ claude_settings_apply <- function(
       agent$.__enclos_env__$private$slash_commands_data,
       settings$commands
     )
+  }
+
+  if (isTRUE(load_agents) && length(settings$agents) > 0) {
+    if (inherits(agent, "LeadAgent")) {
+      for (definition in settings$agents) {
+        agent$register_sub_agent(definition)
+      }
+    } else {
+      cli::cli_warn(c(
+        "Settings include custom agents but {.cls {class(agent)}} does not support delegation",
+        "i" = "Use LeadAgent or ClaudeSDKClient to activate .claude/agents definitions"
+      ))
+    }
   }
 
   # Apply settings-based tool gating to permissions
@@ -278,6 +300,7 @@ resolve_setting_sources <- function(setting_sources, working_dir) {
   memory_files <- character()
   skill_dirs <- character()
   command_dirs <- character()
+  agent_dirs <- character()
 
   working_dir <- normalizePath(working_dir, mustWork = TRUE)
   user_root <- path.expand("~/.claude")
@@ -299,6 +322,7 @@ resolve_setting_sources <- function(setting_sources, working_dir) {
         command_dirs,
         file.path(working_dir, ".claude", "commands")
       )
+      agent_dirs <- c(agent_dirs, file.path(working_dir, ".claude", "agents"))
       next
     }
 
@@ -307,6 +331,7 @@ resolve_setting_sources <- function(setting_sources, working_dir) {
       memory_files <- c(memory_files, file.path(user_root, "CLAUDE.md"))
       skill_dirs <- c(skill_dirs, file.path(user_root, "skills"))
       command_dirs <- c(command_dirs, file.path(user_root, "commands"))
+      agent_dirs <- c(agent_dirs, file.path(user_root, "agents"))
       next
     }
 
@@ -318,7 +343,8 @@ resolve_setting_sources <- function(setting_sources, working_dir) {
     settings_files = unique(stats::na.omit(settings_files)),
     memory_files = unique(stats::na.omit(memory_files)),
     skill_dirs = unique(stats::na.omit(skill_dirs)),
-    command_dirs = unique(stats::na.omit(command_dirs))
+    command_dirs = unique(stats::na.omit(command_dirs)),
+    agent_dirs = unique(stats::na.omit(agent_dirs))
   )
 }
 
@@ -466,6 +492,67 @@ load_slash_command <- function(path) {
     prompt = body,
     aliases = aliases,
     source = path
+  )
+}
+
+# Load custom agents from directories.
+load_agents_from_dirs <- function(dirs, skills = list()) {
+  agents <- list()
+  for (dir in dirs) {
+    if (!dir.exists(dir)) {
+      next
+    }
+
+    files <- list.files(dir, pattern = "\\.md$", full.names = TRUE)
+    for (path in files) {
+      definition <- tryCatch(
+        load_custom_agent_definition(path, skills = skills),
+        error = function(e) {
+          cli::cli_warn(c(
+            "Failed to load custom agent from {.path {path}}",
+            "x" = e$message
+          ))
+          NULL
+        }
+      )
+
+      if (!is.null(definition)) {
+        agents[[definition$name]] <- definition
+      }
+    }
+  }
+
+  agents
+}
+
+# Parse a .claude/agents markdown file into an AgentDefinition.
+load_custom_agent_definition <- function(path, skills = list()) {
+  parsed <- parse_markdown_frontmatter(path)
+  meta <- parsed$meta
+
+  name <- meta$name %||% tools::file_path_sans_ext(basename(path))
+  description <- meta$description %||% ""
+  model <- meta$model %||% "inherit"
+
+  tool_names <- meta$tools %||% list()
+  tools <- compat_resolve_named_tools(tool_names)
+
+  skill_names <- meta$skills %||% list()
+  skill_names <- trimws(as.character(unlist(
+    skill_names,
+    recursive = TRUE,
+    use.names = FALSE
+  )))
+  skill_names <- skill_names[nzchar(skill_names)]
+  resolved_skills <- unname(Filter(Negate(is.null), skills[skill_names]))
+
+  agent_definition(
+    name = name,
+    description = description,
+    prompt = parsed$body,
+    tools = tools,
+    model = model,
+    skills = resolved_skills
   )
 }
 

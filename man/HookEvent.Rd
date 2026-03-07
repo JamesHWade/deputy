@@ -5,7 +5,7 @@
 \alias{HookEvent}
 \title{Hook events supported by deputy}
 \format{
-An object of class \code{character} of length 8.
+An object of class \code{character} of length 9.
 }
 \usage{
 HookEvent
@@ -67,6 +67,16 @@ Callback signature: \verb{function(prompt, context)}
 \item Return: NULL (informational only)
 }
 
+\strong{Notification} - Informational runtime notice
+
+Callback signature: \verb{function(message, context)}
+\itemize{
+\item \code{message}: The notification text (character)
+\item \code{context}: List containing \code{working_dir}, \code{level}, \code{code}, and any
+event-specific metadata
+\item Return: NULL (informational only)
+}
+
 \strong{PreCompact} - Before conversation compaction
 
 Callback signature: \verb{function(turns_to_compact, turns_to_keep, context)}
@@ -105,6 +115,8 @@ The context parameter is always a named list. Common fields:
 \item \code{total_turns}: (Stop, PreCompact, SessionEnd) Number of turns in the conversation
 \item \code{cost}: (Stop, SessionEnd) List with \code{total}, \code{input_tokens}, \code{output_tokens}
 \item \code{compact_count}: (PreCompact only) Number of turns being compacted
+\item \code{level}: (Notification only) Informational severity such as \code{"info"} or \code{"warning"}
+\item \code{code}: (Notification only) Stable notification code when available
 \item \code{permissions}: (SessionStart only) The agent's permissions configuration
 \item \code{provider}: (SessionStart only) List with \code{name} and \code{model}
 \item \code{tools_count}: (SessionStart only) Number of registered tools

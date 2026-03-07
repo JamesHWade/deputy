@@ -125,6 +125,201 @@ convert_to_markdown_markitdown <- function(path) {
   text
 }
 
+# Count fixed-string matches in text.
+count_fixed_matches <- function(text, pattern) {
+  matches <- gregexpr(pattern, text, fixed = TRUE)[[1]]
+  if (length(matches) == 1 && identical(matches[[1]], -1L)) {
+    return(0L)
+  }
+  length(matches)
+}
+
+# Apply a fixed-string replacement with safety checks for edit tools.
+replace_fixed_text <- function(text, old_text, new_text, replace_all = FALSE) {
+  if (!nzchar(old_text)) {
+    stop("old_text must not be empty")
+  }
+
+  occurrences <- count_fixed_matches(text, old_text)
+  if (occurrences == 0L) {
+    stop("old_text was not found in the file")
+  }
+
+  if (!isTRUE(replace_all) && occurrences > 1L) {
+    stop("old_text matched multiple locations; set replace_all = TRUE")
+  }
+
+  updated <- if (isTRUE(replace_all)) {
+    gsub(old_text, new_text, text, fixed = TRUE)
+  } else {
+    sub(old_text, new_text, text, fixed = TRUE)
+  }
+
+  list(
+    text = updated,
+    replacements = if (isTRUE(replace_all)) occurrences else 1L
+  )
+}
+
+# Parse multi-edit operations from a list or JSON string.
+parse_multi_edits <- function(edits) {
+  parsed <- edits
+
+  if (is.character(edits) && length(edits) == 1) {
+    if (!rlang::is_installed("jsonlite")) {
+      stop("Parsing JSON edits requires package 'jsonlite'.")
+    }
+
+    parsed <- tryCatch(
+      jsonlite::fromJSON(edits, simplifyVector = FALSE),
+      error = function(e) {
+        stop("Could not parse edits JSON: ", e$message)
+      }
+    )
+  }
+
+  if (!is.list(parsed) || length(parsed) == 0) {
+    stop("edits must be a non-empty list or JSON array")
+  }
+
+  lapply(seq_along(parsed), function(i) {
+    edit <- parsed[[i]]
+    if (!is.list(edit)) {
+      stop("Edit ", i, " must be an object")
+    }
+
+    old_text <- edit$old_text %||% edit$old_string
+    new_text <- edit$new_text %||% edit$new_string
+    replace_all <- isTRUE(edit$replace_all %||% edit$replaceAll)
+
+    if (is.null(old_text) || is.null(new_text)) {
+      stop("Edit ", i, " must include old_text/new_text")
+    }
+
+    list(
+      old_text = as.character(old_text[[1]]),
+      new_text = as.character(new_text[[1]]),
+      replace_all = replace_all
+    )
+  })
+}
+
+# Convert a glob pattern to a regex with basic ** support.
+glob_pattern_to_regex <- function(pattern) {
+  placeholder <- "<<DEPUTY_GLOBSTAR>>"
+  regex <- pattern
+  regex <- gsub("\\*\\*", placeholder, regex)
+  regex <- gsub("([][{}()+^$.|\\\\])", "\\\\\\1", regex, perl = TRUE)
+  regex <- gsub("\\*", "[^/]*", regex)
+  regex <- gsub("\\?", "[^/]", regex)
+  regex <- gsub(placeholder, ".*", regex, fixed = TRUE)
+  paste0("^", regex, "$")
+}
+
+# List files relative to a base directory using a glob-style filter.
+glob_relative_paths <- function(path = ".", pattern = "*", recursive = TRUE) {
+  if (!dir.exists(path)) {
+    stop("Directory not found: ", path)
+  }
+
+  base <- normalizePath(path, mustWork = TRUE)
+  paths <- list.files(
+    base,
+    recursive = recursive,
+    full.names = TRUE,
+    include.dirs = TRUE,
+    all.files = TRUE,
+    no.. = TRUE
+  )
+
+  if (length(paths) == 0) {
+    return(character())
+  }
+
+  rel <- substring(paths, nchar(base) + 2L)
+  rel <- rel[nzchar(rel)]
+
+  matches <- grepl(glob_pattern_to_regex(pattern), rel, perl = TRUE)
+  sort(rel[matches])
+}
+
+# Normalize todo items from list or JSON input.
+normalize_todo_items <- function(todos) {
+  parsed <- todos
+
+  if (is.character(todos) && length(todos) == 1) {
+    if (!rlang::is_installed("jsonlite")) {
+      stop("Parsing JSON todos requires package 'jsonlite'.")
+    }
+
+    parsed <- tryCatch(
+      jsonlite::fromJSON(todos, simplifyVector = FALSE),
+      error = function(e) {
+        stop("Could not parse todos JSON: ", e$message)
+      }
+    )
+  }
+
+  if (is.list(parsed) && !is.null(parsed$items)) {
+    parsed <- parsed$items
+  }
+
+  if (!is.list(parsed)) {
+    stop("todos must be a list or JSON array")
+  }
+
+  lapply(seq_along(parsed), function(i) {
+    item <- parsed[[i]]
+    if (!is.list(item)) {
+      stop("Todo ", i, " must be an object")
+    }
+
+    content <- item$content %||% item$text %||% item$description
+    if (is.null(content) || !nzchar(as.character(content[[1]]))) {
+      stop("Todo ", i, " must include non-empty content")
+    }
+
+    list(
+      id = as.character(item$id %||% paste0("todo-", i))[[1]],
+      content = as.character(content[[1]]),
+      status = as.character(item$status %||% "pending")[[1]],
+      priority = as.character(item$priority %||% NA_character_)[[1]]
+    )
+  })
+}
+
+# Read todos from disk.
+read_todo_file <- function(path) {
+  if (!file.exists(path)) {
+    return(list())
+  }
+
+  if (!rlang::is_installed("jsonlite")) {
+    stop("Reading todo files requires package 'jsonlite'.")
+  }
+
+  payload <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+  payload$items %||% payload
+}
+
+# Persist todos to disk.
+write_todo_file <- function(path, items) {
+  if (!rlang::is_installed("jsonlite")) {
+    stop("Writing todo files requires package 'jsonlite'.")
+  }
+
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  jsonlite::write_json(
+    list(
+      updated_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+      items = items
+    ),
+    path = path,
+    auto_unbox = TRUE,
+    pretty = TRUE
+  )
+}
+
 #' Read file contents
 #'
 #' @description
@@ -324,6 +519,129 @@ tool_write_file <- ellmer::tool(
   )
 )
 
+#' Edit file contents by replacing text
+#'
+#' @description
+#' Replace a specific text span in an existing file.
+#'
+#' @format A tool definition created with `ellmer::tool()`.
+#'
+#' @param path Path to the file to edit (tool argument)
+#' @param old_text Existing text to replace (tool argument)
+#' @param new_text Replacement text (tool argument)
+#' @param replace_all If TRUE, replace all matches instead of requiring a
+#'   unique match (tool argument)
+#'
+#' @export
+tool_edit_file <- ellmer::tool(
+  fun = function(path, old_text, new_text, replace_all = FALSE) {
+    if (!file.exists(path)) {
+      ellmer::tool_reject(paste("File not found:", path))
+    }
+
+    tryCatch(
+      {
+        original <- paste(readLines(path, warn = FALSE), collapse = "\n")
+        updated <- replace_fixed_text(
+          original,
+          old_text = old_text,
+          new_text = new_text,
+          replace_all = replace_all
+        )
+        writeLines(updated$text, path)
+
+        paste(
+          "Successfully edited",
+          path,
+          sprintf("(%s replacement%s)", updated$replacements, if (updated$replacements == 1L) "" else "s")
+        )
+      },
+      error = function(e) {
+        ellmer::tool_reject(paste("Error editing file:", e$message))
+      }
+    )
+  },
+  name = "edit_file",
+  description = "Replace text in an existing file. By default the target text must appear exactly once.",
+  arguments = list(
+    path = ellmer::type_string("Path to the file to edit"),
+    old_text = ellmer::type_string("Existing text to replace"),
+    new_text = ellmer::type_string("Replacement text"),
+    replace_all = ellmer::type_boolean(
+      "If TRUE, replace every occurrence of old_text. Default is FALSE.",
+      required = FALSE
+    )
+  ),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = FALSE,
+    destructive_hint = TRUE
+  )
+)
+
+#' Apply multiple text edits to a file
+#'
+#' @description
+#' Apply a sequence of exact-match text replacements to a file.
+#'
+#' @format A tool definition created with `ellmer::tool()`.
+#'
+#' @param path Path to the file to edit (tool argument)
+#' @param edits List or JSON string of edit operations (tool argument)
+#'
+#' @export
+tool_multi_edit <- ellmer::tool(
+  fun = function(path, edits) {
+    if (!file.exists(path)) {
+      ellmer::tool_reject(paste("File not found:", path))
+    }
+
+    tryCatch(
+      {
+        operations <- parse_multi_edits(edits)
+        text <- paste(readLines(path, warn = FALSE), collapse = "\n")
+        total_replacements <- 0L
+
+        for (edit in operations) {
+          result <- replace_fixed_text(
+            text,
+            old_text = edit$old_text,
+            new_text = edit$new_text,
+            replace_all = edit$replace_all
+          )
+          text <- result$text
+          total_replacements <- total_replacements + result$replacements
+        }
+
+        writeLines(text, path)
+
+        paste(
+          "Successfully applied",
+          length(operations),
+          "edit(s) to",
+          path,
+          sprintf("(%s total replacement%s)", total_replacements, if (total_replacements == 1L) "" else "s")
+        )
+      },
+      error = function(e) {
+        ellmer::tool_reject(paste("Error applying edits:", e$message))
+      }
+    )
+  },
+  name = "multi_edit",
+  description = "Apply multiple exact-match text replacements to a file. Edits can be provided as a list or JSON string.",
+  arguments = list(
+    path = ellmer::type_string("Path to the file to edit"),
+    edits = ellmer::type_string(
+      "JSON array or structured list of edit operations with old_text/new_text.",
+      required = FALSE
+    )
+  ),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = FALSE,
+    destructive_hint = TRUE
+  )
+)
+
 #' List files in a directory
 #'
 #' @description
@@ -420,6 +738,187 @@ tool_list_files <- ellmer::tool(
     ),
     full_names = ellmer::type_boolean(
       "If TRUE, return full paths. Default is FALSE.",
+      required = FALSE
+    )
+  ),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = TRUE,
+    destructive_hint = FALSE
+  )
+)
+
+#' Find files using a glob pattern
+#'
+#' @description
+#' Search for files under a directory using shell-style glob matching.
+#'
+#' @format A tool definition created with `ellmer::tool()`.
+#'
+#' @param pattern Glob pattern to match (tool argument)
+#' @param path Base directory to search (tool argument)
+#' @param recursive If TRUE, search subdirectories recursively (tool argument)
+#'
+#' @export
+tool_glob_files <- ellmer::tool(
+  fun = function(pattern = "*", path = ".", recursive = TRUE) {
+    tryCatch(
+      {
+        matches <- glob_relative_paths(
+          path = path,
+          pattern = pattern,
+          recursive = recursive
+        )
+
+        if (length(matches) == 0) {
+          return(paste("No files matched pattern", shQuote(pattern)))
+        }
+
+        paste(
+          c(
+            paste("Base path:", path),
+            paste("Matches:", length(matches)),
+            "",
+            matches
+          ),
+          collapse = "\n"
+        )
+      },
+      error = function(e) {
+        ellmer::tool_reject(paste("Error globbing files:", e$message))
+      }
+    )
+  },
+  name = "glob_files",
+  description = "Find files matching a glob pattern under a base directory.",
+  arguments = list(
+    pattern = ellmer::type_string("Glob pattern to match"),
+    path = ellmer::type_string(
+      "Base directory to search. Default is current directory.",
+      required = FALSE
+    ),
+    recursive = ellmer::type_boolean(
+      "If TRUE, search recursively. Default is TRUE.",
+      required = FALSE
+    )
+  ),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = TRUE,
+    destructive_hint = FALSE
+  )
+)
+
+#' Search file contents with grep-like matching
+#'
+#' @description
+#' Search text files under a directory and return matching lines.
+#'
+#' @format A tool definition created with `ellmer::tool()`.
+#'
+#' @param pattern Regex pattern to search for (tool argument)
+#' @param path Base directory to search (tool argument)
+#' @param recursive If TRUE, search subdirectories recursively (tool argument)
+#' @param ignore_case If TRUE, ignore case when matching (tool argument)
+#' @param max_matches Maximum matching lines to return (tool argument)
+#'
+#' @export
+tool_grep_files <- ellmer::tool(
+  fun = function(
+    pattern,
+    path = ".",
+    recursive = TRUE,
+    ignore_case = FALSE,
+    max_matches = 100
+  ) {
+    tryCatch(
+      {
+        rel_paths <- glob_relative_paths(
+          path = path,
+          pattern = if (isTRUE(recursive)) "**" else "*",
+          recursive = recursive
+        )
+
+        if (length(rel_paths) == 0) {
+          return("No files available to search")
+        }
+
+        max_matches <- as.integer(max_matches %||% 100L)
+        if (is.na(max_matches) || max_matches < 1L) {
+          max_matches <- 100L
+        }
+
+        hits <- character()
+        base <- normalizePath(path, mustWork = TRUE)
+
+        for (rel_path in rel_paths) {
+          full_path <- file.path(base, rel_path)
+          if (isTRUE(file.info(full_path)$isdir)) {
+            next
+          }
+
+          lines <- tryCatch(
+            readLines(full_path, warn = FALSE),
+            error = function(e) NULL
+          )
+          if (is.null(lines) || length(lines) == 0) {
+            next
+          }
+
+          matched <- grep(pattern, lines, ignore.case = ignore_case, perl = TRUE)
+          if (length(matched) == 0) {
+            next
+          }
+
+          entries <- vapply(
+            matched,
+            function(i) {
+              sprintf("%s:%d: %s", rel_path, i, lines[[i]])
+            },
+            character(1)
+          )
+          hits <- c(hits, entries)
+          if (length(hits) >= max_matches) {
+            hits <- hits[seq_len(max_matches)]
+            break
+          }
+        }
+
+        if (length(hits) == 0) {
+          return(paste("No matches found for pattern", shQuote(pattern)))
+        }
+
+        paste(
+          c(
+            paste("Pattern:", pattern),
+            paste("Matches:", length(hits)),
+            "",
+            hits
+          ),
+          collapse = "\n"
+        )
+      },
+      error = function(e) {
+        ellmer::tool_reject(paste("Error searching files:", e$message))
+      }
+    )
+  },
+  name = "grep_files",
+  description = "Search file contents with a regex pattern and return matching lines.",
+  arguments = list(
+    pattern = ellmer::type_string("Regex pattern to search for"),
+    path = ellmer::type_string(
+      "Base directory to search. Default is current directory.",
+      required = FALSE
+    ),
+    recursive = ellmer::type_boolean(
+      "If TRUE, search recursively. Default is TRUE.",
+      required = FALSE
+    ),
+    ignore_case = ellmer::type_boolean(
+      "If TRUE, ignore case while matching. Default is FALSE.",
+      required = FALSE
+    ),
+    max_matches = ellmer::type_integer(
+      "Maximum matching lines to return. Default is 100.",
       required = FALSE
     )
   ),
@@ -716,5 +1215,90 @@ tool_read_csv <- ellmer::tool(
   annotations = ellmer::tool_annotations(
     read_only_hint = TRUE,
     destructive_hint = FALSE
+  )
+)
+
+#' Read persisted todo items
+#'
+#' @description
+#' Read a JSON todo list used by compatibility workflows.
+#'
+#' @format A tool definition created with `ellmer::tool()`.
+#'
+#' @param path Path to the todo file (tool argument)
+#'
+#' @export
+tool_todo_read <- ellmer::tool(
+  fun = function(path = ".deputy/todos.json") {
+    tryCatch(
+      {
+        list(
+          path = normalizePath(path, mustWork = FALSE),
+          items = read_todo_file(path)
+        )
+      },
+      error = function(e) {
+        ellmer::tool_reject(paste("Error reading todos:", e$message))
+      }
+    )
+  },
+  name = "todo_read",
+  description = "Read the current todo list from disk.",
+  arguments = list(
+    path = ellmer::type_string(
+      "Path to the todo file. Default is .deputy/todos.json.",
+      required = FALSE
+    )
+  ),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = TRUE,
+    destructive_hint = FALSE
+  )
+)
+
+#' Write persisted todo items
+#'
+#' @description
+#' Replace the current JSON todo list used by compatibility workflows.
+#'
+#' @format A tool definition created with `ellmer::tool()`.
+#'
+#' @param todos List or JSON array of todo items (tool argument)
+#' @param path Path to the todo file (tool argument)
+#'
+#' @export
+tool_todo_write <- ellmer::tool(
+  fun = function(todos, path = ".deputy/todos.json") {
+    tryCatch(
+      {
+        items <- normalize_todo_items(todos)
+        write_todo_file(path, items)
+
+        list(
+          path = normalizePath(path, mustWork = FALSE),
+          count = length(items),
+          items = items
+        )
+      },
+      error = function(e) {
+        ellmer::tool_reject(paste("Error writing todos:", e$message))
+      }
+    )
+  },
+  name = "todo_write",
+  description = "Replace the current todo list on disk with the provided items.",
+  arguments = list(
+    todos = ellmer::type_string(
+      "JSON array or structured list of todo items.",
+      required = FALSE
+    ),
+    path = ellmer::type_string(
+      "Path to the todo file. Default is .deputy/todos.json.",
+      required = FALSE
+    )
+  ),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = FALSE,
+    destructive_hint = TRUE
   )
 )

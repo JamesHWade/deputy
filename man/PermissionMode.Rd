@@ -5,7 +5,7 @@
 \alias{PermissionMode}
 \title{Permission modes for agent tool access}
 \format{
-An object of class \code{character} of length 4.
+An object of class \code{character} of length 5.
 }
 \usage{
 PermissionMode
@@ -15,6 +15,7 @@ Permission modes control the overall behavior of tool permission checking:
 \itemize{
 \item \code{"default"} - Check each tool against the permission policy
 \item \code{"acceptEdits"} - Auto-accept file write tools
+\item \code{"plan"} - Allow only annotated read-only tools and human approval prompts
 \item \code{"readonly"} - Deny all write/execute tools
 \item \code{"bypassPermissions"} - Allow all tools (dangerous, use with caution)
 }

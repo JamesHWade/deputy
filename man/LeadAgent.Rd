@@ -33,6 +33,7 @@ sub-agents based on registered AgentDefinitions.
 <ul>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href='../../deputy/html/Agent.html#method-Agent-add_hook'><code>deputy::Agent$add_hook()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href='../../deputy/html/Agent.html#method-Agent-compact'><code>deputy::Agent$compact()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="configure_sdk_compat"><a href='../../deputy/html/Agent.html#method-Agent-configure_sdk_compat'><code>deputy::Agent$configure_sdk_compat()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href='../../deputy/html/Agent.html#method-Agent-cost'><code>deputy::Agent$cost()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_turn"><a href='../../deputy/html/Agent.html#method-Agent-last_turn'><code>deputy::Agent$last_turn()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_mcp"><a href='../../deputy/html/Agent.html#method-Agent-load_mcp'><code>deputy::Agent$load_mcp()</code></a></span></li>
@@ -46,6 +47,7 @@ sub-agents based on registered AgentDefinitions.
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_shiny"><a href='../../deputy/html/Agent.html#method-Agent-run_shiny'><code>deputy::Agent$run_shiny()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_sync"><a href='../../deputy/html/Agent.html#method-Agent-run_sync'><code>deputy::Agent$run_sync()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="save_session"><a href='../../deputy/html/Agent.html#method-Agent-save_session'><code>deputy::Agent$save_session()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="session_id"><a href='../../deputy/html/Agent.html#method-Agent-session_id'><code>deputy::Agent$session_id()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="settings"><a href='../../deputy/html/Agent.html#method-Agent-settings'><code>deputy::Agent$settings()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="skills"><a href='../../deputy/html/Agent.html#method-Agent-skills'><code>deputy::Agent$skills()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="slash_commands"><a href='../../deputy/html/Agent.html#method-Agent-slash_commands'><code>deputy::Agent$slash_commands()</code></a></span></li>
@@ -65,7 +67,9 @@ Create a new LeadAgent.
   tools = list(),
   system_prompt = NULL,
   permissions = NULL,
-  working_dir = getwd()
+  working_dir = getwd(),
+  setting_sources = NULL,
+  settings = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -83,6 +87,10 @@ Create a new LeadAgent.
 \item{\code{permissions}}{Permissions for the lead agent (also applied to sub-agents)}
 
 \item{\code{working_dir}}{Working directory}
+
+\item{\code{setting_sources}}{Optional Claude-style setting sources}
+
+\item{\code{settings}}{Optional pre-loaded settings list from claude_settings_load()}
 }
 \if{html}{\out{</div>}}
 }
