@@ -19,6 +19,37 @@ test_that("Agent initializes with custom permissions", {
   expect_equal(agent$permissions$mode, "readonly")
 })
 
+test_that("Agent core fields are immutable after construction", {
+  mock_chat <- create_mock_chat()
+  agent <- Agent$new(chat = mock_chat)
+
+  original_permissions <- agent$permissions
+  original_hooks <- agent$hooks
+  original_working_dir <- agent$working_dir
+
+  expect_error(
+    agent$chat <- create_mock_chat(),
+    "immutable after construction"
+  )
+  expect_error(
+    agent$permissions <- permissions_readonly(),
+    "immutable after construction"
+  )
+  expect_error(
+    agent$working_dir <- tempdir(),
+    "immutable after construction"
+  )
+  expect_error(
+    agent$hooks <- HookRegistry$new(),
+    "immutable after construction"
+  )
+
+  expect_identical(agent$chat, mock_chat)
+  expect_identical(agent$permissions, original_permissions)
+  expect_identical(agent$hooks, original_hooks)
+  expect_identical(agent$working_dir, original_working_dir)
+})
+
 test_that("Agent initializes with tools", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(
@@ -140,12 +171,16 @@ test_that("Agent save_session creates file", {
 
 test_that("Agent load_session restores state", {
   mock_chat <- create_mock_chat()
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  saved_working_dir <- file.path(temp_dir, "saved-session-dir")
+  dir.create(saved_working_dir)
   agent1 <- Agent$new(
     chat = mock_chat,
-    system_prompt = "Test prompt"
+    system_prompt = "Test prompt",
+    permissions = permissions_readonly(max_turns = 10),
+    working_dir = saved_working_dir
   )
 
-  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
   session_file <- file.path(temp_dir, "session.rds")
 
   agent1$save_session(session_file)
@@ -156,6 +191,9 @@ test_that("Agent load_session restores state", {
   agent2$load_session(session_file)
 
   expect_equal(mock_chat2$get_system_prompt(), "Test prompt")
+  expect_equal(agent2$permissions$mode, "readonly")
+  expect_equal(agent2$permissions$max_turns, 10)
+  expect_equal(agent2$working_dir, saved_working_dir)
 })
 
 test_that("Agent load_session validates file exists", {

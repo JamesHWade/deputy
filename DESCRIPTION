@@ -23,6 +23,7 @@ Suggests:
     jsonlite,
     jsonvalidate,
     knitr,
+    later,
     mcptools,
     pdftools,
     promises,
