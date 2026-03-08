@@ -1415,8 +1415,8 @@ Agent <- R6::R6Class(
               stop_reason <- "cost_limit"
               break
             }
-          if (
-            !is.na(current_cost) &&
+            if (
+              !is.na(current_cost) &&
                 current_cost >= agent$permissions$max_cost_usd * 0.9
             ) {
               agent$.__enclos_env__$private$notify(

@@ -174,7 +174,10 @@ session_store_select_snapshot <- function(root, session_id, at = NULL) {
     list(
       path = path,
       payload = payload,
-      snapshot_at = as.POSIXct(session_store_payload_time(payload, path), tz = "UTC")
+      snapshot_at = as.POSIXct(
+        session_store_payload_time(payload, path),
+        tz = "UTC"
+      )
     )
   })
 
@@ -182,9 +185,12 @@ session_store_select_snapshot <- function(root, session_id, at = NULL) {
     return(payloads[[length(payloads)]])
   }
 
-  eligible <- Filter(function(x) {
-    !is.na(x$snapshot_at) && x$snapshot_at <= requested_at
-  }, payloads)
+  eligible <- Filter(
+    function(x) {
+      !is.na(x$snapshot_at) && x$snapshot_at <= requested_at
+    },
+    payloads
+  )
 
   if (length(eligible) == 0) {
     abort_session_load(
@@ -218,7 +224,11 @@ session_store_list_sessions <- function(root = NULL) {
     ))
   }
 
-  session_dirs <- sort(list.dirs(store_dir, recursive = FALSE, full.names = TRUE))
+  session_dirs <- sort(list.dirs(
+    store_dir,
+    recursive = FALSE,
+    full.names = TRUE
+  ))
   if (length(session_dirs) == 0) {
     return(data.frame(
       session_id = character(),

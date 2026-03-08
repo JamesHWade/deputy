@@ -327,10 +327,18 @@ compat_resolve_named_tools <- function(tool_names, task_tool = NULL) {
   }
 
   normalized <- tool_names
-  if (is.character(normalized) && length(normalized) == 1 && grepl(",", normalized)) {
+  if (
+    is.character(normalized) &&
+      length(normalized) == 1 &&
+      grepl(",", normalized)
+  ) {
     normalized <- strsplit(normalized, ",", fixed = TRUE)[[1]]
   }
-  normalized <- trimws(as.character(unlist(normalized, recursive = TRUE, use.names = FALSE)))
+  normalized <- trimws(as.character(unlist(
+    normalized,
+    recursive = TRUE,
+    use.names = FALSE
+  )))
   normalized <- normalized[nzchar(normalized)]
 
   registry <- compat_named_tool_registry(task_tool = task_tool)
@@ -381,7 +389,9 @@ validate_compat_hooks <- function(hooks) {
   }
 
   if (!is.list(hooks)) {
-    cli::cli_abort("{.arg hooks} must be a HookMatcher or list of HookMatcher objects")
+    cli::cli_abort(
+      "{.arg hooks} must be a HookMatcher or list of HookMatcher objects"
+    )
   }
 
   invalid <- !vapply(hooks, inherits, logical(1), what = "HookMatcher")
@@ -635,17 +645,21 @@ claude_sdk_options <- function(
     cli::cli_abort("{.arg agents} must be a list of AgentDefinition objects")
   }
   if (length(agents) > 0) {
-    invalid_agents <- !vapply(agents, inherits, logical(1), what = "AgentDefinition")
+    invalid_agents <- !vapply(
+      agents,
+      inherits,
+      logical(1),
+      what = "AgentDefinition"
+    )
     if (any(invalid_agents)) {
       cli::cli_abort("{.arg agents} must contain only AgentDefinition objects")
     }
   }
 
-  if (!permission_mode %in% PermissionMode) {
-    cli::cli_abort(
-      "{.arg permission_mode} must be one of {.val {PermissionMode}}"
-    )
-  }
+  permission_mode <- validate_permission_mode_value(
+    permission_mode,
+    arg = "permission_mode"
+  )
 
   if (!is.null(setting_sources) && !is.character(setting_sources)) {
     cli::cli_abort("{.arg setting_sources} must be NULL or a character vector")
@@ -698,7 +712,9 @@ ClaudeSDKClient <- R6::R6Class(
     #' @param options Claude SDK compatibility options
     initialize = function(options = claude_sdk_options()) {
       if (!inherits(options, "ClaudeSDKOptions")) {
-        cli::cli_abort("{.arg options} must be created with claude_sdk_options()")
+        cli::cli_abort(
+          "{.arg options} must be created with claude_sdk_options()"
+        )
       }
 
       self$options <- options
@@ -759,7 +775,11 @@ ClaudeSDKClient <- R6::R6Class(
         self$agent$load_session(snapshot$path)
       )
 
-      active_session_id <- if (isTRUE(fork)) generate_session_id() else session_id
+      active_session_id <- if (isTRUE(fork)) {
+        generate_session_id()
+      } else {
+        session_id
+      }
       self$options$session_id <- active_session_id
       self$agent$configure_sdk_compat(list(
         persist_session = self$options$persist_session,

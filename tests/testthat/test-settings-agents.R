@@ -22,7 +22,11 @@ test_that("claude_settings_load returns custom agents from .claude/agents", {
 
   expect_true("reviewer" %in% names(settings$agents))
   expect_s3_class(settings$agents$reviewer, "AgentDefinition")
-  tool_names <- vapply(settings$agents$reviewer$tools, function(x) x@name, character(1))
+  tool_names <- vapply(
+    settings$agents$reviewer$tools,
+    function(x) x@name,
+    character(1)
+  )
   expect_setequal(tool_names, c("Read", "Grep"))
 })
 

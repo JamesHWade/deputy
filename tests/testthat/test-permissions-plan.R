@@ -14,6 +14,22 @@ test_that("permissions_plan creates compat planning permissions", {
   expect_equal(perms$max_cost_usd, 0.25)
 })
 
+test_that("permission mode validation rejects unknown CLI values", {
+  expect_equal(
+    validate_permission_mode_value("plan", allow_cli_aliases = TRUE),
+    "plan"
+  )
+  expect_equal(
+    validate_permission_mode_value("standard", allow_cli_aliases = TRUE),
+    "standard"
+  )
+
+  expect_error(
+    validate_permission_mode_value("readOnly", allow_cli_aliases = TRUE),
+    "must be one of"
+  )
+})
+
 test_that("plan mode allows only annotated read-only tools", {
   perms <- permissions_plan()
 
@@ -27,10 +43,12 @@ test_that("plan mode allows only annotated read-only tools", {
   destructive <- perms$check(
     "custom_edit",
     list(),
-    list(tool_annotations = list(
-      read_only_hint = FALSE,
-      destructive_hint = TRUE
-    ))
+    list(
+      tool_annotations = list(
+        read_only_hint = FALSE,
+        destructive_hint = TRUE
+      )
+    )
   )
   expect_s3_class(destructive, "PermissionResultDeny")
   expect_match(destructive$reason, "destructive", ignore.case = TRUE)

@@ -45,6 +45,18 @@ test_that("tool_glob_files and tool_grep_files search files", {
   expect_match(grepped, "app.R:1")
 })
 
+test_that("tool_glob_files matches nested basenames in recursive mode", {
+  withr::local_tempdir(pattern = "deputy-search") -> temp_dir
+  dir.create(file.path(temp_dir, "R"), recursive = TRUE)
+  writeLines("print('hello')", file.path(temp_dir, "R", "app.R"))
+  writeLines("cat('hi')", file.path(temp_dir, "script.R"))
+
+  globbed <- tool_glob_files(pattern = "*.R", path = temp_dir, recursive = TRUE)
+
+  expect_match(globbed, "R/app.R")
+  expect_match(globbed, "script.R")
+})
+
 test_that("todo tools round-trip JSON todo items", {
   withr::local_tempdir(pattern = "deputy-todo") -> temp_dir
   path <- file.path(temp_dir, "todos.json")

@@ -239,7 +239,14 @@ glob_relative_paths <- function(path = ".", pattern = "*", recursive = TRUE) {
   rel <- substring(paths, nchar(base) + 2L)
   rel <- rel[nzchar(rel)]
 
-  matches <- grepl(glob_pattern_to_regex(pattern), rel, perl = TRUE)
+  regex <- glob_pattern_to_regex(pattern)
+  matches <- grepl(regex, rel, perl = TRUE)
+
+  # In recursive mode, bare patterns like "*.R" should match nested basenames.
+  if (isTRUE(recursive) && !grepl("/", pattern, fixed = TRUE)) {
+    matches <- matches | grepl(regex, basename(rel), perl = TRUE)
+  }
+
   sort(rel[matches])
 }
 
@@ -553,7 +560,11 @@ tool_edit_file <- ellmer::tool(
         paste(
           "Successfully edited",
           path,
-          sprintf("(%s replacement%s)", updated$replacements, if (updated$replacements == 1L) "" else "s")
+          sprintf(
+            "(%s replacement%s)",
+            updated$replacements,
+            if (updated$replacements == 1L) "" else "s"
+          )
         )
       },
       error = function(e) {
@@ -619,7 +630,11 @@ tool_multi_edit <- ellmer::tool(
           length(operations),
           "edit(s) to",
           path,
-          sprintf("(%s total replacement%s)", total_replacements, if (total_replacements == 1L) "" else "s")
+          sprintf(
+            "(%s total replacement%s)",
+            total_replacements,
+            if (total_replacements == 1L) "" else "s"
+          )
         )
       },
       error = function(e) {
@@ -863,7 +878,12 @@ tool_grep_files <- ellmer::tool(
             next
           }
 
-          matched <- grep(pattern, lines, ignore.case = ignore_case, perl = TRUE)
+          matched <- grep(
+            pattern,
+            lines,
+            ignore.case = ignore_case,
+            perl = TRUE
+          )
           if (length(matched) == 0) {
             next
           }

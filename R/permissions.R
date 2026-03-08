@@ -75,6 +75,31 @@ PermissionMode <- c(
   "bypassPermissions"
 )
 
+# Validate a permission mode string, optionally allowing CLI aliases.
+validate_permission_mode_value <- function(
+  mode,
+  allow_cli_aliases = FALSE,
+  arg = "mode"
+) {
+  if (!is.character(mode) || length(mode) != 1 || is.na(mode)) {
+    cli_abort("{.arg {arg}} must be a length-1 character string")
+  }
+
+  valid_modes <- PermissionMode
+  if (isTRUE(allow_cli_aliases)) {
+    valid_modes <- c(valid_modes, "standard", "full")
+  }
+
+  if (!mode %in% valid_modes) {
+    cli_abort(c(
+      "Invalid permission mode: {.val {mode}}",
+      "i" = "{.arg {arg}} must be one of {.val {valid_modes}}"
+    ))
+  }
+
+  mode
+}
+
 #' Create an allow permission result
 #'
 #' @description
@@ -185,12 +210,7 @@ Permissions <- R6::R6Class(
       tool_denylist = NULL,
       permission_prompt_tool_name = NULL
     ) {
-      if (!mode %in% PermissionMode) {
-        cli_abort(c(
-          "Invalid permission mode: {.val {mode}}",
-          "i" = "Valid modes are: {.val {PermissionMode}}"
-        ))
-      }
+      mode <- validate_permission_mode_value(mode)
 
       if (!is.null(tool_allowlist) && !is.character(tool_allowlist)) {
         cli_abort("{.arg tool_allowlist} must be NULL or a character vector")
