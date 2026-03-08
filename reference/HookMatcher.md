@@ -3,24 +3,32 @@
 Defines when a hook callback should be triggered. Hooks can be filtered
 by event type and optionally by tool name pattern.
 
-## Public fields
+**Security Note:** Hook matcher configuration is read-only from the
+public API after construction so callbacks and matching rules cannot be
+swapped out accidentally at runtime.
+
+## Active bindings
 
 - `event`:
 
   The hook event type (see
-  [HookEvent](https://jameshwade.github.io/deputy/reference/HookEvent.md))
+  [HookEvent](https://jameshwade.github.io/deputy/reference/HookEvent.md)).
+  Read-only after construction.
 
 - `pattern`:
 
-  Optional regex pattern for tool name filtering
+  Optional regex pattern for tool name filtering. Read-only after
+  construction.
 
 - `callback`:
 
-  The function to call when the hook fires
+  The function to call when the hook fires. Read-only after
+  construction.
 
 - `timeout`:
 
-  Maximum execution time for the callback in seconds
+  Maximum execution time for the callback in seconds. Read-only after
+  construction.
 
 ## Methods
 

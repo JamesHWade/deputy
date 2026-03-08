@@ -5,6 +5,10 @@ tasks. Agent wraps an ellmer Chat object and adds agentic capabilities
 including multi-turn execution, permission enforcement, and streaming
 output.
 
+**Security Note:** Core agent fields are read-only from the public API
+after construction. Internal lifecycle methods may update the underlying
+state through private storage when required.
+
 ## Skill Methods
 
 The following methods manage skills:
@@ -38,23 +42,23 @@ The following methods manage MCP (Model Context Protocol) server tools:
 
   Get names of loaded MCP tools.
 
-## Public fields
+## Active bindings
 
 - `chat`:
 
-  The wrapped ellmer Chat object
+  The wrapped ellmer Chat object. Read-only after construction.
 
 - `permissions`:
 
-  Permission policy for the agent
+  Permission policy for the agent. Read-only after construction.
 
 - `working_dir`:
 
-  Working directory for file operations
+  Working directory for file operations. Read-only after construction.
 
 - `hooks`:
 
-  Hook registry for lifecycle events
+  Hook registry for lifecycle events. Read-only after construction.
 
 ## Methods
 
@@ -677,7 +681,7 @@ permissions, hooks, and tool call limits are still enforced via the
 
 #### Returns
 
-A promise that resolves when the stream is complete, suitable for
+An async content stream suitable for
 [`shinychat::chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
 
 ------------------------------------------------------------------------

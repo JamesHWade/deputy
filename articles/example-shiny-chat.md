@@ -18,6 +18,13 @@ turn-level controls like `max_turns` and `max_cost_usd`.
 shinychat understands while still enforcing deputy’s permissions, hooks,
 and limits.
 
+Following shinychat’s recommended pattern, pass that stream directly to
+[`chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
+[`chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html)
+returns the completion promise, so make it the last expression in your
+observer if you want shinychat to surface streaming errors in the chat
+UI.
+
 ## What `run_shiny()` Enforces
 
 | Feature                             | Enforced? | How                                                         |
@@ -53,8 +60,12 @@ server <- function(input, output, session) {
   )
 
   observeEvent(input$chat_user_input, {
-    stream <- agent$run_shiny(input$chat_user_input)
-    chat_append("chat", stream)
+    req(input$chat_user_input)
+
+    chat_append(
+      "chat",
+      agent$run_shiny(input$chat_user_input)
+    )
   })
 }
 
@@ -89,12 +100,16 @@ server <- function(input, output, session) {
   agent$add_hook(hook_log_tools(verbose = TRUE))
 
   observeEvent(input$chat_user_input, {
+    req(input$chat_user_input)
+
     # max_tool_calls limits how many tool calls the agent can make
-    stream <- agent$run_shiny(
-      input$chat_user_input,
-      max_tool_calls = 10
+    chat_append(
+      "chat",
+      agent$run_shiny(
+        input$chat_user_input,
+        max_tool_calls = 10
+      )
     )
-    chat_append("chat", stream)
   })
 }
 ```

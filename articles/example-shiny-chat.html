@@ -98,6 +98,10 @@ deputy’s turn-level controls like <code>max_turns</code> and
 <p><code>run_shiny()</code> bridges this gap: it returns a content
 stream that shinychat understands while still enforcing deputy’s
 permissions, hooks, and limits.</p>
+<p>Following shinychat’s recommended pattern, pass that stream directly
+to <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append()</a></code>. <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append()</a></code> returns the
+completion promise, so make it the last expression in your observer if
+you want shinychat to surface streaming errors in the chat UI.</p>
 </div>
 <div class="section level2">
 <h2 id="what-run_shiny-enforces">What <code>run_shiny()</code> Enforces<a class="anchor" aria-label="anchor" href="#what-run_shiny-enforces"></a>
@@ -182,8 +186,12 @@ message</td>
 <span>  <span class="op">)</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/observeEvent.html" class="external-link">observeEvent</a></span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span>, <span class="op">{</span></span>
-<span>    <span class="va">stream</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_shiny</span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span><span class="op">)</span></span>
-<span>    <span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append</a></span><span class="op">(</span><span class="st">"chat"</span>, <span class="va">stream</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/req.html" class="external-link">req</a></span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span><span class="op">)</span></span>
+<span></span>
+<span>    <span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append</a></span><span class="op">(</span></span>
+<span>      <span class="st">"chat"</span>,</span>
+<span>      <span class="va">agent</span><span class="op">$</span><span class="fu">run_shiny</span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span><span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
 <span>  <span class="op">}</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
@@ -217,12 +225,16 @@ shinychat drives the streaming loop:</p>
 <span>  <span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/hook_log_tools.html">hook_log_tools</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/observeEvent.html" class="external-link">observeEvent</a></span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span>, <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/req.html" class="external-link">req</a></span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span><span class="op">)</span></span>
+<span></span>
 <span>    <span class="co"># max_tool_calls limits how many tool calls the agent can make</span></span>
-<span>    <span class="va">stream</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_shiny</span><span class="op">(</span></span>
-<span>      <span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span>,</span>
-<span>      max_tool_calls <span class="op">=</span> <span class="fl">10</span></span>
+<span>    <span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append</a></span><span class="op">(</span></span>
+<span>      <span class="st">"chat"</span>,</span>
+<span>      <span class="va">agent</span><span class="op">$</span><span class="fu">run_shiny</span><span class="op">(</span></span>
+<span>        <span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span>,</span>
+<span>        max_tool_calls <span class="op">=</span> <span class="fl">10</span></span>
+<span>      <span class="op">)</span></span>
 <span>    <span class="op">)</span></span>
-<span>    <span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append</a></span><span class="op">(</span><span class="st">"chat"</span>, <span class="va">stream</span><span class="op">)</span></span>
 <span>  <span class="op">}</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 </div>
