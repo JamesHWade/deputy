@@ -1,0 +1,166 @@
+---
+title: "Claude Agent SDK Compatibility"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Claude Agent SDK Compatibility}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+deputy keeps a provider-agnostic R runtime at its core and layers an opt-in
+Anthropic-compatible facade on top. This vignette shows what is covered by the
+compatibility layer, how the Anthropic-style entrypoints map to deputy, and
+where the current boundary remains intentionally narrower than Anthropic's full
+ecosystem surface.
+
+## Compatibility Matrix
+
+| Surface | Status | deputy mapping |
+|--------|--------|----------------|
+| `claude_sdk_query()` / `query()` | Covered | `claude_sdk_query()` and `ClaudeSDKClient$query()` |
+| Session ids, resume, fork | Covered | Persisted snapshots plus `resume()` / CLI flags |
+| Permission modes | Covered | `default`, `acceptEdits`, `readonly`, `plan`, `bypassPermissions` |
+| Hook events | Covered | Existing hook system plus `Notification` |
+| Claude settings | Covered | `CLAUDE.md`, `.claude/skills`, `.claude/commands`, `.claude/agents`, tool policy keys |
+| Anthropic-style built-in tool names | Covered | `Read`, `Write`, `Edit`, `MultiEdit`, `Glob`, `Grep`, `LS`, `TodoRead`, `TodoWrite`, `WebFetch`, `WebSearch`, `Task` |
+| Native deputy runtime | Canonical | `Agent`, `LeadAgent`, `Permissions`, `HookMatcher` |
+| Plugin discovery / marketplace execution | Not in this wave | Track separately from the core compat facade |
+| MCP resource subscriptions | Not in this wave | deputy exposes MCP tools, not Anthropic-specific resource flows |
+
+## Entry Points
+
+Use `claude_sdk_options()` to express Anthropic-shaped options and translate
+them into deputy internals:
+
+```{r, eval = FALSE}
+library(deputy)
+
+options <- claude_sdk_options(
+  chat = ellmer::chat_anthropic(model = "claude-sonnet-4-5-20250929"),
+  setting_sources = c("project", "user"),
+  permission_mode = "plan",
+  allowed_tools = c("Read", "Grep", "LS"),
+  max_turns = 15
+)
+
+result <- claude_sdk_query("Summarize the package structure", options = options)
+result$session_id
+```
+
+For a stateful client:
+
+```{r, eval = FALSE}
+client <- ClaudeSDKClient$new(options)
+client$query("Inspect the R/ directory")
+```
+
+## Sessions, Resume, and Fork
+
+The compatibility layer persists snapshots to:
+
+```{r, eval = FALSE}
+tools::R_user_dir("deputy", "cache")
+```
+
+Snapshots are enabled by default for the Claude-compatible APIs. Each completed
+turn writes a new snapshot, and the latest snapshot path is attached to
+`AgentResult$snapshot_path`.
+
+```{r, eval = FALSE}
+result <- client$query("Create a high-level summary")
+
+# Restore the latest snapshot for a session id
+client$resume(result$session_id)
+
+# Restore the newest snapshot at or before a point in time
+client$resume(result$session_id, at = "2026-03-07 10:30:00")
+
+# Clone the restored state into a new session id
+client$resume(result$session_id, fork = TRUE)
+```
+
+The CLI exposes the same behavior:
+
+```bash
+deputy --permission-mode plan --persist-session
+deputy --resume-session-id abc123
+deputy --resume-session-id abc123 --resume-session-at "2026-03-07 10:30:00"
+deputy --resume-session-id abc123 --fork-session
+```
+
+## Permissions and Hooks
+
+Anthropic's planning behavior maps to deputy's `plan` mode:
+
+```{r, eval = FALSE}
+permissions_plan()
+```
+
+`plan` allows only tools annotated with `read_only_hint = TRUE` plus the
+approval tool named by `permission_prompt_tool_name` (default:
+`"AskUserQuestion"`). Write, execution, and unannotated tools are denied by
+default.
+
+Informational runtime events now use the existing hook system via
+`Notification`:
+
+```{r, eval = FALSE}
+hook <- HookMatcher$new(
+  event = "Notification",
+  callback = function(message, context) {
+    cli::cli_alert_info("[{context$code}] {message}")
+    NULL
+  }
+)
+```
+
+deputy emits `Notification` for cases such as session restore or fork notices,
+permission-denied guidance, compaction fallbacks, and cost warnings.
+
+## Settings, Agents, and Tool Aliases
+
+`claude_settings_load()` and `claude_settings_apply()` now understand:
+
+- `CLAUDE.md` memory blocks
+- `.claude/skills`
+- `.claude/commands`
+- `.claude/agents`
+- Tool policy keys such as `allowedTools`, `disallowedTools`, and `permissionPromptToolName`
+
+Custom agents from `.claude/agents` are converted to `AgentDefinition`
+objects and registered automatically when you use `LeadAgent` or
+`ClaudeSDKClient`.
+
+Anthropic-style tool names resolve through the compatibility layer rather than
+changing deputy's native tool names:
+
+```{r, eval = FALSE}
+compat_tools <- claude_sdk_options(
+  custom_tools = list(),
+  allowed_tools = c("Read", "Edit", "TodoWrite")
+)
+```
+
+This keeps `read_file`, `edit_file`, `todo_write`, and the rest of deputy's
+snake_case tool surface intact for native R users.
+
+## Design Boundary
+
+deputy aims for behavioral compatibility, not a literal language-port of the
+Node or Python SDKs. The runtime model is intentionally R-native:
+
+- R6 objects instead of Python or TypeScript classes
+- `coro` generators for streaming
+- Base lists and data frames for snapshots and session indexes
+- Existing deputy hooks and permissions reused by the compat facade
+
+That boundary keeps the Anthropic surface available without making the rest of
+the package Anthropic-specific.

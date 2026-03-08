@@ -24,6 +24,10 @@ execution.
 \item{\code{stop_reason}}{Reason the agent stopped}
 
 \item{\code{structured_output}}{Parsed/validated structured output (if requested)}
+
+\item{\code{session_id}}{Compat session identifier when Claude SDK mode is active}
+
+\item{\code{snapshot_path}}{Latest compat snapshot path when session persistence is active}
 }
 \if{html}{\out{</div>}}
 }
@@ -52,7 +56,9 @@ Create a new AgentResult object.
   events = list(),
   duration = NULL,
   stop_reason = "complete",
-  structured_output = NULL
+  structured_output = NULL,
+  session_id = NULL,
+  snapshot_path = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -72,6 +78,10 @@ Create a new AgentResult object.
 \item{\code{stop_reason}}{Reason for stopping}
 
 \item{\code{structured_output}}{Parsed structured output (if any)}
+
+\item{\code{session_id}}{Compat session identifier (if any)}
+
+\item{\code{snapshot_path}}{Latest compat snapshot path (if any)}
 }
 \if{html}{\out{</div>}}
 }

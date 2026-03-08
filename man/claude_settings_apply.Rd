@@ -9,7 +9,8 @@ claude_settings_apply(
   settings,
   apply_memory = TRUE,
   load_skills = TRUE,
-  load_commands = TRUE
+  load_commands = TRUE,
+  load_agents = TRUE
 )
 }
 \arguments{
@@ -22,6 +23,9 @@ claude_settings_apply(
 \item{load_skills}{Logical. If TRUE (default), load skills into the agent.}
 
 \item{load_commands}{Logical. If TRUE (default), register slash commands.}
+
+\item{load_agents}{Logical. If TRUE (default), register settings-defined
+agents on \link{LeadAgent} objects.}
 }
 \value{
 Invisibly returns the agent.

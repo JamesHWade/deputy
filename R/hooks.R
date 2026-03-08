@@ -48,6 +48,14 @@
 #' - `context`: List containing `working_dir`
 #' - Return: NULL (informational only)
 #'
+#' **Notification** - Informational runtime notice
+#'
+#' Callback signature: `function(message, context)`
+#' - `message`: The notification text (character)
+#' - `context`: List containing `working_dir`, `level`, `code`, and any
+#'   event-specific metadata
+#' - Return: NULL (informational only)
+#'
 #' **PreCompact** - Before conversation compaction
 #'
 #' Callback signature: `function(turns_to_compact, turns_to_keep, context)`
@@ -77,6 +85,8 @@
 #' - `total_turns`: (Stop, PreCompact, SessionEnd) Number of turns in the conversation
 #' - `cost`: (Stop, SessionEnd) List with `total`, `input_tokens`, `output_tokens`
 #' - `compact_count`: (PreCompact only) Number of turns being compacted
+#' - `level`: (Notification only) Informational severity such as `"info"` or `"warning"`
+#' - `code`: (Notification only) Stable notification code when available
 #' - `permissions`: (SessionStart only) The agent's permissions configuration
 #' - `provider`: (SessionStart only) List with `name` and `model`
 #' - `tools_count`: (SessionStart only) Number of registered tools
@@ -112,6 +122,7 @@ HookEvent <- c(
   "Stop",
   "SubagentStop",
   "UserPromptSubmit",
+  "Notification",
   "PreCompact",
 
   "SessionStart",
@@ -333,6 +344,7 @@ HookMatcher <- R6::R6Class(
     #'   * Stop: `function(reason, context)`
     #'   * SubagentStop: `function(agent_name, task, result, context)`
     #'   * UserPromptSubmit: `function(prompt, context)`
+    #'   * Notification: `function(message, context)`
     #'   * PreCompact: `function(turns_to_compact, turns_to_keep, context)`
     #'   * SessionStart: `function(context)`
     #'   * SessionEnd: `function(reason, context)`

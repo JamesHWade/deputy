@@ -226,7 +226,9 @@ Agent <- R6::R6Class(
         events = events,
         duration = duration,
         stop_reason = stop_event$reason %||% "complete",
-        structured_output = structured_output
+        structured_output = structured_output,
+        session_id = private$compat_session_id,
+        snapshot_path = private$compat_last_snapshot_path
       )
     },
 
@@ -300,6 +302,26 @@ Agent <- R6::R6Class(
     },
 
     #' @description
+    #' Get the active Claude SDK compatibility session identifier.
+    #'
+    #' @return Character session id, or NULL when compat mode is inactive
+    session_id = function() {
+      private$compat_session_id
+    },
+
+    #' @description
+    #' Configure Claude SDK compatibility behavior for this agent.
+    #'
+    #' @param config Named list of compat settings
+    #' @return Invisible self for chaining
+    configure_sdk_compat = function(config = list()) {
+      private$compat_config <- private$normalize_compat_config(config)
+      private$compat_session_id <- private$compat_config$session_id
+      private$compat_last_snapshot_path <- NULL
+      invisible(self)
+    },
+
+    #' @description
     #' Get cost information for the conversation.
     #'
     #' @return A list with input, output, cached, and total token costs
@@ -347,28 +369,25 @@ Agent <- R6::R6Class(
     #' - Working directory
     #' - Metadata (timestamp, version, provider info)
     save_session = function(path) {
-      # Get tools as a list for serialization
-      tools_list <- self$chat$get_tools()
+      session <- private$build_session_payload()
 
-      session <- list(
-        turns = self$chat$get_turns(),
-        system_prompt = self$chat$get_system_prompt(),
-        tool_names = names(tools_list),
-        tools = tools_list, # Store actual tool objects
-        permissions = self$permissions,
-        working_dir = self$working_dir,
-        loaded_skills = names(private$loaded_skills),
-        hooks_count = self$hooks$count(),
-        metadata = list(
-          saved_at = Sys.time(),
-          deputy_version = as.character(utils::packageVersion("deputy")),
-          provider = self$provider(),
-          session_format_version = 2L # Track format for compatibility
-        )
+      tryCatch(
+        {
+          saveRDS(session, path)
+          cli_alert_success("Session saved to {.path {path}}")
+          invisible(path)
+        },
+        error = function(e) {
+          abort_session_save(
+            c(
+              "Failed to save session file",
+              "x" = e$message
+            ),
+            path = path,
+            parent = e
+          )
+        }
       )
-      saveRDS(session, path)
-      cli_alert_success("Session saved to {.path {path}}")
-      invisible(path)
     },
 
     #' @description
@@ -405,93 +424,11 @@ Agent <- R6::R6Class(
         }
       )
 
-      # Validate session structure
-      required_fields <- c(
-        "turns",
-        "system_prompt",
-        "permissions",
-        "working_dir"
+      private$restore_session_payload(
+        session,
+        restore_tools = restore_tools,
+        source = path
       )
-      missing <- setdiff(required_fields, names(session))
-      if (length(missing) > 0) {
-        abort_session_load(
-          c(
-            "Invalid session file - missing required fields",
-            "x" = "Missing: {.val {missing}}"
-          ),
-          path = path
-        )
-      }
-
-      # Check version compatibility
-      if (!is.null(session$metadata$deputy_version)) {
-        current_version <- as.character(utils::packageVersion("deputy"))
-        loaded_version <- session$metadata$deputy_version
-        if (loaded_version != current_version) {
-          cli_warn(c(
-            "Session from different deputy version",
-            "i" = "Session version: {loaded_version}",
-            "i" = "Current version: {current_version}",
-            "i" = "This may cause compatibility issues"
-          ))
-        }
-      }
-
-      # Restore turns
-      self$chat$set_turns(session$turns)
-
-      # Restore system prompt
-      if (!is.null(session$system_prompt)) {
-        self$chat$set_system_prompt(session$system_prompt)
-      }
-
-      # Restore tools if available and requested
-      if (
-        restore_tools && !is.null(session$tools) && length(session$tools) > 0
-      ) {
-        tryCatch(
-          {
-            self$chat$register_tools(session$tools)
-            cli_alert_info("Restored {length(session$tools)} tools")
-          },
-          error = function(e) {
-            cli_warn(c(
-              "Could not restore tools from session",
-              "x" = e$message,
-              "i" = "You may need to re-register tools manually"
-            ))
-          }
-        )
-      } else if (
-        !is.null(session$tool_names) && length(session$tool_names) > 0
-      ) {
-        cli_warn(c(
-          "Session contains tool references but not tool definitions",
-          "i" = "Tools not restored: {.val {session$tool_names}}",
-          "i" = "Re-register tools manually or use a newer session format"
-        ))
-      }
-
-      # Restore permissions and working dir
-      if (!is.null(session$permissions)) {
-        private$.permissions <- session$permissions
-      }
-      if (!is.null(session$working_dir)) {
-        private$.working_dir <- session$working_dir
-      }
-
-      # Note about skills and hooks
-      if (
-        !is.null(session$loaded_skills) && length(session$loaded_skills) > 0
-      ) {
-        cli_alert_info("Session had skills: {.val {session$loaded_skills}}")
-        cli_alert_info("Skills must be reloaded manually with $load_skill()")
-      }
-      if (!is.null(session$hooks_count) && session$hooks_count > 0) {
-        cli_alert_info("Session had {session$hooks_count} hooks (not restored)")
-        cli_alert_info("Re-add hooks manually with $add_hook()")
-      }
-
       cli_alert_success("Session loaded from {.path {path}}")
       invisible(self)
     },
@@ -923,6 +860,9 @@ Agent <- R6::R6Class(
                 cost = agent$cost()
               )
             )
+            agent$.__enclos_env__$private$snapshot_compat_state(
+              reason = paste0("run_shiny_", stream_state$reason)
+            )
             agent$.__enclos_env__$private$tool_call_limit <- NULL
             agent$.__enclos_env__$private$should_stop <- FALSE
             agent$.__enclos_env__$private$stop_reason_from_hook <- NULL
@@ -1007,6 +947,205 @@ Agent <- R6::R6Class(
     should_stop = FALSE,
     stop_reason_from_hook = NULL,
 
+    normalize_compat_config = function(config) {
+      if (is.null(config)) {
+        return(NULL)
+      }
+      if (!is.list(config)) {
+        cli_abort("{.arg config} must be a named list or NULL")
+      }
+
+      persist_session <- isTRUE(config$persist_session)
+      session_store_dir <- normalize_session_store_dir(config$session_store_dir)
+      session_id <- config$session_id %||% generate_session_id()
+
+      list(
+        persist_session = persist_session,
+        session_store_dir = session_store_dir,
+        session_id = session_id
+      )
+    },
+
+    build_session_payload = function(extra_metadata = list()) {
+      tools_list <- self$chat$get_tools()
+
+      list(
+        turns = self$chat$get_turns(),
+        system_prompt = self$chat$get_system_prompt(),
+        tool_names = names(tools_list),
+        tools = tools_list,
+        permissions = self$permissions,
+        working_dir = self$working_dir,
+        loaded_skills = private$loaded_skills,
+        hooks_count = self$hooks$count(),
+        slash_commands = private$slash_commands_data,
+        settings_data = private$settings_data,
+        metadata = utils::modifyList(
+          list(
+            saved_at = Sys.time(),
+            deputy_version = as.character(utils::packageVersion("deputy")),
+            provider = self$provider(),
+            session_format_version = 3L,
+            session_id = private$compat_session_id
+          ),
+          extra_metadata
+        )
+      )
+    },
+
+    restore_session_payload = function(
+      session,
+      restore_tools = TRUE,
+      source = NULL
+    ) {
+      required_fields <- c(
+        "turns",
+        "system_prompt",
+        "permissions",
+        "working_dir"
+      )
+      missing <- setdiff(required_fields, names(session))
+      if (length(missing) > 0) {
+        abort_session_load(
+          c(
+            "Invalid session file - missing required fields",
+            "x" = "Missing: {.val {missing}}"
+          ),
+          path = source
+        )
+      }
+
+      if (!is.null(session$metadata$deputy_version)) {
+        current_version <- as.character(utils::packageVersion("deputy"))
+        loaded_version <- session$metadata$deputy_version
+        if (loaded_version != current_version) {
+          cli_warn(c(
+            "Session from different deputy version",
+            "i" = "Session version: {loaded_version}",
+            "i" = "Current version: {current_version}",
+            "i" = "This may cause compatibility issues"
+          ))
+        }
+      }
+
+      self$chat$set_turns(session$turns)
+
+      if (!is.null(session$system_prompt)) {
+        self$chat$set_system_prompt(session$system_prompt)
+      }
+
+      if (
+        restore_tools && !is.null(session$tools) && length(session$tools) > 0
+      ) {
+        tryCatch(
+          {
+            self$chat$register_tools(session$tools)
+            cli_alert_info("Restored {length(session$tools)} tools")
+          },
+          error = function(e) {
+            cli_warn(c(
+              "Could not restore tools from session",
+              "x" = e$message,
+              "i" = "You may need to re-register tools manually"
+            ))
+          }
+        )
+      } else if (
+        !is.null(session$tool_names) && length(session$tool_names) > 0
+      ) {
+        cli_warn(c(
+          "Session contains tool references but not tool definitions",
+          "i" = "Tools not restored: {.val {session$tool_names}}",
+          "i" = "Re-register tools manually or use a newer session format"
+        ))
+      }
+
+      if (!is.null(session$permissions)) {
+        private$.permissions <- session$permissions
+      }
+      if (!is.null(session$working_dir)) {
+        private$.working_dir <- session$working_dir
+      }
+
+      if (!is.null(session$slash_commands)) {
+        private$slash_commands_data <- session$slash_commands
+      }
+      if (!is.null(session$settings_data)) {
+        private$settings_data <- session$settings_data
+      }
+      if (!is.null(session$loaded_skills)) {
+        if (is.list(session$loaded_skills)) {
+          private$loaded_skills <- session$loaded_skills
+        } else if (length(session$loaded_skills) > 0) {
+          cli_alert_info("Session had skills: {.val {session$loaded_skills}}")
+          cli_alert_info("Skills must be reloaded manually with $load_skill()")
+        }
+      }
+
+      if (!is.null(session$metadata$session_id)) {
+        private$compat_session_id <- session$metadata$session_id
+      }
+
+      if (!is.null(session$hooks_count) && session$hooks_count > 0) {
+        cli_alert_info("Session had {session$hooks_count} hooks (not restored)")
+        cli_alert_info("Re-add hooks manually with $add_hook()")
+      }
+    },
+
+    notify = function(message, level = "info", code = NULL, ...) {
+      self$hooks$fire(
+        "Notification",
+        message = message,
+        context = utils::modifyList(
+          list(
+            working_dir = self$working_dir,
+            level = level,
+            code = code
+          ),
+          list(...)
+        )
+      )
+      invisible(NULL)
+    },
+
+    snapshot_compat_state = function(reason = "turn", turn_number = NULL) {
+      if (
+        is.null(private$compat_config) ||
+          !isTRUE(private$compat_config$persist_session)
+      ) {
+        return(NULL)
+      }
+
+      payload <- private$build_session_payload(
+        extra_metadata = list(
+          snapshot_at = Sys.time(),
+          snapshot_reason = reason,
+          turn_number = turn_number,
+          session_id = private$compat_session_id
+        )
+      )
+
+      path <- tryCatch(
+        session_store_save_payload(
+          payload = payload,
+          root = private$compat_config$session_store_dir,
+          session_id = private$compat_session_id
+        ),
+        deputy_session_save = function(e) {
+          private$notify(
+            conditionMessage(e),
+            level = "warning",
+            code = "session_snapshot_failed",
+            error = e$message
+          )
+          NULL
+        }
+      )
+
+      private$compat_last_snapshot_path <- path
+      path
+    },
+
     # Callback for tool requests (permission checking + hooks)
     on_tool_request = function(request) {
       # Validate and extract request data safely
@@ -1024,6 +1163,13 @@ Agent <- R6::R6Class(
       perm_result <- self$permissions$check(tool_name, tool_input, context)
 
       if (inherits(perm_result, "PermissionResultDeny")) {
+        private$notify(
+          perm_result$reason,
+          level = "warning",
+          code = "permission_denied",
+          tool_name = tool_name,
+          tool_input = tool_input
+        )
         ellmer::tool_reject(perm_result$reason)
       }
 
@@ -1052,6 +1198,11 @@ Agent <- R6::R6Class(
       if (!is.null(private$tool_call_limit)) {
         private$tool_call_count <- private$tool_call_count + 1L
         if (private$tool_call_count > private$tool_call_limit) {
+          private$notify(
+            "Tool call limit reached. Please provide your final answer with the information gathered so far.",
+            level = "warning",
+            code = "tool_call_limit"
+          )
           ellmer::tool_reject(
             "Tool call limit reached. Please provide your final answer with the information gathered so far."
           )
@@ -1063,6 +1214,11 @@ Agent <- R6::R6Class(
             !is.na(current_cost) &&
               current_cost >= self$permissions$max_cost_usd
           ) {
+            private$notify(
+              "Cost limit reached. Please provide your final answer with the information gathered so far.",
+              level = "warning",
+              code = "cost_limit"
+            )
             ellmer::tool_reject(
               "Cost limit reached. Please provide your final answer with the information gathered so far."
             )
@@ -1351,6 +1507,18 @@ Agent <- R6::R6Class(
               !is.na(current_cost) &&
                 current_cost >= agent$permissions$max_cost_usd * 0.9
             ) {
+              agent$.__enclos_env__$private$notify(
+                paste0(
+                  "Approaching cost limit: ",
+                  format_cost(current_cost),
+                  " / ",
+                  format_cost(agent$permissions$max_cost_usd)
+                ),
+                level = "warning",
+                code = "cost_limit_warning",
+                current_cost = current_cost,
+                max_cost_usd = agent$permissions$max_cost_usd
+              )
               cli::cli_warn(
                 "Approaching cost limit: {format_cost(current_cost)} / {format_cost(agent$permissions$max_cost_usd)}"
               )
@@ -1405,6 +1573,12 @@ Agent <- R6::R6Class(
                 "Streaming failed, falling back to non-streaming",
                 "x" = stream_error$message
               ))
+              agent$.__enclos_env__$private$notify(
+                "Streaming failed, falling back to non-streaming",
+                level = "warning",
+                code = "stream_fallback",
+                error = stream_error$message
+              )
               # Emit warning event so applications can surface this to users
               coro::yield(AgentEvent(
                 "warning",
@@ -1453,6 +1627,10 @@ Agent <- R6::R6Class(
             turn = last_turn,
             turn_number = turn_num
           ))
+          agent$.__enclos_env__$private$snapshot_compat_state(
+            reason = "turn",
+            turn_number = turn_num
+          )
 
           # Check if hook requested stop (after tool execution)
           if (agent$.__enclos_env__$private$should_stop) {
@@ -1496,6 +1674,11 @@ Agent <- R6::R6Class(
             total_turns = turn_num,
             cost = agent$cost()
           )
+        )
+
+        agent$.__enclos_env__$private$snapshot_compat_state(
+          reason = paste0("stop:", stop_reason),
+          turn_number = turn_num
         )
 
         # Yield stop event
@@ -1695,6 +1878,12 @@ Agent <- R6::R6Class(
                 "i" = "Falling back to text-based summary",
                 "x" = e$message
               ))
+              private$notify(
+                "Compaction fell back to text summary because a summarization chat could not be created.",
+                level = "warning",
+                code = "compact_fallback",
+                error = e$message
+              )
               NULL
             }
           )
@@ -1713,6 +1902,12 @@ Agent <- R6::R6Class(
             "i" = "Falling back to text-based summary",
             "x" = e$message
           ))
+          private$notify(
+            "Compaction fell back to text summary because LLM summarization failed.",
+            level = "warning",
+            code = "compact_fallback",
+            error = e$message
+          )
           private$generate_fallback_summary(turns)
         }
       )
@@ -1770,6 +1965,11 @@ Agent <- R6::R6Class(
 
     # Storage for applied settings
     settings_data = NULL,
+
+    # Claude SDK compatibility settings
+    compat_config = NULL,
+    compat_session_id = NULL,
+    compat_last_snapshot_path = NULL,
 
     # Tool call counter for run_shiny() callback-based limits
     tool_call_count = 0L,

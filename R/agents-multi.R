@@ -89,6 +89,8 @@ LeadAgent <- R6::R6Class(
     #' @param system_prompt System prompt for the lead agent
     #' @param permissions Permissions for the lead agent (also applied to sub-agents)
     #' @param working_dir Working directory
+    #' @param setting_sources Optional Claude-style setting sources
+    #' @param settings Optional pre-loaded settings list from claude_settings_load()
     #' @return A new `LeadAgent` object
     initialize = function(
       chat,
@@ -96,7 +98,9 @@ LeadAgent <- R6::R6Class(
       tools = list(),
       system_prompt = NULL,
       permissions = NULL,
-      working_dir = getwd()
+      working_dir = getwd(),
+      setting_sources = NULL,
+      settings = NULL
     ) {
       # Validate sub-agent definitions
       for (def in sub_agents) {
@@ -122,7 +126,9 @@ LeadAgent <- R6::R6Class(
         tools = all_tools,
         system_prompt = enhanced_prompt,
         permissions = permissions,
-        working_dir = working_dir
+        working_dir = working_dir,
+        setting_sources = setting_sources,
+        settings = settings
       )
     },
 

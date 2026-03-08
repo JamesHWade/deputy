@@ -21,6 +21,9 @@ tools <- "standard"
 #| short: P
 permissions <- "standard"
 
+#| description: Claude-style permission mode override (default, acceptEdits, plan, readonly, bypassPermissions)
+permission_mode <- NA_character_
+
 #| description: Maximum number of turns before stopping
 #| short: n
 max_turns <- 25L
@@ -37,6 +40,18 @@ session <- NA_character_
 #| description: Path to save session on exit
 #| short: S
 save_session <- NA_character_
+
+#| description: Persist compat session snapshots to disk
+persist_session <- FALSE
+
+#| description: Resume a persisted compat session by id
+resume_session_id <- NA_character_
+
+#| description: Resume a compat session at or before a timestamp
+resume_session_at <- NA_character_
+
+#| description: Fork a resumed compat session into a new session id
+fork_session <- FALSE
 
 # System prompt
 #| description: Custom system prompt to use
@@ -128,9 +143,12 @@ split_csv_values <- function(values) {
 }
 
 model <- null_if_na(model)
+permission_mode <- null_if_na(permission_mode)
 max_cost <- null_if_na(max_cost)
 session <- null_if_na(session)
 save_session <- null_if_na(save_session)
+resume_session_id <- null_if_na(resume_session_id)
+resume_session_at <- null_if_na(resume_session_at)
 system_prompt <- null_if_na(system_prompt)
 system_prompt_file <- null_if_na(system_prompt_file)
 mcp_config <- null_if_na(mcp_config)
@@ -198,7 +216,8 @@ create_chat <- function(provider, model) {
 
   # Set default models per provider if not specified
   if (is.null(model)) {
-    model <- switch(provider,
+    model <- switch(
+      provider,
       anthropic = "claude-sonnet-4-5-20250929",
       openai = "gpt-4o",
       google = "gemini-2.0-flash",
@@ -207,7 +226,8 @@ create_chat <- function(provider, model) {
     )
   }
 
-  chat <- switch(provider,
+  chat <- switch(
+    provider,
     anthropic = ellmer::chat_anthropic(model = model),
     openai = ellmer::chat_openai(model = model),
     google = ellmer::chat_google(model = model),
@@ -231,12 +251,54 @@ get_tools <- function(preset, include_ask = TRUE) {
 
 # Get permissions based on mode
 # Pass max_turns and max_cost during construction (Permissions are immutable after creation)
-get_permissions <- function(mode, working_dir, max_turns = 25L, max_cost = NULL) {
-  switch(mode,
-    standard = permissions_standard(working_dir, max_turns = max_turns, max_cost_usd = max_cost),
+get_permissions <- function(
+  mode,
+  working_dir,
+  max_turns = 25L,
+  max_cost = NULL
+) {
+  mode <- deputy:::validate_permission_mode_value(
+    mode,
+    allow_cli_aliases = TRUE,
+    arg = "permission mode"
+  )
+
+  switch(
+    mode,
+    standard = permissions_standard(
+      working_dir,
+      max_turns = max_turns,
+      max_cost_usd = max_cost
+    ),
+    plan = permissions_plan(max_turns = max_turns, max_cost_usd = max_cost),
     readonly = permissions_readonly(max_turns = max_turns),
     full = permissions_full(max_turns = max_turns, max_cost_usd = max_cost),
-    permissions_standard(working_dir, max_turns = max_turns, max_cost_usd = max_cost)
+    default = Permissions$new(
+      mode = "default",
+      file_read = TRUE,
+      file_write = working_dir,
+      bash = FALSE,
+      r_code = TRUE,
+      web = FALSE,
+      install_packages = FALSE,
+      max_turns = max_turns,
+      max_cost_usd = max_cost
+    ),
+    acceptEdits = Permissions$new(
+      mode = "acceptEdits",
+      file_read = TRUE,
+      file_write = working_dir,
+      bash = FALSE,
+      r_code = TRUE,
+      web = FALSE,
+      install_packages = FALSE,
+      max_turns = max_turns,
+      max_cost_usd = max_cost
+    ),
+    bypassPermissions = permissions_full(
+      max_turns = max_turns,
+      max_cost_usd = max_cost
+    )
   )
 }
 
@@ -244,7 +306,9 @@ get_permissions <- function(mode, working_dir, max_turns = 25L, max_cost = NULL)
 get_system_prompt <- function(system_prompt, system_prompt_file) {
   if (!is.null(system_prompt_file)) {
     if (!file.exists(system_prompt_file)) {
-      cli::cli_abort("System prompt file not found: {.path {system_prompt_file}}")
+      cli::cli_abort(
+        "System prompt file not found: {.path {system_prompt_file}}"
+      )
     }
     return(paste(readLines(system_prompt_file, warn = FALSE), collapse = "\n"))
   }
@@ -260,7 +324,13 @@ format_cost <- function(cost) {
 }
 
 # Print welcome message
-print_welcome <- function(agent, provider, model_name, tools_preset, perm_mode) {
+print_welcome <- function(
+  agent,
+  provider,
+  model_name,
+  tools_preset,
+  perm_mode
+) {
   provider_info <- agent$provider()
   mcp_tools <- agent$mcp_tools()
 
@@ -284,7 +354,9 @@ print_welcome <- function(agent, provider, model_name, tools_preset, perm_mode) 
 
   cli::cli_bullets(bullets)
   cli::cli_text("")
-  cli::cli_alert_info("Type your message and press Enter. Type {.kbd /help} for commands.")
+  cli::cli_alert_info(
+    "Type your message and press Enter. Type {.kbd /help} for commands."
+  )
   cli::cli_text("")
 }
 
@@ -298,8 +370,8 @@ process_command <- function(input, agent) {
   cmd <- tolower(parts[1])
   args <- parts[-1]
 
-
-  switch(cmd,
+  switch(
+    cmd,
     "/quit" = ,
     "/exit" = ,
     "/q" = {
@@ -308,7 +380,11 @@ process_command <- function(input, agent) {
 
     "/save" = {
       if (length(args) == 0) {
-        path <- paste0("deputy_session_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
+        path <- paste0(
+          "deputy_session_",
+          format(Sys.time(), "%Y%m%d_%H%M%S"),
+          ".rds"
+        )
       } else {
         path <- args[1]
       }
@@ -336,7 +412,9 @@ process_command <- function(input, agent) {
       if (length(args) > 0) {
         parsed <- suppressWarnings(as.integer(args[1]))
         if (is.na(parsed) || parsed < 1) {
-          cli::cli_alert_warning("Invalid keep value: {.val {args[1]}}. Using default (4)")
+          cli::cli_alert_warning(
+            "Invalid keep value: {.val {args[1]}}. Using default (4)"
+          )
         } else {
           keep <- parsed
         }
@@ -344,7 +422,9 @@ process_command <- function(input, agent) {
       tryCatch(
         {
           agent$compact(keep_last = keep)
-          cli::cli_alert_success("Conversation compacted (kept {.val {keep}} recent turns)")
+          cli::cli_alert_success(
+            "Conversation compacted (kept {.val {keep}} recent turns)"
+          )
         },
         error = function(e) {
           cli::cli_alert_danger("Compaction failed: {e$message}")
@@ -386,7 +466,9 @@ process_command <- function(input, agent) {
     },
 
     {
-      cli::cli_alert_warning("Unknown command: {.val {cmd}}. Type {.kbd /help} for available commands.")
+      cli::cli_alert_warning(
+        "Unknown command: {.val {cmd}}. Type {.kbd /help} for available commands."
+      )
       return(list(is_command = TRUE, action = "continue"))
     }
   )
@@ -401,13 +483,18 @@ run_task <- function(agent, task_text, verbose, debug_log = NULL) {
   }
 
   for (event in agent$run(task_text)) {
-    switch(event$type,
+    switch(
+      event$type,
       "text" = {
         cat(event$text)
       },
       "tool_start" = {
         if (!is.null(debug_log)) {
-          tool_name <- if (is.null(event$tool_name)) "<unknown>" else event$tool_name
+          tool_name <- if (is.null(event$tool_name)) {
+            "<unknown>"
+          } else {
+            event$tool_name
+          }
           debug_log("tool_start: ", tool_name)
         }
         if (verbose) {
@@ -416,7 +503,11 @@ run_task <- function(agent, task_text, verbose, debug_log = NULL) {
       },
       "tool_end" = {
         if (!is.null(debug_log)) {
-          tool_name <- if (is.null(event$tool_name)) "<unknown>" else event$tool_name
+          tool_name <- if (is.null(event$tool_name)) {
+            "<unknown>"
+          } else {
+            event$tool_name
+          }
           if (!is.null(event$error)) {
             debug_log("tool_end error: ", tool_name, " -> ", event$error)
           } else {
@@ -425,14 +516,20 @@ run_task <- function(agent, task_text, verbose, debug_log = NULL) {
         }
         # Always show tool errors, not just in verbose mode
         if (!is.null(event$error)) {
-          cli::cli_alert_danger("Tool {.fn {event$tool_name}} failed: {event$error}")
+          cli::cli_alert_danger(
+            "Tool {.fn {event$tool_name}} failed: {event$error}"
+          )
         } else if (verbose) {
           cli::cli_alert_success("Done: {.fn {event$tool_name}}")
         }
       },
       "stop" = {
         if (!is.null(debug_log)) {
-          turns <- if (is.null(event$total_turns)) "NA" else as.character(event$total_turns)
+          turns <- if (is.null(event$total_turns)) {
+            "NA"
+          } else {
+            as.character(event$total_turns)
+          }
           debug_log("run_task stop: turns=", turns)
         }
         cat("\n")
@@ -440,7 +537,9 @@ run_task <- function(agent, task_text, verbose, debug_log = NULL) {
         if (!is.null(cost) && !is.na(cost$total) && cost$total > 0) {
           cli::cli_alert_info("Cost: {.val {sprintf('$%.4f', cost$total)}}")
         }
-        cli::cli_alert_success("Completed in {.val {event$total_turns}} turn(s)")
+        cli::cli_alert_success(
+          "Completed in {.val {event$total_turns}} turn(s)"
+        )
       }
     )
   }
@@ -457,7 +556,9 @@ run_interactive <- function(agent, verbose, debug_log = NULL) {
       readline(prompt = cli::col_cyan("> ")),
       error = function(e) {
         # Check for EOF-like errors
-        if (grepl("EOF|end of file|connection", e$message, ignore.case = TRUE)) {
+        if (
+          grepl("EOF|end of file|connection", e$message, ignore.case = TRUE)
+        ) {
           return(NULL)
         }
         # Log unexpected errors before treating as exit
@@ -495,13 +596,18 @@ run_interactive <- function(agent, verbose, debug_log = NULL) {
     # Run the agent
     cli::cli_text("")
     for (event in agent$run(input)) {
-      switch(event$type,
+      switch(
+        event$type,
         "text" = {
           cat(event$text)
         },
         "tool_start" = {
           if (!is.null(debug_log)) {
-            tool_name <- if (is.null(event$tool_name)) "<unknown>" else event$tool_name
+            tool_name <- if (is.null(event$tool_name)) {
+              "<unknown>"
+            } else {
+              event$tool_name
+            }
             debug_log("tool_start: ", tool_name)
           }
           if (verbose) {
@@ -510,7 +616,11 @@ run_interactive <- function(agent, verbose, debug_log = NULL) {
         },
         "tool_end" = {
           if (!is.null(debug_log)) {
-            tool_name <- if (is.null(event$tool_name)) "<unknown>" else event$tool_name
+            tool_name <- if (is.null(event$tool_name)) {
+              "<unknown>"
+            } else {
+              event$tool_name
+            }
             if (!is.null(event$error)) {
               debug_log("tool_end error: ", tool_name, " -> ", event$error)
             } else {
@@ -519,7 +629,9 @@ run_interactive <- function(agent, verbose, debug_log = NULL) {
           }
           # Always show tool errors, not just in verbose mode
           if (!is.null(event$error)) {
-            cli::cli_alert_danger("Tool {.fn {event$tool_name}} failed: {event$error}")
+            cli::cli_alert_danger(
+              "Tool {.fn {event$tool_name}} failed: {event$error}"
+            )
           } else if (verbose) {
             cli::cli_alert_success("Done: {.fn {event$tool_name}}")
           }
@@ -527,8 +639,14 @@ run_interactive <- function(agent, verbose, debug_log = NULL) {
         "stop" = {
           cat("\n")
           cost <- event$cost
-          if (verbose && !is.null(cost) && !is.na(cost$total) && cost$total > 0) {
-            cli::cli_text(cli::col_grey(sprintf("[%d turns, $%.4f]", event$total_turns, cost$total)))
+          if (
+            verbose && !is.null(cost) && !is.na(cost$total) && cost$total > 0
+          ) {
+            cli::cli_text(cli::col_grey(sprintf(
+              "[%d turns, $%.4f]",
+              event$total_turns,
+              cost$total
+            )))
           }
         }
       )
@@ -563,11 +681,22 @@ if (debug_enabled) {
 
 # Build components
 agent_tools <- get_tools(tools, include_ask = !no_ask)
-agent_permissions <- get_permissions(permissions, dir, max_turns = max_turns, max_cost = max_cost)
+effective_permission_mode <- permission_mode %||% permissions
+agent_permissions <- get_permissions(
+  effective_permission_mode,
+  dir,
+  max_turns = max_turns,
+  max_cost = max_cost
+)
 sys_prompt <- get_system_prompt(system_prompt, system_prompt_file)
 setting_sources <- unique(split_csv_values(setting_source))
 if (length(setting_sources) == 0) {
   setting_sources <- NULL
+}
+if (!is.null(resume_session_at) && is.null(resume_session_id)) {
+  cli::cli_abort(
+    "{.arg --resume-session-at} requires {.arg --resume-session-id}"
+  )
 }
 if (debug_enabled && !is.null(setting_sources)) {
   debug_log("Setting sources: ", paste(setting_sources, collapse = ","))
@@ -583,7 +712,12 @@ agent <- Agent$new(
   setting_sources = setting_sources
 )
 if (debug_enabled) {
-  debug_log("Agent created with tool preset=", tools, " and permission mode=", permissions)
+  debug_log(
+    "Agent created with tool preset=",
+    tools,
+    " and permission mode=",
+    effective_permission_mode
+  )
 }
 
 # Load MCP tools if enabled
@@ -603,7 +737,11 @@ if (mcp) {
   if (debug_enabled) {
     debug_log(
       "Loading MCP tools with servers=",
-      if (is.null(servers_list)) "<all>" else paste(servers_list, collapse = ",")
+      if (is.null(servers_list)) {
+        "<all>"
+      } else {
+        paste(servers_list, collapse = ",")
+      }
     )
   }
   agent$load_mcp(config = mcp_config, servers = servers_list)
@@ -617,14 +755,79 @@ if (!is.null(session)) {
   agent$load_session(session)
 }
 
+# Configure Claude-compatible persisted sessions if requested
+compat_session_enabled <- isTRUE(persist_session) || !is.null(resume_session_id)
+if (compat_session_enabled) {
+  active_session_id <- if (is.null(resume_session_id)) {
+    generate_session_id()
+  } else {
+    resume_session_id
+  }
+  if (isTRUE(fork_session) && !is.null(resume_session_id)) {
+    active_session_id <- generate_session_id()
+  }
+
+  agent$configure_sdk_compat(list(
+    persist_session = TRUE,
+    session_store_dir = session_store_default_dir(),
+    session_id = active_session_id
+  ))
+
+  if (!is.null(resume_session_id)) {
+    snapshot <- session_store_select_snapshot(
+      root = session_store_default_dir(),
+      session_id = resume_session_id,
+      at = resume_session_at
+    )
+    agent$load_session(snapshot$path)
+    agent$configure_sdk_compat(list(
+      persist_session = TRUE,
+      session_store_dir = session_store_default_dir(),
+      session_id = active_session_id
+    ))
+    agent$.__enclos_env__$private$notify(
+      if (isTRUE(fork_session)) {
+        paste0(
+          "Forked compat session ",
+          resume_session_id,
+          " into ",
+          active_session_id,
+          "."
+        )
+      } else {
+        paste0("Resumed compat session ", resume_session_id, ".")
+      },
+      level = "info",
+      code = if (isTRUE(fork_session)) "session_forked" else "session_resumed",
+      source_session_id = resume_session_id,
+      active_session_id = active_session_id,
+      snapshot_path = snapshot$path
+    )
+    if (isTRUE(fork_session)) {
+      agent$.__enclos_env__$private$snapshot_compat_state(
+        reason = "fork_restore"
+      )
+    }
+  }
+}
+
 # Run in appropriate mode
 if (!is.null(task)) {
   # Single task mode
-  run_task(agent, task, verbose, debug_log = if (debug_enabled) debug_log else NULL)
+  run_task(
+    agent,
+    task,
+    verbose,
+    debug_log = if (debug_enabled) debug_log else NULL
+  )
 } else {
   # Interactive mode
-  print_welcome(agent, provider, model, tools, permissions)
-  run_interactive(agent, verbose, debug_log = if (debug_enabled) debug_log else NULL)
+  print_welcome(agent, provider, model, tools, effective_permission_mode)
+  run_interactive(
+    agent,
+    verbose,
+    debug_log = if (debug_enabled) debug_log else NULL
+  )
 }
 
 # Save session on exit if specified

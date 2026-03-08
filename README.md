@@ -13,28 +13,32 @@ experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](h
 coverage](https://codecov.io/gh/JamesHWade/deputy/graph/badge.svg)](https://app.codecov.io/gh/JamesHWade/deputy)
 <!-- badges: end -->
 
-deputy is an R implementation of [Anthropic’s Claude Agent
-SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk),
-built on [ellmer](https://ellmer.tidyverse.org/). It enables you to
-create AI agents that can use tools to accomplish multi-step tasks, with
-built-in support for permissions, hooks, and streaming output.
+deputy is a provider-agnostic agent runtime for R, built on
+[ellmer](https://ellmer.tidyverse.org/). It enables you to create AI
+agents that can use tools to accomplish multi-step tasks, with built-in
+support for permissions, hooks, and streaming output. It also ships an
+Anthropic-compatible Claude Agent SDK facade for teams that want
+Claude-style entrypoints, tool aliases, settings, and persisted session
+workflows.
 
-> **Note:** This package aims to bring the patterns and capabilities of
-> the Claude Agent SDK to the R ecosystem. While inspired by Anthropic’s
-> SDK, deputy is provider-agnostic and works with any LLM that ellmer
-> supports.
+> **Note:** deputy keeps its R-native `Agent` and `LeadAgent` APIs as
+> the canonical runtime. The Claude-compatible layer is opt-in via
+> `claude_sdk_query()`, `claude_sdk_options()`, and `ClaudeSDKClient`.
 
 ## Features
 
 - **Provider-agnostic** - Works with OpenAI, Anthropic, Google, Ollama,
   and any provider ellmer supports
+- **Anthropic-compatible facade** - Claude-style entrypoints, permission
+  modes, tool aliases, and session semantics
 - **Tool bundles** - Pre-built tools for file operations, code
   execution, and data analysis
 - **Permission system** - Fine-grained control over what agents can do
 - **Hooks** - Intercept and customize agent behavior at key points
 - **Streaming output** - Real-time feedback as agents work
 - **Multi-agent** - Coordinate specialized sub-agents for complex tasks
-- **Session persistence** - Save and restore agent conversations
+- **Session persistence** - Save and restore agent conversations,
+  including Claude-compatible session snapshots
 
 ## Installation
 
@@ -105,8 +109,8 @@ Single-task mode (non-interactive):
 deputy -x "Summarize the R files in this project"
 ```
 
-Common options include short aliases (`-p`, `-m`, `-t`, `-P`, `-n`, `-c`,
-`-d`, `-v`, etc.), and repeatable flags for Rapp 0.3 style inputs:
+Common options include short aliases (`-p`, `-m`, `-t`, `-P`, `-n`,
+`-c`, `-d`, `-v`, etc.), and repeatable flags for Rapp 0.3 style inputs:
 
 ``` bash
 deputy --setting-source project --setting-source user
@@ -116,6 +120,47 @@ deputy --debug --debug-file /tmp/deputy-debug.log
 
 `--mcp-servers "github,slack"` is still accepted for backward
 compatibility, but `--mcp-server` is preferred.
+
+Claude-compatible session controls are available when you want
+persistent session ids and resume or fork behavior:
+
+``` bash
+deputy --permission-mode plan --persist-session
+deputy --resume-session-id <session-id>
+deputy --resume-session-id <session-id> --resume-session-at "2026-03-07 10:30:00"
+deputy --resume-session-id <session-id> --fork-session
+```
+
+### Anthropic-Compatible API
+
+Use the compatibility facade when you want Claude-style options, tool
+names, and session persistence without giving up deputy’s
+provider-agnostic runtime:
+
+``` r
+options <- claude_sdk_options(
+  chat = ellmer::chat("openai/gpt-4o"),
+  setting_sources = "project",
+  permission_mode = "plan"
+)
+
+# One-shot query
+result <- claude_sdk_query(
+  "Summarize the current repository state",
+  options = options
+)
+result$session_id
+
+# Stateful client with resume/fork semantics
+client <- ClaudeSDKClient$new(options)
+client$query("Inspect the package structure")
+client$resume(result$session_id, fork = TRUE)
+```
+
+The compatibility layer exposes Anthropic-style tool aliases such as
+`Read`, `Write`, `Edit`, `MultiEdit`, `Glob`, `Grep`, `LS`, `TodoRead`,
+`TodoWrite`, `WebFetch`, `WebSearch`, and `Task` (when sub-agents are
+registered).
 
 ### Tools
 
@@ -146,8 +191,8 @@ tool_read_markdown("slides.pptx")
 ```
 
 PDF page extraction uses `pdftools` when available, with a fallback to
-`reticulate` + Python `pypdf`.
-`tool_read_markdown()` uses `reticulate` + Python `markitdown`.
+`reticulate` + Python `pypdf`. `tool_read_markdown()` uses
+`reticulate` + Python `markitdown`.
 
 ### Permissions
 
@@ -191,11 +236,20 @@ agent <- Agent$new(
     permission_prompt_tool_name = "AskUserQuestion"
   )
 )
+
+# Planning mode: only annotated read-only tools plus AskUserQuestion
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_all(),
+  permissions = permissions_plan()
+)
 ```
 
 When both are set, `tool_denylist` takes precedence over
 `tool_allowlist`. `permission_prompt_tool_name` is always allowed and is
 included in deny messages so the model can request explicit approval.
+`permissions_plan()` mirrors Claude’s `plan` mode by allowing only
+read-only annotated tools and `AskUserQuestion`.
 
 ### Hooks
 
@@ -271,10 +325,10 @@ agent$load_skill(custom)
 ### Claude Settings (settingSources)
 
 deputy can load Claude-style settings from `.claude` directories,
-including `CLAUDE.md` memory, `.claude/skills`, and `.claude/commands`
-slash commands. Tool policy settings from `settings.json` are also
-applied to `agent$permissions` (`allowedTools`, `disallowedTools`, and
-`permissionPromptToolName`).
+including `CLAUDE.md` memory, `.claude/skills`, `.claude/commands` slash
+commands, and `.claude/agents` definitions. Tool policy settings from
+`settings.json` are also applied to `agent$permissions` (`allowedTools`,
+`disallowedTools`, and `permissionPromptToolName`).
 
 ``` r
 agent <- Agent$new(
@@ -286,6 +340,9 @@ agent <- Agent$new(
 # Inspect loaded slash commands
 agent$slash_commands()
 ```
+
+Settings-defined agents are applied automatically when you use
+`LeadAgent$new(setting_sources = ...)` or the Claude-compatible client.
 
 Example `.claude/settings.json` tool policy:
 
@@ -379,6 +436,8 @@ Agent$new(chat = ellmer::chat("ollama/llama3.2"))
 ## Learn More
 
 - `vignette("getting-started")` - Comprehensive introduction
+- `vignette("claude-sdk-parity")` - Anthropic-compatible surface area
+  and gaps
 - [ellmer documentation](https://ellmer.tidyverse.org/) - Underlying LLM
   framework
 

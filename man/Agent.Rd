@@ -101,6 +101,8 @@ agent$add_hook(HookMatcher$new(
 \item \href{#method-Agent-add_hook}{\code{Agent$add_hook()}}
 \item \href{#method-Agent-turns}{\code{Agent$turns()}}
 \item \href{#method-Agent-last_turn}{\code{Agent$last_turn()}}
+\item \href{#method-Agent-session_id}{\code{Agent$session_id()}}
+\item \href{#method-Agent-configure_sdk_compat}{\code{Agent$configure_sdk_compat()}}
 \item \href{#method-Agent-cost}{\code{Agent$cost()}}
 \item \href{#method-Agent-provider}{\code{Agent$provider()}}
 \item \href{#method-Agent-save_session}{\code{Agent$save_session()}}
@@ -353,6 +355,39 @@ Get the last turn in the conversation.
 }
 \subsection{Returns}{
 A Turn object or NULL
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-session_id"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-session_id}{}}}
+\subsection{Method \code{session_id()}}{
+Get the active Claude SDK compatibility session identifier.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Agent$session_id()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Character session id, or NULL when compat mode is inactive
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-configure_sdk_compat"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-configure_sdk_compat}{}}}
+\subsection{Method \code{configure_sdk_compat()}}{
+Configure Claude SDK compatibility behavior for this agent.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Agent$configure_sdk_compat(config = list())}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{config}}{Named list of compat settings}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Invisible self for chaining
 }
 }
 \if{html}{\out{<hr>}}

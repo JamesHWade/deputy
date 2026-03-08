@@ -136,6 +136,15 @@ create_mock_chat <- function(responses = list("Hello!")) {
       },
       on_tool_result = function(callback) {
         tool_result_callback <<- callback
+      },
+      clone = function() {
+        cloned <- create_mock_chat(responses = responses)
+        cloned$set_turns(turns)
+        cloned$set_system_prompt(system_prompt)
+        if (length(tools) > 0) {
+          cloned$register_tools(unname(tools))
+        }
+        cloned
       }
     ),
     class = "Chat"

@@ -28,6 +28,8 @@ navbar:
         href: articles/structured-output.html
       - text: Agent Configuration
         href: articles/agent-configuration.html
+      - text: Claude Agent SDK Compatibility
+        href: articles/claude-sdk-parity.html
       - text: "---"
       - text: "Examples"
       - text: Data Analysis Agent
@@ -96,6 +98,13 @@ reference:
   - claude_settings_load
   - claude_settings_apply
 
+- title: Claude Compatibility
+  desc: Anthropic-compatible facade and entrypoints
+  contents:
+  - ClaudeSDKClient
+  - claude_sdk_options
+  - claude_sdk_query
+
 - title: Multi-Agent
 
   desc: Coordinate multiple specialized agents
@@ -126,6 +135,7 @@ articles:
   - multi-agent
   - structured-output
   - agent-configuration
+  - claude-sdk-parity
 - title: Examples
   contents:
   - example-data-analysis
