@@ -622,7 +622,8 @@ tool calls).}
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-An async content stream suitable for \code{shinychat::chat_append()}.
+An async content stream suitable for
+\code{shinychat::chat_append()}.
 }
 }
 \if{html}{\out{<hr>}}

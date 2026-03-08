@@ -905,27 +905,30 @@ Agent <- R6::R6Class(
       stream_state$reason <- "complete"
 
       coro::async_generator(function() {
-        on.exit({
-          agent$hooks$fire(
-            "Stop",
-            reason = stream_state$reason,
-            context = list(
-              working_dir = agent$working_dir,
-              cost = agent$cost()
+        on.exit(
+          {
+            agent$hooks$fire(
+              "Stop",
+              reason = stream_state$reason,
+              context = list(
+                working_dir = agent$working_dir,
+                cost = agent$cost()
+              )
             )
-          )
-          agent$hooks$fire(
-            "SessionEnd",
-            reason = stream_state$reason,
-            context = list(
-              working_dir = agent$working_dir,
-              cost = agent$cost()
+            agent$hooks$fire(
+              "SessionEnd",
+              reason = stream_state$reason,
+              context = list(
+                working_dir = agent$working_dir,
+                cost = agent$cost()
+              )
             )
-          )
-          agent$.__enclos_env__$private$tool_call_limit <- NULL
-          agent$.__enclos_env__$private$should_stop <- FALSE
-          agent$.__enclos_env__$private$stop_reason_from_hook <- NULL
-        }, add = TRUE)
+            agent$.__enclos_env__$private$tool_call_limit <- NULL
+            agent$.__enclos_env__$private$should_stop <- FALSE
+            agent$.__enclos_env__$private$stop_reason_from_hook <- NULL
+          },
+          add = TRUE
+        )
 
         repeat {
           chunk <- tryCatch(
