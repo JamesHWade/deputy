@@ -325,23 +325,15 @@ HookResultSessionEnd <- function(handled = TRUE) {
 #' Defines when a hook callback should be triggered. Hooks can be filtered
 #' by event type and optionally by tool name pattern.
 #'
+#' **Security Note:** Hook matcher configuration is read-only from the public
+#' API after construction so callbacks and matching rules cannot be swapped out
+#' accidentally at runtime.
+#'
 #' @export
 HookMatcher <- R6::R6Class(
   "HookMatcher",
 
   public = list(
-    #' @field event The hook event type (see [HookEvent])
-    event = NULL,
-
-    #' @field pattern Optional regex pattern for tool name filtering
-    pattern = NULL,
-
-    #' @field callback The function to call when the hook fires
-    callback = NULL,
-
-    #' @field timeout Maximum execution time for the callback in seconds
-    timeout = 30,
-
     #' @description
     #' Create a new HookMatcher.
     #'
@@ -388,10 +380,10 @@ HookMatcher <- R6::R6Class(
         cli_abort("{.arg callback} must be a function")
       }
 
-      self$event <- event
-      self$callback <- callback
-      self$pattern <- pattern
-      self$timeout <- timeout
+      private$.event <- event
+      private$.callback <- callback
+      private$.pattern <- pattern
+      private$.timeout <- timeout
     },
 
     #' @description
@@ -427,6 +419,55 @@ HookMatcher <- R6::R6Class(
       cat("  timeout:", self$timeout, "seconds\n")
       invisible(self)
     }
+  ),
+
+  active = list(
+    #' @field event The hook event type (see [HookEvent]). Read-only after construction.
+    event = function(value) {
+      if (missing(value)) {
+        return(private$.event)
+      }
+      cli_abort(
+        "Cannot modify hook matcher: event is immutable after construction"
+      )
+    },
+
+    #' @field pattern Optional regex pattern for tool name filtering. Read-only after construction.
+    pattern = function(value) {
+      if (missing(value)) {
+        return(private$.pattern)
+      }
+      cli_abort(
+        "Cannot modify hook matcher: pattern is immutable after construction"
+      )
+    },
+
+    #' @field callback The function to call when the hook fires. Read-only after construction.
+    callback = function(value) {
+      if (missing(value)) {
+        return(private$.callback)
+      }
+      cli_abort(
+        "Cannot modify hook matcher: callback is immutable after construction"
+      )
+    },
+
+    #' @field timeout Maximum execution time for the callback in seconds. Read-only after construction.
+    timeout = function(value) {
+      if (missing(value)) {
+        return(private$.timeout)
+      }
+      cli_abort(
+        "Cannot modify hook matcher: timeout is immutable after construction"
+      )
+    }
+  ),
+
+  private = list(
+    .event = NULL,
+    .pattern = NULL,
+    .callback = NULL,
+    .timeout = NULL
   )
 )
 

@@ -137,7 +137,7 @@ claude_settings_apply <- function(
   ) {
     existing <- agent$permissions
 
-    agent$permissions <- Permissions$new(
+    agent$.__enclos_env__$private$.permissions <- Permissions$new(
       mode = existing$mode,
       file_read = existing$file_read,
       file_write = existing$file_write,

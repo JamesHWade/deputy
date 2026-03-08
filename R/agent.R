@@ -7,6 +7,10 @@
 #' Agent wraps an ellmer Chat object and adds agentic capabilities including
 #' multi-turn execution, permission enforcement, and streaming output.
 #'
+#' **Security Note:** Core agent fields are read-only from the public API after
+#' construction. Internal lifecycle methods may update the underlying state
+#' through private storage when required.
+#'
 #' @section Skill Methods:
 #' The following methods manage skills:
 #'
@@ -54,18 +58,6 @@ Agent <- R6::R6Class(
   "Agent",
 
   public = list(
-    #' @field chat The wrapped ellmer Chat object
-    chat = NULL,
-
-    #' @field permissions Permission policy for the agent
-    permissions = NULL,
-
-    #' @field working_dir Working directory for file operations
-    working_dir = NULL,
-
-    #' @field hooks Hook registry for lifecycle events
-    hooks = NULL,
-
     #' @description
     #' Create a new Agent.
     #'
@@ -96,10 +88,10 @@ Agent <- R6::R6Class(
     ) {
       validate_chat(chat)
 
-      self$chat <- chat
-      self$permissions <- permissions %||% permissions_standard(working_dir)
-      self$working_dir <- working_dir
-      self$hooks <- HookRegistry$new()
+      private$.chat <- chat
+      private$.permissions <- permissions %||% permissions_standard(working_dir)
+      private$.working_dir <- working_dir
+      private$.hooks <- HookRegistry$new()
 
       # Override system prompt if provided
       if (!is.null(system_prompt)) {
@@ -794,8 +786,8 @@ Agent <- R6::R6Class(
     #'   Defaults to `permissions$max_turns` or 25. Note this counts individual
     #'   tool call requests, not LLM turns (one turn can have multiple parallel
     #'   tool calls).
-    #' @return A promise that resolves when the stream is complete, suitable
-    #'   for `shinychat::chat_append()`.
+    #' @return An async content stream suitable for
+    #'   `shinychat::chat_append()`.
     run_shiny = function(prompt, max_tool_calls = NULL) {
       rlang::check_installed("promises", reason = "for run_shiny()")
 
@@ -806,6 +798,8 @@ Agent <- R6::R6Class(
       # Reset counters and activate callback-based limits
       private$tool_call_count <- 0L
       private$tool_call_limit <- as.integer(max_tool_calls)
+      private$should_stop <- FALSE
+      private$stop_reason_from_hook <- NULL
 
       # Fire session hooks synchronously before streaming
       self$hooks$fire(
@@ -826,35 +820,129 @@ Agent <- R6::R6Class(
       # Get the async content stream -- ellmer drives the multi-turn loop
       stream <- self$chat$stream_async(prompt, stream = "content")
 
+      # Normalize non-generator responses to a single-yield stream so we can
+      # manage cleanup consistently.
+      if (!inherits(stream, "coro_generator_instance")) {
+        stream_value <- stream
+        stream <- local({
+          yielded <- FALSE
+          function() {
+            if (yielded) {
+              return(coro::exhausted())
+            }
+            yielded <<- TRUE
+            stream_value
+          }
+        })
+      }
+
       # Cleanup: fire Stop/SessionEnd hooks, deactivate limits
       agent <- self
-      promises::finally(stream, function() {
-        agent$hooks$fire(
-          "Stop",
-          reason = "complete",
-          context = list(
-            working_dir = agent$working_dir,
-            cost = agent$cost()
+      stream_state <- new.env(parent = emptyenv())
+      stream_state$reason <- "complete"
+
+      coro::async_generator(function() {
+        on.exit(
+          {
+            agent$hooks$fire(
+              "Stop",
+              reason = stream_state$reason,
+              context = list(
+                working_dir = agent$working_dir,
+                cost = agent$cost()
+              )
+            )
+            agent$hooks$fire(
+              "SessionEnd",
+              reason = stream_state$reason,
+              context = list(
+                working_dir = agent$working_dir,
+                cost = agent$cost()
+              )
+            )
+            agent$.__enclos_env__$private$snapshot_compat_state(
+              reason = paste0("run_shiny_", stream_state$reason)
+            )
+            agent$.__enclos_env__$private$tool_call_limit <- NULL
+            agent$.__enclos_env__$private$should_stop <- FALSE
+            agent$.__enclos_env__$private$stop_reason_from_hook <- NULL
+          },
+          add = TRUE
+        )
+
+        repeat {
+          chunk <- tryCatch(
+            stream(),
+            error = function(e) {
+              stream_state$reason <- "error"
+              stop(e)
+            }
           )
-        )
-        agent$hooks$fire(
-          "SessionEnd",
-          reason = "complete",
-          context = list(
-            working_dir = agent$working_dir,
-            cost = agent$cost()
-          )
-        )
-        agent$.__enclos_env__$private$snapshot_compat_state(
-          reason = "run_shiny_complete"
-        )
-        # Deactivate callback-based limits
-        agent$.__enclos_env__$private$tool_call_limit <- NULL
-      })
+
+          if (promises::is.promising(chunk)) {
+            chunk <- tryCatch(
+              coro::await(chunk),
+              error = function(e) {
+                stream_state$reason <- "error"
+                stop(e)
+              }
+            )
+          }
+
+          if (coro::is_exhausted(chunk)) {
+            break
+          }
+
+          coro::yield(chunk)
+        }
+      })()
+    }
+  ),
+
+  active = list(
+    #' @field chat The wrapped ellmer Chat object. Read-only after construction.
+    chat = function(value) {
+      if (missing(value)) {
+        return(private$.chat)
+      }
+      cli_abort("Cannot modify agent: chat is immutable after construction")
+    },
+
+    #' @field permissions Permission policy for the agent. Read-only after construction.
+    permissions = function(value) {
+      if (missing(value)) {
+        return(private$.permissions)
+      }
+      cli_abort(
+        "Cannot modify agent: permissions are immutable after construction"
+      )
+    },
+
+    #' @field working_dir Working directory for file operations. Read-only after construction.
+    working_dir = function(value) {
+      if (missing(value)) {
+        return(private$.working_dir)
+      }
+      cli_abort(
+        "Cannot modify agent: working_dir is immutable after construction"
+      )
+    },
+
+    #' @field hooks Hook registry for lifecycle events. Read-only after construction.
+    hooks = function(value) {
+      if (missing(value)) {
+        return(private$.hooks)
+      }
+      cli_abort("Cannot modify agent: hooks are immutable after construction")
     }
   ),
 
   private = list(
+    .chat = NULL,
+    .permissions = NULL,
+    .working_dir = NULL,
+    .hooks = NULL,
+
     # Flag to signal stopping from hooks
     should_stop = FALSE,
     stop_reason_from_hook = NULL,
@@ -973,10 +1061,10 @@ Agent <- R6::R6Class(
       }
 
       if (!is.null(session$permissions)) {
-        self$permissions <- session$permissions
+        private$.permissions <- session$permissions
       }
       if (!is.null(session$working_dir)) {
-        self$working_dir <- session$working_dir
+        private$.working_dir <- session$working_dir
       }
 
       if (!is.null(session$slash_commands)) {

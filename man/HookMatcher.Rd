@@ -6,6 +6,10 @@
 \description{
 Defines when a hook callback should be triggered. Hooks can be filtered
 by event type and optionally by tool name pattern.
+
+\strong{Security Note:} Hook matcher configuration is read-only from the public
+API after construction so callbacks and matching rules cannot be swapped out
+accidentally at runtime.
 }
 \examples{
 
@@ -28,16 +32,16 @@ HookMatcher$new(
 )
 }
 }
-\section{Public fields}{
-\if{html}{\out{<div class="r6-fields">}}
+\section{Active bindings}{
+\if{html}{\out{<div class="r6-active-bindings">}}
 \describe{
-\item{\code{event}}{The hook event type (see \link{HookEvent})}
+\item{\code{event}}{The hook event type (see \link{HookEvent}). Read-only after construction.}
 
-\item{\code{pattern}}{Optional regex pattern for tool name filtering}
+\item{\code{pattern}}{Optional regex pattern for tool name filtering. Read-only after construction.}
 
-\item{\code{callback}}{The function to call when the hook fires}
+\item{\code{callback}}{The function to call when the hook fires. Read-only after construction.}
 
-\item{\code{timeout}}{Maximum execution time for the callback in seconds}
+\item{\code{timeout}}{Maximum execution time for the callback in seconds. Read-only after construction.}
 }
 \if{html}{\out{</div>}}
 }
