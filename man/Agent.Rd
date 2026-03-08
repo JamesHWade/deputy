@@ -7,6 +7,10 @@
 The main class for creating AI agents that can use tools to accomplish tasks.
 Agent wraps an ellmer Chat object and adds agentic capabilities including
 multi-turn execution, permission enforcement, and streaming output.
+
+\strong{Security Note:} Core agent fields are read-only from the public API after
+construction. Internal lifecycle methods may update the underlying state
+through private storage when required.
 }
 \section{Skill Methods}{
 
@@ -73,16 +77,16 @@ agent$add_hook(HookMatcher$new(
 ))
 }
 }
-\section{Public fields}{
-\if{html}{\out{<div class="r6-fields">}}
+\section{Active bindings}{
+\if{html}{\out{<div class="r6-active-bindings">}}
 \describe{
-\item{\code{chat}}{The wrapped ellmer Chat object}
+\item{\code{chat}}{The wrapped ellmer Chat object. Read-only after construction.}
 
-\item{\code{permissions}}{Permission policy for the agent}
+\item{\code{permissions}}{Permission policy for the agent. Read-only after construction.}
 
-\item{\code{working_dir}}{Working directory for file operations}
+\item{\code{working_dir}}{Working directory for file operations. Read-only after construction.}
 
-\item{\code{hooks}}{Hook registry for lifecycle events}
+\item{\code{hooks}}{Hook registry for lifecycle events. Read-only after construction.}
 }
 \if{html}{\out{</div>}}
 }

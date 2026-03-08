@@ -7,6 +7,10 @@
 #' Agent wraps an ellmer Chat object and adds agentic capabilities including
 #' multi-turn execution, permission enforcement, and streaming output.
 #'
+#' **Security Note:** Core agent fields are read-only from the public API after
+#' construction. Internal lifecycle methods may update the underlying state
+#' through private storage when required.
+#'
 #' @section Skill Methods:
 #' The following methods manage skills:
 #'
@@ -54,18 +58,6 @@ Agent <- R6::R6Class(
   "Agent",
 
   public = list(
-    #' @field chat The wrapped ellmer Chat object
-    chat = NULL,
-
-    #' @field permissions Permission policy for the agent
-    permissions = NULL,
-
-    #' @field working_dir Working directory for file operations
-    working_dir = NULL,
-
-    #' @field hooks Hook registry for lifecycle events
-    hooks = NULL,
-
     #' @description
     #' Create a new Agent.
     #'
@@ -96,10 +88,10 @@ Agent <- R6::R6Class(
     ) {
       validate_chat(chat)
 
-      self$chat <- chat
-      self$permissions <- permissions %||% permissions_standard(working_dir)
-      self$working_dir <- working_dir
-      self$hooks <- HookRegistry$new()
+      private$.chat <- chat
+      private$.permissions <- permissions %||% permissions_standard(working_dir)
+      private$.working_dir <- working_dir
+      private$.hooks <- HookRegistry$new()
 
       # Override system prompt if provided
       if (!is.null(system_prompt)) {
@@ -482,10 +474,10 @@ Agent <- R6::R6Class(
 
       # Restore permissions and working dir
       if (!is.null(session$permissions)) {
-        self$permissions <- session$permissions
+        private$.permissions <- session$permissions
       }
       if (!is.null(session$working_dir)) {
-        self$working_dir <- session$working_dir
+        private$.working_dir <- session$working_dir
       }
 
       # Note about skills and hooks
@@ -914,7 +906,50 @@ Agent <- R6::R6Class(
     }
   ),
 
+  active = list(
+    #' @field chat The wrapped ellmer Chat object. Read-only after construction.
+    chat = function(value) {
+      if (missing(value)) {
+        return(private$.chat)
+      }
+      cli_abort("Cannot modify agent: chat is immutable after construction")
+    },
+
+    #' @field permissions Permission policy for the agent. Read-only after construction.
+    permissions = function(value) {
+      if (missing(value)) {
+        return(private$.permissions)
+      }
+      cli_abort(
+        "Cannot modify agent: permissions are immutable after construction"
+      )
+    },
+
+    #' @field working_dir Working directory for file operations. Read-only after construction.
+    working_dir = function(value) {
+      if (missing(value)) {
+        return(private$.working_dir)
+      }
+      cli_abort(
+        "Cannot modify agent: working_dir is immutable after construction"
+      )
+    },
+
+    #' @field hooks Hook registry for lifecycle events. Read-only after construction.
+    hooks = function(value) {
+      if (missing(value)) {
+        return(private$.hooks)
+      }
+      cli_abort("Cannot modify agent: hooks are immutable after construction")
+    }
+  ),
+
   private = list(
+    .chat = NULL,
+    .permissions = NULL,
+    .working_dir = NULL,
+    .hooks = NULL,
+
     # Flag to signal stopping from hooks
     should_stop = FALSE,
     stop_reason_from_hook = NULL,

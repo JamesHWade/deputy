@@ -20,6 +20,38 @@ test_that("HookMatcher validates callback is function", {
   )
 })
 
+test_that("HookMatcher fields are immutable after construction", {
+  callback <- function(...) NULL
+  matcher <- HookMatcher$new(
+    event = "PreToolUse",
+    pattern = "^write",
+    callback = callback,
+    timeout = 5
+  )
+
+  expect_error(
+    matcher$event <- "PostToolUse",
+    "immutable after construction"
+  )
+  expect_error(
+    matcher$pattern <- "^read",
+    "immutable after construction"
+  )
+  expect_error(
+    matcher$callback <- function(...) TRUE,
+    "immutable after construction"
+  )
+  expect_error(
+    matcher$timeout <- 0,
+    "immutable after construction"
+  )
+
+  expect_equal(matcher$event, "PreToolUse")
+  expect_equal(matcher$pattern, "^write")
+  expect_identical(matcher$callback, callback)
+  expect_equal(matcher$timeout, 5)
+})
+
 test_that("HookMatcher matches without pattern", {
   matcher <- HookMatcher$new(
     event = "PreToolUse",
