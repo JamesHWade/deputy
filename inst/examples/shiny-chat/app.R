@@ -26,12 +26,15 @@ server <- function(input, output, session) {
   )
   agent$add_hook(hook_log_tools(verbose = TRUE))
 
-  # run_shiny() returns a content stream with deputy's permissions, hooks,
-
-  # and tool call limits enforced
+  # Pass run_shiny() directly to chat_append(); chat_append() owns the
+  # completion promise and surfaces streaming errors in the UI.
   observeEvent(input$chat_user_input, {
-    stream <- agent$run_shiny(input$chat_user_input)
-    chat_append("chat", stream)
+    req(input$chat_user_input)
+
+    chat_append(
+      "chat",
+      agent$run_shiny(input$chat_user_input)
+    )
   })
 }
 

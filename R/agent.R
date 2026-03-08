@@ -849,8 +849,8 @@ Agent <- R6::R6Class(
     #'   Defaults to `permissions$max_turns` or 25. Note this counts individual
     #'   tool call requests, not LLM turns (one turn can have multiple parallel
     #'   tool calls).
-    #' @return A promise that resolves when the stream is complete, suitable
-    #'   for `shinychat::chat_append()`.
+    #' @return An async content stream suitable for
+    #'   `shinychat::chat_append()`.
     run_shiny = function(prompt, max_tool_calls = NULL) {
       rlang::check_installed("promises", reason = "for run_shiny()")
 
@@ -861,6 +861,8 @@ Agent <- R6::R6Class(
       # Reset counters and activate callback-based limits
       private$tool_call_count <- 0L
       private$tool_call_limit <- as.integer(max_tool_calls)
+      private$should_stop <- FALSE
+      private$stop_reason_from_hook <- NULL
 
       # Fire session hooks synchronously before streaming
       self$hooks$fire(
@@ -881,28 +883,76 @@ Agent <- R6::R6Class(
       # Get the async content stream -- ellmer drives the multi-turn loop
       stream <- self$chat$stream_async(prompt, stream = "content")
 
+      # Normalize non-generator responses to a single-yield stream so we can
+      # manage cleanup consistently.
+      if (!inherits(stream, "coro_generator_instance")) {
+        stream_value <- stream
+        stream <- local({
+          yielded <- FALSE
+          function() {
+            if (yielded) {
+              return(coro::exhausted())
+            }
+            yielded <<- TRUE
+            stream_value
+          }
+        })
+      }
+
       # Cleanup: fire Stop/SessionEnd hooks, deactivate limits
       agent <- self
-      promises::finally(stream, function() {
-        agent$hooks$fire(
-          "Stop",
-          reason = "complete",
-          context = list(
-            working_dir = agent$working_dir,
-            cost = agent$cost()
+      stream_state <- new.env(parent = emptyenv())
+      stream_state$reason <- "complete"
+
+      coro::async_generator(function() {
+        on.exit({
+          agent$hooks$fire(
+            "Stop",
+            reason = stream_state$reason,
+            context = list(
+              working_dir = agent$working_dir,
+              cost = agent$cost()
+            )
           )
-        )
-        agent$hooks$fire(
-          "SessionEnd",
-          reason = "complete",
-          context = list(
-            working_dir = agent$working_dir,
-            cost = agent$cost()
+          agent$hooks$fire(
+            "SessionEnd",
+            reason = stream_state$reason,
+            context = list(
+              working_dir = agent$working_dir,
+              cost = agent$cost()
+            )
           )
-        )
-        # Deactivate callback-based limits
-        agent$.__enclos_env__$private$tool_call_limit <- NULL
-      })
+          agent$.__enclos_env__$private$tool_call_limit <- NULL
+          agent$.__enclos_env__$private$should_stop <- FALSE
+          agent$.__enclos_env__$private$stop_reason_from_hook <- NULL
+        }, add = TRUE)
+
+        repeat {
+          chunk <- tryCatch(
+            stream(),
+            error = function(e) {
+              stream_state$reason <- "error"
+              stop(e)
+            }
+          )
+
+          if (promises::is.promising(chunk)) {
+            chunk <- tryCatch(
+              coro::await(chunk),
+              error = function(e) {
+                stream_state$reason <- "error"
+                stop(e)
+              }
+            )
+          }
+
+          if (coro::is_exhausted(chunk)) {
+            break
+          }
+
+          coro::yield(chunk)
+        }
+      })()
     }
   ),
 
