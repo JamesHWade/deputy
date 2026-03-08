@@ -3,7 +3,10 @@
 deputy is an agentic AI framework for R that builds on
 [ellmer](https://ellmer.tidyverse.org/). It enables you to create AI
 agents that use tools to accomplish multi-step tasks, with built-in
-support for permissions, hooks, and streaming output.
+support for permissions, hooks, and streaming output. The core `Agent`
+and `LeadAgent` APIs are provider-agnostic; deputy also includes an
+opt-in Anthropic-compatible Claude Agent SDK facade for Claude-style
+entrypoints and session workflows.
 
 ## Installation
 
@@ -30,6 +33,32 @@ cat(result$response)
 The agent sends your task to the LLM, which may call tools, and loops
 until the task is complete. `run_sync()` blocks until done and returns
 an `AgentResult`.
+
+## Anthropic-Compatible Quick Start
+
+Use the compatibility facade when you want Claude-style options, tool
+aliases, and persisted session ids:
+
+``` r
+library(deputy)
+
+options <- claude_sdk_options(
+  chat = ellmer::chat_openai(model = "gpt-4o-mini"),
+  setting_sources = "project",
+  permission_mode = "plan"
+)
+
+client <- ClaudeSDKClient$new(options)
+result <- client$query("Summarize this repository")
+result$session_id
+
+# Resume or fork the persisted session later
+client$resume(result$session_id, fork = TRUE)
+```
+
+[`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
+is a one-shot wrapper around the same compatibility surface when you do
+not need a long-lived client object.
 
 ## Tool Bundles
 
@@ -106,6 +135,13 @@ agent <- Agent$new(
   tools = tools_all(),
   permissions = permissions_full()
 )
+
+# Planning mode: read-only tools plus AskUserQuestion
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_all(),
+  permissions = permissions_plan()
+)
 ```
 
 ### Custom Permissions
@@ -177,7 +213,8 @@ reasons so the model can request approval.
 ### Applying Tool Policy from `.claude/settings.json`
 
 `setting_sources` now maps Claude-style tool policy keys directly into
-permissions:
+permissions, and can also load `.claude/agents` definitions for
+delegation:
 
 ``` r
 agent <- Agent$new(
@@ -196,6 +233,10 @@ Example `.claude/settings.json`:
   "permissionPromptToolName": "AskUserQuestion"
 }
 ```
+
+Custom agents under `.claude/agents` are registered automatically when
+you use `LeadAgent$new(setting_sources = ...)` or
+`ClaudeSDKClient$new(...)`.
 
 ## Hooks
 
@@ -385,6 +426,8 @@ agent <- Agent$new(
   – Lifecycle hooks for logging, blocking, and auditing
 - [`vignette("multi-agent")`](https://jameshwade.github.io/deputy/articles/multi-agent.md)
   – Multi-agent delegation with LeadAgent
+- [`vignette("claude-sdk-parity")`](https://jameshwade.github.io/deputy/articles/claude-sdk-parity.md)
+  – Anthropic-compatible facade and mappings
 - [`vignette("structured-output")`](https://jameshwade.github.io/deputy/articles/structured-output.md)
   – JSON schema output and validation
 - [`vignette("agent-configuration")`](https://jameshwade.github.io/deputy/articles/agent-configuration.md)

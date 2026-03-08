@@ -3,6 +3,7 @@ pkgdown: 2.2.0
 pkgdown_sha: ~
 articles:
   agent-configuration: agent-configuration.html
+  claude-sdk-parity: claude-sdk-parity.html
   example-code-review: example-code-review.html
   example-data-analysis: example-data-analysis.html
   example-extraction-pipeline: example-extraction-pipeline.html
@@ -13,7 +14,7 @@ articles:
   permissions: permissions.html
   structured-output: structured-output.html
   tools: tools.html
-last_built: 2026-03-08T01:39Z
+last_built: 2026-03-08T02:07Z
 urls:
   reference: https://jameshwade.github.io/deputy/reference
   article: https://jameshwade.github.io/deputy/articles

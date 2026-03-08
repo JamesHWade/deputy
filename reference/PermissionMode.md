@@ -7,6 +7,9 @@ checking:
 
 - `"acceptEdits"` - Auto-accept file write tools
 
+- `"plan"` - Allow only annotated read-only tools and human approval
+  prompts
+
 - `"readonly"` - Deny all write/execute tools
 
 - `"bypassPermissions"` - Allow all tools (dangerous, use with caution)
@@ -19,7 +22,7 @@ PermissionMode
 
 ## Format
 
-An object of class `character` of length 4.
+An object of class `character` of length 5.
 
 ## Tool Annotations
 

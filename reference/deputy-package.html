@@ -3,11 +3,15 @@
 A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, and human-in-the-loop capabilities."><meta property="og:description" content="
+permissions, hooks, and human-in-the-loop capabilities. deputy also ships
+an opt-in Anthropic-compatible Claude Agent SDK facade for teams that want
+Claude-style entrypoints and session semantics on top of the same runtime."><meta property="og:description" content="
 A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, and human-in-the-loop capabilities."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
+permissions, hooks, and human-in-the-loop capabilities. deputy also ships
+an opt-in Anthropic-compatible Claude Agent SDK facade for teams that want
+Claude-style entrypoints and session semantics on top of the same runtime."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -35,6 +39,7 @@ permissions, hooks, and human-in-the-loop capabilities."><meta property="og:imag
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -62,7 +67,9 @@ permissions, hooks, and human-in-the-loop capabilities."><meta property="og:imag
 <p>A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.</p>
 <p>A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, and human-in-the-loop capabilities.</p>
+permissions, hooks, and human-in-the-loop capabilities. deputy also ships
+an opt-in Anthropic-compatible Claude Agent SDK facade for teams that want
+Claude-style entrypoints and session semantics on top of the same runtime.</p>
     </div>
 
 
@@ -71,9 +78,12 @@ permissions, hooks, and human-in-the-loop capabilities.</p>
 
 
 <ul><li><p><a href="Agent.html">Agent</a> - The main class for creating agents</p></li>
+<li><p><a href="ClaudeSDKClient.html">ClaudeSDKClient</a> - Anthropic-compatible client facade</p></li>
+<li><p><code><a href="claude_sdk_query.html">claude_sdk_query()</a></code> - One-shot Claude-compatible query helper</p></li>
 <li><p><code><a href="tools_file.html">tools_file()</a></code> - File operation tools</p></li>
 <li><p><code><a href="tools_code.html">tools_code()</a></code> - Code execution tools</p></li>
 <li><p><code><a href="permissions_standard.html">permissions_standard()</a></code> - Standard permission policy</p></li>
+<li><p><code><a href="permissions_plan.html">permissions_plan()</a></code> - Claude-style planning permission policy</p></li>
 <li><p><code><a href="permissions_readonly.html">permissions_readonly()</a></code> - Read-only permission policy</p></li>
 </ul></div>
     <div class="section level2">

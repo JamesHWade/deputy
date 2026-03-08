@@ -73,6 +73,8 @@ Create a new HookMatcher.
 
   - UserPromptSubmit: `function(prompt, context)`
 
+  - Notification: `function(message, context)`
+
   - PreCompact: `function(turns_to_compact, turns_to_keep, context)`
 
   - SessionStart: `function(context)`

@@ -31,6 +31,7 @@ execution."><meta property="og:image" content="https://jameshwade.github.io/depu
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -90,6 +91,14 @@ execution.</p>
 <dd><p>Parsed/validated structured output (if requested)</p></dd>
 
 
+<dt><code>session_id</code></dt>
+<dd><p>Compat session identifier when Claude SDK mode is active</p></dd>
+
+
+<dt><code>snapshot_path</code></dt>
+<dd><p>Latest compat snapshot path when session persistence is active</p></dd>
+
+
 </dl><p></p></div>
     </div>
     <div class="section level2">
@@ -116,7 +125,9 @@ execution.</p>
 <span>  events <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  duration <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  stop_reason <span class="op">=</span> <span class="st">"complete"</span>,</span>
-<span>  structured_output <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  structured_output <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  session_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  snapshot_path <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -148,6 +159,14 @@ execution.</p>
 
 <dt><code>structured_output</code></dt>
 <dd><p>Parsed structured output (if any)</p></dd>
+
+
+<dt><code>session_id</code></dt>
+<dd><p>Compat session identifier (if any)</p></dd>
+
+
+<dt><code>snapshot_path</code></dt>
+<dd><p>Latest compat snapshot path (if any)</p></dd>
 
 
 </dl><p></p></div>

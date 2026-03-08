@@ -47,6 +47,7 @@
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -84,7 +85,11 @@
     
 <p>deputy is an agentic AI framework for R that builds on <a href="https://ellmer.tidyverse.org/" class="external-link">ellmer</a>. It enables you to
 create AI agents that use tools to accomplish multi-step tasks, with
-built-in support for permissions, hooks, and streaming output.</p>
+built-in support for permissions, hooks, and streaming output. The core
+<code>Agent</code> and <code>LeadAgent</code> APIs are
+provider-agnostic; deputy also includes an opt-in Anthropic-compatible
+Claude Agent SDK facade for Claude-style entrypoints and session
+workflows.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -108,6 +113,30 @@ and lifecycle hooks:</p>
 <p>The agent sends your task to the LLM, which may call tools, and loops
 until the task is complete. <code>run_sync()</code> blocks until done
 and returns an <code>AgentResult</code>.</p>
+</div>
+<div class="section level2">
+<h2 id="anthropic-compatible-quick-start">Anthropic-Compatible Quick Start<a class="anchor" aria-label="anchor" href="#anthropic-compatible-quick-start"></a>
+</h2>
+<p>Use the compatibility facade when you want Claude-style options, tool
+aliases, and persisted session ids:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">options</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/claude_sdk_options.html">claude_sdk_options</a></span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-4o-mini"</span><span class="op">)</span>,</span>
+<span>  setting_sources <span class="op">=</span> <span class="st">"project"</span>,</span>
+<span>  permission_mode <span class="op">=</span> <span class="st">"plan"</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">client</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/ClaudeSDKClient.html">ClaudeSDKClient</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="va">options</span><span class="op">)</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">client</span><span class="op">$</span><span class="fu">query</span><span class="op">(</span><span class="st">"Summarize this repository"</span><span class="op">)</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">session_id</span></span>
+<span></span>
+<span><span class="co"># Resume or fork the persisted session later</span></span>
+<span><span class="va">client</span><span class="op">$</span><span class="fu">resume</span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">session_id</span>, fork <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/claude_sdk_query.html">claude_sdk_query()</a></code> is a one-shot wrapper around the same
+compatibility surface when you do not need a long-lived client
+object.</p>
 </div>
 <div class="section level2">
 <h2 id="tool-bundles">Tool Bundles<a class="anchor" aria-label="anchor" href="#tool-bundles"></a>
@@ -162,7 +191,7 @@ match:</p>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Combine bundles</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -170,7 +199,7 @@ match:</p>
 <span><span class="op">)</span></span></code></pre></div>
 <p>There are also named presets available via
 <code><a href="../reference/tools_preset.html">tools_preset()</a></code>:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/list_presets.html">list_presets</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"dev"</span><span class="op">)</span></span></code></pre></div>
 <p>See <code><a href="../articles/tools.html">vignette("tools")</a></code> for custom tools, web tools, MCP
@@ -181,7 +210,7 @@ integration, and human-in-the-loop.</p>
 </h2>
 <p>For real-time feedback, use <code>run()</code> which returns a
 generator:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="va">chat</span>, tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
@@ -202,7 +231,7 @@ start and finish, and a final stop event.</p>
 <div class="section level3">
 <h3 id="read-only-permissions">Read-Only Permissions<a class="anchor" aria-label="anchor" href="#read-only-permissions"></a>
 </h3>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Only allows reading files - no writes, no code execution</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
@@ -213,19 +242,26 @@ start and finish, and a final stop event.</p>
 <div class="section level3">
 <h3 id="full-permissions">Full Permissions<a class="anchor" aria-label="anchor" href="#full-permissions"></a>
 </h3>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Allows everything - use with caution!</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_full.html">permissions_full</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Planning mode: read-only tools plus AskUserQuestion</span></span>
+<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_plan.html">permissions_plan</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="custom-permissions">Custom Permissions<a class="anchor" aria-label="anchor" href="#custom-permissions"></a>
 </h3>
 <p>For fine-grained control:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  file_write <span class="op">=</span> <span class="st">"/path/to/allowed/dir"</span>, <span class="co"># Restrict to specific directory</span></span>
@@ -246,7 +282,7 @@ start and finish, and a final stop event.</p>
 <h3 id="custom-permission-callbacks">Custom Permission Callbacks<a class="anchor" aria-label="anchor" href="#custom-permission-callbacks"></a>
 </h3>
 <p>For complex permission logic:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  can_use_tool <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="co"># Block any file writes to sensitive directories</span></span>
@@ -266,7 +302,7 @@ start and finish, and a final stop event.</p>
 </h3>
 <p>Use allow/deny lists when you want an explicit tool policy that is
 separate from the broader mode flags:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  mode <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  tool_allowlist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"read_file"</span>, <span class="st">"list_files"</span>, <span class="st">"run_r_code"</span><span class="op">)</span>,</span>
@@ -287,19 +323,24 @@ appears in deny reasons so the model can request approval.</p>
 <h3 id="applying-tool-policy-from--claudesettings-json">Applying Tool Policy from <code>.claude/settings.json</code><a class="anchor" aria-label="anchor" href="#applying-tool-policy-from--claudesettings-json"></a>
 </h3>
 <p><code>setting_sources</code> now maps Claude-style tool policy keys
-directly into permissions:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+directly into permissions, and can also load <code>.claude/agents</code>
+definitions for delegation:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  setting_sources <span class="op">=</span> <span class="st">"project"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Example <code>.claude/settings.json</code>:</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  <span class="dt">"allowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"read_file"</span><span class="ot">,</span> <span class="st">"list_files"</span><span class="ot">,</span> <span class="st">"run_r_code"</span><span class="ot">]</span><span class="fu">,</span></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="dt">"disallowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"run_bash"</span><span class="ot">]</span><span class="fu">,</span></span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="dt">"permissionPromptToolName"</span><span class="fu">:</span> <span class="st">"AskUserQuestion"</span></span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  <span class="dt">"allowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"read_file"</span><span class="ot">,</span> <span class="st">"list_files"</span><span class="ot">,</span> <span class="st">"run_r_code"</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  <span class="dt">"disallowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"run_bash"</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>  <span class="dt">"permissionPromptToolName"</span><span class="fu">:</span> <span class="st">"AskUserQuestion"</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p>Custom agents under <code>.claude/agents</code> are registered
+automatically when you use
+<code>LeadAgent$new(setting_sources = ...)</code> or
+<code>ClaudeSDKClient$new(...)</code>.</p>
 </div>
 </div>
 <div class="section level2">
@@ -348,7 +389,7 @@ points:</p>
 <div class="section level3">
 <h3 id="example-logging-all-tool-calls">Example: Logging All Tool Calls<a class="anchor" aria-label="anchor" href="#example-logging-all-tool-calls"></a>
 </h3>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PostToolUse"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_result</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
@@ -360,7 +401,7 @@ points:</p>
 <div class="section level3">
 <h3 id="example-block-dangerous-commands">Example: Block Dangerous Commands<a class="anchor" aria-label="anchor" href="#example-block-dangerous-commands"></a>
 </h3>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PreToolUse"</span>,</span>
 <span>  pattern <span class="op">=</span> <span class="st">"^run_bash$"</span>, <span class="co"># Only match bash tool</span></span>
@@ -381,7 +422,7 @@ points:</p>
 <h2 id="session-management">Session Management<a class="anchor" aria-label="anchor" href="#session-management"></a>
 </h2>
 <p>Save and restore agent sessions:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Save the current session</span></span>
 <span><span class="va">agent</span><span class="op">$</span><span class="fu">save_session</span><span class="op">(</span><span class="st">"my_session.rds"</span><span class="op">)</span></span>
 <span></span>
@@ -397,7 +438,7 @@ points:</p>
 </h2>
 <p>For complex tasks, you can create a lead agent that delegates to
 specialized sub-agents:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Define specialized sub-agents</span></span>
 <span><span class="va">code_agent</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"code_analyst"</span>,</span>
@@ -429,7 +470,7 @@ specialized sub-agents:</p>
 <h2 id="working-with-results">Working with Results<a class="anchor" aria-label="anchor" href="#working-with-results"></a>
 </h2>
 <p>The <code>AgentResult</code> object contains useful information:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Analyze this project"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># The final response</span></span>
@@ -460,7 +501,7 @@ specialized sub-agents:</p>
 <h2 id="provider-support">Provider Support<a class="anchor" aria-label="anchor" href="#provider-support"></a>
 </h2>
 <p>deputy works with any LLM provider that ellmer supports:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># OpenAI</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
@@ -489,7 +530,7 @@ sessions periodically.</p></li>
 <li><p><strong>Use streaming for UX</strong> - The <code>run()</code>
 method provides real-time feedback.</p></li>
 </ol>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Example combining best practices</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
@@ -517,6 +558,9 @@ blocking, and auditing</li>
 <li>
 <code><a href="../articles/multi-agent.html">vignette("multi-agent")</a></code> – Multi-agent delegation with
 LeadAgent</li>
+<li>
+<code><a href="../articles/claude-sdk-parity.html">vignette("claude-sdk-parity")</a></code> – Anthropic-compatible
+facade and mappings</li>
 <li>
 <code><a href="../articles/structured-output.html">vignette("structured-output")</a></code> – JSON schema output and
 validation</li>

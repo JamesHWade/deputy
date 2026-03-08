@@ -14,7 +14,8 @@ claude_settings_apply(
   settings,
   apply_memory = TRUE,
   load_skills = TRUE,
-  load_commands = TRUE
+  load_commands = TRUE,
+  load_agents = TRUE
 )
 ```
 
@@ -41,6 +42,12 @@ claude_settings_apply(
 - load_commands:
 
   Logical. If TRUE (default), register slash commands.
+
+- load_agents:
+
+  Logical. If TRUE (default), register settings-defined agents on
+  [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
+  objects.
 
 ## Value
 

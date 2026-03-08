@@ -2,15 +2,16 @@
 
 Loads Claude-style settings from a list of `setting_sources`, mirroring
 the Claude Agent SDK behavior. Supports project and user sources, and
-returns memory, skills, and slash commands discovered in `.claude`
-directories.
+returns memory, skills, slash commands, and custom agents discovered in
+`.claude` directories.
 
 Supported sources:
 
-- `"project"`: loads project `.claude` settings, skills, commands, and
-  memory
+- `"project"`: loads project `.claude` settings, skills, commands,
+  agents, and memory
 
-- `"user"`: loads `~/.claude` settings, skills, commands, and memory
+- `"user"`: loads `~/.claude` settings, skills, commands, agents, and
+  memory
 
 - explicit file paths to `.json` settings files
 
@@ -32,4 +33,5 @@ claude_settings_load(setting_sources, working_dir = getwd())
 
 ## Value
 
-A list with `settings`, `memory`, `skills`, `commands`, and metadata.
+A list with `settings`, `memory`, `skills`, `commands`, `agents`, and
+metadata.

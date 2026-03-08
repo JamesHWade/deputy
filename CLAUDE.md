@@ -24,6 +24,9 @@ delegation (LeadAgent) - Session persistence - Streaming output support
     │   ├── agent-result.R      # AgentResult and AgentEvent objects
     │   ├── permissions.R       # Permission system and tool annotations
     │   ├── hooks.R             # HookRegistry for lifecycle events
+    │   ├── settings.R          # Claude settings loading and application
+    │   ├── sdk-compat.R        # Anthropic-compatible SDK facade and client API
+    │   ├── session-store.R     # File-backed session persistence helpers
     │   ├── skills.R            # Skill loading system
     │   ├── tools-builtin.R     # Built-in tools (read_file, write_file, etc.)
     │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)

@@ -11,7 +11,7 @@ HookEvent
 
 ## Format
 
-An object of class `character` of length 8.
+An object of class `character` of length 9.
 
 ## Event Types
 
@@ -83,6 +83,17 @@ Callback signature: `function(prompt, context)`
 
 - Return: NULL (informational only)
 
+**Notification** - Informational runtime notice
+
+Callback signature: `function(message, context)`
+
+- `message`: The notification text (character)
+
+- `context`: List containing `working_dir`, `level`, `code`, and any
+  event-specific metadata
+
+- Return: NULL (informational only)
+
 **PreCompact** - Before conversation compaction
 
 Callback signature: `function(turns_to_compact, turns_to_keep, context)`
@@ -137,6 +148,11 @@ The context parameter is always a named list. Common fields:
   `output_tokens`
 
 - `compact_count`: (PreCompact only) Number of turns being compacted
+
+- `level`: (Notification only) Informational severity such as `"info"`
+  or `"warning"`
+
+- `code`: (Notification only) Stable notification code when available
 
 - `permissions`: (SessionStart only) The agent's permissions
   configuration

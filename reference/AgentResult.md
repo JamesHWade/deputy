@@ -34,6 +34,14 @@ occurred during execution.
 
   Parsed/validated structured output (if requested)
 
+- `session_id`:
+
+  Compat session identifier when Claude SDK mode is active
+
+- `snapshot_path`:
+
+  Latest compat snapshot path when session persistence is active
+
 ## Methods
 
 ### Public methods
@@ -67,7 +75,9 @@ Create a new AgentResult object.
       events = list(),
       duration = NULL,
       stop_reason = "complete",
-      structured_output = NULL
+      structured_output = NULL,
+      session_id = NULL,
+      snapshot_path = NULL
     )
 
 #### Arguments
@@ -99,6 +109,14 @@ Create a new AgentResult object.
 - `structured_output`:
 
   Parsed structured output (if any)
+
+- `session_id`:
+
+  Compat session identifier (if any)
+
+- `snapshot_path`:
+
+  Latest compat snapshot path (if any)
 
 #### Returns
 

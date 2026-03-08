@@ -47,6 +47,7 @@
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -94,6 +95,9 @@ policies.</p>
 <span></span>
 <span><span class="co"># Read-only: only read_file and list_files are allowed</span></span>
 <span><span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Plan: only annotated read-only tools plus AskUserQuestion</span></span>
+<span><span class="fu"><a href="../reference/permissions_plan.html">permissions_plan</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Standard (default): file read/write in working dir, R code, no bash/web</span></span>
 <span><span class="fu"><a href="../reference/permissions_standard.html">permissions_standard</a></span><span class="op">(</span><span class="op">)</span></span>
@@ -186,6 +190,10 @@ directly:</p>
 </h2>
 <p>The <code>mode</code> field provides broad policy shortcuts:</p>
 <table class="table">
+<colgroup>
+<col width="35%">
+<col width="64%">
+</colgroup>
 <thead><tr class="header">
 <th>Mode</th>
 <th>Behaviour</th>
@@ -202,10 +210,15 @@ directly:</p>
 </td>
 </tr>
 <tr class="odd">
+<td><code>"plan"</code></td>
+<td>Allow read-only annotated tools and the human approval prompt
+tool</td>
+</tr>
+<tr class="even">
 <td><code>"acceptEdits"</code></td>
 <td>Auto-approve file writes without prompting</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>"bypassPermissions"</code></td>
 <td>Allow everything (dangerous!)</td>
 </tr>
@@ -213,13 +226,21 @@ directly:</p>
 </table>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"readonly"</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/permissions_plan.html">permissions_plan()</a></code> is a convenience wrapper for
+Claude-style planning flows:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_plan.html">permissions_plan</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="tool-annotations">Tool Annotations<a class="anchor" aria-label="anchor" href="#tool-annotations"></a>
 </h2>
 <p>Tools carry annotations that describe their behaviour. The permission
 system uses these annotations to make decisions:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># A read-only tool</span></span>
 <span><span class="va">tool_safe</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
 <span>  fun <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span>,</span>
@@ -241,7 +262,7 @@ policy.</p>
 <h2 id="custom-permission-callbacks">Custom Permission Callbacks<a class="anchor" aria-label="anchor" href="#custom-permission-callbacks"></a>
 </h2>
 <p>For complex logic, provide a <code>can_use_tool</code> callback:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  can_use_tool <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="co"># Block writes to sensitive files</span></span>
@@ -273,7 +294,7 @@ policy.</p>
 <h2 id="example-read-only-agent">Example: Read-Only Agent<a class="anchor" aria-label="anchor" href="#example-read-only-agent"></a>
 </h2>
 <p>A read-only agent can explore files but cannot change anything:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
@@ -290,7 +311,7 @@ policy.</p>
 <h2 id="cost-and-turn-limits">Cost and Turn Limits<a class="anchor" aria-label="anchor" href="#cost-and-turn-limits"></a>
 </h2>
 <p>Permissions also enforce resource limits:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  max_turns <span class="op">=</span> <span class="fl">10</span>,      <span class="co"># Stop after 10 agentic turns</span></span>
 <span>  max_cost_usd <span class="op">=</span> <span class="fl">1.00</span>  <span class="co"># Stop if cost exceeds $1.00</span></span>

@@ -80,6 +80,10 @@ The following methods manage MCP (Model Context Protocol) server tools:
 
 - [`Agent$last_turn()`](#method-Agent-last_turn)
 
+- [`Agent$session_id()`](#method-Agent-session_id)
+
+- [`Agent$configure_sdk_compat()`](#method-Agent-configure_sdk_compat)
+
 - [`Agent$cost()`](#method-Agent-cost)
 
 - [`Agent$provider()`](#method-Agent-provider)
@@ -384,6 +388,40 @@ Get the last turn in the conversation.
 #### Returns
 
 A Turn object or NULL
+
+------------------------------------------------------------------------
+
+### Method `session_id()`
+
+Get the active Claude SDK compatibility session identifier.
+
+#### Usage
+
+    Agent$session_id()
+
+#### Returns
+
+Character session id, or NULL when compat mode is inactive
+
+------------------------------------------------------------------------
+
+### Method `configure_sdk_compat()`
+
+Configure Claude SDK compatibility behavior for this agent.
+
+#### Usage
+
+    Agent$configure_sdk_compat(config = list())
+
+#### Arguments
+
+- `config`:
+
+  Named list of compat settings
+
+#### Returns
+
+Invisible self for chaining
 
 ------------------------------------------------------------------------
 

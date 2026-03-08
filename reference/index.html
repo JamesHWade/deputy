@@ -27,6 +27,7 @@
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -96,10 +97,38 @@
 
         <dt>
 
+          <code><a href="tool_edit_file.html">tool_edit_file()</a></code>
+
+        </dt>
+        <dd>Edit file contents by replacing text</dd>
+
+        <dt>
+
+          <code><a href="tool_glob_files.html">tool_glob_files()</a></code>
+
+        </dt>
+        <dd>Find files using a glob pattern</dd>
+
+        <dt>
+
+          <code><a href="tool_grep_files.html">tool_grep_files()</a></code>
+
+        </dt>
+        <dd>Search file contents with grep-like matching</dd>
+
+        <dt>
+
           <code><a href="tool_list_files.html">tool_list_files()</a></code>
 
         </dt>
         <dd>List files in a directory</dd>
+
+        <dt>
+
+          <code><a href="tool_multi_edit.html">tool_multi_edit()</a></code>
+
+        </dt>
+        <dd>Apply multiple text edits to a file</dd>
 
         <dt>
 
@@ -135,6 +164,20 @@
 
         </dt>
         <dd>Execute R code</dd>
+
+        <dt>
+
+          <code><a href="tool_todo_read.html">tool_todo_read()</a></code>
+
+        </dt>
+        <dd>Read persisted todo items</dd>
+
+        <dt>
+
+          <code><a href="tool_todo_write.html">tool_todo_write()</a></code>
+
+        </dt>
+        <dd>Write persisted todo items</dd>
 
         <dt>
 
@@ -300,6 +343,13 @@
 
         </dt>
         <dd>Create a full access permission policy</dd>
+
+        <dt>
+
+          <code><a href="permissions_plan.html">permissions_plan()</a></code>
+
+        </dt>
+        <dd>Create a planning permission policy</dd>
 
         <dt>
 
@@ -474,6 +524,36 @@
 
         </dt>
         <dd>Apply Claude-style settings to an Agent</dd>
+      </dl></div><div class="section level2">
+      <h2 id="claude-compatibility">Claude Compatibility<a class="anchor" aria-label="anchor" href="#claude-compatibility"></a></h2>
+
+      <div class="section-desc"><p>Anthropic-compatible facade and entrypoints</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="ClaudeSDKClient.html">ClaudeSDKClient</a></code>
+
+        </dt>
+        <dd>Claude Agent SDK compatibility client</dd>
+
+        <dt>
+
+          <code><a href="claude_sdk_options.html">claude_sdk_options()</a></code>
+
+        </dt>
+        <dd>Create Claude Agent SDK compatibility options</dd>
+
+        <dt>
+
+          <code><a href="claude_sdk_query.html">claude_sdk_query()</a></code>
+
+        </dt>
+        <dd>Run a one-shot Claude Agent SDK compatibility query</dd>
       </dl></div><div class="section level2">
       <h2 id="multi-agent">Multi-Agent<a class="anchor" aria-label="anchor" href="#multi-agent"></a></h2>
 

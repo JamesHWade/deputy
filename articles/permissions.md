@@ -12,6 +12,9 @@ library(deputy)
 # Read-only: only read_file and list_files are allowed
 permissions_readonly()
 
+# Plan: only annotated read-only tools plus AskUserQuestion
+permissions_plan()
+
 # Standard (default): file read/write in working dir, R code, no bash/web
 permissions_standard()
 
@@ -63,15 +66,27 @@ Fields:
 
 The `mode` field provides broad policy shortcuts:
 
-| Mode                  | Behaviour                                             |
-|-----------------------|-------------------------------------------------------|
-| `"default"`           | Check each tool against the policy fields above       |
-| `"readonly"`          | Only allow tools annotated as `read_only_hint = TRUE` |
-| `"acceptEdits"`       | Auto-approve file writes without prompting            |
-| `"bypassPermissions"` | Allow everything (dangerous!)                         |
+| Mode                  | Behaviour                                                          |
+|-----------------------|--------------------------------------------------------------------|
+| `"default"`           | Check each tool against the policy fields above                    |
+| `"readonly"`          | Only allow tools annotated as `read_only_hint = TRUE`              |
+| `"plan"`              | Allow read-only annotated tools and the human approval prompt tool |
+| `"acceptEdits"`       | Auto-approve file writes without prompting                         |
+| `"bypassPermissions"` | Allow everything (dangerous!)                                      |
 
 ``` r
 perms <- Permissions$new(mode = "readonly")
+```
+
+[`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md)
+is a convenience wrapper for Claude-style planning flows:
+
+``` r
+agent <- Agent$new(
+  chat = ellmer::chat_anthropic(),
+  tools = tools_all(),
+  permissions = permissions_plan()
+)
 ```
 
 ## Tool Annotations

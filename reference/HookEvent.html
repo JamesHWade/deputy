@@ -29,6 +29,7 @@ type has a specific callback signature and context structure."><meta property="o
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -63,7 +64,7 @@ type has a specific callback signature and context structure.</p>
 
     <div class="section level2">
     <h2 id="format">Format<a class="anchor" aria-label="anchor" href="#format"></a></h2>
-    <p>An object of class <code>character</code> of length 8.</p>
+    <p>An object of class <code>character</code> of length 9.</p>
     </div>
     <div class="section level2">
     <h2 id="event-types">Event Types<a class="anchor" aria-label="anchor" href="#event-types"></a></h2>
@@ -95,6 +96,11 @@ type has a specific callback signature and context structure.</p>
 <p>Callback signature: <code>function(prompt, context)</code></p><ul><li><p><code>prompt</code>: The user's prompt text (character)</p></li>
 <li><p><code>context</code>: List containing <code>working_dir</code></p></li>
 <li><p>Return: NULL (informational only)</p></li>
+</ul><p><strong>Notification</strong> - Informational runtime notice</p>
+<p>Callback signature: <code>function(message, context)</code></p><ul><li><p><code>message</code>: The notification text (character)</p></li>
+<li><p><code>context</code>: List containing <code>working_dir</code>, <code>level</code>, <code>code</code>, and any
+event-specific metadata</p></li>
+<li><p>Return: NULL (informational only)</p></li>
 </ul><p><strong>PreCompact</strong> - Before conversation compaction</p>
 <p>Callback signature: <code>function(turns_to_compact, turns_to_keep, context)</code></p><ul><li><p><code>turns_to_compact</code>: List of turns that will be compacted into a summary</p></li>
 <li><p><code>turns_to_keep</code>: List of recent turns that will be preserved</p></li>
@@ -118,6 +124,8 @@ type has a specific callback signature and context structure.</p>
 <li><p><code>total_turns</code>: (Stop, PreCompact, SessionEnd) Number of turns in the conversation</p></li>
 <li><p><code>cost</code>: (Stop, SessionEnd) List with <code>total</code>, <code>input_tokens</code>, <code>output_tokens</code></p></li>
 <li><p><code>compact_count</code>: (PreCompact only) Number of turns being compacted</p></li>
+<li><p><code>level</code>: (Notification only) Informational severity such as <code>"info"</code> or <code>"warning"</code></p></li>
+<li><p><code>code</code>: (Notification only) Stable notification code when available</p></li>
 <li><p><code>permissions</code>: (SessionStart only) The agent's permissions configuration</p></li>
 <li><p><code>provider</code>: (SessionStart only) List with <code>name</code> and <code>model</code></p></li>
 <li><p><code>tools_count</code>: (SessionStart only) Number of registered tools</p></li>

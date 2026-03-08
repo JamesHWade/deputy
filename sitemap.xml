@@ -5,6 +5,7 @@
 <url><loc>https://jameshwade.github.io/deputy/LICENSE-text.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/LICENSE.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/agent-configuration.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/articles/claude-sdk-parity.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/example-code-review.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/example-data-analysis.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/example-extraction-pipeline.html</loc></url>
@@ -22,6 +23,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/Agent.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/AgentEvent.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/AgentResult.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/HookEvent.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/HookMatcher.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/HookRegistry.html</loc></url>
@@ -51,6 +53,8 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/agent_definition.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/agent_with_delegation.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/ask_user_impl.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/claude_sdk_options.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/claude_sdk_query.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/claude_settings_apply.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/claude_settings_load.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/deputy-errors.html</loc></url>
@@ -69,6 +73,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/parse_markdown_frontmatter.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/parse_user_response.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/permissions_full.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/permissions_plan.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/permissions_readonly.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/permissions_standard.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/set_ask_user_callback.html</loc></url>
@@ -76,12 +81,18 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_load.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skills_list.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_ask_user.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/tool_edit_file.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/tool_glob_files.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/tool_grep_files.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_list_files.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/tool_multi_edit.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_read_csv.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_read_file.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_read_markdown.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_run_bash.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_run_r_code.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/tool_todo_read.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/tool_todo_write.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_web_fetch.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_web_search.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_write_file.html</loc></url>

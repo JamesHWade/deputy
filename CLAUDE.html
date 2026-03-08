@@ -27,6 +27,7 @@
     <li><a class="dropdown-item" href="articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><a class="dropdown-item" href="articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -65,6 +66,9 @@
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
 │   ├── permissions.R       # Permission system and tool annotations
 │   ├── hooks.R             # HookRegistry for lifecycle events
+│   ├── settings.R          # Claude settings loading and application
+│   ├── sdk-compat.R        # Anthropic-compatible SDK facade and client API
+│   ├── session-store.R     # File-backed session persistence helpers
 │   ├── skills.R            # Skill loading system
 │   ├── tools-builtin.R     # Built-in tools (read_file, write_file, etc.)
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)

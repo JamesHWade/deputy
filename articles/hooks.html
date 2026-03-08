@@ -47,6 +47,7 @@
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -112,33 +113,38 @@ actions, or injecting custom logic.</p>
 <td>After a tool completes</td>
 </tr>
 <tr class="odd">
+<td><code>Notification</code></td>
+<td><code>function(message, context)</code></td>
+<td>Informational runtime notices</td>
+</tr>
+<tr class="even">
 <td><code>Stop</code></td>
 <td><code>function(reason, context)</code></td>
 <td>When the agent finishes</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>SubagentStop</code></td>
 <td><code>function(agent_name, task, result, context)</code></td>
 <td>When a sub-agent finishes</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>UserPromptSubmit</code></td>
 <td><code>function(prompt, context)</code></td>
 <td>When user submits input</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>PreCompact</code></td>
-<td><code>function(context)</code></td>
+<td><code>function(turns_to_compact, turns_to_keep, context)</code></td>
 <td>Before conversation compaction</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>SessionStart</code></td>
 <td><code>function(context)</code></td>
 <td>When a session starts</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>SessionEnd</code></td>
-<td><code>function(context)</code></td>
+<td><code>function(reason, context)</code></td>
 <td>When a session ends</td>
 </tr>
 </tbody>
@@ -294,12 +300,27 @@ call:</p>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
+<h2 id="notification-hooks">Notification Hooks<a class="anchor" aria-label="anchor" href="#notification-hooks"></a>
+</h2>
+<p><code>Notification</code> hooks are useful for informational events
+that should not alter control flow, such as permission-denied guidance,
+session restore notices, or compaction fallbacks:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  event <span class="op">=</span> <span class="st">"Notification"</span>,</span>
+<span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">message</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"[{context$code}] {message}"</span><span class="op">)</span></span>
+<span>    <span class="cn">NULL</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="error-handling-in-hooks">Error Handling in Hooks<a class="anchor" aria-label="anchor" href="#error-handling-in-hooks"></a>
 </h2>
 <p>If a hook callback throws an error, the agent logs it and continues.
 The error does not crash the agent. You can inspect recent hook errors
 with:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="va">hooks</span><span class="op">$</span><span class="fu">last_errors</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

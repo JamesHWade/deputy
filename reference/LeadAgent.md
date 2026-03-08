@@ -33,6 +33,7 @@ Inherited methods
 
 - [`deputy::Agent$add_hook()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-add_hook)
 - [`deputy::Agent$compact()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-compact)
+- [`deputy::Agent$configure_sdk_compat()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-configure_sdk_compat)
 - [`deputy::Agent$cost()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-cost)
 - [`deputy::Agent$last_turn()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-last_turn)
 - [`deputy::Agent$load_mcp()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-load_mcp)
@@ -46,6 +47,7 @@ Inherited methods
 - [`deputy::Agent$run_shiny()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_shiny)
 - [`deputy::Agent$run_sync()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_sync)
 - [`deputy::Agent$save_session()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-save_session)
+- [`deputy::Agent$session_id()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-session_id)
 - [`deputy::Agent$settings()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-settings)
 - [`deputy::Agent$skills()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-skills)
 - [`deputy::Agent$slash_commands()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-slash_commands)
@@ -65,7 +67,9 @@ Create a new LeadAgent.
       tools = list(),
       system_prompt = NULL,
       permissions = NULL,
-      working_dir = getwd()
+      working_dir = getwd(),
+      setting_sources = NULL,
+      settings = NULL
     )
 
 #### Arguments
@@ -95,6 +99,14 @@ Create a new LeadAgent.
 - `working_dir`:
 
   Working directory
+
+- `setting_sources`:
+
+  Optional Claude-style setting sources
+
+- `settings`:
+
+  Optional pre-loaded settings list from claude_settings_load()
 
 #### Returns
 

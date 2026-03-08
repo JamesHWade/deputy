@@ -17,8 +17,16 @@ Built-in tools and tool bundles
 
 - [`tool_ask_user()`](https://jameshwade.github.io/deputy/reference/tool_ask_user.md)
   : AskUserQuestion tool
+- [`tool_edit_file()`](https://jameshwade.github.io/deputy/reference/tool_edit_file.md)
+  : Edit file contents by replacing text
+- [`tool_glob_files()`](https://jameshwade.github.io/deputy/reference/tool_glob_files.md)
+  : Find files using a glob pattern
+- [`tool_grep_files()`](https://jameshwade.github.io/deputy/reference/tool_grep_files.md)
+  : Search file contents with grep-like matching
 - [`tool_list_files()`](https://jameshwade.github.io/deputy/reference/tool_list_files.md)
   : List files in a directory
+- [`tool_multi_edit()`](https://jameshwade.github.io/deputy/reference/tool_multi_edit.md)
+  : Apply multiple text edits to a file
 - [`tool_read_csv()`](https://jameshwade.github.io/deputy/reference/tool_read_csv.md)
   : Read a CSV file
 - [`tool_read_file()`](https://jameshwade.github.io/deputy/reference/tool_read_file.md)
@@ -29,6 +37,10 @@ Built-in tools and tool bundles
   : Execute bash commands
 - [`tool_run_r_code()`](https://jameshwade.github.io/deputy/reference/tool_run_r_code.md)
   : Execute R code
+- [`tool_todo_read()`](https://jameshwade.github.io/deputy/reference/tool_todo_read.md)
+  : Read persisted todo items
+- [`tool_todo_write()`](https://jameshwade.github.io/deputy/reference/tool_todo_write.md)
+  : Write persisted todo items
 - [`tool_web_fetch()`](https://jameshwade.github.io/deputy/reference/tool_web_fetch.md)
   : Fetch web page content
 - [`tool_web_search()`](https://jameshwade.github.io/deputy/reference/tool_web_search.md)
@@ -81,6 +93,8 @@ Control what agents can do
   : Create a deny permission result
 - [`permissions_full()`](https://jameshwade.github.io/deputy/reference/permissions_full.md)
   : Create a full access permission policy
+- [`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md)
+  : Create a planning permission policy
 - [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md)
   : Create a read-only permission policy
 - [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md)
@@ -138,6 +152,17 @@ Claude-style settings sources
   : Load Claude-style settings from settingSources
 - [`claude_settings_apply()`](https://jameshwade.github.io/deputy/reference/claude_settings_apply.md)
   : Apply Claude-style settings to an Agent
+
+## Claude Compatibility
+
+Anthropic-compatible facade and entrypoints
+
+- [`ClaudeSDKClient`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.md)
+  : Claude Agent SDK compatibility client
+- [`claude_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md)
+  : Create Claude Agent SDK compatibility options
+- [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
+  : Run a one-shot Claude Agent SDK compatibility query
 
 ## Multi-Agent
 

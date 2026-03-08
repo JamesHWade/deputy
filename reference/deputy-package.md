@@ -8,12 +8,21 @@ and local models via Ollama.
 
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, and human-in-the-loop capabilities.
+permissions, hooks, and human-in-the-loop capabilities. deputy also
+ships an opt-in Anthropic-compatible Claude Agent SDK facade for teams
+that want Claude-style entrypoints and session semantics on top of the
+same runtime.
 
 ## Main Functions
 
 - [Agent](https://jameshwade.github.io/deputy/reference/Agent.md) - The
   main class for creating agents
+
+- [ClaudeSDKClient](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.md) -
+  Anthropic-compatible client facade
+
+- [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md) -
+  One-shot Claude-compatible query helper
 
 - [`tools_file()`](https://jameshwade.github.io/deputy/reference/tools_file.md) -
   File operation tools
@@ -23,6 +32,9 @@ permissions, hooks, and human-in-the-loop capabilities.
 
 - [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md) -
   Standard permission policy
+
+- [`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md) -
+  Claude-style planning permission policy
 
 - [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md) -
   Read-only permission policy

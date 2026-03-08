@@ -29,6 +29,7 @@ memory injection, skill loading, and slash command registration."><meta property
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
+    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -63,7 +64,8 @@ memory injection, skill loading, and slash command registration.</p>
 <span>  <span class="va">settings</span>,</span>
 <span>  apply_memory <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  load_skills <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  load_commands <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>  load_commands <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  load_agents <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -89,6 +91,11 @@ memory injection, skill loading, and slash command registration.</p>
 
 <dt id="arg-load-commands">load_commands<a class="anchor" aria-label="anchor" href="#arg-load-commands"></a></dt>
 <dd><p>Logical. If TRUE (default), register slash commands.</p></dd>
+
+
+<dt id="arg-load-agents">load_agents<a class="anchor" aria-label="anchor" href="#arg-load-agents"></a></dt>
+<dd><p>Logical. If TRUE (default), register settings-defined
+agents on <a href="LeadAgent.html">LeadAgent</a> objects.</p></dd>
 
 </dl></div>
     <div class="section level2">

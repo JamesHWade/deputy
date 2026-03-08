@@ -21,6 +21,8 @@
   Output](https://jameshwade.github.io/deputy/articles/structured-output.md):
 - [Agent
   Configuration](https://jameshwade.github.io/deputy/articles/agent-configuration.md):
+- [Claude Agent SDK
+  Compatibility](https://jameshwade.github.io/deputy/articles/claude-sdk-parity.md):
 
 ### Examples
 

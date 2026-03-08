@@ -12,12 +12,13 @@ deputy fires hooks at these events:
 |--------------------|---------------------------------------------------------|-------------------------------------|
 | `PreToolUse`       | `function(tool_name, tool_input, context)`              | Before a tool runs (can allow/deny) |
 | `PostToolUse`      | `function(tool_name, tool_result, tool_error, context)` | After a tool completes              |
+| `Notification`     | `function(message, context)`                            | Informational runtime notices       |
 | `Stop`             | `function(reason, context)`                             | When the agent finishes             |
 | `SubagentStop`     | `function(agent_name, task, result, context)`           | When a sub-agent finishes           |
 | `UserPromptSubmit` | `function(prompt, context)`                             | When user submits input             |
-| `PreCompact`       | `function(context)`                                     | Before conversation compaction      |
+| `PreCompact`       | `function(turns_to_compact, turns_to_keep, context)`    | Before conversation compaction      |
 | `SessionStart`     | `function(context)`                                     | When a session starts               |
-| `SessionEnd`       | `function(context)`                                     | When a session ends                 |
+| `SessionEnd`       | `function(reason, context)`                             | When a session ends                 |
 
 ## Creating Hooks
 
@@ -178,6 +179,22 @@ HookMatcher$new(
     HookResultSessionStart()
   }
 )
+```
+
+## Notification Hooks
+
+`Notification` hooks are useful for informational events that should not
+alter control flow, such as permission-denied guidance, session restore
+notices, or compaction fallbacks:
+
+``` r
+agent$add_hook(HookMatcher$new(
+  event = "Notification",
+  callback = function(message, context) {
+    cli::cli_alert_info("[{context$code}] {message}")
+    NULL
+  }
+))
 ```
 
 ## Error Handling in Hooks
