@@ -522,6 +522,11 @@ test_that("tools_preset returns correct tools for full", {
   expect_true("web_search" %in% tool_names)
 })
 
+test_that("tool schemas require non-default structured inputs", {
+  expect_true(tool_multi_edit@arguments@properties$edits@required)
+  expect_true(tool_todo_write@arguments@properties$todos@required)
+})
+
 test_that("tools_preset returns correct tools for data", {
   tools <- tools_preset("data")
   expect_type(tools, "list")

@@ -648,7 +648,7 @@ tool_multi_edit <- ellmer::tool(
     path = ellmer::type_string("Path to the file to edit"),
     edits = ellmer::type_string(
       "JSON array or structured list of edit operations with old_text/new_text.",
-      required = FALSE
+      required = TRUE
     )
   ),
   annotations = ellmer::tool_annotations(
@@ -1310,7 +1310,7 @@ tool_todo_write <- ellmer::tool(
   arguments = list(
     todos = ellmer::type_string(
       "JSON array or structured list of todo items.",
-      required = FALSE
+      required = TRUE
     ),
     path = ellmer::type_string(
       "Path to the todo file. Default is .deputy/todos.json.",
