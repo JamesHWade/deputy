@@ -18,12 +18,7 @@ Returns a list of tools for file operations:
 }
 }
 \examples{
-\dontrun{
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
-  tools = tools_file()
-)
-}
+names(tools_file())
 
 }
 \seealso{

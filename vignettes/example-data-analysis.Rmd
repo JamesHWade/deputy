@@ -8,11 +8,41 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("example-data-analysis", "verified-replay")
+project <- docs$make_project()
+
+setwd(project$root)
+knitr::opts_knit$set(root.dir = project$root)
+
+make_analysis_chat <- function() {
+  docs$create_chat(list(
+    docs$step_tool(
+      "I'll compute a summary of the airquality data first.",
+      "run_r_code",
+      list(code = "summary(airquality)")
+    ),
+    docs$step_text(
+      paste(
+        "The airquality dataset has missing values in Ozone and Solar.R,",
+        "higher temperatures in midsummer, and clear variation across months."
+      )
+    )
+  ))
+}
+
+stream_chat <- docs$create_chat(list(
+  docs$step_text(
+    "Starting analysis now.",
+    chunks = c("Starting ", "analysis ", "now.")
+  )
+))
+```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
 ```
 
 This example builds an autonomous agent that performs exploratory data analysis
@@ -39,10 +69,8 @@ For tasks with a fixed sequence of steps, consider prompt chaining instead
 We create an agent with data and code tools, plus the built-in
 `data_analysis` skill:
 
-```{r setup}
-library(deputy)
-
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+```{r setup, eval = docs$should_eval}
+chat <- make_analysis_chat()
 
 agent <- Agent$new(
   chat = chat,
@@ -70,7 +98,7 @@ The `data_analysis` skill adds specialised tools like `eda_summary` and
 With `run_sync()`, the agent works through the analysis autonomously. It
 calls tools, inspects results, and decides what to do next:
 
-```{r run-analysis}
+```{r run-analysis, eval = docs$should_eval}
 result <- agent$run_sync(
   "Explore the airquality dataset that comes with R. Give me a
    thorough understanding of the data including quality issues,
@@ -95,8 +123,8 @@ The agent typically:
 For interactive use, `run()` streams events as they happen. You see text
 arrive token by token and tools fire in real time:
 
-```{r streaming}
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+```{r streaming, eval = docs$should_eval}
+chat <- stream_chat
 
 agent <- Agent$new(
   chat = chat,
@@ -104,7 +132,14 @@ agent <- Agent$new(
   system_prompt = "You are a data scientist. Be thorough but concise."
 )
 
-for (event in agent$run("Summarise the mtcars dataset")) {
+events <- agent$run("Summarise the mtcars dataset")
+
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) {
+    break
+  }
+
   switch(event$type,
     "text" = cat(event$text),
     "tool_start" = cli::cli_alert_info("Calling {event$tool_name}..."),
@@ -118,7 +153,7 @@ for (event in agent$run("Summarise the mtcars dataset")) {
 
 `AgentResult` captures everything about the run:
 
-```{r inspect-results}
+```{r inspect-results, eval = docs$should_eval}
 # Did it succeed?
 result$is_success()
 result$stop_reason
@@ -140,8 +175,8 @@ result$cost
 For production use, add permissions and hooks to monitor and constrain the
 agent:
 
-```{r guardrails}
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+```{r guardrails, eval = docs$should_eval}
+chat <- make_analysis_chat()
 
 agent <- Agent$new(
   chat = chat,

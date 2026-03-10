@@ -8,11 +8,44 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("multi-agent", "verified-replay")
+project <- docs$make_project()
+
+setwd(project$root)
+knitr::opts_knit$set(root.dir = project$root)
+
+make_multi_agent_chat <- function() {
+  chat <- docs$create_chat(list(
+    docs$step_tool(
+      "I'll ask the specialist to inspect the DESCRIPTION file.",
+      "delegate_to_agent",
+      list(
+        agent_name = "code_reviewer",
+        task = "Read the DESCRIPTION file and summarise what this package does."
+      )
+    ),
+    docs$step_text(
+      "The specialist reports that the package provides agentic AI workflows for R with tools, permissions, hooks, and multi-agent support."
+    )
+  ))
+
+  chat$clone <- function() {
+    docs$create_chat(list(
+      docs$step_text(
+        "The DESCRIPTION file describes deputy as an agentic AI workflow framework for R built on ellmer."
+      )
+    ))
+  }
+
+  chat
+}
+```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
 ```
 
 For complex tasks, deputy supports a **lead agent** that delegates work to
@@ -89,9 +122,7 @@ When the lead agent decides to delegate, it calls `delegate_to_agent`
 internally. The sub-agent runs to completion and returns its result to the
 lead:
 
-```{r multi-agent-demo}
-library(deputy)
-
+```{r multi-agent-demo, eval = docs$should_eval}
 code_reviewer <- agent_definition(
   name = "code_reviewer",
   description = "Reviews R code and suggests improvements",
@@ -99,7 +130,7 @@ code_reviewer <- agent_definition(
   tools = tools_file()
 )
 
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+chat <- make_multi_agent_chat()
 lead <- LeadAgent$new(
   chat = chat,
   sub_agents = list(code_reviewer)

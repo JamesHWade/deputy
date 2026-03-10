@@ -8,12 +8,17 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("example-shiny-chat", "illustrative")
 ```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block("`run_shiny()` itself is covered in the automated test suite.")
+```
+
+Illustrative example only: this page is not executed during pkgdown builds.
 
 This example shows how to use deputy with
 [shinychat](https://posit-dev.github.io/shinychat/) to build an interactive
@@ -50,7 +55,7 @@ streaming errors in the chat UI.
 
 ## Basic Setup
 
-```{r}
+```{r, eval = FALSE}
 library(shiny)
 library(deputy)
 library(shinychat)
@@ -88,7 +93,7 @@ shinyApp(ui, server)
 Deputy's permissions and hooks fire on every tool call, even though
 shinychat drives the streaming loop:
 
-```{r}
+```{r, eval = FALSE}
 server <- function(input, output, session) {
   chat <- ellmer::chat_anthropic(
     model = "claude-sonnet-4-5-20250929",
@@ -141,6 +146,6 @@ precise than turn counting for controlling resource usage.
 
 A complete example app is included in the package:
 
-```{r}
+```{r, eval = FALSE}
 shiny::runApp(system.file("examples/shiny-chat", package = "deputy"))
 ```

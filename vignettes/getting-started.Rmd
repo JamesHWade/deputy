@@ -8,11 +8,36 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("getting-started", "verified-replay")
+project <- docs$make_project()
+
+setwd(project$root)
+knitr::opts_knit$set(root.dir = project$root)
+
+quickstart_chat <- docs$create_chat(list(
+  docs$step_tool(
+    "I'll inspect the working directory first.",
+    "list_files",
+    list(path = ".")
+  ),
+  docs$step_text(
+    "The project contains DESCRIPTION, R/hello.R, data/people.csv, and notes/intro.md."
+  )
+))
+
+streaming_chat <- docs$create_chat(list(
+  docs$step_text(
+    "deputy streams text and events as it works.",
+    chunks = c("deputy ", "streams text ", "and events as it works.")
+  )
+))
+```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
 ```
 
 deputy is an agentic AI framework for R that builds on
@@ -32,11 +57,8 @@ pak::pak("JamesHWade/deputy")
 An agent wraps an ellmer chat object and gives it tools, permissions, and
 lifecycle hooks:
 
-```{r getting-started-quickstart}
-library(deputy)
-
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
-agent <- Agent$new(chat = chat, tools = tools_file())
+```{r getting-started-quickstart, eval = docs$should_eval}
+agent <- Agent$new(chat = quickstart_chat, tools = tools_file())
 
 result <- agent$run_sync("List the files in the current directory")
 cat(result$response)
@@ -80,11 +102,17 @@ human-in-the-loop.
 
 For real-time feedback, use `run()` which returns a generator:
 
-```{r getting-started-streaming, eval = FALSE}
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
-agent <- Agent$new(chat = chat, tools = tools_file())
+```{r getting-started-streaming, eval = docs$should_eval}
+agent <- Agent$new(chat = streaming_chat, tools = tools_file())
 
-for (event in agent$run("What is the name of this package?")) {
+events <- agent$run("What is the name of this package?")
+
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) {
+    break
+  }
+
   switch(event$type,
     "text" = cat(event$text),
     "tool_start" = cli::cli_alert_info("Calling {event$tool_name}..."),
@@ -101,7 +129,7 @@ and finish, and a final stop event.
 
 ### Read-Only Permissions
 
-```{r}
+```{r, eval = FALSE}
 # Only allows reading files - no writes, no code execution
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
@@ -112,7 +140,7 @@ agent <- Agent$new(
 
 ### Full Permissions
 
-```{r}
+```{r, eval = FALSE}
 # Allows everything - use with caution!
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
@@ -125,7 +153,7 @@ agent <- Agent$new(
 
 For fine-grained control:
 
-```{r}
+```{r, eval = FALSE}
 perms <- Permissions$new(
   file_read = TRUE,
   file_write = "/path/to/allowed/dir", # Restrict to specific directory
@@ -147,7 +175,7 @@ agent <- Agent$new(
 
 For complex permission logic:
 
-```{r}
+```{r, eval = FALSE}
 perms <- Permissions$new(
   can_use_tool = function(tool_name, tool_input, context) {
     # Block any file writes to sensitive directories
@@ -168,7 +196,7 @@ perms <- Permissions$new(
 Use allow/deny lists when you want an explicit tool policy that is separate from
 the broader mode flags:
 
-```{r}
+```{r, eval = FALSE}
 perms <- Permissions$new(
   mode = "default",
   tool_allowlist = c("read_file", "list_files", "run_r_code"),
@@ -192,7 +220,7 @@ so the model can request approval.
 `setting_sources` now maps Claude-style tool policy keys directly into
 permissions:
 
-```{r}
+```{r, eval = FALSE}
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
   tools = tools_all(),
@@ -226,7 +254,7 @@ Hooks let you intercept and customize agent behavior at key points:
 
 ### Example: Logging All Tool Calls
 
-```{r}
+```{r, eval = FALSE}
 agent$add_hook(HookMatcher$new(
   event = "PostToolUse",
   callback = function(tool_name, tool_result, context) {
@@ -238,7 +266,7 @@ agent$add_hook(HookMatcher$new(
 
 ### Example: Block Dangerous Commands
 
-```{r}
+```{r, eval = FALSE}
 agent$add_hook(HookMatcher$new(
   event = "PreToolUse",
   pattern = "^run_bash$", # Only match bash tool
@@ -259,7 +287,7 @@ agent$add_hook(HookMatcher$new(
 
 Save and restore agent sessions:
 
-```{r}
+```{r, eval = FALSE}
 # Save the current session
 agent$save_session("my_session.rds")
 
@@ -275,7 +303,7 @@ result <- agent2$run_sync("Continue where we left off...")
 
 For complex tasks, you can create a lead agent that delegates to specialized sub-agents:
 
-```{r}
+```{r, eval = FALSE}
 # Define specialized sub-agents
 code_agent <- agent_definition(
   name = "code_analyst",
@@ -308,7 +336,7 @@ result <- lead$run_sync(
 
 The `AgentResult` object contains useful information:
 
-```{r}
+```{r, eval = FALSE}
 result <- agent$run_sync("Analyze this project")
 
 # The final response
@@ -340,7 +368,7 @@ length(result$events)
 
 deputy works with any LLM provider that ellmer supports:
 
-```{r}
+```{r, eval = FALSE}
 # OpenAI
 agent <- Agent$new(chat = ellmer::chat("openai"))
 
@@ -365,7 +393,7 @@ agent <- Agent$new(chat = ellmer::chat("ollama/llama3.1"))
 
 5. **Use streaming for UX** - The `run()` method provides real-time feedback.
 
-```{r}
+```{r, eval = FALSE}
 # Example combining best practices
 agent <- Agent$new(
   chat = ellmer::chat("openai"),

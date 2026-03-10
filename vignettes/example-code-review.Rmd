@@ -8,11 +8,86 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("example-code-review", "verified-replay")
+project <- docs$make_project()
+
+setwd(project$root)
+knitr::opts_knit$set(root.dir = project$root)
+
+reviewer_outputs <- list(
+  "Bug hunter: no critical bugs found; the code path is simple and predictable.",
+  "Style reviewer: naming is clear and the function is easy to read.",
+  "Doc checker: add one more concrete example for say_hello()."
 )
+
+make_review_lead_chat <- function() {
+  clone_idx <- 0L
+  chat <- docs$create_chat(list(
+    docs$step_tool(
+      "I'll ask the bug hunter to inspect the code first.",
+      "delegate_to_agent",
+      list(agent_name = "bug_hunter", task = "Review the R/hello.R file for bugs.")
+    ),
+    docs$step_tool(
+      "Next I'll ask the style reviewer.",
+      "delegate_to_agent",
+      list(agent_name = "style_reviewer", task = "Review the R/hello.R file for style.")
+    ),
+    docs$step_tool(
+      "Finally I'll ask the documentation reviewer.",
+      "delegate_to_agent",
+      list(agent_name = "doc_checker", task = "Review the documentation for the fixture project.")
+    ),
+    docs$step_text(
+      paste(
+        "No critical bugs were found.",
+        "The main follow-up is to expand the examples and documentation."
+      )
+    )
+  ))
+
+  chat$clone <- function() {
+    clone_idx <<- clone_idx + 1L
+    docs$create_chat(list(docs$step_text(reviewer_outputs[[clone_idx]])))
+  }
+
+  chat
+}
+
+review_json <- jsonlite::toJSON(
+  list(
+    summary = "Two actionable follow-ups, no critical issues.",
+    total_findings = 2,
+    findings = list(
+      list(
+        severity = "warning",
+        category = "documentation",
+        file = "R/hello.R",
+        line = 1,
+        issue = "The fixture example is terse and could use another example.",
+        suggestion = "Add a second example showing the default argument.",
+        reviewer = "doc_checker"
+      ),
+      list(
+        severity = "suggestion",
+        category = "style",
+        file = "R/hello.R",
+        line = 1,
+        issue = "Consider adding a brief comment above the exported function.",
+        suggestion = "Add a short description before the function definition.",
+        reviewer = "style_reviewer"
+      )
+    )
+  ),
+  auto_unbox = TRUE
+)
+```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
 ```
 
 This example builds a code review system using multiple specialised agents
@@ -40,9 +115,7 @@ pipelines, see `vignette("example-extraction-pipeline")`.
 Each reviewer agent focuses on one dimension of code quality. They all
 use `tools_file()` for read-only file access:
 
-```{r define-agents}
-library(deputy)
-
+```{r define-agents, eval = docs$should_eval}
 bug_hunter <- agent_definition(
   name = "bug_hunter",
   description = "Finds logic errors, edge cases, off-by-one errors,
@@ -99,8 +172,8 @@ doc_checker <- agent_definition(
 The `LeadAgent` coordinates the reviewers. It has a `delegate_to_agent`
 tool that lets it assign tasks to any registered sub-agent:
 
-```{r create-lead}
-chat <- ellmer::chat_openai()
+```{r create-lead, eval = docs$should_eval}
+chat <- make_review_lead_chat()
 
 lead <- LeadAgent$new(
   chat = chat,
@@ -127,7 +200,7 @@ lead$available_sub_agents()
 Hooks provide real-time visibility as the agent works. Use them for logging
 and blocking; use `AgentResult` for post-hoc analysis.
 
-```{r monitoring-hooks}
+```{r monitoring-hooks, eval = docs$should_eval}
 # Log when each sub-agent finishes
 hook_sub_agent_log <- HookMatcher$new(
   event = "SubagentStop",
@@ -144,7 +217,7 @@ lead$add_hook(hook_log_tools(verbose = TRUE))
 
 ## Run the Review
 
-```{r run-review}
+```{r run-review, eval = docs$should_eval}
 result <- lead$run_sync(
   "Review the R source files in R/ for code quality issues.
    Have each specialist review the code from their perspective,
@@ -159,7 +232,7 @@ cat(result$response)
 For machine-readable results, add a structured output schema to capture
 individual findings:
 
-```{r structured-review}
+```{r structured-review, eval = docs$should_eval}
 review_schema <- list(
   type = "object",
   properties = list(
@@ -198,7 +271,7 @@ review_schema <- list(
   required = c("summary", "total_findings", "findings")
 )
 
-chat <- ellmer::chat_openai()
+chat <- docs$create_chat(list(docs$step_text(review_json)))
 
 lead <- LeadAgent$new(
   chat = chat,
@@ -220,7 +293,7 @@ result <- lead$run_sync(
 With structured output, you can filter, sort, and summarise findings
 programmatically:
 
-```{r process-results}
+```{r process-results, eval = docs$should_eval}
 review <- result$structured_output$parsed
 
 # Summary
@@ -257,7 +330,7 @@ table(findings_df$category, findings_df$severity)
 
 `AgentResult` captures cost and tool usage for post-hoc analysis:
 
-```{r costs}
+```{r costs, eval = docs$should_eval}
 # Total cost and duration
 result$cost
 result$duration

@@ -8,11 +8,18 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("tools", "verified-vcr")
+project <- docs$make_project()
+
+setwd(project$root)
+knitr::opts_knit$set(root.dir = project$root)
+```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
 ```
 
 Tools are how agents interact with the world. deputy provides built-in tools
@@ -111,9 +118,7 @@ system about the tool's behaviour:
 
 ### Using a Custom Tool
 
-```{r tools-custom-demo}
-library(deputy)
-
+```{r tools-custom-demo, eval = docs$should_eval}
 tool_dice <- ellmer::tool(
   fun = function(n = 1, sides = 6) {
     rolls <- sample(sides, n, replace = TRUE)
@@ -127,7 +132,15 @@ tool_dice <- ellmer::tool(
   )
 )
 
-chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+chat <- docs$create_chat(list(
+  docs$step_tool(
+    "I'll roll the dice.",
+    "roll_dice",
+    list(n = 2, sides = 20)
+  ),
+  docs$step_text("Rolled: 12, 4")
+))
+
 agent <- Agent$new(chat = chat, tools = list(tool_dice))
 result <- agent$run_sync("Roll 2d20 for me")
 cat(result$response)
@@ -151,6 +164,14 @@ agent <- Agent$new(
 For providers without native support, deputy falls back to `tool_web_fetch`
 (fetches a URL and extracts text) and `tool_web_search` (searches via
 DuckDuckGo).
+
+```{r tools-web-demo, eval = docs$should_eval}
+search_results <- docs$use_vcr("web-tools", {
+  tool_web_search("R language site", num_results = 1)
+})
+
+cat(search_results)
+```
 
 ## MCP Integration
 

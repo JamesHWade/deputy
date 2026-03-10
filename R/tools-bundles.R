@@ -12,12 +12,7 @@
 #' @return A list of tool definitions
 #'
 #' @examples
-#' \dontrun{
-#' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
-#'   tools = tools_file()
-#' )
-#' }
+#' names(tools_file())
 #'
 #' @seealso [tool_read_file], [tool_write_file], [tool_list_files]
 #' @export
@@ -43,12 +38,7 @@ tools_file <- function() {
 #' @return A list of tool definitions
 #'
 #' @examples
-#' \dontrun{
-#' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
-#'   tools = tools_code()
-#' )
-#' }
+#' names(tools_code())
 #'
 #' @seealso [tool_run_r_code], [tool_run_bash]
 #' @export
@@ -69,12 +59,7 @@ tools_code <- function() {
 #' @return A list of tool definitions
 #'
 #' @examples
-#' \dontrun{
-#' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
-#'   tools = tools_data()
-#' )
-#' }
+#' names(tools_data())
 #'
 #' @seealso [tool_read_csv], [tool_read_file]
 #' @export
@@ -110,29 +95,7 @@ tools_data <- function() {
 #' @return A list of tool definitions
 #'
 #' @examples
-#' \dontrun{
-#' # Universal tools (work with any provider)
-#' agent <- Agent$new(
-#'   chat = ellmer::chat_ollama(),
-#'   tools = tools_web(),
-#'   permissions = Permissions$new(web = TRUE)
-#' )
-#'
-#' # Provider-specific tools (auto-detected)
-#' chat <- ellmer::chat_claude()
-#' agent <- Agent$new(
-#'   chat = chat,
-#'   tools = tools_web(chat),  # Uses Claude's native web tools
-#'   permissions = Permissions$new(web = TRUE)
-#' )
-#'
-#' # Force universal tools even with Claude
-#' agent <- Agent$new(
-#'   chat = chat,
-#'   tools = tools_web(chat, use_native = FALSE),
-#'   permissions = Permissions$new(web = TRUE)
-#' )
-#' }
+#' names(tools_web())
 #'
 #' @seealso [tool_web_fetch], [tool_web_search]
 #' @export
@@ -213,14 +176,7 @@ get_provider_name <- function(chat) {
 #' @return A list of all tool definitions
 #'
 #' @examples
-#' \dontrun{
-#' # Allow all tools with full permissions
-#' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
-#'   tools = tools_all(),
-#'   permissions = permissions_full()
-#' )
-#' }
+#' names(tools_all())
 #'
 #' @export
 tools_all <- function() {
@@ -265,26 +221,9 @@ ToolPresets <- c("minimal", "standard", "dev", "data", "full")
 #' @return A list of tool definitions
 #'
 #' @examples
-#' \dontrun{
-#' # Minimal preset for read-only operations
-#' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
-#'   tools = tools_preset("minimal"),
-#'   permissions = permissions_readonly()
-#' )
-#'
-#' # Standard preset for typical development
-#' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
-#'   tools = tools_preset("standard")
-#' )
-#'
-#' # Data analysis preset
-#' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
-#'   tools = tools_preset("data")
-#' )
-#' }
+#' names(tools_preset("minimal"))
+#' names(tools_preset("standard"))
+#' names(tools_preset("data"))
 #'
 #' @seealso [tools_file()], [tools_code()], [tools_data()], [tools_all()]
 #' @export

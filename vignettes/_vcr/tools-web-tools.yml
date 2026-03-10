@@ -1,0 +1,395 @@
+http_interactions:
+- request:
+    method: GET
+    uri: https://html.duckduckgo.com/html/?q=R+language+site
+  response:
+    status: 200
+    headers:
+      cache-control: max-age=1
+      content-encoding: gzip
+      content-security-policy: 'default-src ''none'' ; connect-src  https://duck.ai
+        https://*.duck.ai https://duckduckgo.com https://*.duckduckgo.com https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/
+        https://spreadprivacy.com ; manifest-src  https://duck.ai https://*.duck.ai
+        https://duckduckgo.com https://*.duckduckgo.com https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/
+        https://spreadprivacy.com ; media-src  https://duck.ai https://*.duck.ai https://duckduckgo.com
+        https://*.duckduckgo.com https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/
+        https://spreadprivacy.com ; script-src blob:  https://duck.ai https://*.duck.ai
+        https://duckduckgo.com https://*.duckduckgo.com https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/
+        https://spreadprivacy.com ; font-src data:  https://duck.ai https://*.duck.ai
+        https://duckduckgo.com https://*.duckduckgo.com https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/
+        https://spreadprivacy.com ; img-src data:  https://duck.ai https://*.duck.ai
+        https://duckduckgo.com https://*.duckduckgo.com https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/
+        https://spreadprivacy.com ; style-src  https://duck.ai https://*.duck.ai https://duckduckgo.com
+        https://*.duckduckgo.com https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/
+        https://spreadprivacy.com ; object-src ''none'' ; worker-src blob: ; child-src
+        blob:  https://duck.ai https://*.duck.ai https://duckduckgo.com https://*.duckduckgo.com
+        https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/ https://spreadprivacy.com
+        ; frame-src blob:  https://duck.ai https://*.duck.ai https://duckduckgo.com
+        https://*.duckduckgo.com https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/
+        https://spreadprivacy.com ; frame-ancestors ''self'' ; base-uri ''self'' ;
+        block-all-mixed-content ;'
+      content-type: text/html; charset=UTF-8
+      date: Mon, 09 Mar 2026 22:30:58 GMT
+      expect-ct: max-age=0
+      expires: Mon, 09 Mar 2026 22:30:59 GMT
+      permissions-policy: interest-cohort=()
+      referrer-policy: origin
+      server: nginx
+      server-timing: total;dur=686;desc="Backend Total [n]"
+      strict-transport-security: max-age=31536000
+      vary:
+      - Accept-Encoding
+      - Origin
+      x-content-type-options: nosniff
+      x-duckduckgo-locale: en_US
+      x-frame-options: SAMEORIGIN
+      x-robots-tag: noindex
+      x-xss-protection: 1;mode=block
+    body:
+      string: "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n\n<!--[if
+        IE 6]><html class=\"ie6\" xmlns=\"http://www.w3.org/1999/xhtml\"><![endif]-->\n<!--[if
+        IE 7]><html class=\"lt-ie8 lt-ie9\" xmlns=\"http://www.w3.org/1999/xhtml\"><![endif]-->\n<!--[if
+        IE 8]><html class=\"lt-ie9\" xmlns=\"http://www.w3.org/1999/xhtml\"><![endif]-->\n<!--[if
+        gt IE 8]><!--><html xmlns=\"http://www.w3.org/1999/xhtml\"><!--<![endif]-->\n<head>\n
+        \ <meta http-equiv=\"content-type\" content=\"text/html; charset=UTF-8\" />\n
+        \ <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0,
+        maximum-scale=3.0, user-scalable=1\" />\n  <meta name=\"referrer\" content=\"origin\"
+        />\n  <meta name=\"HandheldFriendly\" content=\"true\" />\n  <meta name=\"robots\"
+        content=\"noindex, nofollow\" />\n  <title>R language site at DuckDuckGo</title>\n
+        \ <link title=\"DuckDuckGo (HTML)\" type=\"application/opensearchdescription+xml\"
+        rel=\"search\" href=\"//duckduckgo.com/opensearch_html_v2.xml\" />\n  <link
+        href=\"//duckduckgo.com/favicon.ico\" rel=\"shortcut icon\" />\n  <link rel=\"icon\"
+        href=\"//duckduckgo.com/favicon.ico\" type=\"image/x-icon\" />\n  <link id=\"icon60\"
+        rel=\"apple-touch-icon\" href=\"//duckduckgo.com/assets/icons/meta/DDG-iOS-icon_60x60.png?v=2\"/>\n
+        \ <link id=\"icon76\" rel=\"apple-touch-icon\" sizes=\"76x76\" href=\"//duckduckgo.com/assets/icons/meta/DDG-iOS-icon_76x76.png?v=2\"/>\n
+        \ <link id=\"icon120\" rel=\"apple-touch-icon\" sizes=\"120x120\" href=\"//duckduckgo.com/assets/icons/meta/DDG-iOS-icon_120x120.png?v=2\"/>\n
+        \ <link id=\"icon152\" rel=\"apple-touch-icon\" sizes=\"152x152\" href=\"//duckduckgo.com/assets/icons/meta/DDG-iOS-icon_152x152.png?v=2\"/>\n
+        \ <link rel=\"image_src\" href=\"//duckduckgo.com/assets/icons/meta/DDG-icon_256x256.png\">\n
+        \ <link rel=\"stylesheet\" media=\"handheld, all\" href=\"//duckduckgo.com/dist/h.276ddc0c15a4252ea5a2.css\"
+        type=\"text/css\"/>\n</head>\n\n<body class=\"body--html\">\n  <a name=\"top\"
+        id=\"top\"></a>\n\n  <form action=\"/html/\" method=\"post\">\n    <input
+        type=\"text\" name=\"state_hidden\" id=\"state_hidden\" />\n  </form>\n\n
+        \ <div>\n    <div class=\"site-wrapper-border\"></div>\n\n    <div id=\"header\"
+        class=\"header cw header--html\">\n      <a title=\"DuckDuckGo\" href=\"/html/\"
+        class=\"header__logo-wrap\"></a>\n\n      <form name=\"x\" class=\"header__form\"
+        action=\"/html/\" method=\"post\">\n        <div class=\"search search--header\">\n
+        \         <input name=\"q\" autocomplete=\"off\" class=\"search__input\" id=\"search_form_input_homepage\"
+        type=\"text\" value=\"R language site\" />\n          <input name=\"b\" id=\"search_button_homepage\"
+        class=\"search__button search__button--html\" value=\"\" title=\"Search\"
+        alt=\"Search\" type=\"submit\" />\n        </div>\n\n        \n        \n
+        \       \n        \n\n        <div class=\"frm__select\">\n          <select
+        name=\"kl\">\n            \n              <option value=\"\" >All Regions</option>\n
+        \           \n              <option value=\"ar-es\" >Argentina</option>\n
+        \           \n              <option value=\"au-en\" >Australia</option>\n
+        \           \n              <option value=\"at-de\" >Austria</option>\n            \n
+        \             <option value=\"be-fr\" >Belgium (fr)</option>\n            \n
+        \             <option value=\"be-nl\" >Belgium (nl)</option>\n            \n
+        \             <option value=\"br-pt\" >Brazil</option>\n            \n              <option
+        value=\"bg-bg\" >Bulgaria</option>\n            \n              <option value=\"ca-en\"
+        >Canada (en)</option>\n            \n              <option value=\"ca-fr\"
+        >Canada (fr)</option>\n            \n              <option value=\"ct-ca\"
+        >Catalonia</option>\n            \n              <option value=\"cl-es\" >Chile</option>\n
+        \           \n              <option value=\"cn-zh\" >China</option>\n            \n
+        \             <option value=\"co-es\" >Colombia</option>\n            \n              <option
+        value=\"hr-hr\" >Croatia</option>\n            \n              <option value=\"cz-cs\"
+        >Czech Republic</option>\n            \n              <option value=\"dk-da\"
+        >Denmark</option>\n            \n              <option value=\"ee-et\" >Estonia</option>\n
+        \           \n              <option value=\"fi-fi\" >Finland</option>\n            \n
+        \             <option value=\"fr-fr\" >France</option>\n            \n              <option
+        value=\"de-de\" >Germany</option>\n            \n              <option value=\"gr-el\"
+        >Greece</option>\n            \n              <option value=\"hk-tzh\" >Hong
+        Kong</option>\n            \n              <option value=\"hu-hu\" >Hungary</option>\n
+        \           \n              <option value=\"is-is\" >Iceland</option>\n            \n
+        \             <option value=\"in-en\" >India (en)</option>\n            \n
+        \             <option value=\"id-en\" >Indonesia (en)</option>\n            \n
+        \             <option value=\"ie-en\" >Ireland</option>\n            \n              <option
+        value=\"il-en\" >Israel (en)</option>\n            \n              <option
+        value=\"it-it\" >Italy</option>\n            \n              <option value=\"jp-jp\"
+        >Japan</option>\n            \n              <option value=\"kr-kr\" >Korea</option>\n
+        \           \n              <option value=\"lv-lv\" >Latvia</option>\n            \n
+        \             <option value=\"lt-lt\" >Lithuania</option>\n            \n
+        \             <option value=\"my-en\" >Malaysia (en)</option>\n            \n
+        \             <option value=\"mx-es\" >Mexico</option>\n            \n              <option
+        value=\"nl-nl\" >Netherlands</option>\n            \n              <option
+        value=\"nz-en\" >New Zealand</option>\n            \n              <option
+        value=\"no-no\" >Norway</option>\n            \n              <option value=\"pk-en\"
+        >Pakistan (en)</option>\n            \n              <option value=\"pe-es\"
+        >Peru</option>\n            \n              <option value=\"ph-en\" >Philippines
+        (en)</option>\n            \n              <option value=\"pl-pl\" >Poland</option>\n
+        \           \n              <option value=\"pt-pt\" >Portugal</option>\n            \n
+        \             <option value=\"ro-ro\" >Romania</option>\n            \n              <option
+        value=\"ru-ru\" >Russia</option>\n            \n              <option value=\"xa-ar\"
+        >Saudi Arabia</option>\n            \n              <option value=\"sg-en\"
+        >Singapore</option>\n            \n              <option value=\"sk-sk\" >Slovakia</option>\n
+        \           \n              <option value=\"sl-sl\" >Slovenia</option>\n            \n
+        \             <option value=\"za-en\" >South Africa</option>\n            \n
+        \             <option value=\"es-ca\" >Spain (ca)</option>\n            \n
+        \             <option value=\"es-es\" >Spain (es)</option>\n            \n
+        \             <option value=\"se-sv\" >Sweden</option>\n            \n              <option
+        value=\"ch-de\" >Switzerland (de)</option>\n            \n              <option
+        value=\"ch-fr\" >Switzerland (fr)</option>\n            \n              <option
+        value=\"tw-tzh\" >Taiwan</option>\n            \n              <option value=\"th-en\"
+        >Thailand (en)</option>\n            \n              <option value=\"tr-tr\"
+        >Turkey</option>\n            \n              <option value=\"us-en\" >US
+        (English)</option>\n            \n              <option value=\"us-es\" >US
+        (Spanish)</option>\n            \n              <option value=\"ua-uk\" >Ukraine</option>\n
+        \           \n              <option value=\"uk-en\" >United Kingdom</option>\n
+        \           \n              <option value=\"vn-en\" >Vietnam (en)</option>\n
+        \           \n          </select>\n        </div>\n\n        <div class=\"frm__select
+        frm__select--last\">\n          <select class=\"\" name=\"df\">\n            \n
+        \             <option value=\"\" selected>Any Time</option>\n            \n
+        \             <option value=\"d\" >Past Day</option>\n            \n              <option
+        value=\"w\" >Past Week</option>\n            \n              <option value=\"m\"
+        >Past Month</option>\n            \n              <option value=\"y\" >Past
+        Year</option>\n            \n          </select>\n        </div>\n      </form>\n
+        \   </div>\n\n    \n\n    \n      <!-- Web results are present -->\n      <div>\n
+        \       <div class=\"serp__results\">\n          <div id=\"links\" class=\"results\">\n
+        \           \n\n            \n              \n                <div class=\"result
+        results_links results_links_deep web-result \">\n                  <div class=\"links_main
+        links_deep result__body\"> <!-- This is the visible part -->\n                    \n
+        \                     <h2 class=\"result__title\">\n                        <a
+        rel=\"nofollow\" class=\"result__a\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.r%2Dproject.org%2F&amp;rut=52a26f76399e8a67ffcefe2f4339530d6c87f1f778f5cc0f8f6ff4ecf56a5138\">The
+        R Project for Statistical Computing</a>\n                      </h2>\n\n                    \n\n
+        \                   \n                      <div class=\"result__extras\">\n
+        \                       <div class=\"result__extras__url\">\n                          <span
+        class=\"result__icon\">\n                            <a rel=\"nofollow\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.r%2Dproject.org%2F&amp;rut=52a26f76399e8a67ffcefe2f4339530d6c87f1f778f5cc0f8f6ff4ecf56a5138\">\n
+        \                             <img class=\"result__icon__img\" width=\"16\"
+        height=\"16\" alt=\"\" src=\"//external-content.duckduckgo.com/ip3/www.r-project.org.ico\"
+        name=\"i15\" />\n                            </a>\n                          </span>\n
+        \                         <a class=\"result__url\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.r%2Dproject.org%2F&amp;rut=52a26f76399e8a67ffcefe2f4339530d6c87f1f778f5cc0f8f6ff4ecf56a5138\">\n
+        \                           www.r-project.org\n                          </a>\n
+        \                         \n                        </div>\n                      </div>\n
+        \                   \n\n                    \n                      \n                        <a
+        class=\"result__snippet\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.r%2Dproject.org%2F&amp;rut=52a26f76399e8a67ffcefe2f4339530d6c87f1f778f5cc0f8f6ff4ecf56a5138\">The
+        <b>R</b> Project for Statistical Computing Getting Started <b>R</b> is a free
+        software environment for statistical computing and graphics. It compiles and
+        runs on a wide variety of UNIX platforms, Windows and MacOS. To download <b>R</b>,
+        please choose your preferred CRAN mirror.</a>\n                      \n                    \n\n
+        \                   <div class=\"clear\"></div>\n                  </div>\n
+        \               </div>\n              \n            \n              \n                <div
+        class=\"result results_links results_links_deep web-result \">\n                  <div
+        class=\"links_main links_deep result__body\"> <!-- This is the visible part
+        -->\n                    \n                      <h2 class=\"result__title\">\n
+        \                       <a rel=\"nofollow\" class=\"result__a\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FR_(programming_language)&amp;rut=b37232b41b2da91325552f03aa89d4906e78fcdd1ff0aac42fb88c81153cc6ca\">R
+        (programming language) - Wikipedia</a>\n                      </h2>\n\n                    \n\n
+        \                   \n                      <div class=\"result__extras\">\n
+        \                       <div class=\"result__extras__url\">\n                          <span
+        class=\"result__icon\">\n                            <a rel=\"nofollow\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FR_(programming_language)&amp;rut=b37232b41b2da91325552f03aa89d4906e78fcdd1ff0aac42fb88c81153cc6ca\">\n
+        \                             <img class=\"result__icon__img\" width=\"16\"
+        height=\"16\" alt=\"\" src=\"//external-content.duckduckgo.com/ip3/en.wikipedia.org.ico\"
+        name=\"i15\" />\n                            </a>\n                          </span>\n
+        \                         <a class=\"result__url\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FR_(programming_language)&amp;rut=b37232b41b2da91325552f03aa89d4906e78fcdd1ff0aac42fb88c81153cc6ca\">\n
+        \                           en.wikipedia.org/wiki/R_(programming_language)\n
+        \                         </a>\n                          \n                        </div>\n
+        \                     </div>\n                    \n\n                    \n
+        \                     \n                        <a class=\"result__snippet\"
+        href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FR_(programming_language)&amp;rut=b37232b41b2da91325552f03aa89d4906e78fcdd1ff0aac42fb88c81153cc6ca\"><b>R</b>
+        is a programming <b>language</b> for statistical computing and data visualization.
+        It has been widely adopted in the fields of data mining, bioinformatics, data
+        analysis, and data science.</a>\n                      \n                    \n\n
+        \                   <div class=\"clear\"></div>\n                  </div>\n
+        \               </div>\n              \n            \n              \n                <div
+        class=\"result results_links results_links_deep web-result \">\n                  <div
+        class=\"links_main links_deep result__body\"> <!-- This is the visible part
+        -->\n                    \n                      <h2 class=\"result__title\">\n
+        \                       <a rel=\"nofollow\" class=\"result__a\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fr%2Dconsortium.org%2F&amp;rut=70637ed2d047d74ac415a4821cf771531f8b9052aee63ef5025515559ec70fc3\">R
+        Consortium</a>\n                      </h2>\n\n                    \n\n                    \n
+        \                     <div class=\"result__extras\">\n                        <div
+        class=\"result__extras__url\">\n                          <span class=\"result__icon\">\n
+        \                           <a rel=\"nofollow\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fr%2Dconsortium.org%2F&amp;rut=70637ed2d047d74ac415a4821cf771531f8b9052aee63ef5025515559ec70fc3\">\n
+        \                             <img class=\"result__icon__img\" width=\"16\"
+        height=\"16\" alt=\"\" src=\"//external-content.duckduckgo.com/ip3/r-consortium.org.ico\"
+        name=\"i15\" />\n                            </a>\n                          </span>\n
+        \                         <a class=\"result__url\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fr%2Dconsortium.org%2F&amp;rut=70637ed2d047d74ac415a4821cf771531f8b9052aee63ef5025515559ec70fc3\">\n
+        \                           r-consortium.org\n                          </a>\n
+        \                         \n                        </div>\n                      </div>\n
+        \                   \n\n                    \n                      \n                        <a
+        class=\"result__snippet\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fr%2Dconsortium.org%2F&amp;rut=70637ed2d047d74ac415a4821cf771531f8b9052aee63ef5025515559ec70fc3\">The
+        <b>R</b> <b>language</b> is an open source environment for statistical computing
+        and graphics, and runs on a wide variety of computing platforms. The <b>R</b>
+        <b>language</b> has enjoyed significant growth, and now supports over 2 million
+        users. A broad range of industries have adopted the <b>R</b> <b>language</b>,
+        including biotech, finance, research and high technology industries.</a>\n
+        \                     \n                    \n\n                    <div class=\"clear\"></div>\n
+        \                 </div>\n                </div>\n              \n            \n
+        \             \n                <div class=\"result results_links results_links_deep
+        web-result \">\n                  <div class=\"links_main links_deep result__body\">
+        <!-- This is the visible part -->\n                    \n                      <h2
+        class=\"result__title\">\n                        <a rel=\"nofollow\" class=\"result__a\"
+        href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fweb.mit.edu%2Fr%2Fcurrent%2Flib%2FR%2Fdoc%2Fhtml%2Findex.html&amp;rut=9079540060ef9bfe6bd64b4c0d05fc0b87b0a23b4eb359143ce4ac45afcf3900\">The
+        R Language - MIT</a>\n                      </h2>\n\n                    \n\n
+        \                   \n                      <div class=\"result__extras\">\n
+        \                       <div class=\"result__extras__url\">\n                          <span
+        class=\"result__icon\">\n                            <a rel=\"nofollow\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fweb.mit.edu%2Fr%2Fcurrent%2Flib%2FR%2Fdoc%2Fhtml%2Findex.html&amp;rut=9079540060ef9bfe6bd64b4c0d05fc0b87b0a23b4eb359143ce4ac45afcf3900\">\n
+        \                             <img class=\"result__icon__img\" width=\"16\"
+        height=\"16\" alt=\"\" src=\"//external-content.duckduckgo.com/ip3/web.mit.edu.ico\"
+        name=\"i15\" />\n                            </a>\n                          </span>\n
+        \                         <a class=\"result__url\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fweb.mit.edu%2Fr%2Fcurrent%2Flib%2FR%2Fdoc%2Fhtml%2Findex.html&amp;rut=9079540060ef9bfe6bd64b4c0d05fc0b87b0a23b4eb359143ce4ac45afcf3900\">\n
+        \                           web.mit.edu/r/current/lib/R/doc/html/index.html\n
+        \                         </a>\n                          \n                        </div>\n
+        \                     </div>\n                    \n\n                    \n
+        \                     \n                        <a class=\"result__snippet\"
+        href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fweb.mit.edu%2Fr%2Fcurrent%2Flib%2FR%2Fdoc%2Fhtml%2Findex.html&amp;rut=9079540060ef9bfe6bd64b4c0d05fc0b87b0a23b4eb359143ce4ac45afcf3900\">Manuals
+        An Introduction to <b>R</b> The <b>R</b> <b>Language</b> Definition Writing
+        <b>R</b> Extensions <b>R</b> Installation and Administration <b>R</b> Data
+        Import/Export <b>R</b> Internals</a>\n                      \n                    \n\n
+        \                   <div class=\"clear\"></div>\n                  </div>\n
+        \               </div>\n              \n            \n              \n                <div
+        class=\"result results_links results_links_deep web-result \">\n                  <div
+        class=\"links_main links_deep result__body\"> <!-- This is the visible part
+        -->\n                    \n                      <h2 class=\"result__title\">\n
+        \                       <a rel=\"nofollow\" class=\"result__a\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Flearn%2Dr.org%2F&amp;rut=ad4780befe4e351d5321b3b1069d3ce84eb634e594fec8077c9d4c1c95ce10d2\">Learn
+        R - Online R Programming Tutorial</a>\n                      </h2>\n\n                    \n\n
+        \                   \n                      <div class=\"result__extras\">\n
+        \                       <div class=\"result__extras__url\">\n                          <span
+        class=\"result__icon\">\n                            <a rel=\"nofollow\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Flearn%2Dr.org%2F&amp;rut=ad4780befe4e351d5321b3b1069d3ce84eb634e594fec8077c9d4c1c95ce10d2\">\n
+        \                             <img class=\"result__icon__img\" width=\"16\"
+        height=\"16\" alt=\"\" src=\"//external-content.duckduckgo.com/ip3/learn-r.org.ico\"
+        name=\"i15\" />\n                            </a>\n                          </span>\n
+        \                         <a class=\"result__url\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Flearn%2Dr.org%2F&amp;rut=ad4780befe4e351d5321b3b1069d3ce84eb634e594fec8077c9d4c1c95ce10d2\">\n
+        \                           learn-r.org\n                          </a>\n
+        \                         \n                        </div>\n                      </div>\n
+        \                   \n\n                    \n                      \n                        <a
+        class=\"result__snippet\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Flearn%2Dr.org%2F&amp;rut=ad4780befe4e351d5321b3b1069d3ce84eb634e594fec8077c9d4c1c95ce10d2\">Learn
+        <b>R</b> Programming Welcome to the learn-r.org interactive <b>R</b> tutorial
+        with Examples and Exercises. If you want to learn <b>R</b> for statistics,
+        data science or business analytics, either you are new to programming or an
+        experienced programmer this tutorial will help you to learn the <b>R</b> Programming
+        <b>language</b> fast and efficient. <b>R</b> is a programming <b>language</b>
+        used extensively for statistics and statistical ...</a>\n                      \n
+        \                   \n\n                    <div class=\"clear\"></div>\n
+        \                 </div>\n                </div>\n              \n            \n
+        \             \n                <div class=\"result results_links results_links_deep
+        web-result \">\n                  <div class=\"links_main links_deep result__body\">
+        <!-- This is the visible part -->\n                    \n                      <h2
+        class=\"result__title\">\n                        <a rel=\"nofollow\" class=\"result__a\"
+        href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.w3schools.com%2Fr%2F&amp;rut=84ea7e2b079e4f6566984253ae35b9c3cae6caf1e1996667789a0d47b4aa0dc2\">R
+        Tutorial - W3Schools</a>\n                      </h2>\n\n                    \n\n
+        \                   \n                      <div class=\"result__extras\">\n
+        \                       <div class=\"result__extras__url\">\n                          <span
+        class=\"result__icon\">\n                            <a rel=\"nofollow\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.w3schools.com%2Fr%2F&amp;rut=84ea7e2b079e4f6566984253ae35b9c3cae6caf1e1996667789a0d47b4aa0dc2\">\n
+        \                             <img class=\"result__icon__img\" width=\"16\"
+        height=\"16\" alt=\"\" src=\"//external-content.duckduckgo.com/ip3/www.w3schools.com.ico\"
+        name=\"i15\" />\n                            </a>\n                          </span>\n
+        \                         <a class=\"result__url\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.w3schools.com%2Fr%2F&amp;rut=84ea7e2b079e4f6566984253ae35b9c3cae6caf1e1996667789a0d47b4aa0dc2\">\n
+        \                           www.w3schools.com/r/\n                          </a>\n
+        \                         \n                        </div>\n                      </div>\n
+        \                   \n\n                    \n                      \n                        <a
+        class=\"result__snippet\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.w3schools.com%2Fr%2F&amp;rut=84ea7e2b079e4f6566984253ae35b9c3cae6caf1e1996667789a0d47b4aa0dc2\">Learn
+        <b>R</b> <b>R</b> is a programming <b>language</b>. <b>R</b> is often used
+        for statistical computing and graphical presentation to analyze and visualize
+        data. Start learning <b>R</b> now »</a>\n                      \n                    \n\n
+        \                   <div class=\"clear\"></div>\n                  </div>\n
+        \               </div>\n              \n            \n              \n                <div
+        class=\"result results_links results_links_deep web-result \">\n                  <div
+        class=\"links_main links_deep result__body\"> <!-- This is the visible part
+        -->\n                    \n                      <h2 class=\"result__title\">\n
+        \                       <a rel=\"nofollow\" class=\"result__a\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fcran.rstudio.org%2F&amp;rut=e1c9d691265583149b4a9e56d8b5ad0a405939a054c3b41c3e64f5dfc30f5496\">The
+        Comprehensive R Archive Network</a>\n                      </h2>\n\n                    \n\n
+        \                   \n                      <div class=\"result__extras\">\n
+        \                       <div class=\"result__extras__url\">\n                          <span
+        class=\"result__icon\">\n                            <a rel=\"nofollow\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fcran.rstudio.org%2F&amp;rut=e1c9d691265583149b4a9e56d8b5ad0a405939a054c3b41c3e64f5dfc30f5496\">\n
+        \                             <img class=\"result__icon__img\" width=\"16\"
+        height=\"16\" alt=\"\" src=\"//external-content.duckduckgo.com/ip3/cran.rstudio.org.ico\"
+        name=\"i15\" />\n                            </a>\n                          </span>\n
+        \                         <a class=\"result__url\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fcran.rstudio.org%2F&amp;rut=e1c9d691265583149b4a9e56d8b5ad0a405939a054c3b41c3e64f5dfc30f5496\">\n
+        \                           cran.rstudio.org\n                          </a>\n
+        \                         \n                        </div>\n                      </div>\n
+        \                   \n\n                    \n                      \n                        <a
+        class=\"result__snippet\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fcran.rstudio.org%2F&amp;rut=e1c9d691265583149b4a9e56d8b5ad0a405939a054c3b41c3e64f5dfc30f5496\">What
+        are <b>R</b> and CRAN? <b>R</b> is &#x27;GNU S&#x27;, a freely available <b>language</b>
+        and environment for statistical computing and graphics which provides a wide
+        variety of statistical and graphical techniques: linear and nonlinear modelling,
+        statistical tests, time series analysis, classification, clustering, etc.
+        Please consult the <b>R</b> project homepage for further information. CRAN
+        is a network of ftp and web ...</a>\n                      \n                    \n\n
+        \                   <div class=\"clear\"></div>\n                  </div>\n
+        \               </div>\n              \n            \n              \n                <div
+        class=\"result results_links results_links_deep web-result \">\n                  <div
+        class=\"links_main links_deep result__body\"> <!-- This is the visible part
+        -->\n                    \n                      <h2 class=\"result__title\">\n
+        \                       <a rel=\"nofollow\" class=\"result__a\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fr%2Dgraph%2Dgallery.com%2F&amp;rut=72a97b1befeb40ae0cff4b7b9c2a0eeff97d788bb8b7c910a0aeb5074797f082\">The
+        R Graph Gallery - Help and inspiration for R charts</a>\n                      </h2>\n\n
+        \                   \n\n                    \n                      <div class=\"result__extras\">\n
+        \                       <div class=\"result__extras__url\">\n                          <span
+        class=\"result__icon\">\n                            <a rel=\"nofollow\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fr%2Dgraph%2Dgallery.com%2F&amp;rut=72a97b1befeb40ae0cff4b7b9c2a0eeff97d788bb8b7c910a0aeb5074797f082\">\n
+        \                             <img class=\"result__icon__img\" width=\"16\"
+        height=\"16\" alt=\"\" src=\"//external-content.duckduckgo.com/ip3/r-graph-gallery.com.ico\"
+        name=\"i15\" />\n                            </a>\n                          </span>\n
+        \                         <a class=\"result__url\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fr%2Dgraph%2Dgallery.com%2F&amp;rut=72a97b1befeb40ae0cff4b7b9c2a0eeff97d788bb8b7c910a0aeb5074797f082\">\n
+        \                           r-graph-gallery.com\n                          </a>\n
+        \                         \n                        </div>\n                      </div>\n
+        \                   \n\n                    \n                      \n                        <a
+        class=\"result__snippet\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fr%2Dgraph%2Dgallery.com%2F&amp;rut=72a97b1befeb40ae0cff4b7b9c2a0eeff97d788bb8b7c910a0aeb5074797f082\">The
+        <b>R</b> Graph Gallery Welcome to the <b>R</b> graph gallery, a collection
+        of charts made with the <b>R</b> programming <b>language</b>. Hundreds of
+        charts are displayed in several sections, always with their reproducible code
+        available. The gallery makes a focus on the tidyverse and ggplot2. Feel free
+        to suggest a chart or report a bug: any feedback is highly welcome!</a>\n
+        \                     \n                    \n\n                    <div class=\"clear\"></div>\n
+        \                 </div>\n                </div>\n              \n            \n
+        \             \n                <div class=\"result results_links results_links_deep
+        web-result \">\n                  <div class=\"links_main links_deep result__body\">
+        <!-- This is the visible part -->\n                    \n                      <h2
+        class=\"result__title\">\n                        <a rel=\"nofollow\" class=\"result__a\"
+        href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.r%2Dproject.org%2Fabout.html&amp;rut=00b3bb826a7d8961cf64db8e9a74fcbbd656523644d622225772ae7ba5dfb089\">R:
+        What is R? - The R Project for Statistical Computing</a>\n                      </h2>\n\n
+        \                   \n\n                    \n                      <div class=\"result__extras\">\n
+        \                       <div class=\"result__extras__url\">\n                          <span
+        class=\"result__icon\">\n                            <a rel=\"nofollow\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.r%2Dproject.org%2Fabout.html&amp;rut=00b3bb826a7d8961cf64db8e9a74fcbbd656523644d622225772ae7ba5dfb089\">\n
+        \                             <img class=\"result__icon__img\" width=\"16\"
+        height=\"16\" alt=\"\" src=\"//external-content.duckduckgo.com/ip3/www.r-project.org.ico\"
+        name=\"i15\" />\n                            </a>\n                          </span>\n
+        \                         <a class=\"result__url\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.r%2Dproject.org%2Fabout.html&amp;rut=00b3bb826a7d8961cf64db8e9a74fcbbd656523644d622225772ae7ba5dfb089\">\n
+        \                           www.r-project.org/about.html\n                          </a>\n
+        \                         \n                        </div>\n                      </div>\n
+        \                   \n\n                    \n                      \n                        <a
+        class=\"result__snippet\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.r%2Dproject.org%2Fabout.html&amp;rut=00b3bb826a7d8961cf64db8e9a74fcbbd656523644d622225772ae7ba5dfb089\">The
+        S <b>language</b> is often the vehicle of choice for research in statistical
+        methodology, and <b>R</b> provides an Open Source route to participation in
+        that activity. One of <b>R&#x27;s</b> strengths is the ease with which well-designed
+        publication-quality plots can be produced, including mathematical symbols
+        and formulae where needed.</a>\n                      \n                    \n\n
+        \                   <div class=\"clear\"></div>\n                  </div>\n
+        \               </div>\n              \n            \n              \n                <div
+        class=\"result results_links results_links_deep web-result \">\n                  <div
+        class=\"links_main links_deep result__body\"> <!-- This is the visible part
+        -->\n                    \n                      <h2 class=\"result__title\">\n
+        \                       <a rel=\"nofollow\" class=\"result__a\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fcran.r%2Dproject.org%2Fbin%2Fwindows%2Fbase%2F&amp;rut=0455d50e744dd26378d8d541ab07af0b85e26cf4b213e409c2847e16c5596c03\">Download
+        R-4.5.2 for Windows. The R-project for statistical computing.</a>\n                      </h2>\n\n
+        \                   \n\n                    \n                      <div class=\"result__extras\">\n
+        \                       <div class=\"result__extras__url\">\n                          <span
+        class=\"result__icon\">\n                            <a rel=\"nofollow\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fcran.r%2Dproject.org%2Fbin%2Fwindows%2Fbase%2F&amp;rut=0455d50e744dd26378d8d541ab07af0b85e26cf4b213e409c2847e16c5596c03\">\n
+        \                             <img class=\"result__icon__img\" width=\"16\"
+        height=\"16\" alt=\"\" src=\"//external-content.duckduckgo.com/ip3/cran.r-project.org.ico\"
+        name=\"i15\" />\n                            </a>\n                          </span>\n
+        \                         <a class=\"result__url\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fcran.r%2Dproject.org%2Fbin%2Fwindows%2Fbase%2F&amp;rut=0455d50e744dd26378d8d541ab07af0b85e26cf4b213e409c2847e16c5596c03\">\n
+        \                           cran.r-project.org/bin/windows/base/\n                          </a>\n
+        \                         \n                        </div>\n                      </div>\n
+        \                   \n\n                    \n                      \n                        <a
+        class=\"result__snippet\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fcran.r%2Dproject.org%2Fbin%2Fwindows%2Fbase%2F&amp;rut=0455d50e744dd26378d8d541ab07af0b85e26cf4b213e409c2847e16c5596c03\">Please
+        see the <b>R</b> FAQ for general information about <b>R</b> and the <b>R</b>
+        Windows FAQ for Windows-specific information.</a>\n                      \n
+        \                   \n\n                    <div class=\"clear\"></div>\n
+        \                 </div>\n                </div>\n              \n            \n\n
+        \           \n              \n              \n                <div class=\"nav-link\">\n
+        \                 <form action=\"/html/\" method=\"post\">\n                    <input
+        type=\"submit\" class='btn btn--alt' value=\"Next\" />\n                    <input
+        type=\"hidden\" name=\"q\" value=\"R language site\" />\n                    <input
+        type=\"hidden\" name=\"s\" value=\"10\" />\n                    <input type=\"hidden\"
+        name=\"nextParams\" value=\"\" />\n                    <input type=\"hidden\"
+        name=\"v\" value=\"l\" />\n                    <input type=\"hidden\" name=\"o\"
+        value=\"json\" />\n                    <input type=\"hidden\" name=\"dc\"
+        value=\"11\" />\n                    <input type=\"hidden\" name=\"api\" value=\"d.js\"
+        />\n                    <input type=\"hidden\" name=\"vqd\" value=\"4-54388882044579937868391365910568395319\"
+        />\n\n                    \n                    \n                    \n                      <input
+        name=\"kl\" value=\"wt-wt\" type=\"hidden\" />\n                    \n                    \n
+        \                   \n                    \n                  </form>\n                </div>\n
+        \             \n            \n\n            <div class=\"feedback-btn\">\n
+        \             <a rel=\"nofollow\" href=\"//duckduckgo.com/feedback.html\"
+        target=\"_new\">Feedback</a>\n            </div>\n            <div class=\"clear\"></div>\n
+        \         </div>\n        </div>\n      </div> <!-- links wrapper //-->\n
+        \   \n  </div>\n\n  <div id=\"bottom_spacing2\"></div>\n\n  \n    <img src=\"//duckduckgo.com/t/sl_h\"/>\n
+        \ \n</body>\n</html>"
+  recorded_at: 2026-03-09 22:30:58
+recorded_with: VCR-vcr/2.1.0

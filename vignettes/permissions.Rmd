@@ -8,11 +8,27 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("permissions", "verified-replay")
+project <- docs$make_project()
+
+setwd(project$root)
+knitr::opts_knit$set(root.dir = project$root)
+
+readonly_chat <- docs$create_chat(list(
+  docs$step_tool(
+    "I'll list the files with read-only permissions.",
+    "list_files",
+    list(path = ".")
+  ),
+  docs$step_text("Read-only mode lets me inspect files without modifying them.")
+))
+```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
 ```
 
 Permissions control what an agent is allowed to do. They sit between the LLM
@@ -144,10 +160,8 @@ It must return `PermissionResultAllow()` or `PermissionResultDeny(reason)`.
 
 A read-only agent can explore files but cannot change anything:
 
-```{r permissions-readonly-demo}
-library(deputy)
-
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+```{r permissions-readonly-demo, eval = docs$should_eval}
+chat <- readonly_chat
 agent <- Agent$new(
   chat = chat,
   tools = tools_file(),

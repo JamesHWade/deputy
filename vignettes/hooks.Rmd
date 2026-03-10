@@ -8,11 +8,29 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("hooks", "verified-replay")
+project <- docs$make_project()
+
+setwd(project$root)
+knitr::opts_knit$set(root.dir = project$root)
+
+make_hooks_chat <- function() {
+  docs$create_chat(list(
+    docs$step_tool(
+      "I'll inspect the fixture project.",
+      "list_files",
+      list(path = ".")
+    ),
+    docs$step_text("I inspected the fixture project successfully.")
+  ))
+}
+```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
 ```
 
 Hooks let you intercept agent behaviour at key points in the execution
@@ -81,10 +99,8 @@ deputy includes several ready-made hooks:
 
 `hook_log_tools()` logs every tool call using cli:
 
-```{r hooks-log-demo}
-library(deputy)
-
-chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+```{r hooks-log-demo, eval = docs$should_eval}
+chat <- make_hooks_chat()
 agent <- Agent$new(
   chat = chat,
   tools = tools_file(),
@@ -145,7 +161,7 @@ hook_no_secrets <- HookMatcher$new(
 `PostToolUse` hooks run after a tool completes. Use them for logging,
 metrics, or conditional stopping:
 
-```{r hooks-audit-demo}
+```{r hooks-audit-demo, eval = docs$should_eval}
 hook_audit <- HookMatcher$new(
   event = "PostToolUse",
   callback = function(tool_name, tool_result, tool_error, context) {
@@ -158,7 +174,7 @@ hook_audit <- HookMatcher$new(
   }
 )
 
-chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+chat <- make_hooks_chat()
 agent <- Agent$new(
   chat = chat,
   tools = tools_file(),

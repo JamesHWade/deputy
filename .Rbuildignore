@@ -10,6 +10,10 @@
 ^pkgdown$
 ^codecov\.yml$
 ^\.claude$
+^scripts$
 ^\.beads$
 ^doc$
 ^Meta$
+^vignettes/README\.md$
+^vignettes/_vcr$
+^\.mcp\.json$

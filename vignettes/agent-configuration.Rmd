@@ -8,11 +8,27 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("agent-configuration", "verified-replay")
+project <- docs$make_project()
+
+setwd(project$root)
+knitr::opts_knit$set(root.dir = project$root)
+
+agent_result_chat <- docs$create_chat(list(
+  docs$step_tool(
+    "I'll check the fixture project first.",
+    "list_files",
+    list(path = ".")
+  ),
+  docs$step_text("The fixture project contains a DESCRIPTION file, one R script, and one CSV file.")
+))
+```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
 ```
 
 This vignette covers the many ways to configure an agent: system prompts,
@@ -123,10 +139,8 @@ left off.
 
 Every call to `run_sync()` returns an `AgentResult` with rich metadata:
 
-```{r agent-result-demo}
-library(deputy)
-
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+```{r agent-result-demo, eval = docs$should_eval}
+chat <- agent_result_chat
 agent <- Agent$new(chat = chat, tools = tools_file())
 
 result <- agent$run_sync("How many files are in the current directory?")

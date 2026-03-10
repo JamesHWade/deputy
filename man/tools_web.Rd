@@ -32,29 +32,7 @@ enablement and incurs extra cost)
 Without a \code{chat} argument, returns universal tools that work with any provider.
 }
 \examples{
-\dontrun{
-# Universal tools (work with any provider)
-agent <- Agent$new(
-  chat = ellmer::chat_ollama(),
-  tools = tools_web(),
-  permissions = Permissions$new(web = TRUE)
-)
-
-# Provider-specific tools (auto-detected)
-chat <- ellmer::chat_claude()
-agent <- Agent$new(
-  chat = chat,
-  tools = tools_web(chat),  # Uses Claude's native web tools
-  permissions = Permissions$new(web = TRUE)
-)
-
-# Force universal tools even with Claude
-agent <- Agent$new(
-  chat = chat,
-  tools = tools_web(chat, use_native = FALSE),
-  permissions = Permissions$new(web = TRUE)
-)
-}
+names(tools_web())
 
 }
 \seealso{

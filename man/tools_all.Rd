@@ -14,13 +14,6 @@ Returns all built-in tools. Use with \code{\link[=permissions_full]{permissions_
 to allow all operations.
 }
 \examples{
-\dontrun{
-# Allow all tools with full permissions
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
-  tools = tools_all(),
-  permissions = permissions_full()
-)
-}
+names(tools_all())
 
 }

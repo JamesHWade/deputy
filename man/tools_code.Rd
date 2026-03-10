@@ -20,12 +20,7 @@ Returns a list of tools for code execution:
 \code{\link[=permissions_standard]{permissions_standard()}} allows R code but not bash.
 }
 \examples{
-\dontrun{
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
-  tools = tools_code()
-)
-}
+names(tools_code())
 
 }
 \seealso{

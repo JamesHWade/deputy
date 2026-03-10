@@ -5,13 +5,39 @@ output: github_document
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  fig.path = "man/figures/README-",
-  out.width = "100%",
-  eval = FALSE
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init(
+  "readme",
+  "verified-replay",
+  chunk_options = list(
+    fig.path = "man/figures/README-",
+    out.width = "100%"
+  )
 )
+project <- docs$make_project()
+
+setwd(project$root)
+knitr::opts_knit$set(root.dir = project$root)
+
+quickstart_chat <- docs$create_chat(list(
+  docs$step_tool(
+    "I'll inspect the fixture project.",
+    "list_files",
+    list(path = ".")
+  ),
+  docs$step_text(
+    "I found a DESCRIPTION file, one R script, one CSV file, and a notes directory."
+  )
+))
+
+stream_chat <- docs$create_chat(list(
+  docs$step_text(
+    "Streaming example ready.",
+    chunks = c("Streaming ", "example ", "ready.")
+  )
+))
 ```
 
 # deputy <a href="https://jameshwade.github.io/deputy/"><img src="man/figures/logo.png" align="right" height="138" alt="deputy website" /></a>
@@ -26,6 +52,10 @@ knitr::opts_chunk$set(
 deputy is an R implementation of [Anthropic's Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk), built on [ellmer](https://ellmer.tidyverse.org/). It enables you to create AI agents that can use tools to accomplish multi-step tasks, with built-in support for permissions, hooks, and streaming output.
 
 > **Note:** This package aims to bring the patterns and capabilities of the Claude Agent SDK to the R ecosystem. While inspired by Anthropic's SDK, deputy is provider-agnostic and works with any LLM that ellmer supports.
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
+```
 
 ## Features
 - **Provider-agnostic** - Works with OpenAI, Anthropic, Google, Ollama, and any provider ellmer supports
@@ -54,17 +84,15 @@ pak::pak("tidyverse/ellmer")
 
 ### Create an Agent
 
-```{r example}
-library(deputy)
-
+```{r example, eval = docs$should_eval}
 # Create an agent with file tools
 agent <- Agent$new(
-  chat = ellmer::chat("openai"),
+  chat = quickstart_chat,
   tools = tools_file()
 )
 
 # Run a task (blocking)
-result <- agent$run_sync("What R files are in the current directory?")
+result <- agent$run_sync("What files are in the fixture project?")
 cat(result$response)
 ```
 
@@ -72,8 +100,20 @@ cat(result$response)
 
 For real-time feedback as the agent works:
 
-```{r streaming}
-for (event in agent$run("Analyze the structure of this project")) {
+```{r streaming, eval = docs$should_eval}
+stream_agent <- Agent$new(
+  chat = stream_chat,
+  tools = tools_file()
+)
+
+events <- stream_agent$run("Analyze the structure of this project")
+
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) {
+    break
+  }
+
   switch(
     event$type,
     "text" = cat(event$text),
@@ -120,7 +160,7 @@ but `--mcp-server` is preferred.
 
 deputy provides tool presets for common use cases:
 
-```{r tools}
+```{r tools, eval = FALSE}
 # Use presets for quick setup
 tools_preset("minimal")   # read_file, list_files
 tools_preset("standard")  # + write_file, run_r_code
@@ -152,7 +192,7 @@ PDF page extraction uses `pdftools` when available, with a fallback to
 
 Control what your agent can do:
 
-```{r permissions}
+```{r permissions, eval = FALSE}
 # Read-only: no writes, no code execution
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
@@ -200,7 +240,7 @@ messages so the model can request explicit approval.
 
 Intercept agent behavior:
 
-```{r hooks}
+```{r hooks, eval = FALSE}
 # Log all tool calls
 agent$add_hook(HookMatcher$new(
   event = "PostToolUse",
@@ -247,7 +287,7 @@ Skills bundle tools and prompt extensions. You can load them from disk or create
 them programmatically. deputy ships with a built-in example skill under
 `inst/skills`.
 
-```{r skills}
+```{r skills, eval = FALSE}
 # Discover bundled skills
 skills_dir <- system.file("skills", package = "deputy")
 skills_list(skills_dir)
@@ -274,7 +314,7 @@ deputy can load Claude-style settings from `.claude` directories, including
 Tool policy settings from `settings.json` are also applied to `agent$permissions`
 (`allowedTools`, `disallowedTools`, and `permissionPromptToolName`).
 
-```{r settings}
+```{r settings, eval = FALSE}
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
   tools = tools_file(),
@@ -299,7 +339,7 @@ Example `.claude/settings.json` tool policy:
 
 Request JSON output that matches a schema:
 
-```{r structured_output}
+```{r structured_output, eval = FALSE}
 schema <- list(
   type = "object",
   properties = list(status = list(type = "string")),
@@ -318,7 +358,7 @@ result$structured_output
 
 deputy provides structured error types for programmatic error handling:
 
-```{r errors}
+```{r errors, eval = FALSE}
 # Catch specific error types
 tryCatch(
   agent$run_sync("task"),
@@ -338,7 +378,7 @@ tryCatch(
 
 Coordinate specialized agents:
 
-```{r multi-agent}
+```{r multi-agent, eval = FALSE}
 # Define sub-agents
 code_agent <- agent_definition(
   name = "code_analyst",
@@ -360,7 +400,7 @@ result <- lead$run_sync("Review the R code in this project")
 
 deputy works with any LLM provider that ellmer supports:
 
-```{r providers}
+```{r providers, eval = FALSE}
 # OpenAI
 Agent$new(chat = ellmer::chat("openai"))
 

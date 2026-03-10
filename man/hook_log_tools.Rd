@@ -17,8 +17,7 @@ Convenience function to create a PostToolUse hook that logs tool calls
 using the cli package.
 }
 \examples{
-\dontrun{
-agent$add_hook(hook_log_tools())
-}
+hook <- hook_log_tools(verbose = TRUE)
+hook$event
 
 }

@@ -17,8 +17,12 @@ Convenience function to create a PreToolUse hook that only allows
 file writes within a specified directory.
 }
 \examples{
-\dontrun{
-agent$add_hook(hook_limit_file_writes("./output"))
-}
+allowed_dir <- tempdir()
+hook <- hook_limit_file_writes(allowed_dir)
+hook$callback(
+  "write_file",
+  list(path = file.path(allowed_dir, "report.txt")),
+  list()
+)$permission
 
 }

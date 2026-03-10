@@ -17,9 +17,7 @@ accidentally at runtime.
 ## Method `HookMatcher$new`
 ## ------------------------------------------------
 
-\dontrun{
-# Block dangerous bash commands
-HookMatcher$new(
+hook <- HookMatcher$new(
   event = "PreToolUse",
   pattern = "^(run_bash|bash)$",
   callback = function(tool_name, tool_input, context) {
@@ -30,7 +28,8 @@ HookMatcher$new(
     }
   }
 )
-}
+
+hook$matches("run_bash")
 }
 \section{Active bindings}{
 \if{html}{\out{<div class="r6-active-bindings">}}
@@ -92,9 +91,7 @@ A new \code{HookMatcher} object
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-# Block dangerous bash commands
-HookMatcher$new(
+\preformatted{hook <- HookMatcher$new(
   event = "PreToolUse",
   pattern = "^(run_bash|bash)$",
   callback = function(tool_name, tool_input, context) {
@@ -105,7 +102,8 @@ HookMatcher$new(
     }
   }
 )
-}
+
+hook$matches("run_bash")
 }
 \if{html}{\out{</div>}}
 

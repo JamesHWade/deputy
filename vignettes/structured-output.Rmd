@@ -8,11 +8,78 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("structured-output", "verified-vcr")
+apply_output_format_instructions <- getFromNamespace(
+  "apply_output_format_instructions",
+  "deputy"
 )
+parse_structured_output <- getFromNamespace(
+  "parse_structured_output",
+  "deputy"
+)
+
+extract_openai_output_text <- function(stream_body) {
+  lines <- strsplit(stream_body, "\n", fixed = TRUE)[[1]]
+  data_lines <- lines[startsWith(lines, "data: ")]
+  payloads <- sub("^data: ", "", data_lines)
+  payloads <- payloads[nzchar(payloads) & payloads != "[DONE]"]
+
+  deltas <- vapply(
+    payloads,
+    function(payload) {
+      event <- jsonlite::fromJSON(payload, simplifyVector = FALSE)
+      if (!identical(event$type, "response.output_text.delta")) {
+        return("")
+      }
+      if (is.null(event$delta)) "" else event$delta
+    },
+    character(1)
+  )
+
+  paste(deltas, collapse = "")
+}
+
+run_structured_openai_demo <- function(task, output_format) {
+  prompt <- apply_output_format_instructions(task, output_format)
+  body <- docs$use_vcr("main-example", {
+    httr2::request("https://api.openai.com/v1/responses") |>
+      httr2::req_headers(
+        Authorization = paste(
+          "Bearer",
+          Sys.getenv("OPENAI_API_KEY", unset = "docs-placeholder")
+        )
+      ) |>
+      httr2::req_body_json(
+        list(
+          input = list(list(
+            role = "user",
+            content = list(list(type = "input_text", text = prompt))
+          )),
+          model = "gpt-4o-mini",
+          stream = TRUE,
+          store = FALSE,
+          service_tier = "auto"
+        ),
+        auto_unbox = TRUE
+      ) |>
+      httr2::req_timeout(120) |>
+      httr2::req_perform() |>
+      httr2::resp_body_string()
+  })
+
+  text <- extract_openai_output_text(body)
+  list(
+    text = text,
+    structured_output = parse_structured_output(text, output_format)
+  )
+}
+```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
 ```
 
 Sometimes you need the agent to return data in a specific format rather than
@@ -23,29 +90,25 @@ parameter, which tells the LLM to return valid JSON matching a schema.
 
 The simplest form asks the LLM to return a JSON object:
 
-```{r structured-json-object}
-library(deputy)
-
-chat <- ellmer::chat_openai(model = "gpt-4o-mini")
-agent <- Agent$new(chat = chat)
-
-result <- agent$run_sync(
-  "List three popular R packages for data manipulation.
-   Return a JSON object with a 'packages' array where each
-   element has 'name' and 'description' fields.",
+```{r structured-json-object, eval = docs$should_eval, warning = FALSE, message = FALSE}
+result <- run_structured_openai_demo(
+  "List three popular R packages for data manipulation. Return a JSON object with a packages array where each element has name and description fields.",
   output_format = list(type = "json_object")
 )
 
-parsed <- result$structured_output$parsed
-str(parsed)
+str(result$structured_output$parsed)
 ```
+
+This recorded request uses the same `output_format` prompt shaping and JSON
+parsing helpers that deputy applies inside `Agent$run_sync()`, but captures the
+provider exchange directly so pkgdown can replay it deterministically.
 
 ## JSON Schema Format
 
 For stricter control, provide a JSON Schema. The LLM will be constrained to
 produce output matching the schema:
 
-```{r structured-json-schema}
+```{r structured-json-schema, eval = FALSE}
 schema <- list(
   type = "object",
   properties = list(
@@ -122,7 +185,7 @@ empty. The parsed output is still available.
 
 Structured output is especially useful for data extraction tasks:
 
-```{r structured-extraction}
+```{r structured-extraction, eval = FALSE}
 schema <- list(
   type = "object",
   properties = list(

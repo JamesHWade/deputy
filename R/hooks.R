@@ -82,27 +82,21 @@
 #' - `tools_count`: (SessionStart only) Number of registered tools
 #'
 #' @examples
-#' \dontrun{
-#' # PreToolUse callback example
-#' agent$add_hook(HookMatcher$new(
+#' pre_tool_hook <- HookMatcher$new(
 #'   event = "PreToolUse",
 #'   callback = function(tool_name, tool_input, context) {
-#'     message("Tool: ", tool_name, " in ", context$working_dir)
 #'     HookResultPreToolUse(permission = "allow")
 #'   }
-#' ))
+#' )
 #'
-#' # PostToolUse callback example
-#' agent$add_hook(HookMatcher$new(
+#' post_tool_hook <- HookMatcher$new(
 #'   event = "PostToolUse",
 #'   callback = function(tool_name, tool_result, tool_error, context) {
-#'     if (!is.null(tool_error)) {
-#'       warning("Tool failed: ", tool_error)
-#'     }
 #'     HookResultPostToolUse()
 #'   }
-#' ))
-#' }
+#' )
+#'
+#' c(pre_tool_hook$event, post_tool_hook$event)
 #'
 #' @export
 HookEvent <- c(
@@ -342,9 +336,7 @@ HookMatcher <- R6::R6Class(
     #' @return A new `HookMatcher` object
     #'
     #' @examples
-    #' \dontrun{
-    #' # Block dangerous bash commands
-    #' HookMatcher$new(
+    #' hook <- HookMatcher$new(
     #'   event = "PreToolUse",
     #'   pattern = "^(run_bash|bash)$",
     #'   callback = function(tool_name, tool_input, context) {
@@ -355,7 +347,8 @@ HookMatcher <- R6::R6Class(
     #'     }
     #'   }
     #' )
-    #' }
+    #'
+    #' hook$matches("run_bash")
     initialize = function(event, callback, pattern = NULL, timeout = 30) {
       if (!event %in% HookEvent) {
         cli_abort(c(
@@ -675,9 +668,8 @@ HookRegistry <- R6::R6Class(
 #' @return A [HookMatcher] object
 #'
 #' @examples
-#' \dontrun{
-#' agent$add_hook(hook_log_tools())
-#' }
+#' hook <- hook_log_tools(verbose = TRUE)
+#' hook$event
 #'
 #' @export
 hook_log_tools <- function(verbose = FALSE) {
@@ -745,15 +737,10 @@ hook_log_tools <- function(verbose = FALSE) {
 #' @return A [HookMatcher] object
 #'
 #' @examples
-#' \dontrun{
-#' # Use default patterns
-#' agent$add_hook(hook_block_dangerous_bash())
-#'
-#' # Add custom patterns
-#' agent$add_hook(hook_block_dangerous_bash(
-#'   additional_patterns = c("my_custom_pattern", "another_pattern")
-#' ))
-#' }
+#' hook <- hook_block_dangerous_bash(
+#'   additional_patterns = "curl\\s+-X\\s+POST"
+#' )
+#' hook$callback("run_bash", list(command = "ls"), list())$permission
 #'
 #' @export
 hook_block_dangerous_bash <- function(
@@ -938,9 +925,13 @@ hook_block_dangerous_bash <- function(
 #' @return A [HookMatcher] object
 #'
 #' @examples
-#' \dontrun{
-#' agent$add_hook(hook_limit_file_writes("./output"))
-#' }
+#' allowed_dir <- tempdir()
+#' hook <- hook_limit_file_writes(allowed_dir)
+#' hook$callback(
+#'   "write_file",
+#'   list(path = file.path(allowed_dir, "report.txt")),
+#'   list()
+#' )$permission
 #'
 #' @export
 hook_limit_file_writes <- function(allowed_dir) {

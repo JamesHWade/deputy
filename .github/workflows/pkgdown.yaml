@@ -37,8 +37,7 @@ jobs:
           needs: website
 
       - name: Build site
-        run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
-        shell: Rscript {0}
+        run: Rscript scripts/build-docs.R
 
       - name: Deploy to GitHub pages 🚀
         if: github.event_name != 'pull_request'

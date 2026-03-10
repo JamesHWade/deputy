@@ -8,11 +8,64 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
+library(deputy)
+
+docs_init <- getFromNamespace("deputy_docs_init", "deputy")
+docs <- docs_init("example-extraction-pipeline", "verified-replay")
+project <- docs$make_project()
+
+setwd(project$root)
+knitr::opts_knit$set(root.dir = project$root)
+
+extract_json <- jsonlite::toJSON(
+  list(
+    name = "demoPkg",
+    title = "Demo Package",
+    version = "0.0.1",
+    authors = list(list(name = "Demo Author", role = "aut, cre")),
+    dependencies = c("cli", "rlang"),
+    exported_functions = list(
+      list(name = "say_hello", file = "R/hello.R")
+    )
+  ),
+  auto_unbox = TRUE
 )
+
+enrich_json <- jsonlite::toJSON(
+  list(
+    name = "demoPkg",
+    title = "Demo Package",
+    version = "0.0.1",
+    category_tags = c("infrastructure", "cli"),
+    complexity = "simple",
+    functions = list(
+      list(
+        name = "say_hello",
+        summary = "Returns a greeting string for a supplied name."
+      )
+    )
+  ),
+  auto_unbox = TRUE
+)
+
+make_extract_chat <- function() docs$create_chat(list(docs$step_text(extract_json)))
+make_enrich_chat <- function() docs$create_chat(list(docs$step_text(enrich_json)))
+make_report_chat <- function() {
+  docs$create_chat(list(
+    docs$step_text(paste(
+      "## Package Summary",
+      "",
+      "- **Name:** demoPkg",
+      "- **Version:** 0.0.1",
+      "- **Key function:** `say_hello()` returns a greeting string.",
+      sep = "\n"
+    ))
+  ))
+}
+```
+
+```{r, echo = FALSE, results = 'asis'}
+docs$status_block()
 ```
 
 This example builds a pipeline that extracts structured metadata from an R
@@ -49,9 +102,7 @@ Each step uses `output_format` to constrain the LLM to a JSON schema.
 The first agent reads the DESCRIPTION file and key R source files, then
 extracts structured information:
 
-```{r step1-schema}
-library(deputy)
-
+```{r step1-schema, eval = docs$should_eval}
 extract_schema <- list(
   type = "object",
   properties = list(
@@ -90,8 +141,8 @@ extract_schema <- list(
 )
 ```
 
-```{r step1-run}
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+```{r step1-run, eval = docs$should_eval}
+chat <- make_extract_chat()
 
 extractor <- Agent$new(
   chat = chat,
@@ -124,7 +175,7 @@ length(pkg_metadata$exported_functions)
 The second agent takes the extracted JSON and adds categorisation and
 summaries:
 
-```{r step2-schema}
+```{r step2-schema, eval = docs$should_eval}
 enrich_schema <- list(
   type = "object",
   properties = list(
@@ -160,8 +211,8 @@ enrich_schema <- list(
 )
 ```
 
-```{r step2-run}
-chat2 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+```{r step2-run, eval = docs$should_eval}
+chat2 <- make_enrich_chat()
 
 enricher <- Agent$new(
   chat = chat2,
@@ -195,8 +246,8 @@ enriched$complexity
 
 The third agent takes the enriched data and produces a readable report:
 
-```{r step3-run}
-chat3 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+```{r step3-run, eval = docs$should_eval}
+chat3 <- make_report_chat()
 
 reporter <- Agent$new(
   chat = chat3,
@@ -220,10 +271,10 @@ cat(step3$response)
 
 Wrap the pipeline in a reusable function:
 
-```{r pipeline-function}
+```{r pipeline-function, eval = docs$should_eval}
 extraction_pipeline <- function(package_dir = ".") {
   # Step 1: Extract
-  chat1 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+  chat1 <- make_extract_chat()
   extractor <- Agent$new(
     chat = chat1,
     tools = tools_file(),
@@ -243,7 +294,7 @@ extraction_pipeline <- function(package_dir = ".") {
   }
 
   # Step 2: Enrich
-  chat2 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+  chat2 <- make_enrich_chat()
   enricher <- Agent$new(
     chat = chat2,
     tools = tools_file(),
@@ -266,7 +317,7 @@ extraction_pipeline <- function(package_dir = ".") {
   }
 
   # Step 3: Report
-  chat3 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+  chat3 <- make_report_chat()
   reporter <- Agent$new(chat = chat3)
 
   step3 <- reporter$run_sync(
@@ -295,7 +346,7 @@ Each step validates its output before passing it to the next. Check both
 `is_success()` (the agent completed normally) and `structured_output$valid`
 (the JSON matches the schema):
 
-```{r error-handling}
+```{r error-handling, eval = docs$should_eval}
 step <- extractor$run_sync(
   "Extract metadata.",
   output_format = list(type = "json_schema", schema = extract_schema)

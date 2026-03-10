@@ -28,26 +28,9 @@ Returns a pre-configured collection of tools for common use cases.
 Presets simplify agent setup by providing curated toolsets.
 }
 \examples{
-\dontrun{
-# Minimal preset for read-only operations
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
-  tools = tools_preset("minimal"),
-  permissions = permissions_readonly()
-)
-
-# Standard preset for typical development
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
-  tools = tools_preset("standard")
-)
-
-# Data analysis preset
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
-  tools = tools_preset("data")
-)
-}
+names(tools_preset("minimal"))
+names(tools_preset("standard"))
+names(tools_preset("data"))
 
 }
 \seealso{

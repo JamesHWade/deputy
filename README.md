@@ -24,6 +24,9 @@ built-in support for permissions, hooks, and streaming output.
 > SDK, deputy is provider-agnostic and works with any LLM that ellmer
 > supports.
 
+> **Status:** Verified in pkgdown CI using deterministic replay
+> fixtures. Swap in a real `ellmer::chat_*()` object for live runs.
+
 ## Features
 
 - **Provider-agnostic** - Works with OpenAI, Anthropic, Google, Ollama,
@@ -56,17 +59,16 @@ pak::pak("tidyverse/ellmer")
 ### Create an Agent
 
 ``` r
-library(deputy)
-
 # Create an agent with file tools
 agent <- Agent$new(
-  chat = ellmer::chat("openai"),
+  chat = quickstart_chat,
   tools = tools_file()
 )
 
 # Run a task (blocking)
-result <- agent$run_sync("What R files are in the current directory?")
+result <- agent$run_sync("What files are in the fixture project?")
 cat(result$response)
+#> I found a DESCRIPTION file, one R script, one CSV file, and a notes directory.
 ```
 
 ### Streaming Output
@@ -74,7 +76,19 @@ cat(result$response)
 For real-time feedback as the agent works:
 
 ``` r
-for (event in agent$run("Analyze the structure of this project")) {
+stream_agent <- Agent$new(
+  chat = stream_chat,
+  tools = tools_file()
+)
+
+events <- stream_agent$run("Analyze the structure of this project")
+
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) {
+    break
+  }
+
   switch(
     event$type,
     "text" = cat(event$text),
@@ -82,6 +96,9 @@ for (event in agent$run("Analyze the structure of this project")) {
     "stop" = message("\nDone! Cost: $", round(event$cost$total, 4))
   )
 }
+#> Streaming example ready.
+#> 
+#> Done! Cost: $0.001
 ```
 
 ### CLI (`exec/deputy`)
@@ -105,8 +122,8 @@ Single-task mode (non-interactive):
 deputy -x "Summarize the R files in this project"
 ```
 
-Common options include short aliases (`-p`, `-m`, `-t`, `-P`, `-n`, `-c`,
-`-d`, `-v`, etc.), and repeatable flags for Rapp 0.3 style inputs:
+Common options include short aliases (`-p`, `-m`, `-t`, `-P`, `-n`,
+`-c`, `-d`, `-v`, etc.), and repeatable flags for Rapp 0.3 style inputs:
 
 ``` bash
 deputy --setting-source project --setting-source user
@@ -146,8 +163,8 @@ tool_read_markdown("slides.pptx")
 ```
 
 PDF page extraction uses `pdftools` when available, with a fallback to
-`reticulate` + Python `pypdf`.
-`tool_read_markdown()` uses `reticulate` + Python `markitdown`.
+`reticulate` + Python `pypdf`. `tool_read_markdown()` uses
+`reticulate` + Python `markitdown`.
 
 ### Permissions
 

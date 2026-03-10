@@ -16,21 +16,14 @@
 #' @return An `AgentDefinition` object
 #'
 #' @examples
-#' \dontrun{
-#' # Define a code review agent
 #' code_reviewer <- agent_definition(
 #'   name = "code_reviewer",
-#'   description = "Reviews code for bugs, style issues, and best practices",
-#'   prompt = "You are an expert code reviewer...",
+#'   description = "Reviews code for bugs and style issues",
+#'   prompt = "You are an expert code reviewer.",
 #'   tools = list(tool_read_file, tool_list_files)
 #' )
 #'
-#' # Use with a lead agent
-#' lead <- LeadAgent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
-#'   sub_agents = list(code_reviewer)
-#' )
-#' }
+#' print(code_reviewer)
 #'
 #' @export
 agent_definition <- function(

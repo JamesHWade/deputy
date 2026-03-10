@@ -51,14 +51,9 @@ obfuscation techniques. For high-security environments, consider:
 }
 }
 \examples{
-\dontrun{
-# Use default patterns
-agent$add_hook(hook_block_dangerous_bash())
-
-# Add custom patterns
-agent$add_hook(hook_block_dangerous_bash(
-  additional_patterns = c("my_custom_pattern", "another_pattern")
-))
-}
+hook <- hook_block_dangerous_bash(
+  additional_patterns = "curl\\\\s+-X\\\\s+POST"
+)
+hook$callback("run_bash", list(command = "ls"), list())$permission
 
 }
