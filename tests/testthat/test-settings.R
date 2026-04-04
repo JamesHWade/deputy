@@ -28,6 +28,88 @@ test_that("claude_settings_load loads memory, skills, and commands", {
   expect_true("summarize" %in% names(settings$commands))
 })
 
+test_that("setting sources load user, project, and local with fixed precedence", {
+  withr::local_tempdir(pattern = "deputy-home") -> home_dir
+  withr::local_tempdir(pattern = "deputy-project") -> project_dir
+  withr::local_envvar(HOME = home_dir)
+
+  user_root <- file.path(home_dir, ".claude")
+  dir.create(file.path(user_root, "commands"), recursive = TRUE)
+  writeLines("User memory", file.path(user_root, "CLAUDE.md"))
+  writeLines(
+    '{"policy":{"source":"user"},"user_only":true}',
+    file.path(user_root, "settings.json")
+  )
+
+  dir.create(file.path(project_dir, ".claude", "commands"), recursive = TRUE)
+  writeLines("Project memory", file.path(project_dir, "CLAUDE.md"))
+  writeLines(
+    '{"policy":{"source":"project"},"project_only":true}',
+    file.path(project_dir, ".claude", "settings.json")
+  )
+  writeLines(
+    '{"policy":{"source":"local"},"local_only":true}',
+    file.path(project_dir, ".claude", "settings.local.json")
+  )
+
+  settings <- claude_settings_load(
+    c("local", "user", "project"),
+    working_dir = project_dir
+  )
+
+  expect_equal(
+    settings$sources$settings_files,
+    normalizePath(c(
+      file.path(user_root, "settings.json"),
+      file.path(project_dir, ".claude", "settings.json"),
+      file.path(project_dir, ".claude", "settings.local.json")
+    ), mustWork = FALSE)
+  )
+  expect_equal(settings$settings$policy$source, "local")
+  expect_true(isTRUE(settings$settings$user_only))
+  expect_true(isTRUE(settings$settings$project_only))
+  expect_true(isTRUE(settings$settings$local_only))
+  expect_match(paste(settings$memory, collapse = "\n"), "User memory")
+  expect_match(paste(settings$memory, collapse = "\n"), "Project memory")
+})
+
+test_that("local setting source only loads settings.local.json", {
+  withr::local_tempdir(pattern = "deputy-settings") -> temp_dir
+
+  dir.create(file.path(temp_dir, ".claude", "skills"), recursive = TRUE)
+  dir.create(file.path(temp_dir, ".claude", "commands"), recursive = TRUE)
+  dir.create(file.path(temp_dir, ".claude", "agents"), recursive = TRUE)
+  writeLines("Project memory", file.path(temp_dir, "CLAUDE.md"))
+  writeLines(
+    '{"local_only":true}',
+    file.path(temp_dir, ".claude", "settings.local.json")
+  )
+  writeLines(
+    "Summarize the latest changes.",
+    file.path(temp_dir, ".claude", "commands", "summarize.md")
+  )
+  writeLines(
+    c(
+      "---",
+      "name: reviewer",
+      "description: Reviews code changes",
+      "tools:",
+      "  - Read",
+      "---",
+      "You are a precise code reviewer."
+    ),
+    file.path(temp_dir, ".claude", "agents", "reviewer.md")
+  )
+
+  settings <- claude_settings_load("local", working_dir = temp_dir)
+
+  expect_true(isTRUE(settings$settings$local_only))
+  expect_length(settings$memory, 0)
+  expect_length(settings$skills, 0)
+  expect_length(settings$commands, 0)
+  expect_length(settings$agents, 0)
+})
+
 test_that("Agent applies project setting_sources", {
   withr::local_tempdir(pattern = "deputy-settings") -> temp_dir
 

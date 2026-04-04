@@ -2,11 +2,15 @@
 % Please edit documentation in R/sdk-compat.R
 \name{ClaudeSDKClient}
 \alias{ClaudeSDKClient}
-\title{Claude Agent SDK compatibility client}
+\alias{AgentSDKClient}
+\title{Agent SDK compatibility client}
 \description{
-Claude Agent SDK compatibility client
+Agent SDK compatibility client
 
-Claude Agent SDK compatibility client
+Agent SDK compatibility client
+}
+\details{
+\code{AgentSDKClient} is an additive alias for \link{ClaudeSDKClient}.
 }
 \section{Public fields}{
 \if{html}{\out{<div class="r6-fields">}}
@@ -110,6 +114,43 @@ Invisible self
 The objects of this class are cloneable with this method.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClaudeSDKClient$clone(deep = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{deep}}{Whether to make a deep clone.}
+}
+\if{html}{\out{</div>}}
+}
+}
+}
+\section{Super class}{
+\code{\link[deputy:ClaudeSDKClient]{deputy::ClaudeSDKClient}} -> \code{AgentSDKClient}
+}
+\section{Methods}{
+\subsection{Public methods}{
+\itemize{
+\item \href{#method-AgentSDKClient-clone}{\code{AgentSDKClient$clone()}}
+}
+}
+\if{html}{\out{
+<details open><summary>Inherited methods</summary>
+<ul>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="initialize"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-initialize'><code>deputy::ClaudeSDKClient$initialize()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="list_sessions"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-list_sessions'><code>deputy::ClaudeSDKClient$list_sessions()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="query"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-query'><code>deputy::ClaudeSDKClient$query()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="resume"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-resume'><code>deputy::ClaudeSDKClient$resume()</code></a></span></li>
+</ul>
+</details>
+}}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AgentSDKClient-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-AgentSDKClient-clone}{}}}
+\subsection{Method \code{clone()}}{
+The objects of this class are cloneable with this method.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AgentSDKClient$clone(deep = FALSE)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{

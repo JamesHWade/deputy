@@ -4,14 +4,15 @@
 #'
 #' @description
 #' Loads Claude-style settings from a list of `setting_sources`, mirroring the
-#' Claude Agent SDK behavior. Supports project and user sources, and returns
+#' Agent SDK behavior. Supports user, project, and local sources, and returns
 #' memory, skills, slash commands, and custom agents discovered in `.claude`
 #' directories.
 #'
 #' Supported sources:
+#' - `"user"`: loads `~/.claude` settings, skills, commands, agents, and memory
 #' - `"project"`: loads project `.claude` settings, skills, commands, agents,
 #'   and memory
-#' - `"user"`: loads `~/.claude` settings, skills, commands, agents, and memory
+#' - `"local"`: loads project `.claude/settings.local.json` only
 #' - explicit file paths to `.json` settings files
 #'
 #' @param setting_sources Character vector of sources, e.g. `c("project", "user")`.
@@ -291,7 +292,15 @@ normalize_setting_sources <- function(setting_sources) {
   if (!is.character(setting_sources)) {
     cli::cli_abort("{.arg setting_sources} must be a character vector")
   }
-  trimws(setting_sources[setting_sources != ""])
+
+  normalized <- trimws(setting_sources)
+  normalized <- normalized[nzchar(normalized)]
+
+  builtins <- c("user", "project", "local")
+  present_builtins <- builtins[builtins %in% normalized]
+  explicit_paths <- normalized[!normalized %in% builtins]
+
+  unique(c(present_builtins, explicit_paths))
 }
 
 # Resolve settingSources into concrete paths
@@ -303,14 +312,13 @@ resolve_setting_sources <- function(setting_sources, working_dir) {
   agent_dirs <- character()
 
   working_dir <- normalizePath(working_dir, mustWork = TRUE)
-  user_root <- path.expand("~/.claude")
+  user_root <- expand_and_normalize("~/.claude")
 
   for (src in setting_sources) {
     if (identical(src, "project")) {
       settings_files <- c(
         settings_files,
-        file.path(working_dir, ".claude", "settings.json"),
-        file.path(working_dir, ".claude", "settings.local.json")
+        file.path(working_dir, ".claude", "settings.json")
       )
       memory_files <- c(
         memory_files,
@@ -332,6 +340,14 @@ resolve_setting_sources <- function(setting_sources, working_dir) {
       skill_dirs <- c(skill_dirs, file.path(user_root, "skills"))
       command_dirs <- c(command_dirs, file.path(user_root, "commands"))
       agent_dirs <- c(agent_dirs, file.path(user_root, "agents"))
+      next
+    }
+
+    if (identical(src, "local")) {
+      settings_files <- c(
+        settings_files,
+        file.path(working_dir, ".claude", "settings.local.json")
+      )
       next
     }
 
@@ -529,10 +545,29 @@ load_agents_from_dirs <- function(dirs, skills = list()) {
 load_custom_agent_definition <- function(path, skills = list()) {
   parsed <- parse_markdown_frontmatter(path)
   meta <- parsed$meta
+  supported_fields <- c(
+    "name",
+    "description",
+    "prompt",
+    "tools",
+    "model",
+    "skills"
+  )
+  unsupported_fields <- setdiff(names(meta), supported_fields)
+  if (length(unsupported_fields) > 0) {
+    cli::cli_warn(c(
+      "Ignoring unsupported custom agent metadata in {.path {path}}",
+      "i" = "Unsupported fields: {.val {sort(unsupported_fields)}}"
+    ))
+  }
 
   name <- meta$name %||% tools::file_path_sans_ext(basename(path))
   description <- meta$description %||% ""
   model <- meta$model %||% "inherit"
+  prompt <- parsed$body
+  if (!nzchar(trimws(prompt))) {
+    prompt <- meta$prompt %||% ""
+  }
 
   tool_names <- meta$tools %||% list()
   tools <- compat_resolve_named_tools(tool_names)
@@ -549,7 +584,7 @@ load_custom_agent_definition <- function(path, skills = list()) {
   agent_definition(
     name = name,
     description = description,
-    prompt = parsed$body,
+    prompt = prompt,
     tools = tools,
     model = model,
     skills = resolved_skills

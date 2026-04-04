@@ -2,7 +2,8 @@
 % Please edit documentation in R/sdk-compat.R
 \name{claude_sdk_options}
 \alias{claude_sdk_options}
-\title{Create Claude Agent SDK compatibility options}
+\alias{agent_sdk_options}
+\title{Create Agent SDK compatibility options}
 \usage{
 claude_sdk_options(
   chat = NULL,
@@ -26,6 +27,8 @@ claude_sdk_options(
   max_turns = 25,
   max_cost_usd = NULL
 )
+
+agent_sdk_options(...)
 }
 \arguments{
 \item{chat}{Optional ellmer chat object to use directly}
@@ -67,10 +70,13 @@ claude_sdk_options(
 \item{max_turns}{Maximum turns per query}
 
 \item{max_cost_usd}{Maximum cost per query}
+
+\item{...}{Passed through to \code{\link[=claude_sdk_options]{claude_sdk_options()}}}
 }
 \value{
 A \code{ClaudeSDKOptions} object
 }
 \description{
-Create Claude Agent SDK compatibility options
+\code{agent_sdk_options()} is an additive alias for teams that prefer the newer
+Agent SDK naming while keeping the same deputy runtime and behavior.
 }

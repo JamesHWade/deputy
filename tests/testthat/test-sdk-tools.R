@@ -81,3 +81,23 @@ test_that("compatibility aliases resolve to expected tool names", {
 
   expect_equal(tool_names, c("Read", "Edit", "TodoWrite"))
 })
+
+test_that("delegation aliases resolve to both Agent and Task", {
+  delegate_tool <- ellmer::tool(
+    fun = function(agent_name, task) paste(agent_name, task),
+    name = "delegate_to_agent",
+    description = "Delegate to a sub-agent.",
+    arguments = list(
+      agent_name = ellmer::type_string("Registered sub-agent name"),
+      task = ellmer::type_string("Task description")
+    )
+  )
+
+  resolved <- compat_resolve_named_tools(
+    c("Agent", "Task"),
+    delegate_tool = delegate_tool
+  )
+  tool_names <- vapply(resolved, function(tool) tool@name, character(1))
+
+  expect_equal(tool_names, c("Agent", "Task"))
+})

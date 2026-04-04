@@ -17,15 +17,16 @@ and metadata.
 }
 \description{
 Loads Claude-style settings from a list of \code{setting_sources}, mirroring the
-Claude Agent SDK behavior. Supports project and user sources, and returns
+Agent SDK behavior. Supports user, project, and local sources, and returns
 memory, skills, slash commands, and custom agents discovered in \code{.claude}
 directories.
 
 Supported sources:
 \itemize{
+\item \code{"user"}: loads \verb{~/.claude} settings, skills, commands, agents, and memory
 \item \code{"project"}: loads project \code{.claude} settings, skills, commands, agents,
 and memory
-\item \code{"user"}: loads \verb{~/.claude} settings, skills, commands, agents, and memory
+\item \code{"local"}: loads project \code{.claude/settings.local.json} only
 \item explicit file paths to \code{.json} settings files
 }
 }

@@ -1,4 +1,4 @@
-# Claude Agent SDK compatibility facade for deputy.
+# Agent SDK compatibility facade for deputy.
 
 # Default Anthropic model used by the compatibility layer.
 default_claude_sdk_model <- function() {
@@ -261,13 +261,13 @@ sdk_tool_web_search <- make_tool_alias(
   annotations = tool_annotations_copy(tool_web_search)
 )
 
-# Create the Task alias dynamically from a lead-agent delegate tool.
-make_task_tool_alias <- function(delegate_tool) {
+# Create Agent/Task aliases dynamically from a lead-agent delegate tool.
+make_delegate_tool_alias <- function(delegate_tool, name = "Agent") {
   make_tool_alias(
     fun = function(subagent_type, description) {
       delegate_tool(agent_name = subagent_type, task = description)
     },
-    name = "Task",
+    name = name,
     description = "Delegate work to a specialized sub-agent.",
     arguments = list(
       subagent_type = ellmer::type_string("Registered sub-agent name"),
@@ -278,7 +278,7 @@ make_task_tool_alias <- function(delegate_tool) {
 }
 
 # Compatibility registry for resolving named built-in tools.
-compat_named_tool_registry <- function(task_tool = NULL) {
+compat_named_tool_registry <- function(delegate_tool = NULL) {
   registry <- list(
     read_file = tool_read_file,
     write_file = tool_write_file,
@@ -305,15 +305,16 @@ compat_named_tool_registry <- function(task_tool = NULL) {
     WebSearch = sdk_tool_web_search
   )
 
-  if (!is.null(task_tool)) {
-    registry$Task <- task_tool
+  if (!is.null(delegate_tool)) {
+    registry$Agent <- make_delegate_tool_alias(delegate_tool, name = "Agent")
+    registry$Task <- make_delegate_tool_alias(delegate_tool, name = "Task")
   }
 
   registry
 }
 
 # Resolve tool names from settings or compat options.
-compat_resolve_named_tools <- function(tool_names, task_tool = NULL) {
+compat_resolve_named_tools <- function(tool_names, delegate_tool = NULL) {
   if (is.null(tool_names) || length(tool_names) == 0) {
     return(list())
   }
@@ -341,7 +342,7 @@ compat_resolve_named_tools <- function(tool_names, task_tool = NULL) {
   )))
   normalized <- normalized[nzchar(normalized)]
 
-  registry <- compat_named_tool_registry(task_tool = task_tool)
+  registry <- compat_named_tool_registry(delegate_tool = delegate_tool)
   resolved <- lapply(normalized, function(name) {
     tool <- registry[[name]]
     if (is.null(tool)) {
@@ -355,7 +356,7 @@ compat_resolve_named_tools <- function(tool_names, task_tool = NULL) {
 }
 
 # Default tool set used by the compatibility client.
-compat_default_tools <- function(task_tool = NULL) {
+compat_default_tools <- function(delegate_tool = NULL) {
   tools <- list(
     sdk_tool_read,
     sdk_tool_write,
@@ -371,8 +372,14 @@ compat_default_tools <- function(task_tool = NULL) {
     tool_ask_user
   )
 
-  if (!is.null(task_tool)) {
-    tools <- c(tools, list(task_tool))
+  if (!is.null(delegate_tool)) {
+    tools <- c(
+      tools,
+      list(
+        make_delegate_tool_alias(delegate_tool, name = "Agent"),
+        make_delegate_tool_alias(delegate_tool, name = "Task")
+      )
+    )
   }
 
   tools
@@ -510,7 +517,7 @@ merge_compat_agents <- function(options, settings) {
   c(explicit, unname(from_settings))
 }
 
-# Build a Deputy agent from Claude SDK compatibility options.
+# Build a Deputy agent from Agent SDK compatibility options.
 build_compat_agent <- function(options) {
   settings <- options$settings
   if (is.null(settings)) {
@@ -535,7 +542,8 @@ build_compat_agent <- function(options) {
     )
 
     delegate_tool <- lead$chat$get_tools()[["delegate_to_agent"]]
-    lead$register_tool(make_task_tool_alias(delegate_tool))
+    lead$register_tool(make_delegate_tool_alias(delegate_tool, name = "Agent"))
+    lead$register_tool(make_delegate_tool_alias(delegate_tool, name = "Task"))
     lead
   } else {
     Agent$new(
@@ -584,7 +592,10 @@ with_compat_working_dir <- function(cwd, code) {
   force(code)
 }
 
-#' Create Claude Agent SDK compatibility options
+#' Create Agent SDK compatibility options
+#'
+#' `agent_sdk_options()` is an additive alias for teams that prefer the newer
+#' Agent SDK naming while keeping the same deputy runtime and behavior.
 #'
 #' @param chat Optional ellmer chat object to use directly
 #' @param model Model string used when `chat` is not supplied
@@ -693,7 +704,16 @@ claude_sdk_options <- function(
   )
 }
 
-#' Claude Agent SDK compatibility client
+#' @param ... Passed through to [claude_sdk_options()]
+#' @rdname claude_sdk_options
+#' @export
+agent_sdk_options <- function(...) {
+  claude_sdk_options(...)
+}
+
+#' Agent SDK compatibility client
+#'
+#' `AgentSDKClient` is an additive alias for [ClaudeSDKClient].
 #'
 #' @export
 ClaudeSDKClient <- R6::R6Class(
@@ -819,7 +839,16 @@ ClaudeSDKClient <- R6::R6Class(
   )
 )
 
-#' Run a one-shot Claude Agent SDK compatibility query
+#' @rdname ClaudeSDKClient
+#' @export
+AgentSDKClient <- R6::R6Class(
+  "AgentSDKClient",
+  inherit = ClaudeSDKClient
+)
+
+#' Run a one-shot Agent SDK compatibility query
+#'
+#' `agent_sdk_query()` is an additive alias for [claude_sdk_query()].
 #'
 #' @param prompt User prompt to send
 #' @param options Claude SDK compatibility options
@@ -833,6 +862,19 @@ claude_sdk_query <- function(
   output_format = NULL
 ) {
   ClaudeSDKClient$new(options = options)$query(
+    prompt = prompt,
+    output_format = output_format
+  )
+}
+
+#' @rdname claude_sdk_query
+#' @export
+agent_sdk_query <- function(
+  prompt,
+  options = agent_sdk_options(),
+  output_format = NULL
+) {
+  AgentSDKClient$new(options = options)$query(
     prompt = prompt,
     output_format = output_format
   )

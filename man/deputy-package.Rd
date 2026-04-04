@@ -13,15 +13,15 @@ A provider-agnostic framework for building agentic AI workflows in R. Built on e
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
 permissions, hooks, and human-in-the-loop capabilities. deputy also ships
-an opt-in Anthropic-compatible Claude Agent SDK facade for teams that want
-Claude-style entrypoints and session semantics on top of the same runtime.
+an opt-in Agent SDK-compatible facade for teams that want Anthropic-style
+entrypoints and session semantics on top of the same runtime.
 }
 \section{Main Functions}{
 
 \itemize{
 \item \link{Agent} - The main class for creating agents
-\item \link{ClaudeSDKClient} - Anthropic-compatible client facade
-\item \code{\link[=claude_sdk_query]{claude_sdk_query()}} - One-shot Claude-compatible query helper
+\item \link{ClaudeSDKClient} - Agent SDK-compatible client facade (\code{AgentSDKClient} is an alias)
+\item \code{\link[=claude_sdk_query]{claude_sdk_query()}} - One-shot compatibility query helper (\code{agent_sdk_query()} is an alias)
 \item \code{\link[=tools_file]{tools_file()}} - File operation tools
 \item \code{\link[=tools_code]{tools_code()}} - Code execution tools
 \item \code{\link[=permissions_standard]{permissions_standard()}} - Standard permission policy

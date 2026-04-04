@@ -18,13 +18,13 @@ NULL
 #' A provider-agnostic framework for building agentic AI workflows in R.
 #' Built on ellmer, it enables multi-step reasoning with tool use,
 #' permissions, hooks, and human-in-the-loop capabilities. deputy also ships
-#' an opt-in Anthropic-compatible Claude Agent SDK facade for teams that want
-#' Claude-style entrypoints and session semantics on top of the same runtime.
+#' an opt-in Agent SDK-compatible facade for teams that want Anthropic-style
+#' entrypoints and session semantics on top of the same runtime.
 #'
 #' @section Main Functions:
 #' * [Agent] - The main class for creating agents
-#' * [ClaudeSDKClient] - Anthropic-compatible client facade
-#' * [claude_sdk_query()] - One-shot Claude-compatible query helper
+#' * [ClaudeSDKClient] - Agent SDK-compatible client facade (`AgentSDKClient` is an alias)
+#' * [claude_sdk_query()] - One-shot compatibility query helper (`agent_sdk_query()` is an alias)
 #' * [tools_file()] - File operation tools
 #' * [tools_code()] - Code execution tools
 #' * [permissions_standard()] - Standard permission policy
