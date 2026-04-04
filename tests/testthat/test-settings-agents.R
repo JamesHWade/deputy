@@ -33,7 +33,10 @@ test_that("claude_settings_load returns custom agents from .claude/agents", {
 test_that("custom agent files load supported fields including model and skills", {
   withr::local_tempdir(pattern = "deputy-agents") -> temp_dir
   dir.create(file.path(temp_dir, ".claude", "agents"), recursive = TRUE)
-  dir.create(file.path(temp_dir, ".claude", "skills", "analysis"), recursive = TRUE)
+  dir.create(
+    file.path(temp_dir, ".claude", "skills", "analysis"),
+    recursive = TRUE
+  )
   writeLines(
     "You are a helpful analyst.",
     file.path(temp_dir, ".claude", "skills", "analysis", "SKILL.md")

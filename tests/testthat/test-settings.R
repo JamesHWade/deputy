@@ -31,7 +31,7 @@ test_that("claude_settings_load loads memory, skills, and commands", {
 test_that("setting sources load user, project, and local with fixed precedence", {
   withr::local_tempdir(pattern = "deputy-home") -> home_dir
   withr::local_tempdir(pattern = "deputy-project") -> project_dir
-  withr::local_envvar(HOME = home_dir)
+  withr::local_envvar(HOME = home_dir, R_USER = home_dir)
 
   user_root <- file.path(home_dir, ".claude")
   dir.create(file.path(user_root, "commands"), recursive = TRUE)
@@ -59,11 +59,14 @@ test_that("setting sources load user, project, and local with fixed precedence",
 
   expect_equal(
     settings$sources$settings_files,
-    normalizePath(c(
-      file.path(user_root, "settings.json"),
-      file.path(project_dir, ".claude", "settings.json"),
-      file.path(project_dir, ".claude", "settings.local.json")
-    ), mustWork = FALSE)
+    normalizePath(
+      c(
+        file.path(user_root, "settings.json"),
+        file.path(project_dir, ".claude", "settings.json"),
+        file.path(project_dir, ".claude", "settings.local.json")
+      ),
+      mustWork = FALSE
+    )
   )
   expect_equal(settings$settings$policy$source, "local")
   expect_true(isTRUE(settings$settings$user_only))
