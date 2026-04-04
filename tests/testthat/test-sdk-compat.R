@@ -22,6 +22,49 @@ test_that("claude_sdk_query persists and reuses a compat session id", {
   expect_true(sessions$snapshots[[1]] >= 2)
 })
 
+test_that("agent sdk aliases use the same compat runtime", {
+  expect_s3_class(AgentSDKClient, "R6ClassGenerator")
+
+  options <- agent_sdk_options(
+    chat = create_mock_chat("alias response"),
+    cwd = getwd()
+  )
+  expect_s3_class(options, "ClaudeSDKOptions")
+
+  client <- AgentSDKClient$new(options = options)
+  result <- client$query("alias task")
+
+  expect_equal(result$response, "alias response")
+
+  one_shot <- agent_sdk_query(
+    "one shot",
+    options = agent_sdk_options(
+      chat = create_mock_chat("one shot response"),
+      cwd = getwd()
+    )
+  )
+
+  expect_equal(one_shot$response, "one shot response")
+})
+
+test_that("compat clients register both Agent and Task delegation tools", {
+  options <- claude_sdk_options(
+    chat = create_mock_chat("delegation ready"),
+    cwd = getwd(),
+    agents = list(agent_definition(
+      name = "reviewer",
+      description = "Reviews code",
+      prompt = "Review the provided changes."
+    ))
+  )
+
+  client <- ClaudeSDKClient$new(options = options)
+  tool_names <- names(client$agent$chat$get_tools())
+
+  expect_true("Agent" %in% tool_names)
+  expect_true("Task" %in% tool_names)
+})
+
 test_that("compat resume restores turns, tools, permissions, and settings context", {
   withr::local_tempdir(pattern = "deputy-sdk-store") -> store_dir
   withr::local_tempdir(pattern = "deputy-sdk-project") -> project_dir

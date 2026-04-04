@@ -2,9 +2,12 @@
 % Please edit documentation in R/sdk-compat.R
 \name{claude_sdk_query}
 \alias{claude_sdk_query}
-\title{Run a one-shot Claude Agent SDK compatibility query}
+\alias{agent_sdk_query}
+\title{Run a one-shot Agent SDK compatibility query}
 \usage{
 claude_sdk_query(prompt, options = claude_sdk_options(), output_format = NULL)
+
+agent_sdk_query(prompt, options = agent_sdk_options(), output_format = NULL)
 }
 \arguments{
 \item{prompt}{User prompt to send}
@@ -17,5 +20,5 @@ claude_sdk_query(prompt, options = claude_sdk_options(), output_format = NULL)
 An \link{AgentResult}
 }
 \description{
-Run a one-shot Claude Agent SDK compatibility query
+\code{agent_sdk_query()} is an additive alias for \code{\link[=claude_sdk_query]{claude_sdk_query()}}.
 }
