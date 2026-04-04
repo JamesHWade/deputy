@@ -4,12 +4,15 @@ deputy is a provider-agnostic agent runtime for R, built on
 [ellmer](https://ellmer.tidyverse.org/). It enables you to create AI
 agents that can use tools to accomplish multi-step tasks, with built-in
 support for permissions, hooks, and streaming output. It also ships an
-Anthropic-compatible Claude Agent SDK facade for teams that want
-Claude-style entrypoints, tool aliases, settings, and persisted session
-workflows.
+Agent SDK-compatible facade for teams that want Anthropic-style
+entrypoints, tool aliases, settings, and persisted session workflows
+without giving up deputy’s R-native runtime.
 
 > **Note:** deputy keeps its R-native `Agent` and `LeadAgent` APIs as
-> the canonical runtime. The Claude-compatible layer is opt-in via
+> the canonical runtime. The compatibility layer is opt-in via either
+> [`agent_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md),
+> [`agent_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md),
+> and `AgentSDKClient`, or the existing Claude-named aliases
 > [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md),
 > [`claude_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md),
 > and `ClaudeSDKClient`.
@@ -18,8 +21,8 @@ workflows.
 
 - **Provider-agnostic** - Works with OpenAI, Anthropic, Google, Ollama,
   and any provider ellmer supports
-- **Anthropic-compatible facade** - Claude-style entrypoints, permission
-  modes, tool aliases, and session semantics
+- **Agent SDK-compatible facade** - Anthropic-style entrypoints,
+  permission modes, tool aliases, and session semantics
 - **Tool bundles** - Pre-built tools for file operations, code
   execution, and data analysis
 - **Permission system** - Fine-grained control over what agents can do
@@ -120,36 +123,37 @@ deputy --resume-session-id <session-id> --resume-session-at "2026-03-07 10:30:00
 deputy --resume-session-id <session-id> --fork-session
 ```
 
-### Anthropic-Compatible API
+### Agent SDK-Compatible API
 
 Use the compatibility facade when you want Claude-style options, tool
 names, and session persistence without giving up deputy’s
 provider-agnostic runtime:
 
 ``` r
-options <- claude_sdk_options(
+options <- agent_sdk_options(
   chat = ellmer::chat("openai/gpt-4o"),
-  setting_sources = "project",
+  setting_sources = c("user", "project", "local"),
   permission_mode = "plan"
 )
 
 # One-shot query
-result <- claude_sdk_query(
+result <- agent_sdk_query(
   "Summarize the current repository state",
   options = options
 )
 result$session_id
 
 # Stateful client with resume/fork semantics
-client <- ClaudeSDKClient$new(options)
+client <- AgentSDKClient$new(options)
 client$query("Inspect the package structure")
 client$resume(result$session_id, fork = TRUE)
 ```
 
 The compatibility layer exposes Anthropic-style tool aliases such as
 `Read`, `Write`, `Edit`, `MultiEdit`, `Glob`, `Grep`, `LS`, `TodoRead`,
-`TodoWrite`, `WebFetch`, `WebSearch`, and `Task` (when sub-agents are
-registered).
+`TodoWrite`, `WebFetch`, `WebSearch`, and `Agent` or `Task` (when
+sub-agents are registered). The Claude-named entrypoints remain fully
+supported.
 
 ### Tools
 
@@ -325,7 +329,7 @@ commands, and `.claude/agents` definitions. Tool policy settings from
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
   tools = tools_file(),
-  setting_sources = c("project", "user")
+  setting_sources = c("user", "project", "local")
 )
 
 # Inspect loaded slash commands
@@ -333,7 +337,14 @@ agent$slash_commands()
 ```
 
 Settings-defined agents are applied automatically when you use
-`LeadAgent$new(setting_sources = ...)` or the Claude-compatible client.
+`LeadAgent$new(setting_sources = ...)` or the compatibility client.
+Source precedence is fixed as `user`, then `project`, then `local`, with
+`.claude/settings.local.json` overriding the broader settings files
+without loading extra memory, commands, skills, or agents.
+
+Unsupported `.claude/agents` frontmatter fields are warned on and
+ignored. Plugin discovery and marketplace execution are intentionally
+deferred from the current compatibility surface.
 
 Example `.claude/settings.json` tool policy:
 

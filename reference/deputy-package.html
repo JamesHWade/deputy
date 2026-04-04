@@ -4,14 +4,14 @@ A provider-agnostic framework for building agentic AI workflows in R. Built on e
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
 permissions, hooks, and human-in-the-loop capabilities. deputy also ships
-an opt-in Anthropic-compatible Claude Agent SDK facade for teams that want
-Claude-style entrypoints and session semantics on top of the same runtime."><meta property="og:description" content="
+an opt-in Agent SDK-compatible facade for teams that want Anthropic-style
+entrypoints and session semantics on top of the same runtime."><meta property="og:description" content="
 A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
 permissions, hooks, and human-in-the-loop capabilities. deputy also ships
-an opt-in Anthropic-compatible Claude Agent SDK facade for teams that want
-Claude-style entrypoints and session semantics on top of the same runtime."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
+an opt-in Agent SDK-compatible facade for teams that want Anthropic-style
+entrypoints and session semantics on top of the same runtime."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -68,8 +68,8 @@ Claude-style entrypoints and session semantics on top of the same runtime."><met
 <p>A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
 permissions, hooks, and human-in-the-loop capabilities. deputy also ships
-an opt-in Anthropic-compatible Claude Agent SDK facade for teams that want
-Claude-style entrypoints and session semantics on top of the same runtime.</p>
+an opt-in Agent SDK-compatible facade for teams that want Anthropic-style
+entrypoints and session semantics on top of the same runtime.</p>
     </div>
 
 
@@ -78,8 +78,8 @@ Claude-style entrypoints and session semantics on top of the same runtime.</p>
 
 
 <ul><li><p><a href="Agent.html">Agent</a> - The main class for creating agents</p></li>
-<li><p><a href="ClaudeSDKClient.html">ClaudeSDKClient</a> - Anthropic-compatible client facade</p></li>
-<li><p><code><a href="claude_sdk_query.html">claude_sdk_query()</a></code> - One-shot Claude-compatible query helper</p></li>
+<li><p><a href="ClaudeSDKClient.html">ClaudeSDKClient</a> - Agent SDK-compatible client facade (<code>AgentSDKClient</code> is an alias)</p></li>
+<li><p><code><a href="claude_sdk_query.html">claude_sdk_query()</a></code> - One-shot compatibility query helper (<code><a href="claude_sdk_query.html">agent_sdk_query()</a></code> is an alias)</p></li>
 <li><p><code><a href="tools_file.html">tools_file()</a></code> - File operation tools</p></li>
 <li><p><code><a href="tools_code.html">tools_code()</a></code> - Code execution tools</p></li>
 <li><p><code><a href="permissions_standard.html">permissions_standard()</a></code> - Standard permission policy</p></li>

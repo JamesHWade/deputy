@@ -158,11 +158,14 @@ Claude-style settings sources
 Anthropic-compatible facade and entrypoints
 
 - [`ClaudeSDKClient`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.md)
-  : Claude Agent SDK compatibility client
+  [`AgentSDKClient`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.md)
+  : Agent SDK compatibility client
 - [`claude_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md)
-  : Create Claude Agent SDK compatibility options
+  [`agent_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md)
+  : Create Agent SDK compatibility options
 - [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
-  : Run a one-shot Claude Agent SDK compatibility query
+  [`agent_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
+  : Run a one-shot Agent SDK compatibility query
 
 ## Multi-Agent
 

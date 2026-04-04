@@ -9,9 +9,9 @@ and local models via Ollama.
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
 permissions, hooks, and human-in-the-loop capabilities. deputy also
-ships an opt-in Anthropic-compatible Claude Agent SDK facade for teams
-that want Claude-style entrypoints and session semantics on top of the
-same runtime.
+ships an opt-in Agent SDK-compatible facade for teams that want
+Anthropic-style entrypoints and session semantics on top of the same
+runtime.
 
 ## Main Functions
 
@@ -19,10 +19,12 @@ same runtime.
   main class for creating agents
 
 - [ClaudeSDKClient](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.md) -
-  Anthropic-compatible client facade
+  Agent SDK-compatible client facade (`AgentSDKClient` is an alias)
 
 - [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md) -
-  One-shot Claude-compatible query helper
+  One-shot compatibility query helper
+  ([`agent_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
+  is an alias)
 
 - [`tools_file()`](https://jameshwade.github.io/deputy/reference/tools_file.md) -
   File operation tools

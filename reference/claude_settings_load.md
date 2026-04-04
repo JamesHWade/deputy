@@ -1,17 +1,19 @@
 # Load Claude-style settings from settingSources
 
 Loads Claude-style settings from a list of `setting_sources`, mirroring
-the Claude Agent SDK behavior. Supports project and user sources, and
+the Agent SDK behavior. Supports user, project, and local sources, and
 returns memory, skills, slash commands, and custom agents discovered in
 `.claude` directories.
 
 Supported sources:
 
+- `"user"`: loads `~/.claude` settings, skills, commands, agents, and
+  memory
+
 - `"project"`: loads project `.claude` settings, skills, commands,
   agents, and memory
 
-- `"user"`: loads `~/.claude` settings, skills, commands, agents, and
-  memory
+- `"local"`: loads project `.claude/settings.local.json` only
 
 - explicit file paths to `.json` settings files
 

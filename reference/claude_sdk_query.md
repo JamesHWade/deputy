@@ -1,11 +1,13 @@
-# Run a one-shot Claude Agent SDK compatibility query
+# Run a one-shot Agent SDK compatibility query
 
-Run a one-shot Claude Agent SDK compatibility query
+`agent_sdk_query()` is an additive alias for `claude_sdk_query()`.
 
 ## Usage
 
 ``` r
 claude_sdk_query(prompt, options = claude_sdk_options(), output_format = NULL)
+
+agent_sdk_query(prompt, options = agent_sdk_options(), output_format = NULL)
 ```
 
 ## Arguments

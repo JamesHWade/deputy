@@ -1,6 +1,8 @@
-# Create Claude Agent SDK compatibility options
+# Create Agent SDK compatibility options
 
-Create Claude Agent SDK compatibility options
+`agent_sdk_options()` is an additive alias for teams that prefer the
+newer Agent SDK naming while keeping the same deputy runtime and
+behavior.
 
 ## Usage
 
@@ -27,6 +29,8 @@ claude_sdk_options(
   max_turns = 25,
   max_cost_usd = NULL
 )
+
+agent_sdk_options(...)
 ```
 
 ## Arguments
@@ -113,6 +117,10 @@ claude_sdk_options(
 - max_cost_usd:
 
   Maximum cost per query
+
+- ...:
+
+  Passed through to `claude_sdk_options()`
 
 ## Value
 

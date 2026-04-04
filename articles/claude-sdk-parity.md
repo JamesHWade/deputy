@@ -1,51 +1,51 @@
-# Claude Agent SDK Compatibility
+# Agent SDK Compatibility
 
 deputy keeps a provider-agnostic R runtime at its core and layers an
-opt-in Anthropic-compatible facade on top. This vignette shows what is
+opt-in Agent SDK-compatible facade on top. This vignette shows what is
 covered by the compatibility layer, how the Anthropic-style entrypoints
 map to deputy, and where the current boundary remains intentionally
 narrower than Anthropic’s full ecosystem surface.
 
 ## Compatibility Matrix
 
-| Surface                                                                                               | Status           | deputy mapping                                                                                                          |
-|-------------------------------------------------------------------------------------------------------|------------------|-------------------------------------------------------------------------------------------------------------------------|
-| [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md) / `query()` | Covered          | [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md) and `ClaudeSDKClient$query()` |
-| Session ids, resume, fork                                                                             | Covered          | Persisted snapshots plus `resume()` / CLI flags                                                                         |
-| Permission modes                                                                                      | Covered          | `default`, `acceptEdits`, `readonly`, `plan`, `bypassPermissions`                                                       |
-| Hook events                                                                                           | Covered          | Existing hook system plus `Notification`                                                                                |
-| Claude settings                                                                                       | Covered          | `CLAUDE.md`, `.claude/skills`, `.claude/commands`, `.claude/agents`, tool policy keys                                   |
-| Anthropic-style built-in tool names                                                                   | Covered          | `Read`, `Write`, `Edit`, `MultiEdit`, `Glob`, `Grep`, `LS`, `TodoRead`, `TodoWrite`, `WebFetch`, `WebSearch`, `Task`    |
-| Native deputy runtime                                                                                 | Canonical        | `Agent`, `LeadAgent`, `Permissions`, `HookMatcher`                                                                      |
-| Plugin discovery / marketplace execution                                                              | Not in this wave | Track separately from the core compat facade                                                                            |
-| MCP resource subscriptions                                                                            | Not in this wave | deputy exposes MCP tools, not Anthropic-specific resource flows                                                         |
+| Surface                                                                                                                                                                                          | Status           | deputy mapping                                                                                                                                                                                                    |
+|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [`agent_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md) / [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md) / `query()` | Covered          | [`agent_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md), [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md), and `AgentSDKClient$query()` |
+| Session ids, resume, fork                                                                                                                                                                        | Covered          | Persisted snapshots plus `resume()` / CLI flags                                                                                                                                                                   |
+| Permission modes                                                                                                                                                                                 | Covered          | `default`, `acceptEdits`, `readonly`, `plan`, `bypassPermissions`                                                                                                                                                 |
+| Hook events                                                                                                                                                                                      | Covered          | Existing hook system plus `Notification`                                                                                                                                                                          |
+| Claude settings                                                                                                                                                                                  | Covered          | `CLAUDE.md`, `.claude/skills`, `.claude/commands`, `.claude/agents`, tool policy keys                                                                                                                             |
+| Anthropic-style built-in tool names                                                                                                                                                              | Covered          | `Read`, `Write`, `Edit`, `MultiEdit`, `Glob`, `Grep`, `LS`, `TodoRead`, `TodoWrite`, `WebFetch`, `WebSearch`, `Agent`, `Task`                                                                                     |
+| Native deputy runtime                                                                                                                                                                            | Canonical        | `Agent`, `LeadAgent`, `Permissions`, `HookMatcher`                                                                                                                                                                |
+| Plugin discovery / marketplace execution                                                                                                                                                         | Not in this wave | Track separately from the core compat facade                                                                                                                                                                      |
+| MCP resource subscriptions                                                                                                                                                                       | Not in this wave | deputy exposes MCP tools, not Anthropic-specific resource flows                                                                                                                                                   |
 
 ## Entry Points
 
 Use
-[`claude_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md)
+[`agent_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md)
 to express Anthropic-shaped options and translate them into deputy
-internals:
+internals. The Claude-named aliases remain fully supported.
 
 ``` r
 library(deputy)
 
-options <- claude_sdk_options(
+options <- agent_sdk_options(
   chat = ellmer::chat_anthropic(model = "claude-sonnet-4-5-20250929"),
-  setting_sources = c("project", "user"),
+  setting_sources = c("user", "project", "local"),
   permission_mode = "plan",
   allowed_tools = c("Read", "Grep", "LS"),
   max_turns = 15
 )
 
-result <- claude_sdk_query("Summarize the package structure", options = options)
+result <- agent_sdk_query("Summarize the package structure", options = options)
 result$session_id
 ```
 
 For a stateful client:
 
 ``` r
-client <- ClaudeSDKClient$new(options)
+client <- AgentSDKClient$new(options)
 client$query("Inspect the R/ directory")
 ```
 
@@ -57,7 +57,7 @@ The compatibility layer persists snapshots to:
 tools::R_user_dir("deputy", "cache")
 ```
 
-Snapshots are enabled by default for the Claude-compatible APIs. Each
+Snapshots are enabled by default for the compatibility APIs. Each
 completed turn writes a new snapshot, and the latest snapshot path is
 attached to `AgentResult$snapshot_path`.
 
@@ -127,17 +127,24 @@ now understand:
 - Tool policy keys such as `allowedTools`, `disallowedTools`, and
   `permissionPromptToolName`
 
+`setting_sources` precedence is fixed as `user`, then `project`, then
+`local`. The `local` source only loads `.claude/settings.local.json`, so
+it can override settings keys without pulling in extra memory, commands,
+skills, or agents.
+
 Custom agents from `.claude/agents` are converted to `AgentDefinition`
 objects and registered automatically when you use `LeadAgent` or
-`ClaudeSDKClient`.
+`AgentSDKClient`. Unsupported frontmatter fields are warned on and
+ignored so compatibility stays resilient when files include metadata
+deputy does not map.
 
 Anthropic-style tool names resolve through the compatibility layer
 rather than changing deputy’s native tool names:
 
 ``` r
-compat_tools <- claude_sdk_options(
+compat_tools <- agent_sdk_options(
   custom_tools = list(),
-  allowed_tools = c("Read", "Edit", "TodoWrite")
+  allowed_tools = c("Read", "Edit", "TodoWrite", "Agent")
 )
 ```
 
@@ -155,4 +162,6 @@ the Node or Python SDKs. The runtime model is intentionally R-native:
 - Existing deputy hooks and permissions reused by the compat facade
 
 That boundary keeps the Anthropic surface available without making the
-rest of the package Anthropic-specific.
+rest of the package Anthropic-specific. Plugins and marketplace
+execution remain deferred until the settings and agent surface is more
+mature.

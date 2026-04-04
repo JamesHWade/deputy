@@ -1,8 +1,12 @@
-# Claude Agent SDK compatibility client
+# Agent SDK compatibility client
 
-Claude Agent SDK compatibility client
+Agent SDK compatibility client
 
-Claude Agent SDK compatibility client
+Agent SDK compatibility client
+
+## Details
+
+`AgentSDKClient` is an additive alias for ClaudeSDKClient.
 
 ## Public fields
 
@@ -122,6 +126,39 @@ The objects of this class are cloneable with this method.
 #### Usage
 
     ClaudeSDKClient$clone(deep = FALSE)
+
+#### Arguments
+
+- `deep`:
+
+  Whether to make a deep clone.
+
+## Super class
+
+`deputy::ClaudeSDKClient` -\> `AgentSDKClient`
+
+## Methods
+
+### Public methods
+
+- [`AgentSDKClient$clone()`](#method-AgentSDKClient-clone)
+
+Inherited methods
+
+- [`deputy::ClaudeSDKClient$initialize()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-initialize)
+- [`deputy::ClaudeSDKClient$list_sessions()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-list_sessions)
+- [`deputy::ClaudeSDKClient$query()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-query)
+- [`deputy::ClaudeSDKClient$resume()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-resume)
+
+------------------------------------------------------------------------
+
+### Method `clone()`
+
+The objects of this class are cloneable with this method.
+
+#### Usage
+
+    AgentSDKClient$clone(deep = FALSE)
 
 #### Arguments
 

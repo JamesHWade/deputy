@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Claude Agent SDK Compatibility • deputy</title>
+<title>Agent SDK Compatibility • deputy</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Claude Agent SDK Compatibility">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Agent SDK Compatibility">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -74,7 +74,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Claude Agent SDK Compatibility</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Agent SDK Compatibility</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/vignettes/claude-sdk-parity.Rmd" class="external-link"><code>vignettes/claude-sdk-parity.Rmd</code></a></small>
@@ -84,7 +84,7 @@
     
     
 <p>deputy keeps a provider-agnostic R runtime at its core and layers an
-opt-in Anthropic-compatible facade on top. This vignette shows what is
+opt-in Agent SDK-compatible facade on top. This vignette shows what is
 covered by the compatibility layer, how the Anthropic-style entrypoints
 map to deputy, and where the current boundary remains intentionally
 narrower than Anthropic’s full ecosystem surface.</p>
@@ -105,12 +105,13 @@ narrower than Anthropic’s full ecosystem surface.</p>
 <tbody>
 <tr class="odd">
 <td>
-<code><a href="../reference/claude_sdk_query.html">claude_sdk_query()</a></code> / <code>query()</code>
+<code><a href="../reference/claude_sdk_query.html">agent_sdk_query()</a></code> / <code><a href="../reference/claude_sdk_query.html">claude_sdk_query()</a></code> /
+<code>query()</code>
 </td>
 <td>Covered</td>
 <td>
-<code><a href="../reference/claude_sdk_query.html">claude_sdk_query()</a></code> and
-<code>ClaudeSDKClient$query()</code>
+<code><a href="../reference/claude_sdk_query.html">agent_sdk_query()</a></code>, <code><a href="../reference/claude_sdk_query.html">claude_sdk_query()</a></code>, and
+<code>AgentSDKClient$query()</code>
 </td>
 </tr>
 <tr class="even">
@@ -148,7 +149,8 @@ keys</td>
 <code>Read</code>, <code>Write</code>, <code>Edit</code>,
 <code>MultiEdit</code>, <code>Glob</code>, <code>Grep</code>,
 <code>LS</code>, <code>TodoRead</code>, <code>TodoWrite</code>,
-<code>WebFetch</code>, <code>WebSearch</code>, <code>Task</code>
+<code>WebFetch</code>, <code>WebSearch</code>, <code>Agent</code>,
+<code>Task</code>
 </td>
 </tr>
 <tr class="odd">
@@ -175,24 +177,25 @@ keys</td>
 <div class="section level2">
 <h2 id="entry-points">Entry Points<a class="anchor" aria-label="anchor" href="#entry-points"></a>
 </h2>
-<p>Use <code><a href="../reference/claude_sdk_options.html">claude_sdk_options()</a></code> to express Anthropic-shaped
-options and translate them into deputy internals:</p>
+<p>Use <code><a href="../reference/claude_sdk_options.html">agent_sdk_options()</a></code> to express Anthropic-shaped
+options and translate them into deputy internals. The Claude-named
+aliases remain fully supported.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">options</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/claude_sdk_options.html">claude_sdk_options</a></span><span class="op">(</span></span>
+<span><span class="va">options</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/claude_sdk_options.html">agent_sdk_options</a></span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-5-20250929"</span><span class="op">)</span>,</span>
-<span>  setting_sources <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"project"</span>, <span class="st">"user"</span><span class="op">)</span>,</span>
+<span>  setting_sources <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"user"</span>, <span class="st">"project"</span>, <span class="st">"local"</span><span class="op">)</span>,</span>
 <span>  permission_mode <span class="op">=</span> <span class="st">"plan"</span>,</span>
 <span>  allowed_tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Read"</span>, <span class="st">"Grep"</span>, <span class="st">"LS"</span><span class="op">)</span>,</span>
 <span>  max_turns <span class="op">=</span> <span class="fl">15</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/claude_sdk_query.html">claude_sdk_query</a></span><span class="op">(</span><span class="st">"Summarize the package structure"</span>, options <span class="op">=</span> <span class="va">options</span><span class="op">)</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/claude_sdk_query.html">agent_sdk_query</a></span><span class="op">(</span><span class="st">"Summarize the package structure"</span>, options <span class="op">=</span> <span class="va">options</span><span class="op">)</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">session_id</span></span></code></pre></div>
 <p>For a stateful client:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">client</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/ClaudeSDKClient.html">ClaudeSDKClient</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="va">options</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">client</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/ClaudeSDKClient.html">AgentSDKClient</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="va">options</span><span class="op">)</span></span>
 <span><span class="va">client</span><span class="op">$</span><span class="fu">query</span><span class="op">(</span><span class="st">"Inspect the R/ directory"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
@@ -201,7 +204,7 @@ options and translate them into deputy internals:</p>
 <p>The compatibility layer persists snapshots to:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">tools</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/tools/userdir.html" class="external-link">R_user_dir</a></span><span class="op">(</span><span class="st">"deputy"</span>, <span class="st">"cache"</span><span class="op">)</span></span></code></pre></div>
-<p>Snapshots are enabled by default for the Claude-compatible APIs. Each
+<p>Snapshots are enabled by default for the compatibility APIs. Each
 completed turn writes a new snapshot, and the latest snapshot path is
 attached to <code>AgentResult$snapshot_path</code>.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
@@ -263,15 +266,23 @@ fallbacks, and cost warnings.</p>
 <code>permissionPromptToolName</code>
 </li>
 </ul>
+<p><code>setting_sources</code> precedence is fixed as
+<code>user</code>, then <code>project</code>, then <code>local</code>.
+The <code>local</code> source only loads
+<code>.claude/settings.local.json</code>, so it can override settings
+keys without pulling in extra memory, commands, skills, or agents.</p>
 <p>Custom agents from <code>.claude/agents</code> are converted to
 <code>AgentDefinition</code> objects and registered automatically when
-you use <code>LeadAgent</code> or <code>ClaudeSDKClient</code>.</p>
+you use <code>LeadAgent</code> or <code>AgentSDKClient</code>.
+Unsupported frontmatter fields are warned on and ignored so
+compatibility stays resilient when files include metadata deputy does
+not map.</p>
 <p>Anthropic-style tool names resolve through the compatibility layer
 rather than changing deputy’s native tool names:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">compat_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/claude_sdk_options.html">claude_sdk_options</a></span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="va">compat_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/claude_sdk_options.html">agent_sdk_options</a></span><span class="op">(</span></span>
 <span>  custom_tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  allowed_tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Read"</span>, <span class="st">"Edit"</span>, <span class="st">"TodoWrite"</span><span class="op">)</span></span>
+<span>  allowed_tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Read"</span>, <span class="st">"Edit"</span>, <span class="st">"TodoWrite"</span>, <span class="st">"Agent"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>This keeps <code>read_file</code>, <code>edit_file</code>,
 <code>todo_write</code>, and the rest of deputy’s snake_case tool
@@ -292,7 +303,9 @@ R-native:</p>
 facade</li>
 </ul>
 <p>That boundary keeps the Anthropic surface available without making
-the rest of the package Anthropic-specific.</p>
+the rest of the package Anthropic-specific. Plugins and marketplace
+execution remain deferred until the settings and agent surface is more
+mature.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
