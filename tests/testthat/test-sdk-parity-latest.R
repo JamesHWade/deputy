@@ -84,12 +84,15 @@ test_that("compat tools can be explicitly disabled with an empty list", {
 })
 
 test_that("new hook events and result fields are available", {
-  expect_true(all(c(
-    "PostToolUseFailure",
-    "SubagentStart",
-    "PermissionRequest",
-    "ConfigChange"
-  ) %in% HookEvent))
+  expect_true(all(
+    c(
+      "PostToolUseFailure",
+      "SubagentStart",
+      "PermissionRequest",
+      "ConfigChange"
+    ) %in%
+      HookEvent
+  ))
 
   pre <- HookResultPreToolUse(
     permission = "allow",

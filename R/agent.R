@@ -858,23 +858,29 @@ Agent <- R6::R6Class(
           character(1)
         )
         private$loaded_mcp_tools <- c(private$loaded_mcp_tools, tool_names)
-        private$loaded_mcp_status <- c(private$loaded_mcp_status, list(list(
-          status = "connected",
-          config = config,
-          servers = servers %||% character(),
-          tools = tool_names,
-          loaded_at = loaded_at,
-          error = NULL
-        )))
+        private$loaded_mcp_status <- c(
+          private$loaded_mcp_status,
+          list(list(
+            status = "connected",
+            config = config,
+            servers = servers %||% character(),
+            tools = tool_names,
+            loaded_at = loaded_at,
+            error = NULL
+          ))
+        )
       } else {
-        private$loaded_mcp_status <- c(private$loaded_mcp_status, list(list(
-          status = if (mcp_available()) "empty" else "unavailable",
-          config = config,
-          servers = servers %||% character(),
-          tools = character(),
-          loaded_at = loaded_at,
-          error = NULL
-        )))
+        private$loaded_mcp_status <- c(
+          private$loaded_mcp_status,
+          list(list(
+            status = if (mcp_available()) "empty" else "unavailable",
+            config = config,
+            servers = servers %||% character(),
+            tools = character(),
+            loaded_at = loaded_at,
+            error = NULL
+          ))
+        )
       }
 
       invisible(self)
@@ -906,17 +912,20 @@ Agent <- R6::R6Class(
         ))
       }
 
-      do.call(rbind, lapply(records, function(record) {
-        data.frame(
-          status = record$status,
-          config = record$config %||% NA_character_,
-          servers = paste(record$servers, collapse = ","),
-          tools = paste(record$tools, collapse = ","),
-          loaded_at = as.POSIXct(record$loaded_at, tz = "UTC"),
-          error = record$error %||% NA_character_,
-          stringsAsFactors = FALSE
-        )
-      }))
+      do.call(
+        rbind,
+        lapply(records, function(record) {
+          data.frame(
+            status = record$status,
+            config = record$config %||% NA_character_,
+            servers = paste(record$servers, collapse = ","),
+            tools = paste(record$tools, collapse = ","),
+            loaded_at = as.POSIXct(record$loaded_at, tz = "UTC"),
+            error = record$error %||% NA_character_,
+            stringsAsFactors = FALSE
+          )
+        })
+      )
     },
 
     #' @description

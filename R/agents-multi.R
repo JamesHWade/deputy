@@ -223,16 +223,19 @@ LeadAgent <- R6::R6Class(
         ))
       }
 
-      do.call(rbind, lapply(runs, function(run) {
-        data.frame(
-          agent_name = run$agent_name,
-          session_id = run$session_id %||% NA_character_,
-          task = run$task,
-          started_at = as.POSIXct(run$started_at, tz = "UTC"),
-          completed_at = as.POSIXct(run$completed_at, tz = "UTC"),
-          stringsAsFactors = FALSE
-        )
-      }))
+      do.call(
+        rbind,
+        lapply(runs, function(run) {
+          data.frame(
+            agent_name = run$agent_name,
+            session_id = run$session_id %||% NA_character_,
+            task = run$task,
+            started_at = as.POSIXct(run$started_at, tz = "UTC"),
+            completed_at = as.POSIXct(run$completed_at, tz = "UTC"),
+            stringsAsFactors = FALSE
+          )
+        })
+      )
     },
 
     #' @description
@@ -244,10 +247,16 @@ LeadAgent <- R6::R6Class(
     get_subagent_messages = function(agent_name = NULL, session_id = NULL) {
       runs <- private$subagent_runs
       if (!is.null(agent_name)) {
-        runs <- Filter(function(run) identical(run$agent_name, agent_name), runs)
+        runs <- Filter(
+          function(run) identical(run$agent_name, agent_name),
+          runs
+        )
       }
       if (!is.null(session_id)) {
-        runs <- Filter(function(run) identical(run$session_id, session_id), runs)
+        runs <- Filter(
+          function(run) identical(run$session_id, session_id),
+          runs
+        )
       }
 
       lapply(runs, function(run) run$turns)
@@ -355,33 +364,35 @@ LeadAgent <- R6::R6Class(
           # Create the sub-agent
           sub_agent <- private$create_sub_agent(def)
 
-	          # Run the task
-	          cli::cli_alert_info("Delegating to {.val {agent_name}}: {task}")
-	          started_at <- Sys.time()
+          # Run the task
+          cli::cli_alert_info("Delegating to {.val {agent_name}}: {task}")
+          started_at <- Sys.time()
 
-	          lead_agent$hooks$fire(
-	            "SubagentStart",
-	            agent_name = agent_name,
-	            task = task,
-	            context = list(
-	              working_dir = lead_agent$working_dir,
-	              agent_definition = def
-	            )
-	          )
+          lead_agent$hooks$fire(
+            "SubagentStart",
+            agent_name = agent_name,
+            task = task,
+            context = list(
+              working_dir = lead_agent$working_dir,
+              agent_definition = def
+            )
+          )
 
-	          task_to_run <- task
-	          if (!is.null(def$initial_prompt) && nzchar(trimws(def$initial_prompt))) {
-	            task_to_run <- paste(def$initial_prompt, task, sep = "\n\n")
-	          }
+          task_to_run <- task
+          if (
+            !is.null(def$initial_prompt) && nzchar(trimws(def$initial_prompt))
+          ) {
+            task_to_run <- paste(def$initial_prompt, task, sep = "\n\n")
+          }
 
-	          result <- tryCatch(
-	            {
-	              sub_result <- sub_agent$run_sync(
-	                task_to_run,
-	                max_turns = def$max_turns
-	              )
-	              sub_result$response
-	            },
+          result <- tryCatch(
+            {
+              sub_result <- sub_agent$run_sync(
+                task_to_run,
+                max_turns = def$max_turns
+              )
+              sub_result$response
+            },
             error = function(e) {
               cli::cli_alert_danger(
                 "Sub-agent {.val {agent_name}} failed: {e$message}"
@@ -392,31 +403,34 @@ LeadAgent <- R6::R6Class(
                 "' failed.\n",
                 "Error: ",
                 e$message
-	              ))
-	            }
-	          )
-	          completed_at <- Sys.time()
+              ))
+            }
+          )
+          completed_at <- Sys.time()
 
-	          # Fire SubagentStop hook
-	          lead_agent$hooks$fire(
+          # Fire SubagentStop hook
+          lead_agent$hooks$fire(
             "SubagentStop",
             agent_name = agent_name,
             task = task,
             result = result,
-	            context = list(working_dir = lead_agent$working_dir)
-	          )
+            context = list(working_dir = lead_agent$working_dir)
+          )
 
-	          private$subagent_runs <- c(private$subagent_runs, list(list(
-	            agent_name = agent_name,
-	            task = task,
-	            session_id = sub_agent$session_id(),
-	            started_at = started_at,
-	            completed_at = completed_at,
-	            turns = sub_agent$turns()
-	          )))
+          private$subagent_runs <- c(
+            private$subagent_runs,
+            list(list(
+              agent_name = agent_name,
+              task = task,
+              session_id = sub_agent$session_id(),
+              started_at = started_at,
+              completed_at = completed_at,
+              turns = sub_agent$turns()
+            ))
+          )
 
-	          result
-	        },
+          result
+        },
         name = "delegate_to_agent",
         description = "Delegate a task to a specialized sub-agent. The sub-agent will complete the task and return results.",
         arguments = list(
@@ -466,7 +480,10 @@ LeadAgent <- R6::R6Class(
         )
       }
 
-      sub_tools <- private$filter_disallowed_tools(def$tools, def$disallowed_tools)
+      sub_tools <- private$filter_disallowed_tools(
+        def$tools,
+        def$disallowed_tools
+      )
       sub_permissions <- private$derive_subagent_permissions(def)
       sub_prompt <- def$prompt
       if (!is.null(def$memory) && length(def$memory) > 0) {
@@ -535,13 +552,16 @@ LeadAgent <- R6::R6Class(
       }
 
       disallowed <- tolower(trimws(as.character(disallowed_tools)))
-      Filter(function(tool) {
-        name <- tryCatch(tool@name, error = function(e) NULL)
-        if (is.null(name)) {
-          return(TRUE)
-        }
-        !tolower(name) %in% disallowed
-      }, tools)
+      Filter(
+        function(tool) {
+          name <- tryCatch(tool@name, error = function(e) NULL)
+          if (is.null(name)) {
+            return(TRUE)
+          }
+          !tolower(name) %in% disallowed
+        },
+        tools
+      )
     },
 
     subagent_runs = list()

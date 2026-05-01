@@ -50,11 +50,14 @@ session_store_memory <- function() {
     list(
       append = function(session_id, payload, metadata = list()) {
         records <- sessions[[session_id]] %||% list()
-        records <- c(records, list(list(
-          payload = payload,
-          metadata = metadata,
-          appended_at = Sys.time()
-        )))
+        records <- c(
+          records,
+          list(list(
+            payload = payload,
+            metadata = metadata,
+            appended_at = Sys.time()
+          ))
+        )
         sessions[[session_id]] <- records
         invisible(TRUE)
       },
@@ -81,18 +84,21 @@ session_store_memory <- function() {
             stringsAsFactors = FALSE
           ))
         }
-        do.call(rbind, lapply(ids, function(id) {
-          records <- sessions[[id]]
-          data.frame(
-            session_id = id,
-            records = length(records),
-            updated_at = as.POSIXct(
-              records[[length(records)]]$appended_at,
-              tz = "UTC"
-            ),
-            stringsAsFactors = FALSE
-          )
-        }))
+        do.call(
+          rbind,
+          lapply(ids, function(id) {
+            records <- sessions[[id]]
+            data.frame(
+              session_id = id,
+              records = length(records),
+              updated_at = as.POSIXct(
+                records[[length(records)]]$appended_at,
+                tz = "UTC"
+              ),
+              stringsAsFactors = FALSE
+            )
+          })
+        )
       },
       delete = function(session_id) {
         if (exists(session_id, envir = sessions, inherits = FALSE)) {
@@ -147,12 +153,13 @@ session_store_list_external <- function(store) {
 
 session_store_summaries_external <- function(store) {
   out <- session_store_call(store, "list_session_summaries")
-  out %||% data.frame(
-    session_id = character(),
-    records = integer(),
-    updated_at = as.POSIXct(character()),
-    stringsAsFactors = FALSE
-  )
+  out %||%
+    data.frame(
+      session_id = character(),
+      records = integer(),
+      updated_at = as.POSIXct(character()),
+      stringsAsFactors = FALSE
+    )
 }
 
 session_store_delete_external <- function(store, session_id) {

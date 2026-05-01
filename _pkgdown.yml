@@ -104,6 +104,7 @@ reference:
   - ClaudeSDKClient
   - claude_sdk_options
   - claude_sdk_query
+  - session_store_memory
 
 - title: Multi-Agent
 

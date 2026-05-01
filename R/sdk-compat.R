@@ -480,7 +480,10 @@ compat_filter_settings_skills <- function(settings, options) {
 
   if (is.character(requested)) {
     skill_names <- compat_normalize_tool_names(requested)
-    settings$skills <- settings$skills[intersect(names(settings$skills), skill_names)]
+    settings$skills <- settings$skills[intersect(
+      names(settings$skills),
+      skill_names
+    )]
   }
 
   settings
@@ -488,7 +491,9 @@ compat_filter_settings_skills <- function(settings, options) {
 
 compat_load_explicit_skills <- function(agent, options, settings) {
   requested <- options$skills
-  if (is.null(requested) || identical(requested, "all") || length(requested) == 0) {
+  if (
+    is.null(requested) || identical(requested, "all") || length(requested) == 0
+  ) {
     return(invisible(NULL))
   }
 
@@ -538,10 +543,13 @@ compat_first_setting <- function(settings_data, paths) {
 }
 
 compat_output_format_setting <- function(settings_data) {
-  value <- compat_first_setting(settings_data, list(
-    c("outputFormat"),
-    c("output_format")
-  ))
+  value <- compat_first_setting(
+    settings_data,
+    list(
+      c("outputFormat"),
+      c("output_format")
+    )
+  )
   if (is.character(value) && length(value) == 1) {
     normalized <- tolower(trimws(value))
     if (normalized %in% c("json", "json_object")) {
@@ -552,10 +560,13 @@ compat_output_format_setting <- function(settings_data) {
 }
 
 compat_include_partial_setting <- function(settings_data) {
-  value <- compat_first_setting(settings_data, list(
-    c("includePartialMessages"),
-    c("include_partial_messages")
-  ))
+  value <- compat_first_setting(
+    settings_data,
+    list(
+      c("includePartialMessages"),
+      c("include_partial_messages")
+    )
+  )
   if (is.null(value)) {
     return(NULL)
   }
@@ -758,7 +769,10 @@ build_compat_agent <- function(options) {
 
     delegate_tool <- lead$chat$get_tools()[["delegate_to_agent"]]
     if (compat_delegate_tool_requested(options, "Agent")) {
-      lead$register_tool(make_delegate_tool_alias(delegate_tool, name = "Agent"))
+      lead$register_tool(make_delegate_tool_alias(
+        delegate_tool,
+        name = "Agent"
+      ))
     }
     if (compat_delegate_tool_requested(options, "Task")) {
       lead$register_tool(make_delegate_tool_alias(delegate_tool, name = "Task"))
@@ -941,7 +955,9 @@ claude_sdk_options <- function(
   }
 
   if (!is.null(task_budget)) {
-    if (!is.numeric(task_budget) || length(task_budget) != 1 || is.na(task_budget)) {
+    if (
+      !is.numeric(task_budget) || length(task_budget) != 1 || is.na(task_budget)
+    ) {
       cli::cli_abort("{.arg task_budget} must be NULL or a length-1 number")
     }
     max_turns <- task_budget

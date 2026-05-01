@@ -269,7 +269,9 @@ Permissions <- R6::R6Class(
       # Allow prompt tool so gated workflows can request approval. The SDK
       # dontAsk mode keeps normal policy checks but does not allow an approval
       # prompt escape hatch.
-      if (self$mode != "dontAsk" && private$is_permission_prompt_tool(tool_name)) {
+      if (
+        self$mode != "dontAsk" && private$is_permission_prompt_tool(tool_name)
+      ) {
         return(PermissionResultAllow())
       }
 
