@@ -163,7 +163,11 @@ HookEvent <- c(
 #' @param permission Either `"allow"` or `"deny"`
 #' @param reason Reason for denial (shown to the LLM)
 #' @param continue If FALSE, stop the agent after this hook
-#' @param updated_input Optional replacement tool input, where supported
+#' @param updated_input Reserved for SDK-shape parity. **Not currently
+#'   supported**: deputy emits a warning and proceeds with the original tool
+#'   input. ellmer's tool-request callback contract does not yet expose a way
+#'   to mutate the in-flight request, so use `permission = "deny"` to block a
+#'   tool call instead of rewriting its arguments.
 #' @param additional_context Optional text to append to the running context
 #' @param stop_reason Optional stop reason used when `continue = FALSE`
 #' @return A `HookResultPreToolUse` object

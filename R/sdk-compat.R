@@ -499,13 +499,23 @@ compat_load_explicit_skills <- function(agent, options, settings) {
 
   loaded_names <- names(settings$skills %||% list())
   if (is.character(requested)) {
+    unresolved <- character()
     for (skill in requested) {
       if (skill %in% loaded_names) {
         next
       }
       if (file.exists(skill)) {
         agent$load_skill(skill, allow_conflicts = TRUE)
+      } else {
+        unresolved <- c(unresolved, skill)
       }
+    }
+    if (length(unresolved) > 0) {
+      cli::cli_warn(c(
+        "Could not resolve {length(unresolved)} requested skill{?s}",
+        x = "Not found in settings or as a file path: {.val {unresolved}}",
+        i = "Pass a known skill name from settings or a path to a skill directory."
+      ))
     }
     return(invisible(NULL))
   }
@@ -961,6 +971,91 @@ claude_sdk_options <- function(
       cli::cli_abort("{.arg task_budget} must be NULL or a length-1 number")
     }
     max_turns <- task_budget
+  }
+
+  if (
+    !is.numeric(max_turns) ||
+      length(max_turns) != 1 ||
+      is.na(max_turns) ||
+      max_turns < 0
+  ) {
+    cli::cli_abort("{.arg max_turns} must be a non-negative length-1 number")
+  }
+
+  if (!is.null(max_cost_usd)) {
+    if (
+      !is.numeric(max_cost_usd) ||
+        length(max_cost_usd) != 1 ||
+        is.na(max_cost_usd) ||
+        max_cost_usd < 0
+    ) {
+      cli::cli_abort(
+        "{.arg max_cost_usd} must be NULL or a non-negative length-1 number"
+      )
+    }
+  }
+
+  if (!is.null(skills)) {
+    if (!is.character(skills) && !is.list(skills)) {
+      cli::cli_abort(
+        "{.arg skills} must be NULL, a character vector, or a list of skills"
+      )
+    }
+  }
+
+  if (!is.null(allowed_tools) && !is.character(allowed_tools)) {
+    cli::cli_abort("{.arg allowed_tools} must be NULL or a character vector")
+  }
+  if (!is.null(disallowed_tools) && !is.character(disallowed_tools)) {
+    cli::cli_abort("{.arg disallowed_tools} must be NULL or a character vector")
+  }
+  if (
+    !is.null(permission_prompt_tool_name) &&
+      (!is.character(permission_prompt_tool_name) ||
+        length(permission_prompt_tool_name) != 1)
+  ) {
+    cli::cli_abort(
+      "{.arg permission_prompt_tool_name} must be NULL or a length-1 string"
+    )
+  }
+  if (
+    !is.null(resume_session_id) &&
+      (!is.character(resume_session_id) || length(resume_session_id) != 1)
+  ) {
+    cli::cli_abort(
+      "{.arg resume_session_id} must be NULL or a length-1 string"
+    )
+  }
+
+  passthrough_options <- list(
+    sandbox = sandbox,
+    plugins = plugins,
+    thinking = thinking,
+    effort = effort,
+    title = title,
+    user = user,
+    fallback_model = fallback_model,
+    betas = betas,
+    cli_path = cli_path,
+    add_dirs = add_dirs,
+    env = env,
+    extra_args = extra_args,
+    max_buffer_size = max_buffer_size,
+    stderr = stderr,
+    load_timeout_ms = load_timeout_ms
+  )
+  used <- names(passthrough_options)[
+    !vapply(passthrough_options, is.null, logical(1))
+  ]
+  if (length(used) > 0) {
+    cli::cli_warn(
+      c(
+        "The following SDK option{?s} {?is/are} accepted for shape parity but ignored by deputy: {.arg {used}}",
+        i = "Their values are stored on the returned options object but do not affect agent behavior."
+      ),
+      .frequency = "regularly",
+      .frequency_id = "deputy_sdk_options_passthrough"
+    )
   }
 
   structure(

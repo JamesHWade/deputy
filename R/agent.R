@@ -1103,6 +1103,10 @@ Agent <- R6::R6Class(
     should_stop = FALSE,
     stop_reason_from_hook = NULL,
 
+    # Track hashes of hook-supplied additional_context chunks already appended
+    # to the system prompt so repeated hook returns don't grow it unboundedly.
+    appended_hook_context_hashes = character(),
+
     normalize_compat_config = function(config) {
       if (is.null(config)) {
         return(NULL)
@@ -1138,6 +1142,7 @@ Agent <- R6::R6Class(
         hooks_count = self$hooks$count(),
         slash_commands = private$slash_commands_data,
         settings_data = private$settings_data,
+        appended_hook_context_hashes = private$appended_hook_context_hashes,
         metadata = utils::modifyList(
           list(
             saved_at = Sys.time(),
@@ -1242,6 +1247,14 @@ Agent <- R6::R6Class(
 
       if (!is.null(session$metadata$session_id)) {
         private$compat_session_id <- session$metadata$session_id
+      }
+
+      if (!is.null(session$appended_hook_context_hashes)) {
+        private$appended_hook_context_hashes <- as.character(
+          session$appended_hook_context_hashes
+        )
+      } else {
+        private$appended_hook_context_hashes <- character()
       }
 
       if (!is.null(session$hooks_count) && session$hooks_count > 0) {
@@ -1681,34 +1694,30 @@ Agent <- R6::R6Class(
     },
 
     apply_tool_request_updated_input = function(request, updated_input) {
-      if (!is.list(updated_input)) {
-        cli_warn("Ignoring hook updated_input because it is not a list")
-        return(FALSE)
+      # ellmer's on_tool_request callback receives a copy of the request and
+      # discards the callback's return value, so mutating `request@arguments`
+      # here cannot reach the downstream tool invocation. Surface the
+      # limitation rather than silently dropping the rewrite.
+      if (is.null(updated_input)) {
+        return(invisible(FALSE))
       }
 
-      updated <- tryCatch(
-        {
-          if (inherits(request, "ellmer::ContentToolRequest")) {
-            request@arguments <- updated_input
-            TRUE
-          } else if (is.list(request)) {
-            request$arguments <- updated_input
-            TRUE
-          } else {
-            FALSE
-          }
-        },
-        error = function(e) {
-          cli_warn(c(
-            "Could not apply hook updated_input to tool request",
-            "x" = e$message,
-            "i" = "The hook result is preserved, but this ellmer request could not be mutated in place"
-          ))
-          FALSE
-        }
+      if (!is.list(updated_input)) {
+        cli_warn("Ignoring hook updated_input because it is not a list")
+        return(invisible(FALSE))
+      }
+
+      cli_warn(
+        c(
+          "Hook returned `updated_input`, but tool input rewriting is not currently applied.",
+          i = "ellmer's tool-request callback API does not yet support mutating the in-flight request, so the tool will run with its original arguments.",
+          ">" = "Use `permission = \"deny\"` to block the tool, or `additional_context` to steer the model."
+        ),
+        .frequency = "regularly",
+        .frequency_id = "deputy_updated_input_unsupported"
       )
 
-      updated
+      invisible(FALSE)
     },
 
     append_hook_context = function(additional_context) {
@@ -1720,6 +1729,18 @@ Agent <- R6::R6Class(
       if (!nzchar(trimws(context_text))) {
         return(invisible(NULL))
       }
+
+      # De-duplicate by content hash. A hook that fires on every tool call
+      # with the same context would otherwise grow the system prompt without
+      # bound and inflate every subsequent persisted session payload.
+      chunk_hash <- digest::digest(context_text, algo = "sha1")
+      if (chunk_hash %in% private$appended_hook_context_hashes) {
+        return(invisible(NULL))
+      }
+      private$appended_hook_context_hashes <- c(
+        private$appended_hook_context_hashes,
+        chunk_hash
+      )
 
       current_prompt <- self$chat$get_system_prompt() %||% ""
       self$chat$set_system_prompt(paste(

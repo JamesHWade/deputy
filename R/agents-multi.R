@@ -207,9 +207,9 @@ LeadAgent <- R6::R6Class(
     },
 
     #' @description
-    #' List completed delegated sub-agent runs.
+    #' List delegated sub-agent runs, including failures.
     #'
-    #' @return Data frame with one row per completed sub-agent run
+    #' @return Data frame with one row per sub-agent run
     list_subagents = function() {
       runs <- private$subagent_runs
       if (length(runs) == 0) {
@@ -217,8 +217,10 @@ LeadAgent <- R6::R6Class(
           agent_name = character(),
           session_id = character(),
           task = character(),
+          status = character(),
           started_at = as.POSIXct(character()),
           completed_at = as.POSIXct(character()),
+          error = character(),
           stringsAsFactors = FALSE
         ))
       }
@@ -230,8 +232,10 @@ LeadAgent <- R6::R6Class(
             agent_name = run$agent_name,
             session_id = run$session_id %||% NA_character_,
             task = run$task,
+            status = run$status %||% "completed",
             started_at = as.POSIXct(run$started_at, tz = "UTC"),
             completed_at = as.POSIXct(run$completed_at, tz = "UTC"),
+            error = run$error %||% NA_character_,
             stringsAsFactors = FALSE
           )
         })
@@ -385,6 +389,25 @@ LeadAgent <- R6::R6Class(
             task_to_run <- paste(def$initial_prompt, task, sep = "\n\n")
           }
 
+          # Record the run before invoking so failures aren't lost when
+          # `tool_reject` short-circuits the rest of this closure.
+          record_run <- function(status, result_text = NULL, error = NULL) {
+            private$subagent_runs <- c(
+              private$subagent_runs,
+              list(list(
+                agent_name = agent_name,
+                task = task,
+                session_id = sub_agent$session_id(),
+                started_at = started_at,
+                completed_at = Sys.time(),
+                status = status,
+                result = result_text,
+                error = error,
+                turns = tryCatch(sub_agent$turns(), error = function(e) list())
+              ))
+            )
+          }
+
           result <- tryCatch(
             {
               sub_result <- sub_agent$run_sync(
@@ -397,6 +420,18 @@ LeadAgent <- R6::R6Class(
               cli::cli_alert_danger(
                 "Sub-agent {.val {agent_name}} failed: {e$message}"
               )
+              record_run(status = "failed", error = e$message)
+              lead_agent$hooks$fire(
+                "SubagentStop",
+                agent_name = agent_name,
+                task = task,
+                result = NULL,
+                context = list(
+                  working_dir = lead_agent$working_dir,
+                  status = "failed",
+                  error = e$message
+                )
+              )
               ellmer::tool_reject(paste0(
                 "Sub-agent '",
                 agent_name,
@@ -406,28 +441,20 @@ LeadAgent <- R6::R6Class(
               ))
             }
           )
-          completed_at <- Sys.time()
 
-          # Fire SubagentStop hook
+          # Fire SubagentStop hook (success path)
           lead_agent$hooks$fire(
             "SubagentStop",
             agent_name = agent_name,
             task = task,
             result = result,
-            context = list(working_dir = lead_agent$working_dir)
+            context = list(
+              working_dir = lead_agent$working_dir,
+              status = "completed"
+            )
           )
 
-          private$subagent_runs <- c(
-            private$subagent_runs,
-            list(list(
-              agent_name = agent_name,
-              task = task,
-              session_id = sub_agent$session_id(),
-              started_at = started_at,
-              completed_at = completed_at,
-              turns = sub_agent$turns()
-            ))
-          )
+          record_run(status = "completed", result_text = result)
 
           result
         },

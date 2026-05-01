@@ -231,3 +231,152 @@ test_that("MCP status is available even before MCP load attempts", {
     c("status", "config", "servers", "tools", "loaded_at", "error")
   )
 })
+
+test_that("hook updated_input warns and leaves request arguments intact", {
+  agent <- Agent$new(chat = create_mock_chat())
+
+  agent$add_hook(HookMatcher$new(
+    event = "PreToolUse",
+    timeout = 0,
+    callback = function(tool_name, tool_input, context) {
+      HookResultPreToolUse(
+        permission = "allow",
+        updated_input = list(path = "rewritten.txt")
+      )
+    }
+  ))
+
+  request <- create_mock_tool_request(
+    id = "call_write",
+    name = "read_file",
+    arguments = list(path = "original.txt")
+  )
+
+  expect_warning(
+    agent$.__enclos_env__$private$on_tool_request(request),
+    "tool input rewriting is not currently applied"
+  )
+
+  # The original request must remain unchanged - silently mutating only the
+  # callback's local copy is the very bug this test guards against.
+  expect_equal(request@arguments$path, "original.txt")
+})
+
+test_that("repeated hook additional_context is de-duplicated in the system prompt", {
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    system_prompt = "Base."
+  )
+
+  agent$add_hook(HookMatcher$new(
+    event = "PreToolUse",
+    timeout = 0,
+    callback = function(tool_name, tool_input, context) {
+      HookResultPreToolUse(
+        permission = "allow",
+        additional_context = "Watch out for paths."
+      )
+    }
+  ))
+
+  request <- create_mock_tool_request(
+    id = "call_read",
+    name = "read_file",
+    arguments = list(path = "a.txt")
+  )
+
+  agent$.__enclos_env__$private$on_tool_request(request)
+  prompt_after_first <- agent$chat$get_system_prompt()
+
+  # Fire many more times - identical content should not re-append.
+  for (i in seq_len(5)) {
+    agent$.__enclos_env__$private$on_tool_request(request)
+  }
+  prompt_after_repeats <- agent$chat$get_system_prompt()
+
+  expect_identical(prompt_after_first, prompt_after_repeats)
+  expect_equal(
+    length(gregexpr(
+      "# Hook Additional Context",
+      prompt_after_repeats,
+      fixed = TRUE
+    )[[1]]),
+    1L
+  )
+})
+
+test_that("subagent failures are recorded in list_subagents", {
+  # Build a throwing mock chat: its chat()/stream() raise on first turn,
+  # and clone() returns the same throwing chat so the cloned sub-agent
+  # also fails.
+  make_throwing_chat <- function() {
+    chat <- create_mock_chat()
+    chat$chat <- function(...) stop("intentional failure")
+    chat$stream <- function(...) stop("intentional failure")
+    chat$clone <- function() make_throwing_chat()
+    chat
+  }
+  throwing_chat <- make_throwing_chat()
+
+  failing_def <- agent_definition(
+    name = "failer",
+    description = "Always fails",
+    prompt = "Test prompt"
+  )
+
+  lead <- LeadAgent$new(
+    chat = throwing_chat,
+    sub_agents = list(failing_def)
+  )
+
+  delegate <- lead$.__enclos_env__$private$create_delegate_tool()
+
+  err <- tryCatch(
+    delegate(agent_name = "failer", task = "do thing"),
+    ellmer_tool_reject = function(e) e,
+    error = function(e) e
+  )
+  # Either ellmer_tool_reject was raised or some condition propagated.
+  expect_true(inherits(err, "condition"))
+
+  runs <- lead$list_subagents()
+  expect_equal(nrow(runs), 1L)
+  expect_equal(runs$status, "failed")
+  expect_match(runs$error, "intentional failure")
+})
+
+test_that("claude_sdk_options validates numeric and character argument types", {
+  expect_error(
+    claude_sdk_options(max_turns = "ten"),
+    "max_turns"
+  )
+  expect_error(
+    claude_sdk_options(max_cost_usd = -1),
+    "max_cost_usd"
+  )
+  expect_error(
+    claude_sdk_options(skills = 42),
+    "skills"
+  )
+  expect_error(
+    claude_sdk_options(allowed_tools = list("Read")),
+    "allowed_tools"
+  )
+})
+
+test_that("claude_sdk_options stores SDK-shape options it does not yet apply", {
+  # The values are kept on the returned object so callers can introspect them.
+  opts <- suppressWarnings(claude_sdk_options(sandbox = "strict"))
+  expect_equal(opts$sandbox, "strict")
+})
+
+test_that("compat_load_explicit_skills warns on unresolved skill names", {
+  agent <- Agent$new(chat = create_mock_chat())
+  options <- list(skills = c("does-not-exist", "/no/such/path"))
+  settings <- list(skills = list())
+
+  expect_warning(
+    deputy:::compat_load_explicit_skills(agent, options, settings),
+    "Could not resolve"
+  )
+})

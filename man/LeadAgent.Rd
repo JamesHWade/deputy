@@ -137,14 +137,14 @@ sub-agents based on registered AgentDefinitions.
 \if{html}{\out{<a id="method-LeadAgent-list_subagents"></a>}}
 \if{latex}{\out{\hypertarget{method-LeadAgent-list_subagents}{}}}
 \subsection{\code{LeadAgent$list_subagents()}}{
-  List completed delegated sub-agent runs.
+  List delegated sub-agent runs, including failures.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{LeadAgent$list_subagents()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Data frame with one row per completed sub-agent run
+    Data frame with one row per sub-agent run
   }
 }
 
