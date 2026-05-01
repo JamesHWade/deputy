@@ -4,10 +4,27 @@
 \alias{HookResultPostToolUse}
 \title{Create a PostToolUse hook result}
 \usage{
-HookResultPostToolUse(continue = TRUE)
+HookResultPostToolUse(
+  continue = TRUE,
+  suppress_output = FALSE,
+  updated_tool_output = NULL,
+  updated_mcp_tool_output = NULL,
+  additional_context = NULL,
+  stop_reason = NULL
+)
 }
 \arguments{
 \item{continue}{If FALSE, stop the agent after this hook}
+
+\item{suppress_output}{Logical SDK-compatible output suppression hint}
+
+\item{updated_tool_output}{Optional replacement tool output, where supported}
+
+\item{updated_mcp_tool_output}{Deprecated alias for \code{updated_tool_output}}
+
+\item{additional_context}{Optional text to append to the running context}
+
+\item{stop_reason}{Optional stop reason used when \code{continue = FALSE}}
 }
 \value{
 A \code{HookResultPostToolUse} object

@@ -310,6 +310,104 @@ Agent <- R6::R6Class(
     },
 
     #' @description
+    #' Get the active permission mode.
+    #'
+    #' @return Character permission mode
+    get_permission_mode = function() {
+      self$permissions$mode
+    },
+
+    #' @description
+    #' Change the active permission mode for subsequent tool calls.
+    #'
+    #' @param mode Permission mode, see [PermissionMode]
+    #' @return Invisible self
+    set_permission_mode = function(mode) {
+      mode <- validate_permission_mode_value(mode)
+      existing <- self$permissions
+      old_mode <- existing$mode
+
+      file_read <- existing$file_read
+      file_write <- existing$file_write
+      bash <- existing$bash
+      r_code <- existing$r_code
+      web <- existing$web
+      install_packages <- existing$install_packages
+      prompt_tool <- existing$permission_prompt_tool_name
+
+      if (mode %in% c("default", "acceptEdits", "auto", "dontAsk")) {
+        if (old_mode %in% c("plan", "readonly") && isFALSE(file_write)) {
+          file_write <- self$working_dir
+        }
+        if (old_mode %in% c("plan", "readonly")) {
+          r_code <- TRUE
+        }
+      }
+
+      if (mode == "dontAsk") {
+        prompt_tool <- NULL
+      }
+
+      if (mode == "readonly") {
+        file_write <- FALSE
+        bash <- FALSE
+        r_code <- FALSE
+        install_packages <- FALSE
+      }
+
+      if (mode == "plan") {
+        file_write <- FALSE
+        bash <- FALSE
+        r_code <- FALSE
+        web <- TRUE
+        install_packages <- FALSE
+      }
+
+      if (mode == "bypassPermissions") {
+        file_read <- TRUE
+        file_write <- TRUE
+        bash <- TRUE
+        r_code <- TRUE
+        web <- TRUE
+        install_packages <- TRUE
+      }
+
+      private$.permissions <- Permissions$new(
+        mode = mode,
+        file_read = file_read,
+        file_write = file_write,
+        bash = bash,
+        r_code = r_code,
+        web = web,
+        install_packages = install_packages,
+        max_turns = existing$max_turns,
+        max_cost_usd = existing$max_cost_usd,
+        can_use_tool = existing$can_use_tool,
+        tool_allowlist = existing$tool_allowlist,
+        tool_denylist = existing$tool_denylist,
+        permission_prompt_tool_name = prompt_tool
+      )
+
+      self$hooks$fire(
+        "ConfigChange",
+        key = "permission_mode",
+        old_value = old_mode,
+        new_value = mode,
+        context = list(working_dir = self$working_dir)
+      )
+
+      private$notify(
+        paste0("Permission mode changed from ", old_mode, " to ", mode, "."),
+        level = "info",
+        code = "permission_mode_changed",
+        previous_mode = old_mode,
+        permission_mode = mode
+      )
+
+      invisible(self)
+    },
+
+    #' @description
     #' Configure Claude SDK compatibility behavior for this agent.
     #'
     #' @param config Named list of compat settings
@@ -724,6 +822,7 @@ Agent <- R6::R6Class(
     #' @return Invisible self for chaining
     load_mcp = function(config = NULL, servers = NULL) {
       mcp_tools_list <- tools_mcp(config = config, servers = servers)
+      loaded_at <- Sys.time()
 
       if (length(mcp_tools_list) > 0) {
         # Register tools with error handling
@@ -759,6 +858,23 @@ Agent <- R6::R6Class(
           character(1)
         )
         private$loaded_mcp_tools <- c(private$loaded_mcp_tools, tool_names)
+        private$loaded_mcp_status <- c(private$loaded_mcp_status, list(list(
+          status = "connected",
+          config = config,
+          servers = servers %||% character(),
+          tools = tool_names,
+          loaded_at = loaded_at,
+          error = NULL
+        )))
+      } else {
+        private$loaded_mcp_status <- c(private$loaded_mcp_status, list(list(
+          status = if (mcp_available()) "empty" else "unavailable",
+          config = config,
+          servers = servers %||% character(),
+          tools = character(),
+          loaded_at = loaded_at,
+          error = NULL
+        )))
       }
 
       invisible(self)
@@ -770,6 +886,37 @@ Agent <- R6::R6Class(
     #' @return Character vector of MCP tool names
     mcp_tools = function() {
       private$loaded_mcp_tools
+    },
+
+    #' @description
+    #' Get MCP runtime status records.
+    #'
+    #' @return Data frame describing MCP load attempts and registered tools
+    mcp_status = function() {
+      records <- private$loaded_mcp_status
+      if (length(records) == 0) {
+        return(data.frame(
+          status = character(),
+          config = character(),
+          servers = character(),
+          tools = character(),
+          loaded_at = as.POSIXct(character()),
+          error = character(),
+          stringsAsFactors = FALSE
+        ))
+      }
+
+      do.call(rbind, lapply(records, function(record) {
+        data.frame(
+          status = record$status,
+          config = record$config %||% NA_character_,
+          servers = paste(record$servers, collapse = ","),
+          tools = paste(record$tools, collapse = ","),
+          loaded_at = as.POSIXct(record$loaded_at, tz = "UTC"),
+          error = record$error %||% NA_character_,
+          stringsAsFactors = FALSE
+        )
+      }))
     },
 
     #' @description
@@ -958,11 +1105,13 @@ Agent <- R6::R6Class(
       persist_session <- isTRUE(config$persist_session)
       session_store_dir <- normalize_session_store_dir(config$session_store_dir)
       session_id <- config$session_id %||% generate_session_id()
+      session_store <- config$session_store
 
       list(
         persist_session = persist_session,
         session_store_dir = session_store_dir,
-        session_id = session_id
+        session_id = session_id,
+        session_store = session_store
       )
     },
 
@@ -1143,6 +1292,24 @@ Agent <- R6::R6Class(
       )
 
       private$compat_last_snapshot_path <- path
+      if (!is.null(private$compat_config$session_store)) {
+        tryCatch(
+          session_store_append_external(
+            private$compat_config$session_store,
+            session_id = private$compat_session_id,
+            payload = payload,
+            metadata = payload$metadata %||% list()
+          ),
+          error = function(e) {
+            private$notify(
+              "External session store append failed.",
+              level = "warning",
+              code = "session_store_append_failed",
+              error = e$message
+            )
+          }
+        )
+      }
       path
     },
 
@@ -1153,14 +1320,40 @@ Agent <- R6::R6Class(
       tool_name <- extracted$tool_name
       tool_input <- extracted$tool_input
       tool_annotations <- extracted$tool_annotations
+      tool_use_id <- extracted$tool_use_id
 
       context <- list(
         working_dir = self$working_dir,
-        tool_annotations = tool_annotations
+        tool_annotations = tool_annotations,
+        tool_use_id = tool_use_id,
+        session_id = private$compat_session_id,
+        transcript_path = private$compat_last_snapshot_path,
+        permission_mode = self$permissions$mode
       )
 
       # Check permissions first
       perm_result <- self$permissions$check(tool_name, tool_input, context)
+
+      if (inherits(perm_result, "PermissionResultDeny")) {
+        request_result <- self$hooks$fire(
+          "PermissionRequest",
+          tool_name = tool_name,
+          tool_input = tool_input,
+          permission_result = perm_result,
+          context = context
+        )
+
+        if (inherits(request_result, "PermissionResultAllow")) {
+          perm_result <- request_result
+        } else if (inherits(request_result, "PermissionResultDeny")) {
+          perm_result <- request_result
+        } else if (
+          inherits(request_result, "HookResultPreToolUse") &&
+            identical(request_result$permission, "allow")
+        ) {
+          perm_result <- PermissionResultAllow()
+        }
+      }
 
       if (inherits(perm_result, "PermissionResultDeny")) {
         private$notify(
@@ -1186,10 +1379,20 @@ Agent <- R6::R6Class(
         if (hook_result$permission == "deny") {
           ellmer::tool_reject(hook_result$reason %||% "Denied by hook")
         }
+        if (!is.null(hook_result$additional_context)) {
+          private$append_hook_context(hook_result$additional_context)
+        }
+        if (!is.null(hook_result$updated_input)) {
+          private$apply_tool_request_updated_input(
+            request,
+            hook_result$updated_input
+          )
+        }
         # Check continue field - signal to stop after this tool
         if (!is.null(hook_result$continue) && !hook_result$continue) {
           private$should_stop <- TRUE
-          private$stop_reason_from_hook <- "hook_requested_stop"
+          private$stop_reason_from_hook <- hook_result$stop_reason %||%
+            "hook_requested_stop"
         }
       }
 
@@ -1238,7 +1441,11 @@ Agent <- R6::R6Class(
       extracted <- private$extract_tool_result_data(result)
 
       context <- list(
-        working_dir = self$working_dir
+        working_dir = self$working_dir,
+        tool_use_id = extracted$tool_use_id,
+        session_id = private$compat_session_id,
+        transcript_path = private$compat_last_snapshot_path,
+        permission_mode = self$permissions$mode
       )
 
       # Fire PostToolUse hooks
@@ -1252,10 +1459,24 @@ Agent <- R6::R6Class(
 
       # Check continue field in PostToolUse result
       if (inherits(hook_result, "HookResultPostToolUse")) {
+        if (!is.null(hook_result$additional_context)) {
+          private$append_hook_context(hook_result$additional_context)
+        }
         if (!is.null(hook_result$continue) && !hook_result$continue) {
           private$should_stop <- TRUE
-          private$stop_reason_from_hook <- "hook_requested_stop"
+          private$stop_reason_from_hook <- hook_result$stop_reason %||%
+            "hook_requested_stop"
         }
+      }
+
+      if (!is.null(extracted$tool_error)) {
+        self$hooks$fire(
+          "PostToolUseFailure",
+          tool_name = extracted$tool_name,
+          tool_result = extracted$tool_result,
+          tool_error = extracted$tool_error,
+          context = context
+        )
       }
 
       invisible(NULL)
@@ -1267,6 +1488,7 @@ Agent <- R6::R6Class(
       tool_name <- "unknown"
       tool_input <- list()
       tool_annotations <- NULL
+      tool_use_id <- NULL
 
       # Check if we have a valid request object
       if (is.null(request)) {
@@ -1274,7 +1496,8 @@ Agent <- R6::R6Class(
         return(list(
           tool_name = tool_name,
           tool_input = tool_input,
-          tool_annotations = tool_annotations
+          tool_annotations = tool_annotations,
+          tool_use_id = tool_use_id
         ))
       }
 
@@ -1289,6 +1512,7 @@ Agent <- R6::R6Class(
         if (is.list(request)) {
           tool_name <- request$name %||% "unknown"
           tool_input <- request$arguments %||% list()
+          tool_use_id <- request$id
           if (!is.null(request$tool) && is.list(request$tool)) {
             tool_annotations <- request$tool$annotations
           }
@@ -1297,7 +1521,8 @@ Agent <- R6::R6Class(
         return(list(
           tool_name = tool_name,
           tool_input = tool_input,
-          tool_annotations = tool_annotations
+          tool_annotations = tool_annotations,
+          tool_use_id = tool_use_id
         ))
       }
 
@@ -1320,6 +1545,11 @@ Agent <- R6::R6Class(
         }
       )
 
+      tool_use_id <- tryCatch(
+        request@id,
+        error = function(e) NULL
+      )
+
       # Tool annotations
       tool_annotations <- tryCatch(
         {
@@ -1338,7 +1568,8 @@ Agent <- R6::R6Class(
       list(
         tool_name = tool_name,
         tool_input = tool_input,
-        tool_annotations = tool_annotations
+        tool_annotations = tool_annotations,
+        tool_use_id = tool_use_id
       )
     },
 
@@ -1348,6 +1579,7 @@ Agent <- R6::R6Class(
       tool_name <- "unknown"
       tool_result <- NULL
       tool_error <- NULL
+      tool_use_id <- NULL
 
       # Check if we have a valid result object
       if (is.null(result)) {
@@ -1355,7 +1587,8 @@ Agent <- R6::R6Class(
         return(list(
           tool_name = tool_name,
           tool_result = tool_result,
-          tool_error = "NULL result received"
+          tool_error = "NULL result received",
+          tool_use_id = tool_use_id
         ))
       }
 
@@ -1373,13 +1606,15 @@ Agent <- R6::R6Class(
           tool_error <- result$error
           if (!is.null(result$request)) {
             tool_name <- result$request$name %||% "unknown"
+            tool_use_id <- result$request$id
           }
         }
 
         return(list(
           tool_name = tool_name,
           tool_result = tool_result,
-          tool_error = tool_error
+          tool_error = tool_error,
+          tool_use_id = tool_use_id
         ))
       }
 
@@ -1417,11 +1652,76 @@ Agent <- R6::R6Class(
         }
       )
 
+      tool_use_id <- tryCatch(
+        {
+          if (!is.null(result@request)) {
+            result@request@id
+          } else {
+            NULL
+          }
+        },
+        error = function(e) NULL
+      )
+
       list(
         tool_name = tool_name,
         tool_result = tool_result,
-        tool_error = tool_error
+        tool_error = tool_error,
+        tool_use_id = tool_use_id
       )
+    },
+
+    apply_tool_request_updated_input = function(request, updated_input) {
+      if (!is.list(updated_input)) {
+        cli_warn("Ignoring hook updated_input because it is not a list")
+        return(FALSE)
+      }
+
+      updated <- tryCatch(
+        {
+          if (inherits(request, "ellmer::ContentToolRequest")) {
+            request@arguments <- updated_input
+            TRUE
+          } else if (is.list(request)) {
+            request$arguments <- updated_input
+            TRUE
+          } else {
+            FALSE
+          }
+        },
+        error = function(e) {
+          cli_warn(c(
+            "Could not apply hook updated_input to tool request",
+            "x" = e$message,
+            "i" = "The hook result is preserved, but this ellmer request could not be mutated in place"
+          ))
+          FALSE
+        }
+      )
+
+      updated
+    },
+
+    append_hook_context = function(additional_context) {
+      if (is.null(additional_context)) {
+        return(invisible(NULL))
+      }
+
+      context_text <- paste(as.character(additional_context), collapse = "\n")
+      if (!nzchar(trimws(context_text))) {
+        return(invisible(NULL))
+      }
+
+      current_prompt <- self$chat$get_system_prompt() %||% ""
+      self$chat$set_system_prompt(paste(
+        current_prompt,
+        "",
+        "# Hook Additional Context",
+        context_text,
+        sep = "\n"
+      ))
+
+      invisible(NULL)
     },
 
     # Create a true coro generator for streaming events
@@ -1959,6 +2259,7 @@ Agent <- R6::R6Class(
 
     # Storage for loaded MCP tool names
     loaded_mcp_tools = character(),
+    loaded_mcp_status = list(),
 
     # Storage for slash commands
     slash_commands_data = list(),

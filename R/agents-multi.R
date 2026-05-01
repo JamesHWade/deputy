@@ -13,6 +13,14 @@
 #' @param tools Optional list of tools for this agent
 #' @param model Model to use (default: "inherit" uses parent's model)
 #' @param skills Optional list of skills to load
+#' @param disallowed_tools Optional tool denylist for this sub-agent
+#' @param memory Optional memory text appended to this sub-agent's prompt
+#' @param mcp_servers Optional MCP server names to load for this sub-agent
+#' @param initial_prompt Optional text prepended to delegated tasks
+#' @param max_turns Optional per-sub-agent turn limit
+#' @param background Logical SDK-compatible metadata flag
+#' @param effort Optional reasoning effort metadata
+#' @param permission_mode Optional permission mode override
 #' @return An `AgentDefinition` object
 #'
 #' @examples
@@ -39,8 +47,32 @@ agent_definition <- function(
   prompt,
   tools = list(),
   model = "inherit",
-  skills = list()
+  skills = list(),
+  disallowed_tools = NULL,
+  memory = NULL,
+  mcp_servers = NULL,
+  initial_prompt = NULL,
+  max_turns = NULL,
+  background = FALSE,
+  effort = NULL,
+  permission_mode = NULL
 ) {
+  if (!is.null(permission_mode)) {
+    permission_mode <- validate_permission_mode_value(
+      permission_mode,
+      arg = "permission_mode"
+    )
+  }
+  if (!is.null(max_turns)) {
+    if (!is.numeric(max_turns) && !is.character(max_turns)) {
+      cli::cli_abort("{.arg max_turns} must be NULL or a length-1 number")
+    }
+    max_turns <- as.integer(max_turns[[1]])
+    if (is.na(max_turns)) {
+      cli::cli_abort("{.arg max_turns} must be NULL or a length-1 number")
+    }
+  }
+
   structure(
     list(
       name = name,
@@ -48,7 +80,15 @@ agent_definition <- function(
       prompt = prompt,
       tools = tools,
       model = model,
-      skills = skills
+      skills = skills,
+      disallowed_tools = disallowed_tools,
+      memory = memory,
+      mcp_servers = mcp_servers,
+      initial_prompt = initial_prompt,
+      max_turns = max_turns,
+      background = isTRUE(background),
+      effort = effort,
+      permission_mode = permission_mode
     ),
     class = "AgentDefinition"
   )
@@ -61,6 +101,9 @@ print.AgentDefinition <- function(x, ...) {
   cat("  tools:", length(x$tools), "\n")
   cat("  skills:", length(x$skills), "\n")
   cat("  model:", x$model, "\n")
+  if (!is.null(x$permission_mode)) {
+    cat("  permission_mode:", x$permission_mode, "\n")
+  }
   invisible(x)
 }
 
@@ -161,6 +204,53 @@ LeadAgent <- R6::R6Class(
     #' @return Character vector of sub-agent names
     available_sub_agents = function() {
       sapply(self$sub_agent_defs, function(d) d$name)
+    },
+
+    #' @description
+    #' List completed delegated sub-agent runs.
+    #'
+    #' @return Data frame with one row per completed sub-agent run
+    list_subagents = function() {
+      runs <- private$subagent_runs
+      if (length(runs) == 0) {
+        return(data.frame(
+          agent_name = character(),
+          session_id = character(),
+          task = character(),
+          started_at = as.POSIXct(character()),
+          completed_at = as.POSIXct(character()),
+          stringsAsFactors = FALSE
+        ))
+      }
+
+      do.call(rbind, lapply(runs, function(run) {
+        data.frame(
+          agent_name = run$agent_name,
+          session_id = run$session_id %||% NA_character_,
+          task = run$task,
+          started_at = as.POSIXct(run$started_at, tz = "UTC"),
+          completed_at = as.POSIXct(run$completed_at, tz = "UTC"),
+          stringsAsFactors = FALSE
+        )
+      }))
+    },
+
+    #' @description
+    #' Get stored turn history for delegated sub-agent runs.
+    #'
+    #' @param agent_name Optional sub-agent name filter
+    #' @param session_id Optional sub-agent session id filter
+    #' @return List of turn histories
+    get_subagent_messages = function(agent_name = NULL, session_id = NULL) {
+      runs <- private$subagent_runs
+      if (!is.null(agent_name)) {
+        runs <- Filter(function(run) identical(run$agent_name, agent_name), runs)
+      }
+      if (!is.null(session_id)) {
+        runs <- Filter(function(run) identical(run$session_id, session_id), runs)
+      }
+
+      lapply(runs, function(run) run$turns)
     },
 
     #' @description
@@ -265,14 +355,33 @@ LeadAgent <- R6::R6Class(
           # Create the sub-agent
           sub_agent <- private$create_sub_agent(def)
 
-          # Run the task
-          cli::cli_alert_info("Delegating to {.val {agent_name}}: {task}")
+	          # Run the task
+	          cli::cli_alert_info("Delegating to {.val {agent_name}}: {task}")
+	          started_at <- Sys.time()
 
-          result <- tryCatch(
-            {
-              sub_result <- sub_agent$run_sync(task)
-              sub_result$response
-            },
+	          lead_agent$hooks$fire(
+	            "SubagentStart",
+	            agent_name = agent_name,
+	            task = task,
+	            context = list(
+	              working_dir = lead_agent$working_dir,
+	              agent_definition = def
+	            )
+	          )
+
+	          task_to_run <- task
+	          if (!is.null(def$initial_prompt) && nzchar(trimws(def$initial_prompt))) {
+	            task_to_run <- paste(def$initial_prompt, task, sep = "\n\n")
+	          }
+
+	          result <- tryCatch(
+	            {
+	              sub_result <- sub_agent$run_sync(
+	                task_to_run,
+	                max_turns = def$max_turns
+	              )
+	              sub_result$response
+	            },
             error = function(e) {
               cli::cli_alert_danger(
                 "Sub-agent {.val {agent_name}} failed: {e$message}"
@@ -283,21 +392,31 @@ LeadAgent <- R6::R6Class(
                 "' failed.\n",
                 "Error: ",
                 e$message
-              ))
-            }
-          )
+	              ))
+	            }
+	          )
+	          completed_at <- Sys.time()
 
-          # Fire SubagentStop hook
-          lead_agent$hooks$fire(
+	          # Fire SubagentStop hook
+	          lead_agent$hooks$fire(
             "SubagentStop",
             agent_name = agent_name,
             task = task,
             result = result,
-            context = list(working_dir = lead_agent$working_dir)
-          )
+	            context = list(working_dir = lead_agent$working_dir)
+	          )
 
-          result
-        },
+	          private$subagent_runs <- c(private$subagent_runs, list(list(
+	            agent_name = agent_name,
+	            task = task,
+	            session_id = sub_agent$session_id(),
+	            started_at = started_at,
+	            completed_at = completed_at,
+	            turns = sub_agent$turns()
+	          )))
+
+	          result
+	        },
         name = "delegate_to_agent",
         description = "Delegate a task to a specialized sub-agent. The sub-agent will complete the task and return results.",
         arguments = list(
@@ -347,22 +466,85 @@ LeadAgent <- R6::R6Class(
         )
       }
 
+      sub_tools <- private$filter_disallowed_tools(def$tools, def$disallowed_tools)
+      sub_permissions <- private$derive_subagent_permissions(def)
+      sub_prompt <- def$prompt
+      if (!is.null(def$memory) && length(def$memory) > 0) {
+        sub_prompt <- paste(
+          sub_prompt,
+          "",
+          "# Memory",
+          paste(as.character(def$memory), collapse = "\n\n"),
+          sep = "\n"
+        )
+      }
+
       # Create the sub-agent
       sub_agent <- Agent$new(
         chat = sub_chat,
-        tools = def$tools,
-        system_prompt = def$prompt,
-        permissions = self$permissions,
+        tools = sub_tools,
+        system_prompt = sub_prompt,
+        permissions = sub_permissions,
         working_dir = self$working_dir
       )
+      sub_agent$configure_sdk_compat(list(
+        persist_session = FALSE,
+        session_store_dir = session_store_default_dir(),
+        session_id = generate_session_id()
+      ))
+
+      if (!is.null(def$permission_mode)) {
+        sub_agent$set_permission_mode(def$permission_mode)
+      }
 
       # Load any skills
       for (skill in def$skills) {
         sub_agent$load_skill(skill)
       }
 
+      if (!is.null(def$mcp_servers) && length(def$mcp_servers) > 0) {
+        sub_agent$load_mcp(servers = def$mcp_servers)
+      }
+
       sub_agent
-    }
+    },
+
+    derive_subagent_permissions = function(def) {
+      existing <- self$permissions
+      denylist <- unique(c(existing$tool_denylist, def$disallowed_tools))
+      Permissions$new(
+        mode = existing$mode,
+        file_read = existing$file_read,
+        file_write = existing$file_write,
+        bash = existing$bash,
+        r_code = existing$r_code,
+        web = existing$web,
+        install_packages = existing$install_packages,
+        max_turns = def$max_turns %||% existing$max_turns,
+        max_cost_usd = existing$max_cost_usd,
+        can_use_tool = existing$can_use_tool,
+        tool_allowlist = existing$tool_allowlist,
+        tool_denylist = denylist,
+        permission_prompt_tool_name = existing$permission_prompt_tool_name
+      )
+    },
+
+    filter_disallowed_tools = function(tools, disallowed_tools) {
+      if (is.null(disallowed_tools) || length(disallowed_tools) == 0) {
+        return(tools)
+      }
+
+      disallowed <- tolower(trimws(as.character(disallowed_tools)))
+      Filter(function(tool) {
+        name <- tryCatch(tool@name, error = function(e) NULL)
+        if (is.null(name)) {
+          return(TRUE)
+        }
+        !tolower(name) %in% disallowed
+      }, tools)
+    },
+
+    subagent_runs = list()
   )
 )
 

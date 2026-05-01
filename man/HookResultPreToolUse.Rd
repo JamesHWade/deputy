@@ -7,7 +7,10 @@
 HookResultPreToolUse(
   permission = c("allow", "deny"),
   reason = NULL,
-  continue = TRUE
+  continue = TRUE,
+  updated_input = NULL,
+  additional_context = NULL,
+  stop_reason = NULL
 )
 }
 \arguments{
@@ -16,6 +19,12 @@ HookResultPreToolUse(
 \item{reason}{Reason for denial (shown to the LLM)}
 
 \item{continue}{If FALSE, stop the agent after this hook}
+
+\item{updated_input}{Optional replacement tool input, where supported}
+
+\item{additional_context}{Optional text to append to the running context}
+
+\item{stop_reason}{Optional stop reason used when \code{continue = FALSE}}
 }
 \value{
 A \code{HookResultPreToolUse} object

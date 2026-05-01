@@ -68,7 +68,7 @@ test_that("custom agent files load supported fields including model and skills",
   expect_equal(definition$skills[[1]]$name, "analysis")
 })
 
-test_that("unsupported custom agent metadata warns and is ignored", {
+test_that("custom agent files load newer SDK metadata fields", {
   withr::local_tempdir(pattern = "deputy-agents") -> temp_dir
   dir.create(file.path(temp_dir, ".claude", "agents"), recursive = TRUE)
 
@@ -78,6 +78,13 @@ test_that("unsupported custom agent metadata warns and is ignored", {
       "name: reviewer",
       "description: Reviews code changes",
       "permissionMode: plan",
+      "disallowedTools:",
+      "  - Write",
+      "mcpServers:",
+      "  - github",
+      "initialPrompt: Start with risks.",
+      "maxTurns: 2",
+      "effort: medium",
       "tools:",
       "  - Read",
       "---",
@@ -86,13 +93,17 @@ test_that("unsupported custom agent metadata warns and is ignored", {
     file.path(temp_dir, ".claude", "agents", "reviewer.md")
   )
 
-  expect_warning(
-    settings <- claude_settings_load("project", working_dir = temp_dir),
-    "Ignoring unsupported custom agent metadata"
-  )
+  settings <- claude_settings_load("project", working_dir = temp_dir)
 
   expect_true("reviewer" %in% names(settings$agents))
-  expect_equal(settings$agents$reviewer$description, "Reviews code changes")
+  definition <- settings$agents$reviewer
+  expect_equal(definition$description, "Reviews code changes")
+  expect_equal(definition$permission_mode, "plan")
+  expect_equal(definition$disallowed_tools, "Write")
+  expect_equal(definition$mcp_servers, "github")
+  expect_equal(definition$initial_prompt, "Start with risks.")
+  expect_equal(definition$max_turns, 2L)
+  expect_equal(definition$effort, "medium")
 })
 
 test_that("invalid custom agent files warn without blocking valid ones", {

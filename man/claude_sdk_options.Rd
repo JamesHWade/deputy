@@ -10,22 +10,46 @@ claude_sdk_options(
   model = NULL,
   system_prompt = NULL,
   hooks = list(),
+  tools = NULL,
   custom_tools = list(),
   agents = list(),
   setting_sources = NULL,
   settings = NULL,
+  managed_settings = NULL,
   allowed_tools = NULL,
   disallowed_tools = NULL,
   permission_prompt_tool_name = "AskUserQuestion",
   permission_mode = "default",
+  can_use_tool = NULL,
   cwd = getwd(),
   persist_session = TRUE,
   session_store_dir = session_store_default_dir(),
+  session_store = NULL,
   resume_session_id = NULL,
   resume_session_at = NULL,
   fork_session = FALSE,
   max_turns = 25,
-  max_cost_usd = NULL
+  max_cost_usd = NULL,
+  include_partial_messages = TRUE,
+  output_format = NULL,
+  skills = NULL,
+  sandbox = NULL,
+  plugins = NULL,
+  thinking = NULL,
+  effort = NULL,
+  title = NULL,
+  user = NULL,
+  fallback_model = NULL,
+  betas = NULL,
+  cli_path = NULL,
+  add_dirs = NULL,
+  env = NULL,
+  extra_args = NULL,
+  max_buffer_size = NULL,
+  stderr = NULL,
+  enable_file_checkpointing = FALSE,
+  load_timeout_ms = NULL,
+  task_budget = NULL
 )
 
 agent_sdk_options(...)
@@ -39,6 +63,8 @@ agent_sdk_options(...)
 
 \item{hooks}{Optional HookMatcher or list of HookMatcher objects}
 
+\item{tools}{Optional SDK-style built-in tool names or ellmer tools to register}
+
 \item{custom_tools}{Optional list of additional ellmer tools}
 
 \item{agents}{Optional list of \code{\link[=agent_definition]{agent_definition()}} objects}
@@ -46,6 +72,8 @@ agent_sdk_options(...)
 \item{setting_sources}{Optional Claude-style setting sources}
 
 \item{settings}{Optional pre-loaded settings list from \code{\link[=claude_settings_load]{claude_settings_load()}}}
+
+\item{managed_settings}{Optional settings values that override loaded settings}
 
 \item{allowed_tools}{Optional explicit tool allowlist}
 
@@ -55,11 +83,15 @@ agent_sdk_options(...)
 
 \item{permission_mode}{Compatibility permission mode}
 
+\item{can_use_tool}{Optional permission callback}
+
 \item{cwd}{Working directory for the agent}
 
 \item{persist_session}{Whether to persist compat snapshots to disk}
 
 \item{session_store_dir}{Directory where compat session snapshots are stored}
+
+\item{session_store}{Optional external session store adapter}
 
 \item{resume_session_id}{Optional session id to resume later}
 
@@ -70,6 +102,14 @@ agent_sdk_options(...)
 \item{max_turns}{Maximum turns per query}
 
 \item{max_cost_usd}{Maximum cost per query}
+
+\item{include_partial_messages}{Whether query results keep partial text events}
+
+\item{output_format}{Optional default structured output format}
+
+\item{skills}{Optional SDK-style skill selection (\code{"all"}, names, paths, or skills)}
+
+\item{sandbox, plugins, thinking, effort, title, user, fallback_model, betas, cli_path, add_dirs, env, extra_args, max_buffer_size, stderr, enable_file_checkpointing, load_timeout_ms, task_budget}{Additional SDK-shaped options that are preserved for compatibility. deputy applies the subset that maps to its R-native runtime.}
 
 \item{...}{Passed through to \code{\link[=claude_sdk_options]{claude_sdk_options()}}}
 }

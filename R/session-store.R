@@ -33,6 +33,132 @@ generate_session_id <- function() {
   )
 }
 
+#' Create an in-memory SDK-compatible session store
+#'
+#' @description
+#' Creates a lightweight session store adapter with `append()`, `load()`,
+#' `list_sessions()`, `list_session_summaries()`, and `delete()` methods. This
+#' mirrors the Claude Agent SDK store shape while preserving deputy's R-native
+#' session payloads.
+#'
+#' @return A `DeputySessionStore` adapter
+#' @export
+session_store_memory <- function() {
+  sessions <- new.env(parent = emptyenv())
+
+  structure(
+    list(
+      append = function(session_id, payload, metadata = list()) {
+        records <- sessions[[session_id]] %||% list()
+        records <- c(records, list(list(
+          payload = payload,
+          metadata = metadata,
+          appended_at = Sys.time()
+        )))
+        sessions[[session_id]] <- records
+        invisible(TRUE)
+      },
+      load = function(session_id) {
+        records <- sessions[[session_id]]
+        if (is.null(records) || length(records) == 0) {
+          abort_session_load(
+            "Session not found in memory store: {.val {session_id}}",
+            path = session_id
+          )
+        }
+        records[[length(records)]]$payload
+      },
+      list_sessions = function() {
+        sort(ls(sessions, all.names = TRUE))
+      },
+      list_session_summaries = function() {
+        ids <- sort(ls(sessions, all.names = TRUE))
+        if (length(ids) == 0) {
+          return(data.frame(
+            session_id = character(),
+            records = integer(),
+            updated_at = as.POSIXct(character()),
+            stringsAsFactors = FALSE
+          ))
+        }
+        do.call(rbind, lapply(ids, function(id) {
+          records <- sessions[[id]]
+          data.frame(
+            session_id = id,
+            records = length(records),
+            updated_at = as.POSIXct(
+              records[[length(records)]]$appended_at,
+              tz = "UTC"
+            ),
+            stringsAsFactors = FALSE
+          )
+        }))
+      },
+      delete = function(session_id) {
+        if (exists(session_id, envir = sessions, inherits = FALSE)) {
+          rm(list = session_id, envir = sessions)
+        }
+        invisible(TRUE)
+      },
+      list_subkeys = function(session_id) {
+        character()
+      }
+    ),
+    class = "DeputySessionStore"
+  )
+}
+
+session_store_call <- function(store, method, ...) {
+  if (is.null(store)) {
+    return(NULL)
+  }
+
+  fun <- tryCatch(store[[method]], error = function(e) NULL)
+  if (!is.function(fun)) {
+    return(NULL)
+  }
+
+  fun(...)
+}
+
+session_store_append_external <- function(
+  store,
+  session_id,
+  payload,
+  metadata = list()
+) {
+  session_store_call(
+    store,
+    "append",
+    session_id = session_id,
+    payload = payload,
+    metadata = metadata
+  )
+}
+
+session_store_load_external <- function(store, session_id) {
+  session_store_call(store, "load", session_id = session_id)
+}
+
+session_store_list_external <- function(store) {
+  out <- session_store_call(store, "list_sessions")
+  out %||% character()
+}
+
+session_store_summaries_external <- function(store) {
+  out <- session_store_call(store, "list_session_summaries")
+  out %||% data.frame(
+    session_id = character(),
+    records = integer(),
+    updated_at = as.POSIXct(character()),
+    stringsAsFactors = FALSE
+  )
+}
+
+session_store_delete_external <- function(store, session_id) {
+  session_store_call(store, "delete", session_id = session_id)
+}
+
 # Parse a resume timestamp from character or POSIXt input.
 parse_session_resume_at <- function(at) {
   if (is.null(at)) {
@@ -273,4 +399,12 @@ session_store_list_sessions <- function(root = NULL) {
   }
 
   do.call(rbind, records)
+}
+
+session_store_delete_session <- function(root = NULL, session_id) {
+  session_dir <- file.path(normalize_session_store_dir(root), session_id)
+  if (dir.exists(session_dir)) {
+    unlink(session_dir, recursive = TRUE, force = TRUE)
+  }
+  invisible(TRUE)
 }

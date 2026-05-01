@@ -7,6 +7,8 @@
 #' * `"default"` - Check each tool against the permission policy
 #' * `"acceptEdits"` - Auto-accept file write tools
 #' * `"plan"` - Allow only annotated read-only tools and human approval prompts
+#' * `"dontAsk"` - Check policy without suggesting approval prompts
+#' * `"auto"` - SDK-compatible alias for default deputy permission behavior
 #' * `"readonly"` - Deny all write/execute tools
 #' * `"bypassPermissions"` - Allow all tools (dangerous, use with caution)
 #'
@@ -71,6 +73,8 @@ PermissionMode <- c(
   "default",
   "acceptEdits",
   "plan",
+  "dontAsk",
+  "auto",
   "readonly",
   "bypassPermissions"
 )
@@ -262,8 +266,10 @@ Permissions <- R6::R6Class(
     #' @param context Additional context (e.g., working_dir, tool_annotations)
     #' @return A [PermissionResultAllow] or [PermissionResultDeny]
     check = function(tool_name, tool_input, context = list()) {
-      # Allow prompt tool so gated workflows can request approval
-      if (private$is_permission_prompt_tool(tool_name)) {
+      # Allow prompt tool so gated workflows can request approval. The SDK
+      # dontAsk mode keeps normal policy checks but does not allow an approval
+      # prompt escape hatch.
+      if (self$mode != "dontAsk" && private$is_permission_prompt_tool(tool_name)) {
         return(PermissionResultAllow())
       }
 

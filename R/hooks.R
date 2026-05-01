@@ -25,6 +25,11 @@
 #' - `context`: List containing `working_dir` (current directory)
 #' - Return: [HookResultPostToolUse()] to continue/stop
 #'
+#' **PostToolUseFailure** - After a tool reports an error
+#'
+#' Callback signature: `function(tool_name, tool_result, tool_error, context)`
+#' - Same arguments as PostToolUse, fired only when `tool_error` is not NULL
+#'
 #' **Stop** - When the agent stops
 #'
 #' Callback signature: `function(reason, context)`
@@ -40,6 +45,23 @@
 #' - `result`: Result returned by the sub-agent
 #' - `context`: List containing `working_dir`
 #' - Return: [HookResultSubagentStop()]
+#'
+#' **SubagentStart** - When a delegated sub-agent starts (LeadAgent only)
+#'
+#' Callback signature: `function(agent_name, task, context)`
+#' - `agent_name`: Name of the sub-agent that started
+#' - `task`: The delegated task
+#' - `context`: List containing `working_dir`
+#'
+#' **PermissionRequest** - When permission policy denies a tool call
+#'
+#' Callback signature: `function(tool_name, tool_input, permission_result, context)`
+#' - Return: [PermissionResultAllow()] to override the denial, or
+#'   [PermissionResultDeny()] to replace the denial reason
+#'
+#' **ConfigChange** - When runtime configuration changes
+#'
+#' Callback signature: `function(key, old_value, new_value, context)`
 #'
 #' **UserPromptSubmit** - When a user prompt is submitted
 #'
@@ -118,11 +140,15 @@
 HookEvent <- c(
   "PreToolUse",
   "PostToolUse",
+  "PostToolUseFailure",
 
   "Stop",
+  "SubagentStart",
   "SubagentStop",
   "UserPromptSubmit",
   "Notification",
+  "PermissionRequest",
+  "ConfigChange",
   "PreCompact",
 
   "SessionStart",
@@ -137,6 +163,9 @@ HookEvent <- c(
 #' @param permission Either `"allow"` or `"deny"`
 #' @param reason Reason for denial (shown to the LLM)
 #' @param continue If FALSE, stop the agent after this hook
+#' @param updated_input Optional replacement tool input, where supported
+#' @param additional_context Optional text to append to the running context
+#' @param stop_reason Optional stop reason used when `continue = FALSE`
 #' @return A `HookResultPreToolUse` object
 #'
 #' @examples
@@ -153,7 +182,10 @@ HookEvent <- c(
 HookResultPreToolUse <- function(
   permission = c("allow", "deny"),
   reason = NULL,
-  continue = TRUE
+  continue = TRUE,
+  updated_input = NULL,
+  additional_context = NULL,
+  stop_reason = NULL
 ) {
   permission <- match.arg(permission)
 
@@ -161,7 +193,10 @@ HookResultPreToolUse <- function(
     list(
       permission = permission,
       reason = reason,
-      continue = continue
+      continue = continue,
+      updated_input = updated_input,
+      additional_context = additional_context,
+      stop_reason = stop_reason
     ),
     class = c("HookResultPreToolUse", "HookResult", "list")
   )
@@ -173,6 +208,11 @@ HookResultPreToolUse <- function(
 #' Return this from a PostToolUse hook callback.
 #'
 #' @param continue If FALSE, stop the agent after this hook
+#' @param suppress_output Logical SDK-compatible output suppression hint
+#' @param updated_tool_output Optional replacement tool output, where supported
+#' @param updated_mcp_tool_output Deprecated alias for `updated_tool_output`
+#' @param additional_context Optional text to append to the running context
+#' @param stop_reason Optional stop reason used when `continue = FALSE`
 #' @return A `HookResultPostToolUse` object
 #'
 #' @examples
@@ -183,10 +223,26 @@ HookResultPreToolUse <- function(
 #' HookResultPostToolUse(continue = FALSE)
 #'
 #' @export
-HookResultPostToolUse <- function(continue = TRUE) {
+HookResultPostToolUse <- function(
+  continue = TRUE,
+  suppress_output = FALSE,
+  updated_tool_output = NULL,
+  updated_mcp_tool_output = NULL,
+  additional_context = NULL,
+  stop_reason = NULL
+) {
+  if (is.null(updated_tool_output) && !is.null(updated_mcp_tool_output)) {
+    updated_tool_output <- updated_mcp_tool_output
+  }
+
   structure(
     list(
-      continue = continue
+      continue = continue,
+      suppress_output = isTRUE(suppress_output),
+      updated_tool_output = updated_tool_output,
+      updated_mcp_tool_output = updated_mcp_tool_output,
+      additional_context = additional_context,
+      stop_reason = stop_reason
     ),
     class = c("HookResultPostToolUse", "HookResult", "list")
   )
@@ -341,10 +397,14 @@ HookMatcher <- R6::R6Class(
     #' @param callback Function to call. Signature depends on event type:
     #'   * PreToolUse: `function(tool_name, tool_input, context)`
     #'   * PostToolUse: `function(tool_name, tool_result, tool_error, context)`
+    #'   * PostToolUseFailure: `function(tool_name, tool_result, tool_error, context)`
     #'   * Stop: `function(reason, context)`
+    #'   * SubagentStart: `function(agent_name, task, context)`
     #'   * SubagentStop: `function(agent_name, task, result, context)`
     #'   * UserPromptSubmit: `function(prompt, context)`
     #'   * Notification: `function(message, context)`
+    #'   * PermissionRequest: `function(tool_name, tool_input, permission_result, context)`
+    #'   * ConfigChange: `function(key, old_value, new_value, context)`
     #'   * PreCompact: `function(turns_to_compact, turns_to_keep, context)`
     #'   * SessionStart: `function(context)`
     #'   * SessionEnd: `function(reason, context)`

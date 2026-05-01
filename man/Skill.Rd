@@ -8,40 +8,41 @@ Represents a skill that can be loaded into an agent. Skills bundle together
 a system prompt extension, tools, and metadata about requirements.
 }
 \section{Public fields}{
-\if{html}{\out{<div class="r6-fields">}}
-\describe{
-\item{\code{name}}{Skill name}
+  \if{html}{\out{<div class="r6-fields">}}
+  \describe{
+    \item{\code{name}}{Skill name}
 
-\item{\code{version}}{Skill version}
+    \item{\code{version}}{Skill version}
 
-\item{\code{description}}{Brief description of the skill}
+    \item{\code{description}}{Brief description of the skill}
 
-\item{\code{prompt}}{System prompt extension (from SKILL.md)}
+    \item{\code{prompt}}{System prompt extension (from SKILL.md)}
 
-\item{\code{tools}}{List of tools provided by this skill}
+    \item{\code{tools}}{List of tools provided by this skill}
 
-\item{\code{requires}}{Requirements (packages, providers)}
+    \item{\code{requires}}{Requirements (packages, providers)}
 
-\item{\code{path}}{Path to the skill directory}
-}
-\if{html}{\out{</div>}}
+    \item{\code{path}}{Path to the skill directory}
+  }
+  \if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
-\itemize{
-\item \href{#method-Skill-new}{\code{Skill$new()}}
-\item \href{#method-Skill-check_requirements}{\code{Skill$check_requirements()}}
-\item \href{#method-Skill-print}{\code{Skill$print()}}
-\item \href{#method-Skill-clone}{\code{Skill$clone()}}
-}
+  \itemize{
+    \item \href{#method-Skill-initialize}{\code{Skill$new()}}
+    \item \href{#method-Skill-check_requirements}{\code{Skill$check_requirements()}}
+    \item \href{#method-Skill-print}{\code{Skill$print()}}
+    \item \href{#method-Skill-clone}{\code{Skill$clone()}}
+  }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-Skill-new"></a>}}
-\if{latex}{\out{\hypertarget{method-Skill-new}{}}}
-\subsection{Method \code{new()}}{
-Create a new Skill object.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Skill$new(
+\if{html}{\out{<a id="method-Skill-initialize"></a>}}
+\if{latex}{\out{\hypertarget{method-Skill-initialize}{}}}
+\subsection{\code{Skill$new()}}{
+  Create a new Skill object.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Skill$new(
   name,
   version = "0.0.0",
   description = NULL,
@@ -49,78 +50,79 @@ Create a new Skill object.
   tools = list(),
   requires = list(),
   path = NULL
-)}\if{html}{\out{</div>}}
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{name}}{Skill name}
+      \item{\code{version}}{Skill version (default: "0.0.0")}
+      \item{\code{description}}{Brief description}
+      \item{\code{prompt}}{System prompt extension}
+      \item{\code{tools}}{List of tools}
+      \item{\code{requires}}{List of requirements}
+      \item{\code{path}}{Path to skill directory}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A new \code{Skill} object
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{name}}{Skill name}
-
-\item{\code{version}}{Skill version (default: "0.0.0")}
-
-\item{\code{description}}{Brief description}
-
-\item{\code{prompt}}{System prompt extension}
-
-\item{\code{tools}}{List of tools}
-
-\item{\code{requires}}{List of requirements}
-
-\item{\code{path}}{Path to skill directory}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-A new \code{Skill} object
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Skill-check_requirements"></a>}}
 \if{latex}{\out{\hypertarget{method-Skill-check_requirements}{}}}
-\subsection{Method \code{check_requirements()}}{
-Check if skill requirements are met.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Skill$check_requirements(current_provider = NULL)}\if{html}{\out{</div>}}
+\subsection{\code{Skill$check_requirements()}}{
+  Check if skill requirements are met.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Skill$check_requirements(current_provider = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{current_provider}}{Optional current provider name for validation}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    List with \code{ok} (logical), \code{missing} (character vector), and
+\code{provider_mismatch} (logical)
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{current_provider}}{Optional current provider name for validation}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-List with \code{ok} (logical), \code{missing} (character vector), and
-\code{provider_mismatch} (logical)
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Skill-print"></a>}}
 \if{latex}{\out{\hypertarget{method-Skill-print}{}}}
-\subsection{Method \code{print()}}{
-Print the skill.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Skill$print()}\if{html}{\out{</div>}}
+\subsection{\code{Skill$print()}}{
+  Print the skill.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Skill$print()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Skill-clone"></a>}}
 \if{latex}{\out{\hypertarget{method-Skill-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Skill$clone(deep = FALSE)}\if{html}{\out{</div>}}
+\subsection{\code{Skill$clone()}}{
+  The objects of this class are cloneable with this method.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Skill$clone(deep = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{deep}}{Whether to make a deep clone.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
-}
-}
 }

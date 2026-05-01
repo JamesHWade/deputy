@@ -22,52 +22,53 @@ This prevents adversarial code from modifying permissions at runtime.
 All fields use active bindings that reject modification attempts.
 }
 \section{Active bindings}{
-\if{html}{\out{<div class="r6-active-bindings">}}
-\describe{
-\item{\code{mode}}{Permission mode (see \link{PermissionMode}). Read-only after construction.}
+  \if{html}{\out{<div class="r6-active-bindings">}}
+  \describe{
+    \item{\code{mode}}{Permission mode (see \link{PermissionMode}). Read-only after construction.}
 
-\item{\code{file_read}}{Allow file reading. Read-only after construction.}
+    \item{\code{file_read}}{Allow file reading. Read-only after construction.}
 
-\item{\code{file_write}}{Allow file writing. Can be TRUE, FALSE, or a directory path. Read-only after construction.}
+    \item{\code{file_write}}{Allow file writing. Can be TRUE, FALSE, or a directory path. Read-only after construction.}
 
-\item{\code{bash}}{Allow bash command execution. Read-only after construction.}
+    \item{\code{bash}}{Allow bash command execution. Read-only after construction.}
 
-\item{\code{r_code}}{Allow R code execution. Read-only after construction.}
+    \item{\code{r_code}}{Allow R code execution. Read-only after construction.}
 
-\item{\code{web}}{Allow web requests. Read-only after construction.}
+    \item{\code{web}}{Allow web requests. Read-only after construction.}
 
-\item{\code{install_packages}}{Allow package installation. Read-only after construction.}
+    \item{\code{install_packages}}{Allow package installation. Read-only after construction.}
 
-\item{\code{max_turns}}{Maximum number of turns before stopping. Read-only after construction.}
+    \item{\code{max_turns}}{Maximum number of turns before stopping. Read-only after construction.}
 
-\item{\code{max_cost_usd}}{Maximum cost in USD before stopping. Read-only after construction.}
+    \item{\code{max_cost_usd}}{Maximum cost in USD before stopping. Read-only after construction.}
 
-\item{\code{can_use_tool}}{Custom permission callback. Read-only after construction.}
+    \item{\code{can_use_tool}}{Custom permission callback. Read-only after construction.}
 
-\item{\code{tool_allowlist}}{Optional character vector of allowed tool names. Read-only after construction.}
+    \item{\code{tool_allowlist}}{Optional character vector of allowed tool names. Read-only after construction.}
 
-\item{\code{tool_denylist}}{Optional character vector of denied tool names. Read-only after construction.}
+    \item{\code{tool_denylist}}{Optional character vector of denied tool names. Read-only after construction.}
 
-\item{\code{permission_prompt_tool_name}}{Optional tool name used in gating deny messages. Read-only after construction.}
-}
-\if{html}{\out{</div>}}
+    \item{\code{permission_prompt_tool_name}}{Optional tool name used in gating deny messages. Read-only after construction.}
+  }
+  \if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
-\itemize{
-\item \href{#method-Permissions-new}{\code{Permissions$new()}}
-\item \href{#method-Permissions-check}{\code{Permissions$check()}}
-\item \href{#method-Permissions-print}{\code{Permissions$print()}}
-\item \href{#method-Permissions-clone}{\code{Permissions$clone()}}
-}
+  \itemize{
+    \item \href{#method-Permissions-initialize}{\code{Permissions$new()}}
+    \item \href{#method-Permissions-check}{\code{Permissions$check()}}
+    \item \href{#method-Permissions-print}{\code{Permissions$print()}}
+    \item \href{#method-Permissions-clone}{\code{Permissions$clone()}}
+  }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-Permissions-new"></a>}}
-\if{latex}{\out{\hypertarget{method-Permissions-new}{}}}
-\subsection{Method \code{new()}}{
-Create a new Permissions object.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Permissions$new(
+\if{html}{\out{<a id="method-Permissions-initialize"></a>}}
+\if{latex}{\out{\hypertarget{method-Permissions-initialize}{}}}
+\subsection{\code{Permissions$new()}}{
+  Create a new Permissions object.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Permissions$new(
   mode = "default",
   file_read = TRUE,
   file_write = NULL,
@@ -81,94 +82,87 @@ Create a new Permissions object.
   tool_allowlist = NULL,
   tool_denylist = NULL,
   permission_prompt_tool_name = NULL
-)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{mode}}{Permission mode}
-
-\item{\code{file_read}}{Allow file reading}
-
-\item{\code{file_write}}{Allow file writing (TRUE, FALSE, or directory path)}
-
-\item{\code{bash}}{Allow bash commands}
-
-\item{\code{r_code}}{Allow R code execution}
-
-\item{\code{web}}{Allow web requests}
-
-\item{\code{install_packages}}{Allow package installation}
-
-\item{\code{max_turns}}{Maximum turns}
-
-\item{\code{max_cost_usd}}{Maximum cost}
-
-\item{\code{can_use_tool}}{Custom callback function}
-
-\item{\code{tool_allowlist}}{Optional character vector of allowed tool names}
-
-\item{\code{tool_denylist}}{Optional character vector of denied tool names}
-
-\item{\code{permission_prompt_tool_name}}{Optional tool name to suggest in
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{mode}}{Permission mode}
+      \item{\code{file_read}}{Allow file reading}
+      \item{\code{file_write}}{Allow file writing (TRUE, FALSE, or directory path)}
+      \item{\code{bash}}{Allow bash commands}
+      \item{\code{r_code}}{Allow R code execution}
+      \item{\code{web}}{Allow web requests}
+      \item{\code{install_packages}}{Allow package installation}
+      \item{\code{max_turns}}{Maximum turns}
+      \item{\code{max_cost_usd}}{Maximum cost}
+      \item{\code{can_use_tool}}{Custom callback function}
+      \item{\code{tool_allowlist}}{Optional character vector of allowed tool names}
+      \item{\code{tool_denylist}}{Optional character vector of denied tool names}
+      \item{\code{permission_prompt_tool_name}}{Optional tool name to suggest in
 permission deny messages for gated tools}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A new \code{Permissions} object
+  }
 }
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-A new \code{Permissions} object
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Permissions-check"></a>}}
 \if{latex}{\out{\hypertarget{method-Permissions-check}{}}}
-\subsection{Method \code{check()}}{
-Check if a tool is allowed to execute.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Permissions$check(tool_name, tool_input, context = list())}\if{html}{\out{</div>}}
+\subsection{\code{Permissions$check()}}{
+  Check if a tool is allowed to execute.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Permissions$check(tool_name, tool_input, context = list())}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{tool_name}}{Name of the tool}
+      \item{\code{tool_input}}{Arguments passed to the tool}
+      \item{\code{context}}{Additional context (e.g., working_dir, tool_annotations)}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A \link{PermissionResultAllow} or \link{PermissionResultDeny}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{tool_name}}{Name of the tool}
-
-\item{\code{tool_input}}{Arguments passed to the tool}
-
-\item{\code{context}}{Additional context (e.g., working_dir, tool_annotations)}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-A \link{PermissionResultAllow} or \link{PermissionResultDeny}
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Permissions-print"></a>}}
 \if{latex}{\out{\hypertarget{method-Permissions-print}{}}}
-\subsection{Method \code{print()}}{
-Print the permissions configuration.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Permissions$print()}\if{html}{\out{</div>}}
+\subsection{\code{Permissions$print()}}{
+  Print the permissions configuration.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Permissions$print()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Permissions-clone"></a>}}
 \if{latex}{\out{\hypertarget{method-Permissions-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Permissions$clone(deep = FALSE)}\if{html}{\out{</div>}}
+\subsection{\code{Permissions$clone()}}{
+  The objects of this class are cloneable with this method.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Permissions$clone(deep = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{deep}}{Whether to make a deep clone.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
-}
-}
 }
