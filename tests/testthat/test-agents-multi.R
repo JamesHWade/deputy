@@ -259,6 +259,135 @@ test_that("LeadAgent passes permissions to sub-agents", {
   expect_identical(lead$permissions, perms)
 })
 
+test_that("sub-agent permission modes cannot exceed the lead policy", {
+  mock_chat <- create_mock_chat()
+  widening <- agent_definition(
+    name = "widening",
+    description = "Attempts to widen authority",
+    prompt = "You help",
+    permission_mode = "bypassPermissions"
+  )
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(widening),
+    permissions = permissions_readonly()
+  )
+
+  expect_error(
+    lead$.__enclos_env__$private$create_sub_agent(widening),
+    "cannot change under the lead policy"
+  )
+
+  restricted <- widening
+  restricted$name <- "restricted"
+  restricted$permission_mode <- "readonly"
+  child <- lead$.__enclos_env__$private$create_sub_agent(restricted)
+  expect_identical(child$permissions$mode, "readonly")
+  expect_s3_class(
+    child$permissions$check("Write", list(file_path = "blocked.txt")),
+    "PermissionResultDeny"
+  )
+
+  plan_definition <- widening
+  plan_definition$name <- "plan-to-readonly"
+  plan_definition$permission_mode <- "readonly"
+  plan_lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(plan_definition),
+    permissions = Permissions$new(
+      mode = "plan",
+      file_read = TRUE,
+      file_write = FALSE,
+      bash = FALSE,
+      r_code = FALSE,
+      web = FALSE,
+      install_packages = FALSE,
+      tool_allowlist = "custom_tool"
+    )
+  )
+  expect_error(
+    plan_lead$.__enclos_env__$private$create_sub_agent(plan_definition),
+    "cannot change under the lead policy"
+  )
+})
+
+test_that("agent_definition validates max_turns eagerly", {
+  base_args <- list(
+    name = "invalid",
+    description = "Invalid limit",
+    prompt = "Help"
+  )
+
+  expect_error(
+    do.call(agent_definition, c(base_args, list(max_turns = -1))),
+    "non-negative"
+  )
+  expect_error(
+    do.call(agent_definition, c(base_args, list(max_turns = 1.5))),
+    "whole number"
+  )
+  expect_error(
+    do.call(agent_definition, c(base_args, list(max_turns = c(1, 2)))),
+    "length-1"
+  )
+  expect_identical(
+    do.call(agent_definition, c(base_args, list(max_turns = 2)))$max_turns,
+    2L
+  )
+})
+
+test_that("sub-agents inherit remaining lead run budgets", {
+  definition <- agent_definition(
+    name = "bounded",
+    description = "Uses bounded resources",
+    prompt = "You help",
+    max_turns = 3
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(definition),
+    usage_limits = UsageLimits(
+      max_requests = 8,
+      max_tool_calls = 5,
+      max_total_tokens = 1000,
+      max_cost_usd = 0.50
+    )
+  )
+  private <- lead$.__enclos_env__$private
+  private$current_usage_limits <- UsageLimits(
+    max_requests = 6,
+    max_tool_calls = 4,
+    max_total_tokens = 700,
+    max_cost_usd = 0.30
+  )
+  private$current_usage_baseline <- agent_usage_snapshot(lead$chat)
+  private$current_external_usage <- AgentUsage(
+    requests = 2,
+    tool_calls = 1,
+    input_tokens = 100,
+    output_tokens = 50,
+    cost_usd = 0.10
+  )
+  private$run_active <- TRUE
+
+  child <- private$create_sub_agent(definition)
+
+  expect_identical(child$usage_limits$max_requests, 3L)
+  expect_identical(child$usage_limits$max_tool_calls, 3L)
+  expect_equal(child$usage_limits$max_total_tokens, 550)
+  expect_equal(child$usage_limits$max_cost_usd, 0.20)
+
+  private$current_stream_controller <- NULL
+  private$add_external_usage(AgentUsage(requests = 1))
+  expect_false(private$should_stop)
+  private$add_external_usage(AgentUsage(requests = 3))
+  expect_true(private$should_stop)
+  expect_identical(private$stop_reason_from_hook, "request_limit")
+  private$run_active <- FALSE
+  private$should_stop <- FALSE
+  private$stop_reason_from_hook <- NULL
+})
+
 test_that("LeadAgent passes working_dir to sub-agents", {
   withr::local_tempdir(pattern = "deputy-test") -> temp_dir
 
@@ -275,7 +404,10 @@ test_that("LeadAgent passes working_dir to sub-agents", {
     working_dir = temp_dir
   )
 
-  expect_equal(lead$working_dir, temp_dir)
+  expect_equal(
+    lead$working_dir,
+    normalizePath(temp_dir, mustWork = TRUE, winslash = "/")
+  )
 })
 
 test_that("agent_definition supports model inheritance", {
@@ -921,5 +1053,8 @@ test_that("SubagentStop hook receives working_dir in context", {
   delegate_tool <- tools[["delegate_to_agent"]]
   delegate_tool("helper", "Help me")
 
-  expect_equal(captured_context$working_dir, temp_dir)
+  expect_equal(
+    captured_context$working_dir,
+    normalizePath(temp_dir, mustWork = TRUE, winslash = "/")
+  )
 })

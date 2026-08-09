@@ -25,6 +25,9 @@
     \item \href{#method-ClaudeSDKClient-list_session_summaries}{\code{ClaudeSDKClient$list_session_summaries()}}
     \item \href{#method-ClaudeSDKClient-delete_session}{\code{ClaudeSDKClient$delete_session()}}
     \item \href{#method-ClaudeSDKClient-get_mcp_status}{\code{ClaudeSDKClient$get_mcp_status()}}
+    \item \href{#method-ClaudeSDKClient-checkpoint}{\code{ClaudeSDKClient$checkpoint()}}
+    \item \href{#method-ClaudeSDKClient-list_checkpoints}{\code{ClaudeSDKClient$list_checkpoints()}}
+    \item \href{#method-ClaudeSDKClient-rewind_files}{\code{ClaudeSDKClient$rewind_files()}}
     \item \href{#method-ClaudeSDKClient-resume}{\code{ClaudeSDKClient$resume()}}
     \item \href{#method-ClaudeSDKClient-clone}{\code{ClaudeSDKClient$clone()}}
   }
@@ -139,6 +142,66 @@
 }
 
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-ClaudeSDKClient-checkpoint"></a>}}
+\if{latex}{\out{\hypertarget{method-ClaudeSDKClient-checkpoint}{}}}
+\subsection{\code{ClaudeSDKClient$checkpoint()}}{
+  Create a reversible file checkpoint.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{ClaudeSDKClient$checkpoint(name = NULL, metadata = list())}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{name}}{Optional checkpoint label.}
+      \item{\code{metadata}}{Optional serializable metadata list.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The checkpoint ID.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-ClaudeSDKClient-list_checkpoints"></a>}}
+\if{latex}{\out{\hypertarget{method-ClaudeSDKClient-list_checkpoints}{}}}
+\subsection{\code{ClaudeSDKClient$list_checkpoints()}}{
+  List reversible file checkpoints.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{ClaudeSDKClient$list_checkpoints()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A data frame ordered from oldest to newest.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-ClaudeSDKClient-rewind_files"></a>}}
+\if{latex}{\out{\hypertarget{method-ClaudeSDKClient-rewind_files}{}}}
+\subsection{\code{ClaudeSDKClient$rewind_files()}}{
+  Rewind files to a checkpoint without rewinding conversation history.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{ClaudeSDKClient$rewind_files(checkpoint_id)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{checkpoint_id}}{A checkpoint ID.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list describing the restored changes.
+  }
+}
+
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-ClaudeSDKClient-resume"></a>}}
 \if{latex}{\out{\hypertarget{method-ClaudeSDKClient-resume}{}}}
 \subsection{\code{ClaudeSDKClient$resume()}}{
@@ -193,13 +256,16 @@
 }
 \if{html}{\out{<details><summary>Inherited methods</summary>
 <ul>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="checkpoint"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-checkpoint'><code>ClaudeSDKClient$checkpoint()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="delete_session"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-delete_session'><code>ClaudeSDKClient$delete_session()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="get_mcp_status"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-get_mcp_status'><code>ClaudeSDKClient$get_mcp_status()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="initialize"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-initialize'><code>ClaudeSDKClient$initialize()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="list_checkpoints"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-list_checkpoints'><code>ClaudeSDKClient$list_checkpoints()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="list_session_summaries"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-list_session_summaries'><code>ClaudeSDKClient$list_session_summaries()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="list_sessions"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-list_sessions'><code>ClaudeSDKClient$list_sessions()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="query"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-query'><code>ClaudeSDKClient$query()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="resume"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-resume'><code>ClaudeSDKClient$resume()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="ClaudeSDKClient" data-id="rewind_files"><a href='../../deputy/html/ClaudeSDKClient.html#method-ClaudeSDKClient-rewind_files'><code>ClaudeSDKClient$rewind_files()</code></a></span></li>
 </ul>
 </details>}}
 \if{html}{\out{<hr>}}

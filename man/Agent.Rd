@@ -40,6 +40,20 @@ mcptools package. Returns invisible self.}
 }
 }
 
+\section{File checkpoint methods}{
+
+When \code{enable_file_checkpointing = TRUE}, Deputy captures exact preimages for
+writes made through its native and Agent SDK-compatible file tools.
+
+\describe{
+\item{\verb{$checkpoint(name = NULL, metadata = list())}}{Create a manual file
+checkpoint and return its checkpoint ID.}
+\item{\verb{$list_checkpoints()}}{List available file checkpoints.}
+\item{\verb{$rewind_files(checkpoint_id)}}{Restore files to a checkpoint and
+invalidate later file history. Conversation history is not changed.}
+}
+}
+
 \examples{
 \dontrun{
 # Create an agent with file tools
@@ -49,7 +63,10 @@ agent <- Agent$new(
 )
 
 # Run a task with streaming output
-for (event in agent$run("List files in the current directory")) {
+events <- agent$run("List files in the current directory")
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) break
   if (event$type == "text") cat(event$text)
 }
 
@@ -84,6 +101,8 @@ agent$add_hook(HookMatcher$new(
 
     \item{\code{permissions}}{Permission policy for the agent. Read-only after construction.}
 
+    \item{\code{usage_limits}}{Default per-run \link{UsageLimits}. Read-only after construction.}
+
     \item{\code{working_dir}}{Working directory for file operations. Read-only after construction.}
 
     \item{\code{hooks}}{Hook registry for lifecycle events. Read-only after construction.}
@@ -106,9 +125,14 @@ agent$add_hook(HookMatcher$new(
     \item \href{#method-Agent-set_permission_mode}{\code{Agent$set_permission_mode()}}
     \item \href{#method-Agent-configure_sdk_compat}{\code{Agent$configure_sdk_compat()}}
     \item \href{#method-Agent-cost}{\code{Agent$cost()}}
+    \item \href{#method-Agent-usage}{\code{Agent$usage()}}
+    \item \href{#method-Agent-interrupt}{\code{Agent$interrupt()}}
     \item \href{#method-Agent-provider}{\code{Agent$provider()}}
     \item \href{#method-Agent-save_session}{\code{Agent$save_session()}}
     \item \href{#method-Agent-load_session}{\code{Agent$load_session()}}
+    \item \href{#method-Agent-checkpoint}{\code{Agent$checkpoint()}}
+    \item \href{#method-Agent-list_checkpoints}{\code{Agent$list_checkpoints()}}
+    \item \href{#method-Agent-rewind_files}{\code{Agent$rewind_files()}}
     \item \href{#method-Agent-compact}{\code{Agent$compact()}}
     \item \href{#method-Agent-print}{\code{Agent$print()}}
     \item \href{#method-Agent-load_skill}{\code{Agent$load_skill()}}
@@ -134,6 +158,10 @@ agent$add_hook(HookMatcher$new(
   tools = list(),
   system_prompt = NULL,
   permissions = NULL,
+  usage_limits = NULL,
+  enable_file_checkpointing = FALSE,
+  file_checkpoint_max_file_bytes = 50 * 1024^2,
+  file_checkpoint_max_journal_bytes = 250 * 1024^2,
   working_dir = getwd(),
   setting_sources = NULL,
   settings = NULL
@@ -151,6 +179,17 @@ provider-specific functions like \code{ellmer::chat_openai()}.}
 chat object's existing system prompt.}
       \item{\code{permissions}}{A \link{Permissions} object controlling what the agent can do.
 Defaults to \code{\link[=permissions_standard]{permissions_standard()}}.}
+      \item{\code{usage_limits}}{Optional \link{UsageLimits} applied independently to each
+run. NULL request or cost fields inherit the legacy
+\code{permissions$max_turns} and \code{permissions$max_cost_usd} values.}
+      \item{\code{enable_file_checkpointing}}{Whether to journal exact file preimages
+for Deputy's mutating file tools. A checkpoint is created automatically
+at the beginning of every run.}
+      \item{\code{file_checkpoint_max_file_bytes}}{Maximum bytes captured for one
+file preimage. Defaults to 50 MiB.}
+      \item{\code{file_checkpoint_max_journal_bytes}}{Maximum aggregate serialized
+bytes for checkpoint records, markers, metadata, and pending captures.
+Defaults to 250 MiB.}
       \item{\code{working_dir}}{Working directory for file operations. Defaults to
 current directory.}
       \item{\code{setting_sources}}{Optional character vector of Claude-style
@@ -173,13 +212,14 @@ and slash commands.}
   Run an agentic task with streaming output.
 
 Returns a generator that yields \link{AgentEvent} objects as the agent works.
-The agent will continue until the task is complete, max_turns is reached,
-or the cost limit is exceeded.
+The agent will continue until the task is complete, a run limit is
+reached, or it is interrupted.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$run(
   task,
   max_turns = NULL,
+  usage_limits = NULL,
   include_partial_messages = TRUE,
   output_format = NULL
 )}
@@ -189,7 +229,9 @@ or the cost limit is exceeded.
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{task}}{The task for the agent to perform}
-      \item{\code{max_turns}}{Maximum number of turns (default: from permissions)}
+      \item{\code{max_turns}}{Legacy alias for the maximum number of model requests.
+Defaults to the value seeded from permissions.}
+      \item{\code{usage_limits}}{Optional \link{UsageLimits} override for this run.}
       \item{\code{include_partial_messages}}{If TRUE (default), yield partial text
 chunks as they stream. If FALSE, only yield \code{text_complete}.}
       \item{\code{output_format}}{Optional output format spec (e.g. JSON schema) to
@@ -215,6 +257,7 @@ an \link{AgentResult}.
     \preformatted{Agent$run_sync(
   task,
   max_turns = NULL,
+  usage_limits = NULL,
   include_partial_messages = TRUE,
   output_format = NULL
 )}
@@ -224,7 +267,9 @@ an \link{AgentResult}.
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{task}}{The task for the agent to perform}
-      \item{\code{max_turns}}{Maximum number of turns (default: from permissions)}
+      \item{\code{max_turns}}{Legacy alias for the maximum number of model requests.
+Defaults to the value seeded from permissions.}
+      \item{\code{usage_limits}}{Optional \link{UsageLimits} override for this run.}
       \item{\code{include_partial_messages}}{If TRUE (default), keep partial text
 events. If FALSE, suppress partials.}
       \item{\code{output_format}}{Optional output format spec (e.g. JSON schema) to
@@ -450,6 +495,49 @@ agent$add_hook(HookMatcher$new(
 }
 
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-usage"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-usage}{}}}
+\subsection{\code{Agent$usage()}}{
+  Get normalized usage for the complete in-memory conversation.
+
+Per-run usage is available on \link{AgentResult} and in the final \code{usage}
+event returned by \verb{$run()}.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$usage()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    An \link{AgentUsage} object
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-interrupt"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-interrupt}{}}}
+\subsection{\code{Agent$interrupt()}}{
+  Request cancellation of the active stream.
+
+Cancellation is cooperative and takes effect at the next provider or tool
+boundary supported by ellmer.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$interrupt(reason = "interrupted")}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{reason}}{Stable reason stored on the terminal event}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible logical indicating whether a run was active
+  }
+}
+
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-provider"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-provider}{}}}
 \subsection{\code{Agent$provider()}}{
@@ -504,23 +592,87 @@ agent$add_hook(HookMatcher$new(
   Load a session from an RDS file.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$load_session(path, restore_tools = TRUE)}
+    \preformatted{Agent$load_session(path, restore_tools = FALSE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{path}}{Path to the session file}
-      \item{\code{restore_tools}}{If TRUE (default), restore tools from session}
+      \item{\code{restore_tools}}{If TRUE, explicitly trust and restore serialized
+tool definitions. Defaults to FALSE; constructor-registered tools are
+otherwise preserved as control-plane policy.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Details}{
-    Note: Hooks are NOT restored from sessions as they contain
-function closures that may not serialize correctly.
+    Note: Hooks are NOT restored from sessions as they contain function
+closures that may not serialize correctly. Constructor permissions and
+\code{working_dir} always remain authoritative.
   }
   \subsection{Returns}{
     Invisible self
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-checkpoint"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-checkpoint}{}}}
+\subsection{\code{Agent$checkpoint()}}{
+  Create a reversible file checkpoint.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$checkpoint(name = NULL, metadata = list())}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{name}}{Optional checkpoint label.}
+      \item{\code{metadata}}{Optional serializable metadata list.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The checkpoint ID.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-list_checkpoints"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-list_checkpoints}{}}}
+\subsection{\code{Agent$list_checkpoints()}}{
+  List reversible file checkpoints.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$list_checkpoints()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A data frame ordered from oldest to newest.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-rewind_files"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-rewind_files}{}}}
+\subsection{\code{Agent$rewind_files()}}{
+  Rewind files to a checkpoint without changing conversation history.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$rewind_files(checkpoint_id)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{checkpoint_id}}{ID returned by \verb{$checkpoint()} or present in a
+\code{file_checkpoint} run event.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list describing the restored checkpoint and change count.
   }
 }
 
@@ -714,8 +866,10 @@ If NULL, loads from all configured servers.}
 Returns an async content stream suitable for passing to
 \code{shinychat::chat_append()}. Unlike \code{run()} and \code{run_sync()}, the
 multi-turn loop is driven by ellmer's \code{stream_async()} rather than
-deputy's own generator. Deputy's permissions, hooks, and tool call
-limits are still enforced via the \code{on_tool_request} callback.
+deputy's own generator. Deputy's permissions, hooks, and observable
+\link{UsageLimits} are still enforced via callbacks and terminal accounting.
+File tools must use absolute paths within \code{working_dir}; rejected calls
+still count toward tool usage.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$run_shiny(prompt, max_tool_calls = NULL)}
@@ -726,9 +880,9 @@ limits are still enforced via the \code{on_tool_request} callback.
     \describe{
       \item{\code{prompt}}{The user message to send}
       \item{\code{max_tool_calls}}{Maximum number of tool calls before stopping.
-Defaults to \code{permissions$max_turns} or 25. Note this counts individual
-tool call requests, not LLM turns (one turn can have multiple parallel
-tool calls).}
+Overrides \code{usage_limits$max_tool_calls}; otherwise falls back to that
+value, \code{permissions$max_turns}, or 25. This counts individual tool call
+requests, not LLM turns (one turn can have multiple parallel calls).}
     }
     \if{html}{\out{</div>}}
   }

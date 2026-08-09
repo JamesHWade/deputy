@@ -1,36 +1,3 @@
-collect_async_stream <- function(stream) {
-  result <- NULL
-  stream_error <- NULL
-  done <- FALSE
-
-  coro::async_collect(stream) |>
-    promises::then(function(value) {
-      result <<- value
-      done <<- TRUE
-    }) |>
-    promises::catch(function(cnd) {
-      stream_error <<- cnd
-      done <<- TRUE
-    })
-
-  for (i in seq_len(100)) {
-    if (done) {
-      break
-    }
-    later::run_now(0.01)
-  }
-
-  if (!done) {
-    stop("Async stream did not settle")
-  }
-
-  if (!is.null(stream_error)) {
-    stop(stream_error)
-  }
-
-  result
-}
-
 test_that("tool_call_limit is NULL by default", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)
@@ -86,7 +53,7 @@ test_that("on_tool_request enforces cost limit in callback mode", {
   # mock_chat returns cost = 0.001 which matches the limit
   expect_error(
     agent$.__enclos_env__$private$on_tool_request(request),
-    "Cost limit reached"
+    "estimated cost"
   )
 })
 
@@ -124,9 +91,12 @@ test_that("run_shiny returns a content stream and resets counters on each call",
   skip_if_not_installed("later")
 
   mock_chat <- create_mock_chat()
+  observed <- new.env(parent = emptyenv())
 
   # Add stream_async to mock
   mock_chat$stream_async <- function(prompt, stream = "content") {
+    observed$count <- agent$.__enclos_env__$private$tool_call_count
+    observed$limit <- agent$.__enclos_env__$private$tool_call_limit
     coro::generator(function() {
       coro::yield("done")
     })()
@@ -138,13 +108,78 @@ test_that("run_shiny returns a content stream and resets counters on each call",
   agent$.__enclos_env__$private$tool_call_count <- 10L
   agent$.__enclos_env__$private$tool_call_limit <- 5L
 
-  # Call run_shiny -- should reset count and set new limit
+  # Construction is lazy and must not reserve or mutate the Agent.
   result <- agent$run_shiny("test", max_tool_calls = 20L)
 
   expect_true(inherits(result, "coro_generator_instance"))
-  expect_equal(agent$.__enclos_env__$private$tool_call_count, 0L)
-  expect_equal(agent$.__enclos_env__$private$tool_call_limit, 20L)
+  expect_equal(agent$.__enclos_env__$private$tool_call_count, 10L)
+  expect_equal(agent$.__enclos_env__$private$tool_call_limit, 5L)
   expect_equal(collect_async_stream(result), list("done"))
+  expect_equal(observed$count, 0L)
+  expect_equal(observed$limit, 20L)
+  expect_null(agent$.__enclos_env__$private$tool_call_limit)
+})
+
+test_that("run_shiny isolates and clears run-scoped state", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  mock_chat <- create_mock_chat()
+  observed <- new.env(parent = emptyenv())
+  mock_chat$stream_async <- function(prompt, stream = "content") {
+    observed$run_active <- private$run_active
+    observed$current_stream_content <- private$current_stream_content
+    observed$current_usage_limits <- private$current_usage_limits
+    observed$pending_events <- private$pending_events
+    coro::generator(function() {
+      coro::yield("done")
+    })()
+  }
+  agent <- Agent$new(
+    chat = mock_chat,
+    usage_limits = UsageLimits(max_tool_calls = 0)
+  )
+
+  private <- agent$.__enclos_env__$private
+  private$current_usage_limits <- UsageLimits(max_requests = 0)
+  private$current_usage_baseline <- AgentUsage(requests = 100)
+  private$current_stream_content <- FALSE
+  private$pending_events <- list(AgentEvent("warning", message = "stale"))
+
+  stream <- agent$run_shiny("test", max_tool_calls = 3)
+
+  expect_false(private$run_active)
+  expect_false(private$current_stream_content)
+  expect_equal(private$current_usage_limits$max_requests, 0L)
+  expect_length(private$pending_events, 1L)
+
+  expect_equal(collect_async_stream(stream), list("done"))
+  expect_true(observed$run_active)
+  expect_true(observed$current_stream_content)
+  expect_s3_class(observed$current_usage_limits, "UsageLimits")
+  expect_equal(observed$current_usage_limits$max_requests, 25L)
+  expect_equal(observed$current_usage_limits$max_tool_calls, 3L)
+  expect_length(observed$pending_events, 0L)
+  expect_false(private$run_active)
+  expect_false(private$current_stream_content)
+  expect_null(private$current_usage_limits)
+  expect_null(private$current_usage_baseline)
+  expect_length(private$pending_events, 0L)
+})
+
+test_that("run_shiny releases state when stream setup fails", {
+  skip_if_not_installed("promises")
+
+  mock_chat <- create_mock_chat()
+  mock_chat$stream_async <- function(prompt, stream = "content") {
+    stop("setup failed")
+  }
+  agent <- Agent$new(chat = mock_chat)
+
+  stream <- agent$run_shiny("test")
+  expect_error(collect_async_stream(stream), "setup failed")
+  expect_false(agent$.__enclos_env__$private$run_active)
+  expect_null(agent$.__enclos_env__$private$current_usage_limits)
   expect_null(agent$.__enclos_env__$private$tool_call_limit)
 })
 
@@ -153,7 +188,9 @@ test_that("run_shiny defaults max_tool_calls from permissions$max_turns", {
   skip_if_not_installed("later")
 
   mock_chat <- create_mock_chat()
+  observed_limit <- NULL
   mock_chat$stream_async <- function(prompt, stream = "content") {
+    observed_limit <<- agent$.__enclos_env__$private$tool_call_limit
     coro::generator(function() {
       coro::yield("done")
     })()
@@ -166,8 +203,9 @@ test_that("run_shiny defaults max_tool_calls from permissions$max_turns", {
 
   stream <- agent$run_shiny("test")
 
-  expect_equal(agent$.__enclos_env__$private$tool_call_limit, 15L)
+  expect_null(agent$.__enclos_env__$private$tool_call_limit)
   expect_equal(collect_async_stream(stream), list("done"))
+  expect_equal(observed_limit, 15L)
   expect_null(agent$.__enclos_env__$private$tool_call_limit)
 })
 
@@ -254,4 +292,339 @@ test_that("run_shiny cleans up and reports errors when the stream fails", {
   expect_equal(stop_reason, "error")
   expect_equal(session_end_reason, "error")
   expect_null(agent$.__enclos_env__$private$tool_call_limit)
+})
+
+test_that("run_shiny rejects relative and outside file paths", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  sandbox <- withr::local_tempdir(pattern = "deputy-shiny-paths-")
+  root <- file.path(sandbox, "root")
+  outside <- file.path(sandbox, "outside")
+  dir.create(root)
+  dir.create(outside)
+  withr::local_dir(outside)
+
+  relative_write <- create_shiny_tool_chat(
+    "Write",
+    list(file_path = "escaped.txt", content = "unsafe"),
+    execute = function(request) {
+      writeLines("unsafe", request@arguments$file_path)
+    }
+  )
+  write_agent <- Agent$new(
+    chat = relative_write$chat,
+    permissions = permissions_standard(root),
+    working_dir = root
+  )
+  stopped_usage <- NULL
+  write_agent$add_hook(HookMatcher$new(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context) {
+      stopped_usage <<- context$usage
+      HookResultStop()
+    }
+  ))
+  expect_equal(
+    collect_async_stream(write_agent$run_shiny("write")),
+    list("rejected")
+  )
+  expect_true(relative_write$state$rejected)
+  expect_false(relative_write$state$executed)
+  expect_identical(stopped_usage$tool_calls, 1L)
+  expect_false(file.exists(file.path(outside, "escaped.txt")))
+
+  outside_read <- create_shiny_tool_chat(
+    "Read",
+    list(file_path = file.path(outside, "secret.txt"))
+  )
+  read_agent <- Agent$new(
+    chat = outside_read$chat,
+    permissions = permissions_standard(root),
+    working_dir = root
+  )
+  expect_equal(
+    collect_async_stream(read_agent$run_shiny("read")),
+    list("rejected")
+  )
+  expect_true(outside_read$state$rejected)
+  expect_false(outside_read$state$executed)
+})
+
+test_that("run_shiny accepts rooted file paths and checkpoints writes", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  root <- withr::local_tempdir(pattern = "deputy-shiny-checkpoint-")
+  path <- file.path(root, "created.txt")
+  mock <- create_shiny_tool_chat(
+    "Write",
+    list(file_path = path, content = "created"),
+    execute = function(request) {
+      writeLines("created", request@arguments$file_path)
+    }
+  )
+  agent <- Agent$new(
+    chat = mock$chat,
+    permissions = permissions_standard(root),
+    enable_file_checkpointing = TRUE,
+    working_dir = root
+  )
+
+  stream_result <- collect_async_stream(agent$run_shiny("write"))
+  rejection_reason <- if (is.null(mock$state$rejection)) {
+    NULL
+  } else {
+    conditionMessage(mock$state$rejection)
+  }
+  expect_equal(stream_result, list("done"), info = rejection_reason)
+  expect_true(mock$state$executed)
+  expect_true(file.exists(path))
+  checkpoints <- agent$list_checkpoints()
+  expect_equal(nrow(checkpoints), 1L)
+
+  rewind <- agent$rewind_files(checkpoints$checkpoint_id[[1L]])
+  expect_equal(rewind$restored_changes, 1L)
+  expect_false(file.exists(path))
+})
+
+test_that("run_shiny rejects dangling symlinks that target outside", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+  skip_on_os("windows")
+
+  sandbox <- withr::local_tempdir(pattern = "deputy-shiny-link-")
+  root <- file.path(sandbox, "root")
+  outside <- file.path(sandbox, "outside")
+  dir.create(root)
+  dir.create(outside)
+  outside_target <- file.path(outside, "created.txt")
+  link <- file.path(root, "link.txt")
+  expect_true(file.symlink(outside_target, link))
+  mock <- create_shiny_tool_chat(
+    "Write",
+    list(file_path = link, content = "unsafe"),
+    execute = function(request) {
+      writeLines("unsafe", request@arguments$file_path)
+    }
+  )
+  agent <- Agent$new(
+    chat = mock$chat,
+    permissions = permissions_standard(root),
+    working_dir = root
+  )
+
+  expect_equal(collect_async_stream(agent$run_shiny("write")), list("rejected"))
+  expect_true(mock$state$rejected)
+  expect_false(mock$state$executed)
+  expect_false(file.exists(outside_target))
+})
+
+test_that("abandoned run_shiny streams release the exact active run", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  mock_chat <- create_mock_chat()
+  mock_chat$stream_async <- function(
+    prompt,
+    stream = "content",
+    controller = NULL
+  ) {
+    coro::async_generator(function() {
+      coro::yield("first")
+      coro::yield("second")
+    })()
+  }
+  agent <- Agent$new(chat = mock_chat)
+  stream <- agent$run_shiny("test")
+
+  expect_equal(resolve_async_value(stream()), "first")
+  expect_true(agent$.__enclos_env__$private$run_active)
+  expect_true(agent$interrupt("user_cancelled"))
+  stream <- NULL
+  invisible(gc())
+  later::run_now(0.01)
+
+  expect_false(agent$.__enclos_env__$private$run_active)
+  expect_no_error(agent$run_shiny("next"))
+})
+
+test_that("run_shiny reports clean cancellation instead of completion", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  stop_reason <- NULL
+  agent <- NULL
+  chat <- create_mock_chat()
+  chat$stream_async <- function(
+    prompt,
+    stream = "content",
+    controller = NULL
+  ) {
+    coro::async_generator(function() {
+      agent$interrupt("user_cancelled")
+    })()
+  }
+  agent <- Agent$new(chat = chat)
+  agent$add_hook(HookMatcher$new(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context) {
+      stop_reason <<- reason
+      HookResultStop()
+    }
+  ))
+
+  expect_length(collect_async_stream(agent$run_shiny("cancel")), 0L)
+  expect_identical(stop_reason, "user_cancelled")
+})
+
+test_that("run_shiny reports terminal cost limits without tool calls", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  cost <- 0
+  output_tokens <- 0
+  stop_reason <- NULL
+  chat <- create_mock_chat()
+  chat$get_tokens <- function() {
+    data.frame(input = 1, output = 1, cached_input = 0, cost = cost)
+  }
+  chat$stream_async <- function(
+    prompt,
+    stream = "content",
+    controller = NULL
+  ) {
+    cost <<- 0.01
+    coro::async_generator(function() {
+      coro::yield("over budget")
+    })()
+  }
+  agent <- Agent$new(
+    chat = chat,
+    permissions = Permissions$new(max_cost_usd = 0.001)
+  )
+  agent$add_hook(HookMatcher$new(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context) {
+      stop_reason <<- reason
+      HookResultStop()
+    }
+  ))
+
+  expect_equal(
+    collect_async_stream(agent$run_shiny("expensive")),
+    list("over budget")
+  )
+  expect_identical(stop_reason, "cost_limit")
+})
+
+test_that("run_shiny enforces Agent usage_limits", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  cost <- 0
+  stop_reason <- NULL
+  observed_limits <- NULL
+  chat <- create_mock_chat()
+  chat$get_tokens <- function() {
+    data.frame(
+      input = 1,
+      output = output_tokens,
+      cached_input = 0,
+      cost = cost
+    )
+  }
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    observed_limits <<- agent$.__enclos_env__$private$current_usage_limits
+    cost <<- 0.01
+    output_tokens <<- 2
+    coro::async_generator(function() {
+      coro::yield("over budget")
+    })()
+  }
+  agent <- Agent$new(
+    chat = chat,
+    usage_limits = UsageLimits(
+      max_output_tokens = 1,
+      max_cost_usd = 0.001,
+      on_exceed = "stop"
+    )
+  )
+  agent$add_hook(HookMatcher$new(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context) {
+      stop_reason <<- reason
+      HookResultStop()
+    }
+  ))
+
+  expect_equal(
+    collect_async_stream(agent$run_shiny("expensive", max_tool_calls = 7)),
+    list("over budget")
+  )
+  expect_equal(observed_limits$max_output_tokens, 1L)
+  expect_equal(observed_limits$max_cost_usd, 0.001)
+  expect_equal(observed_limits$max_tool_calls, 7L)
+  expect_identical(stop_reason, "output_token_limit")
+})
+
+test_that("run_shiny does not start a provider request with no request budget", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  provider_calls <- 0L
+  stop_reason <- NULL
+  chat <- create_mock_chat()
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    provider_calls <<- provider_calls + 1L
+    coro::async_generator(function() {
+      coro::yield("unexpected")
+    })()
+  }
+  agent <- Agent$new(
+    chat = chat,
+    usage_limits = UsageLimits(max_requests = 0)
+  )
+  agent$add_hook(HookMatcher$new(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context) {
+      stop_reason <<- reason
+      HookResultStop()
+    }
+  ))
+
+  expect_length(collect_async_stream(agent$run_shiny("blocked")), 0L)
+  expect_identical(provider_calls, 0L)
+  expect_identical(stop_reason, "request_limit")
+})
+
+test_that("run_shiny reports incomplete tool calls as provider errors", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  stop_reason <- NULL
+  chat <- create_mock_chat()
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    agent$.__enclos_env__$private$current_tool_calls <- 1L
+    coro::async_generator(function() {
+      if (FALSE) coro::yield("unreachable")
+    })()
+  }
+  agent <- Agent$new(chat = chat)
+  agent$add_hook(HookMatcher$new(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context) {
+      stop_reason <<- reason
+      HookResultStop()
+    }
+  ))
+
+  expect_length(collect_async_stream(agent$run_shiny("incomplete")), 0L)
+  expect_identical(stop_reason, "provider_error")
 })

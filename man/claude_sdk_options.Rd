@@ -48,6 +48,8 @@ claude_sdk_options(
   max_buffer_size = NULL,
   stderr = NULL,
   enable_file_checkpointing = FALSE,
+  file_checkpoint_max_file_bytes = 50 * 1024^2,
+  file_checkpoint_max_journal_bytes = 250 * 1024^2,
   load_timeout_ms = NULL,
   task_budget = NULL
 )
@@ -99,7 +101,7 @@ agent_sdk_options(...)
 
 \item{fork_session}{Whether to fork the resumed session into a new session id}
 
-\item{max_turns}{Maximum turns per query}
+\item{max_turns}{Maximum model requests per query}
 
 \item{max_cost_usd}{Maximum cost per query}
 
@@ -109,7 +111,17 @@ agent_sdk_options(...)
 
 \item{skills}{Optional SDK-style skill selection (\code{"all"}, names, paths, or skills)}
 
-\item{sandbox, plugins, thinking, effort, title, user, fallback_model, betas, cli_path, add_dirs, env, extra_args, max_buffer_size, stderr, enable_file_checkpointing, load_timeout_ms, task_budget}{Additional SDK-shaped options that are preserved for compatibility. deputy applies the subset that maps to its R-native runtime.}
+\item{sandbox, plugins, thinking, effort, title, user, fallback_model, betas, cli_path, add_dirs, env, extra_args, max_buffer_size, stderr, load_timeout_ms, task_budget}{Additional SDK-shaped options that are preserved for compatibility. deputy applies the subset that maps to its R-native runtime.}
+
+\item{enable_file_checkpointing}{Whether to capture reversible file
+preimages for mutating Deputy and SDK-compatible file tools.}
+
+\item{file_checkpoint_max_file_bytes}{Maximum bytes captured for one file
+preimage. Defaults to 50 MiB.}
+
+\item{file_checkpoint_max_journal_bytes}{Maximum aggregate serialized bytes
+for checkpoint records, markers, metadata, and pending captures. Defaults
+to 250 MiB.}
 
 \item{...}{Passed through to \code{\link[=claude_sdk_options]{claude_sdk_options()}}}
 }

@@ -11,7 +11,8 @@ Permission modes control the overall behavior of tool permission checking:
 \itemize{
 \item \code{"default"} - Check each tool against the permission policy
 \item \code{"acceptEdits"} - Auto-accept file write tools
-\item \code{"plan"} - Allow only annotated read-only tools and human approval prompts
+\item \code{"plan"} - Allow annotated read-only tools within configured capabilities
+plus human approval prompts
 \item \code{"dontAsk"} - Check policy without suggesting approval prompts
 \item \code{"auto"} - SDK-compatible alias for default deputy permission behavior
 \item \code{"readonly"} - Deny all write/execute tools
@@ -26,9 +27,11 @@ determine tool behavior. Available annotations:
 
 \strong{read_only_hint} (logical, default: FALSE)
 
-Indicates the tool only reads data and doesn't modify state.
-Tools with \code{read_only_hint = TRUE} are allowed in \code{"readonly"} mode.
-Examples: \code{tool_read_file}, \code{tool_list_files}, \code{tool_search}
+Indicates the tool only reads data and doesn't modify state. Annotations are
+descriptive metadata, not an authority grant: \code{"readonly"} mode allows known
+Deputy read tools or explicit allowlist entries, subject to destructive and
+open-world capability checks. Examples: \code{tool_read_file}, \code{tool_list_files},
+\code{tool_search}.
 
 \strong{destructive_hint} (logical, default: TRUE)
 

@@ -16,9 +16,12 @@ HookResultPostToolUse(
 \arguments{
 \item{continue}{If FALSE, stop the agent after this hook}
 
-\item{suppress_output}{Logical SDK-compatible output suppression hint}
+\item{suppress_output}{Whether to suppress the result on Deputy's emitted
+\code{tool_end} event. This does not remove the result from model context.}
 
-\item{updated_tool_output}{Optional replacement tool output, where supported}
+\item{updated_tool_output}{Optional replacement value for Deputy's emitted
+\code{tool_end} event. ellmer does not support rewriting the model-visible
+in-flight result from this callback.}
 
 \item{updated_mcp_tool_output}{Deprecated alias for \code{updated_tool_output}}
 

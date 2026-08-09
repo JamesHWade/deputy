@@ -28,6 +28,10 @@ execution.
     \item{\code{session_id}}{Compat session identifier when Claude SDK mode is active}
 
     \item{\code{snapshot_path}}{Latest compat snapshot path when session persistence is active}
+
+    \item{\code{run_id}}{Unique identifier shared by events from this run}
+
+    \item{\code{usage}}{Run-scoped \link{AgentUsage}}
   }
   \if{html}{\out{</div>}}
 }
@@ -37,6 +41,7 @@ execution.
     \item \href{#method-AgentResult-initialize}{\code{AgentResult$new()}}
     \item \href{#method-AgentResult-n_turns}{\code{AgentResult$n_turns()}}
     \item \href{#method-AgentResult-tool_calls}{\code{AgentResult$tool_calls()}}
+    \item \href{#method-AgentResult-tool_results}{\code{AgentResult$tool_results()}}
     \item \href{#method-AgentResult-text_chunks}{\code{AgentResult$text_chunks()}}
     \item \href{#method-AgentResult-is_success}{\code{AgentResult$is_success()}}
     \item \href{#method-AgentResult-print}{\code{AgentResult$print()}}
@@ -59,7 +64,9 @@ execution.
   stop_reason = "complete",
   structured_output = NULL,
   session_id = NULL,
-  snapshot_path = NULL
+  snapshot_path = NULL,
+  run_id = NULL,
+  usage = AgentUsage()
 )}
     \if{html}{\out{</div>}}
   }
@@ -75,6 +82,8 @@ execution.
       \item{\code{structured_output}}{Parsed structured output (if any)}
       \item{\code{session_id}}{Compat session identifier (if any)}
       \item{\code{snapshot_path}}{Latest compat snapshot path (if any)}
+      \item{\code{run_id}}{Unique run identifier (if any)}
+      \item{\code{usage}}{Run-scoped \link{AgentUsage}}
     }
     \if{html}{\out{</div>}}
   }
@@ -110,6 +119,21 @@ execution.
   }
   \subsection{Returns}{
     List of tool_start events
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AgentResult-tool_results"></a>}}
+\if{latex}{\out{\hypertarget{method-AgentResult-tool_results}{}}}
+\subsection{\code{AgentResult$tool_results()}}{
+  Get all completed tool events from execution.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{AgentResult$tool_results()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    List of \code{tool_end} events
   }
 }
 

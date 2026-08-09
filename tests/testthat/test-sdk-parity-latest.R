@@ -83,6 +83,50 @@ test_that("compat tools can be explicitly disabled with an empty list", {
   expect_length(client$agent$chat$get_tools(), 0)
 })
 
+test_that("SDK file checkpoint option is operational", {
+  root <- withr::local_tempdir(pattern = "deputy-sdk-checkpoint-")
+  first_path <- file.path(root, "first.bin")
+  oversized_path <- file.path(root, "oversized.bin")
+  second_path <- file.path(root, "second.bin")
+  writeBin(as.raw(1:2), first_path)
+  writeBin(as.raw(1:3), oversized_path)
+  writeBin(as.raw(3:4), second_path)
+  client <- AgentSDKClient$new(agent_sdk_options(
+    chat = create_mock_chat("ok"),
+    cwd = root,
+    tools = list(),
+    persist_session = FALSE,
+    enable_file_checkpointing = TRUE,
+    file_checkpoint_max_file_bytes = 2,
+    file_checkpoint_max_journal_bytes = 800
+  ))
+
+  checkpoint_id <- client$checkpoint("SDK checkpoint")
+  store <- client$agent$.__enclos_env__$private$.file_checkpoints
+  store$before_tool("Write", list(path = "first.bin"), "first")
+  store$after_tool("first", success = TRUE)
+
+  expect_error(
+    store$before_tool("Write", list(path = "oversized.bin"), "oversized"),
+    "max_file_bytes",
+    class = "deputy_file_checkpoint_limit_error"
+  )
+  expect_error(
+    store$before_tool("Write", list(path = "second.bin"), "second"),
+    "max_journal_bytes",
+    class = "deputy_file_checkpoint_limit_error"
+  )
+
+  expect_identical(
+    client$list_checkpoints()$checkpoint_id,
+    checkpoint_id
+  )
+  expect_identical(
+    client$rewind_files(checkpoint_id)$restored_changes,
+    1L
+  )
+})
+
 test_that("new hook events and result fields are available", {
   expect_true(all(
     c(
@@ -219,6 +263,37 @@ test_that("memory session store adapter supports append load list and delete", {
 
   client$delete_session(result$session_id)
   expect_false(result$session_id %in% store$list_sessions())
+})
+
+test_that("SDK resume never imports serialized tool authority", {
+  store <- session_store_memory()
+  payload_tool <- ellmer::tool(
+    fun = function(path) writeLines("payload", path),
+    name = "payload_writer",
+    description = "A serialized payload tool.",
+    arguments = list(path = ellmer::type_string("Output path")),
+    annotations = ellmer::tool_annotations(read_only_hint = TRUE)
+  )
+  source <- Agent$new(
+    chat = create_mock_chat("source"),
+    tools = list(payload_tool)
+  )
+  store$append(
+    "untrusted-session",
+    source$.__enclos_env__$private$build_session_payload()
+  )
+
+  client <- AgentSDKClient$new(claude_sdk_options(
+    chat = create_mock_chat("receiver"),
+    tools = character(),
+    permission_mode = "plan",
+    persist_session = FALSE,
+    session_store = store,
+    session_store_dir = tempfile("deputy-empty-store")
+  ))
+  client$resume("untrusted-session")
+
+  expect_false("payload_writer" %in% names(client$agent$chat$get_tools()))
 })
 
 test_that("MCP status is available even before MCP load attempts", {
@@ -362,6 +437,36 @@ test_that("claude_sdk_options validates numeric and character argument types", {
     claude_sdk_options(allowed_tools = list("Read")),
     "allowed_tools"
   )
+  expect_error(
+    claude_sdk_options(enable_file_checkpointing = "yes"),
+    "enable_file_checkpointing"
+  )
+  expect_error(
+    claude_sdk_options(file_checkpoint_max_file_bytes = Inf),
+    class = "deputy_file_checkpoint_error"
+  )
+})
+
+test_that("claude_sdk_options exposes bounded checkpoint storage", {
+  options <- claude_sdk_options(
+    file_checkpoint_max_file_bytes = 1024,
+    file_checkpoint_max_journal_bytes = 4096
+  )
+
+  expect_identical(options$file_checkpoint_max_file_bytes, 1024)
+  expect_identical(options$file_checkpoint_max_journal_bytes, 4096)
+})
+
+test_that("max_turns NULL remains an operational unlimited option", {
+  options <- claude_sdk_options(
+    chat = create_mock_chat("done"),
+    max_turns = NULL,
+    persist_session = FALSE
+  )
+
+  expect_null(options$max_turns)
+  client <- AgentSDKClient$new(options)
+  expect_identical(client$query("finish")$response, "done")
 })
 
 test_that("claude_sdk_options stores SDK-shape options it does not yet apply", {

@@ -104,7 +104,12 @@ agent <- Agent$new(
   system_prompt = "You are a data scientist. Be thorough but concise."
 )
 
-for (event in agent$run("Summarise the mtcars dataset")) {
+events <- agent$run("Summarise the mtcars dataset")
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) {
+    break
+  }
   switch(event$type,
     "text" = cat(event$text),
     "tool_start" = cli::cli_alert_info("Calling {event$tool_name}..."),

@@ -45,8 +45,10 @@ Callback signature: \verb{function(tool_name, tool_result, tool_error, context)}
 
 Callback signature: \verb{function(reason, context)}
 \itemize{
-\item \code{reason}: Why the agent stopped ("complete", "max_turns", "error")
-\item \code{context}: List containing \code{working_dir}, \code{total_turns}, \code{cost}
+\item \code{reason}: Why the agent stopped (for example \code{"complete"},
+\code{"request_limit"}, \code{"cost_limit"}, or \code{"provider_error"})
+\item \code{context}: List containing \code{working_dir}, \code{usage}, \code{run_id}, and \code{cost};
+native \code{run()} also includes \code{total_turns}
 \item Return: \code{\link[=HookResultStop]{HookResultStop()}}
 }
 
@@ -123,8 +125,10 @@ Callback signature: \verb{function(context)}
 
 Callback signature: \verb{function(reason, context)}
 \itemize{
-\item \code{reason}: Why the agent stopped ("complete", "max_turns", "cost_limit", "hook_requested_stop")
-\item \code{context}: List containing \code{working_dir}, \code{total_turns}, \code{cost}
+\item \code{reason}: Why the agent stopped (for example \code{"complete"},
+\code{"request_limit"}, \code{"cost_limit"}, or \code{"hook_requested_stop"})
+\item \code{context}: List containing \code{working_dir}, \code{usage}, \code{run_id}, and \code{cost};
+native \code{run()} also includes \code{total_turns}
 \item Return: \code{\link[=HookResultSessionEnd]{HookResultSessionEnd()}}
 }
 }
@@ -136,8 +140,12 @@ The context parameter is always a named list. Common fields:
 \itemize{
 \item \code{working_dir}: The agent's current working directory
 \item \code{tool_annotations}: (PreToolUse only) Tool annotations from ellmer if available
-\item \code{total_turns}: (Stop, PreCompact, SessionEnd) Number of turns in the conversation
-\item \code{cost}: (Stop, SessionEnd) List with \code{total}, \code{input_tokens}, \code{output_tokens}
+\item \code{usage}: Run-scoped \link{AgentUsage} for tool and terminal lifecycle hooks
+\item \code{usage_limits}: Active \link{UsageLimits} for tool lifecycle hooks
+\item \code{run_id}: Identifier for the active run
+\item \code{session_id}: Session identifier when compatibility persistence is configured
+\item \code{total_turns}: (native Stop, PreCompact, native SessionEnd) Conversation turns
+\item \code{cost}: (Stop, SessionEnd) List with \code{input}, \code{output}, \code{cached}, and \code{total}
 \item \code{compact_count}: (PreCompact only) Number of turns being compacted
 \item \code{level}: (Notification only) Informational severity such as \code{"info"} or \code{"warning"}
 \item \code{code}: (Notification only) Stable notification code when available

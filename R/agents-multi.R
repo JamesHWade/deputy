@@ -17,10 +17,12 @@
 #' @param memory Optional memory text appended to this sub-agent's prompt
 #' @param mcp_servers Optional MCP server names to load for this sub-agent
 #' @param initial_prompt Optional text prepended to delegated tasks
-#' @param max_turns Optional per-sub-agent turn limit
+#' @param max_turns Optional non-negative whole-number sub-agent request limit
 #' @param background Logical SDK-compatible metadata flag
 #' @param effort Optional reasoning effort metadata
-#' @param permission_mode Optional permission mode override
+#' @param permission_mode Optional permission mode. For non-bypass lead agents,
+#'   this must match the lead mode; use `disallowed_tools` and `max_turns` to
+#'   tighten a child policy. A bypass lead may select any mode.
 #' @return An `AgentDefinition` object
 #'
 #' @examples
@@ -64,13 +66,7 @@ agent_definition <- function(
     )
   }
   if (!is.null(max_turns)) {
-    if (!is.numeric(max_turns) && !is.character(max_turns)) {
-      cli::cli_abort("{.arg max_turns} must be NULL or a length-1 number")
-    }
-    max_turns <- as.integer(max_turns[[1]])
-    if (is.na(max_turns)) {
-      cli::cli_abort("{.arg max_turns} must be NULL or a length-1 number")
-    }
+    max_turns <- validate_usage_limit(max_turns, "max_turns", integer = TRUE)
   }
 
   structure(
@@ -131,6 +127,15 @@ LeadAgent <- R6::R6Class(
     #' @param tools Additional tools for the lead agent
     #' @param system_prompt System prompt for the lead agent
     #' @param permissions Permissions for the lead agent (also applied to sub-agents)
+    #' @param usage_limits Optional [UsageLimits] for each lead-agent run.
+    #' @param enable_file_checkpointing Whether to journal reversible file
+    #'   preimages in one workspace journal shared by the lead agent and its
+    #'   delegated agents.
+    #' @param file_checkpoint_max_file_bytes Maximum bytes captured for one
+    #'   file preimage. Defaults to 50 MiB.
+    #' @param file_checkpoint_max_journal_bytes Maximum aggregate serialized
+    #'   bytes for workspace checkpoint records, markers, metadata, and pending
+    #'   captures. Defaults to 250 MiB.
     #' @param working_dir Working directory
     #' @param setting_sources Optional Claude-style setting sources
     #' @param settings Optional pre-loaded settings list from claude_settings_load()
@@ -141,6 +146,10 @@ LeadAgent <- R6::R6Class(
       tools = list(),
       system_prompt = NULL,
       permissions = NULL,
+      usage_limits = NULL,
+      enable_file_checkpointing = FALSE,
+      file_checkpoint_max_file_bytes = 50 * 1024^2,
+      file_checkpoint_max_journal_bytes = 250 * 1024^2,
       working_dir = getwd(),
       setting_sources = NULL,
       settings = NULL
@@ -169,6 +178,10 @@ LeadAgent <- R6::R6Class(
         tools = all_tools,
         system_prompt = enhanced_prompt,
         permissions = permissions,
+        usage_limits = usage_limits,
+        enable_file_checkpointing = enable_file_checkpointing,
+        file_checkpoint_max_file_bytes = file_checkpoint_max_file_bytes,
+        file_checkpoint_max_journal_bytes = file_checkpoint_max_journal_bytes,
         working_dir = working_dir,
         setting_sources = setting_sources,
         settings = settings
@@ -391,7 +404,12 @@ LeadAgent <- R6::R6Class(
 
           # Record the run before invoking so failures aren't lost when
           # `tool_reject` short-circuits the rest of this closure.
-          record_run <- function(status, result_text = NULL, error = NULL) {
+          record_run <- function(
+            status,
+            result_text = NULL,
+            error = NULL,
+            usage = NULL
+          ) {
             private$subagent_runs <- c(
               private$subagent_runs,
               list(list(
@@ -403,6 +421,7 @@ LeadAgent <- R6::R6Class(
                 status = status,
                 result = result_text,
                 error = error,
+                usage = usage,
                 turns = tryCatch(sub_agent$turns(), error = function(e) list())
               ))
             )
@@ -411,16 +430,22 @@ LeadAgent <- R6::R6Class(
           result <- tryCatch(
             {
               sub_result <- sub_agent$run_sync(
-                task_to_run,
-                max_turns = def$max_turns
+                task_to_run
               )
+              private$add_external_usage(sub_result$usage)
               sub_result$response
             },
             error = function(e) {
+              failed_usage <- sub_agent$.__enclos_env__$private$last_run_usage
+              private$add_external_usage(failed_usage)
               cli::cli_alert_danger(
                 "Sub-agent {.val {agent_name}} failed: {e$message}"
               )
-              record_run(status = "failed", error = e$message)
+              record_run(
+                status = "failed",
+                error = e$message,
+                usage = failed_usage
+              )
               lead_agent$hooks$fire(
                 "SubagentStop",
                 agent_name = agent_name,
@@ -454,7 +479,11 @@ LeadAgent <- R6::R6Class(
             )
           )
 
-          record_run(status = "completed", result_text = result)
+          record_run(
+            status = "completed",
+            result_text = result,
+            usage = sub_result$usage
+          )
 
           result
         },
@@ -529,17 +558,21 @@ LeadAgent <- R6::R6Class(
         tools = sub_tools,
         system_prompt = sub_prompt,
         permissions = sub_permissions,
+        usage_limits = private$derive_subagent_usage_limits(def),
         working_dir = self$working_dir
       )
+      # A checkpoint describes workspace state, not one agent's private
+      # execution history. Delegated agents therefore write to the exact same
+      # journal as the lead so a lead-level rewind includes child mutations.
+      if (!is.null(private$.file_checkpoints)) {
+        sub_agent$.__enclos_env__$private$.file_checkpoints <-
+          private$.file_checkpoints
+      }
       sub_agent$configure_sdk_compat(list(
         persist_session = FALSE,
         session_store_dir = session_store_default_dir(),
         session_id = generate_session_id()
       ))
-
-      if (!is.null(def$permission_mode)) {
-        sub_agent$set_permission_mode(def$permission_mode)
-      }
 
       # Load any skills
       for (skill in def$skills) {
@@ -555,9 +588,37 @@ LeadAgent <- R6::R6Class(
 
     derive_subagent_permissions = function(def) {
       existing <- self$permissions
+      requested_mode <- def$permission_mode %||% existing$mode
+      allowed_modes <- switch(
+        existing$mode,
+        bypassPermissions = PermissionMode,
+        default = "default",
+        auto = "auto",
+        acceptEdits = "acceptEdits",
+        dontAsk = "dontAsk",
+        plan = "plan",
+        readonly = "readonly"
+      )
+      if (!requested_mode %in% allowed_modes) {
+        cli_abort(c(
+          "Sub-agent permission mode cannot change under the lead policy",
+          "x" = paste0(
+            "Lead mode ",
+            existing$mode,
+            " cannot delegate with mode ",
+            requested_mode,
+            "."
+          ),
+          "i" = paste0(
+            "Use mode ",
+            existing$mode,
+            ", then tighten the child with disallowed_tools or max_turns."
+          )
+        ))
+      }
       denylist <- unique(c(existing$tool_denylist, def$disallowed_tools))
       Permissions$new(
-        mode = existing$mode,
+        mode = requested_mode,
         file_read = existing$file_read,
         file_write = existing$file_write,
         bash = existing$bash,
@@ -570,6 +631,43 @@ LeadAgent <- R6::R6Class(
         tool_allowlist = existing$tool_allowlist,
         tool_denylist = denylist,
         permission_prompt_tool_name = existing$permission_prompt_tool_name
+      )
+    },
+
+    derive_subagent_usage_limits = function(def) {
+      limits <- private$current_usage_limits %||% self$usage_limits
+      current <- if (isTRUE(private$run_active)) {
+        private$current_run_usage()
+      } else {
+        AgentUsage()
+      }
+      usage_fields <- c(
+        max_requests = "requests",
+        max_tool_calls = "tool_calls",
+        max_input_tokens = "input_tokens",
+        max_output_tokens = "output_tokens",
+        max_total_tokens = "total_tokens",
+        max_cost_usd = "cost_usd"
+      )
+      remaining <- lapply(names(usage_fields), function(limit_field) {
+        limit <- limits[[limit_field]]
+        if (is.null(limit)) {
+          return(NULL)
+        }
+        max(0, limit - current[[usage_fields[[limit_field]]]])
+      })
+      names(remaining) <- names(usage_fields)
+      if (!is.null(def$max_turns)) {
+        remaining$max_requests <- if (is.null(remaining$max_requests)) {
+          def$max_turns
+        } else {
+          min(remaining$max_requests, def$max_turns)
+        }
+      }
+
+      do.call(
+        UsageLimits,
+        c(remaining, list(on_exceed = limits$on_exceed))
       )
     },
 

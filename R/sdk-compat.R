@@ -607,16 +607,44 @@ validate_compat_hooks <- function(hooks) {
   hooks
 }
 
-# Clone a provided chat when possible so each compat client starts cleanly.
+# Clone a provided chat so each compat client owns isolated mutable state.
 clone_compat_chat <- function(chat, model = NULL) {
   if (!is.null(chat)) {
     validate_chat(chat)
 
     cloned <- tryCatch(
       chat$clone(),
-      error = function(e) chat
+      error = function(error) {
+        cli::cli_abort(
+          c(
+            "Could not clone the configured chat for an isolated SDK client",
+            "x" = error$message
+          ),
+          class = c("deputy_chat_clone_error", "deputy_error"),
+          parent = error
+        )
+      }
     )
-    tryCatch(cloned$set_turns(list()), error = function(e) invisible(NULL))
+    if (identical(cloned, chat)) {
+      cli::cli_abort(
+        "Chat cloning returned the original mutable object",
+        class = c("deputy_chat_clone_error", "deputy_error")
+      )
+    }
+    validate_chat(cloned)
+    tryCatch(
+      cloned$set_turns(list()),
+      error = function(error) {
+        cli::cli_abort(
+          c(
+            "Could not initialize the cloned chat with isolated state",
+            "x" = error$message
+          ),
+          class = c("deputy_chat_clone_error", "deputy_error"),
+          parent = error
+        )
+      }
+    )
     return(cloned)
   }
 
@@ -774,6 +802,9 @@ build_compat_agent <- function(options) {
       tools = compat_requested_tools(options),
       system_prompt = options$system_prompt,
       permissions = permissions,
+      enable_file_checkpointing = options$enable_file_checkpointing,
+      file_checkpoint_max_file_bytes = options$file_checkpoint_max_file_bytes,
+      file_checkpoint_max_journal_bytes = options$file_checkpoint_max_journal_bytes,
       working_dir = options$cwd
     )
 
@@ -794,6 +825,9 @@ build_compat_agent <- function(options) {
       tools = compat_requested_tools(options),
       system_prompt = options$system_prompt,
       permissions = permissions,
+      enable_file_checkpointing = options$enable_file_checkpointing,
+      file_checkpoint_max_file_bytes = options$file_checkpoint_max_file_bytes,
+      file_checkpoint_max_journal_bytes = options$file_checkpoint_max_journal_bytes,
       working_dir = options$cwd
     )
   }
@@ -865,12 +899,19 @@ with_compat_working_dir <- function(cwd, code) {
 #' @param resume_session_id Optional session id to resume later
 #' @param resume_session_at Optional timestamp to resume at or before
 #' @param fork_session Whether to fork the resumed session into a new session id
-#' @param max_turns Maximum turns per query
+#' @param max_turns Maximum model requests per query
 #' @param max_cost_usd Maximum cost per query
 #' @param include_partial_messages Whether query results keep partial text events
 #' @param output_format Optional default structured output format
 #' @param skills Optional SDK-style skill selection (`"all"`, names, paths, or skills)
-#' @param sandbox,plugins,thinking,effort,title,user,fallback_model,betas,cli_path,add_dirs,env,extra_args,max_buffer_size,stderr,enable_file_checkpointing,load_timeout_ms,task_budget Additional SDK-shaped options that are preserved for compatibility. deputy applies the subset that maps to its R-native runtime.
+#' @param enable_file_checkpointing Whether to capture reversible file
+#'   preimages for mutating Deputy and SDK-compatible file tools.
+#' @param file_checkpoint_max_file_bytes Maximum bytes captured for one file
+#'   preimage. Defaults to 50 MiB.
+#' @param file_checkpoint_max_journal_bytes Maximum aggregate serialized bytes
+#'   for checkpoint records, markers, metadata, and pending captures. Defaults
+#'   to 250 MiB.
+#' @param sandbox,plugins,thinking,effort,title,user,fallback_model,betas,cli_path,add_dirs,env,extra_args,max_buffer_size,stderr,load_timeout_ms,task_budget Additional SDK-shaped options that are preserved for compatibility. deputy applies the subset that maps to its R-native runtime.
 #'
 #' @return A `ClaudeSDKOptions` object
 #' @export
@@ -917,6 +958,8 @@ claude_sdk_options <- function(
   max_buffer_size = NULL,
   stderr = NULL,
   enable_file_checkpointing = FALSE,
+  file_checkpoint_max_file_bytes = 50 * 1024^2,
+  file_checkpoint_max_journal_bytes = 250 * 1024^2,
   load_timeout_ms = NULL,
   task_budget = NULL
 ) {
@@ -973,27 +1016,34 @@ claude_sdk_options <- function(
     max_turns <- task_budget
   }
 
-  if (
-    !is.numeric(max_turns) ||
-      length(max_turns) != 1 ||
-      is.na(max_turns) ||
-      max_turns < 0
-  ) {
-    cli::cli_abort("{.arg max_turns} must be a non-negative length-1 number")
-  }
+  max_turns <- validate_usage_limit(
+    max_turns,
+    "max_turns",
+    integer = TRUE
+  )
+  max_cost_usd <- validate_usage_limit(
+    max_cost_usd,
+    "max_cost_usd",
+    integer = FALSE
+  )
 
-  if (!is.null(max_cost_usd)) {
-    if (
-      !is.numeric(max_cost_usd) ||
-        length(max_cost_usd) != 1 ||
-        is.na(max_cost_usd) ||
-        max_cost_usd < 0
-    ) {
-      cli::cli_abort(
-        "{.arg max_cost_usd} must be NULL or a non-negative length-1 number"
-      )
-    }
+  if (
+    !is.logical(enable_file_checkpointing) ||
+      length(enable_file_checkpointing) != 1L ||
+      is.na(enable_file_checkpointing)
+  ) {
+    cli::cli_abort(
+      "{.arg enable_file_checkpointing} must be TRUE or FALSE"
+    )
   }
+  file_checkpoint_max_file_bytes <- file_checkpoint_byte_limit(
+    file_checkpoint_max_file_bytes,
+    "file_checkpoint_max_file_bytes"
+  )
+  file_checkpoint_max_journal_bytes <- file_checkpoint_byte_limit(
+    file_checkpoint_max_journal_bytes,
+    "file_checkpoint_max_journal_bytes"
+  )
 
   if (!is.null(skills)) {
     if (!is.character(skills) && !is.list(skills)) {
@@ -1018,12 +1068,10 @@ claude_sdk_options <- function(
       "{.arg permission_prompt_tool_name} must be NULL or a length-1 string"
     )
   }
-  if (
-    !is.null(resume_session_id) &&
-      (!is.character(resume_session_id) || length(resume_session_id) != 1)
-  ) {
-    cli::cli_abort(
-      "{.arg resume_session_id} must be NULL or a length-1 string"
+  if (!is.null(resume_session_id)) {
+    resume_session_id <- validate_session_id(
+      resume_session_id,
+      argument = "resume_session_id"
     )
   }
 
@@ -1082,7 +1130,7 @@ claude_sdk_options <- function(
       resume_session_id = resume_session_id,
       resume_session_at = resume_session_at,
       fork_session = isTRUE(fork_session),
-      max_turns = as.integer(max_turns),
+      max_turns = max_turns,
       max_cost_usd = max_cost_usd,
       include_partial_messages = isTRUE(include_partial_messages),
       output_format = output_format,
@@ -1102,6 +1150,8 @@ claude_sdk_options <- function(
       max_buffer_size = max_buffer_size,
       stderr = stderr,
       enable_file_checkpointing = isTRUE(enable_file_checkpointing),
+      file_checkpoint_max_file_bytes = file_checkpoint_max_file_bytes,
+      file_checkpoint_max_journal_bytes = file_checkpoint_max_journal_bytes,
       load_timeout_ms = load_timeout_ms,
       task_budget = task_budget,
       session_id = NULL
@@ -1230,6 +1280,33 @@ ClaudeSDKClient <- R6::R6Class(
     },
 
     #' @description
+    #' Create a reversible file checkpoint.
+    #'
+    #' @param name Optional checkpoint label.
+    #' @param metadata Optional serializable metadata list.
+    #' @return The checkpoint ID.
+    checkpoint = function(name = NULL, metadata = list()) {
+      self$agent$checkpoint(name = name, metadata = metadata)
+    },
+
+    #' @description
+    #' List reversible file checkpoints.
+    #'
+    #' @return A data frame ordered from oldest to newest.
+    list_checkpoints = function() {
+      self$agent$list_checkpoints()
+    },
+
+    #' @description
+    #' Rewind files to a checkpoint without rewinding conversation history.
+    #'
+    #' @param checkpoint_id A checkpoint ID.
+    #' @return A list describing the restored changes.
+    rewind_files = function(checkpoint_id) {
+      self$agent$rewind_files(checkpoint_id)
+    },
+
+    #' @description
     #' Resume or fork a persisted compatibility session.
     #'
     #' @param session_id Session identifier to restore
@@ -1237,6 +1314,13 @@ ClaudeSDKClient <- R6::R6Class(
     #' @param fork If TRUE, restore into a new session id
     #' @return Invisible self
     resume = function(session_id, at = NULL, fork = FALSE) {
+      session_id <- validate_session_id(session_id)
+      if (isTRUE(self$agent$.__enclos_env__$private$run_active)) {
+        cli::cli_abort(
+          "Cannot resume or fork a session while the client agent has an active run",
+          class = c("deputy_run_active", "deputy_error")
+        )
+      }
       snapshot <- NULL
       if (!is.null(self$options$session_store) && is.null(at)) {
         payload <- tryCatch(
@@ -1266,13 +1350,13 @@ ClaudeSDKClient <- R6::R6Class(
         )
       }
 
-      self$agent <- build_compat_agent(self$options)
+      candidate_agent <- build_compat_agent(self$options)
 
       with_compat_working_dir(
         self$options$cwd,
-        self$agent$.__enclos_env__$private$restore_session_payload(
+        candidate_agent$.__enclos_env__$private$restore_session_payload(
           snapshot$payload,
-          restore_tools = TRUE,
+          restore_tools = FALSE,
           source = snapshot$path
         )
       )
@@ -1282,8 +1366,7 @@ ClaudeSDKClient <- R6::R6Class(
       } else {
         session_id
       }
-      self$options$session_id <- active_session_id
-      self$agent$configure_sdk_compat(list(
+      candidate_agent$configure_sdk_compat(list(
         persist_session = self$options$persist_session,
         session_store_dir = self$options$session_store_dir,
         session_store = self$options$session_store,
@@ -1302,7 +1385,7 @@ ClaudeSDKClient <- R6::R6Class(
         paste0("Resumed session ", session_id, ".")
       }
       code <- if (isTRUE(fork)) "session_forked" else "session_resumed"
-      self$agent$.__enclos_env__$private$notify(
+      candidate_agent$.__enclos_env__$private$notify(
         notice,
         level = "info",
         code = code,
@@ -1312,10 +1395,15 @@ ClaudeSDKClient <- R6::R6Class(
       )
 
       if (isTRUE(fork) && isTRUE(self$options$persist_session)) {
-        self$agent$.__enclos_env__$private$snapshot_compat_state(
+        candidate_agent$.__enclos_env__$private$snapshot_compat_state(
           reason = "fork_restore"
         )
       }
+
+      updated_options <- self$options
+      updated_options$session_id <- active_session_id
+      self$agent <- candidate_agent
+      self$options <- updated_options
 
       invisible(self)
     }

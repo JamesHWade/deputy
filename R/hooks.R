@@ -33,8 +33,10 @@
 #' **Stop** - When the agent stops
 #'
 #' Callback signature: `function(reason, context)`
-#' - `reason`: Why the agent stopped ("complete", "max_turns", "error")
-#' - `context`: List containing `working_dir`, `total_turns`, `cost`
+#' - `reason`: Why the agent stopped (for example `"complete"`,
+#'   `"request_limit"`, `"cost_limit"`, or `"provider_error"`)
+#' - `context`: List containing `working_dir`, `usage`, `run_id`, and `cost`;
+#'   native `run()` also includes `total_turns`
 #' - Return: [HookResultStop()]
 #'
 #' **SubagentStop** - When a sub-agent completes (LeadAgent only)
@@ -95,8 +97,10 @@
 #' **SessionEnd** - When an agent session ends
 #'
 #' Callback signature: `function(reason, context)`
-#' - `reason`: Why the agent stopped ("complete", "max_turns", "cost_limit", "hook_requested_stop")
-#' - `context`: List containing `working_dir`, `total_turns`, `cost`
+#' - `reason`: Why the agent stopped (for example `"complete"`,
+#'   `"request_limit"`, `"cost_limit"`, or `"hook_requested_stop"`)
+#' - `context`: List containing `working_dir`, `usage`, `run_id`, and `cost`;
+#'   native `run()` also includes `total_turns`
 #' - Return: [HookResultSessionEnd()]
 #'
 #' @section Context Structure:
@@ -104,8 +108,12 @@
 #' The context parameter is always a named list. Common fields:
 #' - `working_dir`: The agent's current working directory
 #' - `tool_annotations`: (PreToolUse only) Tool annotations from ellmer if available
-#' - `total_turns`: (Stop, PreCompact, SessionEnd) Number of turns in the conversation
-#' - `cost`: (Stop, SessionEnd) List with `total`, `input_tokens`, `output_tokens`
+#' - `usage`: Run-scoped [AgentUsage] for tool and terminal lifecycle hooks
+#' - `usage_limits`: Active [UsageLimits] for tool lifecycle hooks
+#' - `run_id`: Identifier for the active run
+#' - `session_id`: Session identifier when compatibility persistence is configured
+#' - `total_turns`: (native Stop, PreCompact, native SessionEnd) Conversation turns
+#' - `cost`: (Stop, SessionEnd) List with `input`, `output`, `cached`, and `total`
 #' - `compact_count`: (PreCompact only) Number of turns being compacted
 #' - `level`: (Notification only) Informational severity such as `"info"` or `"warning"`
 #' - `code`: (Notification only) Stable notification code when available
@@ -212,8 +220,11 @@ HookResultPreToolUse <- function(
 #' Return this from a PostToolUse hook callback.
 #'
 #' @param continue If FALSE, stop the agent after this hook
-#' @param suppress_output Logical SDK-compatible output suppression hint
-#' @param updated_tool_output Optional replacement tool output, where supported
+#' @param suppress_output Whether to suppress the result on Deputy's emitted
+#'   `tool_end` event. This does not remove the result from model context.
+#' @param updated_tool_output Optional replacement value for Deputy's emitted
+#'   `tool_end` event. ellmer does not support rewriting the model-visible
+#'   in-flight result from this callback.
 #' @param updated_mcp_tool_output Deprecated alias for `updated_tool_output`
 #' @param additional_context Optional text to append to the running context
 #' @param stop_reason Optional stop reason used when `continue = FALSE`

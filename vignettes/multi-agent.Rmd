@@ -112,6 +112,12 @@ result <- lead$run_sync(
 cat(result$response)
 ```
 
+Direct synchronous delegation participates in the lead run's budget. Each
+child inherits the lead's remaining `UsageLimits`, and its usage is aggregated
+into `result$usage` and enforced by the lead after delegation. This accounting
+does not yet cover parallel or background children, transitive child trees, or
+cross-run global budgets.
+
 ## Convenience Constructor
 
 `agent_with_delegation()` creates a lead agent with one line:

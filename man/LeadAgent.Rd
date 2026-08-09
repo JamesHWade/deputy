@@ -33,11 +33,14 @@ sub-agents based on registered AgentDefinitions.
 \if{html}{\out{<details><summary>Inherited methods</summary>
 <ul>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href='../../deputy/html/Agent.html#method-Agent-add_hook'><code>Agent$add_hook()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="checkpoint"><a href='../../deputy/html/Agent.html#method-Agent-checkpoint'><code>Agent$checkpoint()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href='../../deputy/html/Agent.html#method-Agent-compact'><code>Agent$compact()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="configure_sdk_compat"><a href='../../deputy/html/Agent.html#method-Agent-configure_sdk_compat'><code>Agent$configure_sdk_compat()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href='../../deputy/html/Agent.html#method-Agent-cost'><code>Agent$cost()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_permission_mode"><a href='../../deputy/html/Agent.html#method-Agent-get_permission_mode'><code>Agent$get_permission_mode()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="interrupt"><a href='../../deputy/html/Agent.html#method-Agent-interrupt'><code>Agent$interrupt()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_turn"><a href='../../deputy/html/Agent.html#method-Agent-last_turn'><code>Agent$last_turn()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="list_checkpoints"><a href='../../deputy/html/Agent.html#method-Agent-list_checkpoints'><code>Agent$list_checkpoints()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_mcp"><a href='../../deputy/html/Agent.html#method-Agent-load_mcp'><code>Agent$load_mcp()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_session"><a href='../../deputy/html/Agent.html#method-Agent-load_session'><code>Agent$load_session()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_skill"><a href='../../deputy/html/Agent.html#method-Agent-load_skill'><code>Agent$load_skill()</code></a></span></li>
@@ -46,6 +49,7 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="provider"><a href='../../deputy/html/Agent.html#method-Agent-provider'><code>Agent$provider()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tool"><a href='../../deputy/html/Agent.html#method-Agent-register_tool'><code>Agent$register_tool()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tools"><a href='../../deputy/html/Agent.html#method-Agent-register_tools'><code>Agent$register_tools()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="rewind_files"><a href='../../deputy/html/Agent.html#method-Agent-rewind_files'><code>Agent$rewind_files()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run"><a href='../../deputy/html/Agent.html#method-Agent-run'><code>Agent$run()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_shiny"><a href='../../deputy/html/Agent.html#method-Agent-run_shiny'><code>Agent$run_shiny()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_sync"><a href='../../deputy/html/Agent.html#method-Agent-run_sync'><code>Agent$run_sync()</code></a></span></li>
@@ -56,6 +60,7 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="skills"><a href='../../deputy/html/Agent.html#method-Agent-skills'><code>Agent$skills()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="slash_commands"><a href='../../deputy/html/Agent.html#method-Agent-slash_commands'><code>Agent$slash_commands()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="turns"><a href='../../deputy/html/Agent.html#method-Agent-turns'><code>Agent$turns()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="usage"><a href='../../deputy/html/Agent.html#method-Agent-usage'><code>Agent$usage()</code></a></span></li>
 </ul>
 </details>}}
 \if{html}{\out{<hr>}}
@@ -71,6 +76,10 @@ sub-agents based on registered AgentDefinitions.
   tools = list(),
   system_prompt = NULL,
   permissions = NULL,
+  usage_limits = NULL,
+  enable_file_checkpointing = FALSE,
+  file_checkpoint_max_file_bytes = 50 * 1024^2,
+  file_checkpoint_max_journal_bytes = 250 * 1024^2,
   working_dir = getwd(),
   setting_sources = NULL,
   settings = NULL
@@ -85,6 +94,15 @@ sub-agents based on registered AgentDefinitions.
       \item{\code{tools}}{Additional tools for the lead agent}
       \item{\code{system_prompt}}{System prompt for the lead agent}
       \item{\code{permissions}}{Permissions for the lead agent (also applied to sub-agents)}
+      \item{\code{usage_limits}}{Optional \link{UsageLimits} for each lead-agent run.}
+      \item{\code{enable_file_checkpointing}}{Whether to journal reversible file
+preimages in one workspace journal shared by the lead agent and its
+delegated agents.}
+      \item{\code{file_checkpoint_max_file_bytes}}{Maximum bytes captured for one
+file preimage. Defaults to 50 MiB.}
+      \item{\code{file_checkpoint_max_journal_bytes}}{Maximum aggregate serialized
+bytes for workspace checkpoint records, markers, metadata, and pending
+captures. Defaults to 250 MiB.}
       \item{\code{working_dir}}{Working directory}
       \item{\code{setting_sources}}{Optional Claude-style setting sources}
       \item{\code{settings}}{Optional pre-loaded settings list from claude_settings_load()}

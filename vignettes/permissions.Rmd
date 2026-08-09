@@ -30,7 +30,8 @@ permissions_readonly()
 # Plan: only annotated read-only tools plus AskUserQuestion
 permissions_plan()
 
-# Standard (default): file read/write in working dir, R code, no bash/web
+# Standard (default): accessible reads, workspace-scoped writes, R code,
+# no bash/web
 permissions_standard()
 
 # Full: everything allowed (use with caution!)
@@ -84,8 +85,8 @@ The `mode` field provides broad policy shortcuts:
 | Mode | Behaviour |
 |------|-----------|
 | `"default"` | Check each tool against the policy fields above |
-| `"readonly"` | Only allow tools annotated as `read_only_hint = TRUE` |
-| `"plan"` | Allow read-only annotated tools and the human approval prompt tool |
+| `"readonly"` | Allow known Deputy read tools and explicit allowlist entries within configured capabilities |
+| `"plan"` | Allow read-only annotated tools within configured capabilities and the human approval prompt tool |
 | `"acceptEdits"` | Auto-approve file writes without prompting |
 | `"bypassPermissions"` | Allow everything (dangerous!) |
 
@@ -122,9 +123,12 @@ tool_safe <- ellmer::tool(
 )
 ```
 
-In `"readonly"` mode, only tools with `read_only_hint = TRUE` are allowed.
-In `"default"` mode, tools with `destructive_hint = TRUE` may be blocked
-depending on the policy.
+Annotations describe behavior; they do not independently grant authority.
+In `"readonly"` mode, Deputy recognizes its built-in read tools and explicit
+allowlist entries, while still denying known writes, destructive tools, and
+open-world tools when web access is disabled. Unknown tools do not become
+authorized merely by declaring `read_only_hint = TRUE`. In `"default"` mode,
+annotations participate in the configured capability checks.
 
 ## Custom Permission Callbacks
 

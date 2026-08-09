@@ -42,7 +42,10 @@ agent <- Agent$new(
 )
 
 # Run a task with streaming output
-for (event in agent$run("List files in current directory")) \{
+events <- agent$run("List files in current directory")
+repeat \{
+  event <- events()
+  if (coro::is_exhausted(event)) break
   if (event$type == "text") cat(event$text)
 \}
 }\if{html}{\out{</div>}}

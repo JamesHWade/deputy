@@ -37,7 +37,11 @@ without giving up deputy’s R-native runtime.
   execution, and data analysis
 - **Permission system** - Fine-grained control over what agents can do
 - **Hooks** - Intercept and customize agent behavior at key points
-- **Streaming output** - Real-time feedback as agents work
+- **Semantic streaming** - Text, content, tool lifecycle, usage, and
+  stop events with run IDs
+- **Run budgets** - Request, tool-call, token, and estimated-cost limits
+- **File checkpoints** - Bounded, persisted byte-exact rewind for Deputy
+  file tools
 - **Multi-agent** - Coordinate specialized sub-agents for complex tasks
 - **Session persistence** - Save and restore agent conversations,
   including Claude-compatible session snapshots
@@ -80,7 +84,12 @@ cat(result$response)
 For real-time feedback as the agent works:
 
 ``` r
-for (event in agent$run("Analyze the structure of this project")) {
+events <- agent$run("Analyze the structure of this project")
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) {
+    break
+  }
   switch(
     event$type,
     "text" = cat(event$text),
@@ -159,6 +168,14 @@ client$query("Inspect the package structure")
 client$resume(result$session_id, fork = TRUE)
 ```
 
+`agent_sdk_query()` and `AgentSDKClient$query()` are blocking. Use the
+native `Agent$run()` generator when an application needs incremental
+events. Resuming a compatibility session restores its conversation and
+prompt while keeping the new agent’s configured tools,
+constructor-supplied permissions, and working directory authoritative.
+Native `Agent$load_session(..., restore_tools = TRUE)` is the explicit
+opt-in for trusting and restoring serialized tools.
+
 The compatibility layer exposes Anthropic-style tool aliases such as
 `Read`, `Write`, `Edit`, `MultiEdit`, `Glob`, `Grep`, `LS`, `TodoRead`,
 `TodoWrite`, `WebFetch`, `WebSearch`, and `Agent` or `Task` (when
@@ -209,7 +226,7 @@ agent <- Agent$new(
   permissions = permissions_readonly()
 )
 
-# Standard: file read/write in working dir, R code, no bash
+# Standard: accessible reads, workspace-scoped writes, R code, no bash
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
   tools = tools_file(),
@@ -249,10 +266,67 @@ agent <- Agent$new(
 ```
 
 When both are set, `tool_denylist` takes precedence over
-`tool_allowlist`. `permission_prompt_tool_name` is always allowed and is
-included in deny messages so the model can request explicit approval.
-`permissions_plan()` mirrors Claude’s `plan` mode by allowing only
-read-only annotated tools and `AskUserQuestion`.
+`tool_allowlist`. `permission_prompt_tool_name` is allowed as an
+approval escape hatch except in `dontAsk` mode, and is included in deny
+messages when prompting is enabled. `permissions_plan()` mirrors
+Claude’s `plan` mode by allowing only read-only annotated tools and
+`AskUserQuestion`.
+
+### Run Budgets and File Rewind
+
+Limits are scoped to one run, so resuming an older conversation does not
+inherit an already-spent budget:
+
+``` r
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_file(),
+  usage_limits = UsageLimits(
+    max_requests = 12,
+    max_tool_calls = 20,
+    max_total_tokens = 50000,
+    max_cost_usd = 1
+  )
+)
+
+result <- agent$run_sync("Inspect this package")
+result$run_id
+result$usage
+result$tool_calls()
+result$tool_results()
+```
+
+Request and tool-call limits are checked at model and tool boundaries.
+Token and cost limits use usage reported after a model response, so a
+run stops once an overage is observed and can exceed the configured
+threshold by one response.
+
+Enable reversible file journals when an agent may edit its workspace:
+
+``` r
+agent <- Agent$new(
+  chat = ellmer::chat("anthropic"),
+  tools = tools_file(),
+  enable_file_checkpointing = TRUE,
+  working_dir = getwd()
+)
+
+checkpoint_id <- agent$checkpoint("before refactor")
+agent$run_sync("Refactor R/parser.R")
+agent$rewind_files(checkpoint_id)
+```
+
+Deputy automatically creates a checkpoint at the beginning of each run
+and persists the journal with session snapshots. Captures default to 50
+MiB per file. The default maximum aggregate serialized checkpoint-state
+size is 250 MiB, counting journal records, checkpoint markers, metadata,
+and pending captures. The bounds apply to live captures and restored
+session state; violations signal `deputy_file_checkpoint_limit_error`.
+Lead agents and their delegated agents share one workspace journal, so
+child-agent edits participate in lead-level rewind. Rewind covers writes
+through native and Agent SDK-compatible write, edit, multi-edit, and
+todo tools; it does not capture writes performed by Bash, R code, or
+arbitrary custom tools.
 
 ### Hooks
 
@@ -262,7 +336,7 @@ Intercept agent behavior:
 # Log all tool calls
 agent$add_hook(HookMatcher$new(
   event = "PostToolUse",
-  callback = function(tool_name, tool_result, context) {
+  callback = function(tool_name, tool_result, tool_error, context) {
     message("[", Sys.time(), "] ", tool_name)
     HookResultPostToolUse()
   }
@@ -390,7 +464,10 @@ deputy provides structured error types for programmatic error handling:
 ``` r
 # Catch specific error types
 tryCatch(
-  agent$run_sync("task"),
+  agent$run_sync(
+    "task",
+    usage_limits = UsageLimits(max_cost_usd = 0.50, on_exceed = "error")
+  ),
   deputy_budget_exceeded = function(e) {
     message("Budget exceeded: $", e$current_cost, " > $", e$max_cost)
   },
@@ -424,6 +501,11 @@ lead <- LeadAgent$new(
 
 result <- lead$run_sync("Review the R code in this project")
 ```
+
+Direct synchronous child usage is aggregated into `result$usage`. Each
+child inherits the lead run’s remaining budget, and the lead enforces
+its limits after delegation. Parallel, background, transitive
+child-tree, and cross-run global budget accounting remain future work.
 
 ## Provider Support
 
