@@ -79,7 +79,37 @@ expand_and_normalize <- function(path) {
   # (Windows paths sometimes have mixed separators that normalizePath doesn't fix)
   if (!is.na(normalized)) {
     normalized <- gsub("\\\\", "/", normalized)
-    if (.Platform$OS.type != "windows") {
+    if (.Platform$OS.type == "windows") {
+      # `normalizePath(..., mustWork = FALSE)` can retain an 8.3 short-name
+      # spelling for the existing parent of a new file while the same
+      # directory normalizes to its long spelling when it exists. Resolve the
+      # longest existing prefix with `mustWork = TRUE`, then append the missing
+      # suffix so containment checks compare one canonical representation.
+      probe <- normalized
+      missing <- character()
+      while (!file.exists(probe) && !dir.exists(probe)) {
+        parent <- dirname(probe)
+        if (identical(parent, probe)) {
+          break
+        }
+        missing <- c(basename(probe), missing)
+        probe <- parent
+      }
+      if (file.exists(probe) || dir.exists(probe)) {
+        canonical_prefix <- tryCatch(
+          normalizePath(probe, mustWork = TRUE, winslash = "/"),
+          error = function(e) NA_character_
+        )
+        if (!is.na(canonical_prefix)) {
+          normalized <- if (length(missing) > 0L) {
+            do.call(file.path, as.list(c(canonical_prefix, missing)))
+          } else {
+            canonical_prefix
+          }
+          normalized <- gsub("\\\\", "/", normalized)
+        }
+      }
+    } else {
       normalized <- sub("^//+", "/", normalized)
     }
   }
@@ -207,6 +237,11 @@ is_path_within <- function(path, dir) {
   # If normalization failed, deny access
   if (is.na(path) || is.na(dir)) {
     return(FALSE)
+  }
+
+  if (.Platform$OS.type == "windows") {
+    path <- tolower(path)
+    dir <- tolower(dir)
   }
 
   # Ensure directory has trailing separator for accurate prefix matching

@@ -301,7 +301,10 @@ test_that("relative native tool paths execute inside Agent working_dir", {
 
   agent$run_sync("Write input.txt")
 
-  expect_identical(getwd(), normalizePath(outside, winslash = "/"))
+  expect_identical(
+    normalizePath(getwd(), winslash = "/"),
+    normalizePath(outside, winslash = "/")
+  )
   expect_identical(readLines(file.path(root, "input.txt")), "after")
   expect_identical(readLines(file.path(outside, "input.txt")), "outside")
 
