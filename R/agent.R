@@ -2110,6 +2110,26 @@ Agent <- R6::R6Class(
       events
     },
 
+    fallback_chat = function(prompt) {
+      # Non-streaming chat calls report tool lifecycle through callbacks, so
+      # switch out of content-stream mode before invoking the provider.
+      private$current_stream_content <- FALSE
+      fallback_error <- NULL
+      response <- tryCatch(
+        self$chat$chat(prompt),
+        error = function(error) {
+          fallback_error <<- error
+          NULL
+        }
+      )
+
+      list(
+        response = response,
+        events = private$drain_events(),
+        error = fallback_error
+      )
+    },
+
     current_run_usage = function() {
       baseline <- private$current_usage_baseline %||% AgentUsage()
       usage <- agent_usage_difference(
@@ -3083,8 +3103,22 @@ Agent <- R6::R6Class(
                   details = stream_error$message
                 ))
               }
-              response <- agent$chat$chat(prompt)
-              if (!is.null(response) && nchar(response) > 0) {
+              fallback <- agent$.__enclos_env__$private$fallback_chat(prompt)
+              for (event in fallback$events) {
+                coro::yield(event)
+              }
+              if (
+                !is.null(fallback$error) &&
+                  !agent$.__enclos_env__$private$should_stop
+              ) {
+                stop(fallback$error)
+              }
+              response <- fallback$response
+              if (
+                !agent$.__enclos_env__$private$should_stop &&
+                  !is.null(response) &&
+                  nchar(response) > 0
+              ) {
                 text_chunks <- response
                 if (isTRUE(include_partial_messages)) {
                   coro::yield(AgentEvent(
@@ -3124,8 +3158,22 @@ Agent <- R6::R6Class(
               message = "Streaming failed, falling back to non-streaming",
               details = stream_error$message
             ))
-            response <- agent$chat$chat(prompt)
-            if (!is.null(response) && nchar(response) > 0) {
+            fallback <- agent$.__enclos_env__$private$fallback_chat(prompt)
+            for (event in fallback$events) {
+              coro::yield(event)
+            }
+            if (
+              !is.null(fallback$error) &&
+                !agent$.__enclos_env__$private$should_stop
+            ) {
+              stop(fallback$error)
+            }
+            response <- fallback$response
+            if (
+              !agent$.__enclos_env__$private$should_stop &&
+                !is.null(response) &&
+                nchar(response) > 0
+            ) {
               text_chunks <- response
               if (isTRUE(include_partial_messages)) {
                 coro::yield(AgentEvent(

@@ -261,6 +261,40 @@ sdk_tool_web_search <- make_tool_alias(
   annotations = tool_annotations_copy(tool_web_search)
 )
 
+# Native tools are collated after this file, so their annotations are not yet
+# available when the SDK aliases above are constructed. Refresh the alias
+# ToolDefs after all package code has loaded rather than duplicating annotation
+# policy in two places.
+sdk_tool_annotation_sources <- c(
+  sdk_tool_read = "tool_read_file",
+  sdk_tool_write = "tool_write_file",
+  sdk_tool_edit = "tool_edit_file",
+  sdk_tool_multi_edit = "tool_multi_edit",
+  sdk_tool_glob = "tool_glob_files",
+  sdk_tool_grep = "tool_grep_files",
+  sdk_tool_ls = "tool_list_files",
+  sdk_tool_todo_read = "tool_todo_read",
+  sdk_tool_todo_write = "tool_todo_write",
+  sdk_tool_web_fetch = "tool_web_fetch",
+  sdk_tool_web_search = "tool_web_search"
+)
+
+initialize_sdk_tool_annotations <- function(namespace) {
+  for (alias_name in names(sdk_tool_annotation_sources)) {
+    native_name <- unname(sdk_tool_annotation_sources[[alias_name]])
+    alias <- get(alias_name, envir = namespace, inherits = FALSE)
+    native_tool <- get(native_name, envir = namespace, inherits = FALSE)
+    alias@annotations <- tool_annotations_copy(native_tool)
+    assign(alias_name, alias, envir = namespace)
+  }
+
+  invisible(NULL)
+}
+
+.onLoad <- function(libname, pkgname) {
+  initialize_sdk_tool_annotations(asNamespace(pkgname))
+}
+
 # Create Agent/Task aliases dynamically from a lead-agent delegate tool.
 make_delegate_tool_alias <- function(delegate_tool, name = "Agent") {
   make_tool_alias(

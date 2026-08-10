@@ -259,6 +259,60 @@ test_that("LeadAgent passes permissions to sub-agents", {
   expect_identical(lead$permissions, perms)
 })
 
+test_that("default and auto permission modes are equivalent for sub-agents", {
+  default_to_auto <- agent_definition(
+    name = "default-to-auto",
+    description = "Uses the SDK alias",
+    prompt = "You help",
+    permission_mode = "auto"
+  )
+  default_lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(default_to_auto),
+    permissions = Permissions$new(mode = "default")
+  )
+
+  auto_child <- default_lead$.__enclos_env__$private$derive_subagent_permissions(
+    default_to_auto
+  )
+  expect_identical(auto_child$mode, "auto")
+
+  auto_to_default <- agent_definition(
+    name = "auto-to-default",
+    description = "Uses Deputy's canonical mode",
+    prompt = "You help",
+    permission_mode = "default"
+  )
+  auto_lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(auto_to_default),
+    permissions = Permissions$new(mode = "auto")
+  )
+
+  default_child <- auto_lead$.__enclos_env__$private$derive_subagent_permissions(
+    auto_to_default
+  )
+  expect_identical(default_child$mode, "default")
+
+  default_to_bypass <- default_to_auto
+  default_to_bypass$permission_mode <- "bypassPermissions"
+  expect_error(
+    default_lead$.__enclos_env__$private$derive_subagent_permissions(
+      default_to_bypass
+    ),
+    "cannot change under the lead policy"
+  )
+
+  auto_to_accept_edits <- auto_to_default
+  auto_to_accept_edits$permission_mode <- "acceptEdits"
+  expect_error(
+    auto_lead$.__enclos_env__$private$derive_subagent_permissions(
+      auto_to_accept_edits
+    ),
+    "cannot change under the lead policy"
+  )
+})
+
 test_that("sub-agent permission modes cannot exceed the lead policy", {
   mock_chat <- create_mock_chat()
   widening <- agent_definition(

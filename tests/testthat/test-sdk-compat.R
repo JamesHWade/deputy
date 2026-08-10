@@ -1,5 +1,87 @@
 # Tests for Claude SDK compatibility facade.
 
+test_that("SDK tool aliases inherit native annotations after package load", {
+  aliases <- list(
+    sdk_tool_read,
+    sdk_tool_write,
+    sdk_tool_edit,
+    sdk_tool_multi_edit,
+    sdk_tool_ls,
+    sdk_tool_glob,
+    sdk_tool_grep,
+    sdk_tool_todo_read,
+    sdk_tool_todo_write,
+    sdk_tool_web_fetch,
+    sdk_tool_web_search
+  )
+  native_tools <- list(
+    tool_read_file,
+    tool_write_file,
+    tool_edit_file,
+    tool_multi_edit,
+    tool_list_files,
+    tool_glob_files,
+    tool_grep_files,
+    tool_todo_read,
+    tool_todo_write,
+    tool_web_fetch,
+    tool_web_search
+  )
+
+  for (i in seq_along(aliases)) {
+    expect_equal(
+      aliases[[i]]@annotations,
+      native_tools[[i]]@annotations,
+      info = aliases[[i]]@name
+    )
+  }
+})
+
+test_that("SDK aliases preserve plan-mode read and write boundaries", {
+  permissions <- permissions_plan()
+  read_aliases <- list(
+    sdk_tool_read,
+    sdk_tool_ls,
+    sdk_tool_glob,
+    sdk_tool_grep,
+    sdk_tool_todo_read,
+    sdk_tool_web_fetch,
+    sdk_tool_web_search
+  )
+  write_aliases <- list(
+    sdk_tool_write,
+    sdk_tool_edit,
+    sdk_tool_multi_edit,
+    sdk_tool_todo_write
+  )
+
+  for (tool in read_aliases) {
+    result <- permissions$check(
+      tool@name,
+      list(),
+      list(tool_annotations = tool@annotations)
+    )
+    expect_identical(
+      class(result)[[1]],
+      "PermissionResultAllow",
+      info = tool@name
+    )
+  }
+
+  for (tool in write_aliases) {
+    result <- permissions$check(
+      tool@name,
+      list(),
+      list(tool_annotations = tool@annotations)
+    )
+    expect_identical(
+      class(result)[[1]],
+      "PermissionResultDeny",
+      info = tool@name
+    )
+  }
+})
+
 test_that("claude_sdk_query persists and reuses a compat session id", {
   withr::local_tempdir(pattern = "deputy-sdk-store") -> store_dir
 

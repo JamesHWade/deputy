@@ -354,6 +354,101 @@ test_that("cancellation before the first chunk never falls back", {
   expect_identical(stop$reason, "user_cancelled")
 })
 
+test_that("non-streaming fallbacks retain tool lifecycle events", {
+  for (failure_mode in c("stream_setup", "first_chunk")) {
+    state <- new.env(parent = emptyenv())
+    state$on_tool_request <- NULL
+    state$on_tool_result <- NULL
+    state$tool_executed <- FALSE
+
+    chat <- create_mock_chat("fallback response")
+    chat$on_tool_request <- function(callback) {
+      state$on_tool_request <- callback
+    }
+    chat$on_tool_result <- function(callback) {
+      state$on_tool_result <- callback
+    }
+    chat$stream <- if (identical(failure_mode, "stream_setup")) {
+      function(
+        prompt = NULL,
+        stream = c("text", "content"),
+        controller = NULL
+      ) {
+        stop("stream setup failed")
+      }
+    } else {
+      function(
+        prompt = NULL,
+        stream = c("text", "content"),
+        controller = NULL
+      ) {
+        function() stop("first chunk failed")
+      }
+    }
+    chat$chat <- function(prompt = NULL) {
+      request <- ellmer::ContentToolRequest(
+        id = paste0("fallback-tool-", failure_mode),
+        name = "read_file",
+        arguments = list(path = "input.txt")
+      )
+      state$on_tool_request(request)
+      state$tool_executed <- TRUE
+      state$on_tool_result(ellmer::ContentToolResult(
+        value = "fallback contents",
+        request = request
+      ))
+      "fallback response"
+    }
+    chat$last_turn <- function(role = "assistant") {
+      create_mock_assistant_turn("fallback response")
+    }
+
+    root <- withr::local_tempdir(pattern = "deputy-fallback-")
+    writeLines("fallback contents", file.path(root, "input.txt"))
+    agent <- Agent$new(
+      chat = chat,
+      permissions = permissions_standard(root),
+      working_dir = root
+    )
+
+    result <- suppressWarnings(agent$run_sync("Read input.txt"))
+    event_types <- vapply(
+      result$events,
+      function(event) event$type,
+      character(1)
+    )
+
+    expect_identical(state$tool_executed, TRUE, info = failure_mode)
+    expect_identical(
+      event_types,
+      c(
+        "start",
+        "warning",
+        "tool_start",
+        "tool_end",
+        "text",
+        "text_complete",
+        "turn",
+        "usage",
+        "stop"
+      ),
+      info = failure_mode
+    )
+    expect_length(result$tool_calls(), 1L)
+    expect_length(result$tool_results(), 1L)
+    expect_identical(
+      result$tool_calls()[[1L]]$tool_use_id,
+      paste0("fallback-tool-", failure_mode),
+      info = failure_mode
+    )
+    expect_identical(
+      result$tool_results()[[1L]]$tool_result,
+      "fallback contents",
+      info = failure_mode
+    )
+  }
+})
+
 test_that("run_sync never returns a prior turn after an early stop", {
   mock <- create_content_stream_chat()
   mock$state$turns <- list(create_mock_assistant_turn("stale response"))

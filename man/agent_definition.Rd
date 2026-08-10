@@ -49,8 +49,9 @@ agent_definition(
 \item{effort}{Optional reasoning effort metadata}
 
 \item{permission_mode}{Optional permission mode. For non-bypass lead agents,
-this must match the lead mode; use \code{disallowed_tools} and \code{max_turns} to
-tighten a child policy. A bypass lead may select any mode.}
+this must match the lead mode (with \code{"default"} and \code{"auto"} treated as
+equivalent); use \code{disallowed_tools} and \code{max_turns} to tighten a child
+policy. A bypass lead may select any mode.}
 }
 \value{
 An \code{AgentDefinition} object

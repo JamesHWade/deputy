@@ -21,8 +21,9 @@
 #' @param background Logical SDK-compatible metadata flag
 #' @param effort Optional reasoning effort metadata
 #' @param permission_mode Optional permission mode. For non-bypass lead agents,
-#'   this must match the lead mode; use `disallowed_tools` and `max_turns` to
-#'   tighten a child policy. A bypass lead may select any mode.
+#'   this must match the lead mode (with `"default"` and `"auto"` treated as
+#'   equivalent); use `disallowed_tools` and `max_turns` to tighten a child
+#'   policy. A bypass lead may select any mode.
 #' @return An `AgentDefinition` object
 #'
 #' @examples
@@ -592,8 +593,8 @@ LeadAgent <- R6::R6Class(
       allowed_modes <- switch(
         existing$mode,
         bypassPermissions = PermissionMode,
-        default = "default",
-        auto = "auto",
+        default = c("default", "auto"),
+        auto = c("default", "auto"),
         acceptEdits = "acceptEdits",
         dontAsk = "dontAsk",
         plan = "plan",
