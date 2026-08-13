@@ -1,3 +1,11 @@
+# deputy (development version)
+
+* `compact()` now summarizes on a clone of the agent's own chat instead of
+  constructing a new provider. Previously any provider other than OpenAI,
+  Anthropic, or Google fell through to `ellmer::chat_openai("gpt-4o-mini")`,
+  sending conversation history to OpenAI when `OPENAI_API_KEY` happened to be
+  set. The clone also preserves the configured model, base URL, and credentials.
+
 # deputy 0.0.0.9000
 
 * Initial development version

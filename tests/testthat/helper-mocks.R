@@ -106,6 +106,7 @@ create_mock_chat <- function(responses = list("Hello!")) {
       get_system_prompt = function() system_prompt,
       set_system_prompt = function(prompt) system_prompt <<- prompt,
       get_tools = function() tools,
+      set_tools = function(new_tools) tools <<- new_tools,
       register_tool = function(tool) {
         tools[[tool@name]] <<- tool
       },

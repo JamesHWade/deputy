@@ -310,6 +310,64 @@ test_that("generate_fallback_summary creates text summary", {
   expect_true(grepl("Asst msg", fallback))
 })
 
+test_that("compaction summarizes on the agent's own chat, not a new provider", {
+  mock_chat <- create_mock_chat(responses = list("A summary."))
+  agent <- Agent$new(chat = mock_chat)
+  mock_turns <- list(
+    structure(
+      list(text = "Q", contents = list()),
+      class = c(
+        "UserTurn",
+        "Turn"
+      )
+    ),
+    structure(
+      list(text = "A", contents = list()),
+      class = c(
+        "AssistantTurn",
+        "Turn"
+      )
+    )
+  )
+
+  local_mocked_bindings(
+    chat_openai = function(...) {
+      stop("compaction must not construct a provider")
+    },
+    chat_anthropic = function(...) {
+      stop("compaction must not construct a provider")
+    },
+    .package = "ellmer"
+  )
+  summary <- agent$.__enclos_env__$private$generate_compaction_summary(
+    mock_turns
+  )
+
+  expect_equal(summary, "A summary.")
+})
+
+test_that("compaction leaves the agent's own chat state untouched", {
+  mock_chat <- create_mock_chat(responses = list("A summary."))
+  agent <- Agent$new(chat = mock_chat, system_prompt = "KEEP ME")
+  original_turns <- list(
+    structure(
+      list(text = "Q", contents = list()),
+      class = c(
+        "UserTurn",
+        "Turn"
+      )
+    )
+  )
+  mock_chat$set_turns(original_turns)
+  mock_chat$register_tool(tool_read_file)
+
+  agent$.__enclos_env__$private$generate_compaction_summary(original_turns)
+
+  expect_equal(mock_chat$get_system_prompt(), "KEEP ME")
+  expect_equal(length(mock_chat$get_turns()), 1)
+  expect_true("read_file" %in% names(mock_chat$get_tools()))
+})
+
 # Tool data extraction tests
 test_that("extract_tool_request_data handles NULL request", {
   mock_chat <- create_mock_chat()

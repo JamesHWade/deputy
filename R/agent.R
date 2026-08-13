@@ -1850,27 +1850,13 @@ Agent <- R6::R6Class(
         {
           # Create a temporary chat for summarization
           # Use the same provider as the main chat
-          provider_info <- self$provider()
-
           temp_chat <- tryCatch(
             {
-              # Try to create a chat with the same provider
-              if (provider_info$name == "openai") {
-                ellmer::chat_openai(
-                  model = provider_info$model %||% "gpt-4o-mini"
-                )
-              } else if (provider_info$name == "anthropic") {
-                ellmer::chat_anthropic(
-                  model = provider_info$model %||% "claude-sonnet-4-5-20250929"
-                )
-              } else if (provider_info$name == "google") {
-                ellmer::chat_google(
-                  model = provider_info$model %||% "gemini-2.0-flash"
-                )
-              } else {
-                # Fallback to a default provider
-                ellmer::chat_openai(model = "gpt-4o-mini")
-              }
+              summary_chat <- self$chat$clone()
+              summary_chat$set_turns(list())
+              summary_chat$set_system_prompt(NULL)
+              summary_chat$set_tools(list())
+              summary_chat
             },
             error = function(e) {
               cli_warn(c(
