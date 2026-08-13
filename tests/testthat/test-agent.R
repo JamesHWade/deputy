@@ -435,6 +435,153 @@ test_that("generate_fallback_summary creates text summary", {
   expect_true(grepl("Asst msg", fallback))
 })
 
+test_that("compaction summary clone is isolated, callback-free, and silent", {
+  request_calls <- 0L
+  result_calls <- 0L
+  probe <- new.env(parent = emptyenv())
+  provider <- list(
+    name = "private-gateway",
+    model = "private-model",
+    base_url = "https://gateway.invalid",
+    credentials = function() "test-token"
+  )
+  mock_chat <- create_compaction_mock_chat(
+    responses = list("A summary."),
+    provider = provider,
+    request_callbacks = list(function(request) {
+      request_calls <<- request_calls + 1L
+    }),
+    result_callbacks = list(function(result) {
+      result_calls <<- result_calls + 1L
+    }),
+    simulate_tool_activity = TRUE,
+    probe = probe
+  )
+  run_context <- list(
+    product = "tempest",
+    research_run_id = "research-123",
+    stage = "expert-research"
+  )
+  agent <- Agent$new(
+    chat = mock_chat,
+    tools = list(tool_read_file),
+    system_prompt = "KEEP ME",
+    run_context = run_context,
+    agent_id = "agent-compaction"
+  )
+  agent$configure_sdk_compat(list(
+    persist_session = FALSE,
+    session_id = "session-compaction"
+  ))
+  original_turns <- list(
+    create_mock_user_turn("Q"),
+    create_mock_assistant_turn("A")
+  )
+  mock_chat$set_turns(original_turns)
+  original_callback_counts <- mock_chat$callback_counts()
+  original_run_context <- agent$run_context
+  original_agent_id <- agent$agent_id
+  original_session_id <- agent$session_id()
+
+  summary <- agent$.__enclos_env__$private$generate_compaction_summary(
+    original_turns
+  )
+
+  expect_equal(summary, "A summary.")
+  expect_identical(probe$clone_calls, 1L)
+  expect_identical(probe$clone_deep, TRUE)
+  expect_length(probe$summary_call$turns, 0L)
+  expect_null(probe$summary_call$system_prompt)
+  expect_length(probe$summary_call$tools, 0L)
+  expect_equal(
+    probe$summary_call$callback_counts,
+    c(request = 0L, result = 0L)
+  )
+  expect_identical(probe$summary_call$echo, "none")
+  expect_identical(probe$summary_call$provider, provider)
+  expect_equal(mock_chat$get_system_prompt(), "KEEP ME")
+  expect_identical(mock_chat$get_turns(), original_turns)
+  expect_named(mock_chat$get_tools(), "read_file")
+  expect_equal(mock_chat$callback_counts(), original_callback_counts)
+  expect_identical(agent$run_context, original_run_context)
+  expect_identical(agent$agent_id, original_agent_id)
+  expect_identical(agent$session_id(), original_session_id)
+  expect_identical(request_calls, 0L)
+  expect_identical(result_calls, 0L)
+})
+
+test_that("compaction does not select a new provider constructor", {
+  mock_chat <- create_mock_chat(responses = list("A summary."))
+  agent <- Agent$new(chat = mock_chat)
+  compaction_code <- paste(
+    c(
+      deparse(body(clone_compaction_chat)),
+      deparse(body(
+        agent$.__enclos_env__$private$generate_compaction_summary
+      ))
+    ),
+    collapse = "\n"
+  )
+
+  expect_no_match(compaction_code, "ellmer::chat_[[:alnum:]_]+")
+})
+
+test_that("compaction preserves run context and session identity", {
+  mock_chat <- create_compaction_mock_chat(responses = list("A summary."))
+  run_context <- list(product = "tempest", research_run_id = "research-123")
+  agent <- Agent$new(
+    chat = mock_chat,
+    run_context = run_context,
+    agent_id = "agent-compaction"
+  )
+  agent$configure_sdk_compat(list(
+    persist_session = FALSE,
+    session_id = "session-compaction"
+  ))
+  mock_chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  original_callback_counts <- mock_chat$callback_counts()
+
+  suppressMessages(agent$compact(keep_last = 1L))
+
+  expect_identical(agent$run_context, run_context)
+  expect_identical(agent$agent_id, "agent-compaction")
+  expect_identical(agent$session_id(), "session-compaction")
+  expect_equal(mock_chat$callback_counts(), original_callback_counts)
+})
+
+test_that("compaction falls back only after clone or summary runtime failure", {
+  turns <- list(
+    create_mock_user_turn("User msg"),
+    create_mock_assistant_turn("Assistant msg")
+  )
+  clone_failure_chat <- create_mock_chat()
+  clone_failure_agent <- Agent$new(chat = clone_failure_chat)
+  clone_failure_chat$clone <- function(deep = FALSE) {
+    stop("clone failed")
+  }
+  runtime_failure_agent <- Agent$new(
+    chat = create_compaction_mock_chat(chat_error = "provider failed")
+  )
+
+  clone_fallback <- suppressWarnings(suppressMessages(
+    clone_failure_agent$.__enclos_env__$private$generate_compaction_summary(
+      turns
+    )
+  ))
+  runtime_fallback <- suppressWarnings(suppressMessages(
+    runtime_failure_agent$.__enclos_env__$private$generate_compaction_summary(
+      turns
+    )
+  ))
+
+  expect_match(clone_fallback, "Compacted 2 earlier turns")
+  expect_match(runtime_fallback, "Compacted 2 earlier turns")
+})
+
 # Tool data extraction tests
 test_that("extract_tool_request_data handles NULL request", {
   mock_chat <- create_mock_chat()
