@@ -136,6 +136,32 @@ test_that("Agent provider returns correct structure", {
   expect_equal(provider$model, "test-model")
 })
 
+test_that("Agent provider reports a model for a provider without a model property", {
+  chat <- ellmer::chat_openai(
+    credentials = function() "test-key",
+    model = "gpt-4o-mini"
+  )
+  skip_if_not(is.null(attr(chat$get_provider(), "model")))
+  agent <- Agent$new(chat = chat)
+
+  provider <- agent$provider()
+
+  expect_equal(provider$name, "OpenAI")
+  expect_equal(provider$model, "gpt-4o-mini")
+})
+
+test_that("Agent provider falls back to unknown when the model cannot be read", {
+  mock_chat <- create_mock_chat()
+  mock_chat$get_provider <- function() list(name = "mock")
+  mock_chat$get_model <- function() stop("no model available")
+  agent <- Agent$new(chat = mock_chat)
+
+  provider <- agent$provider()
+
+  expect_equal(provider$name, "mock")
+  expect_equal(provider$model, "unknown")
+})
+
 test_that("Agent turns returns list", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)
