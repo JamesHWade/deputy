@@ -9,153 +9,215 @@ It automatically has a \code{delegate_to_agent} tool that allows it to spawn
 sub-agents based on registered AgentDefinitions.
 }
 \section{Super class}{
-\code{\link[deputy:Agent]{deputy::Agent}} -> \code{LeadAgent}
+\code{\link[deputy:Agent]{Agent}} -> \code{LeadAgent}
 }
 \section{Public fields}{
-\if{html}{\out{<div class="r6-fields">}}
-\describe{
-\item{\code{sub_agent_defs}}{List of AgentDefinition objects}
-}
-\if{html}{\out{</div>}}
+  \if{html}{\out{<div class="r6-fields">}}
+  \describe{
+    \item{\code{sub_agent_defs}}{List of AgentDefinition objects}
+  }
+  \if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
-\itemize{
-\item \href{#method-LeadAgent-new}{\code{LeadAgent$new()}}
-\item \href{#method-LeadAgent-register_sub_agent}{\code{LeadAgent$register_sub_agent()}}
-\item \href{#method-LeadAgent-available_sub_agents}{\code{LeadAgent$available_sub_agents()}}
-\item \href{#method-LeadAgent-print}{\code{LeadAgent$print()}}
-\item \href{#method-LeadAgent-clone}{\code{LeadAgent$clone()}}
+  \itemize{
+    \item \href{#method-LeadAgent-initialize}{\code{LeadAgent$new()}}
+    \item \href{#method-LeadAgent-register_sub_agent}{\code{LeadAgent$register_sub_agent()}}
+    \item \href{#method-LeadAgent-available_sub_agents}{\code{LeadAgent$available_sub_agents()}}
+    \item \href{#method-LeadAgent-list_subagents}{\code{LeadAgent$list_subagents()}}
+    \item \href{#method-LeadAgent-get_subagent_messages}{\code{LeadAgent$get_subagent_messages()}}
+    \item \href{#method-LeadAgent-print}{\code{LeadAgent$print()}}
+    \item \href{#method-LeadAgent-clone}{\code{LeadAgent$clone()}}
+  }
 }
-}
-\if{html}{\out{
-<details><summary>Inherited methods</summary>
+\if{html}{\out{<details><summary>Inherited methods</summary>
 <ul>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href='../../deputy/html/Agent.html#method-Agent-add_hook'><code>deputy::Agent$add_hook()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href='../../deputy/html/Agent.html#method-Agent-compact'><code>deputy::Agent$compact()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="configure_sdk_compat"><a href='../../deputy/html/Agent.html#method-Agent-configure_sdk_compat'><code>deputy::Agent$configure_sdk_compat()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href='../../deputy/html/Agent.html#method-Agent-cost'><code>deputy::Agent$cost()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_turn"><a href='../../deputy/html/Agent.html#method-Agent-last_turn'><code>deputy::Agent$last_turn()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_mcp"><a href='../../deputy/html/Agent.html#method-Agent-load_mcp'><code>deputy::Agent$load_mcp()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_session"><a href='../../deputy/html/Agent.html#method-Agent-load_session'><code>deputy::Agent$load_session()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_skill"><a href='../../deputy/html/Agent.html#method-Agent-load_skill'><code>deputy::Agent$load_skill()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_tools"><a href='../../deputy/html/Agent.html#method-Agent-mcp_tools'><code>deputy::Agent$mcp_tools()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="provider"><a href='../../deputy/html/Agent.html#method-Agent-provider'><code>deputy::Agent$provider()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tool"><a href='../../deputy/html/Agent.html#method-Agent-register_tool'><code>deputy::Agent$register_tool()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tools"><a href='../../deputy/html/Agent.html#method-Agent-register_tools'><code>deputy::Agent$register_tools()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run"><a href='../../deputy/html/Agent.html#method-Agent-run'><code>deputy::Agent$run()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_shiny"><a href='../../deputy/html/Agent.html#method-Agent-run_shiny'><code>deputy::Agent$run_shiny()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_sync"><a href='../../deputy/html/Agent.html#method-Agent-run_sync'><code>deputy::Agent$run_sync()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="save_session"><a href='../../deputy/html/Agent.html#method-Agent-save_session'><code>deputy::Agent$save_session()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="session_id"><a href='../../deputy/html/Agent.html#method-Agent-session_id'><code>deputy::Agent$session_id()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="settings"><a href='../../deputy/html/Agent.html#method-Agent-settings'><code>deputy::Agent$settings()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="skills"><a href='../../deputy/html/Agent.html#method-Agent-skills'><code>deputy::Agent$skills()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="slash_commands"><a href='../../deputy/html/Agent.html#method-Agent-slash_commands'><code>deputy::Agent$slash_commands()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="turns"><a href='../../deputy/html/Agent.html#method-Agent-turns'><code>deputy::Agent$turns()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href='../../deputy/html/Agent.html#method-Agent-add_hook'><code>Agent$add_hook()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="checkpoint"><a href='../../deputy/html/Agent.html#method-Agent-checkpoint'><code>Agent$checkpoint()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href='../../deputy/html/Agent.html#method-Agent-compact'><code>Agent$compact()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="configure_sdk_compat"><a href='../../deputy/html/Agent.html#method-Agent-configure_sdk_compat'><code>Agent$configure_sdk_compat()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href='../../deputy/html/Agent.html#method-Agent-cost'><code>Agent$cost()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_permission_mode"><a href='../../deputy/html/Agent.html#method-Agent-get_permission_mode'><code>Agent$get_permission_mode()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="interrupt"><a href='../../deputy/html/Agent.html#method-Agent-interrupt'><code>Agent$interrupt()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_turn"><a href='../../deputy/html/Agent.html#method-Agent-last_turn'><code>Agent$last_turn()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="list_checkpoints"><a href='../../deputy/html/Agent.html#method-Agent-list_checkpoints'><code>Agent$list_checkpoints()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_mcp"><a href='../../deputy/html/Agent.html#method-Agent-load_mcp'><code>Agent$load_mcp()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_session"><a href='../../deputy/html/Agent.html#method-Agent-load_session'><code>Agent$load_session()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_skill"><a href='../../deputy/html/Agent.html#method-Agent-load_skill'><code>Agent$load_skill()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_status"><a href='../../deputy/html/Agent.html#method-Agent-mcp_status'><code>Agent$mcp_status()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_tools"><a href='../../deputy/html/Agent.html#method-Agent-mcp_tools'><code>Agent$mcp_tools()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="provider"><a href='../../deputy/html/Agent.html#method-Agent-provider'><code>Agent$provider()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tool"><a href='../../deputy/html/Agent.html#method-Agent-register_tool'><code>Agent$register_tool()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tools"><a href='../../deputy/html/Agent.html#method-Agent-register_tools'><code>Agent$register_tools()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="rewind_files"><a href='../../deputy/html/Agent.html#method-Agent-rewind_files'><code>Agent$rewind_files()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run"><a href='../../deputy/html/Agent.html#method-Agent-run'><code>Agent$run()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_shiny"><a href='../../deputy/html/Agent.html#method-Agent-run_shiny'><code>Agent$run_shiny()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_sync"><a href='../../deputy/html/Agent.html#method-Agent-run_sync'><code>Agent$run_sync()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="save_session"><a href='../../deputy/html/Agent.html#method-Agent-save_session'><code>Agent$save_session()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="session_id"><a href='../../deputy/html/Agent.html#method-Agent-session_id'><code>Agent$session_id()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_permission_mode"><a href='../../deputy/html/Agent.html#method-Agent-set_permission_mode'><code>Agent$set_permission_mode()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="settings"><a href='../../deputy/html/Agent.html#method-Agent-settings'><code>Agent$settings()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="skills"><a href='../../deputy/html/Agent.html#method-Agent-skills'><code>Agent$skills()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="slash_commands"><a href='../../deputy/html/Agent.html#method-Agent-slash_commands'><code>Agent$slash_commands()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="turns"><a href='../../deputy/html/Agent.html#method-Agent-turns'><code>Agent$turns()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="usage"><a href='../../deputy/html/Agent.html#method-Agent-usage'><code>Agent$usage()</code></a></span></li>
 </ul>
-</details>
-}}
+</details>}}
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-LeadAgent-new"></a>}}
-\if{latex}{\out{\hypertarget{method-LeadAgent-new}{}}}
-\subsection{Method \code{new()}}{
-Create a new LeadAgent.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{LeadAgent$new(
+\if{html}{\out{<a id="method-LeadAgent-initialize"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-initialize}{}}}
+\subsection{\code{LeadAgent$new()}}{
+  Create a new LeadAgent.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$new(
   chat,
   sub_agents = list(),
   tools = list(),
   system_prompt = NULL,
   permissions = NULL,
+  usage_limits = NULL,
+  enable_file_checkpointing = FALSE,
+  file_checkpoint_max_file_bytes = 50 * 1024^2,
+  file_checkpoint_max_journal_bytes = 250 * 1024^2,
   working_dir = getwd(),
   setting_sources = NULL,
   settings = NULL
-)}\if{html}{\out{</div>}}
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{chat}}{An ellmer Chat object}
+      \item{\code{sub_agents}}{List of \code{\link[=agent_definition]{agent_definition()}} objects}
+      \item{\code{tools}}{Additional tools for the lead agent}
+      \item{\code{system_prompt}}{System prompt for the lead agent}
+      \item{\code{permissions}}{Permissions for the lead agent (also applied to sub-agents)}
+      \item{\code{usage_limits}}{Optional \link{UsageLimits} for each lead-agent run.}
+      \item{\code{enable_file_checkpointing}}{Whether to journal reversible file
+preimages in one workspace journal shared by the lead agent and its
+delegated agents.}
+      \item{\code{file_checkpoint_max_file_bytes}}{Maximum bytes captured for one
+file preimage. Defaults to 50 MiB.}
+      \item{\code{file_checkpoint_max_journal_bytes}}{Maximum aggregate serialized
+bytes for workspace checkpoint records, markers, metadata, and pending
+captures. Defaults to 250 MiB.}
+      \item{\code{working_dir}}{Working directory}
+      \item{\code{setting_sources}}{Optional Claude-style setting sources}
+      \item{\code{settings}}{Optional pre-loaded settings list from claude_settings_load()}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A new \code{LeadAgent} object
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{chat}}{An ellmer Chat object}
-
-\item{\code{sub_agents}}{List of \code{\link[=agent_definition]{agent_definition()}} objects}
-
-\item{\code{tools}}{Additional tools for the lead agent}
-
-\item{\code{system_prompt}}{System prompt for the lead agent}
-
-\item{\code{permissions}}{Permissions for the lead agent (also applied to sub-agents)}
-
-\item{\code{working_dir}}{Working directory}
-
-\item{\code{setting_sources}}{Optional Claude-style setting sources}
-
-\item{\code{settings}}{Optional pre-loaded settings list from claude_settings_load()}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-A new \code{LeadAgent} object
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-LeadAgent-register_sub_agent"></a>}}
 \if{latex}{\out{\hypertarget{method-LeadAgent-register_sub_agent}{}}}
-\subsection{Method \code{register_sub_agent()}}{
-Register a new sub-agent definition.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{LeadAgent$register_sub_agent(definition)}\if{html}{\out{</div>}}
+\subsection{\code{LeadAgent$register_sub_agent()}}{
+  Register a new sub-agent definition.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$register_sub_agent(definition)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{definition}}{An \code{\link[=agent_definition]{agent_definition()}} object}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{definition}}{An \code{\link[=agent_definition]{agent_definition()}} object}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Invisible self
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-LeadAgent-available_sub_agents"></a>}}
 \if{latex}{\out{\hypertarget{method-LeadAgent-available_sub_agents}{}}}
-\subsection{Method \code{available_sub_agents()}}{
-Get available sub-agent names.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{LeadAgent$available_sub_agents()}\if{html}{\out{</div>}}
+\subsection{\code{LeadAgent$available_sub_agents()}}{
+  Get available sub-agent names.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$available_sub_agents()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Character vector of sub-agent names
+  }
 }
 
-\subsection{Returns}{
-Character vector of sub-agent names
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-list_subagents"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-list_subagents}{}}}
+\subsection{\code{LeadAgent$list_subagents()}}{
+  List delegated sub-agent runs, including failures.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$list_subagents()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Data frame with one row per sub-agent run
+  }
 }
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-get_subagent_messages"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-get_subagent_messages}{}}}
+\subsection{\code{LeadAgent$get_subagent_messages()}}{
+  Get stored turn history for delegated sub-agent runs.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$get_subagent_messages(agent_name = NULL, session_id = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{agent_name}}{Optional sub-agent name filter}
+      \item{\code{session_id}}{Optional sub-agent session id filter}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    List of turn histories
+  }
 }
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-LeadAgent-print"></a>}}
 \if{latex}{\out{\hypertarget{method-LeadAgent-print}{}}}
-\subsection{Method \code{print()}}{
-Print the lead agent.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{LeadAgent$print()}\if{html}{\out{</div>}}
+\subsection{\code{LeadAgent$print()}}{
+  Print the lead agent.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$print()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-LeadAgent-clone"></a>}}
 \if{latex}{\out{\hypertarget{method-LeadAgent-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{LeadAgent$clone(deep = FALSE)}\if{html}{\out{</div>}}
+\subsection{\code{LeadAgent$clone()}}{
+  The objects of this class are cloneable with this method.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$clone(deep = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{deep}}{Whether to make a deep clone.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
-}
-}
 }

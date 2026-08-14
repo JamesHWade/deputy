@@ -11,7 +11,8 @@ permissions_standard(
 )
 }
 \arguments{
-\item{working_dir}{Directory for file operations (default: current directory)}
+\item{working_dir}{Root directory for file writes (default: current
+directory). This does not restrict otherwise accessible file reads.}
 
 \item{max_turns}{Maximum number of turns (default 25)}
 
@@ -22,8 +23,9 @@ A \link{Permissions} object
 }
 \description{
 Creates a permission policy suitable for most use cases.
-Allows file read/write within the working directory and R code execution.
-Denies bash commands, web access, and package installation.
+Allows reads of files accessible to the R process, confines file writes to
+the working directory, and permits R code execution. Denies bash commands,
+web access, and package installation.
 }
 \examples{
 perms <- permissions_standard()

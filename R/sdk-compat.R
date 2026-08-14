@@ -261,6 +261,40 @@ sdk_tool_web_search <- make_tool_alias(
   annotations = tool_annotations_copy(tool_web_search)
 )
 
+# Native tools are collated after this file, so their annotations are not yet
+# available when the SDK aliases above are constructed. Refresh the alias
+# ToolDefs after all package code has loaded rather than duplicating annotation
+# policy in two places.
+sdk_tool_annotation_sources <- c(
+  sdk_tool_read = "tool_read_file",
+  sdk_tool_write = "tool_write_file",
+  sdk_tool_edit = "tool_edit_file",
+  sdk_tool_multi_edit = "tool_multi_edit",
+  sdk_tool_glob = "tool_glob_files",
+  sdk_tool_grep = "tool_grep_files",
+  sdk_tool_ls = "tool_list_files",
+  sdk_tool_todo_read = "tool_todo_read",
+  sdk_tool_todo_write = "tool_todo_write",
+  sdk_tool_web_fetch = "tool_web_fetch",
+  sdk_tool_web_search = "tool_web_search"
+)
+
+initialize_sdk_tool_annotations <- function(namespace) {
+  for (alias_name in names(sdk_tool_annotation_sources)) {
+    native_name <- unname(sdk_tool_annotation_sources[[alias_name]])
+    alias <- get(alias_name, envir = namespace, inherits = FALSE)
+    native_tool <- get(native_name, envir = namespace, inherits = FALSE)
+    alias@annotations <- tool_annotations_copy(native_tool)
+    assign(alias_name, alias, envir = namespace)
+  }
+
+  invisible(NULL)
+}
+
+.onLoad <- function(libname, pkgname) {
+  initialize_sdk_tool_annotations(asNamespace(pkgname))
+}
+
 # Create Agent/Task aliases dynamically from a lead-agent delegate tool.
 make_delegate_tool_alias <- function(delegate_tool, name = "Agent") {
   make_tool_alias(
@@ -385,6 +419,204 @@ compat_default_tools <- function(delegate_tool = NULL) {
   tools
 }
 
+compat_delegate_tool_names <- c("Agent", "Task")
+
+compat_normalize_tool_names <- function(tool_names) {
+  if (is.null(tool_names) || length(tool_names) == 0) {
+    return(character())
+  }
+
+  normalized <- tool_names
+  if (
+    is.character(normalized) &&
+      length(normalized) == 1 &&
+      grepl(",", normalized)
+  ) {
+    normalized <- strsplit(normalized, ",", fixed = TRUE)[[1]]
+  }
+  normalized <- trimws(as.character(unlist(
+    normalized,
+    recursive = TRUE,
+    use.names = FALSE
+  )))
+  normalized[nzchar(normalized)]
+}
+
+compat_requested_tools <- function(options, delegate_tool = NULL) {
+  requested <- options$tools
+  if (is.null(requested)) {
+    return(compat_default_tools(delegate_tool = delegate_tool))
+  }
+
+  if (
+    is.list(requested) &&
+      length(requested) == 0
+  ) {
+    return(list())
+  }
+
+  if (
+    is.list(requested) &&
+      length(requested) > 0 &&
+      all(vapply(requested, inherits, logical(1), what = "ellmer::ToolDef"))
+  ) {
+    return(requested)
+  }
+
+  if (!is.character(requested)) {
+    cli::cli_abort(
+      "{.arg tools} must be NULL, a character vector of tool names, or a list of ellmer tools"
+    )
+  }
+
+  names <- compat_normalize_tool_names(requested)
+  if (is.null(delegate_tool)) {
+    names <- setdiff(names, compat_delegate_tool_names)
+  }
+
+  compat_resolve_named_tools(names, delegate_tool = delegate_tool)
+}
+
+compat_delegate_tool_requested <- function(options, name) {
+  if (is.null(options$tools)) {
+    return(TRUE)
+  }
+  requested <- options$tools
+  if (!is.character(requested)) {
+    return(FALSE)
+  }
+  name %in% compat_normalize_tool_names(requested)
+}
+
+compat_apply_managed_settings <- function(settings, options) {
+  managed <- options$managed_settings
+  if (is.null(managed)) {
+    return(settings)
+  }
+  if (!is.list(managed)) {
+    cli::cli_abort("{.arg managed_settings} must be NULL or a named list")
+  }
+
+  settings$settings <- merge_named_lists(settings$settings %||% list(), managed)
+  settings
+}
+
+compat_filter_settings_skills <- function(settings, options) {
+  requested <- options$skills
+  if (is.null(requested) || identical(requested, "all")) {
+    return(settings)
+  }
+
+  if (length(requested) == 0) {
+    settings$skills <- list()
+    return(settings)
+  }
+
+  if (is.character(requested)) {
+    skill_names <- compat_normalize_tool_names(requested)
+    settings$skills <- settings$skills[intersect(
+      names(settings$skills),
+      skill_names
+    )]
+  }
+
+  settings
+}
+
+compat_load_explicit_skills <- function(agent, options, settings) {
+  requested <- options$skills
+  if (
+    is.null(requested) || identical(requested, "all") || length(requested) == 0
+  ) {
+    return(invisible(NULL))
+  }
+
+  loaded_names <- names(settings$skills %||% list())
+  if (is.character(requested)) {
+    unresolved <- character()
+    for (skill in requested) {
+      if (skill %in% loaded_names) {
+        next
+      }
+      if (file.exists(skill)) {
+        agent$load_skill(skill, allow_conflicts = TRUE)
+      } else {
+        unresolved <- c(unresolved, skill)
+      }
+    }
+    if (length(unresolved) > 0) {
+      cli::cli_warn(c(
+        "Could not resolve {length(unresolved)} requested skill{?s}",
+        x = "Not found in settings or as a file path: {.val {unresolved}}",
+        i = "Pass a known skill name from settings or a path to a skill directory."
+      ))
+    }
+    return(invisible(NULL))
+  }
+
+  if (is.list(requested)) {
+    for (skill in requested) {
+      if (inherits(skill, "Skill") || is.character(skill)) {
+        agent$load_skill(skill, allow_conflicts = TRUE)
+      }
+    }
+  }
+
+  invisible(NULL)
+}
+
+compat_get_nested <- function(x, path) {
+  out <- x
+  for (key in path) {
+    if (!is.list(out) || is.null(out[[key]])) {
+      return(NULL)
+    }
+    out <- out[[key]]
+  }
+  out
+}
+
+compat_first_setting <- function(settings_data, paths) {
+  for (path in paths) {
+    value <- compat_get_nested(settings_data, path)
+    if (!is.null(value)) {
+      return(value)
+    }
+  }
+  NULL
+}
+
+compat_output_format_setting <- function(settings_data) {
+  value <- compat_first_setting(
+    settings_data,
+    list(
+      c("outputFormat"),
+      c("output_format")
+    )
+  )
+  if (is.character(value) && length(value) == 1) {
+    normalized <- tolower(trimws(value))
+    if (normalized %in% c("json", "json_object")) {
+      return(list(type = "json_object"))
+    }
+  }
+  value
+}
+
+compat_include_partial_setting <- function(settings_data) {
+  value <- compat_first_setting(
+    settings_data,
+    list(
+      c("includePartialMessages"),
+      c("include_partial_messages")
+    )
+  )
+  if (is.null(value)) {
+    return(NULL)
+  }
+  isTRUE(value)
+}
+
 # Validate HookMatcher input for the compatibility facade.
 validate_compat_hooks <- function(hooks) {
   if (is.null(hooks)) {
@@ -409,16 +641,44 @@ validate_compat_hooks <- function(hooks) {
   hooks
 }
 
-# Clone a provided chat when possible so each compat client starts cleanly.
+# Clone a provided chat so each compat client owns isolated mutable state.
 clone_compat_chat <- function(chat, model = NULL) {
   if (!is.null(chat)) {
     validate_chat(chat)
 
     cloned <- tryCatch(
       chat$clone(),
-      error = function(e) chat
+      error = function(error) {
+        cli::cli_abort(
+          c(
+            "Could not clone the configured chat for an isolated SDK client",
+            "x" = error$message
+          ),
+          class = c("deputy_chat_clone_error", "deputy_error"),
+          parent = error
+        )
+      }
     )
-    tryCatch(cloned$set_turns(list()), error = function(e) invisible(NULL))
+    if (identical(cloned, chat)) {
+      cli::cli_abort(
+        "Chat cloning returned the original mutable object",
+        class = c("deputy_chat_clone_error", "deputy_error")
+      )
+    }
+    validate_chat(cloned)
+    tryCatch(
+      cloned$set_turns(list()),
+      error = function(error) {
+        cli::cli_abort(
+          c(
+            "Could not initialize the cloned chat with isolated state",
+            "x" = error$message
+          ),
+          class = c("deputy_chat_clone_error", "deputy_error"),
+          parent = error
+        )
+      }
+    )
     return(cloned)
   }
 
@@ -431,6 +691,7 @@ compat_permissions <- function(options) {
   allowlist <- options$allowed_tools
   denylist <- options$disallowed_tools
   prompt_tool <- options$permission_prompt_tool_name
+  can_use_tool <- options$can_use_tool
 
   switch(
     mode,
@@ -444,9 +705,40 @@ compat_permissions <- function(options) {
       install_packages = FALSE,
       max_turns = options$max_turns,
       max_cost_usd = options$max_cost_usd,
+      can_use_tool = can_use_tool,
       tool_allowlist = allowlist,
       tool_denylist = denylist,
       permission_prompt_tool_name = prompt_tool
+    ),
+    auto = Permissions$new(
+      mode = "auto",
+      file_read = TRUE,
+      file_write = options$cwd,
+      bash = FALSE,
+      r_code = TRUE,
+      web = TRUE,
+      install_packages = FALSE,
+      max_turns = options$max_turns,
+      max_cost_usd = options$max_cost_usd,
+      can_use_tool = can_use_tool,
+      tool_allowlist = allowlist,
+      tool_denylist = denylist,
+      permission_prompt_tool_name = prompt_tool
+    ),
+    dontAsk = Permissions$new(
+      mode = "dontAsk",
+      file_read = TRUE,
+      file_write = options$cwd,
+      bash = FALSE,
+      r_code = TRUE,
+      web = TRUE,
+      install_packages = FALSE,
+      max_turns = options$max_turns,
+      max_cost_usd = options$max_cost_usd,
+      can_use_tool = can_use_tool,
+      tool_allowlist = allowlist,
+      tool_denylist = denylist,
+      permission_prompt_tool_name = NULL
     ),
     acceptEdits = Permissions$new(
       mode = "acceptEdits",
@@ -458,6 +750,7 @@ compat_permissions <- function(options) {
       install_packages = FALSE,
       max_turns = options$max_turns,
       max_cost_usd = options$max_cost_usd,
+      can_use_tool = can_use_tool,
       tool_allowlist = allowlist,
       tool_denylist = denylist,
       permission_prompt_tool_name = prompt_tool
@@ -472,6 +765,7 @@ compat_permissions <- function(options) {
       install_packages = FALSE,
       max_turns = options$max_turns,
       max_cost_usd = options$max_cost_usd,
+      can_use_tool = can_use_tool,
       tool_allowlist = allowlist,
       tool_denylist = denylist,
       permission_prompt_tool_name = prompt_tool
@@ -486,6 +780,7 @@ compat_permissions <- function(options) {
       install_packages = FALSE,
       max_turns = options$max_turns,
       max_cost_usd = options$max_cost_usd,
+      can_use_tool = can_use_tool,
       tool_allowlist = allowlist,
       tool_denylist = denylist,
       permission_prompt_tool_name = prompt_tool
@@ -500,6 +795,7 @@ compat_permissions <- function(options) {
       install_packages = TRUE,
       max_turns = options$max_turns,
       max_cost_usd = options$max_cost_usd,
+      can_use_tool = can_use_tool,
       tool_allowlist = allowlist,
       tool_denylist = denylist,
       permission_prompt_tool_name = prompt_tool
@@ -526,6 +822,8 @@ build_compat_agent <- function(options) {
       working_dir = options$cwd
     )
   }
+  settings <- compat_apply_managed_settings(settings, options)
+  settings <- compat_filter_settings_skills(settings, options)
 
   sub_agents <- merge_compat_agents(options, settings)
   permissions <- compat_permissions(options)
@@ -535,22 +833,35 @@ build_compat_agent <- function(options) {
     lead <- LeadAgent$new(
       chat = chat,
       sub_agents = sub_agents,
-      tools = compat_default_tools(),
+      tools = compat_requested_tools(options),
       system_prompt = options$system_prompt,
       permissions = permissions,
+      enable_file_checkpointing = options$enable_file_checkpointing,
+      file_checkpoint_max_file_bytes = options$file_checkpoint_max_file_bytes,
+      file_checkpoint_max_journal_bytes = options$file_checkpoint_max_journal_bytes,
       working_dir = options$cwd
     )
 
     delegate_tool <- lead$chat$get_tools()[["delegate_to_agent"]]
-    lead$register_tool(make_delegate_tool_alias(delegate_tool, name = "Agent"))
-    lead$register_tool(make_delegate_tool_alias(delegate_tool, name = "Task"))
+    if (compat_delegate_tool_requested(options, "Agent")) {
+      lead$register_tool(make_delegate_tool_alias(
+        delegate_tool,
+        name = "Agent"
+      ))
+    }
+    if (compat_delegate_tool_requested(options, "Task")) {
+      lead$register_tool(make_delegate_tool_alias(delegate_tool, name = "Task"))
+    }
     lead
   } else {
     Agent$new(
       chat = chat,
-      tools = compat_default_tools(),
+      tools = compat_requested_tools(options),
       system_prompt = options$system_prompt,
       permissions = permissions,
+      enable_file_checkpointing = options$enable_file_checkpointing,
+      file_checkpoint_max_file_bytes = options$file_checkpoint_max_file_bytes,
+      file_checkpoint_max_journal_bytes = options$file_checkpoint_max_journal_bytes,
       working_dir = options$cwd
     )
   }
@@ -571,6 +882,8 @@ build_compat_agent <- function(options) {
     claude_settings_apply(agent, settings_no_agents)
   }
 
+  compat_load_explicit_skills(agent, options, settings)
+
   for (hook in options$hooks) {
     agent$add_hook(hook)
   }
@@ -578,6 +891,7 @@ build_compat_agent <- function(options) {
   agent$configure_sdk_compat(list(
     persist_session = options$persist_session,
     session_store_dir = options$session_store_dir,
+    session_store = options$session_store,
     session_id = options$session_id %||% generate_session_id()
   ))
 
@@ -601,22 +915,37 @@ with_compat_working_dir <- function(cwd, code) {
 #' @param model Model string used when `chat` is not supplied
 #' @param system_prompt Optional system prompt
 #' @param hooks Optional HookMatcher or list of HookMatcher objects
+#' @param tools Optional SDK-style built-in tool names or ellmer tools to register
 #' @param custom_tools Optional list of additional ellmer tools
 #' @param agents Optional list of [agent_definition()] objects
 #' @param setting_sources Optional Claude-style setting sources
 #' @param settings Optional pre-loaded settings list from [claude_settings_load()]
+#' @param managed_settings Optional settings values that override loaded settings
 #' @param allowed_tools Optional explicit tool allowlist
 #' @param disallowed_tools Optional explicit tool denylist
 #' @param permission_prompt_tool_name Tool name to suggest when approval is required
 #' @param permission_mode Compatibility permission mode
+#' @param can_use_tool Optional permission callback
 #' @param cwd Working directory for the agent
 #' @param persist_session Whether to persist compat snapshots to disk
 #' @param session_store_dir Directory where compat session snapshots are stored
+#' @param session_store Optional external session store adapter
 #' @param resume_session_id Optional session id to resume later
 #' @param resume_session_at Optional timestamp to resume at or before
 #' @param fork_session Whether to fork the resumed session into a new session id
-#' @param max_turns Maximum turns per query
+#' @param max_turns Maximum model requests per query
 #' @param max_cost_usd Maximum cost per query
+#' @param include_partial_messages Whether query results keep partial text events
+#' @param output_format Optional default structured output format
+#' @param skills Optional SDK-style skill selection (`"all"`, names, paths, or skills)
+#' @param enable_file_checkpointing Whether to capture reversible file
+#'   preimages for mutating Deputy and SDK-compatible file tools.
+#' @param file_checkpoint_max_file_bytes Maximum bytes captured for one file
+#'   preimage. Defaults to 50 MiB.
+#' @param file_checkpoint_max_journal_bytes Maximum aggregate serialized bytes
+#'   for checkpoint records, markers, metadata, and pending captures. Defaults
+#'   to 250 MiB.
+#' @param sandbox,plugins,thinking,effort,title,user,fallback_model,betas,cli_path,add_dirs,env,extra_args,max_buffer_size,stderr,load_timeout_ms,task_budget Additional SDK-shaped options that are preserved for compatibility. deputy applies the subset that maps to its R-native runtime.
 #'
 #' @return A `ClaudeSDKOptions` object
 #' @export
@@ -625,22 +954,48 @@ claude_sdk_options <- function(
   model = NULL,
   system_prompt = NULL,
   hooks = list(),
+  tools = NULL,
   custom_tools = list(),
   agents = list(),
   setting_sources = NULL,
   settings = NULL,
+  managed_settings = NULL,
   allowed_tools = NULL,
   disallowed_tools = NULL,
   permission_prompt_tool_name = "AskUserQuestion",
   permission_mode = "default",
+  can_use_tool = NULL,
   cwd = getwd(),
   persist_session = TRUE,
   session_store_dir = session_store_default_dir(),
+  session_store = NULL,
   resume_session_id = NULL,
   resume_session_at = NULL,
   fork_session = FALSE,
   max_turns = 25,
-  max_cost_usd = NULL
+  max_cost_usd = NULL,
+  include_partial_messages = TRUE,
+  output_format = NULL,
+  skills = NULL,
+  sandbox = NULL,
+  plugins = NULL,
+  thinking = NULL,
+  effort = NULL,
+  title = NULL,
+  user = NULL,
+  fallback_model = NULL,
+  betas = NULL,
+  cli_path = NULL,
+  add_dirs = NULL,
+  env = NULL,
+  extra_args = NULL,
+  max_buffer_size = NULL,
+  stderr = NULL,
+  enable_file_checkpointing = FALSE,
+  file_checkpoint_max_file_bytes = 50 * 1024^2,
+  file_checkpoint_max_journal_bytes = 250 * 1024^2,
+  load_timeout_ms = NULL,
+  task_budget = NULL
 ) {
   hooks <- validate_compat_hooks(hooks)
 
@@ -650,6 +1005,16 @@ claude_sdk_options <- function(
 
   if (!is.list(custom_tools)) {
     cli::cli_abort("{.arg custom_tools} must be a list of tools")
+  }
+
+  if (!is.null(tools) && !is.character(tools) && !is.list(tools)) {
+    cli::cli_abort(
+      "{.arg tools} must be NULL, a character vector of tool names, or a list of ellmer tools"
+    )
+  }
+
+  if (!is.null(can_use_tool) && !is.function(can_use_tool)) {
+    cli::cli_abort("{.arg can_use_tool} must be NULL or a function")
   }
 
   if (!is.list(agents)) {
@@ -676,28 +1041,153 @@ claude_sdk_options <- function(
     cli::cli_abort("{.arg setting_sources} must be NULL or a character vector")
   }
 
+  if (!is.null(task_budget)) {
+    if (
+      !is.numeric(task_budget) || length(task_budget) != 1 || is.na(task_budget)
+    ) {
+      cli::cli_abort("{.arg task_budget} must be NULL or a length-1 number")
+    }
+    max_turns <- task_budget
+  }
+
+  max_turns <- validate_usage_limit(
+    max_turns,
+    "max_turns",
+    integer = TRUE
+  )
+  max_cost_usd <- validate_usage_limit(
+    max_cost_usd,
+    "max_cost_usd",
+    integer = FALSE
+  )
+
+  if (
+    !is.logical(enable_file_checkpointing) ||
+      length(enable_file_checkpointing) != 1L ||
+      is.na(enable_file_checkpointing)
+  ) {
+    cli::cli_abort(
+      "{.arg enable_file_checkpointing} must be TRUE or FALSE"
+    )
+  }
+  file_checkpoint_max_file_bytes <- file_checkpoint_byte_limit(
+    file_checkpoint_max_file_bytes,
+    "file_checkpoint_max_file_bytes"
+  )
+  file_checkpoint_max_journal_bytes <- file_checkpoint_byte_limit(
+    file_checkpoint_max_journal_bytes,
+    "file_checkpoint_max_journal_bytes"
+  )
+
+  if (!is.null(skills)) {
+    if (!is.character(skills) && !is.list(skills)) {
+      cli::cli_abort(
+        "{.arg skills} must be NULL, a character vector, or a list of skills"
+      )
+    }
+  }
+
+  if (!is.null(allowed_tools) && !is.character(allowed_tools)) {
+    cli::cli_abort("{.arg allowed_tools} must be NULL or a character vector")
+  }
+  if (!is.null(disallowed_tools) && !is.character(disallowed_tools)) {
+    cli::cli_abort("{.arg disallowed_tools} must be NULL or a character vector")
+  }
+  if (
+    !is.null(permission_prompt_tool_name) &&
+      (!is.character(permission_prompt_tool_name) ||
+        length(permission_prompt_tool_name) != 1)
+  ) {
+    cli::cli_abort(
+      "{.arg permission_prompt_tool_name} must be NULL or a length-1 string"
+    )
+  }
+  if (!is.null(resume_session_id)) {
+    resume_session_id <- validate_session_id(
+      resume_session_id,
+      argument = "resume_session_id"
+    )
+  }
+
+  passthrough_options <- list(
+    sandbox = sandbox,
+    plugins = plugins,
+    thinking = thinking,
+    effort = effort,
+    title = title,
+    user = user,
+    fallback_model = fallback_model,
+    betas = betas,
+    cli_path = cli_path,
+    add_dirs = add_dirs,
+    env = env,
+    extra_args = extra_args,
+    max_buffer_size = max_buffer_size,
+    stderr = stderr,
+    load_timeout_ms = load_timeout_ms
+  )
+  used <- names(passthrough_options)[
+    !vapply(passthrough_options, is.null, logical(1))
+  ]
+  if (length(used) > 0) {
+    cli::cli_warn(
+      c(
+        "The following SDK option{?s} {?is/are} accepted for shape parity but ignored by deputy: {.arg {used}}",
+        i = "Their values are stored on the returned options object but do not affect agent behavior."
+      ),
+      .frequency = "regularly",
+      .frequency_id = "deputy_sdk_options_passthrough"
+    )
+  }
+
   structure(
     list(
       chat = chat,
       model = normalize_claude_sdk_model(model),
       system_prompt = system_prompt,
       hooks = hooks,
+      tools = tools,
       custom_tools = custom_tools,
       agents = agents,
       setting_sources = setting_sources %||% character(),
       settings = settings,
+      managed_settings = managed_settings,
       allowed_tools = allowed_tools,
       disallowed_tools = disallowed_tools,
       permission_prompt_tool_name = permission_prompt_tool_name,
       permission_mode = permission_mode,
+      can_use_tool = can_use_tool,
       cwd = normalizePath(cwd, mustWork = TRUE),
       persist_session = isTRUE(persist_session),
       session_store_dir = normalize_session_store_dir(session_store_dir),
+      session_store = session_store,
       resume_session_id = resume_session_id,
       resume_session_at = resume_session_at,
       fork_session = isTRUE(fork_session),
-      max_turns = as.integer(max_turns),
+      max_turns = max_turns,
       max_cost_usd = max_cost_usd,
+      include_partial_messages = isTRUE(include_partial_messages),
+      output_format = output_format,
+      skills = skills,
+      sandbox = sandbox,
+      plugins = plugins,
+      thinking = thinking,
+      effort = effort,
+      title = title,
+      user = user,
+      fallback_model = fallback_model,
+      betas = betas,
+      cli_path = cli_path,
+      add_dirs = add_dirs,
+      env = env,
+      extra_args = extra_args,
+      max_buffer_size = max_buffer_size,
+      stderr = stderr,
+      enable_file_checkpointing = isTRUE(enable_file_checkpointing),
+      file_checkpoint_max_file_bytes = file_checkpoint_max_file_bytes,
+      file_checkpoint_max_journal_bytes = file_checkpoint_max_journal_bytes,
+      load_timeout_ms = load_timeout_ms,
+      task_budget = task_budget,
       session_id = NULL
     ),
     class = "ClaudeSDKOptions"
@@ -760,9 +1250,23 @@ ClaudeSDKClient <- R6::R6Class(
         self$agent <- build_compat_agent(self$options)
       }
 
+      settings_data <- self$agent$settings()$settings %||% list()
+      output_format <- output_format %||%
+        self$options$output_format %||%
+        compat_output_format_setting(settings_data)
+      include_partial_messages <- self$options$include_partial_messages
+      settings_include_partial <- compat_include_partial_setting(settings_data)
+      if (!is.null(settings_include_partial)) {
+        include_partial_messages <- settings_include_partial
+      }
+
       with_compat_working_dir(
         self$options$cwd,
-        self$agent$run_sync(prompt, output_format = output_format)
+        self$agent$run_sync(
+          prompt,
+          include_partial_messages = include_partial_messages,
+          output_format = output_format
+        )
       )
     },
 
@@ -775,6 +1279,68 @@ ClaudeSDKClient <- R6::R6Class(
     },
 
     #' @description
+    #' List summaries from an external session store, when configured.
+    #'
+    #' @return Data frame or character vector supplied by the store adapter
+    list_session_summaries = function() {
+      if (is.null(self$options$session_store)) {
+        return(self$list_sessions())
+      }
+      session_store_summaries_external(self$options$session_store)
+    },
+
+    #' @description
+    #' Delete a stored compatibility session.
+    #'
+    #' @param session_id Session identifier to delete
+    #' @return Invisible self
+    delete_session = function(session_id) {
+      session_store_delete_session(self$options$session_store_dir, session_id)
+      if (!is.null(self$options$session_store)) {
+        session_store_delete_external(self$options$session_store, session_id)
+      }
+      invisible(self)
+    },
+
+    #' @description
+    #' Get MCP runtime status from the underlying agent.
+    #'
+    #' @return Data frame describing MCP load attempts
+    get_mcp_status = function() {
+      if (is.null(self$agent)) {
+        self$agent <- build_compat_agent(self$options)
+      }
+      self$agent$mcp_status()
+    },
+
+    #' @description
+    #' Create a reversible file checkpoint.
+    #'
+    #' @param name Optional checkpoint label.
+    #' @param metadata Optional serializable metadata list.
+    #' @return The checkpoint ID.
+    checkpoint = function(name = NULL, metadata = list()) {
+      self$agent$checkpoint(name = name, metadata = metadata)
+    },
+
+    #' @description
+    #' List reversible file checkpoints.
+    #'
+    #' @return A data frame ordered from oldest to newest.
+    list_checkpoints = function() {
+      self$agent$list_checkpoints()
+    },
+
+    #' @description
+    #' Rewind files to a checkpoint without rewinding conversation history.
+    #'
+    #' @param checkpoint_id A checkpoint ID.
+    #' @return A list describing the restored changes.
+    rewind_files = function(checkpoint_id) {
+      self$agent$rewind_files(checkpoint_id)
+    },
+
+    #' @description
     #' Resume or fork a persisted compatibility session.
     #'
     #' @param session_id Session identifier to restore
@@ -782,17 +1348,51 @@ ClaudeSDKClient <- R6::R6Class(
     #' @param fork If TRUE, restore into a new session id
     #' @return Invisible self
     resume = function(session_id, at = NULL, fork = FALSE) {
-      snapshot <- session_store_select_snapshot(
-        root = self$options$session_store_dir,
-        session_id = session_id,
-        at = at
-      )
+      session_id <- validate_session_id(session_id)
+      if (isTRUE(self$agent$.__enclos_env__$private$run_active)) {
+        cli::cli_abort(
+          "Cannot resume or fork a session while the client agent has an active run",
+          class = c("deputy_run_active", "deputy_error")
+        )
+      }
+      snapshot <- NULL
+      if (!is.null(self$options$session_store) && is.null(at)) {
+        payload <- tryCatch(
+          session_store_load_external(self$options$session_store, session_id),
+          error = function(e) {
+            cli::cli_warn(c(
+              "External session store load failed; falling back to local snapshots",
+              "x" = e$message
+            ))
+            NULL
+          }
+        )
+        if (!is.null(payload)) {
+          snapshot <- list(
+            path = paste0("session_store:", session_id),
+            payload = payload,
+            snapshot_at = session_store_payload_time(payload)
+          )
+        }
+      }
 
-      self$agent <- build_compat_agent(self$options)
+      if (is.null(snapshot)) {
+        snapshot <- session_store_select_snapshot(
+          root = self$options$session_store_dir,
+          session_id = session_id,
+          at = at
+        )
+      }
+
+      candidate_agent <- build_compat_agent(self$options)
 
       with_compat_working_dir(
         self$options$cwd,
-        self$agent$load_session(snapshot$path)
+        candidate_agent$.__enclos_env__$private$restore_session_payload(
+          snapshot$payload,
+          restore_tools = FALSE,
+          source = snapshot$path
+        )
       )
 
       active_session_id <- if (isTRUE(fork)) {
@@ -800,10 +1400,10 @@ ClaudeSDKClient <- R6::R6Class(
       } else {
         session_id
       }
-      self$options$session_id <- active_session_id
-      self$agent$configure_sdk_compat(list(
+      candidate_agent$configure_sdk_compat(list(
         persist_session = self$options$persist_session,
         session_store_dir = self$options$session_store_dir,
+        session_store = self$options$session_store,
         session_id = active_session_id
       ))
 
@@ -819,7 +1419,7 @@ ClaudeSDKClient <- R6::R6Class(
         paste0("Resumed session ", session_id, ".")
       }
       code <- if (isTRUE(fork)) "session_forked" else "session_resumed"
-      self$agent$.__enclos_env__$private$notify(
+      candidate_agent$.__enclos_env__$private$notify(
         notice,
         level = "info",
         code = code,
@@ -829,10 +1429,15 @@ ClaudeSDKClient <- R6::R6Class(
       )
 
       if (isTRUE(fork) && isTRUE(self$options$persist_session)) {
-        self$agent$.__enclos_env__$private$snapshot_compat_state(
+        candidate_agent$.__enclos_env__$private$snapshot_compat_state(
           reason = "fork_restore"
         )
       }
+
+      updated_options <- self$options
+      updated_options$session_id <- active_session_id
+      self$agent <- candidate_agent
+      self$options <- updated_options
 
       invisible(self)
     }

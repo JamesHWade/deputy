@@ -29,6 +29,19 @@ test_that("AgentEvent supports different types", {
   expect_equal(turn_event$turn_number, 1)
 })
 
+test_that("AgentEvent prints structured usage fields readably", {
+  event <- AgentEvent(
+    "usage",
+    usage = AgentUsage(requests = 2, tool_calls = 1, cost_usd = 0.01),
+    limits = UsageLimits(max_requests = 3)
+  )
+
+  output <- paste(capture.output(print(event)), collapse = "\n")
+  expect_match(output, "usage: requests=2, tool_calls=1")
+  expect_match(output, "limits: max_requests=3, on_exceed=stop")
+  expect_false(grepl("0000000", output, fixed = TRUE))
+})
+
 test_that("AgentResult has correct structure", {
   result <- AgentResult$new(
     response = "Test response",

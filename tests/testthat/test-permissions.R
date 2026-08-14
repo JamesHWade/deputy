@@ -84,6 +84,236 @@ test_that("permission check blocks path traversal", {
   expect_true(grepl("traversal", result$reason, ignore.case = TRUE))
 })
 
+test_that("path-scoped writes reject dangling symlinks outside the root", {
+  skip_on_os("windows")
+  sandbox <- withr::local_tempdir(pattern = "deputy-dangling-link-")
+  root <- file.path(sandbox, "root")
+  outside <- file.path(sandbox, "outside")
+  dir.create(root)
+  dir.create(outside)
+  outside_target <- file.path(outside, "created.txt")
+  link <- file.path(root, "link.txt")
+  expect_true(file.symlink(outside_target, link))
+
+  result <- permissions_standard(root)$check(
+    "write_file",
+    list(path = link),
+    list(working_dir = root)
+  )
+
+  expect_s3_class(result, "PermissionResultDeny")
+  expect_false(file.exists(outside_target))
+})
+
+test_that("path-scoped writes cover native and SDK tool aliases", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  temp_dir <- normalizePath(temp_dir, mustWork = TRUE)
+  outside_path <- file.path(dirname(temp_dir), "outside.txt")
+  perms <- permissions_standard(working_dir = temp_dir)
+
+  cases <- list(
+    list(name = "write_file", path_arg = "path"),
+    list(name = "edit_file", path_arg = "path"),
+    list(name = "multi_edit", path_arg = "path"),
+    list(name = "todo_write", path_arg = "path"),
+    list(name = "Write", path_arg = "file_path"),
+    list(name = "Edit", path_arg = "file_path"),
+    list(name = "MultiEdit", path_arg = "file_path"),
+    list(name = "TodoWrite", path_arg = "path")
+  )
+
+  tool_input <- function(case, path) {
+    stats::setNames(list(path), case$path_arg)
+  }
+
+  for (case in cases) {
+    inside <- perms$check(
+      case$name,
+      tool_input(case, file.path(temp_dir, "inside.txt")),
+      list()
+    )
+    outside <- perms$check(
+      case$name,
+      tool_input(case, outside_path),
+      list()
+    )
+    traversal <- perms$check(
+      case$name,
+      tool_input(case, "../escape.txt"),
+      list()
+    )
+    missing <- perms$check(case$name, list(), list())
+
+    expect_s3_class(inside, "PermissionResultAllow")
+    expect_s3_class(outside, "PermissionResultDeny")
+    expect_s3_class(traversal, "PermissionResultDeny")
+    expect_match(traversal$reason, "traversal")
+    expect_s3_class(missing, "PermissionResultDeny")
+    if (!case$name %in% c("todo_write", "TodoWrite")) {
+      expect_match(missing$reason, "requires a path")
+    }
+  }
+})
+
+test_that("relative writes use context working_dir for every write alias", {
+  sandbox <- withr::local_tempdir(pattern = "deputy-permission-")
+  allowed_dir <- file.path(sandbox, "allowed")
+  process_dir <- file.path(sandbox, "process")
+  dir.create(allowed_dir)
+  dir.create(process_dir)
+  allowed_dir <- normalizePath(allowed_dir, mustWork = TRUE)
+  process_dir <- normalizePath(process_dir, mustWork = TRUE)
+
+  permissions <- permissions_standard(working_dir = allowed_dir)
+  withr::local_dir(process_dir)
+
+  cases <- list(
+    list(name = "write_file", path_arg = "path"),
+    list(name = "edit_file", path_arg = "path"),
+    list(name = "multi_edit", path_arg = "path"),
+    list(name = "todo_write", path_arg = "path"),
+    list(name = "Write", path_arg = "file_path"),
+    list(name = "Edit", path_arg = "file_path"),
+    list(name = "MultiEdit", path_arg = "file_path"),
+    list(name = "TodoWrite", path_arg = "path")
+  )
+
+  for (case in cases) {
+    input <- stats::setNames(list("nested/file.txt"), case$path_arg)
+    traversal_input <- stats::setNames(list("../escape.txt"), case$path_arg)
+
+    allowed <- permissions$check(
+      case$name,
+      input,
+      list(working_dir = allowed_dir)
+    )
+    wrong_context <- permissions$check(
+      case$name,
+      input,
+      list(working_dir = process_dir)
+    )
+    traversal <- permissions$check(
+      case$name,
+      traversal_input,
+      list(working_dir = allowed_dir)
+    )
+
+    expect_true(inherits(allowed, "PermissionResultAllow"), info = case$name)
+    expect_true(
+      inherits(wrong_context, "PermissionResultDeny"),
+      info = case$name
+    )
+    expect_true(
+      inherits(traversal, "PermissionResultDeny"),
+      info = case$name
+    )
+    expect_match(traversal$reason, "traversal")
+  }
+})
+
+test_that("readonly recognizes native and SDK mutating tool aliases", {
+  perms <- permissions_readonly()
+  misleading_context <- list(
+    tool_annotations = list(
+      read_only_hint = TRUE,
+      destructive_hint = FALSE
+    )
+  )
+  mutating_tools <- c(
+    "write_file",
+    "tool_write_file",
+    "edit_file",
+    "multi_edit",
+    "todo_write",
+    "Write",
+    "Edit",
+    "MultiEdit",
+    "TodoWrite",
+    "run_bash",
+    "bash",
+    "run_r_code",
+    "install_package"
+  )
+
+  for (tool_name in mutating_tools) {
+    result <- perms$check(tool_name, list(), misleading_context)
+    expect_s3_class(result, "PermissionResultDeny")
+  }
+})
+
+test_that("readonly fails closed for unknown unannotated tools", {
+  result <- permissions_readonly()$check(
+    "delete_everything",
+    list(),
+    list()
+  )
+
+  expect_s3_class(result, "PermissionResultDeny")
+  expect_match(result$reason, "explicit tool allowlist")
+})
+
+test_that("readonly still enforces capability fields before annotations", {
+  permissions <- permissions_readonly()
+  read_only_web <- list(
+    tool_annotations = list(
+      read_only_hint = TRUE,
+      open_world_hint = TRUE
+    )
+  )
+
+  web <- permissions$check("web_search", list(query = "R"), read_only_web)
+  unknown_web <- permissions$check("custom_search", list(), read_only_web)
+  delegation <- permissions$check(
+    "delegate_to_agent",
+    list(),
+    list(tool_annotations = list(read_only_hint = FALSE))
+  )
+
+  expect_s3_class(web, "PermissionResultDeny")
+  expect_s3_class(unknown_web, "PermissionResultDeny")
+  expect_s3_class(delegation, "PermissionResultDeny")
+  expect_s3_class(
+    permissions$check("read_file", list(path = "safe.txt"), list()),
+    "PermissionResultAllow"
+  )
+})
+
+test_that("readonly denies contradictory destructive annotations", {
+  context <- list(
+    tool_annotations = list(
+      read_only_hint = TRUE,
+      destructive_hint = TRUE
+    )
+  )
+
+  expect_s3_class(
+    permissions_readonly()$check("custom_tool", list(), context),
+    "PermissionResultDeny"
+  )
+  expect_s3_class(
+    permissions_readonly()$check("read_file", list(), context),
+    "PermissionResultDeny"
+  )
+})
+
+test_that("TodoWrite uses its documented default under scoped permissions", {
+  root <- withr::local_tempdir(pattern = "deputy-permission-")
+  permissions <- permissions_standard(root)
+
+  for (tool_name in c("todo_write", "tool_todo_write", "TodoWrite")) {
+    result <- permissions$check(
+      tool_name,
+      list(todos = list()),
+      list(working_dir = root)
+    )
+    expect_true(inherits(result, "PermissionResultAllow"), info = tool_name)
+
+    withr::local_dir(dirname(root))
+    outside <- permissions$check(tool_name, list(todos = list()), list())
+    expect_true(inherits(outside, "PermissionResultDeny"), info = tool_name)
+  }
+})
+
 test_that("bypassPermissions mode allows everything", {
   perms <- permissions_full()
   context <- list(working_dir = getwd())
@@ -140,25 +370,40 @@ test_that("PermissionResultDeny has correct structure", {
   expect_true(result$interrupt)
 })
 
-test_that("readonly mode uses annotations when available", {
+test_that("readonly annotations do not grant authority to unknown tools", {
   perms <- permissions_readonly()
   context <- list(working_dir = getwd())
 
-  # Tool with read_only_hint should be allowed
   read_only_context <- c(
     context,
     list(tool_annotations = list(read_only_hint = TRUE))
   )
   result <- perms$check("unknown_tool", list(), read_only_context)
-  expect_s3_class(result, "PermissionResultAllow")
+  expect_s3_class(result, "PermissionResultDeny")
 
-  # Tool with destructive_hint should be denied
   destructive_context <- c(
     context,
     list(tool_annotations = list(destructive_hint = TRUE))
   )
   result <- perms$check("unknown_tool", list(), destructive_context)
   expect_s3_class(result, "PermissionResultDeny")
+
+  explicitly_allowed <- Permissions$new(
+    mode = "readonly",
+    file_read = TRUE,
+    file_write = FALSE,
+    bash = FALSE,
+    r_code = FALSE,
+    web = FALSE,
+    install_packages = FALSE,
+    tool_allowlist = "unknown_tool"
+  )
+  result <- explicitly_allowed$check(
+    "unknown_tool",
+    list(),
+    read_only_context
+  )
+  expect_s3_class(result, "PermissionResultAllow")
 })
 
 test_that("default mode uses annotations for unknown tools", {
@@ -180,6 +425,53 @@ test_that("default mode uses annotations for unknown tools", {
   )
   result <- perms$check("custom_web_tool", list(), open_world_context)
   expect_s3_class(result, "PermissionResultDeny")
+
+  combined_context <- c(
+    context,
+    list(
+      tool_annotations = list(
+        read_only_hint = TRUE,
+        open_world_hint = TRUE
+      )
+    )
+  )
+  result <- perms$check("custom_read_web_tool", list(), combined_context)
+  expect_s3_class(result, "PermissionResultDeny")
+})
+
+test_that("plan mode preserves capability ceilings before annotations", {
+  permissions <- Permissions$new(
+    mode = "plan",
+    file_read = TRUE,
+    file_write = FALSE,
+    bash = FALSE,
+    r_code = FALSE,
+    web = FALSE,
+    install_packages = FALSE
+  )
+  read_only_web <- list(
+    tool_annotations = list(
+      read_only_hint = TRUE,
+      open_world_hint = TRUE,
+      destructive_hint = FALSE
+    )
+  )
+  misleading_write <- list(
+    tool_annotations = list(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE,
+      destructive_hint = FALSE
+    )
+  )
+
+  expect_s3_class(
+    permissions$check("custom_search", list(), read_only_web),
+    "PermissionResultDeny"
+  )
+  expect_s3_class(
+    permissions$check("Write", list(file_path = "x"), misleading_write),
+    "PermissionResultDeny"
+  )
 })
 
 # Tests for immutability (security feature)
@@ -412,4 +704,61 @@ test_that("run_bash policy also matches bash alias", {
   result <- perms$check("bash", list(command = "pwd"), list())
   expect_s3_class(result, "PermissionResultDeny")
   expect_match(result$reason, "denylist")
+})
+
+test_that("tool policies match equivalent native and SDK aliases", {
+  aliases <- list(
+    c("read_file", "Read"),
+    c("write_file", "Write"),
+    c("edit_file", "Edit"),
+    c("multi_edit", "MultiEdit"),
+    c("list_files", "LS"),
+    c("glob_files", "Glob"),
+    c("grep_files", "Grep"),
+    c("todo_read", "TodoRead"),
+    c("todo_write", "TodoWrite"),
+    c("web_fetch", "WebFetch"),
+    c("web_search", "WebSearch"),
+    c("delegate_to_agent", "Agent"),
+    c("delegate_to_agent", "Task")
+  )
+
+  for (pair in aliases) {
+    native_name <- pair[[1]]
+    sdk_name <- pair[[2]]
+
+    deny_native <- Permissions$new(
+      mode = "bypassPermissions",
+      tool_denylist = native_name
+    )
+    deny_sdk <- Permissions$new(
+      mode = "bypassPermissions",
+      tool_denylist = sdk_name
+    )
+    allow_native <- Permissions$new(
+      mode = "bypassPermissions",
+      tool_allowlist = native_name
+    )
+    allow_sdk <- Permissions$new(
+      mode = "bypassPermissions",
+      tool_allowlist = sdk_name
+    )
+
+    expect_s3_class(
+      deny_native$check(sdk_name, list(), list()),
+      "PermissionResultDeny"
+    )
+    expect_s3_class(
+      deny_sdk$check(native_name, list(), list()),
+      "PermissionResultDeny"
+    )
+    expect_s3_class(
+      allow_native$check(sdk_name, list(), list()),
+      "PermissionResultAllow"
+    )
+    expect_s3_class(
+      allow_sdk$check(native_name, list(), list()),
+      "PermissionResultAllow"
+    )
+  }
 })

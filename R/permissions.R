@@ -6,7 +6,10 @@
 #' Permission modes control the overall behavior of tool permission checking:
 #' * `"default"` - Check each tool against the permission policy
 #' * `"acceptEdits"` - Auto-accept file write tools
-#' * `"plan"` - Allow only annotated read-only tools and human approval prompts
+#' * `"plan"` - Allow annotated read-only tools within configured capabilities
+#'   plus human approval prompts
+#' * `"dontAsk"` - Check policy without suggesting approval prompts
+#' * `"auto"` - SDK-compatible alias for default deputy permission behavior
 #' * `"readonly"` - Deny all write/execute tools
 #' * `"bypassPermissions"` - Allow all tools (dangerous, use with caution)
 #'
@@ -17,9 +20,11 @@
 #'
 #' **read_only_hint** (logical, default: FALSE)
 #'
-#' Indicates the tool only reads data and doesn't modify state.
-#' Tools with `read_only_hint = TRUE` are allowed in `"readonly"` mode.
-#' Examples: `tool_read_file`, `tool_list_files`, `tool_search`
+#' Indicates the tool only reads data and doesn't modify state. Annotations are
+#' descriptive metadata, not an authority grant: `"readonly"` mode allows known
+#' Deputy read tools or explicit allowlist entries, subject to destructive and
+#' open-world capability checks. Examples: `tool_read_file`, `tool_list_files`,
+#' `tool_search`.
 #'
 #' **destructive_hint** (logical, default: TRUE)
 #'
@@ -71,6 +76,8 @@ PermissionMode <- c(
   "default",
   "acceptEdits",
   "plan",
+  "dontAsk",
+  "auto",
   "readonly",
   "bypassPermissions"
 )
@@ -262,8 +269,12 @@ Permissions <- R6::R6Class(
     #' @param context Additional context (e.g., working_dir, tool_annotations)
     #' @return A [PermissionResultAllow] or [PermissionResultDeny]
     check = function(tool_name, tool_input, context = list()) {
-      # Allow prompt tool so gated workflows can request approval
-      if (private$is_permission_prompt_tool(tool_name)) {
+      # Allow prompt tool so gated workflows can request approval. The SDK
+      # dontAsk mode keeps normal policy checks but does not allow an approval
+      # prompt escape hatch.
+      if (
+        self$mode != "dontAsk" && private$is_permission_prompt_tool(tool_name)
+      ) {
         return(PermissionResultAllow())
       }
 
@@ -282,26 +293,73 @@ Permissions <- R6::R6Class(
       annotations <- context$tool_annotations
 
       if (self$mode == "readonly") {
-        # Use annotations if available, otherwise fall back to name-based check
-        if (!is.null(annotations)) {
-          # read_only_hint = TRUE means the tool is safe for readonly mode
-          if (isTRUE(annotations$read_only_hint)) {
-            return(PermissionResultAllow())
-          }
-          # destructive_hint = TRUE means tool modifies state
-          if (isTRUE(annotations$destructive_hint)) {
-            return(PermissionResultDeny(
-              reason = "Permission denied: tool is destructive and readonly mode is active"
-            ))
-          }
-        }
-        # Fall back to name-based check
+        tool_id <- private$normalize_tool_id(tool_name)
+        explicitly_allowed <- private$tool_name_in_list(
+          tool_name,
+          self$tool_allowlist
+        )
+
+        # Known mutating tools remain denied even if annotations are absent or
+        # incorrectly mark an SDK alias as read-only.
         if (private$is_write_tool(tool_name)) {
           return(PermissionResultDeny(
             reason = "Permission denied: readonly mode active"
           ))
         }
-        return(PermissionResultAllow())
+        if (isTRUE(annotations$destructive_hint)) {
+          return(PermissionResultDeny(
+            reason = paste0(
+              "Permission denied: tool is destructive and readonly mode ",
+              "is active"
+            )
+          ))
+        }
+        if (isTRUE(annotations$open_world_hint) && !isTRUE(self$web)) {
+          return(PermissionResultDeny(
+            reason = paste0(
+              "Permission denied: tool can access external resources and ",
+              "web access is disabled"
+            )
+          ))
+        }
+
+        if (
+          tool_id %in%
+            c(
+              "read_file",
+              "read_markdown",
+              "read_csv",
+              "list_files",
+              "glob_files",
+              "grep_files",
+              "todo_read"
+            )
+        ) {
+          if (!isTRUE(self$file_read)) {
+            return(PermissionResultDeny(
+              reason = "File reading is not allowed"
+            ))
+          }
+          return(PermissionResultAllow())
+        }
+
+        if (tool_id %in% c("web_search", "web_fetch")) {
+          if (!isTRUE(self$web)) {
+            return(PermissionResultDeny(
+              reason = "Web access is not allowed in readonly mode"
+            ))
+          }
+          return(PermissionResultAllow())
+        }
+        if (isTRUE(explicitly_allowed)) {
+          return(PermissionResultAllow())
+        }
+        return(PermissionResultDeny(
+          reason = paste0(
+            "Permission denied: readonly mode requires a known read tool ",
+            "or an explicit tool allowlist entry"
+          )
+        ))
       }
 
       if (self$mode == "plan") {
@@ -605,9 +663,35 @@ Permissions <- R6::R6Class(
       normalized <- sub("^tool_", "", normalized)
       normalized <- gsub("[^a-z0-9]+", "", normalized)
 
-      # Canonicalize built-in aliases so gating policies match equivalent tools
+      # Canonicalize native and Agent SDK names to one policy identifier.
       alias_map <- c(
-        bash = "runbash"
+        read = "read_file",
+        readfile = "read_file",
+        readmarkdown = "read_markdown",
+        readcsv = "read_csv",
+        write = "write_file",
+        writefile = "write_file",
+        edit = "edit_file",
+        editfile = "edit_file",
+        multiedit = "multi_edit",
+        ls = "list_files",
+        listfiles = "list_files",
+        glob = "glob_files",
+        globfiles = "glob_files",
+        grep = "grep_files",
+        grepfiles = "grep_files",
+        todoread = "todo_read",
+        todowrite = "todo_write",
+        webfetch = "web_fetch",
+        websearch = "web_search",
+        askuserquestion = "ask_user_question",
+        bash = "run_bash",
+        runbash = "run_bash",
+        runrcode = "run_r_code",
+        installpackage = "install_package",
+        agent = "delegate_to_agent",
+        task = "delegate_to_agent",
+        delegatetoagent = "delegate_to_agent"
       )
       aliased <- unname(alias_map[normalized])
       if (length(aliased) == 0 || is.na(aliased)) {
@@ -688,26 +772,34 @@ Permissions <- R6::R6Class(
 
     # Check if a tool is a write/execute tool
     is_write_tool = function(tool_name) {
-      write_tools <- c(
-        "write_file",
-        "tool_write_file",
-        "run_bash",
-        "tool_run_bash",
-        "bash",
-        "run_r_code",
-        "tool_run_r_code",
-        "install_package",
-        "tool_install_package"
-      )
-      tool_name %in% write_tools
+      private$normalize_tool_id(tool_name) %in%
+        c(
+          "write_file",
+          "edit_file",
+          "multi_edit",
+          "todo_write",
+          "run_bash",
+          "run_r_code",
+          "install_package"
+        )
     },
 
     # Tool-specific permission checks
     check_tool_specific = function(tool_name, tool_input, context) {
+      tool_id <- private$normalize_tool_id(tool_name)
+
       # File read tools
       if (
-        tool_name %in%
-          c("read_file", "tool_read_file", "list_files", "tool_list_files")
+        tool_id %in%
+          c(
+            "read_file",
+            "read_markdown",
+            "read_csv",
+            "list_files",
+            "glob_files",
+            "grep_files",
+            "todo_read"
+          )
       ) {
         if (!self$file_read) {
           return(PermissionResultDeny(reason = "File reading is not allowed"))
@@ -716,7 +808,15 @@ Permissions <- R6::R6Class(
       }
 
       # File write tools
-      if (tool_name %in% c("write_file", "tool_write_file")) {
+      if (
+        tool_id %in%
+          c(
+            "write_file",
+            "edit_file",
+            "multi_edit",
+            "todo_write"
+          )
+      ) {
         if (isFALSE(self$file_write)) {
           return(PermissionResultDeny(reason = "File writing is not allowed"))
         }
@@ -724,19 +824,65 @@ Permissions <- R6::R6Class(
         # Check directory restriction
         if (is.character(self$file_write)) {
           path <- tool_input$path %||% tool_input$file_path
-          if (!is.null(path)) {
-            # Check for path traversal attempts first
-            if (has_path_traversal(path)) {
+          if (is.null(path) && identical(tool_id, "todo_write")) {
+            path <- file.path(".deputy", "todos.json")
+          }
+          if (
+            is.null(path) ||
+              !is.character(path) ||
+              length(path) != 1 ||
+              is.na(path) ||
+              !nzchar(trimws(path))
+          ) {
+            return(PermissionResultDeny(
+              reason = paste0(
+                "File writing requires a path when restricted to: ",
+                self$file_write
+              )
+            ))
+          }
+
+          # Check for path traversal attempts first
+          if (has_path_traversal(path)) {
+            return(PermissionResultDeny(
+              reason = "Path traversal patterns not allowed in file paths"
+            ))
+          }
+
+          # Tool paths are interpreted by the agent relative to its configured
+          # working directory, which may differ from the R process directory.
+          # Resolve the same way here before checking containment so permission
+          # validation and eventual tool execution agree.
+          path_for_check <- path
+          if (!is_absolute_path(path)) {
+            working_dir <- context$working_dir %||% getwd()
+            if (
+              !is.character(working_dir) ||
+                length(working_dir) != 1 ||
+                is.na(working_dir) ||
+                !nzchar(trimws(working_dir))
+            ) {
               return(PermissionResultDeny(
-                reason = "Path traversal patterns not allowed in file paths"
+                reason = paste0(
+                  "Relative file writes require a valid working directory"
+                )
               ))
             }
-            # Then check if within allowed directory
-            if (!is_path_within(path, self$file_write)) {
+
+            working_dir <- expand_and_normalize(working_dir)
+            if (is.na(working_dir)) {
               return(PermissionResultDeny(
-                reason = paste("File writing only allowed in:", self$file_write)
+                reason = "Could not resolve the working directory"
               ))
             }
+            path_for_check <- file.path(working_dir, path)
+          }
+
+          # Then check if within allowed directory
+          if (!is_path_within(path_for_check, self$file_write)) {
+            return(PermissionResultDeny(
+              reason = paste("File writing only allowed in:", self$file_write)
+            ))
           }
         }
 
@@ -749,7 +895,7 @@ Permissions <- R6::R6Class(
       }
 
       # Bash tools
-      if (tool_name %in% c("run_bash", "tool_run_bash", "bash")) {
+      if (identical(tool_id, "run_bash")) {
         if (!self$bash) {
           return(PermissionResultDeny(
             reason = "Bash command execution is not allowed"
@@ -759,7 +905,7 @@ Permissions <- R6::R6Class(
       }
 
       # R code tools
-      if (tool_name %in% c("run_r_code", "tool_run_r_code")) {
+      if (identical(tool_id, "run_r_code")) {
         if (!self$r_code) {
           return(PermissionResultDeny(
             reason = "R code execution is not allowed"
@@ -769,10 +915,7 @@ Permissions <- R6::R6Class(
       }
 
       # Web tools
-      if (
-        tool_name %in%
-          c("web_search", "tool_web_search", "web_fetch", "tool_web_fetch")
-      ) {
+      if (tool_id %in% c("web_search", "web_fetch")) {
         if (!self$web) {
           return(PermissionResultDeny(reason = "Web access is not allowed"))
         }
@@ -780,7 +923,7 @@ Permissions <- R6::R6Class(
       }
 
       # Package installation
-      if (tool_name %in% c("install_package", "tool_install_package")) {
+      if (identical(tool_id, "install_package")) {
         if (!self$install_packages) {
           return(PermissionResultDeny(
             reason = "Package installation is not allowed"
@@ -801,15 +944,16 @@ Permissions <- R6::R6Class(
             ))
           }
         }
-        # Read-only tools are generally safe
-        if (isTRUE(annotations$read_only_hint)) {
-          return(PermissionResultAllow())
-        }
-        # Open-world tools (can access external resources) need explicit permission
+        # Open-world tools need the corresponding capability even when they
+        # also describe themselves as read-only.
         if (isTRUE(annotations$open_world_hint) && !self$web) {
           return(PermissionResultDeny(
             reason = "Tool can access external resources but web access is disabled"
           ))
+        }
+        # Read-only tools are generally safe
+        if (isTRUE(annotations$read_only_hint)) {
+          return(PermissionResultAllow())
         }
       }
 
@@ -819,6 +963,15 @@ Permissions <- R6::R6Class(
 
     check_plan_mode = function(tool_name, tool_input, context) {
       annotations <- context$tool_annotations
+
+      if (private$is_write_tool(tool_name)) {
+        return(PermissionResultDeny(
+          reason = paste0(
+            "Plan mode does not allow write or execute tools: ",
+            tool_name
+          )
+        ))
+      }
 
       # Plan mode is intentionally conservative: no annotation means deny.
       if (is.null(annotations)) {
@@ -835,6 +988,16 @@ Permissions <- R6::R6Class(
         return(PermissionResultDeny(
           reason = paste0(
             "Plan mode does not allow destructive tools: ",
+            tool_name
+          )
+        ))
+      }
+
+      if (isTRUE(annotations$open_world_hint) && !isTRUE(self$web)) {
+        return(PermissionResultDeny(
+          reason = paste0(
+            "Plan mode cannot use open-world tools when web access is ",
+            "disabled: ",
             tool_name
           )
         ))
@@ -885,10 +1048,12 @@ permissions_readonly <- function(max_turns = 25) {
 #'
 #' @description
 #' Creates a permission policy suitable for most use cases.
-#' Allows file read/write within the working directory and R code execution.
-#' Denies bash commands, web access, and package installation.
+#' Allows reads of files accessible to the R process, confines file writes to
+#' the working directory, and permits R code execution. Denies bash commands,
+#' web access, and package installation.
 #'
-#' @param working_dir Directory for file operations (default: current directory)
+#' @param working_dir Root directory for file writes (default: current
+#'   directory). This does not restrict otherwise accessible file reads.
 #' @param max_turns Maximum number of turns (default 25)
 #' @param max_cost_usd Maximum cost in USD (default NULL = unlimited)
 #' @return A [Permissions] object

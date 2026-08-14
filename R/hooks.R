@@ -25,11 +25,18 @@
 #' - `context`: List containing `working_dir` (current directory)
 #' - Return: [HookResultPostToolUse()] to continue/stop
 #'
+#' **PostToolUseFailure** - After a tool reports an error
+#'
+#' Callback signature: `function(tool_name, tool_result, tool_error, context)`
+#' - Same arguments as PostToolUse, fired only when `tool_error` is not NULL
+#'
 #' **Stop** - When the agent stops
 #'
 #' Callback signature: `function(reason, context)`
-#' - `reason`: Why the agent stopped ("complete", "max_turns", "error")
-#' - `context`: List containing `working_dir`, `total_turns`, `cost`
+#' - `reason`: Why the agent stopped (for example `"complete"`,
+#'   `"request_limit"`, `"cost_limit"`, or `"provider_error"`)
+#' - `context`: List containing `working_dir`, `usage`, `run_id`, and `cost`;
+#'   native `run()` also includes `total_turns`
 #' - Return: [HookResultStop()]
 #'
 #' **SubagentStop** - When a sub-agent completes (LeadAgent only)
@@ -40,6 +47,23 @@
 #' - `result`: Result returned by the sub-agent
 #' - `context`: List containing `working_dir`
 #' - Return: [HookResultSubagentStop()]
+#'
+#' **SubagentStart** - When a delegated sub-agent starts (LeadAgent only)
+#'
+#' Callback signature: `function(agent_name, task, context)`
+#' - `agent_name`: Name of the sub-agent that started
+#' - `task`: The delegated task
+#' - `context`: List containing `working_dir`
+#'
+#' **PermissionRequest** - When permission policy denies a tool call
+#'
+#' Callback signature: `function(tool_name, tool_input, permission_result, context)`
+#' - Return: [PermissionResultAllow()] to override the denial, or
+#'   [PermissionResultDeny()] to replace the denial reason
+#'
+#' **ConfigChange** - When runtime configuration changes
+#'
+#' Callback signature: `function(key, old_value, new_value, context)`
 #'
 #' **UserPromptSubmit** - When a user prompt is submitted
 #'
@@ -73,8 +97,10 @@
 #' **SessionEnd** - When an agent session ends
 #'
 #' Callback signature: `function(reason, context)`
-#' - `reason`: Why the agent stopped ("complete", "max_turns", "cost_limit", "hook_requested_stop")
-#' - `context`: List containing `working_dir`, `total_turns`, `cost`
+#' - `reason`: Why the agent stopped (for example `"complete"`,
+#'   `"request_limit"`, `"cost_limit"`, or `"hook_requested_stop"`)
+#' - `context`: List containing `working_dir`, `usage`, `run_id`, and `cost`;
+#'   native `run()` also includes `total_turns`
 #' - Return: [HookResultSessionEnd()]
 #'
 #' @section Context Structure:
@@ -82,8 +108,12 @@
 #' The context parameter is always a named list. Common fields:
 #' - `working_dir`: The agent's current working directory
 #' - `tool_annotations`: (PreToolUse only) Tool annotations from ellmer if available
-#' - `total_turns`: (Stop, PreCompact, SessionEnd) Number of turns in the conversation
-#' - `cost`: (Stop, SessionEnd) List with `total`, `input_tokens`, `output_tokens`
+#' - `usage`: Run-scoped [AgentUsage] for tool and terminal lifecycle hooks
+#' - `usage_limits`: Active [UsageLimits] for tool lifecycle hooks
+#' - `run_id`: Identifier for the active run
+#' - `session_id`: Session identifier when compatibility persistence is configured
+#' - `total_turns`: (native Stop, PreCompact, native SessionEnd) Conversation turns
+#' - `cost`: (Stop, SessionEnd) List with `input`, `output`, `cached`, and `total`
 #' - `compact_count`: (PreCompact only) Number of turns being compacted
 #' - `level`: (Notification only) Informational severity such as `"info"` or `"warning"`
 #' - `code`: (Notification only) Stable notification code when available
@@ -118,11 +148,15 @@
 HookEvent <- c(
   "PreToolUse",
   "PostToolUse",
+  "PostToolUseFailure",
 
   "Stop",
+  "SubagentStart",
   "SubagentStop",
   "UserPromptSubmit",
   "Notification",
+  "PermissionRequest",
+  "ConfigChange",
   "PreCompact",
 
   "SessionStart",
@@ -137,6 +171,13 @@ HookEvent <- c(
 #' @param permission Either `"allow"` or `"deny"`
 #' @param reason Reason for denial (shown to the LLM)
 #' @param continue If FALSE, stop the agent after this hook
+#' @param updated_input Reserved for SDK-shape parity. **Not currently
+#'   supported**: deputy emits a warning and proceeds with the original tool
+#'   input. ellmer's tool-request callback contract does not yet expose a way
+#'   to mutate the in-flight request, so use `permission = "deny"` to block a
+#'   tool call instead of rewriting its arguments.
+#' @param additional_context Optional text to append to the running context
+#' @param stop_reason Optional stop reason used when `continue = FALSE`
 #' @return A `HookResultPreToolUse` object
 #'
 #' @examples
@@ -153,7 +194,10 @@ HookEvent <- c(
 HookResultPreToolUse <- function(
   permission = c("allow", "deny"),
   reason = NULL,
-  continue = TRUE
+  continue = TRUE,
+  updated_input = NULL,
+  additional_context = NULL,
+  stop_reason = NULL
 ) {
   permission <- match.arg(permission)
 
@@ -161,7 +205,10 @@ HookResultPreToolUse <- function(
     list(
       permission = permission,
       reason = reason,
-      continue = continue
+      continue = continue,
+      updated_input = updated_input,
+      additional_context = additional_context,
+      stop_reason = stop_reason
     ),
     class = c("HookResultPreToolUse", "HookResult", "list")
   )
@@ -173,6 +220,14 @@ HookResultPreToolUse <- function(
 #' Return this from a PostToolUse hook callback.
 #'
 #' @param continue If FALSE, stop the agent after this hook
+#' @param suppress_output Whether to suppress the result on Deputy's emitted
+#'   `tool_end` event. This does not remove the result from model context.
+#' @param updated_tool_output Optional replacement value for Deputy's emitted
+#'   `tool_end` event. ellmer does not support rewriting the model-visible
+#'   in-flight result from this callback.
+#' @param updated_mcp_tool_output Deprecated alias for `updated_tool_output`
+#' @param additional_context Optional text to append to the running context
+#' @param stop_reason Optional stop reason used when `continue = FALSE`
 #' @return A `HookResultPostToolUse` object
 #'
 #' @examples
@@ -183,10 +238,26 @@ HookResultPreToolUse <- function(
 #' HookResultPostToolUse(continue = FALSE)
 #'
 #' @export
-HookResultPostToolUse <- function(continue = TRUE) {
+HookResultPostToolUse <- function(
+  continue = TRUE,
+  suppress_output = FALSE,
+  updated_tool_output = NULL,
+  updated_mcp_tool_output = NULL,
+  additional_context = NULL,
+  stop_reason = NULL
+) {
+  if (is.null(updated_tool_output) && !is.null(updated_mcp_tool_output)) {
+    updated_tool_output <- updated_mcp_tool_output
+  }
+
   structure(
     list(
-      continue = continue
+      continue = continue,
+      suppress_output = isTRUE(suppress_output),
+      updated_tool_output = updated_tool_output,
+      updated_mcp_tool_output = updated_mcp_tool_output,
+      additional_context = additional_context,
+      stop_reason = stop_reason
     ),
     class = c("HookResultPostToolUse", "HookResult", "list")
   )
@@ -341,10 +412,14 @@ HookMatcher <- R6::R6Class(
     #' @param callback Function to call. Signature depends on event type:
     #'   * PreToolUse: `function(tool_name, tool_input, context)`
     #'   * PostToolUse: `function(tool_name, tool_result, tool_error, context)`
+    #'   * PostToolUseFailure: `function(tool_name, tool_result, tool_error, context)`
     #'   * Stop: `function(reason, context)`
+    #'   * SubagentStart: `function(agent_name, task, context)`
     #'   * SubagentStop: `function(agent_name, task, result, context)`
     #'   * UserPromptSubmit: `function(prompt, context)`
     #'   * Notification: `function(message, context)`
+    #'   * PermissionRequest: `function(tool_name, tool_input, permission_result, context)`
+    #'   * ConfigChange: `function(key, old_value, new_value, context)`
     #'   * PreCompact: `function(turns_to_compact, turns_to_keep, context)`
     #'   * SessionStart: `function(context)`
     #'   * SessionEnd: `function(reason, context)`

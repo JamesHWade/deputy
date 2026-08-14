@@ -79,9 +79,122 @@ expand_and_normalize <- function(path) {
   # (Windows paths sometimes have mixed separators that normalizePath doesn't fix)
   if (!is.na(normalized)) {
     normalized <- gsub("\\\\", "/", normalized)
+    if (.Platform$OS.type == "windows") {
+      # `normalizePath(..., mustWork = FALSE)` can retain an 8.3 short-name
+      # spelling for the existing parent of a new file while the same
+      # directory normalizes to its long spelling when it exists. Resolve the
+      # longest existing prefix with `mustWork = TRUE`, then append the missing
+      # suffix so containment checks compare one canonical representation.
+      probe <- normalized
+      missing <- character()
+      while (!file.exists(probe) && !dir.exists(probe)) {
+        parent <- dirname(probe)
+        if (identical(parent, probe)) {
+          break
+        }
+        missing <- c(basename(probe), missing)
+        probe <- parent
+      }
+      if (file.exists(probe) || dir.exists(probe)) {
+        canonical_prefix <- tryCatch(
+          normalizePath(probe, mustWork = TRUE, winslash = "/"),
+          error = function(e) NA_character_
+        )
+        if (!is.na(canonical_prefix)) {
+          normalized <- if (length(missing) > 0L) {
+            do.call(file.path, as.list(c(canonical_prefix, missing)))
+          } else {
+            canonical_prefix
+          }
+          normalized <- gsub("\\\\", "/", normalized)
+        }
+      }
+    } else {
+      normalized <- sub("^//+", "/", normalized)
+    }
   }
 
   normalized
+}
+
+# Resolve every symbolic-link component, including links whose final target
+# does not exist yet. `normalizePath(..., mustWork = FALSE)` alone does not
+# follow dangling links and can therefore misclassify a future write target.
+resolve_path_components <- function(path, max_depth = 40L) {
+  path <- expand_and_normalize(path)
+  if (is.na(path)) {
+    return(NA_character_)
+  }
+
+  seen <- character()
+  depth <- 0L
+  repeat {
+    probe <- path
+    components <- character()
+    repeat {
+      parent <- dirname(probe)
+      if (identical(parent, probe)) {
+        root <- probe
+        break
+      }
+      components <- c(basename(probe), components)
+      probe <- parent
+    }
+
+    resolved <- root
+    restarted <- FALSE
+    for (i in seq_along(components)) {
+      candidate <- file.path(resolved, components[[i]])
+      link_target <- tryCatch(
+        suppressWarnings(Sys.readlink(candidate)),
+        error = function(e) ""
+      )
+      if (length(link_target) != 1L) {
+        return(NA_character_)
+      }
+      if (is.na(link_target)) {
+        # Sys.readlink() reports NA for an ordinary nonexistent component.
+        # Once a component is absent, later components cannot be links yet.
+        link_target <- ""
+      }
+
+      if (nzchar(link_target)) {
+        depth <- depth + 1L
+        if (depth > max_depth) {
+          return(NA_character_)
+        }
+
+        target <- if (is_absolute_path(link_target)) {
+          link_target
+        } else {
+          file.path(dirname(candidate), link_target)
+        }
+        remaining <- if (i < length(components)) {
+          components[seq.int(i + 1L, length(components))]
+        } else {
+          character()
+        }
+        path <- if (length(remaining) > 0L) {
+          do.call(file.path, as.list(c(target, remaining)))
+        } else {
+          target
+        }
+        path <- expand_and_normalize(path)
+        if (is.na(path) || path %in% seen) {
+          return(NA_character_)
+        }
+        seen <- c(seen, path)
+        restarted <- TRUE
+        break
+      }
+
+      resolved <- candidate
+    }
+
+    if (!restarted) {
+      return(expand_and_normalize(resolved))
+    }
+  }
 }
 
 #' Check if a path is within a directory (secure)
@@ -116,85 +229,19 @@ is_path_within <- function(path, dir) {
     return(FALSE)
   }
 
-  # Expand home directory references (~ and ~user)
-  path <- expand_and_normalize(path)
-  dir <- expand_and_normalize(dir)
-
-  # If expansion/normalization failed, deny access
-
-  if (is.na(path) || is.na(dir)) {
-    return(FALSE)
-  }
-
-  # Helper: normalize a path, resolving symlinks for the existing portion
-  normalize_path <- function(p) {
-    # First, try to resolve symlinks if the path exists
-    if (file.exists(p)) {
-      resolved <- resolve_symlinks(p)
-      if (!is.na(resolved)) {
-        p <- resolved
-      }
-    }
-
-    # Normalize the path (converts backslashes to forward slashes on Windows)
-    normalized <- tryCatch(
-      normalizePath(p, mustWork = FALSE, winslash = "/"),
-      error = function(e) NA_character_
-    )
-
-    # Explicitly convert any remaining backslashes to forward slashes
-    if (!is.na(normalized)) {
-      normalized <- gsub("\\\\", "/", normalized)
-    }
-
-    # If the path doesn't exist, normalizePath won't resolve symlinks
-    # in the non-existing portion. Find the longest existing prefix.
-    # Use normalized path for checks to handle Windows backslashes correctly
-    if (!file.exists(normalized)) {
-      parts <- strsplit(normalized, "/")[[1]]
-      # Reconstruct path piece by piece to find existing prefix
-      for (i in seq_along(parts)) {
-        prefix <- paste(parts[1:i], collapse = "/")
-        if (nchar(prefix) == 0) {
-          prefix <- "/"
-        }
-        if (!file.exists(prefix)) {
-          # Previous prefix was the last existing one
-          if (i > 1) {
-            existing <- paste(parts[1:(i - 1)], collapse = "/")
-            if (nchar(existing) == 0) {
-              existing <- "/"
-            }
-            remaining <- paste(parts[i:length(parts)], collapse = "/")
-
-            # Resolve symlinks in existing portion
-            existing_resolved <- resolve_symlinks(existing)
-            if (!is.na(existing_resolved)) {
-              existing <- existing_resolved
-            }
-
-            existing_normalized <- tryCatch(
-              normalizePath(existing, mustWork = TRUE, winslash = "/"),
-              error = function(e) existing
-            )
-            # Explicitly convert any remaining backslashes
-            existing_normalized <- gsub("\\\\", "/", existing_normalized)
-            return(paste(existing_normalized, remaining, sep = "/"))
-          }
-          break
-        }
-      }
-    }
-    normalized
-  }
-
-  # Normalize both paths (with symlink resolution)
-  path <- normalize_path(path)
-  dir <- normalize_path(dir)
+  # Normalize both paths while resolving every link component, including a
+  # dangling final link whose target may be created by the pending operation.
+  path <- resolve_path_components(path)
+  dir <- resolve_path_components(dir)
 
   # If normalization failed, deny access
   if (is.na(path) || is.na(dir)) {
     return(FALSE)
+  }
+
+  if (.Platform$OS.type == "windows") {
+    path <- tolower(path)
+    dir <- tolower(dir)
   }
 
   # Ensure directory has trailing separator for accurate prefix matching
@@ -224,6 +271,22 @@ has_path_traversal <- function(path) {
   # Note: Absolute paths are allowed and checked by is_path_within()
   grepl("\\.\\.", path) || # Parent directory references (../escape.txt)
     grepl("^~", path) # Home directory expansion (~user/escape.txt)
+}
+
+#' Check whether a path is absolute
+#'
+#' Recognizes POSIX, Windows drive-letter, and Windows UNC paths. This helper
+#' deliberately does not expand or normalize the path; callers that accept
+#' untrusted input should reject traversal syntax before resolving it.
+#'
+#' @param path Path to inspect
+#' @return A length-one logical
+#' @noRd
+is_absolute_path <- function(path) {
+  is.character(path) &&
+    length(path) == 1 &&
+    !is.na(path) &&
+    grepl("^(/|[A-Za-z]:[/\\\\]|\\\\\\\\)", path)
 }
 
 #' Validate path and perform operation atomically (TOCTOU mitigation)

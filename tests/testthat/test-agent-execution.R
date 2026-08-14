@@ -538,8 +538,18 @@ test_that("run_sync warns when approaching cost limit (90%)", {
     create_mock_assistant_turn(text = "Response")
   }
 
-  # Override get_tokens to return high cost (90% of $1.00 = $0.90)
+  token_reads <- 0L
+  # The first read establishes the run baseline; later reads report run cost.
   mock_chat$get_tokens <- function() {
+    token_reads <<- token_reads + 1L
+    if (token_reads == 1L) {
+      return(data.frame(
+        input = 0,
+        output = 0,
+        cached_input = 0,
+        cost = 0
+      ))
+    }
     data.frame(
       input = 1000,
       output = 500,
@@ -590,8 +600,18 @@ test_that("run_sync stops when cost limit is reached", {
     create_mock_assistant_turn(text = "Response")
   }
 
-  # Override get_tokens to return cost exceeding limit
+  token_reads <- 0L
+  # The first read establishes the run baseline; later reads exceed the limit.
   mock_chat$get_tokens <- function() {
+    token_reads <<- token_reads + 1L
+    if (token_reads == 1L) {
+      return(data.frame(
+        input = 0,
+        output = 0,
+        cached_input = 0,
+        cost = 0
+      ))
+    }
     data.frame(
       input = 10000,
       output = 5000,
@@ -750,8 +770,8 @@ test_that("get_tool_annotation works with S7 ToolDef objects", {
   expect_null(get_tool_annotation("not a tool", "annotation"))
 })
 
-test_that("run_sync stops with max_turns reason when limit reached", {
-  # This test verifies the max_turns stop reason
+test_that("run_sync stops with request_limit reason when limit reached", {
+  # Legacy max_turns now seeds the run-scoped model request limit.
   mock_chat <- create_mock_chat()
 
   # Keep returning tool requests to force multiple turns
@@ -791,5 +811,5 @@ test_that("run_sync stops with max_turns reason when limit reached", {
   )
 
   result <- suppressWarnings(agent$run_sync("Test task"))
-  expect_equal(result$stop_reason, "max_turns")
+  expect_equal(result$stop_reason, "request_limit")
 })

@@ -550,8 +550,21 @@ load_custom_agent_definition <- function(path, skills = list()) {
     "description",
     "prompt",
     "tools",
+    "disallowedTools",
+    "disallowed_tools",
     "model",
-    "skills"
+    "skills",
+    "memory",
+    "mcpServers",
+    "mcp_servers",
+    "initialPrompt",
+    "initial_prompt",
+    "maxTurns",
+    "max_turns",
+    "background",
+    "effort",
+    "permissionMode",
+    "permission_mode"
   )
   unsupported_fields <- setdiff(names(meta), supported_fields)
   if (length(unsupported_fields) > 0) {
@@ -571,6 +584,15 @@ load_custom_agent_definition <- function(path, skills = list()) {
 
   tool_names <- meta$tools %||% list()
   tools <- compat_resolve_named_tools(tool_names)
+  disallowed_tools <- meta$disallowedTools %||% meta$disallowed_tools
+  if (!is.null(disallowed_tools)) {
+    disallowed_tools <- trimws(as.character(unlist(
+      disallowed_tools,
+      recursive = TRUE,
+      use.names = FALSE
+    )))
+    disallowed_tools <- disallowed_tools[nzchar(disallowed_tools)]
+  }
 
   skill_names <- meta$skills %||% list()
   skill_names <- trimws(as.character(unlist(
@@ -581,13 +603,31 @@ load_custom_agent_definition <- function(path, skills = list()) {
   skill_names <- skill_names[nzchar(skill_names)]
   resolved_skills <- unname(Filter(Negate(is.null), skills[skill_names]))
 
+  mcp_servers <- meta$mcpServers %||% meta$mcp_servers
+  if (!is.null(mcp_servers)) {
+    mcp_servers <- trimws(as.character(unlist(
+      mcp_servers,
+      recursive = TRUE,
+      use.names = FALSE
+    )))
+    mcp_servers <- mcp_servers[nzchar(mcp_servers)]
+  }
+
   agent_definition(
     name = name,
     description = description,
     prompt = prompt,
     tools = tools,
     model = model,
-    skills = resolved_skills
+    skills = resolved_skills,
+    disallowed_tools = disallowed_tools,
+    memory = meta$memory,
+    mcp_servers = mcp_servers,
+    initial_prompt = meta$initialPrompt %||% meta$initial_prompt,
+    max_turns = meta$maxTurns %||% meta$max_turns,
+    background = isTRUE(meta$background),
+    effort = meta$effort,
+    permission_mode = meta$permissionMode %||% meta$permission_mode
   )
 }
 

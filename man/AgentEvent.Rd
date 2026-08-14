@@ -28,7 +28,13 @@ updates on agent progress.
 \item \code{"text_complete"} - Full text response. Contains: \code{text}
 \item \code{"turn"} - Turn completed. Contains: \code{turn}, \code{turn_number}
 \item \code{"warning"} - Warning condition occurred. Contains: \code{message}, \code{details}
-\item \code{"stop"} - Agent stopped. Contains: \code{reason}, \code{total_turns}, \code{cost}
+\item \code{"content"} - Non-text provider content. Contains: \code{content},
+\code{content_type}
+\item \code{"file_checkpoint"} - Automatic run-boundary checkpoint. Contains:
+\code{checkpoint_id}, \code{name}
+\item \code{"usage"} - Run usage snapshot. Contains: \code{usage}, \code{limits}
+\item \code{"stop"} - Agent stopped. Contains: \code{reason}, \code{total_turns}, \code{cost},
+\code{usage}, and \code{run_id}
 }
 }
 

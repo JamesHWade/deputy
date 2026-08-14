@@ -6,7 +6,7 @@
 \alias{deputy}
 \title{deputy: Agentic AI Workflows for R}
 \description{
-\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+\if{html}{\figure{logo.svg}{options: style='float: right' alt='logo' width='120'}}
 
 A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.
 
@@ -42,7 +42,10 @@ agent <- Agent$new(
 )
 
 # Run a task with streaming output
-for (event in agent$run("List files in current directory")) \{
+events <- agent$run("List files in current directory")
+repeat \{
+  event <- events()
+  if (coro::is_exhausted(event)) break
   if (event$type == "text") cat(event$text)
 \}
 }\if{html}{\out{</div>}}
@@ -59,6 +62,11 @@ Useful links:
 }
 \author{
 \strong{Maintainer}: James Wade \email{github@jameshwade.com} (\href{https://orcid.org/0000-0002-9740-1905}{ORCID})
+
+Authors:
+\itemize{
+  \item James Wade \email{github@jameshwade.com} (\href{https://orcid.org/0000-0002-9740-1905}{ORCID})
+}
 
 }
 \keyword{internal}

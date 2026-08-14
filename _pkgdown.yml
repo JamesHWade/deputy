@@ -28,7 +28,7 @@ navbar:
         href: articles/structured-output.html
       - text: Agent Configuration
         href: articles/agent-configuration.html
-      - text: Claude Agent SDK Compatibility
+      - text: Agent SDK Parity
         href: articles/claude-sdk-parity.html
       - text: "---"
       - text: "Examples"
@@ -49,6 +49,8 @@ reference:
   - Agent
   - AgentResult
   - AgentEvent
+  - AgentUsage
+  - UsageLimits
 
 - title: Tools
   desc: Built-in tools and tool bundles
@@ -104,6 +106,7 @@ reference:
   - ClaudeSDKClient
   - claude_sdk_options
   - claude_sdk_query
+  - session_store_memory
 
 - title: Multi-Agent
 

@@ -111,7 +111,12 @@ For real-time feedback, use `run()` which returns a generator:
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 agent <- Agent$new(chat = chat, tools = tools_file())
 
-for (event in agent$run("What is the name of this package?")) {
+events <- agent$run("What is the name of this package?")
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) {
+    break
+  }
   switch(event$type,
     "text" = cat(event$text),
     "tool_start" = cli::cli_alert_info("Calling {event$tool_name}..."),
@@ -218,8 +223,8 @@ agent <- Agent$new(
 ```
 
 If both lists are present, `tool_denylist` wins. The
-`permission_prompt_tool_name` tool is always allowed and appears in deny reasons
-so the model can request approval.
+`permission_prompt_tool_name` tool is allowed as an approval escape hatch except
+in `dontAsk` mode, and appears in deny reasons when prompting is enabled.
 
 ### Applying Tool Policy from `.claude/settings.json`
 
@@ -266,7 +271,7 @@ Hooks let you intercept and customize agent behavior at key points:
 ```{r}
 agent$add_hook(HookMatcher$new(
   event = "PostToolUse",
-  callback = function(tool_name, tool_result, context) {
+  callback = function(tool_name, tool_result, tool_error, context) {
     cli::cli_alert_info("Tool {tool_name} completed")
     HookResultPostToolUse()
   }
@@ -307,6 +312,11 @@ agent2$load_session("my_session.rds")
 # Continue the conversation
 result <- agent2$run_sync("Continue where we left off...")
 ```
+
+By default, `Agent$load_session()` restores conversation and prompt while
+keeping the receiving Agent's configured tools. Pass `restore_tools = TRUE`
+only when you explicitly trust and want to restore serialized tools.
+Constructor-supplied permissions and `working_dir` always remain authoritative.
 
 ## Multi-Agent Systems
 

@@ -9,75 +9,80 @@ matching, and execution of hooks.
 }
 \section{Methods}{
 \subsection{Public methods}{
-\itemize{
-\item \href{#method-HookRegistry-new}{\code{HookRegistry$new()}}
-\item \href{#method-HookRegistry-add}{\code{HookRegistry$add()}}
-\item \href{#method-HookRegistry-get_hooks}{\code{HookRegistry$get_hooks()}}
-\item \href{#method-HookRegistry-fire}{\code{HookRegistry$fire()}}
-\item \href{#method-HookRegistry-last_errors}{\code{HookRegistry$last_errors()}}
-\item \href{#method-HookRegistry-clear_errors}{\code{HookRegistry$clear_errors()}}
-\item \href{#method-HookRegistry-count}{\code{HookRegistry$count()}}
-\item \href{#method-HookRegistry-print}{\code{HookRegistry$print()}}
-\item \href{#method-HookRegistry-clone}{\code{HookRegistry$clone()}}
-}
+  \itemize{
+    \item \href{#method-HookRegistry-initialize}{\code{HookRegistry$new()}}
+    \item \href{#method-HookRegistry-add}{\code{HookRegistry$add()}}
+    \item \href{#method-HookRegistry-get_hooks}{\code{HookRegistry$get_hooks()}}
+    \item \href{#method-HookRegistry-fire}{\code{HookRegistry$fire()}}
+    \item \href{#method-HookRegistry-last_errors}{\code{HookRegistry$last_errors()}}
+    \item \href{#method-HookRegistry-clear_errors}{\code{HookRegistry$clear_errors()}}
+    \item \href{#method-HookRegistry-count}{\code{HookRegistry$count()}}
+    \item \href{#method-HookRegistry-print}{\code{HookRegistry$print()}}
+    \item \href{#method-HookRegistry-clone}{\code{HookRegistry$clone()}}
+  }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-HookRegistry-new"></a>}}
-\if{latex}{\out{\hypertarget{method-HookRegistry-new}{}}}
-\subsection{Method \code{new()}}{
-Create a new HookRegistry.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$new()}\if{html}{\out{</div>}}
+\if{html}{\out{<a id="method-HookRegistry-initialize"></a>}}
+\if{latex}{\out{\hypertarget{method-HookRegistry-initialize}{}}}
+\subsection{\code{HookRegistry$new()}}{
+  Create a new HookRegistry.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$new()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HookRegistry-add"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-add}{}}}
-\subsection{Method \code{add()}}{
-Add a hook to the registry.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$add(hook)}\if{html}{\out{</div>}}
+\subsection{\code{HookRegistry$add()}}{
+  Add a hook to the registry.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$add(hook)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{hook}}{A \link{HookMatcher} object}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self for chaining
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{hook}}{A \link{HookMatcher} object}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Invisible self for chaining
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HookRegistry-get_hooks"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-get_hooks}{}}}
-\subsection{Method \code{get_hooks()}}{
-Get all hooks for a specific event.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$get_hooks(event, tool_name = NULL)}\if{html}{\out{</div>}}
+\subsection{\code{HookRegistry$get_hooks()}}{
+  Get all hooks for a specific event.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$get_hooks(event, tool_name = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{event}}{The event type}
+      \item{\code{tool_name}}{Optional tool name for filtering}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    List of matching HookMatcher objects
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{event}}{The event type}
-
-\item{\code{tool_name}}{Optional tool name for filtering}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-List of matching HookMatcher objects
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HookRegistry-fire"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-fire}{}}}
-\subsection{Method \code{fire()}}{
-Fire hooks for an event and return the first non-NULL result.
+\subsection{\code{HookRegistry$fire()}}{
+  Fire hooks for an event and return the first non-NULL result.
 
 Hook errors are handled as follows:
 \itemize{
@@ -85,89 +90,99 @@ Hook errors are handled as follows:
 \item \strong{Other events}: Errors are logged prominently and stored in the
 \code{last_errors} field, but execution continues to prevent cascade failures
 }
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$fire(event, tool_name = NULL, ...)}\if{html}{\out{</div>}}
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$fire(event, tool_name = NULL, ...)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{event}}{The event type}
+      \item{\code{tool_name}}{Optional tool name for filtering (also passed to callback)}
+      \item{\code{...}}{Arguments to pass to the callback}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The first non-NULL hook result, or NULL
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{event}}{The event type}
-
-\item{\code{tool_name}}{Optional tool name for filtering (also passed to callback)}
-
-\item{\code{...}}{Arguments to pass to the callback}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-The first non-NULL hook result, or NULL
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HookRegistry-last_errors"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-last_errors}{}}}
-\subsection{Method \code{last_errors()}}{
-Get errors from recent hook executions.
+\subsection{\code{HookRegistry$last_errors()}}{
+  Get errors from recent hook executions.
 
 Useful for programmatic checking of hook health, especially for
 audit/logging hooks where failures are logged but not fatal.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$last_errors()}\if{html}{\out{</div>}}
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$last_errors()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    List of error records, each containing event, tool_name, error, timestamp
+  }
 }
 
-\subsection{Returns}{
-List of error records, each containing event, tool_name, error, timestamp
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HookRegistry-clear_errors"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-clear_errors}{}}}
-\subsection{Method \code{clear_errors()}}{
-Clear the error history.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$clear_errors()}\if{html}{\out{</div>}}
+\subsection{\code{HookRegistry$clear_errors()}}{
+  Clear the error history.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$clear_errors()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HookRegistry-count"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-count}{}}}
-\subsection{Method \code{count()}}{
-Get the number of registered hooks.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$count()}\if{html}{\out{</div>}}
+\subsection{\code{HookRegistry$count()}}{
+  Get the number of registered hooks.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$count()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Integer count
+  }
 }
 
-\subsection{Returns}{
-Integer count
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HookRegistry-print"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-print}{}}}
-\subsection{Method \code{print()}}{
-Print the registry.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$print()}\if{html}{\out{</div>}}
+\subsection{\code{HookRegistry$print()}}{
+  Print the registry.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$print()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HookRegistry-clone"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{HookRegistry$clone(deep = FALSE)}\if{html}{\out{</div>}}
+\subsection{\code{HookRegistry$clone()}}{
+  The objects of this class are cloneable with this method.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$clone(deep = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{deep}}{Whether to make a deep clone.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
-}
-}
 }

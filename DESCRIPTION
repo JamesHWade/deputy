@@ -14,6 +14,8 @@ Description: A provider-agnostic framework for building agentic AI workflows
 URL: https://github.com/JamesHWade/deputy, https://jameshwade.github.io/deputy/
 BugReports: https://github.com/JamesHWade/deputy/issues
 License: MIT + file LICENSE
+Depends:
+    R (>= 4.1.0)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3

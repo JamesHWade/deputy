@@ -40,6 +40,20 @@ mcptools package. Returns invisible self.}
 }
 }
 
+\section{File checkpoint methods}{
+
+When \code{enable_file_checkpointing = TRUE}, Deputy captures exact preimages for
+writes made through its native and Agent SDK-compatible file tools.
+
+\describe{
+\item{\verb{$checkpoint(name = NULL, metadata = list())}}{Create a manual file
+checkpoint and return its checkpoint ID.}
+\item{\verb{$list_checkpoints()}}{List available file checkpoints.}
+\item{\verb{$rewind_files(checkpoint_id)}}{Restore files to a checkpoint and
+invalidate later file history. Conversation history is not changed.}
+}
+}
+
 \examples{
 \dontrun{
 # Create an agent with file tools
@@ -49,7 +63,10 @@ agent <- Agent$new(
 )
 
 # Run a task with streaming output
-for (event in agent$run("List files in the current directory")) {
+events <- agent$run("List files in the current directory")
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) break
   if (event$type == "text") cat(event$text)
 }
 
@@ -59,7 +76,7 @@ print(result$response)
 }
 
 ## ------------------------------------------------
-## Method `Agent$add_hook`
+## Method `Agent$add_hook()`
 ## ------------------------------------------------
 
 \dontrun{
@@ -78,234 +95,263 @@ agent$add_hook(HookMatcher$new(
 }
 }
 \section{Active bindings}{
-\if{html}{\out{<div class="r6-active-bindings">}}
-\describe{
-\item{\code{chat}}{The wrapped ellmer Chat object. Read-only after construction.}
+  \if{html}{\out{<div class="r6-active-bindings">}}
+  \describe{
+    \item{\code{chat}}{The wrapped ellmer Chat object. Read-only after construction.}
 
-\item{\code{permissions}}{Permission policy for the agent. Read-only after construction.}
+    \item{\code{permissions}}{Permission policy for the agent. Read-only after construction.}
 
-\item{\code{working_dir}}{Working directory for file operations. Read-only after construction.}
+    \item{\code{usage_limits}}{Default per-run \link{UsageLimits}. Read-only after construction.}
 
-\item{\code{hooks}}{Hook registry for lifecycle events. Read-only after construction.}
-}
-\if{html}{\out{</div>}}
+    \item{\code{working_dir}}{Working directory for file operations. Read-only after construction.}
+
+    \item{\code{hooks}}{Hook registry for lifecycle events. Read-only after construction.}
+  }
+  \if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
-\itemize{
-\item \href{#method-Agent-new}{\code{Agent$new()}}
-\item \href{#method-Agent-run}{\code{Agent$run()}}
-\item \href{#method-Agent-run_sync}{\code{Agent$run_sync()}}
-\item \href{#method-Agent-register_tool}{\code{Agent$register_tool()}}
-\item \href{#method-Agent-register_tools}{\code{Agent$register_tools()}}
-\item \href{#method-Agent-add_hook}{\code{Agent$add_hook()}}
-\item \href{#method-Agent-turns}{\code{Agent$turns()}}
-\item \href{#method-Agent-last_turn}{\code{Agent$last_turn()}}
-\item \href{#method-Agent-session_id}{\code{Agent$session_id()}}
-\item \href{#method-Agent-configure_sdk_compat}{\code{Agent$configure_sdk_compat()}}
-\item \href{#method-Agent-cost}{\code{Agent$cost()}}
-\item \href{#method-Agent-provider}{\code{Agent$provider()}}
-\item \href{#method-Agent-save_session}{\code{Agent$save_session()}}
-\item \href{#method-Agent-load_session}{\code{Agent$load_session()}}
-\item \href{#method-Agent-compact}{\code{Agent$compact()}}
-\item \href{#method-Agent-print}{\code{Agent$print()}}
-\item \href{#method-Agent-load_skill}{\code{Agent$load_skill()}}
-\item \href{#method-Agent-skills}{\code{Agent$skills()}}
-\item \href{#method-Agent-slash_commands}{\code{Agent$slash_commands()}}
-\item \href{#method-Agent-settings}{\code{Agent$settings()}}
-\item \href{#method-Agent-load_mcp}{\code{Agent$load_mcp()}}
-\item \href{#method-Agent-mcp_tools}{\code{Agent$mcp_tools()}}
-\item \href{#method-Agent-run_shiny}{\code{Agent$run_shiny()}}
-\item \href{#method-Agent-clone}{\code{Agent$clone()}}
-}
+  \itemize{
+    \item \href{#method-Agent-initialize}{\code{Agent$new()}}
+    \item \href{#method-Agent-run}{\code{Agent$run()}}
+    \item \href{#method-Agent-run_sync}{\code{Agent$run_sync()}}
+    \item \href{#method-Agent-register_tool}{\code{Agent$register_tool()}}
+    \item \href{#method-Agent-register_tools}{\code{Agent$register_tools()}}
+    \item \href{#method-Agent-add_hook}{\code{Agent$add_hook()}}
+    \item \href{#method-Agent-turns}{\code{Agent$turns()}}
+    \item \href{#method-Agent-last_turn}{\code{Agent$last_turn()}}
+    \item \href{#method-Agent-session_id}{\code{Agent$session_id()}}
+    \item \href{#method-Agent-get_permission_mode}{\code{Agent$get_permission_mode()}}
+    \item \href{#method-Agent-set_permission_mode}{\code{Agent$set_permission_mode()}}
+    \item \href{#method-Agent-configure_sdk_compat}{\code{Agent$configure_sdk_compat()}}
+    \item \href{#method-Agent-cost}{\code{Agent$cost()}}
+    \item \href{#method-Agent-usage}{\code{Agent$usage()}}
+    \item \href{#method-Agent-interrupt}{\code{Agent$interrupt()}}
+    \item \href{#method-Agent-provider}{\code{Agent$provider()}}
+    \item \href{#method-Agent-save_session}{\code{Agent$save_session()}}
+    \item \href{#method-Agent-load_session}{\code{Agent$load_session()}}
+    \item \href{#method-Agent-checkpoint}{\code{Agent$checkpoint()}}
+    \item \href{#method-Agent-list_checkpoints}{\code{Agent$list_checkpoints()}}
+    \item \href{#method-Agent-rewind_files}{\code{Agent$rewind_files()}}
+    \item \href{#method-Agent-compact}{\code{Agent$compact()}}
+    \item \href{#method-Agent-print}{\code{Agent$print()}}
+    \item \href{#method-Agent-load_skill}{\code{Agent$load_skill()}}
+    \item \href{#method-Agent-skills}{\code{Agent$skills()}}
+    \item \href{#method-Agent-slash_commands}{\code{Agent$slash_commands()}}
+    \item \href{#method-Agent-settings}{\code{Agent$settings()}}
+    \item \href{#method-Agent-load_mcp}{\code{Agent$load_mcp()}}
+    \item \href{#method-Agent-mcp_tools}{\code{Agent$mcp_tools()}}
+    \item \href{#method-Agent-mcp_status}{\code{Agent$mcp_status()}}
+    \item \href{#method-Agent-run_shiny}{\code{Agent$run_shiny()}}
+    \item \href{#method-Agent-clone}{\code{Agent$clone()}}
+  }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-Agent-new"></a>}}
-\if{latex}{\out{\hypertarget{method-Agent-new}{}}}
-\subsection{Method \code{new()}}{
-Create a new Agent.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$new(
+\if{html}{\out{<a id="method-Agent-initialize"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-initialize}{}}}
+\subsection{\code{Agent$new()}}{
+  Create a new Agent.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$new(
   chat,
   tools = list(),
   system_prompt = NULL,
   permissions = NULL,
+  usage_limits = NULL,
+  enable_file_checkpointing = FALSE,
+  file_checkpoint_max_file_bytes = 50 * 1024^2,
+  file_checkpoint_max_journal_bytes = 250 * 1024^2,
   working_dir = getwd(),
   setting_sources = NULL,
   settings = NULL
-)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{chat}}{An ellmer Chat object created by \code{ellmer::chat()} or
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{chat}}{An ellmer Chat object created by \code{ellmer::chat()} or
 provider-specific functions like \code{ellmer::chat_openai()}.}
-
-\item{\code{tools}}{A list of tools created with \code{ellmer::tool()}. See
+      \item{\code{tools}}{A list of tools created with \code{ellmer::tool()}. See
 \code{\link[=tools_file]{tools_file()}} and \code{\link[=tools_code]{tools_code()}} for built-in tool bundles.}
-
-\item{\code{system_prompt}}{Optional system prompt. If provided, overrides the
+      \item{\code{system_prompt}}{Optional system prompt. If provided, overrides the
 chat object's existing system prompt.}
-
-\item{\code{permissions}}{A \link{Permissions} object controlling what the agent can do.
+      \item{\code{permissions}}{A \link{Permissions} object controlling what the agent can do.
 Defaults to \code{\link[=permissions_standard]{permissions_standard()}}.}
-
-\item{\code{working_dir}}{Working directory for file operations. Defaults to
+      \item{\code{usage_limits}}{Optional \link{UsageLimits} applied independently to each
+run. NULL request or cost fields inherit the legacy
+\code{permissions$max_turns} and \code{permissions$max_cost_usd} values.}
+      \item{\code{enable_file_checkpointing}}{Whether to journal exact file preimages
+for Deputy's mutating file tools. A checkpoint is created automatically
+at the beginning of every run.}
+      \item{\code{file_checkpoint_max_file_bytes}}{Maximum bytes captured for one
+file preimage. Defaults to 50 MiB.}
+      \item{\code{file_checkpoint_max_journal_bytes}}{Maximum aggregate serialized
+bytes for checkpoint records, markers, metadata, and pending captures.
+Defaults to 250 MiB.}
+      \item{\code{working_dir}}{Working directory for file operations. Defaults to
 current directory.}
-
-\item{\code{setting_sources}}{Optional character vector of Claude-style
+      \item{\code{setting_sources}}{Optional character vector of Claude-style
 setting sources (e.g., "project", "user") used to load memory, skills,
 and slash commands.}
-
-\item{\code{settings}}{Optional pre-loaded settings list from
+      \item{\code{settings}}{Optional pre-loaded settings list from
 \code{\link[=claude_settings_load]{claude_settings_load()}}. If provided, bypasses \code{setting_sources}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A new \code{Agent} object
+  }
 }
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-A new \code{Agent} object
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-run"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-run}{}}}
-\subsection{Method \code{run()}}{
-Run an agentic task with streaming output.
+\subsection{\code{Agent$run()}}{
+  Run an agentic task with streaming output.
 
 Returns a generator that yields \link{AgentEvent} objects as the agent works.
-The agent will continue until the task is complete, max_turns is reached,
-or the cost limit is exceeded.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$run(
+The agent will continue until the task is complete, a run limit is
+reached, or it is interrupted.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$run(
   task,
   max_turns = NULL,
+  usage_limits = NULL,
   include_partial_messages = TRUE,
   output_format = NULL
-)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{task}}{The task for the agent to perform}
-
-\item{\code{max_turns}}{Maximum number of turns (default: from permissions)}
-
-\item{\code{include_partial_messages}}{If TRUE (default), yield partial text
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{task}}{The task for the agent to perform}
+      \item{\code{max_turns}}{Legacy alias for the maximum number of model requests.
+Defaults to the value seeded from permissions.}
+      \item{\code{usage_limits}}{Optional \link{UsageLimits} override for this run.}
+      \item{\code{include_partial_messages}}{If TRUE (default), yield partial text
 chunks as they stream. If FALSE, only yield \code{text_complete}.}
-
-\item{\code{output_format}}{Optional output format spec (e.g. JSON schema) to
+      \item{\code{output_format}}{Optional output format spec (e.g. JSON schema) to
 guide and validate structured responses.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A generator yielding \link{AgentEvent} objects
+  }
 }
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-A generator yielding \link{AgentEvent} objects
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-run_sync"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-run_sync}{}}}
-\subsection{Method \code{run_sync()}}{
-Run an agentic task and block until completion.
+\subsection{\code{Agent$run_sync()}}{
+  Run an agentic task and block until completion.
 
 Convenience wrapper around \code{run()} that collects all events and returns
 an \link{AgentResult}.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$run_sync(
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$run_sync(
   task,
   max_turns = NULL,
+  usage_limits = NULL,
   include_partial_messages = TRUE,
   output_format = NULL
-)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{task}}{The task for the agent to perform}
-
-\item{\code{max_turns}}{Maximum number of turns (default: from permissions)}
-
-\item{\code{include_partial_messages}}{If TRUE (default), keep partial text
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{task}}{The task for the agent to perform}
+      \item{\code{max_turns}}{Legacy alias for the maximum number of model requests.
+Defaults to the value seeded from permissions.}
+      \item{\code{usage_limits}}{Optional \link{UsageLimits} override for this run.}
+      \item{\code{include_partial_messages}}{If TRUE (default), keep partial text
 events. If FALSE, suppress partials.}
-
-\item{\code{output_format}}{Optional output format spec (e.g. JSON schema) to
+      \item{\code{output_format}}{Optional output format spec (e.g. JSON schema) to
 guide and validate structured responses.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    An \link{AgentResult} object
+  }
 }
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-An \link{AgentResult} object
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-register_tool"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-register_tool}{}}}
-\subsection{Method \code{register_tool()}}{
-Register a tool with the agent.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$register_tool(tool)}\if{html}{\out{</div>}}
+\subsection{\code{Agent$register_tool()}}{
+  Register a tool with the agent.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$register_tool(tool)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{tool}}{A tool created with \code{ellmer::tool()}}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self for chaining
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{tool}}{A tool created with \code{ellmer::tool()}}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Invisible self for chaining
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-register_tools"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-register_tools}{}}}
-\subsection{Method \code{register_tools()}}{
-Register multiple tools with the agent.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$register_tools(tools)}\if{html}{\out{</div>}}
+\subsection{\code{Agent$register_tools()}}{
+  Register multiple tools with the agent.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$register_tools(tools)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{tools}}{A list of tools created with \code{ellmer::tool()}}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self for chaining
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{tools}}{A list of tools created with \code{ellmer::tool()}}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Invisible self for chaining
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-add_hook"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-add_hook}{}}}
-\subsection{Method \code{add_hook()}}{
-Add a hook to the agent.
+\subsection{\code{Agent$add_hook()}}{
+  Add a hook to the agent.
 
 Hooks are called at specific points during agent execution and can
 modify behavior (e.g., deny tool calls, log events).
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$add_hook(hook)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{hook}}{A \link{HookMatcher} object}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Invisible self for chaining
-}
-\subsection{Examples}{
-\if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-# Add a hook to block dangerous bash commands
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$add_hook(hook)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{hook}}{A \link{HookMatcher} object}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self for chaining
+  }
+  \subsection{Examples}{
+    \if{html}{\out{<div class="r example copy">}}
+    \preformatted{# Add a hook to block dangerous bash commands
 agent$add_hook(hook_block_dangerous_bash())
 
 # Add a custom PreToolUse hook
@@ -318,122 +364,213 @@ agent$add_hook(HookMatcher$new(
   }
 ))
 }
+    \if{html}{\out{</div>}}
+  }
 }
-\if{html}{\out{</div>}}
 
-}
-
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-turns"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-turns}{}}}
-\subsection{Method \code{turns()}}{
-Get the conversation history.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$turns()}\if{html}{\out{</div>}}
+\subsection{\code{Agent$turns()}}{
+  Get the conversation history.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$turns()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list of Turn objects
+  }
 }
 
-\subsection{Returns}{
-A list of Turn objects
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-last_turn"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-last_turn}{}}}
-\subsection{Method \code{last_turn()}}{
-Get the last turn in the conversation.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$last_turn(role = "assistant")}\if{html}{\out{</div>}}
+\subsection{\code{Agent$last_turn()}}{
+  Get the last turn in the conversation.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$last_turn(role = "assistant")}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{role}}{Role to filter by ("assistant", "user", or "system")}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A Turn object or NULL
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{role}}{Role to filter by ("assistant", "user", or "system")}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-A Turn object or NULL
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-session_id"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-session_id}{}}}
-\subsection{Method \code{session_id()}}{
-Get the active Claude SDK compatibility session identifier.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$session_id()}\if{html}{\out{</div>}}
+\subsection{\code{Agent$session_id()}}{
+  Get the active Claude SDK compatibility session identifier.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$session_id()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Character session id, or NULL when compat mode is inactive
+  }
 }
 
-\subsection{Returns}{
-Character session id, or NULL when compat mode is inactive
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-get_permission_mode"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-get_permission_mode}{}}}
+\subsection{\code{Agent$get_permission_mode()}}{
+  Get the active permission mode.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$get_permission_mode()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Character permission mode
+  }
 }
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-set_permission_mode"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-set_permission_mode}{}}}
+\subsection{\code{Agent$set_permission_mode()}}{
+  Change the active permission mode for subsequent tool calls.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$set_permission_mode(mode)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{mode}}{Permission mode, see \link{PermissionMode}}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self
+  }
 }
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-configure_sdk_compat"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-configure_sdk_compat}{}}}
-\subsection{Method \code{configure_sdk_compat()}}{
-Configure Claude SDK compatibility behavior for this agent.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$configure_sdk_compat(config = list())}\if{html}{\out{</div>}}
+\subsection{\code{Agent$configure_sdk_compat()}}{
+  Configure Claude SDK compatibility behavior for this agent.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$configure_sdk_compat(config = list())}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{config}}{Named list of compat settings}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self for chaining
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{config}}{Named list of compat settings}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Invisible self for chaining
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-cost"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-cost}{}}}
-\subsection{Method \code{cost()}}{
-Get cost information for the conversation.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$cost()}\if{html}{\out{</div>}}
+\subsection{\code{Agent$cost()}}{
+  Get cost information for the conversation.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$cost()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list with input, output, cached, and total token costs
+  }
 }
 
-\subsection{Returns}{
-A list with input, output, cached, and total token costs
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-usage"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-usage}{}}}
+\subsection{\code{Agent$usage()}}{
+  Get normalized usage for the complete in-memory conversation.
+
+Per-run usage is available on \link{AgentResult} and in the final \code{usage}
+event returned by \verb{$run()}.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$usage()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    An \link{AgentUsage} object
+  }
 }
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-interrupt"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-interrupt}{}}}
+\subsection{\code{Agent$interrupt()}}{
+  Request cancellation of the active stream.
+
+Cancellation is cooperative and takes effect at the next provider or tool
+boundary supported by ellmer.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$interrupt(reason = "interrupted")}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{reason}}{Stable reason stored on the terminal event}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible logical indicating whether a run was active
+  }
 }
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-provider"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-provider}{}}}
-\subsection{Method \code{provider()}}{
-Get provider information.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$provider()}\if{html}{\out{</div>}}
+\subsection{\code{Agent$provider()}}{
+  Get provider information.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$provider()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list with provider name and model
+  }
 }
 
-\subsection{Returns}{
-A list with provider name and model
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-save_session"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-save_session}{}}}
-\subsection{Method \code{save_session()}}{
-Save the current session to an RDS file.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$save_session(path)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{path}}{Path to save the session}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Details}{
-The session file contains:
+\subsection{\code{Agent$save_session()}}{
+  Save the current session to an RDS file.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$save_session(path)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{path}}{Path to save the session}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Details}{
+    The session file contains:
 \itemize{
 \item Conversation turns
 \item System prompt
@@ -442,66 +579,130 @@ The session file contains:
 \item Working directory
 \item Metadata (timestamp, version, provider info)
 }
+  }
+  \subsection{Returns}{
+    Invisible path
+  }
 }
 
-\subsection{Returns}{
-Invisible path
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-load_session"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-load_session}{}}}
-\subsection{Method \code{load_session()}}{
-Load a session from an RDS file.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$load_session(path, restore_tools = TRUE)}\if{html}{\out{</div>}}
+\subsection{\code{Agent$load_session()}}{
+  Load a session from an RDS file.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$load_session(path, restore_tools = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{path}}{Path to the session file}
+      \item{\code{restore_tools}}{If TRUE, explicitly trust and restore serialized
+tool definitions. Defaults to FALSE; constructor-registered tools are
+otherwise preserved as control-plane policy.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Details}{
+    Note: Hooks are NOT restored from sessions as they contain function
+closures that may not serialize correctly. Constructor permissions and
+\code{working_dir} always remain authoritative.
+  }
+  \subsection{Returns}{
+    Invisible self
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{path}}{Path to the session file}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-checkpoint"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-checkpoint}{}}}
+\subsection{\code{Agent$checkpoint()}}{
+  Create a reversible file checkpoint.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$checkpoint(name = NULL, metadata = list())}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{name}}{Optional checkpoint label.}
+      \item{\code{metadata}}{Optional serializable metadata list.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The checkpoint ID.
+  }
+}
 
-\item{\code{restore_tools}}{If TRUE (default), restore tools from session}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Details}{
-Note: Hooks are NOT restored from sessions as they contain
-function closures that may not serialize correctly.
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-list_checkpoints"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-list_checkpoints}{}}}
+\subsection{\code{Agent$list_checkpoints()}}{
+  List reversible file checkpoints.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$list_checkpoints()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A data frame ordered from oldest to newest.
+  }
 }
 
-\subsection{Returns}{
-Invisible self
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-rewind_files"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-rewind_files}{}}}
+\subsection{\code{Agent$rewind_files()}}{
+  Rewind files to a checkpoint without changing conversation history.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$rewind_files(checkpoint_id)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{checkpoint_id}}{ID returned by \verb{$checkpoint()} or present in a
+\code{file_checkpoint} run event.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list describing the restored checkpoint and change count.
+  }
 }
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-compact"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-compact}{}}}
-\subsection{Method \code{compact()}}{
-Compact the conversation history to reduce context size.
+\subsection{\code{Agent$compact()}}{
+  Compact the conversation history to reduce context size.
 
 This method uses the LLM to generate a meaningful summary of older
 conversation turns, then replaces them with the summary appended to
 the system prompt. This preserves important context while reducing
 token usage.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$compact(keep_last = 4, summary = NULL)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{keep_last}}{Number of recent turns to keep uncompacted (default: 4)}
-
-\item{\code{summary}}{Optional custom summary to use instead of auto-generating.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$compact(keep_last = 4, summary = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{keep_last}}{Number of recent turns to keep uncompacted (default: 4)}
+      \item{\code{summary}}{Optional custom summary to use instead of auto-generating.
 If NULL, the LLM will generate a summary focusing on key decisions,
 findings, files discussed, and task progress.}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Details}{
-The compaction process:
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Details}{
+    The compaction process:
 \enumerate{
 \item Fires the PreCompact hook (can cancel or provide custom summary)
 \item If no custom summary, uses LLM to summarize compacted turns
@@ -511,171 +712,203 @@ The compaction process:
 
 If LLM summarization fails (e.g., no API key), falls back to a simple
 text-based summary with truncated turn contents.
+  }
+  \subsection{Returns}{
+    Invisible self
+  }
 }
 
-\subsection{Returns}{
-Invisible self
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-print"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-print}{}}}
-\subsection{Method \code{print()}}{
-Print the agent configuration.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$print()}\if{html}{\out{</div>}}
+\subsection{\code{Agent$print()}}{
+  Print the agent configuration.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$print()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-load_skill"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-load_skill}{}}}
-\subsection{Method \code{load_skill()}}{
-Load a \link{Skill} into the agent.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$load_skill(skill, allow_conflicts = FALSE)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{skill}}{A \link{Skill} object or path to a skill directory.}
-
-\item{\code{allow_conflicts}}{If FALSE (default), error on tool name conflicts.
+\subsection{\code{Agent$load_skill()}}{
+  Load a \link{Skill} into the agent.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$load_skill(skill, allow_conflicts = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{skill}}{A \link{Skill} object or path to a skill directory.}
+      \item{\code{allow_conflicts}}{If FALSE (default), error on tool name conflicts.
 Set TRUE to allow overwriting existing tools.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self for chaining.
+  }
 }
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Invisible self for chaining.
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-skills"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-skills}{}}}
-\subsection{Method \code{skills()}}{
-Get loaded skills.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$skills()}\if{html}{\out{</div>}}
+\subsection{\code{Agent$skills()}}{
+  Get loaded skills.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$skills()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Named list of loaded \link{Skill} objects.
+  }
 }
 
-\subsection{Returns}{
-Named list of loaded \link{Skill} objects.
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-slash_commands"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-slash_commands}{}}}
-\subsection{Method \code{slash_commands()}}{
-Get registered slash commands.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$slash_commands()}\if{html}{\out{</div>}}
+\subsection{\code{Agent$slash_commands()}}{
+  Get registered slash commands.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$slash_commands()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Named list of slash command definitions
+  }
 }
 
-\subsection{Returns}{
-Named list of slash command definitions
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-settings"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-settings}{}}}
-\subsection{Method \code{settings()}}{
-Get applied Claude-style settings.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$settings()}\if{html}{\out{</div>}}
+\subsection{\code{Agent$settings()}}{
+  Get applied Claude-style settings.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$settings()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Settings list returned by \code{\link[=claude_settings_load]{claude_settings_load()}}
+  }
 }
 
-\subsection{Returns}{
-Settings list returned by \code{\link[=claude_settings_load]{claude_settings_load()}}
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-load_mcp"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-load_mcp}{}}}
-\subsection{Method \code{load_mcp()}}{
-Load tools from MCP (Model Context Protocol) servers.
+\subsection{\code{Agent$load_mcp()}}{
+  Load tools from MCP (Model Context Protocol) servers.
 
 Requires the mcptools package. Issues a warning if not installed or if
 tool fetching fails.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$load_mcp(config = NULL, servers = NULL)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{config}}{Path to MCP configuration file. If NULL (default), uses
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$load_mcp(config = NULL, servers = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{config}}{Path to MCP configuration file. If NULL (default), uses
 the mcptools default location (\verb{~/.config/mcptools/config.json}).}
-
-\item{\code{servers}}{Optional character vector of server names to load from.
+      \item{\code{servers}}{Optional character vector of server names to load from.
 If NULL, loads from all configured servers.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self for chaining
+  }
 }
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Invisible self for chaining
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-mcp_tools"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-mcp_tools}{}}}
-\subsection{Method \code{mcp_tools()}}{
-Get names of loaded MCP tools.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$mcp_tools()}\if{html}{\out{</div>}}
+\subsection{\code{Agent$mcp_tools()}}{
+  Get names of loaded MCP tools.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$mcp_tools()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Character vector of MCP tool names
+  }
 }
 
-\subsection{Returns}{
-Character vector of MCP tool names
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-mcp_status"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-mcp_status}{}}}
+\subsection{\code{Agent$mcp_status()}}{
+  Get MCP runtime status records.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$mcp_status()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Data frame describing MCP load attempts and registered tools
+  }
 }
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-run_shiny"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-run_shiny}{}}}
-\subsection{Method \code{run_shiny()}}{
-Run an agentic task for use in Shiny applications with shinychat.
+\subsection{\code{Agent$run_shiny()}}{
+  Run an agentic task for use in Shiny applications with shinychat.
 
 Returns an async content stream suitable for passing to
 \code{shinychat::chat_append()}. Unlike \code{run()} and \code{run_sync()}, the
 multi-turn loop is driven by ellmer's \code{stream_async()} rather than
-deputy's own generator. Deputy's permissions, hooks, and tool call
-limits are still enforced via the \code{on_tool_request} callback.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$run_shiny(prompt, max_tool_calls = NULL)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{prompt}}{The user message to send}
-
-\item{\code{max_tool_calls}}{Maximum number of tool calls before stopping.
-Defaults to \code{permissions$max_turns} or 25. Note this counts individual
-tool call requests, not LLM turns (one turn can have multiple parallel
-tool calls).}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-An async content stream suitable for
+deputy's own generator. Deputy's permissions, hooks, and observable
+\link{UsageLimits} are still enforced via callbacks and terminal accounting.
+File tools must use absolute paths within \code{working_dir}; rejected calls
+still count toward tool usage.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$run_shiny(prompt, max_tool_calls = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{prompt}}{The user message to send}
+      \item{\code{max_tool_calls}}{Maximum number of tool calls before stopping.
+Overrides \code{usage_limits$max_tool_calls}; otherwise falls back to that
+value, \code{permissions$max_turns}, or 25. This counts individual tool call
+requests, not LLM turns (one turn can have multiple parallel calls).}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    An async content stream suitable for
 \code{shinychat::chat_append()}.
+  }
 }
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-clone"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Agent$clone(deep = FALSE)}\if{html}{\out{</div>}}
+\subsection{\code{Agent$clone()}}{
+  The objects of this class are cloneable with this method.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$clone(deep = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{deep}}{Whether to make a deep clone.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
-}
-}
 }

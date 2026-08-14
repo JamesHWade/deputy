@@ -33,6 +33,168 @@ generate_session_id <- function() {
   )
 }
 
+validate_session_id <- function(session_id, argument = "session_id") {
+  if (
+    !is.character(session_id) ||
+      length(session_id) != 1L ||
+      is.na(session_id) ||
+      !nzchar(session_id) ||
+      !grepl("^[A-Za-z0-9][A-Za-z0-9._-]*$", session_id)
+  ) {
+    cli::cli_abort(
+      paste0(
+        "{.arg ",
+        argument,
+        "} must be one non-empty identifier containing only letters, ",
+        "numbers, dots, underscores, or hyphens"
+      ),
+      class = c(
+        "deputy_session_id_error",
+        "deputy_session",
+        "deputy_error"
+      )
+    )
+  }
+  session_id
+}
+
+#' Create an in-memory SDK-compatible session store
+#'
+#' @description
+#' Creates a lightweight session store adapter with `append()`, `load()`,
+#' `list_sessions()`, `list_session_summaries()`, and `delete()` methods. This
+#' mirrors the Claude Agent SDK store shape while preserving deputy's R-native
+#' session payloads.
+#'
+#' @return A `DeputySessionStore` adapter
+#' @export
+session_store_memory <- function() {
+  sessions <- new.env(parent = emptyenv())
+
+  structure(
+    list(
+      append = function(session_id, payload, metadata = list()) {
+        session_id <- validate_session_id(session_id)
+        records <- sessions[[session_id]] %||% list()
+        records <- c(
+          records,
+          list(list(
+            payload = payload,
+            metadata = metadata,
+            appended_at = Sys.time()
+          ))
+        )
+        sessions[[session_id]] <- records
+        invisible(TRUE)
+      },
+      load = function(session_id) {
+        session_id <- validate_session_id(session_id)
+        records <- sessions[[session_id]]
+        if (is.null(records) || length(records) == 0) {
+          abort_session_load(
+            "Session not found in memory store: {.val {session_id}}",
+            path = session_id
+          )
+        }
+        records[[length(records)]]$payload
+      },
+      list_sessions = function() {
+        sort(ls(sessions, all.names = TRUE))
+      },
+      list_session_summaries = function() {
+        ids <- sort(ls(sessions, all.names = TRUE))
+        if (length(ids) == 0) {
+          return(data.frame(
+            session_id = character(),
+            records = integer(),
+            updated_at = as.POSIXct(character()),
+            stringsAsFactors = FALSE
+          ))
+        }
+        do.call(
+          rbind,
+          lapply(ids, function(id) {
+            records <- sessions[[id]]
+            data.frame(
+              session_id = id,
+              records = length(records),
+              updated_at = as.POSIXct(
+                records[[length(records)]]$appended_at,
+                tz = "UTC"
+              ),
+              stringsAsFactors = FALSE
+            )
+          })
+        )
+      },
+      delete = function(session_id) {
+        session_id <- validate_session_id(session_id)
+        if (exists(session_id, envir = sessions, inherits = FALSE)) {
+          rm(list = session_id, envir = sessions)
+        }
+        invisible(TRUE)
+      },
+      list_subkeys = function(session_id) {
+        validate_session_id(session_id)
+        character()
+      }
+    ),
+    class = "DeputySessionStore"
+  )
+}
+
+session_store_call <- function(store, method, ...) {
+  if (is.null(store)) {
+    return(NULL)
+  }
+
+  fun <- tryCatch(store[[method]], error = function(e) NULL)
+  if (!is.function(fun)) {
+    return(NULL)
+  }
+
+  fun(...)
+}
+
+session_store_append_external <- function(
+  store,
+  session_id,
+  payload,
+  metadata = list()
+) {
+  session_store_call(
+    store,
+    "append",
+    session_id = session_id,
+    payload = payload,
+    metadata = metadata
+  )
+}
+
+session_store_load_external <- function(store, session_id) {
+  session_store_call(store, "load", session_id = session_id)
+}
+
+session_store_list_external <- function(store) {
+  out <- session_store_call(store, "list_sessions")
+  out %||% character()
+}
+
+session_store_summaries_external <- function(store) {
+  out <- session_store_call(store, "list_session_summaries")
+  out %||%
+    data.frame(
+      session_id = character(),
+      records = integer(),
+      updated_at = as.POSIXct(character()),
+      stringsAsFactors = FALSE
+    )
+}
+
+session_store_delete_external <- function(store, session_id) {
+  session_store_call(store, "delete", session_id = session_id)
+}
+
 # Parse a resume timestamp from character or POSIXt input.
 parse_session_resume_at <- function(at) {
   if (is.null(at)) {
@@ -71,7 +233,40 @@ parse_session_resume_at <- function(at) {
 
 # Session-specific directory for snapshots.
 session_store_session_dir <- function(root, session_id) {
-  file.path(ensure_session_store_dir(root), session_id)
+  session_id <- validate_session_id(session_id)
+  store_dir <- normalizePath(
+    ensure_session_store_dir(root),
+    mustWork = TRUE,
+    winslash = "/"
+  )
+  session_dir <- file.path(store_dir, session_id)
+
+  link_target <- suppressWarnings(Sys.readlink(session_dir))
+  if (length(link_target) == 1L && !is.na(link_target) && nzchar(link_target)) {
+    cli::cli_abort(
+      "Session directory must not be a symbolic link: {.path {session_dir}}",
+      class = c(
+        "deputy_session_id_error",
+        "deputy_session",
+        "deputy_error"
+      )
+    )
+  }
+  if (file.exists(session_dir) || dir.exists(session_dir)) {
+    resolved <- normalizePath(session_dir, mustWork = TRUE, winslash = "/")
+    if (!is_path_within(resolved, store_dir)) {
+      cli::cli_abort(
+        "Session directory resolves outside its configured store",
+        class = c(
+          "deputy_session_id_error",
+          "deputy_session",
+          "deputy_error"
+        )
+      )
+    }
+  }
+
+  session_dir
 }
 
 # List snapshot files for a session in chronological order.
@@ -273,4 +468,12 @@ session_store_list_sessions <- function(root = NULL) {
   }
 
   do.call(rbind, records)
+}
+
+session_store_delete_session <- function(root = NULL, session_id) {
+  session_dir <- session_store_session_dir(root, session_id)
+  if (dir.exists(session_dir)) {
+    unlink(session_dir, recursive = TRUE, force = TRUE)
+  }
+  invisible(TRUE)
 }

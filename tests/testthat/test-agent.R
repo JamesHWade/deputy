@@ -169,31 +169,130 @@ test_that("Agent save_session creates file", {
   expect_true("metadata" %in% names(session))
 })
 
-test_that("Agent load_session restores state", {
-  mock_chat <- create_mock_chat()
+test_that("Agent load_session restores chat state but preserves authority", {
+  source_chat <- create_mock_chat()
   withr::local_tempdir(pattern = "deputy-test") -> temp_dir
   saved_working_dir <- file.path(temp_dir, "saved-session-dir")
+  receiver_working_dir <- file.path(temp_dir, "receiver-dir")
   dir.create(saved_working_dir)
-  agent1 <- Agent$new(
-    chat = mock_chat,
+  dir.create(receiver_working_dir)
+  saved_turns <- list(
+    create_mock_user_turn("Remember this"),
+    create_mock_assistant_turn("Conversation restored")
+  )
+  source_chat$set_turns(saved_turns)
+  source <- Agent$new(
+    chat = source_chat,
     system_prompt = "Test prompt",
     permissions = permissions_readonly(max_turns = 10),
     working_dir = saved_working_dir
   )
-
   session_file <- file.path(temp_dir, "session.rds")
+  suppressWarnings(suppressMessages(source$save_session(session_file)))
 
-  agent1$save_session(session_file)
+  receiver_chat <- create_mock_chat()
+  receiver_permissions <- permissions_standard(receiver_working_dir)
+  receiver <- Agent$new(
+    chat = receiver_chat,
+    permissions = receiver_permissions,
+    working_dir = receiver_working_dir
+  )
+  configured_working_dir <- receiver$working_dir
+  suppressMessages(receiver$load_session(session_file))
 
-  # Create new agent and load session
-  mock_chat2 <- create_mock_chat()
-  agent2 <- Agent$new(chat = mock_chat2)
-  agent2$load_session(session_file)
+  expect_equal(receiver_chat$get_system_prompt(), "Test prompt")
+  expect_equal(receiver_chat$get_turns(), saved_turns)
+  expect_identical(receiver$permissions, receiver_permissions)
+  expect_identical(receiver$working_dir, configured_working_dir)
+})
 
-  expect_equal(mock_chat2$get_system_prompt(), "Test prompt")
-  expect_equal(agent2$permissions$mode, "readonly")
-  expect_equal(agent2$permissions$max_turns, 10)
-  expect_equal(agent2$working_dir, saved_working_dir)
+test_that("Agent load_session restores tools only with explicit trust", {
+  source_tool <- ellmer::tool(
+    fun = function() "source",
+    name = "source_tool",
+    description = "Serialized source tool."
+  )
+  receiver_tool <- ellmer::tool(
+    fun = function() "receiver",
+    name = "receiver_tool",
+    description = "Constructor-owned receiver tool."
+  )
+  root <- withr::local_tempdir(pattern = "deputy-session-tools-")
+  session_file <- file.path(root, "session.rds")
+  source <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(source_tool),
+    working_dir = root
+  )
+  suppressWarnings(suppressMessages(source$save_session(session_file)))
+
+  default_chat <- create_mock_chat()
+  default_receiver <- Agent$new(
+    chat = default_chat,
+    tools = list(receiver_tool),
+    working_dir = root
+  )
+  suppressWarnings(suppressMessages(
+    default_receiver$load_session(session_file)
+  ))
+  expect_setequal(names(default_chat$get_tools()), "receiver_tool")
+
+  trusted_chat <- create_mock_chat()
+  trusted_receiver <- Agent$new(
+    chat = trusted_chat,
+    tools = list(receiver_tool),
+    working_dir = root
+  )
+  suppressWarnings(suppressMessages(
+    trusted_receiver$load_session(session_file, restore_tools = TRUE)
+  ))
+  expect_setequal(
+    names(trusted_chat$get_tools()),
+    c("receiver_tool", "source_tool")
+  )
+})
+
+test_that("Agent load_session validates payload before mutating conversation", {
+  root <- withr::local_tempdir(pattern = "deputy-session-atomic-")
+  session_file <- file.path(root, "malformed.rds")
+  old_turns <- list(create_mock_user_turn("old turn"))
+  chat <- create_mock_chat()
+  chat$set_turns(old_turns)
+  chat$set_system_prompt("old prompt")
+  agent <- Agent$new(chat = chat, working_dir = root)
+
+  saveRDS(
+    list(
+      turns = list(create_mock_user_turn("new turn")),
+      system_prompt = "new prompt",
+      appended_hook_context_hashes = new.env(parent = emptyenv()),
+      metadata = list()
+    ),
+    session_file
+  )
+
+  expect_error(
+    suppressMessages(agent$load_session(session_file)),
+    class = "deputy_session_load"
+  )
+  expect_equal(chat$get_turns(), old_turns)
+  expect_identical(chat$get_system_prompt(), "old prompt")
+
+  saveRDS(
+    list(
+      turns = list(create_mock_user_turn("unsafe session")),
+      system_prompt = "unsafe prompt",
+      appended_hook_context_hashes = character(),
+      metadata = list(session_id = "../outside")
+    ),
+    session_file
+  )
+  expect_error(
+    suppressMessages(agent$load_session(session_file)),
+    class = "deputy_session_load"
+  )
+  expect_equal(chat$get_turns(), old_turns)
+  expect_identical(chat$get_system_prompt(), "old prompt")
 })
 
 test_that("Agent load_session validates file exists", {

@@ -10,7 +10,15 @@ agent_definition(
   prompt,
   tools = list(),
   model = "inherit",
-  skills = list()
+  skills = list(),
+  disallowed_tools = NULL,
+  memory = NULL,
+  mcp_servers = NULL,
+  initial_prompt = NULL,
+  max_turns = NULL,
+  background = FALSE,
+  effort = NULL,
+  permission_mode = NULL
 )
 }
 \arguments{
@@ -25,6 +33,25 @@ agent_definition(
 \item{model}{Model to use (default: "inherit" uses parent's model)}
 
 \item{skills}{Optional list of skills to load}
+
+\item{disallowed_tools}{Optional tool denylist for this sub-agent}
+
+\item{memory}{Optional memory text appended to this sub-agent's prompt}
+
+\item{mcp_servers}{Optional MCP server names to load for this sub-agent}
+
+\item{initial_prompt}{Optional text prepended to delegated tasks}
+
+\item{max_turns}{Optional non-negative whole-number sub-agent request limit}
+
+\item{background}{Logical SDK-compatible metadata flag}
+
+\item{effort}{Optional reasoning effort metadata}
+
+\item{permission_mode}{Optional permission mode. For non-bypass lead agents,
+this must match the lead mode (with \code{"default"} and \code{"auto"} treated as
+equivalent); use \code{disallowed_tools} and \code{max_turns} to tighten a child
+policy. A bypass lead may select any mode.}
 }
 \value{
 An \code{AgentDefinition} object
