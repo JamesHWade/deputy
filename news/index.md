@@ -1,5 +1,13 @@
 # Changelog
 
+## deputy (development version)
+
+- `Agent$provider()` no longer errors with “Can’t get S7 properties with
+  `$`” against current ellmer. ellmer moved `model` off `Provider` onto
+  a new `Model` class, so `provider@model` fails for every provider and
+  the `$` fallback threw from inside the error handler. The model is now
+  read with `Chat$get_model()`.
+
 ## deputy 0.0.0.9000
 
 - Added semantic content streaming with `tool_start`, `tool_end`,

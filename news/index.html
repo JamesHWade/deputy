@@ -50,6 +50,11 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="development version" id="deputy-development-version">deputy (development version)<a class="anchor" aria-label="anchor" href="#deputy-development-version"></a></h2>
+<ul><li>
+<code>Agent$provider()</code> no longer errors with “Can’t get S7 properties with <code>$</code>” against current ellmer. ellmer moved <code>model</code> off <code>Provider</code> onto a new <code>Model</code> class, so <code>provider@model</code> fails for every provider and the <code>$</code> fallback threw from inside the error handler. The model is now read with <code>Chat$get_model()</code>.</li>
+</ul></div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.0.0.9000" id="deputy-0009000">deputy 0.0.0.9000<a class="anchor" aria-label="anchor" href="#deputy-0009000"></a></h2>
 <ul><li>Added semantic content streaming with <code>tool_start</code>, <code>tool_end</code>, <code>usage</code>, and <code>file_checkpoint</code> events, stable run IDs, cooperative <code>Agent$interrupt()</code>, and run usage on <code>AgentResult</code>.</li>
 <li>Added <code><a href="../reference/UsageLimits.html">UsageLimits()</a></code> and <code><a href="../reference/AgentUsage.html">AgentUsage()</a></code> for per-run request, tool-call, input/output/total-token, and estimated-cost accounting and enforcement, including remaining-budget inheritance and aggregation for synchronous delegated agents.</li>
@@ -74,7 +79,8 @@
 </li>
 <li>Provider-agnostic design works with any ellmer-supported LLM</li>
 </ul></div>
-  </main></div>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">
