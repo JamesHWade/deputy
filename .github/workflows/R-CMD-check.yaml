@@ -28,6 +28,9 @@ jobs:
           r-version: release
           use-public-rspm: true
 
+      - name: Install ir resolver system requirements
+        run: sudo apt-get install --yes libcurl4-openssl-dev libssl-dev
+
       - uses: astral-sh/setup-uv@v6
 
       - name: Install ir
