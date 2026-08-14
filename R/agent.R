@@ -597,12 +597,13 @@ Agent <- R6::R6Class(
     #' @return A list with provider name and model
     provider = function() {
       provider <- self$chat$get_provider()
-      # Handle both S7 objects (@ access) and regular lists ($ access)
+      # Handle both S7 objects (@ access) and regular lists ([[ access)
       name <- tryCatch(provider@name, error = function(e) {
-        provider$name %||% "unknown"
+        if (is.list(provider)) provider[["name"]] %||% "unknown" else "unknown"
       })
-      model <- tryCatch(provider@model, error = function(e) {
-        provider$model %||% "unknown"
+      # As of ellmer's Model class the model lives on Chat, not on Provider
+      model <- tryCatch(self$chat$get_model(), error = function(e) {
+        if (is.list(provider)) provider[["model"]] %||% "unknown" else "unknown"
       })
       list(
         name = name,
