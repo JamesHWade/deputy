@@ -102,17 +102,28 @@ test_that("web_search requires httr2 package", {
   expect_true(is.function(tool_web_search))
 })
 
-test_that("web_fetch fetches real URL", {
+test_that("web_fetch extracts a mocked HTML response", {
   skip_if_not_installed("httr2")
-  skip_on_cran()
-  skip_if_offline()
 
-  # Fetch a simple test URL
-  result <- tool_web_fetch("https://httpbin.org/html")
+  url <- "https://example.test/page"
+  httr2::local_mocked_responses(list(httr2::response(
+    status_code = 200,
+    url = url,
+    headers = list(`Content-Type` = "text/html; charset=utf-8"),
+    body = charToRaw(paste0(
+      "<html><body><main>",
+      "<h1>Stable fixture</h1>",
+      "<p>Fetched without external network access.</p>",
+      "</main></body></html>"
+    ))
+  )))
+
+  result <- tool_web_fetch(url)
 
   expect_type(result, "character")
   expect_true(nchar(result) > 0)
   expect_true(grepl("web_page", result))
+  expect_true(grepl("Stable fixture", result, fixed = TRUE))
 })
 
 test_that("web_fetch handles invalid URL", {
