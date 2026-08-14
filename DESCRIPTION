@@ -20,7 +20,6 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Suggests:
-    callr,
     httr2,
     jsonlite,
     jsonvalidate,
@@ -29,7 +28,6 @@ Suggests:
     mcptools,
     pdftools,
     promises,
-    Rapp,
     readr,
     reticulate,
     rmarkdown,
@@ -43,9 +41,11 @@ Suggests:
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Imports:
+    callr,
     cli,
     coro,
     digest,
     ellmer (>= 0.3.0),
     R6,
+    Rapp (>= 0.4.0),
     rlang

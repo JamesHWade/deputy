@@ -4,10 +4,12 @@
 \alias{permissions_readonly}
 \title{Create a read-only permission policy}
 \usage{
-permissions_readonly(max_turns = 25)
+permissions_readonly(max_turns = 25, max_cost_usd = NULL)
 }
 \arguments{
 \item{max_turns}{Maximum number of turns (default 25)}
+
+\item{max_cost_usd}{Maximum cost in USD (default NULL = unlimited)}
 }
 \value{
 A \link{Permissions} object

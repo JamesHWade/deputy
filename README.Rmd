@@ -100,33 +100,40 @@ repeat {
 }
 ```
 
-### CLI (`exec/deputy`)
+### CLI (`exec/deputy.R`)
 
-deputy ships an executable CLI app at `exec/deputy` (Rapp front-end).
-Install launchers with:
+deputy ships a [Rapp](https://github.com/r-lib/Rapp) package executable that
+works with [`ir`](https://r-lib.github.io/ir/tools.html). Install `ir` once,
+then run the package directly from GitHub without installing deputy globally:
+
+```bash
+uv tool install r-lib-ir
+rx --from github::JamesHWade/deputy deputy --help
+rx --from github::JamesHWade/deputy deputy \
+  --provider openai "Summarize the R files in this project"
+```
+
+For a persistent `deputy` command, install its launcher:
+
+```bash
+ir tool install github::JamesHWade/deputy
+deputy --provider openai --model gpt-4o --tools standard
+```
+
+If deputy is already installed in an R library, Rapp can install the same
+launcher:
 
 ```r
 Rapp::install_pkg_cli_apps("deputy")
 ```
 
-Then run:
-
-```bash
-deputy --provider openai --model gpt-4o --tools standard
-```
-
-Single-task mode (non-interactive):
-
-```bash
-deputy -x "Summarize the R files in this project"
-```
-
-Common options include short aliases (`-p`, `-m`, `-t`, `-P`, `-n`, `-c`,
-`-d`, `-v`, etc.), and repeatable flags for Rapp 0.3 style inputs:
+The optional positional task selects non-interactive mode; omit it to start an
+interactive session. Common options include short aliases (`-p`, `-m`, `-t`,
+`-P`, `-n`, `-c`, `-d`, `-v`, etc.) and repeatable Rapp 0.4 flags:
 
 ```bash
 deputy --setting-source project --setting-source user
-deputy --mcp-server github --mcp-server slack
+deputy --mcp --mcp-server github --mcp-server slack
 deputy --debug --debug-file /tmp/deputy-debug.log
 ```
 
