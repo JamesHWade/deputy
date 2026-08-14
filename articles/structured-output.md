@@ -10,6 +10,7 @@ matching a schema.
 The simplest form asks the LLM to return a JSON object:
 
 ``` r
+
 library(deputy)
 
 chat <- ellmer::chat_openai(model = "gpt-4o-mini")
@@ -32,6 +33,7 @@ For stricter control, provide a JSON Schema. The LLM will be constrained
 to produce output matching the schema:
 
 ``` r
+
 schema <- list(
   type = "object",
   properties = list(
@@ -79,6 +81,7 @@ The `structured_output` field on `AgentResult` contains:
 | `$format` | The `output_format` spec that was used               |
 
 ``` r
+
 result$structured_output$valid
 #> [1] TRUE
 
@@ -93,6 +96,7 @@ When you provide a JSON Schema and the
 installed, deputy automatically validates the output:
 
 ``` r
+
 # If validation fails:
 result$structured_output$valid
 #> [1] FALSE
@@ -109,6 +113,7 @@ be empty. The parsed output is still available.
 Structured output is especially useful for data extraction tasks:
 
 ``` r
+
 schema <- list(
   type = "object",
   properties = list(

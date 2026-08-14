@@ -12,8 +12,8 @@
 <link rel="icon" sizes="any" href="../favicon.ico">
 <link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Permissions and Safety">
 </head>
@@ -47,7 +47,7 @@
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
+    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -99,7 +99,8 @@ policies.</p>
 <span><span class="co"># Plan: only annotated read-only tools plus AskUserQuestion</span></span>
 <span><span class="fu"><a href="../reference/permissions_plan.html">permissions_plan</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Standard (default): file read/write in working dir, R code, no bash/web</span></span>
+<span><span class="co"># Standard (default): accessible reads, workspace-scoped writes, R code,</span></span>
+<span><span class="co"># no bash/web</span></span>
 <span><span class="fu"><a href="../reference/permissions_standard.html">permissions_standard</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Full: everything allowed (use with caution!)</span></span>
@@ -205,14 +206,13 @@ directly:</p>
 </tr>
 <tr class="even">
 <td><code>"readonly"</code></td>
-<td>Only allow tools annotated as
-<code>read_only_hint = TRUE</code>
-</td>
+<td>Allow known Deputy read tools and explicit allowlist entries within
+configured capabilities</td>
 </tr>
 <tr class="odd">
 <td><code>"plan"</code></td>
-<td>Allow read-only annotated tools and the human approval prompt
-tool</td>
+<td>Allow read-only annotated tools within configured capabilities and
+the human approval prompt tool</td>
 </tr>
 <tr class="even">
 <td><code>"acceptEdits"</code></td>
@@ -252,11 +252,13 @@ system uses these annotations to make decisions:</p>
 <span>    destructive_hint <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>In <code>"readonly"</code> mode, only tools with
-<code>read_only_hint = TRUE</code> are allowed. In
-<code>"default"</code> mode, tools with
-<code>destructive_hint = TRUE</code> may be blocked depending on the
-policy.</p>
+<p>Annotations describe behavior; they do not independently grant
+authority. In <code>"readonly"</code> mode, Deputy recognizes its
+built-in read tools and explicit allowlist entries, while still denying
+known writes, destructive tools, and open-world tools when web access is
+disabled. Unknown tools do not become authorized merely by declaring
+<code>read_only_hint = TRUE</code>. In <code>"default"</code> mode,
+annotations participate in the configured capability checks.</p>
 </div>
 <div class="section level2">
 <h2 id="custom-permission-callbacks">Custom Permission Callbacks<a class="anchor" aria-label="anchor" href="#custom-permission-callbacks"></a>
@@ -331,7 +333,7 @@ policy.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

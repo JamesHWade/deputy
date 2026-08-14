@@ -28,6 +28,7 @@ We create an agent with data and code tools, plus the built-in
 `data_analysis` skill:
 
 ``` r
+
 library(deputy)
 
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
@@ -59,6 +60,7 @@ With `run_sync()`, the agent works through the analysis autonomously. It
 calls tools, inspects results, and decides what to do next:
 
 ``` r
+
 result <- agent$run_sync(
   "Explore the airquality dataset that comes with R. Give me a
    thorough understanding of the data including quality issues,
@@ -85,6 +87,7 @@ For interactive use, `run()` streams events as they happen. You see text
 arrive token by token and tools fire in real time:
 
 ``` r
+
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 
 agent <- Agent$new(
@@ -93,7 +96,12 @@ agent <- Agent$new(
   system_prompt = "You are a data scientist. Be thorough but concise."
 )
 
-for (event in agent$run("Summarise the mtcars dataset")) {
+events <- agent$run("Summarise the mtcars dataset")
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) {
+    break
+  }
   switch(event$type,
     "text" = cat(event$text),
     "tool_start" = cli::cli_alert_info("Calling {event$tool_name}..."),
@@ -108,6 +116,7 @@ for (event in agent$run("Summarise the mtcars dataset")) {
 `AgentResult` captures everything about the run:
 
 ``` r
+
 # Did it succeed?
 result$is_success()
 result$stop_reason
@@ -130,6 +139,7 @@ For production use, add permissions and hooks to monitor and constrain
 the agent:
 
 ``` r
+
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 
 agent <- Agent$new(

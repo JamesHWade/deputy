@@ -25,6 +25,7 @@ Use
 to describe a sub-agent:
 
 ``` r
+
 library(deputy)
 
 code_reviewer <- agent_definition(
@@ -60,6 +61,7 @@ Fields:
 `LeadAgent` extends `Agent` with a built-in `delegate_to_agent` tool:
 
 ``` r
+
 lead <- LeadAgent$new(
   chat = ellmer::chat_anthropic(),
   sub_agents = list(code_reviewer, data_analyst),
@@ -78,6 +80,7 @@ internally. The sub-agent runs to completion and returns its result to
 the lead:
 
 ``` r
+
 library(deputy)
 
 code_reviewer <- agent_definition(
@@ -100,12 +103,19 @@ result <- lead$run_sync(
 cat(result$response)
 ```
 
+Direct synchronous delegation participates in the lead run’s budget.
+Each child inherits the lead’s remaining `UsageLimits`, and its usage is
+aggregated into `result$usage` and enforced by the lead after
+delegation. This accounting does not yet cover parallel or background
+children, transitive child trees, or cross-run global budgets.
+
 ## Convenience Constructor
 
 [`agent_with_delegation()`](https://jameshwade.github.io/deputy/reference/agent_with_delegation.md)
 creates a lead agent with one line:
 
 ``` r
+
 lead <- agent_with_delegation(
   chat = ellmer::chat_anthropic(),
   sub_agents = list(code_reviewer, data_analyst),
@@ -118,6 +128,7 @@ lead <- agent_with_delegation(
 Use a `SubagentStop` hook to log or inspect sub-agent results:
 
 ``` r
+
 hook_monitor <- HookMatcher$new(
   event = "SubagentStop",
   callback = function(agent_name, task, result, context) {

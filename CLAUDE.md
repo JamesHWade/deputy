@@ -112,6 +112,7 @@ Rscript -e "devtools::install()"
 ### R6 Class Pattern
 
 ``` r
+
 ClassName <- R6::R6Class(
   "ClassName",
   public = list(
@@ -138,6 +139,7 @@ ClassName <- R6::R6Class(
 ### Tool Creation Pattern
 
 ``` r
+
 #' Tool description
 #' @export
 tool_name <- ellmer::tool(
@@ -161,6 +163,7 @@ tool_name <- ellmer::tool(
 ### Error Handling
 
 ``` r
+
 # Use custom error constructors
 stop(deputy_error_permission_denied(
   tool_name = "write_file",
@@ -179,6 +182,7 @@ tryCatch(
 ### Testing Pattern
 
 ``` r
+
 test_that("descriptive test name", {
   # Setup - use mocks from helper-mocks.R
   mock_chat <- create_mock_chat()
@@ -234,14 +238,14 @@ test_that("descriptive test name", {
 
 ## Key Files for Understanding
 
-| File                            | Purpose                                      |
-|---------------------------------|----------------------------------------------|
-| `R/agent.R`                     | Main Agent class with run/run_sync/run_shiny |
-| `R/permissions.R`               | Permission system and tool annotations       |
-| `R/hooks.R`                     | HookRegistry and event system                |
-| `R/tools-builtin.R`             | Built-in tools implementation                |
-| `exec/deputy`                   | CLI application using Rapp                   |
-| `tests/testthat/helper-mocks.R` | Mock objects for testing                     |
+| File | Purpose |
+|----|----|
+| `R/agent.R` | Main Agent class with run/run_sync/run_shiny |
+| `R/permissions.R` | Permission system and tool annotations |
+| `R/hooks.R` | HookRegistry and event system |
+| `R/tools-builtin.R` | Built-in tools implementation |
+| `exec/deputy` | CLI application using Rapp |
+| `tests/testthat/helper-mocks.R` | Mock objects for testing |
 
 ## Dependencies
 
@@ -398,6 +402,7 @@ git branch -d feature/<short-description>
 Or use:
 
 ``` r
+
 usethis::pr_finish()
 ```
 

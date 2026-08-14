@@ -82,7 +82,7 @@ All fields use active bindings that reject modification attempts.
 
 ### Public methods
 
-- [`Permissions$new()`](#method-Permissions-new)
+- [`Permissions$new()`](#method-Permissions-initialize)
 
 - [`Permissions$check()`](#method-Permissions-check)
 
@@ -92,7 +92,7 @@ All fields use active bindings that reject modification attempts.
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `Permissions$new()`
 
 Create a new Permissions object.
 
@@ -175,7 +175,7 @@ A new `Permissions` object
 
 ------------------------------------------------------------------------
 
-### Method `check()`
+### `Permissions$check()`
 
 Check if a tool is allowed to execute.
 
@@ -206,7 +206,7 @@ or
 
 ------------------------------------------------------------------------
 
-### Method [`print()`](https://rdrr.io/r/base/print.html)
+### `Permissions$print()`
 
 Print the permissions configuration.
 
@@ -216,7 +216,7 @@ Print the permissions configuration.
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `Permissions$clone()`
 
 The objects of this class are cloneable with this method.
 

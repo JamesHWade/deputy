@@ -1,8 +1,9 @@
 # Create a standard permission policy
 
-Creates a permission policy suitable for most use cases. Allows file
-read/write within the working directory and R code execution. Denies
-bash commands, web access, and package installation.
+Creates a permission policy suitable for most use cases. Allows reads of
+files accessible to the R process, confines file writes to the working
+directory, and permits R code execution. Denies bash commands, web
+access, and package installation.
 
 ## Usage
 
@@ -18,7 +19,8 @@ permissions_standard(
 
 - working_dir:
 
-  Directory for file operations (default: current directory)
+  Root directory for file writes (default: current directory). This does
+  not restrict otherwise accessible file reads.
 
 - max_turns:
 
@@ -40,14 +42,11 @@ object
 perms <- permissions_standard()
 perms$check("write_file", list(path = "output.txt"))
 #> $decision
-#> [1] "deny"
+#> [1] "allow"
 #> 
-#> $reason
-#> [1] "File writing only allowed in: /home/runner/work/deputy/deputy/docs/reference"
-#> 
-#> $interrupt
-#> [1] FALSE
+#> $message
+#> NULL
 #> 
 #> attr(,"class")
-#> [1] "PermissionResultDeny" "PermissionResult"     "list"                
+#> [1] "PermissionResultAllow" "PermissionResult"      "list"                 
 ```

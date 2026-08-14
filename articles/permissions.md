@@ -7,6 +7,7 @@ ships with sensible presets and makes it easy to build custom policies.
 ## Permission Presets
 
 ``` r
+
 library(deputy)
 
 # Read-only: only read_file and list_files are allowed
@@ -15,7 +16,8 @@ permissions_readonly()
 # Plan: only annotated read-only tools plus AskUserQuestion
 permissions_plan()
 
-# Standard (default): file read/write in working dir, R code, no bash/web
+# Standard (default): accessible reads, workspace-scoped writes, R code,
+# no bash/web
 permissions_standard()
 
 # Full: everything allowed (use with caution!)
@@ -25,6 +27,7 @@ permissions_full()
 Each preset returns a `Permissions` object. Pass it to `Agent$new()`:
 
 ``` r
+
 agent <- Agent$new(
   chat = ellmer::chat_anthropic(),
   tools = tools_all(),
@@ -37,6 +40,7 @@ agent <- Agent$new(
 For fine-grained control, create a `Permissions` object directly:
 
 ``` r
+
 perms <- Permissions$new(
   file_read = TRUE,
   file_write = "/path/to/allowed/dir",
@@ -51,30 +55,31 @@ perms <- Permissions$new(
 
 Fields:
 
-| Field              | Type           | Description                                          |
-|--------------------|----------------|------------------------------------------------------|
-| `file_read`        | logical        | Allow reading files                                  |
-| `file_write`       | logical / path | Allow writing (optionally restricted to a directory) |
-| `bash`             | logical        | Allow bash commands                                  |
-| `r_code`           | logical        | Allow R code execution                               |
-| `web`              | logical        | Allow web access                                     |
-| `install_packages` | logical        | Allow package installation                           |
-| `max_turns`        | integer        | Maximum agentic turns (default 25)                   |
-| `max_cost_usd`     | numeric / NULL | Maximum spend in USD                                 |
+| Field | Type | Description |
+|----|----|----|
+| `file_read` | logical | Allow reading files |
+| `file_write` | logical / path | Allow writing (optionally restricted to a directory) |
+| `bash` | logical | Allow bash commands |
+| `r_code` | logical | Allow R code execution |
+| `web` | logical | Allow web access |
+| `install_packages` | logical | Allow package installation |
+| `max_turns` | integer | Maximum agentic turns (default 25) |
+| `max_cost_usd` | numeric / NULL | Maximum spend in USD |
 
 ## Permission Modes
 
 The `mode` field provides broad policy shortcuts:
 
-| Mode                  | Behaviour                                                          |
-|-----------------------|--------------------------------------------------------------------|
-| `"default"`           | Check each tool against the policy fields above                    |
-| `"readonly"`          | Only allow tools annotated as `read_only_hint = TRUE`              |
-| `"plan"`              | Allow read-only annotated tools and the human approval prompt tool |
-| `"acceptEdits"`       | Auto-approve file writes without prompting                         |
-| `"bypassPermissions"` | Allow everything (dangerous!)                                      |
+| Mode | Behaviour |
+|----|----|
+| `"default"` | Check each tool against the policy fields above |
+| `"readonly"` | Allow known Deputy read tools and explicit allowlist entries within configured capabilities |
+| `"plan"` | Allow read-only annotated tools within configured capabilities and the human approval prompt tool |
+| `"acceptEdits"` | Auto-approve file writes without prompting |
+| `"bypassPermissions"` | Allow everything (dangerous!) |
 
 ``` r
+
 perms <- Permissions$new(mode = "readonly")
 ```
 
@@ -82,6 +87,7 @@ perms <- Permissions$new(mode = "readonly")
 is a convenience wrapper for Claude-style planning flows:
 
 ``` r
+
 agent <- Agent$new(
   chat = ellmer::chat_anthropic(),
   tools = tools_all(),
@@ -95,6 +101,7 @@ Tools carry annotations that describe their behaviour. The permission
 system uses these annotations to make decisions:
 
 ``` r
+
 # A read-only tool
 tool_safe <- ellmer::tool(
   fun = function(x) x,
@@ -108,15 +115,20 @@ tool_safe <- ellmer::tool(
 )
 ```
 
-In `"readonly"` mode, only tools with `read_only_hint = TRUE` are
-allowed. In `"default"` mode, tools with `destructive_hint = TRUE` may
-be blocked depending on the policy.
+Annotations describe behavior; they do not independently grant
+authority. In `"readonly"` mode, Deputy recognizes its built-in read
+tools and explicit allowlist entries, while still denying known writes,
+destructive tools, and open-world tools when web access is disabled.
+Unknown tools do not become authorized merely by declaring
+`read_only_hint = TRUE`. In `"default"` mode, annotations participate in
+the configured capability checks.
 
 ## Custom Permission Callbacks
 
 For complex logic, provide a `can_use_tool` callback:
 
 ``` r
+
 perms <- Permissions$new(
   can_use_tool = function(tool_name, tool_input, context) {
     # Block writes to sensitive files
@@ -147,6 +159,7 @@ or `PermissionResultDeny(reason)`.
 A read-only agent can explore files but cannot change anything:
 
 ``` r
+
 library(deputy)
 
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
@@ -165,6 +178,7 @@ cat(result$response)
 Permissions also enforce resource limits:
 
 ``` r
+
 perms <- Permissions$new(
   max_turns = 10,      # Stop after 10 agentic turns
   max_cost_usd = 1.00  # Stop if cost exceeds $1.00

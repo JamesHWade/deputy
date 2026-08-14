@@ -42,15 +42,26 @@ occurred during execution.
 
   Latest compat snapshot path when session persistence is active
 
+- `run_id`:
+
+  Unique identifier shared by events from this run
+
+- `usage`:
+
+  Run-scoped
+  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+
 ## Methods
 
 ### Public methods
 
-- [`AgentResult$new()`](#method-AgentResult-new)
+- [`AgentResult$new()`](#method-AgentResult-initialize)
 
 - [`AgentResult$n_turns()`](#method-AgentResult-n_turns)
 
 - [`AgentResult$tool_calls()`](#method-AgentResult-tool_calls)
+
+- [`AgentResult$tool_results()`](#method-AgentResult-tool_results)
 
 - [`AgentResult$text_chunks()`](#method-AgentResult-text_chunks)
 
@@ -62,7 +73,7 @@ occurred during execution.
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `AgentResult$new()`
 
 Create a new AgentResult object.
 
@@ -77,7 +88,9 @@ Create a new AgentResult object.
       stop_reason = "complete",
       structured_output = NULL,
       session_id = NULL,
-      snapshot_path = NULL
+      snapshot_path = NULL,
+      run_id = NULL,
+      usage = AgentUsage()
     )
 
 #### Arguments
@@ -118,13 +131,22 @@ Create a new AgentResult object.
 
   Latest compat snapshot path (if any)
 
+- `run_id`:
+
+  Unique run identifier (if any)
+
+- `usage`:
+
+  Run-scoped
+  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+
 #### Returns
 
 A new `AgentResult` object
 
 ------------------------------------------------------------------------
 
-### Method `n_turns()`
+### `AgentResult$n_turns()`
 
 Get the number of turns in the conversation.
 
@@ -138,7 +160,7 @@ Integer count of turns
 
 ------------------------------------------------------------------------
 
-### Method `tool_calls()`
+### `AgentResult$tool_calls()`
 
 Get all tool calls made during execution.
 
@@ -152,7 +174,21 @@ List of tool_start events
 
 ------------------------------------------------------------------------
 
-### Method `text_chunks()`
+### `AgentResult$tool_results()`
+
+Get all completed tool events from execution.
+
+#### Usage
+
+    AgentResult$tool_results()
+
+#### Returns
+
+List of `tool_end` events
+
+------------------------------------------------------------------------
+
+### `AgentResult$text_chunks()`
 
 Get all text chunks from the response.
 
@@ -166,7 +202,7 @@ Character vector of text chunks
 
 ------------------------------------------------------------------------
 
-### Method `is_success()`
+### `AgentResult$is_success()`
 
 Check if the agent completed successfully.
 
@@ -180,7 +216,7 @@ Logical indicating success
 
 ------------------------------------------------------------------------
 
-### Method [`print()`](https://rdrr.io/r/base/print.html)
+### `AgentResult$print()`
 
 Print the result summary.
 
@@ -190,7 +226,7 @@ Print the result summary.
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `AgentResult$clone()`
 
 The objects of this class are cloneable with this method.
 

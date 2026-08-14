@@ -42,6 +42,24 @@ The following methods manage MCP (Model Context Protocol) server tools:
 
   Get names of loaded MCP tools.
 
+## File checkpoint methods
+
+When `enable_file_checkpointing = TRUE`, Deputy captures exact preimages
+for writes made through its native and Agent SDK-compatible file tools.
+
+- `$checkpoint(name = NULL, metadata = list())`:
+
+  Create a manual file checkpoint and return its checkpoint ID.
+
+- `$list_checkpoints()`:
+
+  List available file checkpoints.
+
+- `$rewind_files(checkpoint_id)`:
+
+  Restore files to a checkpoint and invalidate later file history.
+  Conversation history is not changed.
+
 ## Active bindings
 
 - `chat`:
@@ -51,6 +69,12 @@ The following methods manage MCP (Model Context Protocol) server tools:
 - `permissions`:
 
   Permission policy for the agent. Read-only after construction.
+
+- `usage_limits`:
+
+  Default per-run
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md).
+  Read-only after construction.
 
 - `working_dir`:
 
@@ -64,7 +88,7 @@ The following methods manage MCP (Model Context Protocol) server tools:
 
 ### Public methods
 
-- [`Agent$new()`](#method-Agent-new)
+- [`Agent$new()`](#method-Agent-initialize)
 
 - [`Agent$run()`](#method-Agent-run)
 
@@ -82,15 +106,29 @@ The following methods manage MCP (Model Context Protocol) server tools:
 
 - [`Agent$session_id()`](#method-Agent-session_id)
 
+- [`Agent$get_permission_mode()`](#method-Agent-get_permission_mode)
+
+- [`Agent$set_permission_mode()`](#method-Agent-set_permission_mode)
+
 - [`Agent$configure_sdk_compat()`](#method-Agent-configure_sdk_compat)
 
 - [`Agent$cost()`](#method-Agent-cost)
+
+- [`Agent$usage()`](#method-Agent-usage)
+
+- [`Agent$interrupt()`](#method-Agent-interrupt)
 
 - [`Agent$provider()`](#method-Agent-provider)
 
 - [`Agent$save_session()`](#method-Agent-save_session)
 
 - [`Agent$load_session()`](#method-Agent-load_session)
+
+- [`Agent$checkpoint()`](#method-Agent-checkpoint)
+
+- [`Agent$list_checkpoints()`](#method-Agent-list_checkpoints)
+
+- [`Agent$rewind_files()`](#method-Agent-rewind_files)
 
 - [`Agent$compact()`](#method-Agent-compact)
 
@@ -108,13 +146,15 @@ The following methods manage MCP (Model Context Protocol) server tools:
 
 - [`Agent$mcp_tools()`](#method-Agent-mcp_tools)
 
+- [`Agent$mcp_status()`](#method-Agent-mcp_status)
+
 - [`Agent$run_shiny()`](#method-Agent-run_shiny)
 
 - [`Agent$clone()`](#method-Agent-clone)
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `Agent$new()`
 
 Create a new Agent.
 
@@ -125,6 +165,10 @@ Create a new Agent.
       tools = list(),
       system_prompt = NULL,
       permissions = NULL,
+      usage_limits = NULL,
+      enable_file_checkpointing = FALSE,
+      file_checkpoint_max_file_bytes = 50 * 1024^2,
+      file_checkpoint_max_journal_bytes = 250 * 1024^2,
       working_dir = getwd(),
       setting_sources = NULL,
       settings = NULL
@@ -161,6 +205,29 @@ Create a new Agent.
   object controlling what the agent can do. Defaults to
   [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md).
 
+- `usage_limits`:
+
+  Optional
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  applied independently to each run. NULL request or cost fields inherit
+  the legacy `permissions$max_turns` and `permissions$max_cost_usd`
+  values.
+
+- `enable_file_checkpointing`:
+
+  Whether to journal exact file preimages for Deputy's mutating file
+  tools. A checkpoint is created automatically at the beginning of every
+  run.
+
+- `file_checkpoint_max_file_bytes`:
+
+  Maximum bytes captured for one file preimage. Defaults to 50 MiB.
+
+- `file_checkpoint_max_journal_bytes`:
+
+  Maximum aggregate serialized bytes for checkpoint records, markers,
+  metadata, and pending captures. Defaults to 250 MiB.
+
 - `working_dir`:
 
   Working directory for file operations. Defaults to current directory.
@@ -182,20 +249,21 @@ A new `Agent` object
 
 ------------------------------------------------------------------------
 
-### Method `run()`
+### `Agent$run()`
 
 Run an agentic task with streaming output.
 
 Returns a generator that yields
 [AgentEvent](https://jameshwade.github.io/deputy/reference/AgentEvent.md)
 objects as the agent works. The agent will continue until the task is
-complete, max_turns is reached, or the cost limit is exceeded.
+complete, a run limit is reached, or it is interrupted.
 
 #### Usage
 
     Agent$run(
       task,
       max_turns = NULL,
+      usage_limits = NULL,
       include_partial_messages = TRUE,
       output_format = NULL
     )
@@ -208,7 +276,14 @@ complete, max_turns is reached, or the cost limit is exceeded.
 
 - `max_turns`:
 
-  Maximum number of turns (default: from permissions)
+  Legacy alias for the maximum number of model requests. Defaults to the
+  value seeded from permissions.
+
+- `usage_limits`:
+
+  Optional
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  override for this run.
 
 - `include_partial_messages`:
 
@@ -228,7 +303,7 @@ objects
 
 ------------------------------------------------------------------------
 
-### Method `run_sync()`
+### `Agent$run_sync()`
 
 Run an agentic task and block until completion.
 
@@ -241,6 +316,7 @@ an
     Agent$run_sync(
       task,
       max_turns = NULL,
+      usage_limits = NULL,
       include_partial_messages = TRUE,
       output_format = NULL
     )
@@ -253,7 +329,14 @@ an
 
 - `max_turns`:
 
-  Maximum number of turns (default: from permissions)
+  Legacy alias for the maximum number of model requests. Defaults to the
+  value seeded from permissions.
+
+- `usage_limits`:
+
+  Optional
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  override for this run.
 
 - `include_partial_messages`:
 
@@ -273,7 +356,7 @@ object
 
 ------------------------------------------------------------------------
 
-### Method `register_tool()`
+### `Agent$register_tool()`
 
 Register a tool with the agent.
 
@@ -294,7 +377,7 @@ Invisible self for chaining
 
 ------------------------------------------------------------------------
 
-### Method `register_tools()`
+### `Agent$register_tools()`
 
 Register multiple tools with the agent.
 
@@ -315,7 +398,7 @@ Invisible self for chaining
 
 ------------------------------------------------------------------------
 
-### Method `add_hook()`
+### `Agent$add_hook()`
 
 Add a hook to the agent.
 
@@ -340,7 +423,6 @@ Invisible self for chaining
 
 #### Examples
 
-    \dontrun{
     # Add a hook to block dangerous bash commands
     agent$add_hook(hook_block_dangerous_bash())
 
@@ -353,11 +435,10 @@ Invisible self for chaining
         HookResultPreToolUse(permission = "allow")
       }
     ))
-    }
 
 ------------------------------------------------------------------------
 
-### Method `turns()`
+### `Agent$turns()`
 
 Get the conversation history.
 
@@ -371,7 +452,7 @@ A list of Turn objects
 
 ------------------------------------------------------------------------
 
-### Method `last_turn()`
+### `Agent$last_turn()`
 
 Get the last turn in the conversation.
 
@@ -391,7 +472,7 @@ A Turn object or NULL
 
 ------------------------------------------------------------------------
 
-### Method `session_id()`
+### `Agent$session_id()`
 
 Get the active Claude SDK compatibility session identifier.
 
@@ -405,7 +486,42 @@ Character session id, or NULL when compat mode is inactive
 
 ------------------------------------------------------------------------
 
-### Method `configure_sdk_compat()`
+### `Agent$get_permission_mode()`
+
+Get the active permission mode.
+
+#### Usage
+
+    Agent$get_permission_mode()
+
+#### Returns
+
+Character permission mode
+
+------------------------------------------------------------------------
+
+### `Agent$set_permission_mode()`
+
+Change the active permission mode for subsequent tool calls.
+
+#### Usage
+
+    Agent$set_permission_mode(mode)
+
+#### Arguments
+
+- `mode`:
+
+  Permission mode, see
+  [PermissionMode](https://jameshwade.github.io/deputy/reference/PermissionMode.md)
+
+#### Returns
+
+Invisible self
+
+------------------------------------------------------------------------
+
+### `Agent$configure_sdk_compat()`
 
 Configure Claude SDK compatibility behavior for this agent.
 
@@ -425,7 +541,7 @@ Invisible self for chaining
 
 ------------------------------------------------------------------------
 
-### Method `cost()`
+### `Agent$cost()`
 
 Get cost information for the conversation.
 
@@ -439,7 +555,50 @@ A list with input, output, cached, and total token costs
 
 ------------------------------------------------------------------------
 
-### Method `provider()`
+### `Agent$usage()`
+
+Get normalized usage for the complete in-memory conversation.
+
+Per-run usage is available on
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
+and in the final `usage` event returned by `$run()`.
+
+#### Usage
+
+    Agent$usage()
+
+#### Returns
+
+An
+[AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+object
+
+------------------------------------------------------------------------
+
+### `Agent$interrupt()`
+
+Request cancellation of the active stream.
+
+Cancellation is cooperative and takes effect at the next provider or
+tool boundary supported by ellmer.
+
+#### Usage
+
+    Agent$interrupt(reason = "interrupted")
+
+#### Arguments
+
+- `reason`:
+
+  Stable reason stored on the terminal event
+
+#### Returns
+
+Invisible logical indicating whether a run was active
+
+------------------------------------------------------------------------
+
+### `Agent$provider()`
 
 Get provider information.
 
@@ -453,7 +612,7 @@ A list with provider name and model
 
 ------------------------------------------------------------------------
 
-### Method `save_session()`
+### `Agent$save_session()`
 
 Save the current session to an RDS file.
 
@@ -489,13 +648,13 @@ Invisible path
 
 ------------------------------------------------------------------------
 
-### Method `load_session()`
+### `Agent$load_session()`
 
 Load a session from an RDS file.
 
 #### Usage
 
-    Agent$load_session(path, restore_tools = TRUE)
+    Agent$load_session(path, restore_tools = FALSE)
 
 #### Arguments
 
@@ -505,12 +664,15 @@ Load a session from an RDS file.
 
 - `restore_tools`:
 
-  If TRUE (default), restore tools from session
+  If TRUE, explicitly trust and restore serialized tool definitions.
+  Defaults to FALSE; constructor-registered tools are otherwise
+  preserved as control-plane policy.
 
 #### Details
 
 Note: Hooks are NOT restored from sessions as they contain function
-closures that may not serialize correctly.
+closures that may not serialize correctly. Constructor permissions and
+`working_dir` always remain authoritative.
 
 #### Returns
 
@@ -518,7 +680,66 @@ Invisible self
 
 ------------------------------------------------------------------------
 
-### Method `compact()`
+### `Agent$checkpoint()`
+
+Create a reversible file checkpoint.
+
+#### Usage
+
+    Agent$checkpoint(name = NULL, metadata = list())
+
+#### Arguments
+
+- `name`:
+
+  Optional checkpoint label.
+
+- `metadata`:
+
+  Optional serializable metadata list.
+
+#### Returns
+
+The checkpoint ID.
+
+------------------------------------------------------------------------
+
+### `Agent$list_checkpoints()`
+
+List reversible file checkpoints.
+
+#### Usage
+
+    Agent$list_checkpoints()
+
+#### Returns
+
+A data frame ordered from oldest to newest.
+
+------------------------------------------------------------------------
+
+### `Agent$rewind_files()`
+
+Rewind files to a checkpoint without changing conversation history.
+
+#### Usage
+
+    Agent$rewind_files(checkpoint_id)
+
+#### Arguments
+
+- `checkpoint_id`:
+
+  ID returned by `$checkpoint()` or present in a `file_checkpoint` run
+  event.
+
+#### Returns
+
+A list describing the restored checkpoint and change count.
+
+------------------------------------------------------------------------
+
+### `Agent$compact()`
 
 Compact the conversation history to reduce context size.
 
@@ -565,7 +786,7 @@ Invisible self
 
 ------------------------------------------------------------------------
 
-### Method [`print()`](https://rdrr.io/r/base/print.html)
+### `Agent$print()`
 
 Print the agent configuration.
 
@@ -575,7 +796,7 @@ Print the agent configuration.
 
 ------------------------------------------------------------------------
 
-### Method `load_skill()`
+### `Agent$load_skill()`
 
 Load a [Skill](https://jameshwade.github.io/deputy/reference/Skill.md)
 into the agent.
@@ -602,7 +823,7 @@ Invisible self for chaining.
 
 ------------------------------------------------------------------------
 
-### Method `skills()`
+### `Agent$skills()`
 
 Get loaded skills.
 
@@ -617,7 +838,7 @@ Named list of loaded
 
 ------------------------------------------------------------------------
 
-### Method `slash_commands()`
+### `Agent$slash_commands()`
 
 Get registered slash commands.
 
@@ -631,7 +852,7 @@ Named list of slash command definitions
 
 ------------------------------------------------------------------------
 
-### Method `settings()`
+### `Agent$settings()`
 
 Get applied Claude-style settings.
 
@@ -646,7 +867,7 @@ Settings list returned by
 
 ------------------------------------------------------------------------
 
-### Method `load_mcp()`
+### `Agent$load_mcp()`
 
 Load tools from MCP (Model Context Protocol) servers.
 
@@ -675,7 +896,7 @@ Invisible self for chaining
 
 ------------------------------------------------------------------------
 
-### Method `mcp_tools()`
+### `Agent$mcp_tools()`
 
 Get names of loaded MCP tools.
 
@@ -689,7 +910,21 @@ Character vector of MCP tool names
 
 ------------------------------------------------------------------------
 
-### Method `run_shiny()`
+### `Agent$mcp_status()`
+
+Get MCP runtime status records.
+
+#### Usage
+
+    Agent$mcp_status()
+
+#### Returns
+
+Data frame describing MCP load attempts and registered tools
+
+------------------------------------------------------------------------
+
+### `Agent$run_shiny()`
 
 Run an agentic task for use in Shiny applications with shinychat.
 
@@ -697,8 +932,11 @@ Returns an async content stream suitable for passing to
 [`shinychat::chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
 Unlike `run()` and `run_sync()`, the multi-turn loop is driven by
 ellmer's `stream_async()` rather than deputy's own generator. Deputy's
-permissions, hooks, and tool call limits are still enforced via the
-`on_tool_request` callback.
+permissions, hooks, and observable
+[UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+are still enforced via callbacks and terminal accounting. File tools
+must use absolute paths within `working_dir`; rejected calls still count
+toward tool usage.
 
 #### Usage
 
@@ -712,10 +950,10 @@ permissions, hooks, and tool call limits are still enforced via the
 
 - `max_tool_calls`:
 
-  Maximum number of tool calls before stopping. Defaults to
-  `permissions$max_turns` or 25. Note this counts individual tool call
-  requests, not LLM turns (one turn can have multiple parallel tool
-  calls).
+  Maximum number of tool calls before stopping. Overrides
+  `usage_limits$max_tool_calls`; otherwise falls back to that value,
+  `permissions$max_turns`, or 25. This counts individual tool call
+  requests, not LLM turns (one turn can have multiple parallel calls).
 
 #### Returns
 
@@ -724,7 +962,7 @@ An async content stream suitable for
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `Agent$clone()`
 
 The objects of this class are cloneable with this method.
 
@@ -749,7 +987,10 @@ agent <- Agent$new(
 )
 
 # Run a task with streaming output
-for (event in agent$run("List files in the current directory")) {
+events <- agent$run("List files in the current directory")
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) break
   if (event$type == "text") cat(event$text)
 }
 
@@ -759,7 +1000,7 @@ print(result$response)
 } # }
 
 ## ------------------------------------------------
-## Method `Agent$add_hook`
+## Method `Agent$add_hook()`
 ## ------------------------------------------------
 
 if (FALSE) { # \dontrun{

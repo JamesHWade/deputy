@@ -36,6 +36,7 @@ The first agent reads the DESCRIPTION file and key R source files, then
 extracts structured information:
 
 ``` r
+
 library(deputy)
 
 extract_schema <- list(
@@ -77,6 +78,7 @@ extract_schema <- list(
 ```
 
 ``` r
+
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 
 extractor <- Agent$new(
@@ -111,6 +113,7 @@ The second agent takes the extracted JSON and adds categorisation and
 summaries:
 
 ``` r
+
 enrich_schema <- list(
   type = "object",
   properties = list(
@@ -147,6 +150,7 @@ enrich_schema <- list(
 ```
 
 ``` r
+
 chat2 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 
 enricher <- Agent$new(
@@ -182,6 +186,7 @@ enriched$complexity
 The third agent takes the enriched data and produces a readable report:
 
 ``` r
+
 chat3 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 
 reporter <- Agent$new(
@@ -207,6 +212,7 @@ cat(step3$response)
 Wrap the pipeline in a reusable function:
 
 ``` r
+
 extraction_pipeline <- function(package_dir = ".") {
   # Step 1: Extract
   chat1 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
@@ -282,6 +288,7 @@ Each step validates its output before passing it to the next. Check both
 `structured_output$valid` (the JSON matches the schema):
 
 ``` r
+
 step <- extractor$run_sync(
   "Extract metadata.",
   output_format = list(type = "json_schema", schema = extract_schema)

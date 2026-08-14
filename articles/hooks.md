@@ -8,23 +8,24 @@ or injecting custom logic.
 
 deputy fires hooks at these events:
 
-| Event              | Callback Signature                                      | Purpose                             |
-|--------------------|---------------------------------------------------------|-------------------------------------|
-| `PreToolUse`       | `function(tool_name, tool_input, context)`              | Before a tool runs (can allow/deny) |
-| `PostToolUse`      | `function(tool_name, tool_result, tool_error, context)` | After a tool completes              |
-| `Notification`     | `function(message, context)`                            | Informational runtime notices       |
-| `Stop`             | `function(reason, context)`                             | When the agent finishes             |
-| `SubagentStop`     | `function(agent_name, task, result, context)`           | When a sub-agent finishes           |
-| `UserPromptSubmit` | `function(prompt, context)`                             | When user submits input             |
-| `PreCompact`       | `function(turns_to_compact, turns_to_keep, context)`    | Before conversation compaction      |
-| `SessionStart`     | `function(context)`                                     | When a session starts               |
-| `SessionEnd`       | `function(reason, context)`                             | When a session ends                 |
+| Event | Callback Signature | Purpose |
+|----|----|----|
+| `PreToolUse` | `function(tool_name, tool_input, context)` | Before a tool runs (can allow/deny) |
+| `PostToolUse` | `function(tool_name, tool_result, tool_error, context)` | After a tool completes |
+| `Notification` | `function(message, context)` | Informational runtime notices |
+| `Stop` | `function(reason, context)` | When the agent finishes |
+| `SubagentStop` | `function(agent_name, task, result, context)` | When a sub-agent finishes |
+| `UserPromptSubmit` | `function(prompt, context)` | When user submits input |
+| `PreCompact` | `function(turns_to_compact, turns_to_keep, context)` | Before conversation compaction |
+| `SessionStart` | `function(context)` | When a session starts |
+| `SessionEnd` | `function(reason, context)` | When a session ends |
 
 ## Creating Hooks
 
 Hooks are created with `HookMatcher$new()`:
 
 ``` r
+
 library(deputy)
 
 hook <- HookMatcher$new(
@@ -39,6 +40,7 @@ hook <- HookMatcher$new(
 Add hooks to an agent with `add_hook()`:
 
 ``` r
+
 agent$add_hook(hook)
 ```
 
@@ -48,6 +50,7 @@ The optional `pattern` argument is a regex that filters which tools the
 hook applies to:
 
 ``` r
+
 # Only fires for bash commands
 HookMatcher$new(
   event = "PreToolUse",
@@ -69,6 +72,7 @@ deputy includes several ready-made hooks:
 logs every tool call using cli:
 
 ``` r
+
 library(deputy)
 
 chat <- ellmer::chat_openai(model = "gpt-4o-mini")
@@ -88,6 +92,7 @@ result <- agent$run_sync("What files are in the current directory?")
 blocks patterns like `rm -rf`, `sudo`, `chmod 777`, and more:
 
 ``` r
+
 agent$add_hook(hook_block_dangerous_bash())
 
 # Optionally add your own patterns
@@ -102,6 +107,7 @@ agent$add_hook(hook_block_dangerous_bash(
 restricts writes to a specific directory:
 
 ``` r
+
 agent$add_hook(hook_limit_file_writes(allowed_dir = "/safe/output/dir"))
 ```
 
@@ -112,6 +118,7 @@ agent$add_hook(hook_limit_file_writes(allowed_dir = "/safe/output/dir"))
 with `permission = "allow"` or `"deny"`:
 
 ``` r
+
 hook_no_secrets <- HookMatcher$new(
   event = "PreToolUse",
   pattern = "^write_file$",
@@ -135,6 +142,7 @@ hook_no_secrets <- HookMatcher$new(
 metrics, or conditional stopping:
 
 ``` r
+
 hook_audit <- HookMatcher$new(
   event = "PostToolUse",
   callback = function(tool_name, tool_result, tool_error, context) {
@@ -164,6 +172,7 @@ result$tool_calls()
 Set `continue = FALSE` to stop the agent after a tool call:
 
 ``` r
+
 HookResultPostToolUse(continue = FALSE)
 ```
 
@@ -172,6 +181,7 @@ HookResultPostToolUse(continue = FALSE)
 Session hooks fire at the start and end of a session:
 
 ``` r
+
 HookMatcher$new(
   event = "SessionStart",
   callback = function(context) {
@@ -188,6 +198,7 @@ alter control flow, such as permission-denied guidance, session restore
 notices, or compaction fallbacks:
 
 ``` r
+
 agent$add_hook(HookMatcher$new(
   event = "Notification",
   callback = function(message, context) {
@@ -203,5 +214,6 @@ If a hook callback throws an error, the agent logs it and continues. The
 error does not crash the agent. You can inspect recent hook errors with:
 
 ``` r
+
 agent$hooks$last_errors()
 ```

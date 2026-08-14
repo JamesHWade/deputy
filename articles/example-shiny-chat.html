@@ -12,8 +12,8 @@
 <link rel="icon" sizes="any" href="../favicon.ico">
 <link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Example: Shiny Chat with shinychat">
 </head>
@@ -47,7 +47,7 @@
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
+    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -91,14 +91,20 @@ limits.</p>
 </h2>
 <p>shinychat’s <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append()</a></code> expects an ellmer content
 stream from <code>chat$stream_async()</code>. Deputy’s
-<code>run()</code> and <code>run_sync()</code> methods return
-<code>AgentEvent</code> objects instead. Calling
+<code>run()</code> yields <code>AgentEvent</code> objects, while
+<code>run_sync()</code> returns an <code>AgentResult</code>. Calling
 <code>agent$chat$stream_async()</code> directly works but bypasses
 deputy’s turn-level controls like <code>max_turns</code> and
 <code>max_cost_usd</code>.</p>
 <p><code>run_shiny()</code> bridges this gap: it returns a content
 stream that shinychat understands while still enforcing deputy’s
 permissions, hooks, and limits.</p>
+<p><code>run_shiny()</code> is deliberately strict about file tools:
+every supplied file path must be absolute and resolve within the Agent’s
+immutable <code>working_dir</code>. Relative paths, omitted path
+defaults, and paths outside that root are rejected. Bind a normalized
+workspace and include its exact path in the model’s system prompt, as
+both examples below do.</p>
 <p>Following shinychat’s recommended pattern, pass that stream directly
 to <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append()</a></code>. <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append()</a></code> returns the
 completion promise, so make it the last expression in your observer if
@@ -133,28 +139,35 @@ you want shinychat to surface streaming errors in the chat UI.</p>
 callbacks</td>
 </tr>
 <tr class="odd">
-<td>Tool call limit</td>
+<td>File path confinement</td>
 <td>Yes</td>
-<td>Counter in <code>on_tool_request</code>, rejects with graceful
-message</td>
-</tr>
-<tr class="even">
-<td>Cost limit (<code>max_cost_usd</code>)</td>
-<td>Yes</td>
-<td>Checked in <code>on_tool_request</code>
+<td>Every recognized file path must be absolute and inside
+<code>working_dir</code>
 </td>
 </tr>
+<tr class="even">
+<td>Tool call limit</td>
+<td>Yes</td>
+<td>Checked at each tool request; an overage cancels the active
+stream</td>
+</tr>
 <tr class="odd">
+<td>Request, token, and cost limits</td>
+<td>Yes</td>
+<td>Checked when usage is observed; an overage cancels the active
+stream</td>
+</tr>
+<tr class="even">
 <td>SessionStart / SessionEnd hooks</td>
 <td>Yes</td>
 <td>Fired before/after the stream</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Stall detection</td>
 <td>No</td>
 <td>Requires deputy’s own loop</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>
 <code>output_format</code> (structured output)</td>
 <td>No</td>
@@ -171,6 +184,8 @@ message</td>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://posit-dev.github.io/shinychat/r/" class="external-link">shinychat</a></span><span class="op">)</span></span>
 <span></span>
+<span><span class="va">workspace</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/normalizePath.html" class="external-link">normalizePath</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>, mustWork <span class="op">=</span> <span class="cn">TRUE</span>, winslash <span class="op">=</span> <span class="st">"/"</span><span class="op">)</span></span>
+<span></span>
 <span><span class="va">ui</span> <span class="op">&lt;-</span> <span class="fu">bslib</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/bslib/reference/page.html" class="external-link">page_fluid</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_ui.html" class="external-link">chat_ui</a></span><span class="op">(</span><span class="st">"chat"</span>, fill <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
@@ -178,12 +193,20 @@ message</td>
 <span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span></span>
 <span>    model <span class="op">=</span> <span class="st">"gpt-4o-mini"</span>,</span>
-<span>    system_prompt <span class="op">=</span> <span class="st">"You are a helpful assistant. Be concise."</span></span>
+<span>    system_prompt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span></span>
+<span>      <span class="st">"You are a helpful assistant. Be concise."</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span></span>
+<span>        <span class="st">"For every file tool, use an absolute path inside: %s"</span>,</span>
+<span>        <span class="va">workspace</span></span>
+<span>      <span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
 <span>  <span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>    chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>    tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>    tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>    permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_standard.html">permissions_standard</a></span><span class="op">(</span><span class="va">workspace</span><span class="op">)</span>,</span>
+<span>    working_dir <span class="op">=</span> <span class="va">workspace</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/observeEvent.html" class="external-link">observeEvent</a></span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span>, <span class="op">{</span></span>
@@ -204,10 +227,18 @@ message</td>
 <p>Deputy’s permissions and hooks fire on every tool call, even though
 shinychat drives the streaming loop:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
+<code class="sourceCode R"><span><span class="va">workspace</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/normalizePath.html" class="external-link">normalizePath</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>, mustWork <span class="op">=</span> <span class="cn">TRUE</span>, winslash <span class="op">=</span> <span class="st">"/"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span></span>
 <span>    model <span class="op">=</span> <span class="st">"claude-sonnet-4-5-20250929"</span>,</span>
-<span>    system_prompt <span class="op">=</span> <span class="st">"You are a data analyst. Be concise."</span></span>
+<span>    system_prompt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span></span>
+<span>      <span class="st">"You are a data analyst. Be concise."</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span></span>
+<span>        <span class="st">"For every file tool, use an absolute path inside: %s"</span>,</span>
+<span>        <span class="va">workspace</span></span>
+<span>      <span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
 <span>  <span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
@@ -219,7 +250,8 @@ shinychat drives the streaming loop:</p>
 <span>      r_code <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>      bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>      max_cost_usd <span class="op">=</span> <span class="fl">0.50</span></span>
-<span>    <span class="op">)</span></span>
+<span>    <span class="op">)</span>,</span>
+<span>    working_dir <span class="op">=</span> <span class="va">workspace</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
 <span>  <span class="co"># Hooks still fire normally</span></span>
@@ -242,11 +274,19 @@ shinychat drives the streaming loop:</p>
 <div class="section level2">
 <h2 id="how-limits-work">How Limits Work<a class="anchor" aria-label="anchor" href="#how-limits-work"></a>
 </h2>
-<p>When a tool call limit or cost limit is reached, deputy calls
-<code><a href="https://ellmer.tidyverse.org/reference/tool_reject.html" class="external-link">ellmer::tool_reject()</a></code> with a message asking the LLM to wrap
-up. The LLM receives this as a tool error and generates a final
-response. The user sees a complete, coherent message rather than a
-truncated stream.</p>
+<p><code>run_shiny()</code> starts with the Agent’s run limits and lets
+<code>max_tool_calls</code> override that one field. When Deputy
+observes a request, tool, token, or cost overage, it marks the run
+stopped and asks ellmer’s stream controller to cancel active generation.
+An overage found at a tool boundary also rejects that tool call.
+<code>Stop</code> and <code>SessionEnd</code> hooks receive the
+corresponding limit reason.</p>
+<p>Provider token and cost usage is not observable until a response
+arrives. The initial response can therefore cross one of those limits
+before cancellation; it may overshoot the configured threshold by one
+response. Cancellation stops further work but cannot retract content
+already emitted. Treat token and cost limits as observed stop
+conditions, not provider-side generation ceilings.</p>
 <p>The <code>max_tool_calls</code> parameter counts individual tool call
 requests, not LLM turns. One turn can include multiple parallel tool
 calls (e.g., the LLM reads three files at once), each counting
@@ -271,7 +311,7 @@ resource usage.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

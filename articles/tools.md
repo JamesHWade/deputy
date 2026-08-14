@@ -28,6 +28,7 @@ for details.
 Bundles group related tools together:
 
 ``` r
+
 library(deputy)
 
 tools_file()  # read_file, write_file, list_files
@@ -40,6 +41,7 @@ tools_all()   # everything
 Combine bundles by concatenating:
 
 ``` r
+
 tools <- c(tools_file(), tools_code())
 agent <- Agent$new(chat = ellmer::chat_openai(), tools = tools)
 ```
@@ -49,6 +51,7 @@ agent <- Agent$new(chat = ellmer::chat_openai(), tools = tools)
 Presets are named collections with opinionated defaults:
 
 ``` r
+
 list_presets()
 #> # A tibble: 5 x 3
 #>   name     n_tools description
@@ -68,6 +71,7 @@ Use [`ellmer::tool()`](https://ellmer.tidyverse.org/reference/tool.html)
 to define custom tools with type-safe arguments and annotations:
 
 ``` r
+
 tool_lookup_user <- ellmer::tool(
   fun = function(user_id) {
     # your implementation
@@ -98,6 +102,7 @@ system about the tool’s behaviour:
 ### Using a Custom Tool
 
 ``` r
+
 library(deputy)
 
 tool_dice <- ellmer::tool(
@@ -128,6 +133,7 @@ Claude’s tool use, Google’s grounding) and uses the native version when
 available:
 
 ``` r
+
 # Automatically uses provider's native web tools when available
 agent <- Agent$new(
   chat = ellmer::chat_anthropic(),
@@ -146,6 +152,7 @@ Protocol](https://modelcontextprotocol.io/) servers via the
 [mcptools](https://github.com/tidyverse/mcptools) package:
 
 ``` r
+
 # Check if MCP is available
 mcp_available()
 
@@ -169,6 +176,7 @@ execution. This is useful for confirmations, clarifications, or
 collecting input:
 
 ``` r
+
 agent <- Agent$new(
   chat = ellmer::chat_openai(),
   tools = c(tools_file(), tools_interactive())

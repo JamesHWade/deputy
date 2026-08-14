@@ -9,6 +9,7 @@ Every agent has a system prompt that shapes its behaviour. Pass it
 directly at construction:
 
 ``` r
+
 library(deputy)
 
 agent <- Agent$new(
@@ -27,6 +28,7 @@ deputy can load settings from `.claude/` directories, following the same
 conventions as Claude Code:
 
 ``` r
+
 # Load from project and user directories
 settings <- claude_settings_load(
   setting_sources = c("project", "user"),
@@ -55,6 +57,7 @@ to an agent. They live in directories with a `SKILL.yaml` (or
 ### Loading a Skill
 
 ``` r
+
 skill <- skill_load("path/to/skill/directory")
 agent$load_skill(skill)
 ```
@@ -62,6 +65,7 @@ agent$load_skill(skill)
 ### Creating a Skill Programmatically
 
 ``` r
+
 skill <- skill_create(
   name = "data_analysis",
   description = "Helps with data analysis tasks",
@@ -76,6 +80,7 @@ agent$load_skill(skill)
 ### Listing Available Skills
 
 ``` r
+
 skills_list("path/to/skills/directory")
 ```
 
@@ -92,6 +97,7 @@ A skill directory contains:
 Agents can save and restore their conversation state:
 
 ``` r
+
 # Save current state
 agent$save_session("my_session.rds")
 
@@ -111,6 +117,7 @@ it left off.
 Every call to `run_sync()` returns an `AgentResult` with rich metadata:
 
 ``` r
+
 library(deputy)
 
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
@@ -122,12 +129,14 @@ result <- agent$run_sync("How many files are in the current directory?")
 ### Response Text
 
 ``` r
+
 cat(result$response)
 ```
 
 ### Cost Information
 
 ``` r
+
 result$cost
 #> $input
 #> [1] 1250
@@ -140,6 +149,7 @@ result$cost
 ### Execution Metadata
 
 ``` r
+
 result$duration       # seconds
 result$stop_reason    # "complete", "max_turns", "cost_limit", etc.
 result$n_turns()      # number of conversation turns
@@ -151,6 +161,7 @@ result$is_success()   # TRUE if stop_reason == "complete"
 The full event stream is available for detailed analysis:
 
 ``` r
+
 result$events         # list of AgentEvent objects
 result$tool_calls()   # just the tool_start events
 result$text_chunks()  # just the text events
@@ -169,6 +180,7 @@ deputy works with any provider that ellmer supports:
 | Azure OpenAI | `chat_azure_openai()` | Enterprise        |
 
 ``` r
+
 # Any ellmer chat works
 Agent$new(chat = ellmer::chat_openai())
 Agent$new(chat = ellmer::chat_anthropic())

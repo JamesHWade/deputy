@@ -10,6 +10,10 @@ Core agent class for agentic AI workflows
   : Agent Result R6 Class
 - [`AgentEvent()`](https://jameshwade.github.io/deputy/reference/AgentEvent.md)
   : Create an agent event
+- [`AgentUsage()`](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+  : Create an agent usage record
+- [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  : Configure run-scoped usage limits
 
 ## Tools
 
@@ -166,6 +170,8 @@ Anthropic-compatible facade and entrypoints
 - [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
   [`agent_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
   : Run a one-shot Agent SDK compatibility query
+- [`session_store_memory()`](https://jameshwade.github.io/deputy/reference/session_store_memory.md)
+  : Create an in-memory SDK-compatible session store
 
 ## Multi-Agent
 

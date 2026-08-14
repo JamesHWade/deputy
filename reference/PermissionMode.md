@@ -7,8 +7,12 @@ checking:
 
 - `"acceptEdits"` - Auto-accept file write tools
 
-- `"plan"` - Allow only annotated read-only tools and human approval
-  prompts
+- `"plan"` - Allow annotated read-only tools within configured
+  capabilities plus human approval prompts
+
+- `"dontAsk"` - Check policy without suggesting approval prompts
+
+- `"auto"` - SDK-compatible alias for default deputy permission behavior
 
 - `"readonly"` - Deny all write/execute tools
 
@@ -20,10 +24,6 @@ checking:
 PermissionMode
 ```
 
-## Format
-
-An object of class `character` of length 5.
-
 ## Tool Annotations
 
 Permissions use tool annotations (from
@@ -32,9 +32,11 @@ to determine tool behavior. Available annotations:
 
 **read_only_hint** (logical, default: FALSE)
 
-Indicates the tool only reads data and doesn't modify state. Tools with
-`read_only_hint = TRUE` are allowed in `"readonly"` mode. Examples:
-`tool_read_file`, `tool_list_files`, `tool_search`
+Indicates the tool only reads data and doesn't modify state. Annotations
+are descriptive metadata, not an authority grant: `"readonly"` mode
+allows known Deputy read tools or explicit allowlist entries, subject to
+destructive and open-world capability checks. Examples:
+`tool_read_file`, `tool_list_files`, `tool_search`.
 
 **destructive_hint** (logical, default: TRUE)
 

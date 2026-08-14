@@ -38,7 +38,7 @@ requirements.
 
 ### Public methods
 
-- [`Skill$new()`](#method-Skill-new)
+- [`Skill$new()`](#method-Skill-initialize)
 
 - [`Skill$check_requirements()`](#method-Skill-check_requirements)
 
@@ -48,7 +48,7 @@ requirements.
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `Skill$new()`
 
 Create a new Skill object.
 
@@ -100,7 +100,7 @@ A new `Skill` object
 
 ------------------------------------------------------------------------
 
-### Method `check_requirements()`
+### `Skill$check_requirements()`
 
 Check if skill requirements are met.
 
@@ -121,7 +121,7 @@ List with `ok` (logical), `missing` (character vector), and
 
 ------------------------------------------------------------------------
 
-### Method [`print()`](https://rdrr.io/r/base/print.html)
+### `Skill$print()`
 
 Print the skill.
 
@@ -131,7 +131,7 @@ Print the skill.
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `Skill$clone()`
 
 The objects of this class are cloneable with this method.
 

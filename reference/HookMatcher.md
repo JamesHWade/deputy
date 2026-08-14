@@ -34,7 +34,7 @@ swapped out accidentally at runtime.
 
 ### Public methods
 
-- [`HookMatcher$new()`](#method-HookMatcher-new)
+- [`HookMatcher$new()`](#method-HookMatcher-initialize)
 
 - [`HookMatcher$matches()`](#method-HookMatcher-matches)
 
@@ -44,7 +44,7 @@ swapped out accidentally at runtime.
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `HookMatcher$new()`
 
 Create a new HookMatcher.
 
@@ -67,13 +67,23 @@ Create a new HookMatcher.
 
   - PostToolUse: `function(tool_name, tool_result, tool_error, context)`
 
+  - PostToolUseFailure:
+    `function(tool_name, tool_result, tool_error, context)`
+
   - Stop: `function(reason, context)`
+
+  - SubagentStart: `function(agent_name, task, context)`
 
   - SubagentStop: `function(agent_name, task, result, context)`
 
   - UserPromptSubmit: `function(prompt, context)`
 
   - Notification: `function(message, context)`
+
+  - PermissionRequest:
+    `function(tool_name, tool_input, permission_result, context)`
+
+  - ConfigChange: `function(key, old_value, new_value, context)`
 
   - PreCompact: `function(turns_to_compact, turns_to_keep, context)`
 
@@ -96,7 +106,6 @@ A new `HookMatcher` object
 
 #### Examples
 
-    \dontrun{
     # Block dangerous bash commands
     HookMatcher$new(
       event = "PreToolUse",
@@ -109,11 +118,10 @@ A new `HookMatcher` object
         }
       }
     )
-    }
 
 ------------------------------------------------------------------------
 
-### Method `matches()`
+### `HookMatcher$matches()`
 
 Check if this hook matches a given tool name.
 
@@ -133,7 +141,7 @@ Logical indicating if the hook matches
 
 ------------------------------------------------------------------------
 
-### Method [`print()`](https://rdrr.io/r/base/print.html)
+### `HookMatcher$print()`
 
 Print the hook matcher.
 
@@ -143,7 +151,7 @@ Print the hook matcher.
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `HookMatcher$clone()`
 
 The objects of this class are cloneable with this method.
 
@@ -160,8 +168,9 @@ The objects of this class are cloneable with this method.
 ## Examples
 
 ``` r
+
 ## ------------------------------------------------
-## Method `HookMatcher$new`
+## Method `HookMatcher$new()`
 ## ------------------------------------------------
 
 if (FALSE) { # \dontrun{

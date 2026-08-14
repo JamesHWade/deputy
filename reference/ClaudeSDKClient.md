@@ -1,11 +1,5 @@
 # Agent SDK compatibility client
 
-Agent SDK compatibility client
-
-Agent SDK compatibility client
-
-## Details
-
 `AgentSDKClient` is an additive alias for ClaudeSDKClient.
 
 ## Public fields
@@ -24,11 +18,23 @@ Agent SDK compatibility client
 
 ### Public methods
 
-- [`ClaudeSDKClient$new()`](#method-ClaudeSDKClient-new)
+- [`ClaudeSDKClient$new()`](#method-ClaudeSDKClient-initialize)
 
 - [`ClaudeSDKClient$query()`](#method-ClaudeSDKClient-query)
 
 - [`ClaudeSDKClient$list_sessions()`](#method-ClaudeSDKClient-list_sessions)
+
+- [`ClaudeSDKClient$list_session_summaries()`](#method-ClaudeSDKClient-list_session_summaries)
+
+- [`ClaudeSDKClient$delete_session()`](#method-ClaudeSDKClient-delete_session)
+
+- [`ClaudeSDKClient$get_mcp_status()`](#method-ClaudeSDKClient-get_mcp_status)
+
+- [`ClaudeSDKClient$checkpoint()`](#method-ClaudeSDKClient-checkpoint)
+
+- [`ClaudeSDKClient$list_checkpoints()`](#method-ClaudeSDKClient-list_checkpoints)
+
+- [`ClaudeSDKClient$rewind_files()`](#method-ClaudeSDKClient-rewind_files)
 
 - [`ClaudeSDKClient$resume()`](#method-ClaudeSDKClient-resume)
 
@@ -36,7 +42,7 @@ Agent SDK compatibility client
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `ClaudeSDKClient$new()`
 
 Create a new compatibility client.
 
@@ -52,7 +58,7 @@ Create a new compatibility client.
 
 ------------------------------------------------------------------------
 
-### Method `query()`
+### `ClaudeSDKClient$query()`
 
 Run a prompt through the compatibility client.
 
@@ -77,7 +83,7 @@ An
 
 ------------------------------------------------------------------------
 
-### Method `list_sessions()`
+### `ClaudeSDKClient$list_sessions()`
 
 List persisted compatibility sessions.
 
@@ -91,7 +97,113 @@ Data frame describing stored sessions
 
 ------------------------------------------------------------------------
 
-### Method `resume()`
+### `ClaudeSDKClient$list_session_summaries()`
+
+List summaries from an external session store, when configured.
+
+#### Usage
+
+    ClaudeSDKClient$list_session_summaries()
+
+#### Returns
+
+Data frame or character vector supplied by the store adapter
+
+------------------------------------------------------------------------
+
+### `ClaudeSDKClient$delete_session()`
+
+Delete a stored compatibility session.
+
+#### Usage
+
+    ClaudeSDKClient$delete_session(session_id)
+
+#### Arguments
+
+- `session_id`:
+
+  Session identifier to delete
+
+#### Returns
+
+Invisible self
+
+------------------------------------------------------------------------
+
+### `ClaudeSDKClient$get_mcp_status()`
+
+Get MCP runtime status from the underlying agent.
+
+#### Usage
+
+    ClaudeSDKClient$get_mcp_status()
+
+#### Returns
+
+Data frame describing MCP load attempts
+
+------------------------------------------------------------------------
+
+### `ClaudeSDKClient$checkpoint()`
+
+Create a reversible file checkpoint.
+
+#### Usage
+
+    ClaudeSDKClient$checkpoint(name = NULL, metadata = list())
+
+#### Arguments
+
+- `name`:
+
+  Optional checkpoint label.
+
+- `metadata`:
+
+  Optional serializable metadata list.
+
+#### Returns
+
+The checkpoint ID.
+
+------------------------------------------------------------------------
+
+### `ClaudeSDKClient$list_checkpoints()`
+
+List reversible file checkpoints.
+
+#### Usage
+
+    ClaudeSDKClient$list_checkpoints()
+
+#### Returns
+
+A data frame ordered from oldest to newest.
+
+------------------------------------------------------------------------
+
+### `ClaudeSDKClient$rewind_files()`
+
+Rewind files to a checkpoint without rewinding conversation history.
+
+#### Usage
+
+    ClaudeSDKClient$rewind_files(checkpoint_id)
+
+#### Arguments
+
+- `checkpoint_id`:
+
+  A checkpoint ID.
+
+#### Returns
+
+A list describing the restored changes.
+
+------------------------------------------------------------------------
+
+### `ClaudeSDKClient$resume()`
 
 Resume or fork a persisted compatibility session.
 
@@ -119,7 +231,7 @@ Invisible self
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `ClaudeSDKClient$clone()`
 
 The objects of this class are cloneable with this method.
 
@@ -135,7 +247,7 @@ The objects of this class are cloneable with this method.
 
 ## Super class
 
-`deputy::ClaudeSDKClient` -\> `AgentSDKClient`
+`ClaudeSDKClient` -\> `AgentSDKClient`
 
 ## Methods
 
@@ -145,14 +257,20 @@ The objects of this class are cloneable with this method.
 
 Inherited methods
 
-- [`deputy::ClaudeSDKClient$initialize()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-initialize)
-- [`deputy::ClaudeSDKClient$list_sessions()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-list_sessions)
-- [`deputy::ClaudeSDKClient$query()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-query)
-- [`deputy::ClaudeSDKClient$resume()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-resume)
+- [`ClaudeSDKClient$checkpoint()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-checkpoint)
+- [`ClaudeSDKClient$delete_session()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-delete_session)
+- [`ClaudeSDKClient$get_mcp_status()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-get_mcp_status)
+- [`ClaudeSDKClient$initialize()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-initialize)
+- [`ClaudeSDKClient$list_checkpoints()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-list_checkpoints)
+- [`ClaudeSDKClient$list_session_summaries()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-list_session_summaries)
+- [`ClaudeSDKClient$list_sessions()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-list_sessions)
+- [`ClaudeSDKClient$query()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-query)
+- [`ClaudeSDKClient$resume()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-resume)
+- [`ClaudeSDKClient$rewind_files()`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html#method-rewind_files)
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `AgentSDKClient$clone()`
 
 The objects of this class are cloneable with this method.
 

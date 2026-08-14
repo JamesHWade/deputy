@@ -9,10 +9,6 @@ event type has a specific callback signature and context structure.
 HookEvent
 ```
 
-## Format
-
-An object of class `character` of length 9.
-
 ## Event Types
 
 **PreToolUse** - Before a tool is executed (can deny)
@@ -47,13 +43,23 @@ Callback signature:
   [`HookResultPostToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.md)
   to continue/stop
 
+**PostToolUseFailure** - After a tool reports an error
+
+Callback signature:
+`function(tool_name, tool_result, tool_error, context)`
+
+- Same arguments as PostToolUse, fired only when `tool_error` is not
+  NULL
+
 **Stop** - When the agent stops
 
 Callback signature: `function(reason, context)`
 
-- `reason`: Why the agent stopped ("complete", "max_turns", "error")
+- `reason`: Why the agent stopped (for example `"complete"`,
+  `"request_limit"`, `"cost_limit"`, or `"provider_error"`)
 
-- `context`: List containing `working_dir`, `total_turns`, `cost`
+- `context`: List containing `working_dir`, `usage`, `run_id`, and
+  `cost`; native `run()` also includes `total_turns`
 
 - Return:
   [`HookResultStop()`](https://jameshwade.github.io/deputy/reference/HookResultStop.md)
@@ -72,6 +78,31 @@ Callback signature: `function(agent_name, task, result, context)`
 
 - Return:
   [`HookResultSubagentStop()`](https://jameshwade.github.io/deputy/reference/HookResultSubagentStop.md)
+
+**SubagentStart** - When a delegated sub-agent starts (LeadAgent only)
+
+Callback signature: `function(agent_name, task, context)`
+
+- `agent_name`: Name of the sub-agent that started
+
+- `task`: The delegated task
+
+- `context`: List containing `working_dir`
+
+**PermissionRequest** - When permission policy denies a tool call
+
+Callback signature:
+`function(tool_name, tool_input, permission_result, context)`
+
+- Return:
+  [`PermissionResultAllow()`](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md)
+  to override the denial, or
+  [`PermissionResultDeny()`](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md)
+  to replace the denial reason
+
+**ConfigChange** - When runtime configuration changes
+
+Callback signature: `function(key, old_value, new_value, context)`
 
 **UserPromptSubmit** - When a user prompt is submitted
 
@@ -124,10 +155,11 @@ Callback signature: `function(context)`
 
 Callback signature: `function(reason, context)`
 
-- `reason`: Why the agent stopped ("complete", "max_turns",
-  "cost_limit", "hook_requested_stop")
+- `reason`: Why the agent stopped (for example `"complete"`,
+  `"request_limit"`, `"cost_limit"`, or `"hook_requested_stop"`)
 
-- `context`: List containing `working_dir`, `total_turns`, `cost`
+- `context`: List containing `working_dir`, `usage`, `run_id`, and
+  `cost`; native `run()` also includes `total_turns`
 
 - Return:
   [`HookResultSessionEnd()`](https://jameshwade.github.io/deputy/reference/HookResultSessionEnd.md)
@@ -141,11 +173,24 @@ The context parameter is always a named list. Common fields:
 - `tool_annotations`: (PreToolUse only) Tool annotations from ellmer if
   available
 
-- `total_turns`: (Stop, PreCompact, SessionEnd) Number of turns in the
-  conversation
+- `usage`: Run-scoped
+  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+  for tool and terminal lifecycle hooks
 
-- `cost`: (Stop, SessionEnd) List with `total`, `input_tokens`,
-  `output_tokens`
+- `usage_limits`: Active
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  for tool lifecycle hooks
+
+- `run_id`: Identifier for the active run
+
+- `session_id`: Session identifier when compatibility persistence is
+  configured
+
+- `total_turns`: (native Stop, PreCompact, native SessionEnd)
+  Conversation turns
+
+- `cost`: (Stop, SessionEnd) List with `input`, `output`, `cached`, and
+  `total`
 
 - `compact_count`: (PreCompact only) Number of turns being compacted
 

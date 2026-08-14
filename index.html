@@ -12,8 +12,8 @@
 <link rel="icon" sizes="any" href="favicon.ico">
 <link rel="manifest" href="site.webmanifest">
 <script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Agentic AI Workflows for R">
 <meta name="description" content="A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.">
@@ -50,7 +50,7 @@
     <li><a class="dropdown-item" href="articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="articles/claude-sdk-parity.html">Claude Agent SDK Compatibility</a></li>
+    <li><a class="dropdown-item" href="articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -99,7 +99,11 @@
 <li>
 <strong>Hooks</strong> - Intercept and customize agent behavior at key points</li>
 <li>
-<strong>Streaming output</strong> - Real-time feedback as agents work</li>
+<strong>Semantic streaming</strong> - Text, content, tool lifecycle, usage, and stop events with run IDs</li>
+<li>
+<strong>Run budgets</strong> - Request, tool-call, token, and estimated-cost limits</li>
+<li>
+<strong>File checkpoints</strong> - Bounded, persisted byte-exact rewind for Deputy file tools</li>
 <li>
 <strong>Multi-agent</strong> - Coordinate specialized sub-agents for complex tasks</li>
 <li>
@@ -141,7 +145,12 @@
 </h3>
 <p>For real-time feedback as the agent works:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw">for</span> <span class="op">(</span><span class="va">event</span> <span class="kw">in</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span><span class="st">"Analyze the structure of this project"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<code class="sourceCode R"><span><span class="va">events</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span><span class="st">"Analyze the structure of this project"</span><span class="op">)</span></span>
+<span><span class="kw">repeat</span> <span class="op">{</span></span>
+<span>  <span class="va">event</span> <span class="op">&lt;-</span> <span class="fu">events</span><span class="op">(</span><span class="op">)</span></span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu">coro</span><span class="fu">::</span><span class="fu"><a href="https://coro.r-lib.org/reference/iterator.html" class="external-link">is_exhausted</a></span><span class="op">(</span><span class="va">event</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="kw">break</span></span>
+<span>  <span class="op">}</span></span>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/switch.html" class="external-link">switch</a></span><span class="op">(</span></span>
 <span>    <span class="va">event</span><span class="op">$</span><span class="va">type</span>,</span>
 <span>    <span class="st">"text"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">event</span><span class="op">$</span><span class="va">text</span><span class="op">)</span>,</span>
@@ -193,6 +202,7 @@
 <span><span class="va">client</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/ClaudeSDKClient.html">AgentSDKClient</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="va">options</span><span class="op">)</span></span>
 <span><span class="va">client</span><span class="op">$</span><span class="fu">query</span><span class="op">(</span><span class="st">"Inspect the package structure"</span><span class="op">)</span></span>
 <span><span class="va">client</span><span class="op">$</span><span class="fu">resume</span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">session_id</span>, fork <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="reference/claude_sdk_query.html">agent_sdk_query()</a></code> and <code>AgentSDKClient$query()</code> are blocking. Use the native <code>Agent$run()</code> generator when an application needs incremental events. Resuming a compatibility session restores its conversation and prompt while keeping the new agent’s configured tools, constructor-supplied permissions, and working directory authoritative. Native <code>Agent$load_session(..., restore_tools = TRUE)</code> is the explicit opt-in for trusting and restoring serialized tools.</p>
 <p>The compatibility layer exposes Anthropic-style tool aliases such as <code>Read</code>, <code>Write</code>, <code>Edit</code>, <code>MultiEdit</code>, <code>Glob</code>, <code>Grep</code>, <code>LS</code>, <code>TodoRead</code>, <code>TodoWrite</code>, <code>WebFetch</code>, <code>WebSearch</code>, and <code>Agent</code> or <code>Task</code> (when sub-agents are registered). The Claude-named entrypoints remain fully supported.</p>
 </div>
 <div class="section level3">
@@ -235,7 +245,7 @@
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Standard: file read/write in working dir, R code, no bash</span></span>
+<span><span class="co"># Standard: accessible reads, workspace-scoped writes, R code, no bash</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -272,17 +282,53 @@
 <span>  tools <span class="op">=</span> <span class="fu"><a href="reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="reference/permissions_plan.html">permissions_plan</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>When both are set, <code>tool_denylist</code> takes precedence over <code>tool_allowlist</code>. <code>permission_prompt_tool_name</code> is always allowed and is included in deny messages so the model can request explicit approval. <code><a href="reference/permissions_plan.html">permissions_plan()</a></code> mirrors Claude’s <code>plan</code> mode by allowing only read-only annotated tools and <code>AskUserQuestion</code>.</p>
+<p>When both are set, <code>tool_denylist</code> takes precedence over <code>tool_allowlist</code>. <code>permission_prompt_tool_name</code> is allowed as an approval escape hatch except in <code>dontAsk</code> mode, and is included in deny messages when prompting is enabled. <code><a href="reference/permissions_plan.html">permissions_plan()</a></code> mirrors Claude’s <code>plan</code> mode by allowing only read-only annotated tools and <code>AskUserQuestion</code>.</p>
+</div>
+<div class="section level3">
+<h3 id="run-budgets-and-file-rewind">Run Budgets and File Rewind<a class="anchor" aria-label="anchor" href="#run-budgets-and-file-rewind"></a>
+</h3>
+<p>Limits are scoped to one run, so resuming an older conversation does not inherit an already-spent budget:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span></span>
+<span>    max_requests <span class="op">=</span> <span class="fl">12</span>,</span>
+<span>    max_tool_calls <span class="op">=</span> <span class="fl">20</span>,</span>
+<span>    max_total_tokens <span class="op">=</span> <span class="fl">50000</span>,</span>
+<span>    max_cost_usd <span class="op">=</span> <span class="fl">1</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Inspect this package"</span><span class="op">)</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">run_id</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">usage</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="fu">tool_calls</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="fu">tool_results</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>Request and tool-call limits are checked at model and tool boundaries. Token and cost limits use usage reported after a model response, so a run stops once an overage is observed and can exceed the configured threshold by one response.</p>
+<p>Enable reversible file journals when an agent may edit its workspace:</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  enable_file_checkpointing <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  working_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">checkpoint_id</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">checkpoint</span><span class="op">(</span><span class="st">"before refactor"</span><span class="op">)</span></span>
+<span><span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Refactor R/parser.R"</span><span class="op">)</span></span>
+<span><span class="va">agent</span><span class="op">$</span><span class="fu">rewind_files</span><span class="op">(</span><span class="va">checkpoint_id</span><span class="op">)</span></span></code></pre></div>
+<p>Deputy automatically creates a checkpoint at the beginning of each run and persists the journal with session snapshots. Captures default to 50 MiB per file. The default maximum aggregate serialized checkpoint-state size is 250 MiB, counting journal records, checkpoint markers, metadata, and pending captures. The bounds apply to live captures and restored session state; violations signal <code>deputy_file_checkpoint_limit_error</code>. Lead agents and their delegated agents share one workspace journal, so child-agent edits participate in lead-level rewind. Rewind covers writes through native and Agent SDK-compatible write, edit, multi-edit, and todo tools; it does not capture writes performed by Bash, R code, or arbitrary custom tools.</p>
 </div>
 <div class="section level3">
 <h3 id="hooks">Hooks<a class="anchor" aria-label="anchor" href="#hooks"></a>
 </h3>
 <p>Intercept agent behavior:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Log all tool calls</span></span>
 <span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va"><a href="reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PostToolUse"</span>,</span>
-<span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_result</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_result</span>, <span class="va">tool_error</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"["</span>, <span class="fu"><a href="https://rdrr.io/r/base/Sys.time.html" class="external-link">Sys.time</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"] "</span>, <span class="va">tool_name</span><span class="op">)</span></span>
 <span>    <span class="fu"><a href="reference/HookResultPostToolUse.html">HookResultPostToolUse</a></span><span class="op">(</span><span class="op">)</span></span>
 <span>  <span class="op">}</span></span>
@@ -322,7 +368,7 @@
 <h3 id="skills">Skills<a class="anchor" aria-label="anchor" href="#skills"></a>
 </h3>
 <p>Skills bundle tools and prompt extensions. You can load them from disk or create them programmatically. deputy ships with a built-in example skill under <code>inst/skills</code>.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Discover bundled skills</span></span>
 <span><span class="va">skills_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"skills"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/skills_list.html">skills_list</a></span><span class="op">(</span><span class="va">skills_dir</span><span class="op">)</span></span>
@@ -345,7 +391,7 @@
 <h3 id="claude-settings-settingsources">Claude Settings (settingSources)<a class="anchor" aria-label="anchor" href="#claude-settings-settingsources"></a>
 </h3>
 <p>deputy can load Claude-style settings from <code>.claude</code> directories, including <code>CLAUDE.md</code> memory, <code>.claude/skills</code>, <code>.claude/commands</code> slash commands, and <code>.claude/agents</code> definitions. Tool policy settings from <code>settings.json</code> are also applied to <code>agent$permissions</code> (<code>allowedTools</code>, <code>disallowedTools</code>, and <code>permissionPromptToolName</code>).</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -357,17 +403,17 @@
 <p>Settings-defined agents are applied automatically when you use <code>LeadAgent$new(setting_sources = ...)</code> or the compatibility client. Source precedence is fixed as <code>user</code>, then <code>project</code>, then <code>local</code>, with <code>.claude/settings.local.json</code> overriding the broader settings files without loading extra memory, commands, skills, or agents.</p>
 <p>Unsupported <code>.claude/agents</code> frontmatter fields are warned on and ignored. Plugin discovery and marketplace execution are intentionally deferred from the current compatibility surface.</p>
 <p>Example <code>.claude/settings.json</code> tool policy:</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>  <span class="dt">"allowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"read_file"</span><span class="ot">,</span> <span class="st">"list_files"</span><span class="ot">,</span> <span class="st">"run_r_code"</span><span class="ot">]</span><span class="fu">,</span></span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>  <span class="dt">"disallowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"run_bash"</span><span class="ot">]</span><span class="fu">,</span></span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>  <span class="dt">"permissionPromptToolName"</span><span class="fu">:</span> <span class="st">"AskUserQuestion"</span></span>
-<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>  <span class="dt">"allowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"read_file"</span><span class="ot">,</span> <span class="st">"list_files"</span><span class="ot">,</span> <span class="st">"run_r_code"</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>  <span class="dt">"disallowedTools"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"run_bash"</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>  <span class="dt">"permissionPromptToolName"</span><span class="fu">:</span> <span class="st">"AskUserQuestion"</span></span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="structured-output">Structured Output<a class="anchor" aria-label="anchor" href="#structured-output"></a>
 </h3>
 <p>Request JSON output that matches a schema:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">schema</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  type <span class="op">=</span> <span class="st">"object"</span>,</span>
 <span>  properties <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>status <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"string"</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -385,10 +431,13 @@
 <h3 id="error-handling">Error Handling<a class="anchor" aria-label="anchor" href="#error-handling"></a>
 </h3>
 <p>deputy provides structured error types for programmatic error handling:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Catch specific error types</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span></span>
-<span>  <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"task"</span><span class="op">)</span>,</span>
+<span>  <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
+<span>    <span class="st">"task"</span>,</span>
+<span>    usage_limits <span class="op">=</span> <span class="fu"><a href="reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_cost_usd <span class="op">=</span> <span class="fl">0.50</span>, on_exceed <span class="op">=</span> <span class="st">"error"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
 <span>  deputy_budget_exceeded <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">e</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Budget exceeded: $"</span>, <span class="va">e</span><span class="op">$</span><span class="va">current_cost</span>, <span class="st">" &gt; $"</span>, <span class="va">e</span><span class="op">$</span><span class="va">max_cost</span><span class="op">)</span></span>
 <span>  <span class="op">}</span>,</span>
@@ -404,7 +453,7 @@
 <h3 id="multi-agent-systems">Multi-Agent Systems<a class="anchor" aria-label="anchor" href="#multi-agent-systems"></a>
 </h3>
 <p>Coordinate specialized agents:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Define sub-agents</span></span>
 <span><span class="va">code_agent</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"code_analyst"</span>,</span>
@@ -420,13 +469,14 @@
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Review the R code in this project"</span><span class="op">)</span></span></code></pre></div>
+<p>Direct synchronous child usage is aggregated into <code>result$usage</code>. Each child inherits the lead run’s remaining budget, and the lead enforces its limits after delegation. Parallel, background, transitive child-tree, and cross-run global budget accounting remain future work.</p>
 </div>
 </div>
 <div class="section level2">
 <h2 id="provider-support">Provider Support<a class="anchor" aria-label="anchor" href="#provider-support"></a>
 </h2>
 <p>deputy works with any LLM provider that ellmer supports:</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># OpenAI</span></span>
 <span><span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
@@ -507,7 +557,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

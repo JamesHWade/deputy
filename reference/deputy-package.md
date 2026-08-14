@@ -52,7 +52,10 @@ runtime.
     )
 
     # Run a task with streaming output
-    for (event in agent$run("List files in current directory")) {
+    events <- agent$run("List files in current directory")
+    repeat {
+      event <- events()
+      if (coro::is_exhausted(event)) break
       if (event$type == "text") cat(event$text)
     }
 
@@ -70,3 +73,8 @@ Useful links:
 
 **Maintainer**: James Wade <github@jameshwade.com>
 ([ORCID](https://orcid.org/0000-0002-9740-1905))
+
+Authors:
+
+- James Wade <github@jameshwade.com>
+  ([ORCID](https://orcid.org/0000-0002-9740-1905))

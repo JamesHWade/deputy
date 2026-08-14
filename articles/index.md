@@ -22,7 +22,7 @@
 - [Agent
   Configuration](https://jameshwade.github.io/deputy/articles/agent-configuration.md):
 - [Agent SDK
-  Compatibility](https://jameshwade.github.io/deputy/articles/claude-sdk-parity.md):
+  Parity](https://jameshwade.github.io/deputy/articles/claude-sdk-parity.md):
 
 ### Examples
 

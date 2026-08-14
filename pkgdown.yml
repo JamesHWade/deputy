@@ -1,5 +1,5 @@
-pandoc: 3.1.11
-pkgdown: 2.2.0
+pandoc: 3.8.3
+pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   agent-configuration: agent-configuration.html
@@ -14,7 +14,7 @@ articles:
   permissions: permissions.html
   structured-output: structured-output.html
   tools: tools.html
-last_built: 2026-04-04T17:54Z
+last_built: 2026-08-14T01:37Z
 urls:
   reference: https://jameshwade.github.io/deputy/reference
   article: https://jameshwade.github.io/deputy/articles

@@ -13,7 +13,15 @@ agent_definition(
   prompt,
   tools = list(),
   model = "inherit",
-  skills = list()
+  skills = list(),
+  disallowed_tools = NULL,
+  memory = NULL,
+  mcp_servers = NULL,
+  initial_prompt = NULL,
+  max_turns = NULL,
+  background = FALSE,
+  effort = NULL,
+  permission_mode = NULL
 )
 ```
 
@@ -42,6 +50,41 @@ agent_definition(
 - skills:
 
   Optional list of skills to load
+
+- disallowed_tools:
+
+  Optional tool denylist for this sub-agent
+
+- memory:
+
+  Optional memory text appended to this sub-agent's prompt
+
+- mcp_servers:
+
+  Optional MCP server names to load for this sub-agent
+
+- initial_prompt:
+
+  Optional text prepended to delegated tasks
+
+- max_turns:
+
+  Optional non-negative whole-number sub-agent request limit
+
+- background:
+
+  Logical SDK-compatible metadata flag
+
+- effort:
+
+  Optional reasoning effort metadata
+
+- permission_mode:
+
+  Optional permission mode. For non-bypass lead agents, this must match
+  the lead mode (with `"default"` and `"auto"` treated as equivalent);
+  use `disallowed_tools` and `max_turns` to tighten a child policy. A
+  bypass lead may select any mode.
 
 ## Value
 

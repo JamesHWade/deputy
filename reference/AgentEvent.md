@@ -42,7 +42,16 @@ An `AgentEvent` object
 - `"warning"` - Warning condition occurred. Contains: `message`,
   `details`
 
-- `"stop"` - Agent stopped. Contains: `reason`, `total_turns`, `cost`
+- `"content"` - Non-text provider content. Contains: `content`,
+  `content_type`
+
+- `"file_checkpoint"` - Automatic run-boundary checkpoint. Contains:
+  `checkpoint_id`, `name`
+
+- `"usage"` - Run usage snapshot. Contains: `usage`, `limits`
+
+- `"stop"` - Agent stopped. Contains: `reason`, `total_turns`, `cost`,
+  `usage`, and `run_id`
 
 ## Examples
 
@@ -50,14 +59,14 @@ An `AgentEvent` object
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-04-04 17:54:07 
+#>   timestamp: 2026-08-14 01:37:30 
 #>   task: Analyze data.csv
 
 # Create a text event
 AgentEvent("text", text = "Hello", is_complete = FALSE
 )
 #> <AgentEvent: text >
-#>   timestamp: 2026-04-04 17:54:07 
+#>   timestamp: 2026-08-14 01:37:30 
 #>   text: Hello
 #>   is_complete: FALSE
 ```

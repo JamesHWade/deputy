@@ -8,7 +8,3 @@ Character vector of valid preset names for
 ``` r
 ToolPresets
 ```
-
-## Format
-
-An object of class `character` of length 5.

@@ -10,13 +10,20 @@ limits.
 shinychat’s
 [`chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html)
 expects an ellmer content stream from `chat$stream_async()`. Deputy’s
-`run()` and `run_sync()` methods return `AgentEvent` objects instead.
-Calling `agent$chat$stream_async()` directly works but bypasses deputy’s
-turn-level controls like `max_turns` and `max_cost_usd`.
+`run()` yields `AgentEvent` objects, while `run_sync()` returns an
+`AgentResult`. Calling `agent$chat$stream_async()` directly works but
+bypasses deputy’s turn-level controls like `max_turns` and
+`max_cost_usd`.
 
 `run_shiny()` bridges this gap: it returns a content stream that
 shinychat understands while still enforcing deputy’s permissions, hooks,
 and limits.
+
+`run_shiny()` is deliberately strict about file tools: every supplied
+file path must be absolute and resolve within the Agent’s immutable
+`working_dir`. Relative paths, omitted path defaults, and paths outside
+that root are rejected. Bind a normalized workspace and include its
+exact path in the model’s system prompt, as both examples below do.
 
 Following shinychat’s recommended pattern, pass that stream directly to
 [`chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
@@ -27,22 +34,26 @@ UI.
 
 ## What `run_shiny()` Enforces
 
-| Feature                             | Enforced? | How                                                         |
-|-------------------------------------|-----------|-------------------------------------------------------------|
-| Permissions (file_read, bash, etc.) | Yes       | `on_tool_request` callback                                  |
-| PreToolUse / PostToolUse hooks      | Yes       | `on_tool_request` / `on_tool_result` callbacks              |
-| Tool call limit                     | Yes       | Counter in `on_tool_request`, rejects with graceful message |
-| Cost limit (`max_cost_usd`)         | Yes       | Checked in `on_tool_request`                                |
-| SessionStart / SessionEnd hooks     | Yes       | Fired before/after the stream                               |
-| Stall detection                     | No        | Requires deputy’s own loop                                  |
-| `output_format` (structured output) | No        | Requires deputy’s own loop                                  |
+| Feature | Enforced? | How |
+|----|----|----|
+| Permissions (file_read, bash, etc.) | Yes | `on_tool_request` callback |
+| PreToolUse / PostToolUse hooks | Yes | `on_tool_request` / `on_tool_result` callbacks |
+| File path confinement | Yes | Every recognized file path must be absolute and inside `working_dir` |
+| Tool call limit | Yes | Checked at each tool request; an overage cancels the active stream |
+| Request, token, and cost limits | Yes | Checked when usage is observed; an overage cancels the active stream |
+| SessionStart / SessionEnd hooks | Yes | Fired before/after the stream |
+| Stall detection | No | Requires deputy’s own loop |
+| `output_format` (structured output) | No | Requires deputy’s own loop |
 
 ## Basic Setup
 
 ``` r
+
 library(shiny)
 library(deputy)
 library(shinychat)
+
+workspace <- normalizePath(getwd(), mustWork = TRUE, winslash = "/")
 
 ui <- bslib::page_fluid(
   chat_ui("chat", fill = TRUE)
@@ -51,12 +62,20 @@ ui <- bslib::page_fluid(
 server <- function(input, output, session) {
   chat <- ellmer::chat_openai(
     model = "gpt-4o-mini",
-    system_prompt = "You are a helpful assistant. Be concise."
+    system_prompt = paste(
+      "You are a helpful assistant. Be concise.",
+      sprintf(
+        "For every file tool, use an absolute path inside: %s",
+        workspace
+      )
+    )
   )
 
   agent <- Agent$new(
     chat = chat,
-    tools = tools_file()
+    tools = tools_file(),
+    permissions = permissions_standard(workspace),
+    working_dir = workspace
   )
 
   observeEvent(input$chat_user_input, {
@@ -78,10 +97,19 @@ Deputy’s permissions and hooks fire on every tool call, even though
 shinychat drives the streaming loop:
 
 ``` r
+
+workspace <- normalizePath(getwd(), mustWork = TRUE, winslash = "/")
+
 server <- function(input, output, session) {
   chat <- ellmer::chat_anthropic(
     model = "claude-sonnet-4-5-20250929",
-    system_prompt = "You are a data analyst. Be concise."
+    system_prompt = paste(
+      "You are a data analyst. Be concise.",
+      sprintf(
+        "For every file tool, use an absolute path inside: %s",
+        workspace
+      )
+    )
   )
 
   agent <- Agent$new(
@@ -93,7 +121,8 @@ server <- function(input, output, session) {
       r_code = FALSE,
       bash = FALSE,
       max_cost_usd = 0.50
-    )
+    ),
+    working_dir = workspace
   )
 
   # Hooks still fire normally
@@ -116,11 +145,19 @@ server <- function(input, output, session) {
 
 ## How Limits Work
 
-When a tool call limit or cost limit is reached, deputy calls
-[`ellmer::tool_reject()`](https://ellmer.tidyverse.org/reference/tool_reject.html)
-with a message asking the LLM to wrap up. The LLM receives this as a
-tool error and generates a final response. The user sees a complete,
-coherent message rather than a truncated stream.
+`run_shiny()` starts with the Agent’s run limits and lets
+`max_tool_calls` override that one field. When Deputy observes a
+request, tool, token, or cost overage, it marks the run stopped and asks
+ellmer’s stream controller to cancel active generation. An overage found
+at a tool boundary also rejects that tool call. `Stop` and `SessionEnd`
+hooks receive the corresponding limit reason.
+
+Provider token and cost usage is not observable until a response
+arrives. The initial response can therefore cross one of those limits
+before cancellation; it may overshoot the configured threshold by one
+response. Cancellation stops further work but cannot retract content
+already emitted. Treat token and cost limits as observed stop
+conditions, not provider-side generation ceilings.
 
 The `max_tool_calls` parameter counts individual tool call requests, not
 LLM turns. One turn can include multiple parallel tool calls (e.g., the
@@ -132,5 +169,6 @@ precise than turn counting for controlling resource usage.
 A complete example app is included in the package:
 
 ``` r
+
 shiny::runApp(system.file("examples/shiny-chat", package = "deputy"))
 ```

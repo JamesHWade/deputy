@@ -30,6 +30,7 @@ use
 for read-only file access:
 
 ``` r
+
 library(deputy)
 
 bug_hunter <- agent_definition(
@@ -89,6 +90,7 @@ The `LeadAgent` coordinates the reviewers. It has a `delegate_to_agent`
 tool that lets it assign tasks to any registered sub-agent:
 
 ``` r
+
 chat <- ellmer::chat_openai()
 
 lead <- LeadAgent$new(
@@ -117,6 +119,7 @@ Hooks provide real-time visibility as the agent works. Use them for
 logging and blocking; use `AgentResult` for post-hoc analysis.
 
 ``` r
+
 # Log when each sub-agent finishes
 hook_sub_agent_log <- HookMatcher$new(
   event = "SubagentStop",
@@ -134,6 +137,7 @@ lead$add_hook(hook_log_tools(verbose = TRUE))
 ## Run the Review
 
 ``` r
+
 result <- lead$run_sync(
   "Review the R source files in R/ for code quality issues.
    Have each specialist review the code from their perspective,
@@ -149,6 +153,7 @@ For machine-readable results, add a structured output schema to capture
 individual findings:
 
 ``` r
+
 review_schema <- list(
   type = "object",
   properties = list(
@@ -210,6 +215,7 @@ With structured output, you can filter, sort, and summarise findings
 programmatically:
 
 ``` r
+
 review <- result$structured_output$parsed
 
 # Summary
@@ -247,6 +253,7 @@ table(findings_df$category, findings_df$severity)
 `AgentResult` captures cost and tool usage for post-hoc analysis:
 
 ``` r
+
 # Total cost and duration
 result$cost
 result$duration

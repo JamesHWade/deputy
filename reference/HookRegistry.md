@@ -7,7 +7,7 @@ matching, and execution of hooks.
 
 ### Public methods
 
-- [`HookRegistry$new()`](#method-HookRegistry-new)
+- [`HookRegistry$new()`](#method-HookRegistry-initialize)
 
 - [`HookRegistry$add()`](#method-HookRegistry-add)
 
@@ -27,7 +27,7 @@ matching, and execution of hooks.
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `HookRegistry$new()`
 
 Create a new HookRegistry.
 
@@ -37,7 +37,7 @@ Create a new HookRegistry.
 
 ------------------------------------------------------------------------
 
-### Method `add()`
+### `HookRegistry$add()`
 
 Add a hook to the registry.
 
@@ -59,7 +59,7 @@ Invisible self for chaining
 
 ------------------------------------------------------------------------
 
-### Method `get_hooks()`
+### `HookRegistry$get_hooks()`
 
 Get all hooks for a specific event.
 
@@ -83,7 +83,7 @@ List of matching HookMatcher objects
 
 ------------------------------------------------------------------------
 
-### Method `fire()`
+### `HookRegistry$fire()`
 
 Fire hooks for an event and return the first non-NULL result.
 
@@ -119,7 +119,7 @@ The first non-NULL hook result, or NULL
 
 ------------------------------------------------------------------------
 
-### Method `last_errors()`
+### `HookRegistry$last_errors()`
 
 Get errors from recent hook executions.
 
@@ -137,7 +137,7 @@ timestamp
 
 ------------------------------------------------------------------------
 
-### Method `clear_errors()`
+### `HookRegistry$clear_errors()`
 
 Clear the error history.
 
@@ -147,7 +147,7 @@ Clear the error history.
 
 ------------------------------------------------------------------------
 
-### Method `count()`
+### `HookRegistry$count()`
 
 Get the number of registered hooks.
 
@@ -161,7 +161,7 @@ Integer count
 
 ------------------------------------------------------------------------
 
-### Method [`print()`](https://rdrr.io/r/base/print.html)
+### `HookRegistry$print()`
 
 Print the registry.
 
@@ -171,7 +171,7 @@ Print the registry.
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `HookRegistry$clone()`
 
 The objects of this class are cloneable with this method.
 

@@ -11,6 +11,7 @@ entrypoints and session workflows.
 ## Installation
 
 ``` r
+
 # Install from GitHub
 pak::pak("JamesHWade/deputy")
 ```
@@ -21,6 +22,7 @@ An agent wraps an ellmer chat object and gives it tools, permissions,
 and lifecycle hooks:
 
 ``` r
+
 library(deputy)
 
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
@@ -40,6 +42,7 @@ Use the compatibility facade when you want Claude-style options, tool
 aliases, and persisted session ids:
 
 ``` r
+
 library(deputy)
 
 options <- claude_sdk_options(
@@ -64,15 +67,16 @@ not need a long-lived client object.
 
 deputy organises built-in tools into bundles you can mix and match:
 
-| Bundle                                                                        | Tools                                   | Purpose         |
-|-------------------------------------------------------------------------------|-----------------------------------------|-----------------|
+| Bundle | Tools | Purpose |
+|----|----|----|
 | [`tools_file()`](https://jameshwade.github.io/deputy/reference/tools_file.md) | `read_file`, `write_file`, `list_files` | File operations |
-| [`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md) | `run_r_code`, `run_bash`                | Code execution  |
-| [`tools_data()`](https://jameshwade.github.io/deputy/reference/tools_data.md) | `read_csv`, `read_file`                 | Data reading    |
-| [`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md)   | `web_fetch`, `web_search`               | Web access      |
-| [`tools_all()`](https://jameshwade.github.io/deputy/reference/tools_all.md)   | All of the above                        | Everything      |
+| [`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md) | `run_r_code`, `run_bash` | Code execution |
+| [`tools_data()`](https://jameshwade.github.io/deputy/reference/tools_data.md) | `read_csv`, `read_file` | Data reading |
+| [`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md) | `web_fetch`, `web_search` | Web access |
+| [`tools_all()`](https://jameshwade.github.io/deputy/reference/tools_all.md) | All of the above | Everything |
 
 ``` r
+
 # Combine bundles
 agent <- Agent$new(
   chat = ellmer::chat_anthropic(),
@@ -84,6 +88,7 @@ There are also named presets available via
 [`tools_preset()`](https://jameshwade.github.io/deputy/reference/tools_preset.md):
 
 ``` r
+
 list_presets()
 tools_preset("dev")
 ```
@@ -97,10 +102,16 @@ for custom tools, web tools, MCP integration, and human-in-the-loop.
 For real-time feedback, use `run()` which returns a generator:
 
 ``` r
+
 chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 agent <- Agent$new(chat = chat, tools = tools_file())
 
-for (event in agent$run("What is the name of this package?")) {
+events <- agent$run("What is the name of this package?")
+repeat {
+  event <- events()
+  if (coro::is_exhausted(event)) {
+    break
+  }
   switch(event$type,
     "text" = cat(event$text),
     "tool_start" = cli::cli_alert_info("Calling {event$tool_name}..."),
@@ -118,6 +129,7 @@ start and finish, and a final stop event.
 ### Read-Only Permissions
 
 ``` r
+
 # Only allows reading files - no writes, no code execution
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
@@ -129,6 +141,7 @@ agent <- Agent$new(
 ### Full Permissions
 
 ``` r
+
 # Allows everything - use with caution!
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
@@ -149,6 +162,7 @@ agent <- Agent$new(
 For fine-grained control:
 
 ``` r
+
 perms <- Permissions$new(
   file_read = TRUE,
   file_write = "/path/to/allowed/dir", # Restrict to specific directory
@@ -171,6 +185,7 @@ agent <- Agent$new(
 For complex permission logic:
 
 ``` r
+
 perms <- Permissions$new(
   can_use_tool = function(tool_name, tool_input, context) {
     # Block any file writes to sensitive directories
@@ -192,6 +207,7 @@ Use allow/deny lists when you want an explicit tool policy that is
 separate from the broader mode flags:
 
 ``` r
+
 perms <- Permissions$new(
   mode = "default",
   tool_allowlist = c("read_file", "list_files", "run_r_code"),
@@ -207,8 +223,9 @@ agent <- Agent$new(
 ```
 
 If both lists are present, `tool_denylist` wins. The
-`permission_prompt_tool_name` tool is always allowed and appears in deny
-reasons so the model can request approval.
+`permission_prompt_tool_name` tool is allowed as an approval escape
+hatch except in `dontAsk` mode, and appears in deny reasons when
+prompting is enabled.
 
 ### Applying Tool Policy from `.claude/settings.json`
 
@@ -217,6 +234,7 @@ permissions, and can also load `.claude/agents` definitions for
 delegation:
 
 ``` r
+
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
   tools = tools_all(),
@@ -255,9 +273,10 @@ Hooks let you intercept and customize agent behavior at key points:
 ### Example: Logging All Tool Calls
 
 ``` r
+
 agent$add_hook(HookMatcher$new(
   event = "PostToolUse",
-  callback = function(tool_name, tool_result, context) {
+  callback = function(tool_name, tool_result, tool_error, context) {
     cli::cli_alert_info("Tool {tool_name} completed")
     HookResultPostToolUse()
   }
@@ -267,6 +286,7 @@ agent$add_hook(HookMatcher$new(
 ### Example: Block Dangerous Commands
 
 ``` r
+
 agent$add_hook(HookMatcher$new(
   event = "PreToolUse",
   pattern = "^run_bash$", # Only match bash tool
@@ -288,6 +308,7 @@ agent$add_hook(HookMatcher$new(
 Save and restore agent sessions:
 
 ``` r
+
 # Save the current session
 agent$save_session("my_session.rds")
 
@@ -299,12 +320,19 @@ agent2$load_session("my_session.rds")
 result <- agent2$run_sync("Continue where we left off...")
 ```
 
+By default, `Agent$load_session()` restores conversation and prompt
+while keeping the receiving Agent’s configured tools. Pass
+`restore_tools = TRUE` only when you explicitly trust and want to
+restore serialized tools. Constructor-supplied permissions and
+`working_dir` always remain authoritative.
+
 ## Multi-Agent Systems
 
 For complex tasks, you can create a lead agent that delegates to
 specialized sub-agents:
 
 ``` r
+
 # Define specialized sub-agents
 code_agent <- agent_definition(
   name = "code_analyst",
@@ -338,6 +366,7 @@ result <- lead$run_sync(
 The `AgentResult` object contains useful information:
 
 ``` r
+
 result <- agent$run_sync("Analyze this project")
 
 # The final response
@@ -370,6 +399,7 @@ length(result$events)
 deputy works with any LLM provider that ellmer supports:
 
 ``` r
+
 # OpenAI
 agent <- Agent$new(chat = ellmer::chat("openai"))
 
@@ -404,6 +434,7 @@ agent <- Agent$new(chat = ellmer::chat("ollama/llama3.1"))
     feedback.
 
 ``` r
+
 # Example combining best practices
 agent <- Agent$new(
   chat = ellmer::chat("openai"),

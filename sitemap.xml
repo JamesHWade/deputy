@@ -23,6 +23,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/Agent.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/AgentEvent.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/AgentResult.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/AgentUsage.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/HookEvent.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/HookMatcher.html</loc></url>
@@ -41,6 +42,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/Permissions.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/Skill.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/ToolPresets.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/UsageLimits.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/abort_budget_exceeded.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/abort_deputy.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/abort_hook.html</loc></url>
@@ -76,6 +78,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/permissions_plan.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/permissions_readonly.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/permissions_standard.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/session_store_memory.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/set_ask_user_callback.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_create.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_load.html</loc></url>
