@@ -14,12 +14,11 @@ jobs:
     name: ir package executable
     runs-on: ubuntu-latest
     env:
-      IR_CACHE_DIR: ${{ runner.temp }}/ir-cache
-      IR_TOOL_STORE_DIR: ${{ runner.temp }}/ir-tools
-      IR_TOOL_BIN_DIR: ${{ runner.temp }}/ir-bin
-      R_USER_CACHE_DIR: ${{ runner.temp }}/r-cache
-      IR_NO_MODIFY_PATH: 1
-      RAPP_NO_MODIFY_PATH: 1
+      IR_CACHE_DIR: /tmp/deputy-ir-cache
+      IR_TOOL_STORE_DIR: /tmp/deputy-ir-tools
+      R_USER_CACHE_DIR: /tmp/deputy-r-cache
+      IR_NO_MODIFY_PATH: "1"
+      RAPP_NO_MODIFY_PATH: "1"
 
     steps:
       - uses: actions/checkout@v4
