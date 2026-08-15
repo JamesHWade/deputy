@@ -31,7 +31,24 @@ execution.
 
     \item{\code{run_id}}{Unique identifier shared by events from this run}
 
+    \item{\code{agent_id}}{Immutable identifier for the Agent instance}
+
+    \item{\code{agent_name}}{Optional human-readable Agent name}
+
+    \item{\code{parent_agent_id}}{Parent Agent identifier for delegated runs}
+
+    \item{\code{parent_run_id}}{Parent run identifier for delegated runs}
+
+    \item{\code{delegation_id}}{Delegation identifier for delegated runs}
+
     \item{\code{usage}}{Run-scoped \link{AgentUsage}}
+  }
+  \if{html}{\out{</div>}}
+}
+\section{Active bindings}{
+  \if{html}{\out{<div class="r6-active-bindings">}}
+  \describe{
+    \item{\code{run_context}}{Canonical product context for the run. Read-only.}
   }
   \if{html}{\out{</div>}}
 }
@@ -66,7 +83,13 @@ execution.
   session_id = NULL,
   snapshot_path = NULL,
   run_id = NULL,
-  usage = AgentUsage()
+  usage = AgentUsage(),
+  agent_id = NULL,
+  agent_name = NULL,
+  parent_agent_id = NULL,
+  parent_run_id = NULL,
+  delegation_id = NULL,
+  run_context = list()
 )}
     \if{html}{\out{</div>}}
   }
@@ -84,6 +107,12 @@ execution.
       \item{\code{snapshot_path}}{Latest compat snapshot path (if any)}
       \item{\code{run_id}}{Unique run identifier (if any)}
       \item{\code{usage}}{Run-scoped \link{AgentUsage}}
+      \item{\code{agent_id}}{Agent instance identifier (if any)}
+      \item{\code{agent_name}}{Optional human-readable Agent name}
+      \item{\code{parent_agent_id}}{Parent Agent identifier for delegated runs}
+      \item{\code{parent_run_id}}{Parent run identifier for delegated runs}
+      \item{\code{delegation_id}}{Delegation identifier for delegated runs}
+      \item{\code{run_context}}{Immutable product context for this run}
     }
     \if{html}{\out{</div>}}
   }

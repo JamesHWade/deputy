@@ -25,6 +25,7 @@ sub-agents based on registered AgentDefinitions.
     \item \href{#method-LeadAgent-register_sub_agent}{\code{LeadAgent$register_sub_agent()}}
     \item \href{#method-LeadAgent-available_sub_agents}{\code{LeadAgent$available_sub_agents()}}
     \item \href{#method-LeadAgent-list_subagents}{\code{LeadAgent$list_subagents()}}
+    \item \href{#method-LeadAgent-get_subagent_results}{\code{LeadAgent$get_subagent_results()}}
     \item \href{#method-LeadAgent-get_subagent_messages}{\code{LeadAgent$get_subagent_messages()}}
     \item \href{#method-LeadAgent-print}{\code{LeadAgent$print()}}
     \item \href{#method-LeadAgent-clone}{\code{LeadAgent$clone()}}
@@ -82,7 +83,10 @@ sub-agents based on registered AgentDefinitions.
   file_checkpoint_max_journal_bytes = 250 * 1024^2,
   working_dir = getwd(),
   setting_sources = NULL,
-  settings = NULL
+  settings = NULL,
+  run_context = list(),
+  agent_id = NULL,
+  agent_name = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -106,6 +110,10 @@ captures. Defaults to 250 MiB.}
       \item{\code{working_dir}}{Working directory}
       \item{\code{setting_sources}}{Optional Claude-style setting sources}
       \item{\code{settings}}{Optional pre-loaded settings list from claude_settings_load()}
+      \item{\code{run_context}}{Immutable canonical product context inherited by lead
+runs and delegated agents.}
+      \item{\code{agent_id}}{Optional stable identifier for this LeadAgent instance.}
+      \item{\code{agent_name}}{Optional human-readable LeadAgent name.}
     }
     \if{html}{\out{</div>}}
   }
@@ -163,6 +171,29 @@ captures. Defaults to 250 MiB.}
   }
   \subsection{Returns}{
     Data frame with one row per sub-agent run
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-get_subagent_results"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-get_subagent_results}{}}}
+\subsection{\code{LeadAgent$get_subagent_results()}}{
+  Get retained results from delegated sub-agent runs.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$get_subagent_results(agent_name = NULL, delegation_id = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{agent_name}}{Optional sub-agent name filter}
+      \item{\code{delegation_id}}{Optional delegation identifier filter}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    List of \link{AgentResult} objects or \code{NULL} entries for failed runs
   }
 }
 

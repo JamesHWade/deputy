@@ -17,18 +17,33 @@ ensure_session_store_dir <- function(path = NULL) {
   dir
 }
 
-# Generate a UUID-like session identifier without adding a hard dependency.
+# Process-local counter used to make identifiers unique without consuming the
+# caller's random-number stream.
+deputy_id_state <- new.env(parent = emptyenv())
+deputy_id_state$counter <- 0L
+
+# Generate a UUID-like session identifier without adding a hard dependency or
+# changing R's global RNG state.
 generate_session_id <- function() {
-  random_hex <- function(n) {
-    paste(sample(c(0:9, letters[1:6]), n, replace = TRUE), collapse = "")
-  }
+  deputy_id_state$counter <- deputy_id_state$counter + 1L
+  entropy <- paste(
+    Sys.getpid(),
+    format(Sys.time(), "%Y%m%d%H%M%OS9", tz = "UTC"),
+    deputy_id_state$counter,
+    sep = ":"
+  )
+  hex <- substr(
+    digest::digest(entropy, algo = "sha256", serialize = FALSE),
+    1L,
+    32L
+  )
 
   paste(
-    random_hex(8),
-    random_hex(4),
-    random_hex(4),
-    random_hex(4),
-    random_hex(12),
+    substr(hex, 1L, 8L),
+    substr(hex, 9L, 12L),
+    substr(hex, 13L, 16L),
+    substr(hex, 17L, 20L),
+    substr(hex, 21L, 32L),
     sep = "-"
   )
 }
