@@ -27,6 +27,8 @@ it to spawn sub-agents based on registered AgentDefinitions.
 
 - [`LeadAgent$list_subagents()`](#method-LeadAgent-list_subagents)
 
+- [`LeadAgent$get_subagent_results()`](#method-LeadAgent-get_subagent_results)
+
 - [`LeadAgent$get_subagent_messages()`](#method-LeadAgent-get_subagent_messages)
 
 - [`LeadAgent$print()`](#method-LeadAgent-print)
@@ -85,7 +87,10 @@ Create a new LeadAgent.
       file_checkpoint_max_journal_bytes = 250 * 1024^2,
       working_dir = getwd(),
       setting_sources = NULL,
-      settings = NULL
+      settings = NULL,
+      run_context = list(),
+      agent_id = NULL,
+      agent_name = NULL
     )
 
 #### Arguments
@@ -144,6 +149,19 @@ Create a new LeadAgent.
 
   Optional pre-loaded settings list from claude_settings_load()
 
+- `run_context`:
+
+  Immutable canonical product context inherited by lead runs and
+  delegated agents.
+
+- `agent_id`:
+
+  Optional stable identifier for this LeadAgent instance.
+
+- `agent_name`:
+
+  Optional human-readable LeadAgent name.
+
 #### Returns
 
 A new `LeadAgent` object
@@ -197,6 +215,32 @@ List delegated sub-agent runs, including failures.
 #### Returns
 
 Data frame with one row per sub-agent run
+
+------------------------------------------------------------------------
+
+### `LeadAgent$get_subagent_results()`
+
+Get retained results from delegated sub-agent runs.
+
+#### Usage
+
+    LeadAgent$get_subagent_results(agent_name = NULL, delegation_id = NULL)
+
+#### Arguments
+
+- `agent_name`:
+
+  Optional sub-agent name filter
+
+- `delegation_id`:
+
+  Optional delegation identifier filter
+
+#### Returns
+
+List of
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
+objects or `NULL` entries for failed runs
 
 ------------------------------------------------------------------------
 

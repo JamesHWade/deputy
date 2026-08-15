@@ -46,10 +46,36 @@ occurred during execution.
 
   Unique identifier shared by events from this run
 
+- `agent_id`:
+
+  Immutable identifier for the Agent instance
+
+- `agent_name`:
+
+  Optional human-readable Agent name
+
+- `parent_agent_id`:
+
+  Parent Agent identifier for delegated runs
+
+- `parent_run_id`:
+
+  Parent run identifier for delegated runs
+
+- `delegation_id`:
+
+  Delegation identifier for delegated runs
+
 - `usage`:
 
   Run-scoped
   [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+
+## Active bindings
+
+- `run_context`:
+
+  Canonical product context for the run. Read-only.
 
 ## Methods
 
@@ -90,7 +116,13 @@ Create a new AgentResult object.
       session_id = NULL,
       snapshot_path = NULL,
       run_id = NULL,
-      usage = AgentUsage()
+      usage = AgentUsage(),
+      agent_id = NULL,
+      agent_name = NULL,
+      parent_agent_id = NULL,
+      parent_run_id = NULL,
+      delegation_id = NULL,
+      run_context = list()
     )
 
 #### Arguments
@@ -139,6 +171,30 @@ Create a new AgentResult object.
 
   Run-scoped
   [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+
+- `agent_id`:
+
+  Agent instance identifier (if any)
+
+- `agent_name`:
+
+  Optional human-readable Agent name
+
+- `parent_agent_id`:
+
+  Parent Agent identifier for delegated runs
+
+- `parent_run_id`:
+
+  Parent run identifier for delegated runs
+
+- `delegation_id`:
+
+  Delegation identifier for delegated runs
+
+- `run_context`:
+
+  Immutable product context for this run
 
 #### Returns
 

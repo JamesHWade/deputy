@@ -59,7 +59,13 @@ code-related tasks.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">agent_with_delegation</span><span class="op">(</span><span class="va">chat</span>, permissions <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">agent_with_delegation</span><span class="op">(</span></span>
+<span>  <span class="va">chat</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  agent_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  agent_name <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -72,6 +78,19 @@ code-related tasks.</p>
 
 <dt id="arg-permissions">permissions<a class="anchor" aria-label="anchor" href="#arg-permissions"></a></dt>
 <dd><p>Optional permissions</p></dd>
+
+
+<dt id="arg-run-context">run_context<a class="anchor" aria-label="anchor" href="#arg-run-context"></a></dt>
+<dd><p>Immutable canonical product context for lead and child
+runs.</p></dd>
+
+
+<dt id="arg-agent-id">agent_id<a class="anchor" aria-label="anchor" href="#arg-agent-id"></a></dt>
+<dd><p>Optional stable LeadAgent identifier.</p></dd>
+
+
+<dt id="arg-agent-name">agent_name<a class="anchor" aria-label="anchor" href="#arg-agent-name"></a></dt>
+<dd><p>Optional human-readable LeadAgent name.</p></dd>
 
 </dl></div>
     <div class="section level2">

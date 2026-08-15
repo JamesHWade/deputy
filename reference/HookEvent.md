@@ -19,8 +19,8 @@ Callback signature: `function(tool_name, tool_input, context)`
 
 - `tool_input`: Named list of arguments passed to the tool
 
-- `context`: List containing `working_dir` and `tool_annotations` (if
-  available)
+- `context`: Common correlation fields plus `tool_call_id`,
+  `tool_use_id`, and `tool_annotations` (if available)
 
 - Return:
   [`HookResultPreToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.md)
@@ -37,7 +37,8 @@ Callback signature:
 
 - `tool_error`: Error message if tool failed (or NULL on success)
 
-- `context`: List containing `working_dir` (current directory)
+- `context`: Common correlation fields plus `tool_call_id` and
+  `tool_use_id`
 
 - Return:
   [`HookResultPostToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.md)
@@ -58,8 +59,8 @@ Callback signature: `function(reason, context)`
 - `reason`: Why the agent stopped (for example `"complete"`,
   `"request_limit"`, `"cost_limit"`, or `"provider_error"`)
 
-- `context`: List containing `working_dir`, `usage`, `run_id`, and
-  `cost`; native `run()` also includes `total_turns`
+- `context`: Common correlation fields plus `usage` and `cost`; native
+  `run()` also includes `total_turns`
 
 - Return:
   [`HookResultStop()`](https://jameshwade.github.io/deputy/reference/HookResultStop.md)
@@ -74,7 +75,8 @@ Callback signature: `function(agent_name, task, result, context)`
 
 - `result`: Result returned by the sub-agent
 
-- `context`: List containing `working_dir`
+- `context`: Common correlation fields plus parent/child Agent and run
+  IDs
 
 - Return:
   [`HookResultSubagentStop()`](https://jameshwade.github.io/deputy/reference/HookResultSubagentStop.md)
@@ -87,7 +89,7 @@ Callback signature: `function(agent_name, task, context)`
 
 - `task`: The delegated task
 
-- `context`: List containing `working_dir`
+- `context`: Common correlation fields plus parent/child Agent IDs
 
 **PermissionRequest** - When permission policy denies a tool call
 
@@ -110,7 +112,7 @@ Callback signature: `function(prompt, context)`
 
 - `prompt`: The user's prompt text (character)
 
-- `context`: List containing `working_dir`
+- `context`: Common correlation fields
 
 - Return: NULL (informational only)
 
@@ -120,7 +122,7 @@ Callback signature: `function(message, context)`
 
 - `message`: The notification text (character)
 
-- `context`: List containing `working_dir`, `level`, `code`, and any
+- `context`: Common correlation fields plus `level`, `code`, and any
   event-specific metadata
 
 - Return: NULL (informational only)
@@ -134,7 +136,7 @@ Callback signature: `function(turns_to_compact, turns_to_keep, context)`
 
 - `turns_to_keep`: List of recent turns that will be preserved
 
-- `context`: List containing `working_dir`, `total_turns`,
+- `context`: Common correlation fields plus `total_turns` and
   `compact_count`
 
 - Return:
@@ -145,8 +147,8 @@ Callback signature: `function(turns_to_compact, turns_to_keep, context)`
 
 Callback signature: `function(context)`
 
-- `context`: List containing `working_dir`, `permissions`, `provider`,
-  `tools_count`
+- `context`: Common correlation fields plus `permissions`, `provider`,
+  and `tools_count`
 
 - Return:
   [`HookResultSessionStart()`](https://jameshwade.github.io/deputy/reference/HookResultSessionStart.md)
@@ -158,8 +160,8 @@ Callback signature: `function(reason, context)`
 - `reason`: Why the agent stopped (for example `"complete"`,
   `"request_limit"`, `"cost_limit"`, or `"hook_requested_stop"`)
 
-- `context`: List containing `working_dir`, `usage`, `run_id`, and
-  `cost`; native `run()` also includes `total_turns`
+- `context`: Common correlation fields plus `usage` and `cost`; native
+  `run()` also includes `total_turns`
 
 - Return:
   [`HookResultSessionEnd()`](https://jameshwade.github.io/deputy/reference/HookResultSessionEnd.md)
@@ -170,8 +172,24 @@ The context parameter is always a named list. Common fields:
 
 - `working_dir`: The agent's current working directory
 
+- `run_context`: Immutable canonical product context for the active run
+
+- `agent_id`: Stable identifier for the Agent instance
+
+- `agent_name`: Optional human-readable Agent name
+
+- `parent_agent_id`: Parent Agent identifier for delegated runs
+
+- `parent_run_id`: Parent run identifier for delegated runs
+
+- `delegation_id`: Delegation identifier for delegated runs and tools
+
 - `tool_annotations`: (PreToolUse only) Tool annotations from ellmer if
   available
+
+- `tool_call_id`: Canonical tool lifecycle identifier
+
+- `tool_use_id`: Provider tool identifier retained for compatibility
 
 - `usage`: Run-scoped
   [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)

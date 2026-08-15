@@ -27,11 +27,11 @@ An `AgentEvent` object
 
 - `"start"` - Task started. Contains: `task`
 
-- `"tool_start"` - Tool execution starting. Contains: `tool_name`,
-  `tool_input`
+- `"tool_start"` - Tool execution starting. Contains: `tool_call_id`,
+  `tool_name`, and `tool_input`
 
-- `"tool_end"` - Tool execution completed. Contains: `tool_name`,
-  `tool_result`, `tool_error`
+- `"tool_end"` - Tool execution completed. Contains: `tool_call_id`,
+  `tool_name`, `tool_result`, and `tool_error`
 
 - `"text"` - Text chunk from LLM. Contains: `text`, `is_complete`
 
@@ -53,20 +53,24 @@ An `AgentEvent` object
 - `"stop"` - Agent stopped. Contains: `reason`, `total_turns`, `cost`,
   `usage`, and `run_id`
 
+Run-boundary and tool lifecycle events also carry `agent_id`, `run_id`,
+immutable `run_context`, and delegated-run correlation fields when
+applicable. `tool_use_id` remains as a provider-ID compatibility alias.
+
 ## Examples
 
 ``` r
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-08-15 18:29:21 
+#>   timestamp: 2026-08-15 18:48:23 
 #>   task: Analyze data.csv
 
 # Create a text event
 AgentEvent("text", text = "Hello", is_complete = FALSE
 )
 #> <AgentEvent: text >
-#>   timestamp: 2026-08-15 18:29:21 
+#>   timestamp: 2026-08-15 18:48:23 
 #>   text: Hello
 #>   is_complete: FALSE
 ```

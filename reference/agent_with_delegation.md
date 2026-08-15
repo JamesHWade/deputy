@@ -6,7 +6,13 @@ code-related tasks.
 ## Usage
 
 ``` r
-agent_with_delegation(chat, permissions = NULL)
+agent_with_delegation(
+  chat,
+  permissions = NULL,
+  run_context = list(),
+  agent_id = NULL,
+  agent_name = NULL
+)
 ```
 
 ## Arguments
@@ -18,6 +24,18 @@ agent_with_delegation(chat, permissions = NULL)
 - permissions:
 
   Optional permissions
+
+- run_context:
+
+  Immutable canonical product context for lead and child runs.
+
+- agent_id:
+
+  Optional stable LeadAgent identifier.
+
+- agent_name:
+
+  Optional human-readable LeadAgent name.
 
 ## Value
 

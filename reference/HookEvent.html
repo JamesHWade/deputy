@@ -70,32 +70,33 @@ type has a specific callback signature and context structure.</p>
 <p><strong>PreToolUse</strong> - Before a tool is executed (can deny)</p>
 <p>Callback signature: <code>function(tool_name, tool_input, context)</code></p><ul><li><p><code>tool_name</code>: Name of the tool being called (character)</p></li>
 <li><p><code>tool_input</code>: Named list of arguments passed to the tool</p></li>
-<li><p><code>context</code>: List containing <code>working_dir</code> and <code>tool_annotations</code> (if available)</p></li>
+<li><p><code>context</code>: Common correlation fields plus <code>tool_call_id</code>, <code>tool_use_id</code>,
+and <code>tool_annotations</code> (if available)</p></li>
 <li><p>Return: <code><a href="HookResultPreToolUse.html">HookResultPreToolUse()</a></code> to allow/deny</p></li>
 </ul><p><strong>PostToolUse</strong> - After a tool completes</p>
 <p>Callback signature: <code>function(tool_name, tool_result, tool_error, context)</code></p><ul><li><p><code>tool_name</code>: Name of the tool that was called (character)</p></li>
 <li><p><code>tool_result</code>: Result returned by the tool (or NULL on error)</p></li>
 <li><p><code>tool_error</code>: Error message if tool failed (or NULL on success)</p></li>
-<li><p><code>context</code>: List containing <code>working_dir</code> (current directory)</p></li>
+<li><p><code>context</code>: Common correlation fields plus <code>tool_call_id</code> and <code>tool_use_id</code></p></li>
 <li><p>Return: <code><a href="HookResultPostToolUse.html">HookResultPostToolUse()</a></code> to continue/stop</p></li>
 </ul><p><strong>PostToolUseFailure</strong> - After a tool reports an error</p>
 <p>Callback signature: <code>function(tool_name, tool_result, tool_error, context)</code></p><ul><li><p>Same arguments as PostToolUse, fired only when <code>tool_error</code> is not NULL</p></li>
 </ul><p><strong>Stop</strong> - When the agent stops</p>
 <p>Callback signature: <code>function(reason, context)</code></p><ul><li><p><code>reason</code>: Why the agent stopped (for example <code>"complete"</code>,
 <code>"request_limit"</code>, <code>"cost_limit"</code>, or <code>"provider_error"</code>)</p></li>
-<li><p><code>context</code>: List containing <code>working_dir</code>, <code>usage</code>, <code>run_id</code>, and <code>cost</code>;
-native <code>run()</code> also includes <code>total_turns</code></p></li>
+<li><p><code>context</code>: Common correlation fields plus <code>usage</code> and <code>cost</code>; native
+<code>run()</code> also includes <code>total_turns</code></p></li>
 <li><p>Return: <code><a href="HookResultStop.html">HookResultStop()</a></code></p></li>
 </ul><p><strong>SubagentStop</strong> - When a sub-agent completes (LeadAgent only)</p>
 <p>Callback signature: <code>function(agent_name, task, result, context)</code></p><ul><li><p><code>agent_name</code>: Name of the sub-agent that completed (character)</p></li>
 <li><p><code>task</code>: The task that was delegated (character)</p></li>
 <li><p><code>result</code>: Result returned by the sub-agent</p></li>
-<li><p><code>context</code>: List containing <code>working_dir</code></p></li>
+<li><p><code>context</code>: Common correlation fields plus parent/child Agent and run IDs</p></li>
 <li><p>Return: <code><a href="HookResultSubagentStop.html">HookResultSubagentStop()</a></code></p></li>
 </ul><p><strong>SubagentStart</strong> - When a delegated sub-agent starts (LeadAgent only)</p>
 <p>Callback signature: <code>function(agent_name, task, context)</code></p><ul><li><p><code>agent_name</code>: Name of the sub-agent that started</p></li>
 <li><p><code>task</code>: The delegated task</p></li>
-<li><p><code>context</code>: List containing <code>working_dir</code></p></li>
+<li><p><code>context</code>: Common correlation fields plus parent/child Agent IDs</p></li>
 </ul><p><strong>PermissionRequest</strong> - When permission policy denies a tool call</p>
 <p>Callback signature: <code>function(tool_name, tool_input, permission_result, context)</code></p><ul><li><p>Return: <code><a href="PermissionResultAllow.html">PermissionResultAllow()</a></code> to override the denial, or
 <code><a href="PermissionResultDeny.html">PermissionResultDeny()</a></code> to replace the denial reason</p></li>
@@ -103,26 +104,27 @@ native <code>run()</code> also includes <code>total_turns</code></p></li>
 <p>Callback signature: <code>function(key, old_value, new_value, context)</code></p>
 <p><strong>UserPromptSubmit</strong> - When a user prompt is submitted</p>
 <p>Callback signature: <code>function(prompt, context)</code></p><ul><li><p><code>prompt</code>: The user's prompt text (character)</p></li>
-<li><p><code>context</code>: List containing <code>working_dir</code></p></li>
+<li><p><code>context</code>: Common correlation fields</p></li>
 <li><p>Return: NULL (informational only)</p></li>
 </ul><p><strong>Notification</strong> - Informational runtime notice</p>
 <p>Callback signature: <code>function(message, context)</code></p><ul><li><p><code>message</code>: The notification text (character)</p></li>
-<li><p><code>context</code>: List containing <code>working_dir</code>, <code>level</code>, <code>code</code>, and any
+<li><p><code>context</code>: Common correlation fields plus <code>level</code>, <code>code</code>, and any
 event-specific metadata</p></li>
 <li><p>Return: NULL (informational only)</p></li>
 </ul><p><strong>PreCompact</strong> - Before conversation compaction</p>
 <p>Callback signature: <code>function(turns_to_compact, turns_to_keep, context)</code></p><ul><li><p><code>turns_to_compact</code>: List of turns that will be compacted into a summary</p></li>
 <li><p><code>turns_to_keep</code>: List of recent turns that will be preserved</p></li>
-<li><p><code>context</code>: List containing <code>working_dir</code>, <code>total_turns</code>, <code>compact_count</code></p></li>
+<li><p><code>context</code>: Common correlation fields plus <code>total_turns</code> and <code>compact_count</code></p></li>
 <li><p>Return: <code><a href="HookResultPreCompact.html">HookResultPreCompact()</a></code> to allow/cancel or provide custom summary</p></li>
 </ul><p><strong>SessionStart</strong> - When an agent session begins</p>
-<p>Callback signature: <code>function(context)</code></p><ul><li><p><code>context</code>: List containing <code>working_dir</code>, <code>permissions</code>, <code>provider</code>, <code>tools_count</code></p></li>
+<p>Callback signature: <code>function(context)</code></p><ul><li><p><code>context</code>: Common correlation fields plus <code>permissions</code>, <code>provider</code>, and
+<code>tools_count</code></p></li>
 <li><p>Return: <code><a href="HookResultSessionStart.html">HookResultSessionStart()</a></code></p></li>
 </ul><p><strong>SessionEnd</strong> - When an agent session ends</p>
 <p>Callback signature: <code>function(reason, context)</code></p><ul><li><p><code>reason</code>: Why the agent stopped (for example <code>"complete"</code>,
 <code>"request_limit"</code>, <code>"cost_limit"</code>, or <code>"hook_requested_stop"</code>)</p></li>
-<li><p><code>context</code>: List containing <code>working_dir</code>, <code>usage</code>, <code>run_id</code>, and <code>cost</code>;
-native <code>run()</code> also includes <code>total_turns</code></p></li>
+<li><p><code>context</code>: Common correlation fields plus <code>usage</code> and <code>cost</code>; native
+<code>run()</code> also includes <code>total_turns</code></p></li>
 <li><p>Return: <code><a href="HookResultSessionEnd.html">HookResultSessionEnd()</a></code></p></li>
 </ul></div>
     <div class="section level2">
@@ -131,7 +133,15 @@ native <code>run()</code> also includes <code>total_turns</code></p></li>
 
 
 <p>The context parameter is always a named list. Common fields:</p><ul><li><p><code>working_dir</code>: The agent's current working directory</p></li>
+<li><p><code>run_context</code>: Immutable canonical product context for the active run</p></li>
+<li><p><code>agent_id</code>: Stable identifier for the Agent instance</p></li>
+<li><p><code>agent_name</code>: Optional human-readable Agent name</p></li>
+<li><p><code>parent_agent_id</code>: Parent Agent identifier for delegated runs</p></li>
+<li><p><code>parent_run_id</code>: Parent run identifier for delegated runs</p></li>
+<li><p><code>delegation_id</code>: Delegation identifier for delegated runs and tools</p></li>
 <li><p><code>tool_annotations</code>: (PreToolUse only) Tool annotations from ellmer if available</p></li>
+<li><p><code>tool_call_id</code>: Canonical tool lifecycle identifier</p></li>
+<li><p><code>tool_use_id</code>: Provider tool identifier retained for compatibility</p></li>
 <li><p><code>usage</code>: Run-scoped <a href="AgentUsage.html">AgentUsage</a> for tool and terminal lifecycle hooks</p></li>
 <li><p><code>usage_limits</code>: Active <a href="UsageLimits.html">UsageLimits</a> for tool lifecycle hooks</p></li>
 <li><p><code>run_id</code>: Identifier for the active run</p></li>
