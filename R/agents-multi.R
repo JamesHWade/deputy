@@ -140,6 +140,10 @@ LeadAgent <- R6::R6Class(
     #' @param working_dir Working directory
     #' @param setting_sources Optional Claude-style setting sources
     #' @param settings Optional pre-loaded settings list from claude_settings_load()
+    #' @param run_context Immutable canonical product context inherited by lead
+    #'   runs and delegated agents.
+    #' @param agent_id Optional stable identifier for this LeadAgent instance.
+    #' @param agent_name Optional human-readable LeadAgent name.
     #' @return A new `LeadAgent` object
     initialize = function(
       chat,
@@ -153,7 +157,10 @@ LeadAgent <- R6::R6Class(
       file_checkpoint_max_journal_bytes = 250 * 1024^2,
       working_dir = getwd(),
       setting_sources = NULL,
-      settings = NULL
+      settings = NULL,
+      run_context = list(),
+      agent_id = NULL,
+      agent_name = NULL
     ) {
       # Validate sub-agent definitions
       for (def in sub_agents) {
@@ -185,7 +192,10 @@ LeadAgent <- R6::R6Class(
         file_checkpoint_max_journal_bytes = file_checkpoint_max_journal_bytes,
         working_dir = working_dir,
         setting_sources = setting_sources,
-        settings = settings
+        settings = settings,
+        run_context = run_context,
+        agent_id = agent_id,
+        agent_name = agent_name
       )
     },
 
@@ -229,7 +239,13 @@ LeadAgent <- R6::R6Class(
       if (length(runs) == 0) {
         return(data.frame(
           agent_name = character(),
+          agent_id = character(),
+          parent_agent_id = character(),
           session_id = character(),
+          run_id = character(),
+          parent_run_id = character(),
+          delegation_id = character(),
+          tool_call_id = character(),
           task = character(),
           status = character(),
           started_at = as.POSIXct(character()),
@@ -244,7 +260,13 @@ LeadAgent <- R6::R6Class(
         lapply(runs, function(run) {
           data.frame(
             agent_name = run$agent_name,
+            agent_id = run$agent_id %||% NA_character_,
+            parent_agent_id = run$parent_agent_id %||% NA_character_,
             session_id = run$session_id %||% NA_character_,
+            run_id = run$run_id %||% NA_character_,
+            parent_run_id = run$parent_run_id %||% NA_character_,
+            delegation_id = run$delegation_id %||% NA_character_,
+            tool_call_id = run$tool_call_id %||% NA_character_,
             task = run$task,
             status = run$status %||% "completed",
             started_at = as.POSIXct(run$started_at, tz = "UTC"),
@@ -254,6 +276,29 @@ LeadAgent <- R6::R6Class(
           )
         })
       )
+    },
+
+    #' @description
+    #' Get retained results from delegated sub-agent runs.
+    #'
+    #' @param agent_name Optional sub-agent name filter
+    #' @param delegation_id Optional delegation identifier filter
+    #' @return List of [AgentResult] objects or `NULL` entries for failed runs
+    get_subagent_results = function(agent_name = NULL, delegation_id = NULL) {
+      runs <- private$subagent_runs
+      if (!is.null(agent_name)) {
+        runs <- Filter(
+          function(run) identical(run$agent_name, agent_name),
+          runs
+        )
+      }
+      if (!is.null(delegation_id)) {
+        runs <- Filter(
+          function(run) identical(run$delegation_id, delegation_id),
+          runs
+        )
+      }
+      lapply(runs, function(run) run$agent_result)
     },
 
     #' @description
@@ -359,6 +404,8 @@ LeadAgent <- R6::R6Class(
 
       ellmer::tool(
         fun = function(agent_name, task) {
+          correlation <- private$claim_delegation()
+
           # Find the agent definition
           def <- NULL
           for (d in lead_agent$sub_agent_defs) {
@@ -380,7 +427,7 @@ LeadAgent <- R6::R6Class(
           }
 
           # Create the sub-agent
-          sub_agent <- private$create_sub_agent(def)
+          sub_agent <- private$create_sub_agent(def, correlation)
 
           # Run the task
           cli::cli_alert_info("Delegating to {.val {agent_name}}: {task}")
@@ -390,9 +437,15 @@ LeadAgent <- R6::R6Class(
             "SubagentStart",
             agent_name = agent_name,
             task = task,
-            context = list(
-              working_dir = lead_agent$working_dir,
-              agent_definition = def
+            context = private$hook_context(
+              agent_definition = def,
+              tool_call_id = correlation$tool_call_id,
+              parent_agent_id = correlation$parent_agent_id,
+              parent_run_id = correlation$parent_run_id,
+              child_agent_id = sub_agent$agent_id,
+              child_agent_name = sub_agent$agent_name,
+              child_run_context = sub_agent$run_context,
+              delegation_id = correlation$delegation_id
             )
           )
 
@@ -409,20 +462,32 @@ LeadAgent <- R6::R6Class(
             status,
             result_text = NULL,
             error = NULL,
-            usage = NULL
+            usage = NULL,
+            agent_result = NULL
           ) {
+            child_run_id <- agent_result$run_id %||%
+              sub_agent$.__enclos_env__$private$current_run_id
             private$subagent_runs <- c(
               private$subagent_runs,
               list(list(
                 agent_name = agent_name,
+                agent_id = sub_agent$agent_id,
+                parent_agent_id = correlation$parent_agent_id,
                 task = task,
                 session_id = sub_agent$session_id(),
+                run_id = child_run_id,
+                parent_run_id = correlation$parent_run_id,
+                delegation_id = correlation$delegation_id,
+                tool_call_id = correlation$tool_call_id,
+                run_context = agent_result$run_context %||%
+                  sub_agent$run_context,
                 started_at = started_at,
                 completed_at = Sys.time(),
                 status = status,
                 result = result_text,
                 error = error,
                 usage = usage,
+                agent_result = agent_result,
                 turns = tryCatch(sub_agent$turns(), error = function(e) list())
               ))
             )
@@ -445,17 +510,26 @@ LeadAgent <- R6::R6Class(
               record_run(
                 status = "failed",
                 error = e$message,
-                usage = failed_usage
+                usage = failed_usage,
+                agent_result = NULL
               )
+              child_run_id <- sub_agent$.__enclos_env__$private$current_run_id
               lead_agent$hooks$fire(
                 "SubagentStop",
                 agent_name = agent_name,
                 task = task,
                 result = NULL,
-                context = list(
-                  working_dir = lead_agent$working_dir,
+                context = private$hook_context(
                   status = "failed",
-                  error = e$message
+                  error = e$message,
+                  tool_call_id = correlation$tool_call_id,
+                  parent_agent_id = correlation$parent_agent_id,
+                  parent_run_id = correlation$parent_run_id,
+                  child_agent_id = sub_agent$agent_id,
+                  child_agent_name = sub_agent$agent_name,
+                  child_run_id = child_run_id,
+                  child_run_context = sub_agent$run_context,
+                  delegation_id = correlation$delegation_id
                 )
               )
               ellmer::tool_reject(paste0(
@@ -474,16 +548,24 @@ LeadAgent <- R6::R6Class(
             agent_name = agent_name,
             task = task,
             result = result,
-            context = list(
-              working_dir = lead_agent$working_dir,
-              status = "completed"
+            context = private$hook_context(
+              status = "completed",
+              tool_call_id = correlation$tool_call_id,
+              parent_agent_id = correlation$parent_agent_id,
+              parent_run_id = correlation$parent_run_id,
+              child_agent_id = sub_agent$agent_id,
+              child_agent_name = sub_agent$agent_name,
+              child_run_id = sub_result$run_id,
+              child_run_context = sub_result$run_context,
+              delegation_id = correlation$delegation_id
             )
           )
 
           record_run(
             status = "completed",
             result_text = result,
-            usage = sub_result$usage
+            usage = sub_result$usage,
+            agent_result = sub_result
           )
 
           result
@@ -504,7 +586,9 @@ LeadAgent <- R6::R6Class(
     },
 
     # Create a sub-agent from a definition
-    create_sub_agent = function(def) {
+    create_sub_agent = function(def, correlation = NULL) {
+      correlation <- correlation %||% private$claim_delegation()
+
       # Get the model to use
       if (def$model == "inherit") {
         # Clone the parent chat to get the same provider/model config,
@@ -554,14 +638,26 @@ LeadAgent <- R6::R6Class(
       }
 
       # Create the sub-agent
+      child_run_context <- merge_run_context(
+        correlation$run_context,
+        list(role = def$name)
+      )
       sub_agent <- Agent$new(
         chat = sub_chat,
         tools = sub_tools,
         system_prompt = sub_prompt,
         permissions = sub_permissions,
         usage_limits = private$derive_subagent_usage_limits(def),
-        working_dir = self$working_dir
+        working_dir = self$working_dir,
+        run_context = child_run_context,
+        agent_name = def$name
       )
+      sub_agent$.__enclos_env__$private$.parent_agent_id <-
+        correlation$parent_agent_id
+      sub_agent$.__enclos_env__$private$.parent_run_id <-
+        correlation$parent_run_id
+      sub_agent$.__enclos_env__$private$.delegation_id <-
+        correlation$delegation_id
       # A checkpoint describes workspace state, not one agent's private
       # execution history. Delegated agents therefore write to the exact same
       # journal as the lead so a lead-level rewind includes child mutations.
@@ -702,6 +798,10 @@ LeadAgent <- R6::R6Class(
 #'
 #' @param chat An ellmer Chat object
 #' @param permissions Optional permissions
+#' @param run_context Immutable canonical product context for lead and child
+#'   runs.
+#' @param agent_id Optional stable LeadAgent identifier.
+#' @param agent_name Optional human-readable LeadAgent name.
 #' @return A [LeadAgent] object
 #'
 #' @examples
@@ -714,7 +814,13 @@ LeadAgent <- R6::R6Class(
 #' }
 #'
 #' @export
-agent_with_delegation <- function(chat, permissions = NULL) {
+agent_with_delegation <- function(
+  chat,
+  permissions = NULL,
+  run_context = list(),
+  agent_id = NULL,
+  agent_name = NULL
+) {
   # Define common sub-agents
   code_reader <- agent_definition(
     name = "code_reader",
@@ -734,6 +840,9 @@ agent_with_delegation <- function(chat, permissions = NULL) {
     chat = chat,
     sub_agents = list(code_reader, code_analyzer),
     tools = tools_file(),
-    permissions = permissions
+    permissions = permissions,
+    run_context = run_context,
+    agent_id = agent_id,
+    agent_name = agent_name
   )
 }

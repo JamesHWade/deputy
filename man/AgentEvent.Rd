@@ -22,8 +22,10 @@ updates on agent progress.
 
 \itemize{
 \item \code{"start"} - Task started. Contains: \code{task}
-\item \code{"tool_start"} - Tool execution starting. Contains: \code{tool_name}, \code{tool_input}
-\item \code{"tool_end"} - Tool execution completed. Contains: \code{tool_name}, \code{tool_result}, \code{tool_error}
+\item \code{"tool_start"} - Tool execution starting. Contains: \code{tool_call_id},
+\code{tool_name}, and \code{tool_input}
+\item \code{"tool_end"} - Tool execution completed. Contains: \code{tool_call_id},
+\code{tool_name}, \code{tool_result}, and \code{tool_error}
 \item \code{"text"} - Text chunk from LLM. Contains: \code{text}, \code{is_complete}
 \item \code{"text_complete"} - Full text response. Contains: \code{text}
 \item \code{"turn"} - Turn completed. Contains: \code{turn}, \code{turn_number}
@@ -36,6 +38,10 @@ updates on agent progress.
 \item \code{"stop"} - Agent stopped. Contains: \code{reason}, \code{total_turns}, \code{cost},
 \code{usage}, and \code{run_id}
 }
+
+Run-boundary and tool lifecycle events also carry \code{agent_id}, \code{run_id},
+immutable \code{run_context}, and delegated-run correlation fields when
+applicable. \code{tool_use_id} remains as a provider-ID compatibility alias.
 }
 
 \examples{

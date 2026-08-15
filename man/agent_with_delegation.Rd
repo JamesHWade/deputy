@@ -4,12 +4,25 @@
 \alias{agent_with_delegation}
 \title{Create a simple delegation agent}
 \usage{
-agent_with_delegation(chat, permissions = NULL)
+agent_with_delegation(
+  chat,
+  permissions = NULL,
+  run_context = list(),
+  agent_id = NULL,
+  agent_name = NULL
+)
 }
 \arguments{
 \item{chat}{An ellmer Chat object}
 
 \item{permissions}{Optional permissions}
+
+\item{run_context}{Immutable canonical product context for lead and child
+runs.}
+
+\item{agent_id}{Optional stable LeadAgent identifier.}
+
+\item{agent_name}{Optional human-readable LeadAgent name.}
 }
 \value{
 A \link{LeadAgent} object

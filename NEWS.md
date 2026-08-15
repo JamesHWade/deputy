@@ -5,6 +5,12 @@
   interactive modes now consume streaming generators correctly, report tool
   failures, and restore persisted sessions from an installed package.
 
+* `Agent$new()` and per-run methods now accept immutable, canonical
+  JSON-compatible `run_context`. Results, hooks, session snapshots, and
+  delegated agents retain that context, while paired tool events and delegated
+  results expose Agent, run, parent, tool-call, and delegation identifiers.
+  Generated correlation identifiers no longer advance R's global RNG stream.
+
 * `Agent$provider()` no longer errors with "Can't get S7 properties with `$`"
   against current ellmer. ellmer moved `model` off `Provider` onto a new `Model`
   class, so `provider@model` fails for every provider and the `$` fallback threw

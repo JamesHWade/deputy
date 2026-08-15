@@ -12,8 +12,10 @@
 #'
 #' @section Event Types:
 #' * `"start"` - Task started. Contains: `task`
-#' * `"tool_start"` - Tool execution starting. Contains: `tool_name`, `tool_input`
-#' * `"tool_end"` - Tool execution completed. Contains: `tool_name`, `tool_result`, `tool_error`
+#' * `"tool_start"` - Tool execution starting. Contains: `tool_call_id`,
+#'   `tool_name`, and `tool_input`
+#' * `"tool_end"` - Tool execution completed. Contains: `tool_call_id`,
+#'   `tool_name`, `tool_result`, and `tool_error`
 #' * `"text"` - Text chunk from LLM. Contains: `text`, `is_complete`
 #' * `"text_complete"` - Full text response. Contains: `text`
 #' * `"turn"` - Turn completed. Contains: `turn`, `turn_number`
@@ -25,6 +27,10 @@
 #' * `"usage"` - Run usage snapshot. Contains: `usage`, `limits`
 #' * `"stop"` - Agent stopped. Contains: `reason`, `total_turns`, `cost`,
 #'   `usage`, and `run_id`
+#'
+#' Run-boundary and tool lifecycle events also carry `agent_id`, `run_id`,
+#' immutable `run_context`, and delegated-run correlation fields when
+#' applicable. `tool_use_id` remains as a provider-ID compatibility alias.
 #'
 #' @examples
 #' # Create a start event
@@ -142,6 +148,21 @@ AgentResult <- R6::R6Class(
     #' @field run_id Unique identifier shared by events from this run
     run_id = NULL,
 
+    #' @field agent_id Immutable identifier for the Agent instance
+    agent_id = NULL,
+
+    #' @field agent_name Optional human-readable Agent name
+    agent_name = NULL,
+
+    #' @field parent_agent_id Parent Agent identifier for delegated runs
+    parent_agent_id = NULL,
+
+    #' @field parent_run_id Parent run identifier for delegated runs
+    parent_run_id = NULL,
+
+    #' @field delegation_id Delegation identifier for delegated runs
+    delegation_id = NULL,
+
     #' @field usage Run-scoped [AgentUsage]
     usage = NULL,
 
@@ -159,6 +180,12 @@ AgentResult <- R6::R6Class(
     #' @param snapshot_path Latest compat snapshot path (if any)
     #' @param run_id Unique run identifier (if any)
     #' @param usage Run-scoped [AgentUsage]
+    #' @param agent_id Agent instance identifier (if any)
+    #' @param agent_name Optional human-readable Agent name
+    #' @param parent_agent_id Parent Agent identifier for delegated runs
+    #' @param parent_run_id Parent run identifier for delegated runs
+    #' @param delegation_id Delegation identifier for delegated runs
+    #' @param run_context Immutable product context for this run
     #' @return A new `AgentResult` object
     initialize = function(
       response = NULL,
@@ -171,7 +198,13 @@ AgentResult <- R6::R6Class(
       session_id = NULL,
       snapshot_path = NULL,
       run_id = NULL,
-      usage = AgentUsage()
+      usage = AgentUsage(),
+      agent_id = NULL,
+      agent_name = NULL,
+      parent_agent_id = NULL,
+      parent_run_id = NULL,
+      delegation_id = NULL,
+      run_context = list()
     ) {
       self$response <- response
       self$turns <- turns
@@ -183,6 +216,12 @@ AgentResult <- R6::R6Class(
       self$session_id <- session_id
       self$snapshot_path <- snapshot_path
       self$run_id <- run_id
+      self$agent_id <- agent_id
+      self$agent_name <- agent_name
+      self$parent_agent_id <- parent_agent_id
+      self$parent_run_id <- parent_run_id
+      self$delegation_id <- delegation_id
+      private$.run_context <- normalize_run_context(run_context)
       self$usage <- usage
     },
 
@@ -247,6 +286,12 @@ AgentResult <- R6::R6Class(
       if (!is.null(self$run_id)) {
         cat("  run_id:", self$run_id, "\n")
       }
+      if (!is.null(self$agent_id)) {
+        cat("  agent_id:", self$agent_id, "\n")
+      }
+      if (!is.null(self$delegation_id)) {
+        cat("  delegation_id:", self$delegation_id, "\n")
+      }
       if (!is.null(self$usage)) {
         cat("  requests:", self$usage$requests, "\n")
         cat("  tokens:", self$usage$total_tokens, "\n")
@@ -267,5 +312,19 @@ AgentResult <- R6::R6Class(
 
       invisible(self)
     }
+  ),
+
+  active = list(
+    #' @field run_context Canonical product context for the run. Read-only.
+    run_context = function(value) {
+      if (missing(value)) {
+        return(clone_run_context(private$.run_context))
+      }
+      cli_abort("Cannot modify AgentResult: run_context is immutable")
+    }
+  ),
+
+  private = list(
+    .run_context = list()
   )
 )

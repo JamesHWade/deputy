@@ -13,7 +13,8 @@
 #' Callback signature: `function(tool_name, tool_input, context)`
 #' - `tool_name`: Name of the tool being called (character)
 #' - `tool_input`: Named list of arguments passed to the tool
-#' - `context`: List containing `working_dir` and `tool_annotations` (if available)
+#' - `context`: Common correlation fields plus `tool_call_id`, `tool_use_id`,
+#'   and `tool_annotations` (if available)
 #' - Return: [HookResultPreToolUse()] to allow/deny
 #'
 #' **PostToolUse** - After a tool completes
@@ -22,7 +23,7 @@
 #' - `tool_name`: Name of the tool that was called (character)
 #' - `tool_result`: Result returned by the tool (or NULL on error)
 #' - `tool_error`: Error message if tool failed (or NULL on success)
-#' - `context`: List containing `working_dir` (current directory)
+#' - `context`: Common correlation fields plus `tool_call_id` and `tool_use_id`
 #' - Return: [HookResultPostToolUse()] to continue/stop
 #'
 #' **PostToolUseFailure** - After a tool reports an error
@@ -35,8 +36,8 @@
 #' Callback signature: `function(reason, context)`
 #' - `reason`: Why the agent stopped (for example `"complete"`,
 #'   `"request_limit"`, `"cost_limit"`, or `"provider_error"`)
-#' - `context`: List containing `working_dir`, `usage`, `run_id`, and `cost`;
-#'   native `run()` also includes `total_turns`
+#' - `context`: Common correlation fields plus `usage` and `cost`; native
+#'   `run()` also includes `total_turns`
 #' - Return: [HookResultStop()]
 #'
 #' **SubagentStop** - When a sub-agent completes (LeadAgent only)
@@ -45,7 +46,7 @@
 #' - `agent_name`: Name of the sub-agent that completed (character)
 #' - `task`: The task that was delegated (character)
 #' - `result`: Result returned by the sub-agent
-#' - `context`: List containing `working_dir`
+#' - `context`: Common correlation fields plus parent/child Agent and run IDs
 #' - Return: [HookResultSubagentStop()]
 #'
 #' **SubagentStart** - When a delegated sub-agent starts (LeadAgent only)
@@ -53,7 +54,7 @@
 #' Callback signature: `function(agent_name, task, context)`
 #' - `agent_name`: Name of the sub-agent that started
 #' - `task`: The delegated task
-#' - `context`: List containing `working_dir`
+#' - `context`: Common correlation fields plus parent/child Agent IDs
 #'
 #' **PermissionRequest** - When permission policy denies a tool call
 #'
@@ -69,14 +70,14 @@
 #'
 #' Callback signature: `function(prompt, context)`
 #' - `prompt`: The user's prompt text (character)
-#' - `context`: List containing `working_dir`
+#' - `context`: Common correlation fields
 #' - Return: NULL (informational only)
 #'
 #' **Notification** - Informational runtime notice
 #'
 #' Callback signature: `function(message, context)`
 #' - `message`: The notification text (character)
-#' - `context`: List containing `working_dir`, `level`, `code`, and any
+#' - `context`: Common correlation fields plus `level`, `code`, and any
 #'   event-specific metadata
 #' - Return: NULL (informational only)
 #'
@@ -85,13 +86,14 @@
 #' Callback signature: `function(turns_to_compact, turns_to_keep, context)`
 #' - `turns_to_compact`: List of turns that will be compacted into a summary
 #' - `turns_to_keep`: List of recent turns that will be preserved
-#' - `context`: List containing `working_dir`, `total_turns`, `compact_count`
+#' - `context`: Common correlation fields plus `total_turns` and `compact_count`
 #' - Return: [HookResultPreCompact()] to allow/cancel or provide custom summary
 #'
 #' **SessionStart** - When an agent session begins
 #'
 #' Callback signature: `function(context)`
-#' - `context`: List containing `working_dir`, `permissions`, `provider`, `tools_count`
+#' - `context`: Common correlation fields plus `permissions`, `provider`, and
+#'   `tools_count`
 #' - Return: [HookResultSessionStart()]
 #'
 #' **SessionEnd** - When an agent session ends
@@ -99,15 +101,23 @@
 #' Callback signature: `function(reason, context)`
 #' - `reason`: Why the agent stopped (for example `"complete"`,
 #'   `"request_limit"`, `"cost_limit"`, or `"hook_requested_stop"`)
-#' - `context`: List containing `working_dir`, `usage`, `run_id`, and `cost`;
-#'   native `run()` also includes `total_turns`
+#' - `context`: Common correlation fields plus `usage` and `cost`; native
+#'   `run()` also includes `total_turns`
 #' - Return: [HookResultSessionEnd()]
 #'
 #' @section Context Structure:
 #'
 #' The context parameter is always a named list. Common fields:
 #' - `working_dir`: The agent's current working directory
+#' - `run_context`: Immutable canonical product context for the active run
+#' - `agent_id`: Stable identifier for the Agent instance
+#' - `agent_name`: Optional human-readable Agent name
+#' - `parent_agent_id`: Parent Agent identifier for delegated runs
+#' - `parent_run_id`: Parent run identifier for delegated runs
+#' - `delegation_id`: Delegation identifier for delegated runs and tools
 #' - `tool_annotations`: (PreToolUse only) Tool annotations from ellmer if available
+#' - `tool_call_id`: Canonical tool lifecycle identifier
+#' - `tool_use_id`: Provider tool identifier retained for compatibility
 #' - `usage`: Run-scoped [AgentUsage] for tool and terminal lifecycle hooks
 #' - `usage_limits`: Active [UsageLimits] for tool lifecycle hooks
 #' - `run_id`: Identifier for the active run
