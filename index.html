@@ -160,18 +160,22 @@
 <span><span class="op">}</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="cli-execdeputy">CLI (<code>exec/deputy</code>)<a class="anchor" aria-label="anchor" href="#cli-execdeputy"></a>
+<h3 id="cli-execdeputyr">CLI (<code>exec/deputy.R</code>)<a class="anchor" aria-label="anchor" href="#cli-execdeputyr"></a>
 </h3>
-<p>deputy ships an executable CLI app at <code>exec/deputy</code> (Rapp front-end). Install launchers with:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<p>deputy ships a <a href="https://github.com/r-lib/Rapp" class="external-link">Rapp</a> package executable that works with <a href="https://r-lib.github.io/ir/tools.html" class="external-link"><code>ir</code></a>. Install <code>ir</code> once, then run the package directly from GitHub without installing deputy globally:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="ex">uv</span> tool install r-lib-ir</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="ex">rx</span> <span class="at">--from</span> github::JamesHWade/deputy deputy <span class="at">--help</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="ex">rx</span> <span class="at">--from</span> github::JamesHWade/deputy deputy <span class="dt">\</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">--provider</span> openai <span class="st">"Summarize the R files in this project"</span></span></code></pre></div>
+<p>For a persistent <code>deputy</code> command, install its launcher:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="ex">ir</span> tool install github::JamesHWade/deputy</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--provider</span> openai <span class="at">--model</span> gpt-4o <span class="at">--tools</span> standard</span></code></pre></div>
+<p>If deputy is already installed in an R library, Rapp can install the same launcher:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">Rapp</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Rapp/man/install_pkg_cli_apps.html" class="external-link">install_pkg_cli_apps</a></span><span class="op">(</span><span class="st">"deputy"</span><span class="op">)</span></span></code></pre></div>
-<p>Then run:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--provider</span> openai <span class="at">--model</span> gpt-4o <span class="at">--tools</span> standard</span></code></pre></div>
-<p>Single-task mode (non-interactive):</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">-x</span> <span class="st">"Summarize the R files in this project"</span></span></code></pre></div>
-<p>Common options include short aliases (<code>-p</code>, <code>-m</code>, <code>-t</code>, <code>-P</code>, <code>-n</code>, <code>-c</code>, <code>-d</code>, <code>-v</code>, etc.), and repeatable flags for Rapp 0.3 style inputs:</p>
+<p>The optional positional task selects non-interactive mode; omit it to start an interactive session. Common options include short aliases (<code>-p</code>, <code>-m</code>, <code>-t</code>, <code>-P</code>, <code>-n</code>, <code>-c</code>, <code>-d</code>, <code>-v</code>, etc.) and repeatable Rapp 0.4 flags:</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--setting-source</span> project <span class="at">--setting-source</span> user</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--mcp-server</span> github <span class="at">--mcp-server</span> slack</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--mcp</span> <span class="at">--mcp-server</span> github <span class="at">--mcp-server</span> slack</span>
 <span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--debug</span> <span class="at">--debug-file</span> /tmp/deputy-debug.log</span></code></pre></div>
 <p><code>--mcp-servers "github,slack"</code> is still accepted for backward compatibility, but <code>--mcp-server</code> is preferred.</p>
 <p>Claude-compatible session controls are available when you want persistent session ids and resume or fork behavior:</p>

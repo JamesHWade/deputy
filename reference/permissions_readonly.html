@@ -59,7 +59,7 @@ All write operations, code execution, and web access are denied.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">permissions_readonly</span><span class="op">(</span>max_turns <span class="op">=</span> <span class="fl">25</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">permissions_readonly</span><span class="op">(</span>max_turns <span class="op">=</span> <span class="fl">25</span>, max_cost_usd <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -68,6 +68,10 @@ All write operations, code execution, and web access are denied.</p>
 
 <dl><dt id="arg-max-turns">max_turns<a class="anchor" aria-label="anchor" href="#arg-max-turns"></a></dt>
 <dd><p>Maximum number of turns (default 25)</p></dd>
+
+
+<dt id="arg-max-cost-usd">max_cost_usd<a class="anchor" aria-label="anchor" href="#arg-max-cost-usd"></a></dt>
+<dd><p>Maximum cost in USD (default NULL = unlimited)</p></dd>
 
 </dl></div>
     <div class="section level2">

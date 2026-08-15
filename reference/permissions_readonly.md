@@ -6,7 +6,7 @@ operations, code execution, and web access are denied.
 ## Usage
 
 ``` r
-permissions_readonly(max_turns = 25)
+permissions_readonly(max_turns = 25, max_cost_usd = NULL)
 ```
 
 ## Arguments
@@ -14,6 +14,10 @@ permissions_readonly(max_turns = 25)
 - max_turns:
 
   Maximum number of turns (default 25)
+
+- max_cost_usd:
+
+  Maximum cost in USD (default NULL = unlimited)
 
 ## Value
 

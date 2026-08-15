@@ -78,7 +78,7 @@
 ├── tests/testthat/         # Unit tests (testthat edition 3)
 ├── inst/skills/            # Built-in skills with YAML metadata
 ├── inst/examples/          # Example apps (e.g., shiny-chat)
-├── exec/deputy             # Terminal CLI using Rapp
+├── exec/deputy.R           # Terminal CLI using Rapp
 ├── vignettes/              # User documentation (R Markdown)
 ├── man/                    # Auto-generated roxygen2 docs
 ├── .claude/                # Claude Code environment setup
@@ -295,15 +295,15 @@
 <td>HookRegistry and event system</td>
 </tr><tr><td><code>R/tools-builtin.R</code></td>
 <td>Built-in tools implementation</td>
-</tr><tr><td><code>exec/deputy</code></td>
+</tr><tr><td><code>exec/deputy.R</code></td>
 <td>CLI application using Rapp</td>
 </tr><tr><td><code>tests/testthat/helper-mocks.R</code></td>
 <td>Mock objects for testing</td>
 </tr></tbody></table></div>
 <div class="section level2">
 <h2 id="dependencies">Dependencies<a class="anchor" aria-label="anchor" href="#dependencies"></a></h2>
-<p><strong>Core</strong> (in Imports): - <code>ellmer</code> (&gt;= 0.3.0) - LLM abstraction layer - <code>R6</code> - Object-oriented programming - <code>cli</code> - CLI formatting - <code>rlang</code> - Language utilities - <code>coro</code> - Coroutines for streaming - <code>digest</code> - Hashing</p>
-<p><strong>Development</strong> (in Suggests): - <code>testthat</code> (&gt;= 3.0.0) - Testing - <code>Rapp</code> - CLI framework - <code>knitr</code> - Vignettes</p>
+<p><strong>Core</strong> (in Imports): - <code>ellmer</code> (&gt;= 0.3.0) - LLM abstraction layer - <code>R6</code> - Object-oriented programming - <code>cli</code> - CLI formatting - <code>rlang</code> - Language utilities - <code>coro</code> - Coroutines for streaming - <code>digest</code> - Hashing - <code>Rapp</code> (&gt;= 0.4.0) - CLI framework - <code>callr</code> - Subprocess isolation for the standard CLI tool preset</p>
+<p><strong>Development</strong> (in Suggests): - <code>testthat</code> (&gt;= 3.0.0) - Testing - <code>knitr</code> - Vignettes</p>
 <p><strong>Shiny Integration</strong> (in Suggests): - <code>promises</code> - Async support for <code>run_shiny()</code> - <code>shiny</code> - Shiny framework - <code>shinychat</code> - Chat UI component</p>
 </div>
 <div class="section level2">
