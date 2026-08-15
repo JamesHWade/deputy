@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* The `deputy` command now ships as a tested Rapp 0.4 package executable for
+  one-off `rx` use and persistent `ir tool install` launchers. Its task and
+  interactive modes now consume streaming generators correctly, report tool
+  failures, and restore persisted sessions from an installed package.
+
 * `Agent$provider()` no longer errors with "Can't get S7 properties with `$`"
   against current ellmer. ellmer moved `model` off `Provider` onto a new `Model`
   class, so `provider@model` fails for every provider and the `$` fallback threw

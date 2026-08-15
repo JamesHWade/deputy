@@ -37,7 +37,7 @@ deputy/
 ├── tests/testthat/         # Unit tests (testthat edition 3)
 ├── inst/skills/            # Built-in skills with YAML metadata
 ├── inst/examples/          # Example apps (e.g., shiny-chat)
-├── exec/deputy             # Terminal CLI using Rapp
+├── exec/deputy.R           # Terminal CLI using Rapp
 ├── vignettes/              # User documentation (R Markdown)
 ├── man/                    # Auto-generated roxygen2 docs
 ├── .claude/                # Claude Code environment setup
@@ -237,7 +237,7 @@ test_that("descriptive test name", {
 | `R/permissions.R` | Permission system and tool annotations |
 | `R/hooks.R` | HookRegistry and event system |
 | `R/tools-builtin.R` | Built-in tools implementation |
-| `exec/deputy` | CLI application using Rapp |
+| `exec/deputy.R` | CLI application using Rapp |
 | `tests/testthat/helper-mocks.R` | Mock objects for testing |
 
 ## Dependencies
@@ -249,10 +249,11 @@ test_that("descriptive test name", {
 - `rlang` - Language utilities
 - `coro` - Coroutines for streaming
 - `digest` - Hashing
+- `Rapp` (>= 0.4.0) - CLI framework
+- `callr` - Subprocess isolation for the standard CLI tool preset
 
 **Development** (in Suggests):
 - `testthat` (>= 3.0.0) - Testing
-- `Rapp` - CLI framework
 - `knitr` - Vignettes
 
 **Shiny Integration** (in Suggests):

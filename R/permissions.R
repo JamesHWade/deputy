@@ -1024,6 +1024,7 @@ Permissions <- R6::R6Class(
 #' All write operations, code execution, and web access are denied.
 #'
 #' @param max_turns Maximum number of turns (default 25)
+#' @param max_cost_usd Maximum cost in USD (default NULL = unlimited)
 #' @return A [Permissions] object
 #'
 #' @examples
@@ -1031,7 +1032,7 @@ Permissions <- R6::R6Class(
 #' perms$check("read_file", list(path = "test.txt"))
 #'
 #' @export
-permissions_readonly <- function(max_turns = 25) {
+permissions_readonly <- function(max_turns = 25, max_cost_usd = NULL) {
   Permissions$new(
     mode = "readonly",
     file_read = TRUE,
@@ -1040,7 +1041,8 @@ permissions_readonly <- function(max_turns = 25) {
     r_code = FALSE,
     web = FALSE,
     install_packages = FALSE,
-    max_turns = max_turns
+    max_turns = max_turns,
+    max_cost_usd = max_cost_usd
   )
 }
 
