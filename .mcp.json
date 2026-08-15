@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hello-mcp": {
+      "command": "Rscript",
+      "args": ["/Users/james/Projects/shinymcp/inst/examples/hello-mcp/app.R"]
+    }
+  }
+}
