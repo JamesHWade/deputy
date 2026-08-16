@@ -142,16 +142,42 @@ test_that("web_fetch handles invalid URL", {
 
 test_that("web_search returns results", {
   skip_if_not_installed("httr2")
-  skip_on_cran()
-  skip_if_offline()
 
-  # Search for something common
+  httr2::local_mocked_responses(list(httr2::response(
+    status_code = 200,
+    url = "https://html.duckduckgo.com/html/?q=R%20programming%20language",
+    headers = list(`Content-Type` = "text/html; charset=utf-8"),
+    body = charToRaw(paste0(
+      "<html><body>",
+      "<div class='result results_links web-result'>",
+      "<h2 class='result__title'>",
+      "<a class='result__a' href='//duckduckgo.com/l/?uddg=",
+      "https%3A%2F%2Fwww.r-project.org%2F&amp;rut=fixture'>",
+      "The R Project for Statistical Computing</a>",
+      "</h2>",
+      "<a class='result__snippet' href='https://www.r-project.org/'>",
+      "R is a free software environment for statistical computing.",
+      "</a>",
+      "</div>",
+      "</body></html>"
+    ))
+  )))
+
   result <- tool_web_search("R programming language", num_results = 5)
 
   expect_type(result, "character")
-  expect_true(nchar(result) > 0)
-  # Should contain search query
-  expect_true(grepl("R programming language", result))
+  expect_match(
+    result,
+    "Search results for: R programming language",
+    fixed = TRUE
+  )
+  expect_match(result, "The R Project for Statistical Computing", fixed = TRUE)
+  expect_match(result, "https://www.r-project.org/", fixed = TRUE)
+  expect_match(
+    result,
+    "R is a free software environment for statistical computing.",
+    fixed = TRUE
+  )
 })
 
 test_that("web permission is checked correctly", {

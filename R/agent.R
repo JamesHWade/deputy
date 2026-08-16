@@ -1,5 +1,44 @@
 # Agent class for deputy
 
+clone_compaction_chat <- function(chat) {
+  summary_chat <- chat$clone(deep = TRUE)
+  if (identical(summary_chat, chat)) {
+    cli::cli_abort("Chat cloning returned the original mutable object")
+  }
+  validate_chat(summary_chat)
+
+  callback_names <- c(
+    "callback_on_tool_request",
+    "callback_on_tool_result"
+  )
+  live_private <- chat$.__enclos_env__$private
+  summary_private <- summary_chat$.__enclos_env__$private
+
+  for (callback_name in callback_names) {
+    live_manager <- live_private[[callback_name]]
+    summary_manager <- summary_private[[callback_name]]
+    if (is.null(summary_manager) || !is.function(summary_manager$clear)) {
+      cli::cli_abort(
+        "The summary chat does not expose an isolated {callback_name} manager"
+      )
+    }
+    if (identical(summary_manager, live_manager)) {
+      cli::cli_abort(
+        "The summary chat shares its {callback_name} manager with the live chat"
+      )
+    }
+  }
+
+  for (callback_name in callback_names) {
+    summary_private[[callback_name]]$clear()
+  }
+  summary_chat$set_turns(list())
+  summary_chat$set_system_prompt(NULL)
+  summary_chat$set_tools(list())
+
+  summary_chat
+}
+
 #' Agent R6 Class
 #'
 #' @description
@@ -3901,27 +3940,9 @@ Agent <- R6::R6Class(
         {
           # Create a temporary chat for summarization
           # Use the same provider as the main chat
-          provider_info <- self$provider()
-
           temp_chat <- tryCatch(
             {
-              # Try to create a chat with the same provider
-              if (provider_info$name == "openai") {
-                ellmer::chat_openai(
-                  model = provider_info$model %||% "gpt-4o-mini"
-                )
-              } else if (provider_info$name == "anthropic") {
-                ellmer::chat_anthropic(
-                  model = provider_info$model %||% "claude-sonnet-4-5-20250929"
-                )
-              } else if (provider_info$name == "google") {
-                ellmer::chat_google(
-                  model = provider_info$model %||% "gemini-2.0-flash"
-                )
-              } else {
-                # Fallback to a default provider
-                ellmer::chat_openai(model = "gpt-4o-mini")
-              }
+              clone_compaction_chat(self$chat)
             },
             error = function(e) {
               cli_warn(c(
@@ -3944,7 +3965,7 @@ Agent <- R6::R6Class(
           }
 
           # Generate summary
-          response <- temp_chat$chat(summarization_prompt)
+          response <- temp_chat$chat(summarization_prompt, echo = "none")
           response
         },
         error = function(e) {

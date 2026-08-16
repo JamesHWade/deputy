@@ -16,6 +16,13 @@
   class, so `provider@model` fails for every provider and the `$` fallback threw
   from inside the error handler. The model is now read with `Chat$get_model()`.
 
+* `compact()` now summarizes on a clone of the agent's own chat instead of
+  constructing a new provider. Previously any provider other than OpenAI,
+  Anthropic, or Google fell through to `ellmer::chat_openai("gpt-4o-mini")`,
+  sending conversation history to OpenAI when `OPENAI_API_KEY` happened to be
+  set. The summary clone preserves configured provider behavior while removing
+  tools and callbacks and suppressing console echo.
+
 # deputy 0.0.0.9000
 
 * Added semantic content streaming with `tool_start`, `tool_end`, `usage`, and

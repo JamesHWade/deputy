@@ -106,6 +106,7 @@ create_mock_chat <- function(responses = list("Hello!")) {
       get_system_prompt = function() system_prompt,
       set_system_prompt = function(prompt) system_prompt <<- prompt,
       get_tools = function() tools,
+      set_tools = function(new_tools) tools <<- new_tools,
       register_tool = function(tool) {
         tools[[tool@name]] <<- tool
       },
@@ -137,7 +138,7 @@ create_mock_chat <- function(responses = list("Hello!")) {
       on_tool_result = function(callback) {
         tool_result_callback <<- callback
       },
-      clone = function() {
+      clone = function(deep = FALSE) {
         cloned <- create_mock_chat(responses = responses)
         cloned$set_turns(turns)
         cloned$set_system_prompt(system_prompt)
@@ -148,5 +149,179 @@ create_mock_chat <- function(responses = list("Hello!")) {
       }
     ),
     class = "Chat"
+  )
+}
+
+create_mock_callback_manager <- function(callbacks = list()) {
+  state <- new.env(parent = emptyenv())
+  state$callbacks <- callbacks
+
+  structure(
+    list(
+      add = function(callback) {
+        state$callbacks <- c(state$callbacks, list(callback))
+        invisible(NULL)
+      },
+      clear = function() {
+        state$callbacks <- list()
+        invisible(NULL)
+      },
+      count = function() length(state$callbacks),
+      get_callbacks = function() state$callbacks,
+      invoke = function(value) {
+        for (callback in state$callbacks) {
+          callback(value)
+        }
+        invisible(NULL)
+      },
+      clone = function() create_mock_callback_manager(state$callbacks)
+    ),
+    class = "CallbackManager"
+  )
+}
+
+create_compaction_mock_chat <- function(
+  responses = list("Hello!"),
+  provider = list(
+    name = "gateway",
+    model = "test-model",
+    base_url = "https://gateway.invalid"
+  ),
+  request_callbacks = list(),
+  result_callbacks = list(),
+  simulate_tool_activity = FALSE,
+  chat_error = NULL,
+  probe = new.env(parent = emptyenv())
+) {
+  build_chat <- function(
+    turns,
+    tools,
+    system_prompt,
+    request_manager,
+    result_manager
+  ) {
+    response_idx <- 0L
+    private <- new.env(parent = emptyenv())
+    private$callback_on_tool_request <- request_manager
+    private$callback_on_tool_result <- result_manager
+
+    chat <- list(
+      .__enclos_env__ = list(private = private),
+      chat = function(prompt = NULL, echo = NULL) {
+        probe$summary_call <- list(
+          prompt = prompt,
+          echo = echo,
+          turns = turns,
+          system_prompt = system_prompt,
+          tools = tools,
+          callback_counts = c(
+            request = request_manager$count(),
+            result = result_manager$count()
+          ),
+          provider = provider
+        )
+        if (!is.null(chat_error)) {
+          stop(chat_error)
+        }
+        if (isTRUE(simulate_tool_activity)) {
+          request_manager$invoke(list(
+            name = "write_file",
+            arguments = list(
+              path = "../outside",
+              content = "unexpected summary tool content"
+            )
+          ))
+          result_manager$invoke(list(
+            name = "write_file",
+            value = "unexpected summary tool result"
+          ))
+        }
+        response_idx <<- min(response_idx + 1L, length(responses))
+        responses[[response_idx]]
+      },
+      stream = function(prompt = NULL) {
+        response_idx <<- min(response_idx + 1L, length(responses))
+        text <- responses[[response_idx]]
+        yielded <- FALSE
+        function() {
+          if (yielded) {
+            return(coro::exhausted())
+          }
+          yielded <<- TRUE
+          text
+        }
+      },
+      get_turns = function() turns,
+      set_turns = function(new_turns) turns <<- new_turns,
+      get_system_prompt = function() system_prompt,
+      set_system_prompt = function(prompt) system_prompt <<- prompt,
+      get_tools = function() tools,
+      set_tools = function(new_tools) tools <<- new_tools,
+      register_tool = function(tool) {
+        tools[[tool@name]] <<- tool
+      },
+      register_tools = function(tool_list) {
+        for (tool in tool_list) {
+          tools[[tool@name]] <<- tool
+        }
+      },
+      get_tokens = function() {
+        data.frame(
+          input = 100,
+          output = 50,
+          cached_input = 0,
+          cost = 0.001
+        )
+      },
+      get_provider = function() provider,
+      get_model = function() provider$model,
+      last_turn = function(role = "assistant") {
+        text <- responses[[max(1L, response_idx)]]
+        create_mock_assistant_turn(text = text)
+      },
+      on_tool_request = function(callback) {
+        request_manager$add(callback)
+      },
+      on_tool_result = function(callback) {
+        result_manager$add(callback)
+      },
+      callback_counts = function() {
+        c(
+          request = request_manager$count(),
+          result = result_manager$count()
+        )
+      },
+      clone = function(deep = FALSE) {
+        probe$clone_calls <- (probe$clone_calls %||% 0L) + 1L
+        probe$clone_deep <- deep
+        cloned_request_manager <- if (isTRUE(deep)) {
+          request_manager$clone()
+        } else {
+          request_manager
+        }
+        cloned_result_manager <- if (isTRUE(deep)) {
+          result_manager$clone()
+        } else {
+          result_manager
+        }
+        build_chat(
+          turns = turns,
+          tools = tools,
+          system_prompt = system_prompt,
+          request_manager = cloned_request_manager,
+          result_manager = cloned_result_manager
+        )
+      }
+    )
+
+    structure(chat, class = "Chat")
+  }
+
+  build_chat(
+    turns = list(),
+    tools = list(),
+    system_prompt = NULL,
+    request_manager = create_mock_callback_manager(request_callbacks),
+    result_manager = create_mock_callback_manager(result_callbacks)
   )
 }
