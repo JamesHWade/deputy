@@ -63,14 +63,14 @@ applicable. `tool_use_id` remains as a provider-ID compatibility alias.
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-08-15 18:48:23 
+#>   timestamp: 2026-08-16 02:25:42 
 #>   task: Analyze data.csv
 
 # Create a text event
 AgentEvent("text", text = "Hello", is_complete = FALSE
 )
 #> <AgentEvent: text >
-#>   timestamp: 2026-08-15 18:48:23 
+#>   timestamp: 2026-08-16 02:25:42 
 #>   text: Hello
 #>   is_complete: FALSE
 ```
