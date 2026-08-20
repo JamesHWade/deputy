@@ -7,8 +7,9 @@
 permissions_standard(working_dir = getwd())
 }
 \arguments{
-\item{working_dir}{Root directory for file writes (default: current
-directory). This does not restrict otherwise accessible file reads.}
+\item{working_dir}{Existing absolute root directory for file writes (default:
+current directory). This does not restrict otherwise accessible file
+reads.}
 }
 \value{
 A \link{Permissions} object

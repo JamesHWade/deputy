@@ -499,7 +499,10 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Change the active permission mode for subsequent tool calls.
+    #' Preserve or narrow the active permission mode for subsequent tool calls.
+    #' Reapplying the current mode is a no-op. Widening or incomparable mode
+    #' changes require a newly configured `Agent` so custom restrictions remain
+    #' an immutable authority ceiling.
     #'
     #' @param mode Permission mode, see [PermissionMode]
     #' @return Invisible self
@@ -507,7 +510,35 @@ Agent <- R6::R6Class(
       mode <- validate_permission_mode_value(mode)
       existing <- self$permissions
       old_mode <- existing$mode
-      capabilities <- permission_mode_capabilities(mode, self$working_dir)
+
+      if (identical(mode, old_mode)) {
+        return(invisible(self))
+      }
+
+      if (!mode %in% permission_mode_targets(old_mode)) {
+        cli_abort(
+          c(
+            "Permission mode cannot widen or replace the current policy",
+            "x" = paste0(
+              "Mode ",
+              old_mode,
+              " cannot change to ",
+              mode,
+              "."
+            ),
+            "i" = paste0(
+              "Create a new Agent with explicitly broader Permissions to ",
+              "make this change."
+            )
+          ),
+          class = c("deputy_permission_mode_widening", "deputy_error")
+        )
+      }
+
+      capabilities <- intersect_permission_capabilities(
+        permission_capabilities_from(existing),
+        permission_mode_capabilities(mode, self$working_dir)
+      )
 
       private$.permissions <- Permissions$new(
         mode = mode,

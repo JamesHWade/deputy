@@ -457,6 +457,7 @@ test_that("permissions mode is immutable after construction", {
 
 test_that("permissions file_write is immutable after construction", {
   withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  temp_dir <- normalizePath(temp_dir, winslash = "/")
   perms <- permissions_standard(working_dir = temp_dir)
 
   # Reading should work
@@ -583,13 +584,13 @@ test_that("denylist takes precedence over allowlist", {
   expect_match(result$reason, "denylist")
 })
 
-test_that("permission prompt tool is always allowed and referenced in denies", {
+test_that("permission prompt tool is allowed and referenced in denies", {
   perms <- Permissions$new(
     file_read = TRUE,
     file_write = TRUE,
     bash = FALSE,
     r_code = TRUE,
-    tool_allowlist = "read_file",
+    tool_allowlist = c("read_file", "ask_user"),
     permission_prompt_tool_name = "ask_user"
   )
 
@@ -603,6 +604,107 @@ test_that("permission prompt tool is always allowed and referenced in denies", {
   expect_s3_class(prompt_result, "PermissionResultAllow")
   expect_s3_class(deny_result, "PermissionResultDeny")
   expect_match(deny_result$reason, "ask_user", fixed = TRUE)
+})
+
+test_that("explicit tool gating applies to permission prompt tools", {
+  denied <- Permissions$new(
+    mode = "plan",
+    tool_denylist = "ask_user",
+    permission_prompt_tool_name = "ask_user"
+  )
+  excluded <- Permissions$new(
+    mode = "plan",
+    tool_allowlist = "read_file",
+    permission_prompt_tool_name = "ask_user"
+  )
+
+  deny_result <- denied$check("ask_user", list(), list())
+  excluded_result <- excluded$check("ask_user", list(), list())
+
+  expect_s3_class(deny_result, "PermissionResultDeny")
+  expect_match(deny_result$reason, "denylist")
+  expect_false(grepl("Use ask_user", deny_result$reason, fixed = TRUE))
+  expect_s3_class(excluded_result, "PermissionResultDeny")
+  expect_match(excluded_result$reason, "allowlist")
+  expect_false(grepl("Use ask_user", excluded_result$reason, fixed = TRUE))
+
+  other_denial <- excluded$check("write_file", list(path = "x.txt"), list())
+  expect_s3_class(other_denial, "PermissionResultDeny")
+  expect_false(grepl("Use ask_user", other_denial$reason, fixed = TRUE))
+})
+
+test_that("file-write capability intersections choose the narrower root", {
+  withr::local_tempdir(pattern = "deputy-permission-meet") -> container
+  root <- file.path(container, "root")
+  nested <- file.path(root, "nested")
+  disjoint <- file.path(container, "other")
+  dir.create(nested, recursive = TRUE)
+  dir.create(disjoint)
+  root <- normalizePath(root, winslash = "/")
+  nested <- normalizePath(nested, winslash = "/")
+  disjoint <- normalizePath(disjoint, winslash = "/")
+
+  expect_false(intersect_file_write_capability(FALSE, TRUE))
+  expect_identical(intersect_file_write_capability(TRUE, nested), nested)
+  expect_identical(intersect_file_write_capability(nested, TRUE), nested)
+  expect_identical(intersect_file_write_capability(root, nested), nested)
+  expect_identical(intersect_file_write_capability(nested, root), nested)
+  expect_false(intersect_file_write_capability(root, disjoint))
+  expect_false(intersect_file_write_capability(NULL, root))
+  expect_false(intersect_file_write_capability("relative/root", root))
+  expect_false(intersect_file_write_capability(paste0(root, " "), TRUE))
+  expect_false(intersect_file_write_capability(
+    file.path(container, "missing"),
+    TRUE
+  ))
+})
+
+test_that("file-write intersections return stable canonical roots", {
+  skip_on_os("windows")
+  withr::local_tempdir(pattern = "deputy-permission-symlink") -> container
+  real_root <- file.path(container, "real")
+  other_root <- file.path(container, "other")
+  alias <- file.path(container, "alias")
+  dir.create(real_root)
+  dir.create(other_root)
+  skip_if_not(file.symlink(real_root, alias), "Symlinks are unavailable")
+
+  canonical <- normalizePath(real_root, winslash = "/")
+  first <- intersect_file_write_capability(alias, real_root)
+  second <- intersect_file_write_capability(real_root, alias)
+  expect_identical(first, canonical)
+  expect_identical(second, canonical)
+
+  unlink(alias)
+  expect_true(file.symlink(other_root, alias))
+  expect_identical(first, canonical)
+  expect_false(is_path_within(file.path(other_root, "file.txt"), first))
+
+  permissions <- Permissions$new(file_write = real_root)
+  unlink(real_root, recursive = TRUE)
+  expect_true(file.symlink(other_root, real_root))
+  escaped <- permissions$check(
+    "write_file",
+    list(path = file.path(real_root, "file.txt")),
+    list()
+  )
+  expect_s3_class(escaped, "PermissionResultDeny")
+})
+
+test_that("file-write directory grants are canonical and fail closed", {
+  withr::local_tempdir(pattern = "deputy-permission-root") -> root
+  canonical <- normalizePath(root, winslash = "/")
+
+  permissions <- Permissions$new(file_write = root)
+  expect_identical(permissions$file_write, canonical)
+  expect_error(
+    Permissions$new(file_write = "relative/root"),
+    "existing absolute directory"
+  )
+  expect_error(
+    Permissions$new(file_write = file.path(root, "missing")),
+    "existing absolute directory"
+  )
 })
 
 test_that("tool name matching ignores case", {

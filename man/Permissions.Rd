@@ -28,7 +28,8 @@ All fields use active bindings that reject modification attempts.
 
     \item{\code{file_read}}{Allow file reading. Read-only after construction.}
 
-    \item{\code{file_write}}{Allow file writing. Can be TRUE, FALSE, or a directory path. Read-only after construction.}
+    \item{\code{file_write}}{Allow file writing. Can be \code{TRUE}, \code{FALSE}, or a
+canonical absolute directory path. Read-only after construction.}
 
     \item{\code{bash}}{Allow bash command execution. Read-only after construction.}
 
@@ -84,7 +85,9 @@ All fields use active bindings that reject modification attempts.
     \describe{
       \item{\code{mode}}{Permission mode}
       \item{\code{file_read}}{Allow file reading}
-      \item{\code{file_write}}{Allow file writing (TRUE, FALSE, or directory path)}
+      \item{\code{file_write}}{Allow file writing (\code{TRUE}, \code{FALSE}, or an existing
+absolute directory path). Directory grants are canonicalized once when
+the policy is constructed.}
       \item{\code{bash}}{Allow bash commands}
       \item{\code{r_code}}{Allow R code execution}
       \item{\code{web}}{Allow web requests}
@@ -92,8 +95,9 @@ All fields use active bindings that reject modification attempts.
       \item{\code{can_use_tool}}{Custom callback function}
       \item{\code{tool_allowlist}}{Optional character vector of allowed tool names}
       \item{\code{tool_denylist}}{Optional character vector of denied tool names}
-      \item{\code{permission_prompt_tool_name}}{Optional tool name to suggest in
-permission deny messages for gated tools}
+      \item{\code{permission_prompt_tool_name}}{Optional dedicated approval-tool name
+to suggest in permission deny messages for gated tools. Native
+capability-bearing tools cannot be used as approval prompts.}
     }
     \if{html}{\out{</div>}}
   }

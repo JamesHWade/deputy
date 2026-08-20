@@ -7,8 +7,9 @@
 permissions_plan(permission_prompt_tool_name = "ask_user")
 }
 \arguments{
-\item{permission_prompt_tool_name}{Optional tool name that the model can use
-to request explicit approval. Defaults to \code{"ask_user"}.}
+\item{permission_prompt_tool_name}{Optional dedicated approval-tool name that
+the model can use to request explicit approval. Native capability-bearing
+tools are rejected. Defaults to \code{"ask_user"}.}
 }
 \value{
 A \link{Permissions} object

@@ -75,6 +75,37 @@ PermissionMode <- c(
   "full"
 )
 
+permission_file_read_tool_ids <- c(
+  "read_file",
+  "read_markdown",
+  "read_csv",
+  "list_files",
+  "glob_files",
+  "grep_files"
+)
+
+permission_native_capability_tool_ids <- c(
+  permission_file_read_tool_ids,
+  "write_file",
+  "edit_file",
+  "multi_edit",
+  "run_bash",
+  "run_r_code",
+  "web_search",
+  "web_fetch",
+  "install_package",
+  "delegate_to_agent"
+)
+
+is_permission_file_read_tool <- function(tool_name) {
+  normalize_native_tool_id(tool_name) %in% permission_file_read_tool_ids
+}
+
+is_permission_native_capability_tool <- function(tool_name) {
+  normalize_native_tool_id(tool_name) %in%
+    permission_native_capability_tool_ids
+}
+
 # Validate a permission mode string.
 validate_permission_mode_value <- function(mode, arg = "mode") {
   if (!is.character(mode) || length(mode) != 1 || is.na(mode)) {
@@ -132,6 +163,137 @@ permission_mode_capabilities <- function(mode, working_dir = getwd()) {
       permission_prompt_tool_name = NULL
     )
   )
+}
+
+# Return the modes that do not widen or replace an existing mode policy.
+permission_mode_targets <- function(mode) {
+  mode <- validate_permission_mode_value(mode)
+  switch(
+    mode,
+    full = PermissionMode,
+    standard = c("standard", "readonly"),
+    plan = c("plan", "readonly"),
+    readonly = "readonly"
+  )
+}
+
+# Extract the capability fields that form an immutable permission ceiling.
+permission_capabilities_from <- function(permissions) {
+  list(
+    file_read = permissions$file_read,
+    file_write = permissions$file_write,
+    bash = permissions$bash,
+    r_code = permissions$r_code,
+    web = permissions$web,
+    install_packages = permissions$install_packages,
+    permission_prompt_tool_name = permissions$permission_prompt_tool_name
+  )
+}
+
+# Intersect two file-write grants. Directory grants are ordered by containment;
+# disjoint or malformed grants fail closed.
+intersect_file_write_capability <- function(ceiling, requested) {
+  if (isFALSE(ceiling) || isFALSE(requested)) {
+    return(FALSE)
+  }
+  if (isTRUE(ceiling)) {
+    if (isTRUE(requested)) {
+      return(TRUE)
+    }
+    requested_root <- canonical_permission_root(requested)
+    return(if (is.na(requested_root)) FALSE else requested_root)
+  }
+  if (isTRUE(requested)) {
+    ceiling_root <- canonical_permission_root(ceiling)
+    return(if (is.na(ceiling_root)) FALSE else ceiling_root)
+  }
+
+  ceiling_root <- canonical_permission_root(ceiling)
+  requested_root <- canonical_permission_root(requested)
+  if (is.na(ceiling_root) || is.na(requested_root)) {
+    return(FALSE)
+  }
+
+  if (is_canonical_permission_root_within(ceiling_root, requested_root)) {
+    return(ceiling_root)
+  }
+  if (is_canonical_permission_root_within(requested_root, ceiling_root)) {
+    return(requested_root)
+  }
+  FALSE
+}
+
+is_canonical_permission_root_within <- function(path, root) {
+  root_with_sep <- if (endsWith(root, "/")) root else paste0(root, "/")
+  path_with_sep <- if (endsWith(path, "/")) path else paste0(path, "/")
+  startsWith(path_with_sep, root_with_sep) ||
+    identical(path, sub("/$", "", root_with_sep))
+}
+
+canonical_permission_root <- function(value) {
+  if (
+    !is.character(value) ||
+      length(value) != 1L ||
+      is.na(value) ||
+      !nzchar(value) ||
+      !identical(value, trimws(value)) ||
+      !is_absolute_path(value) ||
+      !dir.exists(value)
+  ) {
+    return(NA_character_)
+  }
+
+  resolved <- resolve_path_components(value)
+  if (is.na(resolved) || !dir.exists(resolved)) {
+    return(NA_character_)
+  }
+
+  tryCatch(
+    normalizePath(resolved, mustWork = TRUE, winslash = "/"),
+    error = function(...) NA_character_
+  )
+}
+
+normalize_file_write_capability <- function(value, arg = "file_write") {
+  if (isTRUE(value) || isFALSE(value)) {
+    return(value)
+  }
+
+  root <- canonical_permission_root(value)
+  if (!is.na(root)) {
+    return(root)
+  }
+
+  cli_abort(c(
+    "{.arg {arg}} must be TRUE, FALSE, or an existing absolute directory",
+    "i" = "Directory grants are resolved once when the policy is created."
+  ))
+}
+
+is_path_within_permission_root <- function(path, root) {
+  resolved_path <- resolve_path_components(path)
+  if (is.na(resolved_path)) {
+    return(FALSE)
+  }
+  is_canonical_permission_root_within(resolved_path, root)
+}
+
+# Apply a requested mode preset beneath an existing capability ceiling.
+intersect_permission_capabilities <- function(ceiling, requested) {
+  out <- list(
+    file_read = isTRUE(ceiling$file_read) && isTRUE(requested$file_read),
+    file_write = intersect_file_write_capability(
+      ceiling$file_write,
+      requested$file_write
+    ),
+    bash = isTRUE(ceiling$bash) && isTRUE(requested$bash),
+    r_code = isTRUE(ceiling$r_code) && isTRUE(requested$r_code),
+    web = isTRUE(ceiling$web) && isTRUE(requested$web),
+    install_packages = isTRUE(ceiling$install_packages) &&
+      isTRUE(requested$install_packages),
+    permission_prompt_tool_name = requested$permission_prompt_tool_name
+  )
+  out
 }
 
 #' Create an allow permission result
@@ -216,7 +378,9 @@ Permissions <- R6::R6Class(
     #'
     #' @param mode Permission mode
     #' @param file_read Allow file reading
-    #' @param file_write Allow file writing (TRUE, FALSE, or directory path)
+    #' @param file_write Allow file writing (`TRUE`, `FALSE`, or an existing
+    #'   absolute directory path). Directory grants are canonicalized once when
+    #'   the policy is constructed.
     #' @param bash Allow bash commands
     #' @param r_code Allow R code execution
     #' @param web Allow web requests
@@ -224,8 +388,9 @@ Permissions <- R6::R6Class(
     #' @param can_use_tool Custom callback function
     #' @param tool_allowlist Optional character vector of allowed tool names
     #' @param tool_denylist Optional character vector of denied tool names
-    #' @param permission_prompt_tool_name Optional tool name to suggest in
-    #'   permission deny messages for gated tools
+    #' @param permission_prompt_tool_name Optional dedicated approval-tool name
+    #'   to suggest in permission deny messages for gated tools. Native
+    #'   capability-bearing tools cannot be used as approval prompts.
     #' @return A new `Permissions` object
     initialize = function(
       mode = "standard",
@@ -241,6 +406,7 @@ Permissions <- R6::R6Class(
       permission_prompt_tool_name = NULL
     ) {
       mode <- validate_permission_mode_value(mode)
+      file_write <- normalize_file_write_capability(file_write)
 
       if (!is.null(tool_allowlist) && !is.character(tool_allowlist)) {
         cli_abort("{.arg tool_allowlist} must be NULL or a character vector")
@@ -266,6 +432,15 @@ Permissions <- R6::R6Class(
       if (nchar(permission_prompt_tool_name) == 0) {
         permission_prompt_tool_name <- NULL
       }
+      if (
+        !is.null(permission_prompt_tool_name) &&
+          is_permission_native_capability_tool(permission_prompt_tool_name)
+      ) {
+        cli_abort(c(
+          "{.arg permission_prompt_tool_name} must name a dedicated approval tool",
+          "x" = "Native read, write, execute, web, install, and delegation tools cannot bypass their capabilities."
+        ))
+      }
 
       # Store values in private fields (immutable after construction)
       private$.mode <- mode
@@ -290,16 +465,16 @@ Permissions <- R6::R6Class(
     #' @param context Additional context (e.g., working_dir, tool_annotations)
     #' @return A [PermissionResultAllow] or [PermissionResultDeny]
     check = function(tool_name, tool_input, context = list()) {
-      # Allow the configured prompt tool so gated workflows can request
-      # explicit human approval.
-      if (private$is_permission_prompt_tool(tool_name)) {
-        return(PermissionResultAllow())
-      }
-
       # Explicit tool gating (denylist/allowlist) takes precedence
       gating_result <- private$check_tool_gating(tool_name)
       if (!is.null(gating_result)) {
         return(gating_result)
+      }
+
+      # Allow the configured prompt tool so gated workflows can request
+      # explicit human approval, provided it passed explicit tool gating.
+      if (private$is_permission_prompt_tool(tool_name)) {
+        return(PermissionResultAllow())
       }
 
       # Mode-based shortcuts
@@ -341,23 +516,13 @@ Permissions <- R6::R6Class(
           ))
         }
 
-        if (
-          tool_id %in%
-            c(
-              "read_file",
-              "read_markdown",
-              "read_csv",
-              "list_files",
-              "glob_files",
-              "grep_files"
-            )
-        ) {
+        if (is_permission_file_read_tool(tool_name)) {
           if (!isTRUE(self$file_read)) {
             return(PermissionResultDeny(
               reason = "File reading is not allowed"
             ))
           }
-          return(PermissionResultAllow())
+          return(private$apply_callback_veto(tool_name, tool_input, context))
         }
 
         if (tool_id %in% c("web_search", "web_fetch")) {
@@ -366,10 +531,10 @@ Permissions <- R6::R6Class(
               reason = "Web access is not allowed in readonly mode"
             ))
           }
-          return(PermissionResultAllow())
+          return(private$apply_callback_veto(tool_name, tool_input, context))
         }
         if (isTRUE(explicitly_allowed)) {
-          return(PermissionResultAllow())
+          return(private$apply_callback_veto(tool_name, tool_input, context))
         }
         return(PermissionResultDeny(
           reason = paste0(
@@ -386,26 +551,14 @@ Permissions <- R6::R6Class(
         }
       }
 
-      # Custom callback takes precedence
-      if (!is.null(self$can_use_tool)) {
-        result <- tryCatch(
-          self$can_use_tool(tool_name, tool_input, context),
-          error = function(e) {
-            cli_warn(c(
-              "Permission callback failed, denying for safety",
-              "x" = e$message
-            ))
-            PermissionResultDeny(reason = "Permission callback error")
-          }
-        )
-        if (inherits(result, "PermissionResult")) {
-          return(result)
-        } else {
-          cli_warn(
-            "Permission callback returned invalid type, denying for safety"
-          )
-          return(PermissionResultDeny(reason = "Invalid callback result"))
-        }
+      # Custom callback takes precedence in standard mode.
+      callback_result <- private$check_permission_callback(
+        tool_name,
+        tool_input,
+        context
+      )
+      if (!is.null(callback_result)) {
+        return(callback_result)
       }
 
       # Tool-specific checks (with annotation awareness)
@@ -486,7 +639,8 @@ Permissions <- R6::R6Class(
       private$.file_read <- value
     },
 
-    #' @field file_write Allow file writing. Can be TRUE, FALSE, or a directory path. Read-only after construction.
+    #' @field file_write Allow file writing. Can be `TRUE`, `FALSE`, or a
+    #' canonical absolute directory path. Read-only after construction.
     file_write = function(value) {
       if (missing(value)) {
         return(private$.file_write)
@@ -666,7 +820,7 @@ Permissions <- R6::R6Class(
 
     gating_reason = function(tool_name, base_reason) {
       reason <- base_reason
-      if (!is.null(private$.permission_prompt_tool_name)) {
+      if (private$permission_prompt_is_available()) {
         reason <- paste0(
           reason,
           " Use ",
@@ -675,6 +829,23 @@ Permissions <- R6::R6Class(
         )
       }
       reason
+    },
+
+    permission_prompt_is_available = function() {
+      prompt <- private$.permission_prompt_tool_name
+      if (is.null(prompt)) {
+        return(FALSE)
+      }
+      if (private$tool_name_in_list(prompt, private$.tool_denylist)) {
+        return(FALSE)
+      }
+      if (
+        !is.null(private$.tool_allowlist) &&
+          !private$tool_name_in_list(prompt, private$.tool_allowlist)
+      ) {
+        return(FALSE)
+      }
+      TRUE
     },
 
     check_tool_gating = function(tool_name) {
@@ -720,22 +891,40 @@ Permissions <- R6::R6Class(
         )
     },
 
+    check_permission_callback = function(tool_name, tool_input, context) {
+      if (is.null(self$can_use_tool)) {
+        return(NULL)
+      }
+
+      result <- tryCatch(
+        self$can_use_tool(tool_name, tool_input, context),
+        error = function(e) {
+          cli_warn(c(
+            "Permission callback failed, denying for safety",
+            "x" = e$message
+          ))
+          PermissionResultDeny(reason = "Permission callback error")
+        }
+      )
+      if (inherits(result, "PermissionResult")) {
+        return(result)
+      }
+
+      cli_warn("Permission callback returned invalid type, denying for safety")
+      PermissionResultDeny(reason = "Invalid callback result")
+    },
+
+    apply_callback_veto = function(tool_name, tool_input, context) {
+      private$check_permission_callback(tool_name, tool_input, context) %||%
+        PermissionResultAllow()
+    },
+
     # Tool-specific permission checks
     check_tool_specific = function(tool_name, tool_input, context) {
       tool_id <- normalize_native_tool_id(tool_name)
 
       # File read tools
-      if (
-        tool_id %in%
-          c(
-            "read_file",
-            "read_markdown",
-            "read_csv",
-            "list_files",
-            "glob_files",
-            "grep_files"
-          )
-      ) {
+      if (is_permission_file_read_tool(tool_name)) {
         if (!self$file_read) {
           return(PermissionResultDeny(reason = "File reading is not allowed"))
         }
@@ -810,7 +999,12 @@ Permissions <- R6::R6Class(
           }
 
           # Then check if within allowed directory
-          if (!is_path_within(path_for_check, self$file_write)) {
+          if (
+            !is_path_within_permission_root(
+              path_for_check,
+              self$file_write
+            )
+          ) {
             return(PermissionResultDeny(
               reason = paste("File writing only allowed in:", self$file_write)
             ))
@@ -899,6 +1093,15 @@ Permissions <- R6::R6Class(
         ))
       }
 
+      if (
+        is_permission_file_read_tool(tool_name) &&
+          !isTRUE(self$file_read)
+      ) {
+        return(PermissionResultDeny(
+          reason = "File reading is not allowed"
+        ))
+      }
+
       # Plan mode is intentionally conservative: no annotation means deny.
       if (is.null(annotations)) {
         return(PermissionResultDeny(
@@ -976,8 +1179,9 @@ permissions_readonly <- function() {
 #' the working directory, and permits R code execution. Denies bash commands,
 #' web access, and package installation.
 #'
-#' @param working_dir Root directory for file writes (default: current
-#'   directory). This does not restrict otherwise accessible file reads.
+#' @param working_dir Existing absolute root directory for file writes (default:
+#'   current directory). This does not restrict otherwise accessible file
+#'   reads.
 #' @return A [Permissions] object
 #'
 #' @examples
@@ -1004,8 +1208,9 @@ permissions_standard <- function(working_dir = getwd()) {
 #' Only tools annotated as read-only are allowed, plus the permission prompt
 #' tool when configured.
 #'
-#' @param permission_prompt_tool_name Optional tool name that the model can use
-#'   to request explicit approval. Defaults to `"ask_user"`.
+#' @param permission_prompt_tool_name Optional dedicated approval-tool name that
+#'   the model can use to request explicit approval. Native capability-bearing
+#'   tools are rejected. Defaults to `"ask_user"`.
 #' @return A [Permissions] object
 #'
 #' @examples

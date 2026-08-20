@@ -1,6 +1,180 @@
 # Tests for Agent permission enforcement integration
 # Note: create_mock_chat is defined in helper-mocks.R
 
+test_that("reapplying a permission mode preserves the custom policy", {
+  callback <- function(...) PermissionResultDeny(reason = "custom ceiling")
+  permissions <- Permissions$new(
+    mode = "standard",
+    file_read = FALSE,
+    file_write = FALSE,
+    bash = FALSE,
+    r_code = FALSE,
+    web = FALSE,
+    install_packages = FALSE,
+    can_use_tool = callback,
+    tool_allowlist = "read_file",
+    tool_denylist = "run_r_code",
+    permission_prompt_tool_name = "ask_user"
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    permissions = permissions
+  )
+
+  expect_invisible(agent$set_permission_mode("standard"))
+  expect_identical(agent$permissions, permissions)
+  expect_false(agent$permissions$file_read)
+  expect_false(agent$permissions$file_write)
+  expect_false(agent$permissions$r_code)
+  expect_identical(agent$permissions$can_use_tool, callback)
+  expect_identical(agent$permissions$tool_allowlist, "read_file")
+  expect_identical(agent$permissions$tool_denylist, "run_r_code")
+  expect_identical(
+    agent$permissions$permission_prompt_tool_name,
+    "ask_user"
+  )
+})
+
+test_that("permission mode changes can only narrow the current policy", {
+  permissions <- Permissions$new(
+    mode = "standard",
+    file_read = FALSE,
+    file_write = FALSE,
+    bash = FALSE,
+    r_code = FALSE,
+    web = FALSE,
+    install_packages = FALSE
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(tool_read_file),
+    permissions = permissions
+  )
+
+  expect_invisible(agent$set_permission_mode("readonly"))
+  expect_identical(agent$get_permission_mode(), "readonly")
+  expect_false(agent$permissions$file_read)
+  expect_false(agent$permissions$file_write)
+  expect_false(agent$permissions$r_code)
+  expect_s3_class(
+    agent$permissions$check("read_file", list(path = "blocked.txt")),
+    "PermissionResultDeny"
+  )
+
+  expect_error(
+    agent$set_permission_mode("standard"),
+    class = "deputy_permission_mode_widening"
+  )
+
+  plan_agent <- Agent$new(
+    chat = create_mock_chat(),
+    permissions = permissions_plan()
+  )
+  expect_error(
+    plan_agent$set_permission_mode("standard"),
+    class = "deputy_permission_mode_widening"
+  )
+  expect_error(
+    plan_agent$set_permission_mode("full"),
+    class = "deputy_permission_mode_widening"
+  )
+})
+
+test_that("permission mode transitions follow the authority lattice", {
+  expected <- list(
+    standard = c("standard", "readonly"),
+    plan = c("plan", "readonly"),
+    readonly = "readonly",
+    full = PermissionMode
+  )
+  make_permissions <- function(mode) {
+    switch(
+      mode,
+      standard = permissions_standard(),
+      plan = permissions_plan(),
+      readonly = permissions_readonly(),
+      full = permissions_full()
+    )
+  }
+
+  for (source in PermissionMode) {
+    expect_identical(permission_mode_targets(source), expected[[source]])
+    for (target in PermissionMode) {
+      agent <- Agent$new(
+        chat = create_mock_chat(),
+        permissions = make_permissions(source)
+      )
+      if (target %in% expected[[source]]) {
+        expect_no_error(agent$set_permission_mode(target))
+        expect_identical(agent$get_permission_mode(), target)
+      } else {
+        expect_error(
+          agent$set_permission_mode(target),
+          class = "deputy_permission_mode_widening"
+        )
+        expect_identical(agent$get_permission_mode(), source)
+      }
+    }
+  }
+})
+
+test_that("readonly transitions retain callback denials as a veto", {
+  callback <- function(tool_name, ...) {
+    if (identical(tool_name, "read_file")) {
+      return(PermissionResultDeny(reason = "custom read denial"))
+    }
+    PermissionResultAllow()
+  }
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    permissions = Permissions$new(
+      mode = "standard",
+      can_use_tool = callback
+    )
+  )
+
+  expect_s3_class(
+    agent$permissions$check("read_file", list(path = "blocked.txt")),
+    "PermissionResultDeny"
+  )
+  agent$set_permission_mode("readonly")
+  expect_s3_class(
+    agent$permissions$check("read_file", list(path = "blocked.txt")),
+    "PermissionResultDeny"
+  )
+  expect_s3_class(
+    agent$permissions$check("run_bash", list(command = "pwd")),
+    "PermissionResultDeny"
+  )
+})
+
+test_that("narrowing a full policy retains a custom write root", {
+  withr::local_tempdir(pattern = "deputy-permission-root") -> root
+  nested <- file.path(root, "nested")
+  dir.create(nested)
+  nested <- normalizePath(nested, winslash = "/")
+  permissions <- Permissions$new(
+    mode = "full",
+    file_read = TRUE,
+    file_write = nested,
+    bash = TRUE,
+    r_code = TRUE,
+    web = TRUE,
+    install_packages = TRUE
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    working_dir = root,
+    permissions = permissions
+  )
+
+  expect_invisible(agent$set_permission_mode("standard"))
+  expect_identical(agent$permissions$file_write, nested)
+  expect_false(agent$permissions$bash)
+  expect_false(agent$permissions$web)
+  expect_false(agent$permissions$install_packages)
+})
+
 test_that("Agent rejects tool when permission denies", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(

@@ -676,14 +676,7 @@ LeadAgent <- R6::R6Class(
     derive_subagent_permissions = function(def) {
       existing <- self$permissions
       requested_mode <- def$permission_mode %||% existing$mode
-      allowed_modes <- switch(
-        existing$mode,
-        full = PermissionMode,
-        standard = c("standard", "readonly"),
-        plan = c("plan", "readonly"),
-        readonly = "readonly",
-        cli_abort("Unknown lead permission mode: {.val {existing$mode}}")
-      )
+      allowed_modes <- permission_mode_targets(existing$mode)
       if (!requested_mode %in% allowed_modes) {
         cli_abort(c(
           "Sub-agent permission mode cannot change under the lead policy",
@@ -704,18 +697,14 @@ LeadAgent <- R6::R6Class(
       }
       denylist <- unique(c(existing$tool_denylist, def$disallowed_tools))
 
+      ceiling <- permission_capabilities_from(existing)
       capabilities <- if (identical(requested_mode, existing$mode)) {
-        list(
-          file_read = existing$file_read,
-          file_write = existing$file_write,
-          bash = existing$bash,
-          r_code = existing$r_code,
-          web = existing$web,
-          install_packages = existing$install_packages,
-          permission_prompt_tool_name = existing$permission_prompt_tool_name
-        )
+        ceiling
       } else {
-        permission_mode_capabilities(requested_mode, self$working_dir)
+        intersect_permission_capabilities(
+          ceiling,
+          permission_mode_capabilities(requested_mode, self$working_dir)
+        )
       }
 
       Permissions$new(

@@ -446,7 +446,10 @@ agent$add_hook(HookMatcher$new(
 \if{html}{\out{<a id="method-Agent-set_permission_mode"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-set_permission_mode}{}}}
 \subsection{\code{Agent$set_permission_mode()}}{
-  Change the active permission mode for subsequent tool calls.
+  Preserve or narrow the active permission mode for subsequent tool calls.
+Reapplying the current mode is a no-op. Widening or incomparable mode
+changes require a newly configured \code{Agent} so custom restrictions remain
+an immutable authority ceiling.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_permission_mode(mode)}

@@ -56,3 +56,43 @@ test_that("plan mode always allows the permission prompt tool", {
   result <- perms$check("ask_user", list(), list())
   expect_s3_class(result, "PermissionResultAllow")
 })
+
+test_that("plan mode respects a disabled file-read capability", {
+  perms <- Permissions$new(
+    mode = "plan",
+    file_read = FALSE,
+    file_write = FALSE,
+    bash = FALSE,
+    r_code = FALSE,
+    web = FALSE,
+    install_packages = FALSE
+  )
+
+  for (tool_name in permission_file_read_tool_ids) {
+    result <- perms$check(
+      tool_name,
+      list(path = "blocked.txt"),
+      list(
+        tool_annotations = list(
+          read_only_hint = TRUE,
+          destructive_hint = FALSE
+        )
+      )
+    )
+    expect_s3_class(result, "PermissionResultDeny")
+    expect_match(result$reason, "File reading")
+  }
+})
+
+test_that("permission prompts must use dedicated approval tools", {
+  for (tool_name in c("read_file", "delegate_to_agent")) {
+    expect_error(
+      Permissions$new(
+        mode = "plan",
+        file_read = FALSE,
+        permission_prompt_tool_name = tool_name
+      ),
+      "dedicated approval tool"
+    )
+  }
+})

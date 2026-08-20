@@ -388,6 +388,137 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
   expect_false(plan_child$permissions$web)
 })
 
+test_that("readonly sub-agents retain custom lead read restrictions", {
+  definition <- agent_definition(
+    name = "restricted-reader",
+    description = "Must retain the lead read ceiling",
+    prompt = "You help",
+    permission_mode = "readonly"
+  )
+
+  for (lead_mode in c("standard", "plan")) {
+    permissions <- Permissions$new(
+      mode = lead_mode,
+      file_read = FALSE,
+      file_write = FALSE,
+      bash = FALSE,
+      r_code = FALSE,
+      web = FALSE,
+      install_packages = FALSE
+    )
+    lead <- LeadAgent$new(
+      chat = create_mock_chat(),
+      sub_agents = list(definition),
+      permissions = permissions
+    )
+    child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+
+    expect_identical(child$permissions$mode, "readonly")
+    expect_false(child$permissions$file_read)
+    expect_s3_class(
+      child$permissions$check("read_file", list(path = "blocked.txt")),
+      "PermissionResultDeny"
+    )
+  }
+})
+
+test_that("readonly sub-agents retain custom callback denials", {
+  definition <- agent_definition(
+    name = "callback-restricted",
+    description = "Must retain the callback ceiling",
+    prompt = "You help",
+    permission_mode = "readonly"
+  )
+  callback <- function(tool_name, ...) {
+    if (identical(tool_name, "read_file")) {
+      return(PermissionResultDeny(reason = "custom read denial"))
+    }
+    PermissionResultAllow()
+  }
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(definition),
+    permissions = Permissions$new(
+      mode = "standard",
+      can_use_tool = callback
+    )
+  )
+  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+
+  expect_s3_class(
+    child$permissions$check("read_file", list(path = "blocked.txt")),
+    "PermissionResultDeny"
+  )
+  expect_s3_class(
+    child$permissions$check("run_bash", list(command = "pwd")),
+    "PermissionResultDeny"
+  )
+})
+
+test_that("sub-agent disallowed tools override permission prompts", {
+  definition <- agent_definition(
+    name = "no-prompt",
+    description = "Cannot request permission",
+    prompt = "You help",
+    permission_mode = "plan",
+    disallowed_tools = "ask_user"
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(definition),
+    permissions = permissions_full()
+  )
+  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+
+  result <- child$permissions$check("ask_user", list())
+  expect_s3_class(result, "PermissionResultDeny")
+  expect_false(grepl("Use ask_user", result$reason, fixed = TRUE))
+})
+
+test_that("sub-agents retain inherited prompt-tool gates", {
+  definition <- agent_definition(
+    name = "gated-prompt",
+    description = "Retains lead tool gates",
+    prompt = "You help",
+    permission_mode = "plan"
+  )
+  policies <- list(
+    Permissions$new(
+      mode = "full",
+      file_read = TRUE,
+      file_write = TRUE,
+      bash = TRUE,
+      r_code = TRUE,
+      web = TRUE,
+      install_packages = TRUE,
+      tool_denylist = "ask_user"
+    ),
+    Permissions$new(
+      mode = "full",
+      file_read = TRUE,
+      file_write = TRUE,
+      bash = TRUE,
+      r_code = TRUE,
+      web = TRUE,
+      install_packages = TRUE,
+      tool_allowlist = "read_file"
+    )
+  )
+
+  for (permissions in policies) {
+    lead <- LeadAgent$new(
+      chat = create_mock_chat(),
+      sub_agents = list(definition),
+      permissions = permissions
+    )
+    child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+    result <- child$permissions$check("ask_user", list())
+
+    expect_s3_class(result, "PermissionResultDeny")
+    expect_false(grepl("Use ask_user", result$reason, fixed = TRUE))
+  }
+})
+
 test_that("agent_definition validates max_requests eagerly", {
   base_args <- list(
     name = "invalid",
