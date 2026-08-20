@@ -41,7 +41,7 @@ updates on agent progress.
 
 Run-boundary and tool lifecycle events also carry \code{agent_id}, \code{run_id},
 immutable \code{run_context}, and delegated-run correlation fields when
-applicable. \code{tool_use_id} remains as a provider-ID compatibility alias.
+applicable.
 }
 
 \examples{

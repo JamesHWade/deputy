@@ -108,6 +108,36 @@ test_that("skill_load reads SKILL.md", {
   expect_true(grepl("Be kind", skill$prompt))
 })
 
+test_that("SKILL.md frontmatter augments SKILL.yaml metadata", {
+  skip_if_not_installed("yaml")
+
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  writeLines(
+    c(
+      "name: metadata_skill",
+      "version: '1.0.0'"
+    ),
+    file.path(temp_dir, "SKILL.yaml")
+  )
+  writeLines(
+    c(
+      "---",
+      "version: '2.0.0'",
+      "description: Combined metadata",
+      "---",
+      "Use both skill files."
+    ),
+    file.path(temp_dir, "SKILL.md")
+  )
+
+  skill <- skill_load(temp_dir, check_requirements = FALSE)
+
+  expect_equal(skill$name, "metadata_skill")
+  expect_equal(skill$version, "2.0.0")
+  expect_equal(skill$description, "Combined metadata")
+  expect_equal(skill$prompt, "Use both skill files.")
+})
+
 test_that("skills_list returns empty for missing directory", {
   result <- skills_list("nonexistent_dir_12345")
 

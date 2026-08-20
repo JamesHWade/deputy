@@ -58,15 +58,15 @@ test_that("Agent cost method returns cost data", {
   expect_true("total" %in% names(cost))
 })
 
-test_that("Agent permissions affect run configuration", {
+test_that("Agent usage limits affect run configuration", {
   mock_chat <- create_mock_chat()
 
   agent_limited <- Agent$new(
     chat = mock_chat,
-    permissions = Permissions$new(max_turns = 5)
+    usage_limits = UsageLimits(max_requests = 5)
   )
 
-  expect_equal(agent_limited$permissions$max_turns, 5)
+  expect_equal(agent_limited$usage_limits$max_requests, 5L)
 })
 
 test_that("Agent with cost limit stores limit correctly", {
@@ -74,10 +74,10 @@ test_that("Agent with cost limit stores limit correctly", {
 
   agent <- Agent$new(
     chat = mock_chat,
-    permissions = Permissions$new(max_cost_usd = 1.00)
+    usage_limits = UsageLimits(max_cost_usd = 1.00)
   )
 
-  expect_equal(agent$permissions$max_cost_usd, 1.00)
+  expect_equal(agent$usage_limits$max_cost_usd, 1.00)
 })
 
 # AgentEvent tests
@@ -150,7 +150,7 @@ test_that("AgentResult print shows key information", {
     turns = list(1, 2, 3, 4, 5),
     cost = list(total = 0.123),
     duration = 5.5,
-    stop_reason = "max_turns"
+    stop_reason = "request_limit"
   )
 
   output <- capture.output(print(result))
@@ -159,7 +159,7 @@ test_that("AgentResult print shows key information", {
   expect_true(grepl("AgentResult", output_text))
   # Print format is "turns: 5" not "5 turns"
   expect_true(grepl("turns:", output_text))
-  expect_true(grepl("max_turns", output_text))
+  expect_true(grepl("request_limit", output_text))
 })
 
 # Generator tests (testing coro::is_exhausted handling)
@@ -560,7 +560,7 @@ test_that("run_sync warns when approaching cost limit (90%)", {
 
   agent <- Agent$new(
     chat = mock_chat,
-    permissions = Permissions$new(max_cost_usd = 1.00)
+    usage_limits = UsageLimits(max_cost_usd = 1.00)
   )
 
   # Capture warnings
@@ -622,7 +622,7 @@ test_that("run_sync stops when cost limit is reached", {
 
   agent <- Agent$new(
     chat = mock_chat,
-    permissions = Permissions$new(max_cost_usd = 1.00)
+    usage_limits = UsageLimits(max_cost_usd = 1.00)
   )
 
   # Suppress warnings for this test
@@ -682,7 +682,7 @@ test_that("run_sync detects stalled responses", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(test_tool),
-    permissions = Permissions$new(max_turns = 5)
+    usage_limits = UsageLimits(max_requests = 5)
   )
 
   # Capture warnings
@@ -771,7 +771,6 @@ test_that("get_tool_annotation works with S7 ToolDef objects", {
 })
 
 test_that("run_sync stops with request_limit reason when limit reached", {
-  # Legacy max_turns now seeds the run-scoped model request limit.
   mock_chat <- create_mock_chat()
 
   # Keep returning tool requests to force multiple turns
@@ -807,7 +806,7 @@ test_that("run_sync stops with request_limit reason when limit reached", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(test_tool),
-    permissions = Permissions$new(max_turns = 2)
+    usage_limits = UsageLimits(max_requests = 2)
   )
 
   result <- suppressWarnings(agent$run_sync("Test task"))

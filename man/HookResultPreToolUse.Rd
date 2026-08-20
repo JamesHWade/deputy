@@ -8,7 +8,6 @@ HookResultPreToolUse(
   permission = c("allow", "deny"),
   reason = NULL,
   continue = TRUE,
-  updated_input = NULL,
   additional_context = NULL,
   stop_reason = NULL
 )
@@ -19,12 +18,6 @@ HookResultPreToolUse(
 \item{reason}{Reason for denial (shown to the LLM)}
 
 \item{continue}{If FALSE, stop the agent after this hook}
-
-\item{updated_input}{Reserved for SDK-shape parity. \strong{Not currently
-supported}: deputy emits a warning and proceeds with the original tool
-input. ellmer's tool-request callback contract does not yet expose a way
-to mutate the in-flight request, so use \code{permission = "deny"} to block a
-tool call instead of rewriting its arguments.}
 
 \item{additional_context}{Optional text to append to the running context}
 

@@ -20,7 +20,7 @@
 #'     - `deputy_tool_execution` - Tool failed during execution
 #'   - **deputy_budget** - Resource limit violations
 #'     - `deputy_budget_exceeded` - Cost limit exceeded
-#'     - `deputy_turn_limit` - Max turns exceeded
+#'     - `deputy_request_limit` - Maximum model requests exceeded
 #'   - **deputy_provider** - LLM provider failures
 #'   - **deputy_session** - Session management failures
 #'     - `deputy_session_load` - Failed to load session
@@ -74,7 +74,7 @@ NULL
 #' )
 #' }
 #'
-#' @export
+#' @noRd
 abort_deputy <- function(message, class = NULL, ..., .envir = parent.frame()) {
   # Build class hierarchy
   classes <- c(
@@ -113,7 +113,7 @@ abort_deputy <- function(message, class = NULL, ..., .envir = parent.frame()) {
 #' )
 #' }
 #'
-#' @export
+#' @noRd
 abort_permission_denied <- function(
   message,
   tool_name = NULL,
@@ -154,7 +154,7 @@ abort_permission_denied <- function(
 #' )
 #' }
 #'
-#' @export
+#' @noRd
 abort_tool_execution <- function(
   message,
   tool_name,
@@ -194,7 +194,7 @@ abort_tool_execution <- function(
 #' )
 #' }
 #'
-#' @export
+#' @noRd
 abort_budget_exceeded <- function(
   message,
   current_cost = NULL,
@@ -212,39 +212,39 @@ abort_budget_exceeded <- function(
   )
 }
 
-#' Abort with a turn limit error
+#' Abort with a request limit error
 #'
 #' @description
-#' Signals that the agent exceeded its maximum turn limit.
+#' Signals that the agent exceeded its maximum model request limit.
 #'
 #' @param message The error message (supports cli formatting)
-#' @param current_turns The number of turns executed
-#' @param max_turns The maximum allowed turns
+#' @param current_requests The number of model requests made
+#' @param max_requests The maximum allowed model requests
 #' @param ... Additional context fields
 #' @param .envir Environment for cli interpolation
 #'
 #' @examples
 #' \dontrun{
-#' abort_turn_limit(
-#'   "Maximum turns exceeded: {current_turns}/{max_turns}",
-#'   current_turns = 25,
-#'   max_turns = 25
+#' abort_request_limit(
+#'   "Maximum requests exceeded: {current_requests}/{max_requests}",
+#'   current_requests = 25,
+#'   max_requests = 25
 #' )
 #' }
 #'
-#' @export
-abort_turn_limit <- function(
+#' @noRd
+abort_request_limit <- function(
   message,
-  current_turns = NULL,
-  max_turns = NULL,
+  current_requests = NULL,
+  max_requests = NULL,
   ...,
   .envir = parent.frame()
 ) {
   abort_deputy(
     message,
-    class = c("turn_limit", "budget"),
-    current_turns = current_turns,
-    max_turns = max_turns,
+    class = c("request_limit", "budget"),
+    current_requests = current_requests,
+    max_requests = max_requests,
     ...,
     .envir = .envir
   )
@@ -271,7 +271,7 @@ abort_turn_limit <- function(
 #' )
 #' }
 #'
-#' @export
+#' @noRd
 abort_provider <- function(
   message,
   provider_name = NULL,
@@ -310,7 +310,7 @@ abort_provider <- function(
 #' )
 #' }
 #'
-#' @export
+#' @noRd
 abort_session_load <- function(
   message,
   path = NULL,
@@ -347,7 +347,7 @@ abort_session_load <- function(
 #' )
 #' }
 #'
-#' @export
+#' @noRd
 abort_session_save <- function(
   message,
   path = NULL,
@@ -384,7 +384,7 @@ abort_session_save <- function(
 #' )
 #' }
 #'
-#' @export
+#' @noRd
 abort_hook <- function(
   message,
   hook_event = NULL,

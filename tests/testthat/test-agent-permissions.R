@@ -230,7 +230,7 @@ test_that("Agent respects r_code permission", {
   expect_s3_class(result_r, "PermissionResultAllow")
 })
 
-test_that("bypassPermissions mode allows everything", {
+test_that("full mode allows everything", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(
     chat = mock_chat,

@@ -1,6 +1,6 @@
 # Interactive tools for human-in-the-loop workflows
 #
-# This implements AskUserQuestion following the Anthropic Agent SDK format:
+# This implements Deputy's structured ask_user tool:
 # - questions: array of 1-4 questions
 # - Each question has: question, header, options (2-4), multiSelect
 # - Each option has: label, description
@@ -15,10 +15,10 @@
 #' @description
 #' In non-interactive sessions (scripts, Shiny apps, etc.), set a callback
 #' function that will be called when the agent needs user input via
-#' `AskUserQuestion`.
+#' `ask_user`.
 #'
-#' @param callback A function that takes `questions` (list matching the
-#'   AskUserQuestion format). Each question has `question`, `header`,
+#' @param callback A function that takes `questions` in Deputy's structured
+#'   question format. Each question has `question`, `header`,
 #'   `options` (list with `label` and `description`), and `multiSelect`.
 #'   Should return a named list mapping question text to selected label(s).
 #'   For multi-select, join labels with ", ".
@@ -54,8 +54,7 @@ set_ask_user_callback <- function(callback) {
 #' Get the current user input callback
 #'
 #' @return The current callback function, or NULL if none set.
-#' @keywords internal
-#' @export
+#' @noRd
 get_ask_user_callback <- function() {
   .deputy_env$ask_user_callback
 }
@@ -101,7 +100,7 @@ parse_user_response <- function(response, options, multi_select = FALSE) {
 
 #' Ask user questions (internal implementation)
 #'
-#' @param questions List of question objects following the SDK format
+#' @param questions List of structured question objects
 #' @return Named list mapping question text to selected answers
 #' @keywords internal
 ask_user_impl <- function(questions) {
@@ -217,14 +216,14 @@ validate_questions <- function(questions) {
   TRUE
 }
 
-#' AskUserQuestion tool
+#' Ask user tool
 #'
 #' @description
 #' A tool that allows the agent to ask the user clarifying questions and
 #' receive their responses. This enables human-in-the-loop workflows where
 #' the agent can request clarification or choices from the user.
 #'
-#' @param questions JSON string or list of question objects following the SDK format.
+#' @param questions JSON string or list of structured question objects.
 #'   Each question should have: `question` (string), `header` (string, max 12 chars),
 #'   `options` (list of objects with `label` and `description`), and optionally
 #'   `multiSelect` (logical).
@@ -232,8 +231,6 @@ validate_questions <- function(questions) {
 #' @format A tool definition created with `ellmer::tool()`.
 #'
 #' @details
-#' This tool follows the Anthropic Agent SDK format:
-#'
 #' **Input format:**
 #' - `questions`: Array of 1-4 question objects
 #' - Each question has:
@@ -329,7 +326,7 @@ tool_ask_user <- ellmer::tool(
       }
     )
   },
-  name = "AskUserQuestion",
+  name = "ask_user",
   description = paste(
     "Ask the user clarifying questions when you need more information to proceed.",
     "Present 1-4 questions with 2-4 options each.",
@@ -361,7 +358,7 @@ tool_ask_user <- ellmer::tool(
 #'
 #' @description
 #' Returns a list of tools that enable human-in-the-loop interactions.
-#' Currently includes `tool_ask_user` (AskUserQuestion) for asking
+#' Currently includes `tool_ask_user` (`ask_user`) for asking
 #' clarifying questions.
 #'
 #' @return A list of tool definitions.

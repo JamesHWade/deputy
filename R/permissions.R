@@ -4,14 +4,11 @@
 #'
 #' @description
 #' Permission modes control the overall behavior of tool permission checking:
-#' * `"default"` - Check each tool against the permission policy
-#' * `"acceptEdits"` - Auto-accept file write tools
+#' * `"standard"` - Check each tool against the configured capabilities
 #' * `"plan"` - Allow annotated read-only tools within configured capabilities
 #'   plus human approval prompts
-#' * `"dontAsk"` - Check policy without suggesting approval prompts
-#' * `"auto"` - SDK-compatible alias for default deputy permission behavior
 #' * `"readonly"` - Deny all write/execute tools
-#' * `"bypassPermissions"` - Allow all tools (dangerous, use with caution)
+#' * `"full"` - Allow all tools (dangerous, use with caution)
 #'
 #' @section Tool Annotations:
 #'
@@ -70,41 +67,71 @@
 #'   )
 #' )
 #' ```
-#'
 #' @export
 PermissionMode <- c(
-  "default",
-  "acceptEdits",
+  "standard",
   "plan",
-  "dontAsk",
-  "auto",
   "readonly",
-  "bypassPermissions"
+  "full"
 )
 
-# Validate a permission mode string, optionally allowing CLI aliases.
-validate_permission_mode_value <- function(
-  mode,
-  allow_cli_aliases = FALSE,
-  arg = "mode"
-) {
+# Validate a permission mode string.
+validate_permission_mode_value <- function(mode, arg = "mode") {
   if (!is.character(mode) || length(mode) != 1 || is.na(mode)) {
     cli_abort("{.arg {arg}} must be a length-1 character string")
   }
 
-  valid_modes <- PermissionMode
-  if (isTRUE(allow_cli_aliases)) {
-    valid_modes <- c(valid_modes, "standard", "full")
-  }
-
-  if (!mode %in% valid_modes) {
+  if (!mode %in% PermissionMode) {
     cli_abort(c(
       "Invalid permission mode: {.val {mode}}",
-      "i" = "{.arg {arg}} must be one of {.val {valid_modes}}"
+      "i" = "{.arg {arg}} must be one of {.val {PermissionMode}}"
     ))
   }
 
   mode
+}
+
+permission_mode_capabilities <- function(mode, working_dir = getwd()) {
+  mode <- validate_permission_mode_value(mode)
+  switch(
+    mode,
+    standard = list(
+      file_read = TRUE,
+      file_write = working_dir,
+      bash = FALSE,
+      r_code = TRUE,
+      web = FALSE,
+      install_packages = FALSE,
+      permission_prompt_tool_name = NULL
+    ),
+    plan = list(
+      file_read = TRUE,
+      file_write = FALSE,
+      bash = FALSE,
+      r_code = FALSE,
+      web = TRUE,
+      install_packages = FALSE,
+      permission_prompt_tool_name = "ask_user"
+    ),
+    readonly = list(
+      file_read = TRUE,
+      file_write = FALSE,
+      bash = FALSE,
+      r_code = FALSE,
+      web = FALSE,
+      install_packages = FALSE,
+      permission_prompt_tool_name = NULL
+    ),
+    full = list(
+      file_read = TRUE,
+      file_write = TRUE,
+      bash = TRUE,
+      r_code = TRUE,
+      web = TRUE,
+      install_packages = TRUE,
+      permission_prompt_tool_name = NULL
+    )
+  )
 }
 
 #' Create an allow permission result
@@ -173,7 +200,7 @@ PermissionResultDeny <- function(reason, interrupt = FALSE) {
 #'   tools not in the list are denied.
 #' - `tool_denylist`: Optional list of tools that are always denied.
 #' - `permission_prompt_tool_name`: Optional tool name to mention in deny
-#'   messages for gated tools (e.g., "AskUserQuestion").
+#'   messages for gated tools (e.g., "ask_user").
 #'
 #' **Security Note:** Permission fields are immutable after construction.
 #' This prevents adversarial code from modifying permissions at runtime.
@@ -194,8 +221,6 @@ Permissions <- R6::R6Class(
     #' @param r_code Allow R code execution
     #' @param web Allow web requests
     #' @param install_packages Allow package installation
-    #' @param max_turns Maximum turns
-    #' @param max_cost_usd Maximum cost
     #' @param can_use_tool Custom callback function
     #' @param tool_allowlist Optional character vector of allowed tool names
     #' @param tool_denylist Optional character vector of denied tool names
@@ -203,15 +228,13 @@ Permissions <- R6::R6Class(
     #'   permission deny messages for gated tools
     #' @return A new `Permissions` object
     initialize = function(
-      mode = "default",
+      mode = "standard",
       file_read = TRUE,
-      file_write = NULL,
+      file_write = getwd(),
       bash = FALSE,
       r_code = TRUE,
       web = FALSE,
       install_packages = FALSE,
-      max_turns = 25,
-      max_cost_usd = NULL,
       can_use_tool = NULL,
       tool_allowlist = NULL,
       tool_denylist = NULL,
@@ -252,8 +275,6 @@ Permissions <- R6::R6Class(
       private$.r_code <- r_code
       private$.web <- web
       private$.install_packages <- install_packages
-      private$.max_turns <- max_turns
-      private$.max_cost_usd <- max_cost_usd
       private$.can_use_tool <- can_use_tool
       private$.tool_allowlist <- tool_allowlist
       private$.tool_denylist <- tool_denylist
@@ -269,12 +290,9 @@ Permissions <- R6::R6Class(
     #' @param context Additional context (e.g., working_dir, tool_annotations)
     #' @return A [PermissionResultAllow] or [PermissionResultDeny]
     check = function(tool_name, tool_input, context = list()) {
-      # Allow prompt tool so gated workflows can request approval. The SDK
-      # dontAsk mode keeps normal policy checks but does not allow an approval
-      # prompt escape hatch.
-      if (
-        self$mode != "dontAsk" && private$is_permission_prompt_tool(tool_name)
-      ) {
+      # Allow the configured prompt tool so gated workflows can request
+      # explicit human approval.
+      if (private$is_permission_prompt_tool(tool_name)) {
         return(PermissionResultAllow())
       }
 
@@ -285,7 +303,7 @@ Permissions <- R6::R6Class(
       }
 
       # Mode-based shortcuts
-      if (self$mode == "bypassPermissions") {
+      if (self$mode == "full") {
         return(PermissionResultAllow())
       }
 
@@ -293,14 +311,14 @@ Permissions <- R6::R6Class(
       annotations <- context$tool_annotations
 
       if (self$mode == "readonly") {
-        tool_id <- private$normalize_tool_id(tool_name)
+        tool_id <- normalize_native_tool_id(tool_name)
         explicitly_allowed <- private$tool_name_in_list(
           tool_name,
           self$tool_allowlist
         )
 
         # Known mutating tools remain denied even if annotations are absent or
-        # incorrectly mark an SDK alias as read-only.
+        # incorrectly mark a tool as read-only.
         if (private$is_write_tool(tool_name)) {
           return(PermissionResultDeny(
             reason = "Permission denied: readonly mode active"
@@ -331,8 +349,7 @@ Permissions <- R6::R6Class(
               "read_csv",
               "list_files",
               "glob_files",
-              "grep_files",
-              "todo_read"
+              "grep_files"
             )
         ) {
           if (!isTRUE(self$file_read)) {
@@ -438,12 +455,6 @@ Permissions <- R6::R6Class(
         self$permission_prompt_tool_name %||% "NULL",
         "\n"
       )
-      cat("  max_turns:", self$max_turns, "\n")
-      cat(
-        "  max_cost_usd:",
-        if (is.null(self$max_cost_usd)) "unlimited" else self$max_cost_usd,
-        "\n"
-      )
       invisible(self)
     }
   ),
@@ -540,32 +551,6 @@ Permissions <- R6::R6Class(
       private$.install_packages <- value
     },
 
-    #' @field max_turns Maximum number of turns before stopping. Read-only after construction.
-    max_turns = function(value) {
-      if (missing(value)) {
-        return(private$.max_turns)
-      }
-      if (isTRUE(private$.frozen)) {
-        cli_abort(
-          "Cannot modify permissions: max_turns is immutable after construction"
-        )
-      }
-      private$.max_turns <- value
-    },
-
-    #' @field max_cost_usd Maximum cost in USD before stopping. Read-only after construction.
-    max_cost_usd = function(value) {
-      if (missing(value)) {
-        return(private$.max_cost_usd)
-      }
-      if (isTRUE(private$.frozen)) {
-        cli_abort(
-          "Cannot modify permissions: max_cost_usd is immutable after construction"
-        )
-      }
-      private$.max_cost_usd <- value
-    },
-
     #' @field can_use_tool Custom permission callback. Read-only after construction.
     can_use_tool = function(value) {
       if (missing(value)) {
@@ -638,8 +623,6 @@ Permissions <- R6::R6Class(
     .r_code = NULL,
     .web = NULL,
     .install_packages = NULL,
-    .max_turns = NULL,
-    .max_cost_usd = NULL,
     .can_use_tool = NULL,
     .tool_allowlist = NULL,
     .tool_denylist = NULL,
@@ -655,63 +638,17 @@ Permissions <- R6::R6Class(
       unique(out)
     },
 
-    normalize_tool_id = function(name) {
-      if (is.null(name) || length(name) == 0) {
-        return(NA_character_)
-      }
-      normalized <- tolower(trimws(as.character(name[[1]])))
-      normalized <- sub("^tool_", "", normalized)
-      normalized <- gsub("[^a-z0-9]+", "", normalized)
-
-      # Canonicalize native and Agent SDK names to one policy identifier.
-      alias_map <- c(
-        read = "read_file",
-        readfile = "read_file",
-        readmarkdown = "read_markdown",
-        readcsv = "read_csv",
-        write = "write_file",
-        writefile = "write_file",
-        edit = "edit_file",
-        editfile = "edit_file",
-        multiedit = "multi_edit",
-        ls = "list_files",
-        listfiles = "list_files",
-        glob = "glob_files",
-        globfiles = "glob_files",
-        grep = "grep_files",
-        grepfiles = "grep_files",
-        todoread = "todo_read",
-        todowrite = "todo_write",
-        webfetch = "web_fetch",
-        websearch = "web_search",
-        askuserquestion = "ask_user_question",
-        bash = "run_bash",
-        runbash = "run_bash",
-        runrcode = "run_r_code",
-        installpackage = "install_package",
-        agent = "delegate_to_agent",
-        task = "delegate_to_agent",
-        delegatetoagent = "delegate_to_agent"
-      )
-      aliased <- unname(alias_map[normalized])
-      if (length(aliased) == 0 || is.na(aliased)) {
-        normalized
-      } else {
-        aliased
-      }
-    },
-
     tool_name_in_list = function(tool_name, names_vec) {
       if (is.null(names_vec) || length(names_vec) == 0) {
         return(FALSE)
       }
-      tool_id <- private$normalize_tool_id(tool_name)
+      tool_id <- normalize_native_tool_id(tool_name)
       if (is.na(tool_id)) {
         return(FALSE)
       }
       candidate_ids <- unique(vapply(
         names_vec,
-        private$normalize_tool_id,
+        normalize_native_tool_id,
         character(1)
       ))
       tool_id %in% candidate_ids
@@ -772,12 +709,11 @@ Permissions <- R6::R6Class(
 
     # Check if a tool is a write/execute tool
     is_write_tool = function(tool_name) {
-      private$normalize_tool_id(tool_name) %in%
+      normalize_native_tool_id(tool_name) %in%
         c(
           "write_file",
           "edit_file",
           "multi_edit",
-          "todo_write",
           "run_bash",
           "run_r_code",
           "install_package"
@@ -786,7 +722,7 @@ Permissions <- R6::R6Class(
 
     # Tool-specific permission checks
     check_tool_specific = function(tool_name, tool_input, context) {
-      tool_id <- private$normalize_tool_id(tool_name)
+      tool_id <- normalize_native_tool_id(tool_name)
 
       # File read tools
       if (
@@ -797,8 +733,7 @@ Permissions <- R6::R6Class(
             "read_csv",
             "list_files",
             "glob_files",
-            "grep_files",
-            "todo_read"
+            "grep_files"
           )
       ) {
         if (!self$file_read) {
@@ -813,8 +748,7 @@ Permissions <- R6::R6Class(
           c(
             "write_file",
             "edit_file",
-            "multi_edit",
-            "todo_write"
+            "multi_edit"
           )
       ) {
         if (isFALSE(self$file_write)) {
@@ -823,10 +757,7 @@ Permissions <- R6::R6Class(
 
         # Check directory restriction
         if (is.character(self$file_write)) {
-          path <- tool_input$path %||% tool_input$file_path
-          if (is.null(path) && identical(tool_id, "todo_write")) {
-            path <- file.path(".deputy", "todos.json")
-          }
+          path <- tool_input$path
           if (
             is.null(path) ||
               !is.character(path) ||
@@ -884,11 +815,6 @@ Permissions <- R6::R6Class(
               reason = paste("File writing only allowed in:", self$file_write)
             ))
           }
-        }
-
-        # acceptEdits mode auto-accepts
-        if (self$mode == "acceptEdits") {
-          return(PermissionResultAllow())
         }
 
         return(PermissionResultAllow())
@@ -979,7 +905,7 @@ Permissions <- R6::R6Class(
           reason = paste0(
             "Plan mode only allows annotated read-only tools. ",
             tool_name,
-            " has no compatible annotations."
+            " has no annotations."
           )
         ))
       }
@@ -1023,8 +949,6 @@ Permissions <- R6::R6Class(
 #' Creates a permission policy that only allows reading files.
 #' All write operations, code execution, and web access are denied.
 #'
-#' @param max_turns Maximum number of turns (default 25)
-#' @param max_cost_usd Maximum cost in USD (default NULL = unlimited)
 #' @return A [Permissions] object
 #'
 #' @examples
@@ -1032,7 +956,7 @@ Permissions <- R6::R6Class(
 #' perms$check("read_file", list(path = "test.txt"))
 #'
 #' @export
-permissions_readonly <- function(max_turns = 25, max_cost_usd = NULL) {
+permissions_readonly <- function() {
   Permissions$new(
     mode = "readonly",
     file_read = TRUE,
@@ -1040,9 +964,7 @@ permissions_readonly <- function(max_turns = 25, max_cost_usd = NULL) {
     bash = FALSE,
     r_code = FALSE,
     web = FALSE,
-    install_packages = FALSE,
-    max_turns = max_turns,
-    max_cost_usd = max_cost_usd
+    install_packages = FALSE
   )
 }
 
@@ -1056,8 +978,6 @@ permissions_readonly <- function(max_turns = 25, max_cost_usd = NULL) {
 #'
 #' @param working_dir Root directory for file writes (default: current
 #'   directory). This does not restrict otherwise accessible file reads.
-#' @param max_turns Maximum number of turns (default 25)
-#' @param max_cost_usd Maximum cost in USD (default NULL = unlimited)
 #' @return A [Permissions] object
 #'
 #' @examples
@@ -1065,21 +985,15 @@ permissions_readonly <- function(max_turns = 25, max_cost_usd = NULL) {
 #' perms$check("write_file", list(path = "output.txt"))
 #'
 #' @export
-permissions_standard <- function(
-  working_dir = getwd(),
-  max_turns = 25,
-  max_cost_usd = NULL
-) {
+permissions_standard <- function(working_dir = getwd()) {
   Permissions$new(
-    mode = "default",
+    mode = "standard",
     file_read = TRUE,
     file_write = working_dir,
     bash = FALSE,
     r_code = TRUE,
     web = FALSE,
-    install_packages = FALSE,
-    max_turns = max_turns,
-    max_cost_usd = max_cost_usd
+    install_packages = FALSE
   )
 }
 
@@ -1090,10 +1004,8 @@ permissions_standard <- function(
 #' Only tools annotated as read-only are allowed, plus the permission prompt
 #' tool when configured.
 #'
-#' @param max_turns Maximum number of turns (default 25)
-#' @param max_cost_usd Maximum cost in USD (default NULL = unlimited)
 #' @param permission_prompt_tool_name Optional tool name that the model can use
-#'   to request explicit approval. Defaults to `"AskUserQuestion"`.
+#'   to request explicit approval. Defaults to `"ask_user"`.
 #' @return A [Permissions] object
 #'
 #' @examples
@@ -1101,9 +1013,7 @@ permissions_standard <- function(
 #'
 #' @export
 permissions_plan <- function(
-  max_turns = 25,
-  max_cost_usd = NULL,
-  permission_prompt_tool_name = "AskUserQuestion"
+  permission_prompt_tool_name = "ask_user"
 ) {
   Permissions$new(
     mode = "plan",
@@ -1113,8 +1023,6 @@ permissions_plan <- function(
     r_code = FALSE,
     web = TRUE,
     install_packages = FALSE,
-    max_turns = max_turns,
-    max_cost_usd = max_cost_usd,
     permission_prompt_tool_name = permission_prompt_tool_name
   )
 }
@@ -1125,24 +1033,29 @@ permissions_plan <- function(
 #' Creates a permission policy that allows all operations.
 #' **Use with caution!** This bypasses all permission checks.
 #'
-#' @param max_turns Maximum number of turns (default 50)
-#' @param max_cost_usd Maximum cost in USD (default NULL = unlimited)
 #' @return A [Permissions] object
 #'
 #' @examples
 #' perms <- permissions_full()
 #'
 #' @export
-permissions_full <- function(max_turns = 50, max_cost_usd = NULL) {
+permissions_full <- function() {
   Permissions$new(
-    mode = "bypassPermissions",
+    mode = "full",
     file_read = TRUE,
     file_write = TRUE,
     bash = TRUE,
     r_code = TRUE,
     web = TRUE,
-    install_packages = TRUE,
-    max_turns = max_turns,
-    max_cost_usd = max_cost_usd
+    install_packages = TRUE
   )
+}
+# Normalize Deputy's canonical snake-case tool identifiers.
+normalize_native_tool_id <- function(name) {
+  if (is.null(name) || length(name) == 0L) {
+    return(NA_character_)
+  }
+  normalized <- tolower(trimws(as.character(name[[1L]])))
+  normalized <- gsub("[^a-z0-9]+", "_", normalized)
+  gsub("^_+|_+$", "", normalized)
 }

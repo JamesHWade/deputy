@@ -136,30 +136,12 @@ test_that("Agent provider returns correct structure", {
   expect_equal(provider$model, "test-model")
 })
 
-test_that("Agent provider reports a model for a provider without a model property", {
-  chat <- ellmer::chat_openai(
-    credentials = function() "test-key",
-    model = "gpt-4o-mini"
-  )
-  skip_if_not(is.null(attr(chat$get_provider(), "model")))
-  agent <- Agent$new(chat = chat)
-
-  provider <- agent$provider()
-
-  expect_equal(provider$name, "OpenAI")
-  expect_equal(provider$model, "gpt-4o-mini")
-})
-
-test_that("Agent provider falls back to unknown when the model cannot be read", {
+test_that("Agent provider surfaces model access errors", {
   mock_chat <- create_mock_chat()
-  mock_chat$get_provider <- function() list(name = "mock")
   mock_chat$get_model <- function() stop("no model available")
   agent <- Agent$new(chat = mock_chat)
 
-  provider <- agent$provider()
-
-  expect_equal(provider$name, "mock")
-  expect_equal(provider$model, "unknown")
+  expect_error(agent$provider(), "no model available")
 })
 
 test_that("Agent turns returns list", {
@@ -190,9 +172,19 @@ test_that("Agent save_session creates file", {
 
   # Check session contents
   session <- readRDS(session_file)
-  expect_true("turns" %in% names(session))
-  expect_true("permissions" %in% names(session))
-  expect_true("metadata" %in% names(session))
+  expect_identical(session$schema_version, 1L)
+  expect_named(
+    session,
+    c(
+      "schema_version",
+      "turns",
+      "system_prompt",
+      "run_context",
+      "appended_hook_context_hashes",
+      "file_checkpoint_state",
+      "metadata"
+    )
+  )
 })
 
 test_that("Agent load_session restores chat state but preserves authority", {
@@ -210,7 +202,7 @@ test_that("Agent load_session restores chat state but preserves authority", {
   source <- Agent$new(
     chat = source_chat,
     system_prompt = "Test prompt",
-    permissions = permissions_readonly(max_turns = 10),
+    permissions = permissions_readonly(),
     working_dir = saved_working_dir
   )
   session_file <- file.path(temp_dir, "session.rds")
@@ -232,52 +224,6 @@ test_that("Agent load_session restores chat state but preserves authority", {
   expect_identical(receiver$working_dir, configured_working_dir)
 })
 
-test_that("Agent load_session restores tools only with explicit trust", {
-  source_tool <- ellmer::tool(
-    fun = function() "source",
-    name = "source_tool",
-    description = "Serialized source tool."
-  )
-  receiver_tool <- ellmer::tool(
-    fun = function() "receiver",
-    name = "receiver_tool",
-    description = "Constructor-owned receiver tool."
-  )
-  root <- withr::local_tempdir(pattern = "deputy-session-tools-")
-  session_file <- file.path(root, "session.rds")
-  source <- Agent$new(
-    chat = create_mock_chat(),
-    tools = list(source_tool),
-    working_dir = root
-  )
-  suppressWarnings(suppressMessages(source$save_session(session_file)))
-
-  default_chat <- create_mock_chat()
-  default_receiver <- Agent$new(
-    chat = default_chat,
-    tools = list(receiver_tool),
-    working_dir = root
-  )
-  suppressWarnings(suppressMessages(
-    default_receiver$load_session(session_file)
-  ))
-  expect_setequal(names(default_chat$get_tools()), "receiver_tool")
-
-  trusted_chat <- create_mock_chat()
-  trusted_receiver <- Agent$new(
-    chat = trusted_chat,
-    tools = list(receiver_tool),
-    working_dir = root
-  )
-  suppressWarnings(suppressMessages(
-    trusted_receiver$load_session(session_file, restore_tools = TRUE)
-  ))
-  expect_setequal(
-    names(trusted_chat$get_tools()),
-    c("receiver_tool", "source_tool")
-  )
-})
-
 test_that("Agent load_session validates payload before mutating conversation", {
   root <- withr::local_tempdir(pattern = "deputy-session-atomic-")
   session_file <- file.path(root, "malformed.rds")
@@ -289,9 +235,12 @@ test_that("Agent load_session validates payload before mutating conversation", {
 
   saveRDS(
     list(
+      schema_version = 1L,
       turns = list(create_mock_user_turn("new turn")),
       system_prompt = "new prompt",
+      run_context = list(),
       appended_hook_context_hashes = new.env(parent = emptyenv()),
+      file_checkpoint_state = NULL,
       metadata = list()
     ),
     session_file
@@ -306,10 +255,13 @@ test_that("Agent load_session validates payload before mutating conversation", {
 
   saveRDS(
     list(
+      schema_version = 0L,
       turns = list(create_mock_user_turn("unsafe session")),
       system_prompt = "unsafe prompt",
+      run_context = list(),
       appended_hook_context_hashes = character(),
-      metadata = list(session_id = "../outside")
+      file_checkpoint_state = NULL,
+      metadata = list()
     ),
     session_file
   )
@@ -411,16 +363,9 @@ test_that("generate_fallback_summary creates text summary", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)
 
-  # Create mock turns (text inside the list, not as attribute)
   mock_turns <- list(
-    structure(
-      list(text = "User msg", contents = list()),
-      class = c("UserTurn", "Turn")
-    ),
-    structure(
-      list(text = "Asst msg", contents = list()),
-      class = c("AssistantTurn", "Turn")
-    )
+    create_mock_user_turn("User msg"),
+    create_mock_assistant_turn("Asst msg")
   )
 
   # Access private method
@@ -439,10 +384,13 @@ test_that("compaction summary clone is isolated, callback-free, and silent", {
   request_calls <- 0L
   result_calls <- 0L
   probe <- new.env(parent = emptyenv())
-  provider <- list(
+  provider <- ellmer::Provider(
     name = "private-gateway",
     model = "private-model",
     base_url = "https://gateway.invalid",
+    params = list(),
+    extra_args = list(),
+    extra_headers = character(),
     credentials = function() "test-token"
   )
   mock_chat <- create_compaction_mock_chat(
@@ -467,12 +415,9 @@ test_that("compaction summary clone is isolated, callback-free, and silent", {
     tools = list(tool_read_file),
     system_prompt = "KEEP ME",
     run_context = run_context,
-    agent_id = "agent-compaction"
-  )
-  agent$configure_sdk_compat(list(
-    persist_session = FALSE,
+    agent_id = "agent-compaction",
     session_id = "session-compaction"
-  ))
+  )
   original_turns <- list(
     create_mock_user_turn("Q"),
     create_mock_assistant_turn("A")
@@ -532,12 +477,9 @@ test_that("compaction preserves run context and session identity", {
   agent <- Agent$new(
     chat = mock_chat,
     run_context = run_context,
-    agent_id = "agent-compaction"
-  )
-  agent$configure_sdk_compat(list(
-    persist_session = FALSE,
+    agent_id = "agent-compaction",
     session_id = "session-compaction"
-  ))
+  )
   mock_chat$set_turns(list(
     create_mock_user_turn("Q1"),
     create_mock_assistant_turn("A1"),
@@ -599,30 +541,6 @@ test_that("extract_tool_request_data handles NULL request", {
   expect_null(result$tool_annotations)
 })
 
-test_that("extract_tool_request_data handles list-style request", {
-  mock_chat <- create_mock_chat()
-  agent <- Agent$new(chat = mock_chat)
-
-  # Create a list-style request (not S7)
-  list_request <- list(
-    name = "test_tool",
-    arguments = list(arg1 = "value1"),
-    tool = list(annotations = list(read_only_hint = TRUE))
-  )
-
-  result <- NULL
-  expect_warning(
-    result <- agent$.__enclos_env__$private$extract_tool_request_data(
-      list_request
-    ),
-    "not a ContentToolRequest"
-  )
-
-  expect_equal(result$tool_name, "test_tool")
-  expect_equal(result$tool_input, list(arg1 = "value1"))
-  expect_equal(result$tool_annotations, list(read_only_hint = TRUE))
-})
-
 test_that("extract_tool_result_data handles NULL result", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)
@@ -637,52 +555,4 @@ test_that("extract_tool_result_data handles NULL result", {
   expect_equal(result$tool_name, "unknown")
   expect_null(result$tool_result)
   expect_equal(result$tool_error, "NULL result received")
-})
-
-test_that("extract_tool_result_data handles list-style result", {
-  mock_chat <- create_mock_chat()
-  agent <- Agent$new(chat = mock_chat)
-
-  # Create a list-style result (not S7)
-  list_result <- list(
-    value = "tool output",
-    error = NULL,
-    request = list(name = "test_tool")
-  )
-
-  result <- NULL
-  expect_warning(
-    result <- agent$.__enclos_env__$private$extract_tool_result_data(
-      list_result
-    ),
-    "not a ContentToolResult"
-  )
-
-  expect_equal(result$tool_name, "test_tool")
-  expect_equal(result$tool_result, "tool output")
-  expect_null(result$tool_error)
-})
-
-test_that("extract_tool_result_data handles result with error", {
-  mock_chat <- create_mock_chat()
-  agent <- Agent$new(chat = mock_chat)
-
-  # Create a list-style result with error
-  list_result <- list(
-    value = NULL,
-    error = "Something went wrong",
-    request = list(name = "failing_tool")
-  )
-
-  result <- NULL
-  expect_warning(
-    result <- agent$.__enclos_env__$private$extract_tool_result_data(
-      list_result
-    ),
-    "not a ContentToolResult"
-  )
-
-  expect_equal(result$tool_name, "failing_tool")
-  expect_null(result$tool_result)
-  expect_equal(result$tool_error, "Something went wrong")
 })

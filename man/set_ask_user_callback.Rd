@@ -7,8 +7,8 @@
 set_ask_user_callback(callback)
 }
 \arguments{
-\item{callback}{A function that takes \code{questions} (list matching the
-AskUserQuestion format). Each question has \code{question}, \code{header},
+\item{callback}{A function that takes \code{questions} in Deputy's structured
+question format. Each question has \code{question}, \code{header},
 \code{options} (list with \code{label} and \code{description}), and \code{multiSelect}.
 Should return a named list mapping question text to selected label(s).
 For multi-select, join labels with ", ".
@@ -20,7 +20,7 @@ Invisibly returns the previous callback (or NULL).
 \description{
 In non-interactive sessions (scripts, Shiny apps, etc.), set a callback
 function that will be called when the agent needs user input via
-\code{AskUserQuestion}.
+\code{ask_user}.
 }
 \examples{
 \dontrun{

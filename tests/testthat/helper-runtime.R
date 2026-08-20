@@ -40,6 +40,7 @@ create_content_stream_chat <- function(
     )
   }
 
+  provider <- create_mock_provider(model = "content-stream")
   chat <- structure(
     list(
       chat = function(prompt = NULL) final_text,
@@ -58,7 +59,7 @@ create_content_stream_chat <- function(
           value = tool_result,
           request = request
         )
-        text <- ellmer::ContentText(final_text)
+        content <- ellmer::ContentText(final_text)
         step <- 0L
 
         function() {
@@ -97,8 +98,8 @@ create_content_stream_chat <- function(
             if (isTRUE(state$tool_rejected)) {
               return(coro::exhausted())
             }
-            add_assistant_turn(list(text), 5, 2, 0.005)
-            return(text)
+            add_assistant_turn(list(content), 5, 2, 0.005)
+            return(content)
           }
           coro::exhausted()
         }
@@ -125,7 +126,8 @@ create_content_stream_chat <- function(
         }
         do.call(rbind, state$token_rows)
       },
-      get_provider = function() list(name = "mock", model = "content-stream"),
+      get_provider = function() provider,
+      get_model = function() provider@model,
       last_turn = function(role = "assistant") {
         if (length(state$turns) == 0L) NULL else tail(state$turns, 1L)[[1]]
       },
@@ -186,11 +188,9 @@ collect_async_stream <- function(stream) {
   if (!done) {
     stop("Async stream did not settle")
   }
-
   if (!is.null(stream_error)) {
     stop(stream_error)
   }
-
   result
 }
 
@@ -268,11 +268,7 @@ create_shiny_tool_chat <- function(tool_name, tool_input, execute = NULL) {
         )
       }
       state$on_tool_result(result)
-      result_text <- "done"
-      if (state$rejected) {
-        result_text <- "rejected"
-      }
-      coro::yield(result_text)
+      coro::yield(if (state$rejected) "rejected" else "done")
     })()
   }
 
@@ -299,31 +295,5 @@ create_checkpoint_callback_chat <- function() {
     chat = chat,
     request_callback = function() request_callback,
     result_callback = function() result_callback
-  )
-}
-
-checkpoint_test_write_raw <- function(path, bytes) {
-  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
-  connection <- file(path, open = "wb")
-  on.exit(close(connection), add = TRUE)
-  if (length(bytes) > 0L) {
-    writeBin(bytes, connection)
-  }
-  invisible(path)
-}
-
-checkpoint_test_read_raw <- function(path) {
-  connection <- file(path, open = "rb")
-  on.exit(close(connection), add = TRUE)
-  readBin(connection, what = "raw", n = file.info(path)$size)
-}
-
-checkpoint_test_error <- function(expr) {
-  tryCatch(
-    {
-      force(expr)
-      NULL
-    },
-    deputy_file_checkpoint_error = function(error) error
   )
 }

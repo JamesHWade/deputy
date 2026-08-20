@@ -3,9 +3,7 @@
 test_that("tool_ask_user has correct structure", {
   expect_true(inherits(tool_ask_user, "ellmer::ToolDef"))
 
-  # Check name - matches Anthropic SDK naming
-
-  expect_equal(tool_ask_user@name, "AskUserQuestion")
+  expect_equal(tool_ask_user@name, "ask_user")
 
   # Check it has the right annotations
   annotations <- tool_ask_user@annotations
@@ -18,9 +16,8 @@ test_that("tools_interactive returns tool list", {
   expect_true(is.list(tools))
   expect_true(length(tools) >= 1)
 
-  # Should include AskUserQuestion
   tool_names <- vapply(tools, function(t) t@name, character(1))
-  expect_true("AskUserQuestion" %in% tool_names)
+  expect_true("ask_user" %in% tool_names)
 })
 
 test_that("set_ask_user_callback validates input", {

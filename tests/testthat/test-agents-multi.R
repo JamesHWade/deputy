@@ -17,6 +17,24 @@ test_that("agent_definition creates correct structure", {
   expect_equal(def$tools, list())
   expect_equal(def$model, "inherit")
   expect_equal(def$skills, list())
+  expect_null(def$max_requests)
+  expect_named(
+    def,
+    c(
+      "name",
+      "description",
+      "prompt",
+      "tools",
+      "model",
+      "skills",
+      "disallowed_tools",
+      "memory",
+      "mcp_servers",
+      "initial_prompt",
+      "max_requests",
+      "permission_mode"
+    )
+  )
 })
 
 test_that("agent_definition accepts tools", {
@@ -72,6 +90,25 @@ test_that("LeadAgent initializes correctly", {
   expect_s3_class(lead, "LeadAgent")
   expect_s3_class(lead, "Agent")
   expect_equal(length(lead$sub_agent_defs), 1)
+})
+
+test_that("LeadAgent and sub-agents use native session identifiers", {
+  sub_agent <- agent_definition(
+    name = "helper",
+    description = "A helper agent",
+    prompt = "You help with tasks"
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(sub_agent),
+    session_id = "session-lead"
+  )
+
+  child <- lead$.__enclos_env__$private$create_sub_agent(sub_agent)
+
+  expect_identical(lead$session_id(), "session-lead")
+  expect_match(child$session_id(), "^session_")
+  expect_false(identical(child$session_id(), lead$session_id()))
 })
 
 test_that("LeadAgent adds delegate_to_agent tool", {
@@ -259,58 +296,43 @@ test_that("LeadAgent passes permissions to sub-agents", {
   expect_identical(lead$permissions, perms)
 })
 
-test_that("default and auto permission modes are equivalent for sub-agents", {
-  default_to_auto <- agent_definition(
-    name = "default-to-auto",
-    description = "Uses the SDK alias",
-    prompt = "You help",
-    permission_mode = "auto"
-  )
-  default_lead <- LeadAgent$new(
-    chat = create_mock_chat(),
-    sub_agents = list(default_to_auto),
-    permissions = Permissions$new(mode = "default")
-  )
+test_that("agent_definition accepts only canonical permission modes", {
+  for (mode in PermissionMode) {
+    definition <- agent_definition(
+      name = paste0("agent-", mode),
+      description = "Uses a canonical mode",
+      prompt = "You help",
+      permission_mode = mode
+    )
+    expect_identical(definition$permission_mode, mode)
+  }
 
-  auto_child <- default_lead$.__enclos_env__$private$derive_subagent_permissions(
-    default_to_auto
-  )
-  expect_identical(auto_child$mode, "auto")
-
-  auto_to_default <- agent_definition(
-    name = "auto-to-default",
-    description = "Uses Deputy's canonical mode",
-    prompt = "You help",
-    permission_mode = "default"
-  )
-  auto_lead <- LeadAgent$new(
-    chat = create_mock_chat(),
-    sub_agents = list(auto_to_default),
-    permissions = Permissions$new(mode = "auto")
-  )
-
-  default_child <- auto_lead$.__enclos_env__$private$derive_subagent_permissions(
-    auto_to_default
-  )
-  expect_identical(default_child$mode, "default")
-
-  default_to_bypass <- default_to_auto
-  default_to_bypass$permission_mode <- "bypassPermissions"
   expect_error(
-    default_lead$.__enclos_env__$private$derive_subagent_permissions(
-      default_to_bypass
+    agent_definition(
+      name = "sdk-alias",
+      description = "Uses a removed alias",
+      prompt = "You help",
+      permission_mode = "auto"
     ),
-    "cannot change under the lead policy"
+    "Invalid permission mode"
   )
 
-  auto_to_accept_edits <- auto_to_default
-  auto_to_accept_edits$permission_mode <- "acceptEdits"
-  expect_error(
-    auto_lead$.__enclos_env__$private$derive_subagent_permissions(
-      auto_to_accept_edits
-    ),
-    "cannot change under the lead policy"
+  readonly_definition <- agent_definition(
+    name = "full-to-readonly",
+    description = "Tightens a full-access lead",
+    prompt = "You help",
+    permission_mode = "readonly"
   )
+  full_lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(readonly_definition),
+    permissions = permissions_full()
+  )
+  readonly_child <- full_lead$.__enclos_env__$private$create_sub_agent(
+    readonly_definition
+  )
+  expect_identical(readonly_child$permissions$mode, "readonly")
+  expect_false(readonly_child$permissions$file_write)
 })
 
 test_that("sub-agent permission modes cannot exceed the lead policy", {
@@ -319,7 +341,7 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
     name = "widening",
     description = "Attempts to widen authority",
     prompt = "You help",
-    permission_mode = "bypassPermissions"
+    permission_mode = "full"
   )
   lead <- LeadAgent$new(
     chat = mock_chat,
@@ -338,7 +360,7 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
   child <- lead$.__enclos_env__$private$create_sub_agent(restricted)
   expect_identical(child$permissions$mode, "readonly")
   expect_s3_class(
-    child$permissions$check("Write", list(file_path = "blocked.txt")),
+    child$permissions$check("write_file", list(path = "blocked.txt")),
     "PermissionResultDeny"
   )
 
@@ -359,13 +381,14 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
       tool_allowlist = "custom_tool"
     )
   )
-  expect_error(
-    plan_lead$.__enclos_env__$private$create_sub_agent(plan_definition),
-    "cannot change under the lead policy"
+  plan_child <- plan_lead$.__enclos_env__$private$create_sub_agent(
+    plan_definition
   )
+  expect_identical(plan_child$permissions$mode, "readonly")
+  expect_false(plan_child$permissions$web)
 })
 
-test_that("agent_definition validates max_turns eagerly", {
+test_that("agent_definition validates max_requests eagerly", {
   base_args <- list(
     name = "invalid",
     description = "Invalid limit",
@@ -373,19 +396,22 @@ test_that("agent_definition validates max_turns eagerly", {
   )
 
   expect_error(
-    do.call(agent_definition, c(base_args, list(max_turns = -1))),
+    do.call(agent_definition, c(base_args, list(max_requests = -1))),
     "non-negative"
   )
   expect_error(
-    do.call(agent_definition, c(base_args, list(max_turns = 1.5))),
+    do.call(agent_definition, c(base_args, list(max_requests = 1.5))),
     "whole number"
   )
   expect_error(
-    do.call(agent_definition, c(base_args, list(max_turns = c(1, 2)))),
+    do.call(agent_definition, c(base_args, list(max_requests = c(1, 2)))),
     "length-1"
   )
   expect_identical(
-    do.call(agent_definition, c(base_args, list(max_turns = 2)))$max_turns,
+    do.call(
+      agent_definition,
+      c(base_args, list(max_requests = 2))
+    )$max_requests,
     2L
   )
 })
@@ -395,7 +421,7 @@ test_that("sub-agents inherit remaining lead run budgets", {
     name = "bounded",
     description = "Uses bounded resources",
     prompt = "You help",
-    max_turns = 3
+    max_requests = 3
   )
   lead <- LeadAgent$new(
     chat = create_mock_chat(),
@@ -496,39 +522,9 @@ test_that("agent_definition supports skills", {
   expect_true("skill1" %in% def$skills)
 })
 
-test_that("agent_with_delegation creates default sub-agents", {
-  mock_chat <- create_mock_chat()
-  lead <- agent_with_delegation(chat = mock_chat)
-
-  available <- lead$available_sub_agents()
-
-  # Should have code_reader and code_analyzer by default
-  expect_true("code_reader" %in% available)
-  expect_true("code_analyzer" %in% available)
-})
-
-test_that("agent_with_delegation accepts custom permissions", {
-  mock_chat <- create_mock_chat()
-  perms <- permissions_readonly()
-  lead <- agent_with_delegation(chat = mock_chat, permissions = perms)
-
-  expect_identical(lead$permissions, perms)
-})
-
 # Tests for SubagentStop hook
 test_that("SubagentStop hook event exists", {
   expect_true("SubagentStop" %in% HookEvent)
-})
-
-test_that("HookResultSubagentStop creates correct structure", {
-  result <- HookResultSubagentStop()
-
-  expect_s3_class(result, "HookResultSubagentStop")
-  expect_s3_class(result, "HookResult")
-  expect_true(result$handled)
-
-  result_unhandled <- HookResultSubagentStop(handled = FALSE)
-  expect_false(result_unhandled$handled)
 })
 
 test_that("LeadAgent can add SubagentStop hook", {
@@ -555,7 +551,7 @@ test_that("LeadAgent can add SubagentStop hook", {
       hook_fired <<- TRUE
       captured_agent_name <<- agent_name
       captured_task <<- task
-      HookResultSubagentStop()
+      NULL
     }
   ))
 
@@ -902,7 +898,7 @@ test_that("SubagentStop hook fires after successful delegation", {
       captured_agent_name <<- agent_name
       captured_task <<- task
       captured_result <<- result
-      HookResultSubagentStop()
+      NULL
     }
   ))
 
@@ -1099,7 +1095,7 @@ test_that("SubagentStop hook receives working_dir in context", {
     timeout = 0, # Run synchronously to avoid subprocess closure issues
     callback = function(agent_name, task, result, context) {
       captured_context <<- context
-      HookResultSubagentStop()
+      NULL
     }
   ))
 

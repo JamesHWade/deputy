@@ -210,37 +210,14 @@ merge_usage_limits <- function(override, defaults) {
   resolved
 }
 
-normalize_usage_limits <- function(
-  limits,
-  max_requests = NULL,
-  max_cost_usd = NULL
-) {
+normalize_usage_limits <- function(limits) {
   if (is.null(limits)) {
-    return(UsageLimits(
-      max_requests = max_requests,
-      max_cost_usd = max_cost_usd
-    ))
+    return(UsageLimits(max_requests = 25))
   }
   if (!inherits(limits, "UsageLimits")) {
     cli::cli_abort("{.arg usage_limits} must be created with UsageLimits()")
   }
-
-  resolved <- limits
-  if (is.null(resolved$max_requests)) {
-    resolved$max_requests <- validate_usage_limit(
-      max_requests,
-      "max_requests",
-      integer = TRUE
-    )
-  }
-  if (is.null(resolved$max_cost_usd)) {
-    resolved$max_cost_usd <- validate_usage_limit(
-      max_cost_usd,
-      "max_cost_usd",
-      integer = FALSE
-    )
-  }
-  resolved
+  limits
 }
 
 agent_usage_snapshot <- function(chat) {

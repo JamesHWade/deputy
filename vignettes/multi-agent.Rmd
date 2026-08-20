@@ -112,23 +112,11 @@ result <- lead$run_sync(
 cat(result$response)
 ```
 
-Direct synchronous delegation participates in the lead run's budget. Each
+Direct synchronous delegation participates in the lead run's usage limits. Each
 child inherits the lead's remaining `UsageLimits`, and its usage is aggregated
 into `result$usage` and enforced by the lead after delegation. This accounting
 does not yet cover parallel or background children, transitive child trees, or
-cross-run global budgets.
-
-## Convenience Constructor
-
-`agent_with_delegation()` creates a lead agent with one line:
-
-```{r, eval = FALSE}
-lead <- agent_with_delegation(
-  chat = ellmer::chat_anthropic(),
-  sub_agents = list(code_reviewer, data_analyst),
-  tools = tools_file()
-)
-```
+cross-run global limits.
 
 ## Monitoring with SubagentStop Hooks
 
@@ -139,8 +127,8 @@ hook_monitor <- HookMatcher$new(
   event = "SubagentStop",
   callback = function(agent_name, task, result, context) {
     cli::cli_alert_info("Sub-agent {agent_name} finished")
-    cli::cli_alert("Cost: {result$cost$total}")
-    HookResultSubagentStop()
+    cli::cli_alert("Requests: {result$usage$requests}")
+    NULL
   }
 )
 

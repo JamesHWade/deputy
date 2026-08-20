@@ -1,7 +1,7 @@
 # Tests for plan permission mode.
 
-test_that("permissions_plan creates compat planning permissions", {
-  perms <- permissions_plan(max_turns = 7, max_cost_usd = 0.25)
+test_that("permissions_plan creates planning permissions", {
+  perms <- permissions_plan()
 
   expect_s3_class(perms, "Permissions")
   expect_equal(perms$mode, "plan")
@@ -9,23 +9,15 @@ test_that("permissions_plan creates compat planning permissions", {
   expect_false(perms$file_write)
   expect_false(perms$bash)
   expect_false(perms$r_code)
-  expect_equal(perms$permission_prompt_tool_name, "AskUserQuestion")
-  expect_equal(perms$max_turns, 7)
-  expect_equal(perms$max_cost_usd, 0.25)
+  expect_equal(perms$permission_prompt_tool_name, "ask_user")
 })
 
-test_that("permission mode validation rejects unknown CLI values", {
-  expect_equal(
-    validate_permission_mode_value("plan", allow_cli_aliases = TRUE),
-    "plan"
-  )
-  expect_equal(
-    validate_permission_mode_value("standard", allow_cli_aliases = TRUE),
-    "standard"
-  )
+test_that("permission mode validation rejects unknown values", {
+  expect_equal(validate_permission_mode_value("plan"), "plan")
+  expect_equal(validate_permission_mode_value("standard"), "standard")
 
   expect_error(
-    validate_permission_mode_value("readOnly", allow_cli_aliases = TRUE),
+    validate_permission_mode_value("readOnly"),
     "must be one of"
   )
 })
@@ -59,8 +51,8 @@ test_that("plan mode allows only annotated read-only tools", {
 })
 
 test_that("plan mode always allows the permission prompt tool", {
-  perms <- permissions_plan(permission_prompt_tool_name = "AskUserQuestion")
+  perms <- permissions_plan(permission_prompt_tool_name = "ask_user")
 
-  result <- perms$check("AskUserQuestion", list(), list())
+  result <- perms$check("ask_user", list(), list())
   expect_s3_class(result, "PermissionResultAllow")
 })

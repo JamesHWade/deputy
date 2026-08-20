@@ -88,21 +88,21 @@ test_that("abort_budget_exceeded has correct structure", {
   expect_equal(err$max_cost, 0.50)
 })
 
-test_that("abort_turn_limit has correct structure", {
+test_that("abort_request_limit has correct structure", {
   err <- tryCatch(
-    abort_turn_limit(
-      "Maximum turns exceeded",
-      current_turns = 25,
-      max_turns = 25
+    abort_request_limit(
+      "Maximum requests exceeded",
+      current_requests = 25,
+      max_requests = 25
     ),
     error = function(e) e
   )
 
-  expect_s3_class(err, "deputy_turn_limit")
+  expect_s3_class(err, "deputy_request_limit")
   expect_s3_class(err, "deputy_budget")
   expect_s3_class(err, "deputy_error")
-  expect_equal(err$current_turns, 25)
-  expect_equal(err$max_turns, 25)
+  expect_equal(err$current_requests, 25)
+  expect_equal(err$max_requests, 25)
 })
 
 test_that("abort_provider has correct structure", {

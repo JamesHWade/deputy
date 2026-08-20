@@ -184,6 +184,10 @@ test_that("HookResultPreToolUse has correct structure", {
   expect_s3_class(result, "HookResult")
   expect_equal(result$permission, "allow")
   expect_true(result$continue)
+  expect_named(
+    result,
+    c("permission", "reason", "continue", "additional_context", "stop_reason")
+  )
 
   result_deny <- HookResultPreToolUse(
     permission = "deny",
@@ -200,6 +204,16 @@ test_that("HookResultPostToolUse has correct structure", {
   expect_s3_class(result, "HookResultPostToolUse")
   expect_s3_class(result, "HookResult")
   expect_true(result$continue)
+  expect_named(
+    result,
+    c(
+      "continue",
+      "suppress_output",
+      "updated_tool_output",
+      "additional_context",
+      "stop_reason"
+    )
+  )
 
   result_stop <- HookResultPostToolUse(continue = FALSE)
   expect_false(result_stop$continue)
@@ -804,16 +818,6 @@ test_that("Hook callback error returns NULL for Stop event", {
   expect_null(result)
 })
 
-test_that("HookResultStop has correct structure", {
-  result <- HookResultStop()
-  expect_s3_class(result, "HookResultStop")
-  expect_s3_class(result, "HookResult")
-  expect_true(result$handled)
-
-  result_unhandled <- HookResultStop(handled = FALSE)
-  expect_false(result_unhandled$handled)
-})
-
 test_that("HookResultPreCompact has correct structure", {
   result <- HookResultPreCompact()
   expect_s3_class(result, "HookResultPreCompact")
@@ -827,16 +831,6 @@ test_that("HookResultPreCompact has correct structure", {
   )
   expect_false(result_with_summary$continue)
   expect_equal(result_with_summary$summary, "Custom summary")
-})
-
-test_that("HookResultSubagentStop has correct structure", {
-  result <- HookResultSubagentStop()
-  expect_s3_class(result, "HookResultSubagentStop")
-  expect_s3_class(result, "HookResult")
-  expect_true(result$handled)
-
-  result_unhandled <- HookResultSubagentStop(handled = FALSE)
-  expect_false(result_unhandled$handled)
 })
 
 test_that("Multiple hooks are called in order until non-NULL result", {
@@ -931,32 +925,12 @@ test_that("HookMatcher print method works", {
 
 # SessionStart and SessionEnd hook tests
 
-test_that("HookResultSessionStart has correct structure", {
-  result <- HookResultSessionStart()
-  expect_s3_class(result, "HookResultSessionStart")
-  expect_s3_class(result, "HookResult")
-  expect_true(result$handled)
-
-  result_unhandled <- HookResultSessionStart(handled = FALSE)
-  expect_false(result_unhandled$handled)
-})
-
-test_that("HookResultSessionEnd has correct structure", {
-  result <- HookResultSessionEnd()
-  expect_s3_class(result, "HookResultSessionEnd")
-  expect_s3_class(result, "HookResult")
-  expect_true(result$handled)
-
-  result_unhandled <- HookResultSessionEnd(handled = FALSE)
-  expect_false(result_unhandled$handled)
-})
-
 test_that("SessionStart is a valid hook event", {
   # Should not error when creating a SessionStart hook
   hook <- HookMatcher$new(
     event = "SessionStart",
     callback = function(context) {
-      HookResultSessionStart()
+      NULL
     }
   )
   expect_s3_class(hook, "HookMatcher")
@@ -968,7 +942,7 @@ test_that("SessionEnd is a valid hook event", {
   hook <- HookMatcher$new(
     event = "SessionEnd",
     callback = function(reason, context) {
-      HookResultSessionEnd()
+      NULL
     }
   )
   expect_s3_class(hook, "HookMatcher")
@@ -980,11 +954,11 @@ test_that("HookRegistry filters SessionStart and SessionEnd events", {
 
   registry$add(HookMatcher$new(
     event = "SessionStart",
-    callback = function(context) HookResultSessionStart()
+    callback = function(context) NULL
   ))
   registry$add(HookMatcher$new(
     event = "SessionEnd",
-    callback = function(reason, context) HookResultSessionEnd()
+    callback = function(reason, context) NULL
   ))
   registry$add(HookMatcher$new(
     event = "PreToolUse",
@@ -1009,7 +983,7 @@ test_that("SessionStart hook fires with correct context", {
     timeout = 0,
     callback = function(context) {
       received_context <<- context
-      HookResultSessionStart()
+      NULL
     }
   )
 
@@ -1042,7 +1016,7 @@ test_that("SessionEnd hook fires with correct reason and context", {
     callback = function(reason, context) {
       received_reason <<- reason
       received_context <<- context
-      HookResultSessionEnd()
+      NULL
     }
   )
 
@@ -1072,7 +1046,7 @@ test_that("SessionEnd receives different stop reasons", {
     timeout = 0,
     callback = function(reason, context) {
       reasons_received <<- c(reasons_received, reason)
-      HookResultSessionEnd()
+      NULL
     }
   )
 
@@ -1082,7 +1056,7 @@ test_that("SessionEnd receives different stop reasons", {
   # Test different stop reasons
   for (reason in c(
     "complete",
-    "max_turns",
+    "request_limit",
     "cost_limit",
     "hook_requested_stop"
   )) {
@@ -1091,7 +1065,7 @@ test_that("SessionEnd receives different stop reasons", {
 
   expect_equal(
     reasons_received,
-    c("complete", "max_turns", "cost_limit", "hook_requested_stop")
+    c("complete", "request_limit", "cost_limit", "hook_requested_stop")
   )
 })
 

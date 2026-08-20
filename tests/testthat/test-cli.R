@@ -33,9 +33,17 @@ test_that("the package executable exposes the Rapp command surface", {
 
   expect_true(grepl("Usage: deputy [OPTIONS] [<TASK>]", help, fixed = TRUE))
   expect_true(grepl("-d, --dir <DIR>", help, fixed = TRUE))
+  expect_true(grepl("-n, --max-requests <MAX-REQUESTS>", help, fixed = TRUE))
   expect_true(grepl("--mcp-server <MCP-SERVER>", help, fixed = TRUE))
   expect_true(grepl("<TASK>  Task to run", help, fixed = TRUE))
   expect_false(grepl("-x, --task", help, fixed = TRUE))
+  expect_false(grepl("--permission-mode", help, fixed = TRUE))
+  expect_false(grepl("--max-turns", help, fixed = TRUE))
+  expect_false(grepl("--persist-session", help, fixed = TRUE))
+  expect_false(grepl("--resume-session-id", help, fixed = TRUE))
+  expect_false(grepl("--fork-session", help, fixed = TRUE))
+  expect_false(grepl("--mcp-servers", help, fixed = TRUE))
+  expect_false(grepl("--setting-source", help, fixed = TRUE))
 })
 
 test_that("Rapp parses CLI options before entering the package runtime", {
@@ -60,8 +68,6 @@ test_that("Rapp parses CLI options before entering the package runtime", {
       "minimal",
       "-P",
       "readonly",
-      "--permission-mode",
-      "acceptEdits",
       "-n",
       "7",
       "-c",
@@ -70,12 +76,6 @@ test_that("Rapp parses CLI options before entering the package runtime", {
       "load.rds",
       "-S",
       "save.rds",
-      "--persist-session",
-      "--resume-session-id",
-      "session-old",
-      "--resume-session-at",
-      "2026-08-14T12:00:00Z",
-      "--fork-session",
       "-y",
       "Be concise",
       "-f",
@@ -88,12 +88,6 @@ test_that("Rapp parses CLI options before entering the package runtime", {
       "alpha",
       "--mcp-server",
       "beta",
-      "--mcp-servers",
-      "gamma,delta",
-      "--setting-source",
-      "project",
-      "--setting-source",
-      "user",
       "-d",
       working_dir,
       "-v",
@@ -109,23 +103,16 @@ test_that("Rapp parses CLI options before entering the package runtime", {
   expect_equal(captured$model, "gpt-test")
   expect_equal(captured$tools, "minimal")
   expect_equal(captured$permissions, "readonly")
-  expect_equal(captured$permission_mode, "acceptEdits")
-  expect_identical(captured$max_turns, 7L)
+  expect_identical(captured$max_requests, 7L)
   expect_equal(captured$max_cost, 1.25)
   expect_equal(captured$session, "load.rds")
   expect_equal(captured$save_session, "save.rds")
-  expect_true(captured$persist_session)
-  expect_equal(captured$resume_session_id, "session-old")
-  expect_equal(captured$resume_session_at, "2026-08-14T12:00:00Z")
-  expect_true(captured$fork_session)
   expect_equal(captured$system_prompt, "Be concise")
   expect_equal(captured$system_prompt_file, "prompt.txt")
   expect_true(captured$no_ask)
   expect_true(captured$mcp)
   expect_equal(captured$mcp_config, ".mcp.json")
   expect_equal(captured$mcp_server, c("alpha", "beta"))
-  expect_equal(captured$mcp_servers, "gamma,delta")
-  expect_equal(captured$setting_source, c("project", "user"))
   expect_equal(captured$dir, working_dir)
   expect_true(captured$verbose)
   expect_true(captured$no_color)
@@ -175,16 +162,13 @@ test_that("Google uses the current ellmer constructor and its default model", {
   expect_equal(seen_model, "gemini-test")
 })
 
-test_that("CLI permission limits include cost in readonly mode", {
-  permissions <- cli_get_permissions(
-    "readonly",
-    working_dir = tempdir(),
-    max_turns = 7L,
-    max_cost = 0.01
-  )
+test_that("CLI builds permissions and usage limits separately", {
+  permissions <- cli_get_permissions("readonly", working_dir = tempdir())
+  limits <- cli_get_usage_limits(max_requests = 7L, max_cost = 0.01)
 
-  expect_identical(permissions$max_turns, 7L)
-  expect_equal(permissions$max_cost_usd, 0.01)
+  expect_identical(permissions$mode, "readonly")
+  expect_identical(limits$max_requests, 7L)
+  expect_equal(limits$max_cost_usd, 0.01)
 })
 
 test_that("the event walker consumes callable generators through stop", {
@@ -349,69 +333,4 @@ test_that("interactive mode runs prompts until a quit command", {
   expect_identical(state$input_index, 2L)
   expect_true(any(grepl("interactive response", output, fixed = TRUE)))
   expect_true(any(grepl("Goodbye", messages, fixed = TRUE)))
-})
-
-test_that("compat persistence resolves package-owned session helpers", {
-  state <- new.env(parent = emptyenv())
-  state$configurations <- list()
-  agent <- list(
-    configure_sdk_compat = function(options) {
-      state$configurations[[length(state$configurations) + 1L]] <- options
-    },
-    load_session = function(path) {
-      state$loaded_path <- path
-    },
-    .__enclos_env__ = list(
-      private = list(
-        notify = function(message, ...) {
-          state$notification <- c(list(message = message), list(...))
-        },
-        snapshot_compat_state = function(reason) {
-          state$snapshot_reason <- reason
-        }
-      )
-    )
-  )
-  local_mocked_bindings(
-    session_store_default_dir = function() "/tmp/deputy-test-sessions",
-    generate_session_id = function() "session-new",
-    session_store_select_snapshot = function(root, session_id, at) {
-      state$selection <- list(root = root, session_id = session_id, at = at)
-      list(path = "/tmp/deputy-session.rds")
-    },
-    .package = "deputy"
-  )
-  config <- list(
-    persist_session = TRUE,
-    resume_session_id = "session-old",
-    resume_session_at = "2026-08-14T12:00:00Z",
-    fork_session = TRUE
-  )
-
-  session_id <- cli_configure_compat_session(agent, config)
-
-  expect_equal(session_id, "session-new")
-  expect_length(state$configurations, 2L)
-  expect_equal(
-    state$configurations[[1L]],
-    list(
-      persist_session = TRUE,
-      session_store_dir = "/tmp/deputy-test-sessions",
-      session_id = "session-new"
-    )
-  )
-  expect_equal(state$configurations[[2L]], state$configurations[[1L]])
-  expect_equal(
-    state$selection,
-    list(
-      root = "/tmp/deputy-test-sessions",
-      session_id = "session-old",
-      at = "2026-08-14T12:00:00Z"
-    )
-  )
-  expect_equal(state$loaded_path, "/tmp/deputy-session.rds")
-  expect_equal(state$notification$code, "session_forked")
-  expect_equal(state$notification$source_session_id, "session-old")
-  expect_equal(state$notification$active_session_id, "session-new")
-  expect_equal(state$snapshot_reason, "fork_restore")
 })

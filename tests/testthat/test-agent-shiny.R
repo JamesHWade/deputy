@@ -38,7 +38,7 @@ test_that("on_tool_request enforces cost limit in callback mode", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(
     chat = mock_chat,
-    permissions = Permissions$new(max_cost_usd = 0.001)
+    usage_limits = UsageLimits(max_cost_usd = 0.001)
   )
 
   # Activate callback-based limits
@@ -157,7 +157,7 @@ test_that("run_shiny isolates and clears run-scoped state", {
   expect_true(observed$run_active)
   expect_true(observed$current_stream_content)
   expect_s3_class(observed$current_usage_limits, "UsageLimits")
-  expect_equal(observed$current_usage_limits$max_requests, 25L)
+  expect_null(observed$current_usage_limits$max_requests)
   expect_equal(observed$current_usage_limits$max_tool_calls, 3L)
   expect_length(observed$pending_events, 0L)
   expect_false(private$run_active)
@@ -183,7 +183,7 @@ test_that("run_shiny releases state when stream setup fails", {
   expect_null(agent$.__enclos_env__$private$tool_call_limit)
 })
 
-test_that("run_shiny defaults max_tool_calls from permissions$max_turns", {
+test_that("run_shiny defaults max_tool_calls from usage limits", {
   skip_if_not_installed("promises")
   skip_if_not_installed("later")
 
@@ -198,7 +198,7 @@ test_that("run_shiny defaults max_tool_calls from permissions$max_turns", {
 
   agent <- Agent$new(
     chat = mock_chat,
-    permissions = Permissions$new(max_turns = 15)
+    usage_limits = UsageLimits(max_tool_calls = 15)
   )
 
   stream <- agent$run_shiny("test")
@@ -230,7 +230,7 @@ test_that("run_shiny fires Stop and SessionEnd hooks when the stream completes",
     timeout = 0,
     callback = function(reason, context) {
       stop_reason <<- reason
-      HookResultStop()
+      NULL
     }
   ))
   agent$add_hook(HookMatcher$new(
@@ -238,7 +238,7 @@ test_that("run_shiny fires Stop and SessionEnd hooks when the stream completes",
     timeout = 0,
     callback = function(reason, context) {
       session_end_reason <<- reason
-      HookResultSessionEnd()
+      NULL
     }
   ))
 
@@ -274,7 +274,7 @@ test_that("run_shiny cleans up and reports errors when the stream fails", {
     timeout = 0,
     callback = function(reason, context) {
       stop_reason <<- reason
-      HookResultStop()
+      NULL
     }
   ))
   agent$add_hook(HookMatcher$new(
@@ -282,7 +282,7 @@ test_that("run_shiny cleans up and reports errors when the stream fails", {
     timeout = 0,
     callback = function(reason, context) {
       session_end_reason <<- reason
-      HookResultSessionEnd()
+      NULL
     }
   ))
 
@@ -306,10 +306,10 @@ test_that("run_shiny rejects relative and outside file paths", {
   withr::local_dir(outside)
 
   relative_write <- create_shiny_tool_chat(
-    "Write",
-    list(file_path = "escaped.txt", content = "unsafe"),
+    "write_file",
+    list(path = "escaped.txt", content = "unsafe"),
     execute = function(request) {
-      writeLines("unsafe", request@arguments$file_path)
+      writeLines("unsafe", request@arguments$path)
     }
   )
   write_agent <- Agent$new(
@@ -323,7 +323,7 @@ test_that("run_shiny rejects relative and outside file paths", {
     timeout = 0,
     callback = function(reason, context) {
       stopped_usage <<- context$usage
-      HookResultStop()
+      NULL
     }
   ))
   expect_equal(
@@ -336,8 +336,8 @@ test_that("run_shiny rejects relative and outside file paths", {
   expect_false(file.exists(file.path(outside, "escaped.txt")))
 
   outside_read <- create_shiny_tool_chat(
-    "Read",
-    list(file_path = file.path(outside, "secret.txt"))
+    "read_file",
+    list(path = file.path(outside, "secret.txt"))
   )
   read_agent <- Agent$new(
     chat = outside_read$chat,
@@ -359,10 +359,10 @@ test_that("run_shiny accepts rooted file paths and checkpoints writes", {
   root <- withr::local_tempdir(pattern = "deputy-shiny-checkpoint-")
   path <- file.path(root, "created.txt")
   mock <- create_shiny_tool_chat(
-    "Write",
-    list(file_path = path, content = "created"),
+    "write_file",
+    list(path = path, content = "created"),
     execute = function(request) {
-      writeLines("created", request@arguments$file_path)
+      writeLines("created", request@arguments$path)
     }
   )
   agent <- Agent$new(
@@ -403,10 +403,10 @@ test_that("run_shiny rejects dangling symlinks that target outside", {
   link <- file.path(root, "link.txt")
   expect_true(file.symlink(outside_target, link))
   mock <- create_shiny_tool_chat(
-    "Write",
-    list(file_path = link, content = "unsafe"),
+    "write_file",
+    list(path = link, content = "unsafe"),
     execute = function(request) {
-      writeLines("unsafe", request@arguments$file_path)
+      writeLines("unsafe", request@arguments$path)
     }
   )
   agent <- Agent$new(
@@ -472,7 +472,7 @@ test_that("run_shiny reports clean cancellation instead of completion", {
     timeout = 0,
     callback = function(reason, context) {
       stop_reason <<- reason
-      HookResultStop()
+      NULL
     }
   ))
 
@@ -503,14 +503,14 @@ test_that("run_shiny reports terminal cost limits without tool calls", {
   }
   agent <- Agent$new(
     chat = chat,
-    permissions = Permissions$new(max_cost_usd = 0.001)
+    usage_limits = UsageLimits(max_cost_usd = 0.001)
   )
   agent$add_hook(HookMatcher$new(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {
       stop_reason <<- reason
-      HookResultStop()
+      NULL
     }
   ))
 
@@ -558,7 +558,7 @@ test_that("run_shiny enforces Agent usage_limits", {
     timeout = 0,
     callback = function(reason, context) {
       stop_reason <<- reason
-      HookResultStop()
+      NULL
     }
   ))
 
@@ -594,7 +594,7 @@ test_that("run_shiny does not start a provider request with no request budget", 
     timeout = 0,
     callback = function(reason, context) {
       stop_reason <<- reason
-      HookResultStop()
+      NULL
     }
   ))
 
@@ -621,7 +621,7 @@ test_that("run_shiny reports incomplete tool calls as provider errors", {
     timeout = 0,
     callback = function(reason, context) {
       stop_reason <<- reason
-      HookResultStop()
+      NULL
     }
   ))
 

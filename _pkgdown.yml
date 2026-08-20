@@ -26,10 +26,6 @@ navbar:
         href: articles/multi-agent.html
       - text: Structured Output
         href: articles/structured-output.html
-      - text: Agent Configuration
-        href: articles/agent-configuration.html
-      - text: Agent SDK Parity
-        href: articles/claude-sdk-parity.html
       - text: "---"
       - text: "Examples"
       - text: Data Analysis Agent
@@ -55,17 +51,29 @@ reference:
 - title: Tools
   desc: Built-in tools and tool bundles
   contents:
-  - starts_with("tool_")
-  - starts_with("tools_")
-  - ToolPresets
-  - list_presets
+  - tool_read_file
+  - tool_read_markdown
+  - tool_write_file
+  - tool_edit_file
+  - tool_multi_edit
+  - tool_list_files
+  - tool_glob_files
+  - tool_grep_files
+  - tool_run_r_code
+  - tool_run_bash
+  - tool_read_csv
+  - tool_web_fetch
+  - tool_web_search
+  - tool_ask_user
+  - tools_file
+  - tools_code
+  - tools_data
+  - tools_web
+  - tools_all
+  - tools_preset
+  - tools_interactive
+  - tools_mcp
   - set_ask_user_callback
-
-- title: MCP Integration
-  desc: Model Context Protocol server support
-  contents:
-  - mcp_available
-  - mcp_servers
 
 - title: Permissions
 
@@ -75,16 +83,22 @@ reference:
   - PermissionMode
   - PermissionResultAllow
   - PermissionResultDeny
-  - starts_with("permissions_")
+  - permissions_standard
+  - permissions_readonly
+  - permissions_plan
+  - permissions_full
 
 - title: Hooks
   desc: Intercept and customize agent behavior
   contents:
-  - HookMatcher
-  - HookRegistry
   - HookEvent
-  - starts_with("HookResult")
-  - starts_with("hook_")
+  - HookMatcher
+  - HookResultPreToolUse
+  - HookResultPostToolUse
+  - HookResultPreCompact
+  - hook_log_tools
+  - hook_block_dangerous_bash
+  - hook_limit_file_writes
 
 - title: Skills
   desc: Extend agents with specialized capabilities
@@ -94,34 +108,18 @@ reference:
   - skill_create
   - skills_list
 
-- title: Settings
-  desc: Claude-style settings sources
-  contents:
-  - claude_settings_load
-  - claude_settings_apply
-
-- title: Claude Compatibility
-  desc: Anthropic-compatible facade and entrypoints
-  contents:
-  - ClaudeSDKClient
-  - claude_sdk_options
-  - claude_sdk_query
-  - session_store_memory
-
 - title: Multi-Agent
 
   desc: Coordinate multiple specialized agents
   contents:
   - LeadAgent
   - agent_definition
-  - agent_with_delegation
 
 - title: Errors
-  desc: Error classes and constructors
+  desc: Identify structured Deputy conditions
   contents:
   - deputy-errors
   - is_deputy_error
-  - starts_with("abort_")
 
 articles:
 - title: Getting Started
@@ -137,8 +135,6 @@ articles:
   contents:
   - multi-agent
   - structured-output
-  - agent-configuration
-  - claude-sdk-parity
 - title: Examples
   contents:
   - example-data-analysis

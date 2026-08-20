@@ -17,18 +17,16 @@ NULL
 #' @description
 #' A provider-agnostic framework for building agentic AI workflows in R.
 #' Built on ellmer, it enables multi-step reasoning with tool use,
-#' permissions, hooks, and human-in-the-loop capabilities. deputy also ships
-#' an opt-in Agent SDK-compatible facade for teams that want Anthropic-style
-#' entrypoints and session semantics on top of the same runtime.
+#' permissions, hooks, human-in-the-loop capabilities, and multi-agent
+#' delegation.
 #'
 #' @section Main Functions:
 #' * [Agent] - The main class for creating agents
-#' * [ClaudeSDKClient] - Agent SDK-compatible client facade (`AgentSDKClient` is an alias)
-#' * [claude_sdk_query()] - One-shot compatibility query helper (`agent_sdk_query()` is an alias)
-#' * [tools_file()] - File operation tools
-#' * [tools_code()] - Code execution tools
+#' * [LeadAgent] - Coordinate specialized delegated agents
+#' * [tools_preset()] - Curated built-in tool collections
+#' * [UsageLimits()] - Run-scoped request, tool, token, and cost limits
 #' * [permissions_standard()] - Standard permission policy
-#' * [permissions_plan()] - Claude-style planning permission policy
+#' * [permissions_plan()] - Planning permission policy
 #' * [permissions_readonly()] - Read-only permission policy
 #'
 #' @section Getting Started:
@@ -38,7 +36,7 @@ NULL
 #' # Create an agent with file tools
 #' agent <- Agent$new(
 #'   chat = ellmer::chat("openai/gpt-4o"),
-#'   tools = tools_file()
+#'   tools = tools_preset("standard")
 #' )
 #'
 #' # Run a task with streaming output

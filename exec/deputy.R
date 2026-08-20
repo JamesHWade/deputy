@@ -15,16 +15,13 @@ model <- NA_character_
 #| short: 't'
 tools <- "standard"
 
-#| description: "Permission mode (standard, readonly, full)"
+#| description: "Permission mode (standard, plan, readonly, full)"
 #| short: 'P'
 permissions <- "standard"
 
-#| description: "Claude-style permission mode override"
-permission_mode <- NA_character_
-
-#| description: "Maximum number of turns before stopping"
+#| description: "Maximum model requests before stopping"
 #| short: 'n'
-max_turns <- 25L
+max_requests <- 25L
 
 #| description: "Maximum cost in USD before stopping"
 #| short: 'c'
@@ -37,18 +34,6 @@ session <- NA_character_
 #| description: "Path to save the session on exit"
 #| short: 'S'
 save_session <- NA_character_
-
-#| description: "Persist compatibility session snapshots to disk"
-persist_session <- FALSE
-
-#| description: "Resume a persisted compatibility session by id"
-resume_session_id <- NA_character_
-
-#| description: "Resume a compatibility session at or before a timestamp"
-resume_session_at <- NA_character_
-
-#| description: "Fork a resumed compatibility session into a new session id"
-fork_session <- FALSE
 
 #| description: "Custom system prompt to use"
 #| short: 'y'
@@ -72,12 +57,6 @@ mcp_config <- NA_character_
 
 #| description: "MCP server name to load; repeat for multiple servers"
 mcp_server <- c()
-
-#| description: "Deprecated comma-separated MCP server names"
-mcp_servers <- NA_character_
-
-#| description: "Claude setting source; repeat for multiple sources"
-setting_source <- c()
 
 #| description: "Working directory for file operations"
 #| short: 'd'
@@ -107,23 +86,16 @@ deputy:::deputy_cli_main(list(
   model = model,
   tools = tools,
   permissions = permissions,
-  permission_mode = permission_mode,
-  max_turns = max_turns,
+  max_requests = max_requests,
   max_cost = max_cost,
   session = session,
   save_session = save_session,
-  persist_session = persist_session,
-  resume_session_id = resume_session_id,
-  resume_session_at = resume_session_at,
-  fork_session = fork_session,
   system_prompt = system_prompt,
   system_prompt_file = system_prompt_file,
   no_ask = no_ask,
   mcp = mcp,
   mcp_config = mcp_config,
   mcp_server = mcp_server,
-  mcp_servers = mcp_servers,
-  setting_source = setting_source,
   dir = dir,
   verbose = verbose,
   no_color = no_color,
