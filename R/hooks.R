@@ -13,8 +13,8 @@
 #' Callback signature: `function(tool_name, tool_input, context)`
 #' - `tool_name`: Name of the tool being called (character)
 #' - `tool_input`: Named list of arguments passed to the tool
-#' - `context`: Common correlation fields plus `tool_call_id`, `tool_use_id`,
-#'   and `tool_annotations` (if available)
+#' - `context`: Common correlation fields plus `tool_call_id` and
+#'   `tool_annotations` (if available)
 #' - Return: [HookResultPreToolUse()] to allow/deny
 #'
 #' **PostToolUse** - After a tool completes
@@ -23,7 +23,7 @@
 #' - `tool_name`: Name of the tool that was called (character)
 #' - `tool_result`: Result returned by the tool (or NULL on error)
 #' - `tool_error`: Error message if tool failed (or NULL on success)
-#' - `context`: Common correlation fields plus `tool_call_id` and `tool_use_id`
+#' - `context`: Common correlation fields plus `tool_call_id`
 #' - Return: [HookResultPostToolUse()] to continue/stop
 #'
 #' **PostToolUseFailure** - After a tool reports an error
@@ -38,7 +38,7 @@
 #'   `"request_limit"`, `"cost_limit"`, or `"provider_error"`)
 #' - `context`: Common correlation fields plus `usage` and `cost`; native
 #'   `run()` also includes `total_turns`
-#' - Return: [HookResultStop()]
+#' - Return: NULL (informational only)
 #'
 #' **SubagentStop** - When a sub-agent completes (LeadAgent only)
 #'
@@ -47,7 +47,7 @@
 #' - `task`: The task that was delegated (character)
 #' - `result`: Result returned by the sub-agent
 #' - `context`: Common correlation fields plus parent/child Agent and run IDs
-#' - Return: [HookResultSubagentStop()]
+#' - Return: NULL (informational only)
 #'
 #' **SubagentStart** - When a delegated sub-agent starts (LeadAgent only)
 #'
@@ -94,7 +94,7 @@
 #' Callback signature: `function(context)`
 #' - `context`: Common correlation fields plus `permissions`, `provider`, and
 #'   `tools_count`
-#' - Return: [HookResultSessionStart()]
+#' - Return: NULL (informational only)
 #'
 #' **SessionEnd** - When an agent session ends
 #'
@@ -103,7 +103,7 @@
 #'   `"request_limit"`, `"cost_limit"`, or `"hook_requested_stop"`)
 #' - `context`: Common correlation fields plus `usage` and `cost`; native
 #'   `run()` also includes `total_turns`
-#' - Return: [HookResultSessionEnd()]
+#' - Return: NULL (informational only)
 #'
 #' @section Context Structure:
 #'
@@ -117,11 +117,9 @@
 #' - `delegation_id`: Delegation identifier for delegated runs and tools
 #' - `tool_annotations`: (PreToolUse only) Tool annotations from ellmer if available
 #' - `tool_call_id`: Canonical tool lifecycle identifier
-#' - `tool_use_id`: Provider tool identifier retained for compatibility
 #' - `usage`: Run-scoped [AgentUsage] for tool and terminal lifecycle hooks
 #' - `usage_limits`: Active [UsageLimits] for tool lifecycle hooks
 #' - `run_id`: Identifier for the active run
-#' - `session_id`: Session identifier when compatibility persistence is configured
 #' - `total_turns`: (native Stop, PreCompact, native SessionEnd) Conversation turns
 #' - `cost`: (Stop, SessionEnd) List with `input`, `output`, `cached`, and `total`
 #' - `compact_count`: (PreCompact only) Number of turns being compacted
@@ -181,11 +179,6 @@ HookEvent <- c(
 #' @param permission Either `"allow"` or `"deny"`
 #' @param reason Reason for denial (shown to the LLM)
 #' @param continue If FALSE, stop the agent after this hook
-#' @param updated_input Reserved for SDK-shape parity. **Not currently
-#'   supported**: deputy emits a warning and proceeds with the original tool
-#'   input. ellmer's tool-request callback contract does not yet expose a way
-#'   to mutate the in-flight request, so use `permission = "deny"` to block a
-#'   tool call instead of rewriting its arguments.
 #' @param additional_context Optional text to append to the running context
 #' @param stop_reason Optional stop reason used when `continue = FALSE`
 #' @return A `HookResultPreToolUse` object
@@ -205,7 +198,6 @@ HookResultPreToolUse <- function(
   permission = c("allow", "deny"),
   reason = NULL,
   continue = TRUE,
-  updated_input = NULL,
   additional_context = NULL,
   stop_reason = NULL
 ) {
@@ -216,7 +208,6 @@ HookResultPreToolUse <- function(
       permission = permission,
       reason = reason,
       continue = continue,
-      updated_input = updated_input,
       additional_context = additional_context,
       stop_reason = stop_reason
     ),
@@ -235,7 +226,6 @@ HookResultPreToolUse <- function(
 #' @param updated_tool_output Optional replacement value for Deputy's emitted
 #'   `tool_end` event. ellmer does not support rewriting the model-visible
 #'   in-flight result from this callback.
-#' @param updated_mcp_tool_output Deprecated alias for `updated_tool_output`
 #' @param additional_context Optional text to append to the running context
 #' @param stop_reason Optional stop reason used when `continue = FALSE`
 #' @return A `HookResultPostToolUse` object
@@ -252,68 +242,18 @@ HookResultPostToolUse <- function(
   continue = TRUE,
   suppress_output = FALSE,
   updated_tool_output = NULL,
-  updated_mcp_tool_output = NULL,
   additional_context = NULL,
   stop_reason = NULL
 ) {
-  if (is.null(updated_tool_output) && !is.null(updated_mcp_tool_output)) {
-    updated_tool_output <- updated_mcp_tool_output
-  }
-
   structure(
     list(
       continue = continue,
       suppress_output = isTRUE(suppress_output),
       updated_tool_output = updated_tool_output,
-      updated_mcp_tool_output = updated_mcp_tool_output,
       additional_context = additional_context,
       stop_reason = stop_reason
     ),
     class = c("HookResultPostToolUse", "HookResult", "list")
-  )
-}
-
-#' Create a Stop hook result
-#'
-#' @description
-#' Return this from a Stop hook callback.
-#'
-#' @param handled If TRUE, indicates the hook handled the stop event
-#' @return A `HookResultStop` object
-#'
-#' @export
-HookResultStop <- function(handled = TRUE) {
-  structure(
-    list(
-      handled = handled
-    ),
-    class = c("HookResultStop", "HookResult", "list")
-  )
-}
-
-#' Create a SubagentStop hook result
-#'
-#' @description
-#' Return this from a SubagentStop hook callback. This hook fires when a
-#' sub-agent (delegated from a LeadAgent) completes its task.
-#'
-#' @param handled If TRUE, indicates the hook handled the sub-agent completion
-#' @return A `HookResultSubagentStop` object
-#'
-#' @examples
-#' # Basic handler
-#' HookResultSubagentStop()
-#'
-#' # Mark as handled
-#' HookResultSubagentStop(handled = TRUE)
-#'
-#' @export
-HookResultSubagentStop <- function(handled = TRUE) {
-  structure(
-    list(
-      handled = handled
-    ),
-    class = c("HookResultSubagentStop", "HookResult", "list")
   )
 }
 
@@ -345,58 +285,6 @@ HookResultPreCompact <- function(continue = TRUE, summary = NULL) {
       summary = summary
     ),
     class = c("HookResultPreCompact", "HookResult", "list")
-  )
-}
-
-#' Create a SessionStart hook result
-#'
-#' @description
-#' Return this from a SessionStart hook callback. This hook fires once at the
-#' beginning of an agent session, before the first turn begins.
-#'
-#' @param handled If TRUE, indicates the hook handled the session start event
-#' @return A `HookResultSessionStart` object
-#'
-#' @examples
-#' # Log session start
-#' HookResultSessionStart()
-#'
-#' # Mark as handled
-#' HookResultSessionStart(handled = TRUE)
-#'
-#' @export
-HookResultSessionStart <- function(handled = TRUE) {
-  structure(
-    list(
-      handled = handled
-    ),
-    class = c("HookResultSessionStart", "HookResult", "list")
-  )
-}
-
-#' Create a SessionEnd hook result
-#'
-#' @description
-#' Return this from a SessionEnd hook callback. This hook fires once at the
-#' end of an agent session, after the agent stops for any reason.
-#'
-#' @param handled If TRUE, indicates the hook handled the session end event
-#' @return A `HookResultSessionEnd` object
-#'
-#' @examples
-#' # Log session end
-#' HookResultSessionEnd()
-#'
-#' # Mark as handled
-#' HookResultSessionEnd(handled = TRUE)
-#'
-#' @export
-HookResultSessionEnd <- function(handled = TRUE) {
-  structure(
-    list(
-      handled = handled
-    ),
-    class = c("HookResultSessionEnd", "HookResult", "list")
   )
 }
 
@@ -562,7 +450,7 @@ HookMatcher <- R6::R6Class(
 #' Manages a collection of hooks for an agent. Handles registration,
 #' matching, and execution of hooks.
 #'
-#' @export
+#' @keywords internal
 HookRegistry <- R6::R6Class(
   "HookRegistry",
 
@@ -1045,10 +933,10 @@ hook_limit_file_writes <- function(allowed_dir) {
 
   HookMatcher$new(
     event = "PreToolUse",
-    pattern = "^(write_file|tool_write_file)$",
+    pattern = "^write_file$",
     timeout = 0, # Run in main process
     callback = function(tool_name, tool_input, context) {
-      path <- tool_input$path %||% tool_input$file_path %||% ""
+      path <- tool_input$path %||% ""
       full_path <- normalizePath(path, mustWork = FALSE)
 
       if (!startsWith(full_path, allowed_dir)) {

@@ -15,7 +15,7 @@ test_that("content streams expose tool lifecycle before and after execution", {
 
   expect_identical(start$type, "start")
   expect_identical(tool_start$type, "tool_start")
-  expect_identical(tool_start$tool_use_id, "tool-use-1")
+  expect_identical(tool_start$tool_call_id, "tool-use-1")
   expect_false(mock$state$tool_executed)
 
   tool_end <- generator()
@@ -168,12 +168,12 @@ test_that("error mode signals structured limit conditions", {
       "Do not call the provider",
       usage_limits = UsageLimits(max_requests = 0, on_exceed = "error")
     ),
-    deputy_turn_limit = function(error) error
+    deputy_request_limit = function(error) error
   )
 
-  expect_s3_class(error, "deputy_turn_limit")
-  expect_identical(error$current_turns, 0L)
-  expect_identical(error$max_turns, 0L)
+  expect_s3_class(error, "deputy_request_limit")
+  expect_identical(error$current_requests, 0L)
+  expect_identical(error$max_requests, 0L)
   expect_match(error$run_id, "^run_")
 })
 
@@ -437,7 +437,7 @@ test_that("non-streaming fallbacks retain tool lifecycle events", {
     expect_length(result$tool_calls(), 1L)
     expect_length(result$tool_results(), 1L)
     expect_identical(
-      result$tool_calls()[[1L]]$tool_use_id,
+      result$tool_calls()[[1L]]$tool_call_id,
       paste0("fallback-tool-", failure_mode),
       info = failure_mode
     )
@@ -482,7 +482,6 @@ test_that("pre-tool effects are applied before a real hook rejection", {
         permission = "deny",
         reason = "Rejected after effects",
         continue = FALSE,
-        updated_input = list(path = "replacement.txt"),
         additional_context = "Persist this hook context",
         stop_reason = "hook_policy_stop"
       )
@@ -495,13 +494,9 @@ test_that("pre-tool effects are applied before a real hook rejection", {
     tool = mock$tool
   )
 
-  rejection <- NULL
-  expect_warning(
-    rejection <- tryCatch(
-      agent$.__enclos_env__$private$on_tool_request(request),
-      ellmer_tool_reject = function(error) error
-    ),
-    "not currently applied"
+  rejection <- tryCatch(
+    agent$.__enclos_env__$private$on_tool_request(request),
+    ellmer_tool_reject = function(error) error
   )
 
   expect_s3_class(rejection, "ellmer_tool_reject")

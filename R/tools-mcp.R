@@ -9,7 +9,7 @@
 #' Returns TRUE if the mcptools package is installed and available.
 #'
 #' @return Logical indicating if MCP support is available
-#' @export
+#' @noRd
 #'
 #' @examples
 #' if (mcp_available()) {
@@ -53,8 +53,7 @@ mcp_available <- function() {
 #' ```
 #'
 #' @seealso
-#' - `mcp_available()` to check if MCP support is installed
-#' - [mcptools package](https://posit-dev.github.io/mcptools/) for configuration
+#' [mcptools package](https://posit-dev.github.io/mcptools/) for configuration
 #'
 #' @export
 #'
@@ -181,7 +180,7 @@ tools_mcp <- function(config = NULL, servers = NULL) {
 #'   exists but has no servers. Returns NULL on error (mcptools not installed,
 #'   config file missing, or parse error).
 #'
-#' @export
+#' @noRd
 #'
 #' @examples
 #' \dontrun{

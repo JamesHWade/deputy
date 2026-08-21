@@ -6,15 +6,31 @@
   failures, and restore persisted sessions from an installed package.
 
 * `Agent$new()` and per-run methods now accept immutable, canonical
-  JSON-compatible `run_context`. Results, hooks, session snapshots, and
+  JSON-compatible `run_context`. Results, hooks, saved sessions, and
   delegated agents retain that context, while paired tool events and delegated
   results expose Agent, run, parent, tool-call, and delegation identifiers.
   Generated correlation identifiers no longer advance R's global RNG stream.
+
+* Deputy now has a deliberate 51-symbol public API centered on native agents,
+  tools, permissions, hooks, skills, delegation, and run usage. Sessions use a
+  stable `session_id` for correlation and explicit `Agent$save_session()` and
+  `Agent$load_session()` calls for persistence.
+
+* Removed the pre-release Agent SDK/Claude facades, Claude settings loader,
+  automatic session stores, vendor tool and permission aliases, deprecated run
+  arguments, todo tools, and redundant convenience exports. Saved sessions and
+  file-checkpoint journals now use strict native schemas; unsupported earlier
+  payloads are rejected rather than migrated.
 
 * `Agent$provider()` no longer errors with "Can't get S7 properties with `$`"
   against current ellmer. ellmer moved `model` off `Provider` onto a new `Model`
   class, so `provider@model` fails for every provider and the `$` fallback threw
   from inside the error handler. The model is now read with `Chat$get_model()`.
+
+* `Agent$set_permission_mode()` now preserves constructor permissions as an
+  immutable authority ceiling. Reapplying the current mode is a no-op; other
+  changes may only narrow authority. Delegated agents use the same rule and
+  retain lead capability, tool-gate, callback, and write-root restrictions.
 
 * `compact()` now summarizes on a clone of the agent's own chat instead of
   constructing a new provider. Previously any provider other than OpenAI,
@@ -30,27 +46,23 @@
   and run usage on `AgentResult`.
 * Added `UsageLimits()` and `AgentUsage()` for per-run request, tool-call,
   input/output/total-token, and estimated-cost accounting and enforcement,
-  including remaining-budget inheritance and aggregation for synchronous
+  including remaining-limit inheritance and aggregation for synchronous
   delegated agents.
 * Added persisted, bounded byte-exact file checkpoints and rewind through
-  `Agent` and `AgentSDKClient` for native and SDK-compatible write/edit tools;
-  lead and delegated agents share one workspace journal. Serialized state is
-  size-bounded and restores are root-validated and transactional.
-* Hardened permission checks so native and SDK tool aliases share policy IDs,
-  all mutating file tools enforce configured roots, and readonly mode fails
-  closed for unknown, write/edit/multi-edit/todo, destructive, and disallowed
-  open-world tools. Constructor permissions, workspace roots, and tools remain
-  authoritative when sessions resume unless serialized tools are explicitly
-  trusted.
+  `Agent` for Deputy write and edit tools; lead and delegated agents share one
+  workspace journal. Serialized state is size-bounded and loads are
+  root-validated and transactional.
+* Hardened permission checks so all mutating file tools enforce configured
+  roots and readonly mode fails closed for unknown, mutating, destructive, and
+  disallowed open-world tools. Constructor permissions, workspace roots, and
+  tools remain authoritative when a saved conversation is loaded.
 * Post-tool hook output replacement and suppression now apply to emitted tool
   lifecycle events; interrupting permission denials stop active streams.
 * Added lazy, cancellable `run_shiny()` lifecycle management with the Agent's
   run limits, file-root confinement, automatic checkpoints, and incomplete-tool
-  recovery; active runs now reject conflicting session, rewind, and compaction
+  recovery; active runs now reject conflicting load, rewind, and compaction
   mutations.
-* Added external and in-memory session-store adapters, MCP status reporting,
-  richer sub-agent run metadata, and an evidence-backed Agent SDK parity
-  inventory with remaining gaps documented explicitly.
+* Added MCP status reporting and richer sub-agent run metadata.
 * Initial development version
 * Core `Agent` class with streaming `run()` and blocking `run_sync()` methods
 * Built-in tools: `tool_read_file`, `tool_write_file`, `tool_list_files`,
@@ -58,9 +70,10 @@
 * Tool bundles: `tools_file()`, `tools_code()`, `tools_data()`, `tools_all()`
 * Permission system with `permissions_readonly()`, `permissions_standard()`,
   `permissions_full()`, and custom `Permissions` class
-* Hook system with `HookMatcher`, `HookRegistry`, and events:
+* Hook system with `HookMatcher` and events:
   `PreToolUse`, `PostToolUse`, `Stop`, `UserPromptSubmit`, `PreCompact`
 * Multi-agent support with `agent_definition()` and `LeadAgent`
 * Skills system with `skill_load()`, `skill_create()`, and `Skill` class
-* Session persistence via `save_session()` and `load_session()`
+* Explicit session persistence via `Agent$save_session()` and
+  `Agent$load_session()`
 * Provider-agnostic design works with any ellmer-supported LLM

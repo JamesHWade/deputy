@@ -173,22 +173,13 @@ file_checkpoint_existing_prefix <- function(path) {
 }
 
 file_checkpoint_mutating_tool <- function(tool_name) {
-  aliases <- c(
+  tool_kinds <- c(
     write_file = "write",
-    tool_write_file = "write",
-    Write = "write",
     edit_file = "edit",
-    tool_edit_file = "edit",
-    Edit = "edit",
-    multi_edit = "multi_edit",
-    tool_multi_edit = "multi_edit",
-    MultiEdit = "multi_edit",
-    todo_write = "todo_write",
-    tool_todo_write = "todo_write",
-    TodoWrite = "todo_write"
+    multi_edit = "multi_edit"
   )
 
-  match <- unname(aliases[tool_name])
+  match <- unname(tool_kinds[tool_name])
   if (length(match) == 0L || is.na(match)) NULL else match
 }
 
@@ -361,7 +352,7 @@ FileCheckpointStore <- R6::R6Class(
       checkpoint_id
     },
 
-    before_tool = function(tool_name, tool_input, tool_use_id) {
+    before_tool = function(tool_name, tool_input, tool_call_id) {
       if (
         !is.character(tool_name) || length(tool_name) != 1L || is.na(tool_name)
       ) {
@@ -373,11 +364,11 @@ FileCheckpointStore <- R6::R6Class(
         return(invisible(FALSE))
       }
 
-      private$validate_tool_use_id(tool_use_id)
-      if (exists(tool_use_id, envir = private$.pending, inherits = FALSE)) {
+      private$validate_tool_call_id(tool_call_id)
+      if (exists(tool_call_id, envir = private$.pending, inherits = FALSE)) {
         file_checkpoint_abort(sprintf(
-          "A checkpoint capture is already pending for tool use %s.",
-          tool_use_id
+          "A checkpoint capture is already pending for tool call %s.",
+          tool_call_id
         ))
       }
       if (private$.next_capture_sequence >= .Machine$integer.max) {
@@ -389,26 +380,10 @@ FileCheckpointStore <- R6::R6Class(
         file_checkpoint_abort("`tool_input` must be a list.")
       }
 
-      supplied_paths <- Filter(
-        function(path) !is.null(path),
-        list(path = tool_input$path, file_path = tool_input$file_path)
-      )
-      if (length(supplied_paths) > 1L) {
-        path_values <- vapply(supplied_paths, as.character, character(1))
-        if (length(unique(path_values)) > 1L) {
-          file_checkpoint_abort(
-            "Tool input contains conflicting `path` and `file_path` values."
-          )
-        }
-      }
-
-      path <- tool_input$path %||% tool_input$file_path
-      if (is.null(path) && identical(tool_kind, "todo_write")) {
-        path <- ".deputy/todos.json"
-      }
+      path <- tool_input$path
       if (is.null(path)) {
         file_checkpoint_abort(sprintf(
-          "Mutating tool %s did not provide `path` or `file_path`.",
+          "Mutating tool %s did not provide `path`.",
           tool_name
         ))
       }
@@ -482,7 +457,7 @@ FileCheckpointStore <- R6::R6Class(
       private$assert_capture_within_limits(path, length(bytes))
 
       entry <- list(
-        tool_use_id = tool_use_id,
+        tool_call_id = tool_call_id,
         tool_name = tool_name,
         path = relative_path,
         existed = existed,
@@ -491,29 +466,29 @@ FileCheckpointStore <- R6::R6Class(
         captured_at = Sys.time()
       )
       pending <- c(private$pending_entries(), list(entry))
-      names(pending)[[length(pending)]] <- tool_use_id
+      names(pending)[[length(pending)]] <- tool_call_id
       private$assert_state_within_limit(
         journal = private$.journal,
         checkpoints = private$.checkpoints,
         pending = pending,
         action = sprintf("Capturing checkpoint preimage for %s", path)
       )
-      assign(tool_use_id, entry, envir = private$.pending)
+      assign(tool_call_id, entry, envir = private$.pending)
       private$.next_capture_sequence <- private$.next_capture_sequence + 1L
 
       invisible(TRUE)
     },
 
-    after_tool = function(tool_use_id, success) {
-      private$validate_tool_use_id(tool_use_id)
+    after_tool = function(tool_call_id, success) {
+      private$validate_tool_call_id(tool_call_id)
       if (!is.logical(success) || length(success) != 1L || is.na(success)) {
         file_checkpoint_abort("`success` must be TRUE or FALSE.")
       }
-      if (!exists(tool_use_id, envir = private$.pending, inherits = FALSE)) {
+      if (!exists(tool_call_id, envir = private$.pending, inherits = FALSE)) {
         return(invisible(FALSE))
       }
 
-      entry <- get(tool_use_id, envir = private$.pending, inherits = FALSE)
+      entry <- get(tool_call_id, envir = private$.pending, inherits = FALSE)
       changed <- isTRUE(success)
       if (!changed) {
         verification_error <- NULL
@@ -530,7 +505,7 @@ FileCheckpointStore <- R6::R6Class(
         }
       }
 
-      pending <- private$pending_entries(exclude = tool_use_id)
+      pending <- private$pending_entries(exclude = tool_call_id)
 
       # Validate and append before releasing the pending capture. If allocation
       # or limit enforcement fails, the original remains recoverable in
@@ -541,11 +516,11 @@ FileCheckpointStore <- R6::R6Class(
           journal = journal,
           checkpoints = private$.checkpoints,
           pending = pending,
-          action = sprintf("Finalizing checkpoint capture %s", tool_use_id)
+          action = sprintf("Finalizing checkpoint capture %s", tool_call_id)
         )
         private$.journal <- journal
       }
-      rm(list = tool_use_id, envir = private$.pending)
+      rm(list = tool_call_id, envir = private$.pending)
 
       invisible(changed)
     },
@@ -557,8 +532,8 @@ FileCheckpointStore <- R6::R6Class(
       }
 
       finalized <- 0L
-      for (tool_use_id in pending_ids) {
-        self$after_tool(tool_use_id, success = FALSE)
+      for (tool_call_id in pending_ids) {
+        self$after_tool(tool_call_id, success = FALSE)
         finalized <- finalized + 1L
       }
 
@@ -683,7 +658,7 @@ FileCheckpointStore <- R6::R6Class(
     export_state = function() {
       private$assert_no_pending("export checkpoint state")
       file_checkpoint_deep_copy(list(
-        version = 2L,
+        version = 3L,
         root = private$.root,
         journal = private$.journal,
         checkpoints = private$.checkpoints,
@@ -862,14 +837,14 @@ FileCheckpointStore <- R6::R6Class(
       invisible(NULL)
     },
 
-    validate_tool_use_id = function(tool_use_id) {
+    validate_tool_call_id = function(tool_call_id) {
       if (
-        !is.character(tool_use_id) ||
-          length(tool_use_id) != 1L ||
-          is.na(tool_use_id) ||
-          !nzchar(tool_use_id)
+        !is.character(tool_call_id) ||
+          length(tool_call_id) != 1L ||
+          is.na(tool_call_id) ||
+          !nzchar(tool_call_id)
       ) {
-        file_checkpoint_abort("`tool_use_id` must be a non-empty string.")
+        file_checkpoint_abort("`tool_call_id` must be a non-empty string.")
       }
       invisible(NULL)
     },
@@ -1098,7 +1073,7 @@ FileCheckpointStore <- R6::R6Class(
     },
 
     validate_state = function(state) {
-      if (!is.list(state) || !identical(state$version, 2L)) {
+      if (!is.list(state) || !identical(state$version, 3L)) {
         file_checkpoint_abort("Unsupported or malformed checkpoint state.")
       }
       if (
@@ -1220,9 +1195,9 @@ FileCheckpointStore <- R6::R6Class(
     validate_state_entry = function(entry) {
       if (
         !is.list(entry) ||
-          !is.character(entry$tool_use_id) ||
-          length(entry$tool_use_id) != 1L ||
-          !nzchar(entry$tool_use_id) ||
+          !is.character(entry$tool_call_id) ||
+          length(entry$tool_call_id) != 1L ||
+          !nzchar(entry$tool_call_id) ||
           !is.character(entry$tool_name) ||
           length(entry$tool_name) != 1L ||
           !is.character(entry$path) ||

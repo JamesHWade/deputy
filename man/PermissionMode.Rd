@@ -9,14 +9,11 @@ PermissionMode
 \description{
 Permission modes control the overall behavior of tool permission checking:
 \itemize{
-\item \code{"default"} - Check each tool against the permission policy
-\item \code{"acceptEdits"} - Auto-accept file write tools
+\item \code{"standard"} - Check each tool against the configured capabilities
 \item \code{"plan"} - Allow annotated read-only tools within configured capabilities
 plus human approval prompts
-\item \code{"dontAsk"} - Check policy without suggesting approval prompts
-\item \code{"auto"} - SDK-compatible alias for default deputy permission behavior
 \item \code{"readonly"} - Deny all write/execute tools
-\item \code{"bypassPermissions"} - Allow all tools (dangerous, use with caution)
+\item \code{"full"} - Allow all tools (dangerous, use with caution)
 }
 }
 \section{Tool Annotations}{
@@ -50,6 +47,7 @@ Examples: \code{tool_web_search}, \code{tool_install_package}
 Indicates repeated calls produce the same result.
 Safe to retry on failure.
 }
+
 \section{Creating Tools with Annotations}{
 
 
@@ -77,4 +75,9 @@ tool_delete <- ellmer::tool(
   )
 )
 }\if{html}{\out{</div>}}
+}
+
+\seealso{
+\link{Permissions}, \code{\link[=permissions_standard]{permissions_standard()}}, \code{\link[=permissions_plan]{permissions_plan()}},
+\code{\link[=permissions_readonly]{permissions_readonly()}}, and \code{\link[=permissions_full]{permissions_full()}}.
 }

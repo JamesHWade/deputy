@@ -15,9 +15,7 @@ agent_definition(
   memory = NULL,
   mcp_servers = NULL,
   initial_prompt = NULL,
-  max_turns = NULL,
-  background = FALSE,
-  effort = NULL,
+  max_requests = NULL,
   permission_mode = NULL
 )
 }
@@ -42,16 +40,11 @@ agent_definition(
 
 \item{initial_prompt}{Optional text prepended to delegated tasks}
 
-\item{max_turns}{Optional non-negative whole-number sub-agent request limit}
+\item{max_requests}{Optional non-negative whole-number sub-agent request limit}
 
-\item{background}{Logical SDK-compatible metadata flag}
-
-\item{effort}{Optional reasoning effort metadata}
-
-\item{permission_mode}{Optional permission mode. For non-bypass lead agents,
-this must match the lead mode (with \code{"default"} and \code{"auto"} treated as
-equivalent); use \code{disallowed_tools} and \code{max_turns} to tighten a child
-policy. A bypass lead may select any mode.}
+\item{permission_mode}{Optional permission mode. A child may keep the lead
+mode or narrow it to \code{"readonly"}; a \code{"full"} lead may select any mode.
+Use \code{disallowed_tools} and \code{max_requests} for additional limits.}
 }
 \value{
 An \code{AgentDefinition} object

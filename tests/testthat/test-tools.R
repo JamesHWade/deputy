@@ -502,7 +502,7 @@ test_that("tools_preset returns correct tools for dev", {
 test_that("tools_preset returns correct tools for full", {
   tools <- tools_preset("full")
   expect_type(tools, "list")
-  expect_length(tools, 15)
+  expect_length(tools, 13)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
@@ -516,15 +516,12 @@ test_that("tools_preset returns correct tools for full", {
   expect_true("run_r_code" %in% tool_names)
   expect_true("run_bash" %in% tool_names)
   expect_true("read_csv" %in% tool_names)
-  expect_true("todo_read" %in% tool_names)
-  expect_true("todo_write" %in% tool_names)
   expect_true("web_fetch" %in% tool_names)
   expect_true("web_search" %in% tool_names)
 })
 
 test_that("tool schemas require non-default structured inputs", {
   expect_true(tool_multi_edit@arguments@properties$edits@required)
-  expect_true(tool_todo_write@arguments@properties$todos@required)
 })
 
 test_that("tools_preset returns correct tools for data", {
@@ -545,15 +542,4 @@ test_that("tools_preset errors on invalid preset name", {
     tools_preset("invalid"),
     "Unknown tool preset"
   )
-})
-
-test_that("list_presets returns data frame with preset info", {
-  presets <- list_presets()
-
-  expect_s3_class(presets, "data.frame")
-  expect_equal(nrow(presets), 5)
-  expect_true("name" %in% names(presets))
-  expect_true("description" %in% names(presets))
-  expect_true("tools" %in% names(presets))
-  expect_equal(presets$name, c("minimal", "standard", "dev", "data", "full"))
 })

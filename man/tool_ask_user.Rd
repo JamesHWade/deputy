@@ -2,7 +2,7 @@
 % Please edit documentation in R/tools-interactive.R
 \name{tool_ask_user}
 \alias{tool_ask_user}
-\title{AskUserQuestion tool}
+\title{Ask user tool}
 \format{
 A tool definition created with \code{ellmer::tool()}.
 }
@@ -10,7 +10,7 @@ A tool definition created with \code{ellmer::tool()}.
 tool_ask_user(questions)
 }
 \arguments{
-\item{questions}{JSON string or list of question objects following the SDK format.
+\item{questions}{JSON string or list of structured question objects.
 Each question should have: \code{question} (string), \code{header} (string, max 12 chars),
 \code{options} (list of objects with \code{label} and \code{description}), and optionally
 \code{multiSelect} (logical).}
@@ -21,8 +21,6 @@ receive their responses. This enables human-in-the-loop workflows where
 the agent can request clarification or choices from the user.
 }
 \details{
-This tool follows the Anthropic Agent SDK format:
-
 \strong{Input format:}
 \itemize{
 \item \code{questions}: Array of 1-4 question objects

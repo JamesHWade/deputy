@@ -25,9 +25,7 @@ execution.
 
     \item{\code{structured_output}}{Parsed/validated structured output (if requested)}
 
-    \item{\code{session_id}}{Compat session identifier when Claude SDK mode is active}
-
-    \item{\code{snapshot_path}}{Latest compat snapshot path when session persistence is active}
+    \item{\code{session_id}}{Stable session identifier for run correlation}
 
     \item{\code{run_id}}{Unique identifier shared by events from this run}
 
@@ -81,7 +79,6 @@ execution.
   stop_reason = "complete",
   structured_output = NULL,
   session_id = NULL,
-  snapshot_path = NULL,
   run_id = NULL,
   usage = AgentUsage(),
   agent_id = NULL,
@@ -103,8 +100,7 @@ execution.
       \item{\code{duration}}{Execution duration in seconds}
       \item{\code{stop_reason}}{Reason for stopping}
       \item{\code{structured_output}}{Parsed structured output (if any)}
-      \item{\code{session_id}}{Compat session identifier (if any)}
-      \item{\code{snapshot_path}}{Latest compat snapshot path (if any)}
+      \item{\code{session_id}}{Stable session identifier (if any)}
       \item{\code{run_id}}{Unique run identifier (if any)}
       \item{\code{usage}}{Run-scoped \link{AgentUsage}}
       \item{\code{agent_id}}{Agent instance identifier (if any)}

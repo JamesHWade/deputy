@@ -236,19 +236,12 @@ tools_all <- function() {
     tool_run_r_code,
     tool_run_bash,
     tool_read_csv,
-    tool_todo_read,
-    tool_todo_write,
     tool_web_fetch,
     tool_web_search
   )
 }
 
-#' Available tool preset names
-#'
-#' @description
-#' Character vector of valid preset names for [tools_preset()].
-#'
-#' @export
+# Available tool preset names.
 ToolPresets <- c("minimal", "standard", "dev", "data", "full")
 
 #' Get a tool preset by name
@@ -332,57 +325,5 @@ tools_preset <- function(name) {
       tool_run_r_code
     ),
     full = tools_all()
-  )
-}
-
-#' List available tool presets
-#'
-#' @description
-#' Returns information about available tool presets, including
-#' their names, descriptions, and the tools they contain.
-#'
-#' @return A data frame with preset information
-#'
-#' @examples
-#' list_presets()
-#'
-#' @export
-list_presets <- function() {
-  data.frame(
-    name = c("minimal", "standard", "dev", "data", "full"),
-    description = c(
-      "Read-only tools for safe exploration",
-      "Balanced toolset for R development",
-      "Full development with shell access",
-      "Data analysis focused tools",
-      "All available tools"
-    ),
-    tools = c(
-      "read_file, read_markdown, list_files",
-      "read_file, read_markdown, write_file, list_files, run_r_code",
-      "read_file, read_markdown, write_file, list_files, run_r_code, run_bash",
-      "read_file, read_markdown, list_files, read_csv, run_r_code",
-      paste(
-        c(
-          "read_file",
-          "read_markdown",
-          "write_file",
-          "edit_file",
-          "multi_edit",
-          "list_files",
-          "glob_files",
-          "grep_files",
-          "run_r_code",
-          "run_bash",
-          "read_csv",
-          "todo_read",
-          "todo_write",
-          "web_fetch",
-          "web_search"
-        ),
-        collapse = ", "
-      )
-    ),
-    stringsAsFactors = FALSE
   )
 }

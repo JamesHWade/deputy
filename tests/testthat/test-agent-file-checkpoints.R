@@ -65,7 +65,7 @@ test_that("file checkpoint journals survive session serialization", {
     working_dir = root
   )
   suppressWarnings(suppressMessages(
-    restored$load_session(session_path, restore_tools = FALSE)
+    restored$load_session(session_path)
   ))
   restored$rewind_files(checkpoint_id)
 
@@ -75,6 +75,7 @@ test_that("file checkpoint journals survive session serialization", {
 test_that("provider errors finalize and persist orphaned tool captures", {
   root <- withr::local_tempdir(pattern = "deputy-orphan-checkpoint-")
   session_root <- file.path(root, "sessions")
+  dir.create(session_root)
   path <- file.path(root, "orphaned.txt")
   writeLines("before", path)
   mock <- create_checkpoint_callback_chat()
@@ -114,18 +115,14 @@ test_that("provider errors finalize and persist orphaned tool captures", {
     enable_file_checkpointing = TRUE,
     working_dir = root
   )
-  agent$configure_sdk_compat(list(
-    persist_session = TRUE,
-    session_store_dir = session_root,
-    session_id = "orphaned-session"
-  ))
-
   result <- agent$run_sync("write then fail")
   checkpoint_id <- result$events[[1L]]$checkpoint_id
+  session_path <- file.path(session_root, "orphaned-session.rds")
+  suppressMessages(agent$save_session(session_path))
 
   expect_identical(result$stop_reason, "provider_error")
   expect_identical(readLines(path), "after")
-  expect_true(file.exists(result$snapshot_path))
+  expect_true(file.exists(session_path))
   expect_no_error(agent$checkpoint("next checkpoint"))
 
   restored <- Agent$new(
@@ -134,7 +131,7 @@ test_that("provider errors finalize and persist orphaned tool captures", {
     working_dir = root
   )
   suppressWarnings(suppressMessages(
-    restored$load_session(result$snapshot_path)
+    restored$load_session(session_path)
   ))
   restored$rewind_files(checkpoint_id)
   expect_identical(readLines(path), "before")
@@ -156,7 +153,7 @@ test_that("session checkpoint state cannot enable checkpointing", {
     enable_file_checkpointing = FALSE,
     working_dir = root
   )
-  suppressMessages(receiver$load_session(session_path, restore_tools = FALSE))
+  suppressMessages(receiver$load_session(session_path))
 
   expect_error(
     receiver$list_checkpoints(),
@@ -193,7 +190,7 @@ test_that("session checkpoint state cannot cross configured roots", {
 
   expect_error(
     suppressMessages(
-      receiver$load_session(session_path, restore_tools = FALSE)
+      receiver$load_session(session_path)
     ),
     class = "deputy_file_checkpoint_path_error"
   )

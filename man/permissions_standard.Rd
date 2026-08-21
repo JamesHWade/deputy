@@ -4,19 +4,12 @@
 \alias{permissions_standard}
 \title{Create a standard permission policy}
 \usage{
-permissions_standard(
-  working_dir = getwd(),
-  max_turns = 25,
-  max_cost_usd = NULL
-)
+permissions_standard(working_dir = getwd())
 }
 \arguments{
-\item{working_dir}{Root directory for file writes (default: current
-directory). This does not restrict otherwise accessible file reads.}
-
-\item{max_turns}{Maximum number of turns (default 25)}
-
-\item{max_cost_usd}{Maximum cost in USD (default NULL = unlimited)}
+\item{working_dir}{Existing absolute root directory for file writes (default:
+current directory). This does not restrict otherwise accessible file
+reads.}
 }
 \value{
 A \link{Permissions} object

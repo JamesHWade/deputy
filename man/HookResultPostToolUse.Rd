@@ -8,7 +8,6 @@ HookResultPostToolUse(
   continue = TRUE,
   suppress_output = FALSE,
   updated_tool_output = NULL,
-  updated_mcp_tool_output = NULL,
   additional_context = NULL,
   stop_reason = NULL
 )
@@ -22,8 +21,6 @@ HookResultPostToolUse(
 \item{updated_tool_output}{Optional replacement value for Deputy's emitted
 \code{tool_end} event. ellmer does not support rewriting the model-visible
 in-flight result from this callback.}
-
-\item{updated_mcp_tool_output}{Deprecated alias for \code{updated_tool_output}}
 
 \item{additional_context}{Optional text to append to the running context}
 

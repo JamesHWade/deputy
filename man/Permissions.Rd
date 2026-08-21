@@ -14,7 +14,7 @@ Tool gating fields:
 tools not in the list are denied.
 \item \code{tool_denylist}: Optional list of tools that are always denied.
 \item \code{permission_prompt_tool_name}: Optional tool name to mention in deny
-messages for gated tools (e.g., "AskUserQuestion").
+messages for gated tools (e.g., "ask_user").
 }
 
 \strong{Security Note:} Permission fields are immutable after construction.
@@ -28,7 +28,8 @@ All fields use active bindings that reject modification attempts.
 
     \item{\code{file_read}}{Allow file reading. Read-only after construction.}
 
-    \item{\code{file_write}}{Allow file writing. Can be TRUE, FALSE, or a directory path. Read-only after construction.}
+    \item{\code{file_write}}{Allow file writing. Can be \code{TRUE}, \code{FALSE}, or a
+canonical absolute directory path. Read-only after construction.}
 
     \item{\code{bash}}{Allow bash command execution. Read-only after construction.}
 
@@ -37,10 +38,6 @@ All fields use active bindings that reject modification attempts.
     \item{\code{web}}{Allow web requests. Read-only after construction.}
 
     \item{\code{install_packages}}{Allow package installation. Read-only after construction.}
-
-    \item{\code{max_turns}}{Maximum number of turns before stopping. Read-only after construction.}
-
-    \item{\code{max_cost_usd}}{Maximum cost in USD before stopping. Read-only after construction.}
 
     \item{\code{can_use_tool}}{Custom permission callback. Read-only after construction.}
 
@@ -69,15 +66,13 @@ All fields use active bindings that reject modification attempts.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Permissions$new(
-  mode = "default",
+  mode = "standard",
   file_read = TRUE,
-  file_write = NULL,
+  file_write = getwd(),
   bash = FALSE,
   r_code = TRUE,
   web = FALSE,
   install_packages = FALSE,
-  max_turns = 25,
-  max_cost_usd = NULL,
   can_use_tool = NULL,
   tool_allowlist = NULL,
   tool_denylist = NULL,
@@ -90,18 +85,19 @@ All fields use active bindings that reject modification attempts.
     \describe{
       \item{\code{mode}}{Permission mode}
       \item{\code{file_read}}{Allow file reading}
-      \item{\code{file_write}}{Allow file writing (TRUE, FALSE, or directory path)}
+      \item{\code{file_write}}{Allow file writing (\code{TRUE}, \code{FALSE}, or an existing
+absolute directory path). Directory grants are canonicalized once when
+the policy is constructed.}
       \item{\code{bash}}{Allow bash commands}
       \item{\code{r_code}}{Allow R code execution}
       \item{\code{web}}{Allow web requests}
       \item{\code{install_packages}}{Allow package installation}
-      \item{\code{max_turns}}{Maximum turns}
-      \item{\code{max_cost_usd}}{Maximum cost}
       \item{\code{can_use_tool}}{Custom callback function}
       \item{\code{tool_allowlist}}{Optional character vector of allowed tool names}
       \item{\code{tool_denylist}}{Optional character vector of denied tool names}
-      \item{\code{permission_prompt_tool_name}}{Optional tool name to suggest in
-permission deny messages for gated tools}
+      \item{\code{permission_prompt_tool_name}}{Optional dedicated approval-tool name
+to suggest in permission deny messages for gated tools. Native
+capability-bearing tools cannot be used as approval prompts.}
     }
     \if{html}{\out{</div>}}
   }

@@ -7,6 +7,7 @@
 Manages a collection of hooks for an agent. Handles registration,
 matching, and execution of hooks.
 }
+\keyword{internal}
 \section{Methods}{
 \subsection{Public methods}{
   \itemize{

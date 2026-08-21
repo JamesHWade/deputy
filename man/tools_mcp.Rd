@@ -59,8 +59,5 @@ mcp_tools <- tools_mcp(servers = c("github", "slack"))
 }
 }
 \seealso{
-\itemize{
-\item \code{mcp_available()} to check if MCP support is installed
-\item \href{https://posit-dev.github.io/mcptools/}{mcptools package} for configuration
-}
+\href{https://posit-dev.github.io/mcptools/}{mcptools package} for configuration
 }

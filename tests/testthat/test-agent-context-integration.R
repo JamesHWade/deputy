@@ -74,7 +74,8 @@ test_that("per-run context merges into result and terminal events", {
   agent <- Agent$new(
     chat = create_mock_chat("done"),
     run_context = defaults,
-    agent_id = "agent-merge"
+    agent_id = "agent-merge",
+    session_id = "session-merge"
   )
 
   result <- agent$run_sync(
@@ -104,8 +105,18 @@ test_that("per-run context merges into result and terminal events", {
   expect_identical(stop$run_context, expected)
   expect_identical(start$run_id, stop$run_id)
   expect_identical(result$run_id, stop$run_id)
+  expect_identical(result$session_id, "session-merge")
+  expect_identical(start$session_id, "session-merge")
+  expect_identical(stop$session_id, "session-merge")
   expect_identical(start$agent_id, "agent-merge")
   expect_identical(stop$agent_id, "agent-merge")
+})
+
+test_that("session identifiers are validated at construction", {
+  expect_error(
+    Agent$new(chat = create_mock_chat(), session_id = "../unsafe"),
+    class = "deputy_id_error"
+  )
 })
 
 test_that("per-run context cannot replace protected constructor identity", {
@@ -229,7 +240,7 @@ test_that("tool events and major hooks share run correlation", {
     timeout = 0,
     callback = function(context) {
       seen$SessionStart <- context
-      HookResultSessionStart()
+      NULL
     }
   ))
   agent$add_hook(HookMatcher$new(
@@ -269,7 +280,7 @@ test_that("tool events and major hooks share run correlation", {
     timeout = 0,
     callback = function(reason, context) {
       seen$SessionEnd <- context
-      HookResultSessionEnd()
+      NULL
     }
   ))
 
@@ -343,7 +354,7 @@ test_that("missing provider IDs fail closed when correlation is ambiguous", {
   extracted <- list(
     tool_name = "inspect_evidence",
     tool_input = list(claim = "claim-1"),
-    tool_use_id = NULL
+    provider_tool_call_id = NULL
   )
 
   first_start <- private$tool_start_event(extracted)
@@ -397,7 +408,7 @@ test_that("manual save and load preserve run context", {
     product = "tempest",
     research_run_id = "research-123"
   )
-  expect_identical(payload$run_context_defaults, expected)
+  expect_identical(payload$schema_version, 1L)
   expect_identical(payload$run_context, expected)
 
   restored_chat <- create_mock_chat()
@@ -433,59 +444,20 @@ test_that("manual save after a run preserves its effective context", {
   payload <- readRDS(path)
   expect_identical(result$run_context, expected)
   expect_identical(payload$run_context, expected)
-  expect_false("stage" %in% names(payload$run_context_defaults))
 
   restored <- Agent$new(chat = create_mock_chat())
   suppressMessages(restored$load_session(path))
   expect_identical(restored$run_context, expected)
 })
 
-test_that("compat snapshots preserve the effective run context", {
-  store <- withr::local_tempdir(pattern = "deputy-context-compat-")
-  source <- Agent$new(
-    chat = create_mock_chat("saved"),
-    run_context = list(
-      product = "tempest",
-      research_run_id = "research-123"
-    )
-  )
-  source$configure_sdk_compat(list(
-    persist_session = TRUE,
-    session_store_dir = store,
-    session_id = "context-session"
-  ))
-
-  saved <- source$run_sync(
-    "Persist context",
-    run_context = list(stage = "verify_claims")
-  )
-  expected <- list(
-    product = "tempest",
-    research_run_id = "research-123",
-    stage = "verify_claims"
-  )
-  expect_identical(file.exists(saved$snapshot_path), TRUE)
-  snapshot <- readRDS(saved$snapshot_path)
-  expect_identical(snapshot$run_context, expected)
-
-  client <- AgentSDKClient$new(agent_sdk_options(
-    chat = create_mock_chat("resumed"),
-    cwd = getwd(),
-    session_store_dir = store
-  ))
-  suppressMessages(client$resume("context-session"))
-
-  expect_identical(client$agent$run_context, expected)
-})
-
-test_that("older session payloads remain compatible with constructor context", {
-  root <- withr::local_tempdir(pattern = "deputy-context-legacy-")
-  path <- file.path(root, "legacy.rds")
-  legacy_turns <- list(create_mock_user_turn("Legacy conversation"))
+test_that("unsupported session schemas are rejected", {
+  root <- withr::local_tempdir(pattern = "deputy-context-unsupported-")
+  path <- file.path(root, "unsupported.rds")
+  unsupported_turns <- list(create_mock_user_turn("Unsupported conversation"))
   saveRDS(
     list(
-      turns = legacy_turns,
-      system_prompt = "Legacy prompt",
+      turns = unsupported_turns,
+      system_prompt = "Unsupported prompt",
       metadata = list()
     ),
     path
@@ -498,17 +470,11 @@ test_that("older session payloads remain compatible with constructor context", {
     )
   )
 
-  suppressMessages(agent$load_session(path))
-
-  expect_identical(
-    agent$run_context,
-    list(
-      product = "tempest",
-      research_run_id = "research-current"
-    )
+  expect_error(
+    suppressMessages(agent$load_session(path)),
+    class = "deputy_session_load"
   )
-  expect_equal(agent$chat$get_turns(), legacy_turns)
-  expect_identical(agent$chat$get_system_prompt(), "Legacy prompt")
+  expect_length(agent$chat$get_turns(), 0L)
 })
 
 test_that("unsafe restored context is rejected before conversation mutation", {
@@ -518,19 +484,14 @@ test_that("unsafe restored context is rejected before conversation mutation", {
   secret <- "super-secret-value-that-must-not-leak"
   cases <- list(
     conflict = list(
-      defaults = list(
-        product = "tempest",
-        research_run_id = "research-saved"
-      ),
-      effective = list(
+      context = list(
         product = "tempest",
         research_run_id = "research-saved"
       ),
       parent_class = "deputy_run_context_conflict"
     ),
     credential = list(
-      defaults = list(api_key = secret),
-      effective = list(api_key = secret),
+      context = list(api_key = secret),
       parent_class = "deputy_run_context_error"
     )
   )
@@ -540,10 +501,12 @@ test_that("unsafe restored context is rejected before conversation mutation", {
     path <- file.path(root, paste0(case_name, ".rds"))
     saveRDS(
       list(
+        schema_version = 1L,
         turns = unsafe_turns,
         system_prompt = "Unsafe prompt",
-        run_context_defaults = case$defaults,
-        run_context = case$effective,
+        run_context = case$context,
+        appended_hook_context_hashes = character(),
+        file_checkpoint_state = NULL,
         metadata = list()
       ),
       path

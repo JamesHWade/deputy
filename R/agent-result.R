@@ -30,7 +30,7 @@
 #'
 #' Run-boundary and tool lifecycle events also carry `agent_id`, `run_id`,
 #' immutable `run_context`, and delegated-run correlation fields when
-#' applicable. `tool_use_id` remains as a provider-ID compatibility alias.
+#' applicable.
 #'
 #' @examples
 #' # Create a start event
@@ -139,11 +139,8 @@ AgentResult <- R6::R6Class(
     #' @field structured_output Parsed/validated structured output (if requested)
     structured_output = NULL,
 
-    #' @field session_id Compat session identifier when Claude SDK mode is active
+    #' @field session_id Stable session identifier for run correlation
     session_id = NULL,
-
-    #' @field snapshot_path Latest compat snapshot path when session persistence is active
-    snapshot_path = NULL,
 
     #' @field run_id Unique identifier shared by events from this run
     run_id = NULL,
@@ -176,8 +173,7 @@ AgentResult <- R6::R6Class(
     #' @param duration Execution duration in seconds
     #' @param stop_reason Reason for stopping
     #' @param structured_output Parsed structured output (if any)
-    #' @param session_id Compat session identifier (if any)
-    #' @param snapshot_path Latest compat snapshot path (if any)
+    #' @param session_id Stable session identifier (if any)
     #' @param run_id Unique run identifier (if any)
     #' @param usage Run-scoped [AgentUsage]
     #' @param agent_id Agent instance identifier (if any)
@@ -196,7 +192,6 @@ AgentResult <- R6::R6Class(
       stop_reason = "complete",
       structured_output = NULL,
       session_id = NULL,
-      snapshot_path = NULL,
       run_id = NULL,
       usage = AgentUsage(),
       agent_id = NULL,
@@ -214,7 +209,6 @@ AgentResult <- R6::R6Class(
       self$stop_reason <- stop_reason
       self$structured_output <- structured_output
       self$session_id <- session_id
-      self$snapshot_path <- snapshot_path
       self$run_id <- run_id
       self$agent_id <- agent_id
       self$agent_name <- agent_name

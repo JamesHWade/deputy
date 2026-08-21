@@ -4,12 +4,7 @@
 \alias{permissions_full}
 \title{Create a full access permission policy}
 \usage{
-permissions_full(max_turns = 50, max_cost_usd = NULL)
-}
-\arguments{
-\item{max_turns}{Maximum number of turns (default 50)}
-
-\item{max_cost_usd}{Maximum cost in USD (default NULL = unlimited)}
+permissions_full()
 }
 \value{
 A \link{Permissions} object

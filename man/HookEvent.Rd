@@ -19,8 +19,8 @@ Callback signature: \verb{function(tool_name, tool_input, context)}
 \itemize{
 \item \code{tool_name}: Name of the tool being called (character)
 \item \code{tool_input}: Named list of arguments passed to the tool
-\item \code{context}: Common correlation fields plus \code{tool_call_id}, \code{tool_use_id},
-and \code{tool_annotations} (if available)
+\item \code{context}: Common correlation fields plus \code{tool_call_id} and
+\code{tool_annotations} (if available)
 \item Return: \code{\link[=HookResultPreToolUse]{HookResultPreToolUse()}} to allow/deny
 }
 
@@ -31,7 +31,7 @@ Callback signature: \verb{function(tool_name, tool_result, tool_error, context)}
 \item \code{tool_name}: Name of the tool that was called (character)
 \item \code{tool_result}: Result returned by the tool (or NULL on error)
 \item \code{tool_error}: Error message if tool failed (or NULL on success)
-\item \code{context}: Common correlation fields plus \code{tool_call_id} and \code{tool_use_id}
+\item \code{context}: Common correlation fields plus \code{tool_call_id}
 \item Return: \code{\link[=HookResultPostToolUse]{HookResultPostToolUse()}} to continue/stop
 }
 
@@ -50,7 +50,7 @@ Callback signature: \verb{function(reason, context)}
 \code{"request_limit"}, \code{"cost_limit"}, or \code{"provider_error"})
 \item \code{context}: Common correlation fields plus \code{usage} and \code{cost}; native
 \code{run()} also includes \code{total_turns}
-\item Return: \code{\link[=HookResultStop]{HookResultStop()}}
+\item Return: NULL (informational only)
 }
 
 \strong{SubagentStop} - When a sub-agent completes (LeadAgent only)
@@ -61,7 +61,7 @@ Callback signature: \verb{function(agent_name, task, result, context)}
 \item \code{task}: The task that was delegated (character)
 \item \code{result}: Result returned by the sub-agent
 \item \code{context}: Common correlation fields plus parent/child Agent and run IDs
-\item Return: \code{\link[=HookResultSubagentStop]{HookResultSubagentStop()}}
+\item Return: NULL (informational only)
 }
 
 \strong{SubagentStart} - When a delegated sub-agent starts (LeadAgent only)
@@ -120,7 +120,7 @@ Callback signature: \verb{function(context)}
 \itemize{
 \item \code{context}: Common correlation fields plus \code{permissions}, \code{provider}, and
 \code{tools_count}
-\item Return: \code{\link[=HookResultSessionStart]{HookResultSessionStart()}}
+\item Return: NULL (informational only)
 }
 
 \strong{SessionEnd} - When an agent session ends
@@ -131,7 +131,7 @@ Callback signature: \verb{function(reason, context)}
 \code{"request_limit"}, \code{"cost_limit"}, or \code{"hook_requested_stop"})
 \item \code{context}: Common correlation fields plus \code{usage} and \code{cost}; native
 \code{run()} also includes \code{total_turns}
-\item Return: \code{\link[=HookResultSessionEnd]{HookResultSessionEnd()}}
+\item Return: NULL (informational only)
 }
 }
 
@@ -149,11 +149,9 @@ The context parameter is always a named list. Common fields:
 \item \code{delegation_id}: Delegation identifier for delegated runs and tools
 \item \code{tool_annotations}: (PreToolUse only) Tool annotations from ellmer if available
 \item \code{tool_call_id}: Canonical tool lifecycle identifier
-\item \code{tool_use_id}: Provider tool identifier retained for compatibility
 \item \code{usage}: Run-scoped \link{AgentUsage} for tool and terminal lifecycle hooks
 \item \code{usage_limits}: Active \link{UsageLimits} for tool lifecycle hooks
 \item \code{run_id}: Identifier for the active run
-\item \code{session_id}: Session identifier when compatibility persistence is configured
 \item \code{total_turns}: (native Stop, PreCompact, native SessionEnd) Conversation turns
 \item \code{cost}: (Stop, SessionEnd) List with \code{input}, \code{output}, \code{cached}, and \code{total}
 \item \code{compact_count}: (PreCompact only) Number of turns being compacted

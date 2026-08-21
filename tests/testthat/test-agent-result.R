@@ -61,8 +61,8 @@ test_that("AgentResult has correct structure", {
 })
 
 test_that("AgentResult detects non-success states", {
-  result_max_turns <- AgentResult$new(stop_reason = "max_turns")
-  expect_false(result_max_turns$is_success())
+  result_request_limit <- AgentResult$new(stop_reason = "request_limit")
+  expect_false(result_request_limit$is_success())
 
   result_cost <- AgentResult$new(stop_reason = "cost_limit")
   expect_false(result_cost$is_success())

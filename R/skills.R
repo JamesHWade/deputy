@@ -310,7 +310,7 @@ skill_load <- function(path, check_requirements = TRUE) {
     parsed <- parse_markdown_frontmatter(md_path)
     prompt <- parsed$body
     if (length(parsed$meta) > 0) {
-      meta <- merge_named_lists(meta, parsed$meta)
+      meta <- utils::modifyList(meta, parsed$meta, keep.null = TRUE)
     }
   }
 

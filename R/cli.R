@@ -32,23 +32,16 @@ cli_normalize_config <- function(config) {
     "model",
     "tools",
     "permissions",
-    "permission_mode",
-    "max_turns",
+    "max_requests",
     "max_cost",
     "session",
     "save_session",
-    "persist_session",
-    "resume_session_id",
-    "resume_session_at",
-    "fork_session",
     "system_prompt",
     "system_prompt_file",
     "no_ask",
     "mcp",
     "mcp_config",
     "mcp_server",
-    "mcp_servers",
-    "setting_source",
     "dir",
     "verbose",
     "no_color",
@@ -66,16 +59,12 @@ cli_normalize_config <- function(config) {
 
   nullable <- c(
     "model",
-    "permission_mode",
     "max_cost",
     "session",
     "save_session",
-    "resume_session_id",
-    "resume_session_at",
     "system_prompt",
     "system_prompt_file",
     "mcp_config",
-    "mcp_servers",
     "debug_file",
     "task"
   )
@@ -182,58 +171,23 @@ cli_get_tools <- function(preset, include_ask = TRUE) {
   }
 }
 
-cli_get_permissions <- function(
-  mode,
-  working_dir,
-  max_turns = 25L,
-  max_cost = NULL
-) {
+cli_get_permissions <- function(mode, working_dir) {
   mode <- validate_permission_mode_value(
     mode,
-    allow_cli_aliases = TRUE,
     arg = "permission mode"
   )
 
   switch(
     mode,
-    standard = permissions_standard(
-      working_dir,
-      max_turns = max_turns,
-      max_cost_usd = max_cost
-    ),
-    plan = permissions_plan(max_turns = max_turns, max_cost_usd = max_cost),
-    readonly = permissions_readonly(
-      max_turns = max_turns,
-      max_cost_usd = max_cost
-    ),
-    full = permissions_full(max_turns = max_turns, max_cost_usd = max_cost),
-    default = Permissions$new(
-      mode = "default",
-      file_read = TRUE,
-      file_write = working_dir,
-      bash = FALSE,
-      r_code = TRUE,
-      web = FALSE,
-      install_packages = FALSE,
-      max_turns = max_turns,
-      max_cost_usd = max_cost
-    ),
-    acceptEdits = Permissions$new(
-      mode = "acceptEdits",
-      file_read = TRUE,
-      file_write = working_dir,
-      bash = FALSE,
-      r_code = TRUE,
-      web = FALSE,
-      install_packages = FALSE,
-      max_turns = max_turns,
-      max_cost_usd = max_cost
-    ),
-    bypassPermissions = permissions_full(
-      max_turns = max_turns,
-      max_cost_usd = max_cost
-    )
+    standard = permissions_standard(working_dir),
+    plan = permissions_plan(),
+    readonly = permissions_readonly(),
+    full = permissions_full()
   )
+}
+
+cli_get_usage_limits <- function(max_requests = 25L, max_cost = NULL) {
+  UsageLimits(max_requests = max_requests, max_cost_usd = max_cost)
 }
 
 cli_get_system_prompt <- function(prompt, path) {
@@ -610,14 +564,7 @@ cli_load_mcp <- function(agent, config, debug_log = NULL) {
   }
 
   servers <- cli_split_csv_values(config$mcp_server)
-  legacy_servers <- cli_split_csv_values(config$mcp_servers)
-  if (length(legacy_servers) > 0L) {
-    cli::cli_warn(c(
-      "{.arg --mcp-servers} is deprecated",
-      "i" = "Use repeated {.arg --mcp-server} instead"
-    ))
-  }
-  servers <- unique(c(servers, legacy_servers))
+  servers <- unique(servers)
   if (length(servers) == 0L) {
     servers <- NULL
   }
@@ -631,92 +578,8 @@ cli_load_mcp <- function(agent, config, debug_log = NULL) {
   invisible(NULL)
 }
 
-cli_configure_compat_session <- function(agent, config) {
-  enabled <- isTRUE(config$persist_session) ||
-    !is.null(config$resume_session_id)
-  if (!enabled) {
-    return(invisible(NULL))
-  }
-
-  store_dir <- session_store_default_dir()
-  active_session_id <- if (is.null(config$resume_session_id)) {
-    generate_session_id()
-  } else {
-    config$resume_session_id
-  }
-  if (isTRUE(config$fork_session) && !is.null(config$resume_session_id)) {
-    active_session_id <- generate_session_id()
-  }
-
-  agent$configure_sdk_compat(list(
-    persist_session = TRUE,
-    session_store_dir = store_dir,
-    session_id = active_session_id
-  ))
-
-  if (is.null(config$resume_session_id)) {
-    return(invisible(active_session_id))
-  }
-
-  snapshot <- session_store_select_snapshot(
-    root = store_dir,
-    session_id = config$resume_session_id,
-    at = config$resume_session_at
-  )
-  agent$load_session(snapshot$path)
-  agent$configure_sdk_compat(list(
-    persist_session = TRUE,
-    session_store_dir = store_dir,
-    session_id = active_session_id
-  ))
-  agent$.__enclos_env__$private$notify(
-    if (isTRUE(config$fork_session)) {
-      paste0(
-        "Forked compat session ",
-        config$resume_session_id,
-        " into ",
-        active_session_id,
-        "."
-      )
-    } else {
-      paste0("Resumed compat session ", config$resume_session_id, ".")
-    },
-    level = "info",
-    code = if (isTRUE(config$fork_session)) {
-      "session_forked"
-    } else {
-      "session_resumed"
-    },
-    source_session_id = config$resume_session_id,
-    active_session_id = active_session_id,
-    snapshot_path = snapshot$path
-  )
-  if (isTRUE(config$fork_session)) {
-    agent$.__enclos_env__$private$snapshot_compat_state(
-      reason = "fork_restore"
-    )
-  }
-  invisible(active_session_id)
-}
-
 deputy_cli_main <- function(config) {
   config <- cli_normalize_config(config)
-  if (!is.null(config$resume_session_at) && is.null(config$resume_session_id)) {
-    cli::cli_abort(
-      "{.arg --resume-session-at} requires {.arg --resume-session-id}"
-    )
-  }
-  if (isTRUE(config$fork_session) && is.null(config$resume_session_id)) {
-    cli::cli_abort(
-      "{.arg --fork-session} requires {.arg --resume-session-id}"
-    )
-  }
-  if (!is.null(config$session) && !is.null(config$resume_session_id)) {
-    cli::cli_abort(
-      "Use either {.arg --session} or {.arg --resume-session-id}, not both"
-    )
-  }
-
   if (isTRUE(config$no_color)) {
     old_colors <- getOption("cli.num_colors")
     options(cli.num_colors = 1)
@@ -753,15 +616,6 @@ deputy_cli_main <- function(config) {
     )
   }
 
-  effective_permission_mode <- config$permission_mode %||% config$permissions
-  setting_sources <- unique(cli_split_csv_values(config$setting_source))
-  if (length(setting_sources) == 0L) {
-    setting_sources <- NULL
-  }
-  if (debug_enabled && !is.null(setting_sources)) {
-    debug_log("Setting sources: ", paste(setting_sources, collapse = ","))
-  }
-
   agent <- Agent$new(
     chat = chat,
     tools = cli_get_tools(config$tools, include_ask = !config$no_ask),
@@ -770,20 +624,21 @@ deputy_cli_main <- function(config) {
       config$system_prompt_file
     ),
     permissions = cli_get_permissions(
-      effective_permission_mode,
-      config$dir,
-      max_turns = config$max_turns,
+      config$permissions,
+      config$dir
+    ),
+    usage_limits = cli_get_usage_limits(
+      max_requests = config$max_requests,
       max_cost = config$max_cost
     ),
-    working_dir = config$dir,
-    setting_sources = setting_sources
+    working_dir = config$dir
   )
   if (debug_enabled) {
     debug_log(
       "Agent created with tool preset=",
       config$tools,
       " and permission mode=",
-      effective_permission_mode
+      config$permissions
     )
   }
 
@@ -798,23 +653,9 @@ deputy_cli_main <- function(config) {
     }
     agent$load_session(config$session)
   }
-  active_session_id <- cli_configure_compat_session(agent, config)
-  if (!is.null(active_session_id)) {
-    if (isTRUE(config$fork_session)) {
-      cli::cli_alert_success(
-        "Forked session as {.val {active_session_id}}"
-      )
-    } else if (!is.null(config$resume_session_id)) {
-      cli::cli_alert_success(
-        "Resumed session {.val {active_session_id}}"
-      )
-    } else {
-      cli::cli_alert_info("Session id: {.val {active_session_id}}")
-    }
-  }
 
   if (is.null(config$task)) {
-    cli_print_welcome(agent, config$tools, effective_permission_mode)
+    cli_print_welcome(agent, config$tools, config$permissions)
     cli_run_interactive(
       agent,
       verbose = config$verbose,

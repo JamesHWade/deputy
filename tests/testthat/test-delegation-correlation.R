@@ -75,8 +75,9 @@ create_delegation_child_chat <- function() {
         data.frame(input = 4, output = 2, cached_input = 0, cost = 0)
       },
       get_provider = function() {
-        list(name = "mock", model = "delegation-child")
+        create_mock_provider(model = "delegation-child")
       },
+      get_model = function() "delegation-child",
       last_turn = function(role = "assistant") {
         if (length(state$turns) == 0L) {
           return(NULL)
@@ -191,8 +192,9 @@ create_delegation_parent_chat <- function(child_chat) {
         data.frame(input = 10, output = 5, cached_input = 0, cost = 0)
       },
       get_provider = function() {
-        list(name = "mock", model = "delegation-parent")
+        create_mock_provider(model = "delegation-parent")
       },
+      get_model = function() "delegation-parent",
       last_turn = function(role = "assistant") {
         if (length(state$turns) == 0L) {
           return(NULL)

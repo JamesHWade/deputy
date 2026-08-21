@@ -7,7 +7,7 @@
 ask_user_impl(questions)
 }
 \arguments{
-\item{questions}{List of question objects following the SDK format}
+\item{questions}{List of structured question objects}
 }
 \value{
 Named list mapping question text to selected answers

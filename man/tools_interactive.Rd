@@ -11,7 +11,7 @@ A list of tool definitions.
 }
 \description{
 Returns a list of tools that enable human-in-the-loop interactions.
-Currently includes \code{tool_ask_user} (AskUserQuestion) for asking
+Currently includes \code{tool_ask_user} (\code{ask_user}) for asking
 clarifying questions.
 }
 \examples{

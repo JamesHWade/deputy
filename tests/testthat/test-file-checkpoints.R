@@ -1,3 +1,29 @@
+checkpoint_test_write_raw <- function(path, bytes) {
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  connection <- file(path, open = "wb")
+  on.exit(close(connection), add = TRUE)
+  if (length(bytes) > 0L) {
+    writeBin(bytes, connection)
+  }
+  invisible(path)
+}
+
+checkpoint_test_read_raw <- function(path) {
+  connection <- file(path, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  readBin(connection, what = "raw", n = file.info(path)$size)
+}
+
+checkpoint_test_error <- function(expr) {
+  tryCatch(
+    {
+      force(expr)
+      NULL
+    },
+    deputy_file_checkpoint_error = function(error) error
+  )
+}
+
 test_that("checkpoints restore exact binary file contents", {
   root <- withr::local_tempdir(pattern = "deputy-checkpoint-")
   path <- file.path(root, "binary.dat")
@@ -11,8 +37,8 @@ test_that("checkpoints restore exact binary file contents", {
   )
   expect_identical(
     store$before_tool(
-      "Write",
-      list(file_path = "binary.dat"),
+      "write_file",
+      list(path = "binary.dat"),
       "tool-binary"
     ),
     TRUE
@@ -39,8 +65,8 @@ test_that("absolute paths through a filesystem root alias are accepted", {
 
   expect_identical(
     store$before_tool(
-      "Write",
-      list(file_path = path),
+      "write_file",
+      list(path = path),
       "absolute-alias"
     ),
     TRUE
@@ -202,11 +228,11 @@ test_that("concurrent captures for one target fail closed", {
   store <- FileCheckpointStore$new(root)
   checkpoint_id <- store$checkpoint("before overlapping writes")
 
-  store$before_tool("Write", list(file_path = "shared.txt"), "write-a")
+  store$before_tool("write_file", list(path = "shared.txt"), "write-a")
   checkpoint_test_write_raw(path, charToRaw("write-a"))
   overlap_error <- checkpoint_test_error(store$before_tool(
-    "Edit",
-    list(file_path = "shared.txt"),
+    "edit_file",
+    list(path = "shared.txt"),
     "write-b"
   ))
 
@@ -233,11 +259,11 @@ test_that("rewind follows capture order across reversed hard-link completion", {
   store <- FileCheckpointStore$new(root)
   checkpoint_id <- store$checkpoint("before overlapping hard-link writes")
 
-  store$before_tool("Write", list(path = "first.txt"), "write-first")
+  store$before_tool("write_file", list(path = "first.txt"), "write-first")
   checkpoint_test_write_raw(first_path, intermediate)
   expect_identical(checkpoint_test_read_raw(alias_path), intermediate)
 
-  store$before_tool("Write", list(path = "alias.txt"), "write-alias")
+  store$before_tool("write_file", list(path = "alias.txt"), "write-alias")
   checkpoint_test_write_raw(alias_path, final)
   expect_identical(checkpoint_test_read_raw(first_path), final)
 
@@ -298,11 +324,11 @@ test_that("total checkpoint byte limits include journaled preimages", {
   )
   store$checkpoint("before total limit")
 
-  store$before_tool("Write", list(path = "first.bin"), "first")
+  store$before_tool("write_file", list(path = "first.bin"), "first")
   checkpoint_test_write_raw(first_path, as.raw(7:9))
   store$after_tool("first", TRUE)
   error <- checkpoint_test_error(store$before_tool(
-    "Write",
+    "write_file",
     list(path = "second.bin"),
     "second"
   ))
@@ -334,11 +360,11 @@ test_that("journal limits include checkpoint metadata and empty preimages", {
     max_journal_bytes = 800
   )
   store$checkpoint("before empty files")
-  store$before_tool("Write", list(path = "first.txt"), "first-empty")
+  store$before_tool("write_file", list(path = "first.txt"), "first-empty")
   writeLines(character(), file.path(root, "first.txt"))
   store$after_tool("first-empty", TRUE)
   second_error <- checkpoint_test_error(store$before_tool(
-    "Write",
+    "write_file",
     list(path = "second.txt"),
     "second-empty"
   ))
@@ -352,7 +378,7 @@ test_that("restored checkpoint state honors configured byte limits", {
   checkpoint_test_write_raw(path, as.raw(1:6))
   source <- FileCheckpointStore$new(root)
   source$checkpoint("before restore")
-  source$before_tool("Write", list(path = "restore-limit.bin"), "write")
+  source$before_tool("write_file", list(path = "restore-limit.bin"), "write")
   checkpoint_test_write_raw(path, as.raw(7:12))
   source$after_tool("write", TRUE)
 
@@ -384,7 +410,7 @@ test_that("rewind removes files created after a checkpoint", {
   path <- file.path(root, "nested", "new.bin")
 
   store$before_tool(
-    "tool_write_file",
+    "write_file",
     list(path = "nested/new.bin"),
     "new-file"
   )
@@ -396,26 +422,26 @@ test_that("rewind removes files created after a checkpoint", {
   expect_identical(file.exists(path), FALSE)
 })
 
-test_that("native and SDK aliases reverse multiple changes in order", {
+test_that("native edit tools reverse multiple changes in order", {
   root <- withr::local_tempdir(pattern = "deputy-checkpoint-")
   path <- file.path(root, "sequence.txt")
   checkpoint_test_write_raw(path, charToRaw("zero"))
   store <- FileCheckpointStore$new(root)
   checkpoint_id <- store$checkpoint("zero")
 
-  aliases <- list(
-    list("Edit", list(file_path = "sequence.txt")),
-    list("tool_multi_edit", list(path = "sequence.txt")),
-    list("MultiEdit", list(file_path = "sequence.txt")),
+  tools <- list(
+    list("edit_file", list(path = "sequence.txt")),
+    list("multi_edit", list(path = "sequence.txt")),
+    list("multi_edit", list(path = "sequence.txt")),
     list("edit_file", list(path = "sequence.txt"))
   )
   values <- c("one", "two", "three", "four")
 
-  for (i in seq_along(aliases)) {
-    tool_use_id <- paste0("edit-", i)
-    store$before_tool(aliases[[i]][[1]], aliases[[i]][[2]], tool_use_id)
+  for (i in seq_along(tools)) {
+    tool_call_id <- paste0("edit-", i)
+    store$before_tool(tools[[i]][[1]], tools[[i]][[2]], tool_call_id)
     checkpoint_test_write_raw(path, charToRaw(values[[i]]))
-    store$after_tool(tool_use_id, TRUE)
+    store$after_tool(tool_call_id, TRUE)
   }
 
   result <- store$rewind(checkpoint_id)
@@ -423,60 +449,32 @@ test_that("native and SDK aliases reverse multiple changes in order", {
   expect_identical(result$restored_changes, 4L)
 })
 
-test_that("all supported mutating tool aliases are recognized", {
+test_that("all mutating tools are recognized", {
   root <- withr::local_tempdir(pattern = "deputy-checkpoint-")
-  path <- file.path(root, "aliases.txt")
+  path <- file.path(root, "tools.txt")
   checkpoint_test_write_raw(path, charToRaw("unchanged"))
   store <- FileCheckpointStore$new(root)
-  store$checkpoint("aliases")
+  store$checkpoint("tools")
 
-  aliases <- c(
+  tools <- c(
     "write_file",
-    "tool_write_file",
-    "Write",
     "edit_file",
-    "tool_edit_file",
-    "Edit",
-    "multi_edit",
-    "tool_multi_edit",
-    "MultiEdit",
-    "todo_write",
-    "tool_todo_write",
-    "TodoWrite"
+    "multi_edit"
   )
 
-  for (i in seq_along(aliases)) {
-    tool_use_id <- paste0("alias-", i)
-    input <- if (i %% 2L == 0L) {
-      list(file_path = "aliases.txt")
-    } else {
-      list(path = "aliases.txt")
-    }
+  for (i in seq_along(tools)) {
+    tool_call_id <- paste0("tool-", i)
     expect_identical(
-      store$before_tool(aliases[[i]], input, tool_use_id),
+      store$before_tool(tools[[i]], list(path = "tools.txt"), tool_call_id),
       TRUE,
-      info = aliases[[i]]
+      info = tools[[i]]
     )
     expect_identical(
-      store$after_tool(tool_use_id, FALSE),
+      store$after_tool(tool_call_id, FALSE),
       FALSE,
-      info = aliases[[i]]
+      info = tools[[i]]
     )
   }
-})
-
-test_that("TodoWrite uses its default checkpoint path", {
-  root <- withr::local_tempdir(pattern = "deputy-checkpoint-")
-  todo_path <- file.path(root, ".deputy", "todos.json")
-  store <- FileCheckpointStore$new(root)
-  checkpoint_id <- store$checkpoint("before todos")
-
-  store$before_tool("TodoWrite", list(todos = list()), "todo-write")
-  checkpoint_test_write_raw(todo_path, charToRaw("[]"))
-  store$after_tool("todo-write", TRUE)
-  store$rewind(checkpoint_id)
-
-  expect_identical(file.exists(todo_path), FALSE)
 })
 
 test_that("rewind invalidates future checkpoints and journal history", {
@@ -500,7 +498,7 @@ test_that("rewind invalidates future checkpoints and journal history", {
   invalidated <- checkpoint_test_error(store$rewind(future_checkpoint))
   expect_s3_class(invalidated, "deputy_file_checkpoint_error")
 
-  store$before_tool("Write", list(path = "branch.txt"), "replacement")
+  store$before_tool("write_file", list(path = "branch.txt"), "replacement")
   checkpoint_test_write_raw(path, charToRaw("replacement"))
   store$after_tool("replacement", TRUE)
   second_rewind <- store$rewind(root_checkpoint)
@@ -521,8 +519,10 @@ test_that("exported journals restore into another store for the same root", {
   checkpoint_test_write_raw(path, charToRaw("changed"))
   store$after_tool("persist", TRUE)
   state <- store$export_state()
-  expect_identical(state$version, 2L)
+  expect_identical(state$version, 3L)
   expect_identical(state$next_capture_sequence, 2L)
+  expect_identical(state$journal[[1]]$tool_call_id, "persist")
+  expect_identical("tool_use_id" %in% names(state$journal[[1]]), FALSE)
 
   restored <- FileCheckpointStore$new(root)
   expect_identical(restored$restore_state(state), restored)
@@ -533,7 +533,7 @@ test_that("exported journals restore into another store for the same root", {
   restored$rewind(checkpoint_id)
   expect_identical(checkpoint_test_read_raw(path), original)
 
-  restored$before_tool("Write", list(path = "persisted.bin"), "continued")
+  restored$before_tool("write_file", list(path = "persisted.bin"), "continued")
   checkpoint_test_write_raw(path, charToRaw("continued"))
   restored$after_tool("continued", TRUE)
   continued_state <- restored$export_state()
@@ -559,14 +559,24 @@ test_that("restored state validates capture sequences and marker boundaries", {
 
   store <- FileCheckpointStore$new(root)
   store$checkpoint("initial")
-  store$before_tool("Write", list(path = "first.txt"), "first")
+  store$before_tool("write_file", list(path = "first.txt"), "first")
   checkpoint_test_write_raw(first_path, charToRaw("changed first"))
   store$after_tool("first", TRUE)
   store$checkpoint("between captures")
-  store$before_tool("Write", list(path = "second.txt"), "second")
+  store$before_tool("write_file", list(path = "second.txt"), "second")
   checkpoint_test_write_raw(second_path, charToRaw("changed second"))
   store$after_tool("second", TRUE)
   state <- store$export_state()
+
+  legacy_field <- state
+  legacy_field$journal[[1]]$tool_use_id <-
+    legacy_field$journal[[1]]$tool_call_id
+  legacy_field$journal[[1]]$tool_call_id <- NULL
+  legacy_field_error <- checkpoint_test_error(
+    FileCheckpointStore$new(root)$restore_state(legacy_field)
+  )
+  expect_s3_class(legacy_field_error, "deputy_file_checkpoint_error")
+  expect_match(conditionMessage(legacy_field_error), "malformed journal entry")
 
   duplicate <- state
   duplicate$journal[[2]]$capture_sequence <- 1L
@@ -635,8 +645,8 @@ test_that("paths outside the root are refused", {
   expect_s3_class(absolute_error, "deputy_file_checkpoint_path_error")
 
   relative_error <- checkpoint_test_error(store$before_tool(
-    "Write",
-    list(file_path = file.path("..", basename(outside), "outside.txt")),
+    "write_file",
+    list(path = file.path("..", basename(outside), "outside.txt")),
     "relative-escape"
   ))
   expect_s3_class(relative_error, "deputy_file_checkpoint_path_error")
@@ -654,8 +664,8 @@ test_that("symlink escapes including dangling links are refused", {
   link <- file.path(root, "escape")
   expect_identical(file.symlink(outside, link), TRUE)
   symlink_error <- checkpoint_test_error(store$before_tool(
-    "Edit",
-    list(file_path = "escape/outside.txt"),
+    "edit_file",
+    list(path = "escape/outside.txt"),
     "symlink-escape"
   ))
   expect_s3_class(symlink_error, "deputy_file_checkpoint_path_error")
@@ -666,8 +676,8 @@ test_that("symlink escapes including dangling links are refused", {
     TRUE
   )
   dangling_error <- checkpoint_test_error(store$before_tool(
-    "Write",
-    list(file_path = "dangling"),
+    "write_file",
+    list(path = "dangling"),
     "dangling-escape"
   ))
   expect_s3_class(dangling_error, "deputy_file_checkpoint_path_error")
@@ -684,7 +694,7 @@ test_that("symlinks that remain inside the root restore their targets", {
   store <- FileCheckpointStore$new(root)
   checkpoint_id <- store$checkpoint("before internal link")
 
-  store$before_tool("Write", list(file_path = "link.bin"), "internal-link")
+  store$before_tool("write_file", list(path = "link.bin"), "internal-link")
   checkpoint_test_write_raw(link, charToRaw("changed"))
   store$after_tool("internal-link", TRUE)
   store$rewind(checkpoint_id)

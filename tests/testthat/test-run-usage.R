@@ -117,14 +117,10 @@ test_that("usage limit status distinguishes reached request limits", {
   expect_equal(tool_status$reason, "tool_call_limit")
 })
 
-test_that("usage limit defaults inherit legacy request and cost limits", {
-  limits <- normalize_usage_limits(
-    NULL,
-    max_requests = 7,
-    max_cost_usd = 0.5
-  )
+test_that("usage limit defaults use the native request limit", {
+  limits <- normalize_usage_limits(NULL)
 
-  expect_identical(limits$max_requests, 7L)
-  expect_equal(limits$max_cost_usd, 0.5)
+  expect_identical(limits$max_requests, 25L)
+  expect_null(limits$max_cost_usd)
   expect_equal(limits$on_exceed, "stop")
 })

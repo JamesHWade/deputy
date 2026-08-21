@@ -1,7 +1,24 @@
 # Shared test helpers for deputy
 
+# Helper to create a current ellmer provider.
+create_mock_provider <- function(
+  name = "mock",
+  model = "test-model",
+  base_url = "https://example.invalid"
+) {
+  ellmer::Provider(
+    name = name,
+    model = model,
+    base_url = base_url,
+    params = list(),
+    extra_args = list(),
+    extra_headers = character(),
+    credentials = NULL
+  )
+}
+
 # Helper to create a proper S7 AssistantTurn
-# Uses ellmer's actual constructors for compatibility
+# Uses ellmer's current constructors.
 create_mock_assistant_turn <- function(
   text = "Hello!",
   contents = NULL,
@@ -74,6 +91,7 @@ create_mock_chat <- function(responses = list("Hello!")) {
   system_prompt <- NULL
   tool_request_callback <- NULL
   tool_result_callback <- NULL
+  provider <- create_mock_provider()
 
   # Create a simple mock that behaves like ellmer's Chat
   structure(
@@ -124,9 +142,9 @@ create_mock_chat <- function(responses = list("Hello!")) {
         )
       },
       get_provider = function() {
-        # Simple mock provider with list access
-        list(name = "mock", model = "test-model")
+        provider
       },
+      get_model = function() provider@model,
       last_turn = function(role = "assistant") {
         # Return a proper S7 AssistantTurn
         text <- responses[[min(response_idx, length(responses))]]
@@ -182,7 +200,7 @@ create_mock_callback_manager <- function(callbacks = list()) {
 
 create_compaction_mock_chat <- function(
   responses = list("Hello!"),
-  provider = list(
+  provider = create_mock_provider(
     name = "gateway",
     model = "test-model",
     base_url = "https://gateway.invalid"
@@ -274,7 +292,7 @@ create_compaction_mock_chat <- function(
         )
       },
       get_provider = function() provider,
-      get_model = function() provider$model,
+      get_model = function() provider@model,
       last_turn = function(role = "assistant") {
         text <- responses[[max(1L, response_idx)]]
         create_mock_assistant_turn(text = text)
