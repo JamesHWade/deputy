@@ -48,4 +48,4 @@ Imports:
     R6,
     Rapp (>= 0.4.0),
     rlang
-Config/roxygen2/version: 8.0.0
+Config/roxygen2/version: 8.1.0

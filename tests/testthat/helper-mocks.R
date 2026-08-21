@@ -6,7 +6,10 @@ create_mock_provider <- function(
   model = "test-model",
   base_url = "https://example.invalid"
 ) {
-  ellmer::Provider(
+  # ellmer's development version moved `model`, `params`, and `extra_args`
+  # off `Provider`. Pass only the arguments the installed ellmer accepts so
+  # the mocks build against both the CRAN and development APIs.
+  args <- list(
     name = name,
     model = model,
     base_url = base_url,
@@ -15,6 +18,16 @@ create_mock_provider <- function(
     extra_headers = character(),
     credentials = NULL
   )
+  accepted <- names(formals(ellmer::Provider))
+  provider <- do.call(ellmer::Provider, args[names(args) %in% accepted])
+  attr(provider, "mock_model") <- model
+  provider
+}
+
+# The model name behind a mock provider, whichever ellmer API built it.
+mock_provider_model <- function(provider) {
+  attr(provider, "mock_model") %||%
+    tryCatch(provider@model, error = function(e) "test-model")
 }
 
 # Helper to create a proper S7 AssistantTurn
@@ -144,7 +157,7 @@ create_mock_chat <- function(responses = list("Hello!")) {
       get_provider = function() {
         provider
       },
-      get_model = function() provider@model,
+      get_model = function() mock_provider_model(provider),
       last_turn = function(role = "assistant") {
         # Return a proper S7 AssistantTurn
         text <- responses[[min(response_idx, length(responses))]]
@@ -292,7 +305,7 @@ create_compaction_mock_chat <- function(
         )
       },
       get_provider = function() provider,
-      get_model = function() provider@model,
+      get_model = function() mock_provider_model(provider),
       last_turn = function(role = "assistant") {
         text <- responses[[max(1L, response_idx)]]
         create_mock_assistant_turn(text = text)

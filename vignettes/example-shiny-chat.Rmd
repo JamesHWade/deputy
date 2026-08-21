@@ -55,6 +55,41 @@ streaming errors in the chat UI.
 | Stall detection | No | Requires deputy's own loop |
 | `output_format` (structured output) | No | Requires deputy's own loop |
 
+## Sub-Agents Inside a Streaming Chat: `run_async()`
+
+`run_shiny()` is for the agent that owns the chat UI. When a Deputy Agent
+is instead a *worker* -- for example a delegated sub-agent invoked from an
+ellmer tool of a chat that is already streaming -- use `run_async()`. It
+drives the same callback-enforced loop but returns a promise that resolves
+to an `AgentResult`, so the tool body can `await` it without blocking other
+Shiny sessions:
+
+```{r}
+scout <- Agent$new(
+  chat = chat$clone()$set_turns(list()),
+  system_prompt = "You are a literature scout. Report sources with DOIs.",
+  tools = tools_web(),
+  usage_limits = UsageLimits(max_requests = 8, max_tool_calls = 12)
+)
+
+tool_scout <- ellmer::tool(
+  fun = coro::async(function(prompt) {
+    result <- coro::await(scout$run_async(prompt))
+    paste0(result$response, "\n\n(stopped: ", result$stop_reason, ")")
+  }),
+  name = "agent_scout",
+  description = "Delegate a literature search to the scout sub-agent.",
+  arguments = list(prompt = ellmer::type_string("Self-contained task"))
+)
+chat$register_tool(tool_scout)
+```
+
+`run_async()` enforces everything in the table above except file path
+confinement, which is a `run_shiny()` rule: worker agents resolve relative
+paths against their `working_dir` like `run()` does. Pass
+`UsageLimits(on_exceed = "error")` to have the promise rejected on a limit
+instead of resolving with a typed `stop_reason`.
+
 ## Basic Setup
 
 ```{r}

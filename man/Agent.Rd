@@ -146,6 +146,7 @@ agent$add_hook(HookMatcher$new(
     \item \href{#method-Agent-mcp_tools}{\code{Agent$mcp_tools()}}
     \item \href{#method-Agent-mcp_status}{\code{Agent$mcp_status()}}
     \item \href{#method-Agent-run_shiny}{\code{Agent$run_shiny()}}
+    \item \href{#method-Agent-run_async}{\code{Agent$run_async()}}
     \item \href{#method-Agent-clone}{\code{Agent$clone()}}
   }
 }
@@ -846,6 +847,52 @@ for this run. Protected constructor identity fields cannot change.}
   \subsection{Returns}{
     An async content stream suitable for
 \code{shinychat::chat_append()}.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-run_async"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-run_async}{}}}
+\subsection{\code{Agent$run_async()}}{
+  Run an agentic task asynchronously and resolve to an \link{AgentResult}.
+
+Like \code{run_shiny()}, the multi-turn loop is driven by ellmer's
+\code{stream_async()}, so the R process is never blocked while the model or
+tools work: other Shiny sessions, \code{later} callbacks, and promise chains
+keep running. Unlike \code{run_shiny()}, nothing is streamed to a UI. The
+returned promise resolves once the run stops and carries the final
+response, run-scoped usage, and stop reason. Permissions, hooks, and
+\link{UsageLimits} are enforced as in \code{run_shiny()} (callbacks plus terminal
+accounting). File tools may use relative paths resolved against
+\code{working_dir}, as in \code{run()}; the absolute-path rule is specific to
+\code{run_shiny()}.
+
+Use this when an Agent is a \emph{worker} inside a larger async system, for
+example a delegated sub-agent executed from the tool of a parent chat
+that is itself streaming. \code{output_format} is not supported here;
+structured output still requires \code{run()} or \code{run_sync()}.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$run_async(task, usage_limits = NULL, run_context = list())}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{task}}{The task for the agent to perform}
+      \item{\code{usage_limits}}{Optional \link{UsageLimits} override for this run. Unset
+fields fall back to the Agent's limits. With \code{on_exceed = "error"},
+hitting a limit rejects the promise with the structured limit error
+instead of resolving with a typed \code{stop_reason}.}
+      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
+for this run. Protected constructor identity fields cannot change.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A \code{promises::promise} resolving to an \link{AgentResult}. It is
+rejected if the provider stream fails or a limit configured with
+\code{on_exceed = "error"} is reached.
   }
 }
 

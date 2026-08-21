@@ -51,6 +51,7 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tools"><a href='../../deputy/html/Agent.html#method-Agent-register_tools'><code>Agent$register_tools()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="rewind_files"><a href='../../deputy/html/Agent.html#method-Agent-rewind_files'><code>Agent$rewind_files()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run"><a href='../../deputy/html/Agent.html#method-Agent-run'><code>Agent$run()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_async"><a href='../../deputy/html/Agent.html#method-Agent-run_async'><code>Agent$run_async()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_shiny"><a href='../../deputy/html/Agent.html#method-Agent-run_shiny'><code>Agent$run_shiny()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_sync"><a href='../../deputy/html/Agent.html#method-Agent-run_sync'><code>Agent$run_sync()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="save_session"><a href='../../deputy/html/Agent.html#method-Agent-save_session'><code>Agent$save_session()</code></a></span></li>

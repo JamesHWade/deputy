@@ -1,5 +1,18 @@
 # deputy (development version)
 
+* New `Agent$run_async()` runs a task without blocking the R process and
+  returns a promise that resolves to an `AgentResult`. It shares
+  `run_shiny()`'s engine -- ellmer's `stream_async()` with permissions, hooks,
+  and `UsageLimits` enforced through callbacks and terminal accounting -- but
+  collects the final response, run-scoped usage, and stop reason instead of
+  streaming to a UI, accepts a per-run `UsageLimits` override (including
+  `on_exceed = "error"`, which rejects the promise with the structured limit
+  error), and does not impose `run_shiny()`'s absolute-file-path rule. Use it
+  when an Agent is a worker inside a larger async system, such as a sub-agent
+  invoked from a streaming parent chat's tool. Callback-driven runs now also
+  record their run-scoped usage so `AgentResult$usage` and the Agent's last
+  run usage reflect `run_shiny()`/`run_async()` runs.
+
 * The `deputy` command now ships as a tested Rapp 0.4 package executable for
   one-off `rx` use and persistent `ir tool install` launchers. Its task and
   interactive modes now consume streaming generators correctly, report tool
