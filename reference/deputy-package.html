@@ -3,15 +3,13 @@
 A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, and human-in-the-loop capabilities. deputy also ships
-an opt-in Agent SDK-compatible facade for teams that want Anthropic-style
-entrypoints and session semantics on top of the same runtime."><meta property="og:description" content="
+permissions, hooks, human-in-the-loop capabilities, and multi-agent
+delegation."><meta property="og:description" content="
 A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, and human-in-the-loop capabilities. deputy also ships
-an opt-in Agent SDK-compatible facade for teams that want Anthropic-style
-entrypoints and session semantics on top of the same runtime."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
+permissions, hooks, human-in-the-loop capabilities, and multi-agent
+delegation."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -38,8 +36,6 @@ entrypoints and session semantics on top of the same runtime."><meta property="o
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -67,9 +63,8 @@ entrypoints and session semantics on top of the same runtime."><meta property="o
 <p>A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.</p>
 <p>A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, and human-in-the-loop capabilities. deputy also ships
-an opt-in Agent SDK-compatible facade for teams that want Anthropic-style
-entrypoints and session semantics on top of the same runtime.</p>
+permissions, hooks, human-in-the-loop capabilities, and multi-agent
+delegation.</p>
     </div>
 
 
@@ -78,12 +73,11 @@ entrypoints and session semantics on top of the same runtime.</p>
 
 
 <ul><li><p><a href="Agent.html">Agent</a> - The main class for creating agents</p></li>
-<li><p><a href="ClaudeSDKClient.html">ClaudeSDKClient</a> - Agent SDK-compatible client facade (<code>AgentSDKClient</code> is an alias)</p></li>
-<li><p><code><a href="claude_sdk_query.html">claude_sdk_query()</a></code> - One-shot compatibility query helper (<code><a href="claude_sdk_query.html">agent_sdk_query()</a></code> is an alias)</p></li>
-<li><p><code><a href="tools_file.html">tools_file()</a></code> - File operation tools</p></li>
-<li><p><code><a href="tools_code.html">tools_code()</a></code> - Code execution tools</p></li>
+<li><p><a href="LeadAgent.html">LeadAgent</a> - Coordinate specialized delegated agents</p></li>
+<li><p><code><a href="tools_preset.html">tools_preset()</a></code> - Curated built-in tool collections</p></li>
+<li><p><code><a href="UsageLimits.html">UsageLimits()</a></code> - Run-scoped request, tool, token, and cost limits</p></li>
 <li><p><code><a href="permissions_standard.html">permissions_standard()</a></code> - Standard permission policy</p></li>
-<li><p><code><a href="permissions_plan.html">permissions_plan()</a></code> - Claude-style planning permission policy</p></li>
+<li><p><code><a href="permissions_plan.html">permissions_plan()</a></code> - Planning permission policy</p></li>
 <li><p><code><a href="permissions_readonly.html">permissions_readonly()</a></code> - Read-only permission policy</p></li>
 </ul></div>
     <div class="section level2">
@@ -96,7 +90,7 @@ entrypoints and session semantics on top of the same runtime.</p>
 <span><span class="co"># Create an agent with file tools</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-4o"</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"standard"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Run a task with streaming output</span></span>

@@ -46,8 +46,6 @@
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -201,7 +199,7 @@ analysis.</p>
 <span>  event <span class="op">=</span> <span class="st">"SubagentStop"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">agent_name</span>, <span class="va">task</span>, <span class="va">result</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Sub-agent {.val {agent_name}} finished"</span><span class="op">)</span></span>
-<span>    <span class="fu"><a href="../reference/HookResultSubagentStop.html">HookResultSubagentStop</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>    <span class="cn">NULL</span></span>
 <span>  <span class="op">}</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -332,8 +330,8 @@ analysis:</p>
 <span><span class="va">tool_calls</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">$</span><span class="fu">tool_calls</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Total tool calls: {length(tool_calls)}"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># How many turns did it take?</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="fu">n_turns</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<span><span class="co"># How many model requests were used?</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">usage</span><span class="op">$</span><span class="va">requests</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="next-steps">Next Steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>

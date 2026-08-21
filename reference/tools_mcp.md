@@ -48,11 +48,8 @@ The MCP configuration file follows the Claude Desktop format:
 
 ## See also
 
-- [`mcp_available()`](https://jameshwade.github.io/deputy/reference/mcp_available.md)
-  to check if MCP support is installed
-
-- [mcptools package](https://posit-dev.github.io/mcptools/) for
-  configuration
+[mcptools package](https://posit-dev.github.io/mcptools/) for
+configuration
 
 ## Examples
 

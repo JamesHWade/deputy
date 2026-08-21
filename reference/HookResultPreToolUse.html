@@ -26,8 +26,6 @@
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -60,7 +58,6 @@
 <span>  permission <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"allow"</span>, <span class="st">"deny"</span><span class="op">)</span>,</span>
 <span>  reason <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  continue <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  updated_input <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  additional_context <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  stop_reason <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -80,14 +77,6 @@
 
 <dt id="arg-continue">continue<a class="anchor" aria-label="anchor" href="#arg-continue"></a></dt>
 <dd><p>If FALSE, stop the agent after this hook</p></dd>
-
-
-<dt id="arg-updated-input">updated_input<a class="anchor" aria-label="anchor" href="#arg-updated-input"></a></dt>
-<dd><p>Reserved for SDK-shape parity. <strong>Not currently
-supported</strong>: deputy emits a warning and proceeds with the original tool
-input. ellmer's tool-request callback contract does not yet expose a way
-to mutate the in-flight request, so use <code>permission = "deny"</code> to block a
-tool call instead of rewriting its arguments.</p></dd>
 
 
 <dt id="arg-additional-context">additional_context<a class="anchor" aria-label="anchor" href="#arg-additional-context"></a></dt>
@@ -116,9 +105,6 @@ tool call instead of rewriting its arguments.</p></dd>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $continue</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $updated_input</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $additional_context</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -141,9 +127,6 @@ tool call instead of rewriting its arguments.</p></dd>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $continue</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $updated_input</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $additional_context</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>

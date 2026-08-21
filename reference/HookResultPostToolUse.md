@@ -9,7 +9,6 @@ HookResultPostToolUse(
   continue = TRUE,
   suppress_output = FALSE,
   updated_tool_output = NULL,
-  updated_mcp_tool_output = NULL,
   additional_context = NULL,
   stop_reason = NULL
 )
@@ -31,10 +30,6 @@ HookResultPostToolUse(
   Optional replacement value for Deputy's emitted `tool_end` event.
   ellmer does not support rewriting the model-visible in-flight result
   from this callback.
-
-- updated_mcp_tool_output:
-
-  Deprecated alias for `updated_tool_output`
 
 - additional_context:
 
@@ -62,9 +57,6 @@ HookResultPostToolUse()
 #> $updated_tool_output
 #> NULL
 #> 
-#> $updated_mcp_tool_output
-#> NULL
-#> 
 #> $additional_context
 #> NULL
 #> 
@@ -83,9 +75,6 @@ HookResultPostToolUse(continue = FALSE)
 #> [1] FALSE
 #> 
 #> $updated_tool_output
-#> NULL
-#> 
-#> $updated_mcp_tool_output
 #> NULL
 #> 
 #> $additional_context

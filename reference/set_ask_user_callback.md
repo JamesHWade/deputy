@@ -2,7 +2,7 @@
 
 In non-interactive sessions (scripts, Shiny apps, etc.), set a callback
 function that will be called when the agent needs user input via
-`AskUserQuestion`.
+`ask_user`.
 
 ## Usage
 
@@ -14,8 +14,8 @@ set_ask_user_callback(callback)
 
 - callback:
 
-  A function that takes `questions` (list matching the AskUserQuestion
-  format). Each question has `question`, `header`, `options` (list with
+  A function that takes `questions` in Deputy's structured question
+  format. Each question has `question`, `header`, `options` (list with
   `label` and `description`), and `multiSelect`. Should return a named
   list mapping question text to selected label(s). For multi-select,
   join labels with ", ". Set to NULL to clear the callback.

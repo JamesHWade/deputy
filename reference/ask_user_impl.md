@@ -12,7 +12,7 @@ ask_user_impl(questions)
 
 - questions:
 
-  List of question objects following the SDK format
+  List of structured question objects
 
 ## Value
 

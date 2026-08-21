@@ -18,9 +18,7 @@ agent_definition(
   memory = NULL,
   mcp_servers = NULL,
   initial_prompt = NULL,
-  max_turns = NULL,
-  background = FALSE,
-  effort = NULL,
+  max_requests = NULL,
   permission_mode = NULL
 )
 ```
@@ -67,24 +65,15 @@ agent_definition(
 
   Optional text prepended to delegated tasks
 
-- max_turns:
+- max_requests:
 
   Optional non-negative whole-number sub-agent request limit
 
-- background:
-
-  Logical SDK-compatible metadata flag
-
-- effort:
-
-  Optional reasoning effort metadata
-
 - permission_mode:
 
-  Optional permission mode. For non-bypass lead agents, this must match
-  the lead mode (with `"default"` and `"auto"` treated as equivalent);
-  use `disallowed_tools` and `max_turns` to tighten a child policy. A
-  bypass lead may select any mode.
+  Optional permission mode. A child may keep the lead mode or narrow it
+  to `"readonly"`; a `"full"` lead may select any mode. Use
+  `disallowed_tools` and `max_requests` for additional limits.
 
 ## Value
 

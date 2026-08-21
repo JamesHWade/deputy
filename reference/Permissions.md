@@ -12,7 +12,7 @@ Tool gating fields:
 - `tool_denylist`: Optional list of tools that are always denied.
 
 - `permission_prompt_tool_name`: Optional tool name to mention in deny
-  messages for gated tools (e.g., "AskUserQuestion").
+  messages for gated tools (e.g., "ask_user").
 
 **Security Note:** Permission fields are immutable after construction.
 This prevents adversarial code from modifying permissions at runtime.
@@ -32,8 +32,8 @@ All fields use active bindings that reject modification attempts.
 
 - `file_write`:
 
-  Allow file writing. Can be TRUE, FALSE, or a directory path. Read-only
-  after construction.
+  Allow file writing. Can be `TRUE`, `FALSE`, or a canonical absolute
+  directory path. Read-only after construction.
 
 - `bash`:
 
@@ -50,14 +50,6 @@ All fields use active bindings that reject modification attempts.
 - `install_packages`:
 
   Allow package installation. Read-only after construction.
-
-- `max_turns`:
-
-  Maximum number of turns before stopping. Read-only after construction.
-
-- `max_cost_usd`:
-
-  Maximum cost in USD before stopping. Read-only after construction.
 
 - `can_use_tool`:
 
@@ -99,15 +91,13 @@ Create a new Permissions object.
 #### Usage
 
     Permissions$new(
-      mode = "default",
+      mode = "standard",
       file_read = TRUE,
-      file_write = NULL,
+      file_write = getwd(),
       bash = FALSE,
       r_code = TRUE,
       web = FALSE,
       install_packages = FALSE,
-      max_turns = 25,
-      max_cost_usd = NULL,
       can_use_tool = NULL,
       tool_allowlist = NULL,
       tool_denylist = NULL,
@@ -126,7 +116,9 @@ Create a new Permissions object.
 
 - `file_write`:
 
-  Allow file writing (TRUE, FALSE, or directory path)
+  Allow file writing (`TRUE`, `FALSE`, or an existing absolute directory
+  path). Directory grants are canonicalized once when the policy is
+  constructed.
 
 - `bash`:
 
@@ -144,14 +136,6 @@ Create a new Permissions object.
 
   Allow package installation
 
-- `max_turns`:
-
-  Maximum turns
-
-- `max_cost_usd`:
-
-  Maximum cost
-
 - `can_use_tool`:
 
   Custom callback function
@@ -166,8 +150,9 @@ Create a new Permissions object.
 
 - `permission_prompt_tool_name`:
 
-  Optional tool name to suggest in permission deny messages for gated
-  tools
+  Optional dedicated approval-tool name to suggest in permission deny
+  messages for gated tools. Native capability-bearing tools cannot be
+  used as approval prompts.
 
 #### Returns
 

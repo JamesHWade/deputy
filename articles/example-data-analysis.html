@@ -46,8 +46,6 @@
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -145,7 +143,7 @@ next:</p>
 <span>  <span class="st">"Explore the airquality dataset that comes with R. Give me a</span></span>
 <span><span class="st">   thorough understanding of the data including quality issues,</span></span>
 <span><span class="st">   distributions, and interesting patterns."</span>,</span>
-<span>  max_turns <span class="op">=</span> <span class="fl">15</span></span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">15</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span></code></pre></div>
@@ -226,10 +224,9 @@ constrain the agent:</p>
 <span>  permissions <span class="op">=</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>    r_code <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>    bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>    file_write <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>    max_turns <span class="op">=</span> <span class="fl">20</span>,</span>
-<span>    max_cost_usd <span class="op">=</span> <span class="fl">0.50</span></span>
-<span>  <span class="op">)</span></span>
+<span>    file_write <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">20</span>, max_cost_usd <span class="op">=</span> <span class="fl">0.50</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Log every tool call</span></span>
@@ -241,8 +238,9 @@ constrain the agent:</p>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
 <span>  <span class="st">"Analyse the airquality dataset and report key findings."</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The agent can read data and run R code, but cannot write files, run
-bash commands, or exceed the cost limit.</p>
+<p>The agent can read data and run R code, but cannot write files or run
+bash commands. Deputy stops the run when it observes either configured
+usage limit.</p>
 </div>
 <div class="section level2">
 <h2 id="next-steps">Next Steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>
@@ -251,8 +249,8 @@ bash commands, or exceed the cost limit.</p>
 <li>
 <code><a href="../articles/tools.html">vignette("tools")</a></code> – Tool bundles and custom tools</li>
 <li>
-<code><a href="../articles/agent-configuration.html">vignette("agent-configuration")</a></code> – Skills, system
-prompts, and sessions</li>
+<code><a href="../articles/getting-started.html">vignette("getting-started")</a></code> – Skills, sessions, and run
+results</li>
 <li>
 <code><a href="../articles/example-extraction-pipeline.html">vignette("example-extraction-pipeline")</a></code> – Prompt
 chaining for structured extraction</li>

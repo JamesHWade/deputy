@@ -30,8 +30,6 @@ sub-agents based on registered AgentDefinitions."><meta property="og:image" cont
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -89,7 +87,6 @@ sub-agents based on registered AgentDefinitions.</p>
 </ul></div><p><details><summary>Inherited methods</summary><ul><li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href="Agent.html#method-add_hook"><code>Agent$add_hook()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="checkpoint"><a href="Agent.html#method-checkpoint"><code>Agent$checkpoint()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href="Agent.html#method-compact"><code>Agent$compact()</code></a></span></li>
-  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="configure_sdk_compat"><a href="Agent.html#method-configure_sdk_compat"><code>Agent$configure_sdk_compat()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href="Agent.html#method-cost"><code>Agent$cost()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_permission_mode"><a href="Agent.html#method-get_permission_mode"><code>Agent$get_permission_mode()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="interrupt"><a href="Agent.html#method-interrupt"><code>Agent$interrupt()</code></a></span></li>
@@ -110,9 +107,7 @@ sub-agents based on registered AgentDefinitions.</p>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="save_session"><a href="Agent.html#method-save_session"><code>Agent$save_session()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="session_id"><a href="Agent.html#method-session_id"><code>Agent$session_id()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_permission_mode"><a href="Agent.html#method-set_permission_mode"><code>Agent$set_permission_mode()</code></a></span></li>
-  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="settings"><a href="Agent.html#method-settings"><code>Agent$settings()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="skills"><a href="Agent.html#method-skills"><code>Agent$skills()</code></a></span></li>
-  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="slash_commands"><a href="Agent.html#method-slash_commands"><code>Agent$slash_commands()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="turns"><a href="Agent.html#method-turns"><code>Agent$turns()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="usage"><a href="Agent.html#method-usage"><code>Agent$usage()</code></a></span></li>
 </ul></details></p><hr><a id="method-LeadAgent-initialize"></a><div class="section">
@@ -130,8 +125,7 @@ sub-agents based on registered AgentDefinitions.</p>
 <span>  file_checkpoint_max_file_bytes <span class="op">=</span> <span class="fl">50</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">^</span><span class="fl">2</span>,</span>
 <span>  file_checkpoint_max_journal_bytes <span class="op">=</span> <span class="fl">250</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">^</span><span class="fl">2</span>,</span>
 <span>  working_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  setting_sources <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  settings <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  session_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  agent_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  agent_name <span class="op">=</span> <span class="cn">NULL</span></span>
@@ -173,11 +167,9 @@ captures. Defaults to 250 MiB.</p></dd>
       <dt><code>working_dir</code></dt>
 <dd><p>Working directory</p></dd>
 
-      <dt><code>setting_sources</code></dt>
-<dd><p>Optional Claude-style setting sources</p></dd>
-
-      <dt><code>settings</code></dt>
-<dd><p>Optional pre-loaded settings list from claude_settings_load()</p></dd>
+      <dt><code>session_id</code></dt>
+<dd><p>Optional stable session identifier used for correlation.
+A unique identifier is generated by default.</p></dd>
 
       <dt><code>run_context</code></dt>
 <dd><p>Immutable canonical product context inherited by lead

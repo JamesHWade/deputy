@@ -3,38 +3,25 @@
 deputy is a provider-agnostic agent runtime for R, built on
 [ellmer](https://ellmer.tidyverse.org/). It enables you to create AI
 agents that can use tools to accomplish multi-step tasks, with built-in
-support for permissions, hooks, and streaming output. It also ships an
-Agent SDK-compatible facade for teams that want Anthropic-style
-entrypoints, tool aliases, settings, and persisted session workflows
-without giving up deputy’s R-native runtime.
-
-> **Note:** deputy keeps its R-native `Agent` and `LeadAgent` APIs as
-> the canonical runtime. The compatibility layer is opt-in via either
-> [`agent_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md),
-> [`agent_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md),
-> and `AgentSDKClient`, or the existing Claude-named aliases
-> [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md),
-> [`claude_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md),
-> and `ClaudeSDKClient`.
+support for permissions, hooks, streaming output, explicit persistence,
+and multi-agent delegation.
 
 ## Features
 
 - **Provider-agnostic** - Works with OpenAI, Anthropic, Google, Ollama,
   and any provider ellmer supports
-- **Agent SDK-compatible facade** - Anthropic-style entrypoints,
-  permission modes, tool aliases, and session semantics
 - **Tool bundles** - Pre-built tools for file operations, code
   execution, and data analysis
 - **Permission system** - Fine-grained control over what agents can do
 - **Hooks** - Intercept and customize agent behavior at key points
 - **Semantic streaming** - Text, content, tool lifecycle, usage, and
   stop events with run IDs
-- **Run budgets** - Request, tool-call, token, and estimated-cost limits
+- **Run limits** - Request, tool-call, token, and estimated-cost limits
 - **File checkpoints** - Bounded, persisted byte-exact rewind for Deputy
   file tools
 - **Multi-agent** - Coordinate specialized sub-agents for complex tasks
-- **Session persistence** - Save and restore agent conversations,
-  including Claude-compatible session snapshots
+- **Explicit persistence** - Save and load conversations with native RDS
+  files
 
 ## Installation
 
@@ -128,65 +115,48 @@ start an interactive session. Common options include short aliases
 Rapp 0.4 flags:
 
 ``` bash
-deputy --setting-source project --setting-source user
 deputy --mcp --mcp-server github --mcp-server slack
 deputy --debug --debug-file /tmp/deputy-debug.log
 ```
 
-`--mcp-servers "github,slack"` is still accepted for backward
-compatibility, but `--mcp-server` is preferred.
+### Sessions and Persistence
 
-Claude-compatible session controls are available when you want
-persistent session ids and resume or fork behavior:
-
-``` bash
-deputy --permission-mode plan --persist-session
-deputy --resume-session-id <session-id>
-deputy --resume-session-id <session-id> --resume-session-at "2026-03-07 10:30:00"
-deputy --resume-session-id <session-id> --fork-session
-```
-
-### Agent SDK-Compatible API
-
-Use the compatibility facade when you want Claude-style options, tool
-names, and session persistence without giving up deputy’s
-provider-agnostic runtime:
+Every agent has a stable `session_id` for correlating results and
+events. Pass one at construction when another system owns the
+identifier, or let Deputy generate it:
 
 ``` r
 
-options <- agent_sdk_options(
-  chat = ellmer::chat("openai/gpt-4o"),
-  setting_sources = c("user", "project", "local"),
-  permission_mode = "plan"
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_file(),
+  session_id = "session_research_001"
 )
 
-# One-shot query
-result <- agent_sdk_query(
-  "Summarize the current repository state",
-  options = options
-)
+agent$session_id()
+result <- agent$run_sync("Summarize this package")
 result$session_id
-
-# Stateful client with resume/fork semantics
-client <- AgentSDKClient$new(options)
-client$query("Inspect the package structure")
-client$resume(result$session_id, fork = TRUE)
 ```
 
-[`agent_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
-and `AgentSDKClient$query()` are blocking. Use the native `Agent$run()`
-generator when an application needs incremental events. Resuming a
-compatibility session restores its conversation and prompt while keeping
-the new agent’s configured tools, constructor-supplied permissions, and
-working directory authoritative. Native
-`Agent$load_session(..., restore_tools = TRUE)` is the explicit opt-in
-for trusting and restoring serialized tools.
+`session_id` is correlation metadata, not a storage key. Persistence is
+an explicit file operation:
 
-The compatibility layer exposes Anthropic-style tool aliases such as
-`Read`, `Write`, `Edit`, `MultiEdit`, `Glob`, `Grep`, `LS`, `TodoRead`,
-`TodoWrite`, `WebFetch`, `WebSearch`, and `Agent` or `Task` (when
-sub-agents are registered). The Claude-named entrypoints remain fully
-supported.
+``` r
+
+agent$save_session("research-session.rds")
+
+restored <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_file(),
+  permissions = permissions_readonly(),
+  session_id = "session_research_002"
+)
+restored$load_session("research-session.rds")
+```
+
+Loading restores the saved conversation, prompt, run context, and
+enabled file checkpoint state. The receiving agent keeps its own tools,
+permissions, working directory, and `session_id`.
 
 ### Tools
 
@@ -206,9 +176,6 @@ tools_file()  # File operations
 tools_code()  # Code execution
 tools_data()  # Data reading
 tools_all()   # Everything
-
-# List available presets
-list_presets()
 
 # Optional: read selected pages from a PDF
 tool_read_file("report.pdf", pages = "1,3-5")
@@ -242,31 +209,29 @@ agent <- Agent$new(
   permissions = permissions_standard()
 )
 
-# Custom permissions with limits
+# Custom permissions
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
   tools = tools_all(),
   permissions = Permissions$new(
     file_write = getwd(),
     bash = FALSE,
-    r_code = TRUE,
-    max_turns = 10,
-    max_cost_usd = 0.50
+    r_code = TRUE
   )
 )
 
-# Claude SDK-style tool policy gates
+# Explicit tool policy gates
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
   tools = tools_all(),
   permissions = Permissions$new(
     tool_allowlist = c("read_file", "list_files", "run_r_code"),
     tool_denylist = c("run_bash"),
-    permission_prompt_tool_name = "AskUserQuestion"
+    permission_prompt_tool_name = "ask_user"
   )
 )
 
-# Planning mode: only annotated read-only tools plus AskUserQuestion
+# Planning mode: read-only tools plus ask_user
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
   tools = tools_all(),
@@ -275,17 +240,15 @@ agent <- Agent$new(
 ```
 
 When both are set, `tool_denylist` takes precedence over
-`tool_allowlist`. `permission_prompt_tool_name` is allowed as an
-approval escape hatch except in `dontAsk` mode, and is included in deny
-messages when prompting is enabled.
+`tool_allowlist`. `permission_prompt_tool_name` identifies the tool that
+can request explicit human approval.
 [`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md)
-mirrors Claude’s `plan` mode by allowing only read-only annotated tools
-and `AskUserQuestion`.
+allows read-only annotated tools and `ask_user`.
 
-### Run Budgets and File Rewind
+### Run Limits and File Rewind
 
-Limits are scoped to one run, so resuming an older conversation does not
-inherit an already-spent budget:
+Limits are scoped to one run, so loading a saved conversation does not
+inherit usage from earlier runs:
 
 ``` r
 
@@ -329,16 +292,16 @@ agent$rewind_files(checkpoint_id)
 ```
 
 Deputy automatically creates a checkpoint at the beginning of each run
-and persists the journal with session snapshots. Captures default to 50
-MiB per file. The default maximum aggregate serialized checkpoint-state
-size is 250 MiB, counting journal records, checkpoint markers, metadata,
-and pending captures. The bounds apply to live captures and restored
-session state; violations signal `deputy_file_checkpoint_limit_error`.
-Lead agents and their delegated agents share one workspace journal, so
-child-agent edits participate in lead-level rewind. Rewind covers writes
-through native and Agent SDK-compatible write, edit, multi-edit, and
-todo tools; it does not capture writes performed by Bash, R code, or
-arbitrary custom tools.
+and includes the journal when `save_session()` is called. Captures
+default to 50 MiB per file. The default maximum aggregate serialized
+checkpoint-state size is 250 MiB, counting journal records, checkpoint
+markers, metadata, and pending captures. The bounds apply to live
+captures and restored session state; violations signal
+`deputy_file_checkpoint_limit_error`. Lead agents and their delegated
+agents share one workspace journal, so child-agent edits participate in
+lead-level rewind. Rewind covers writes through Deputy’s write, edit,
+and multi-edit tools; it does not capture writes performed by Bash, R
+code, or arbitrary custom tools.
 
 ### Hooks
 
@@ -368,20 +331,12 @@ agent$add_hook(HookMatcher$new(
   }
 ))
 
-# Track session lifecycle for metrics/logging
+# Replace emitted tool output without changing the model-visible result
 agent$add_hook(HookMatcher$new(
-  event = "SessionStart",
-  callback = function(context) {
-    message("Session started with ", context$tools_count, " tools")
-    HookResultSessionStart()
-  }
-))
-
-agent$add_hook(HookMatcher$new(
-  event = "SessionEnd",
-  callback = function(reason, context) {
-    message("Session ended: ", reason, " after ", context$total_turns, " turns")
-    HookResultSessionEnd()
+  event = "PostToolUse",
+  pattern = "^read_file$",
+  callback = function(tool_name, tool_result, tool_error, context) {
+    HookResultPostToolUse(updated_tool_output = "File read completed")
   }
 ))
 ```
@@ -413,46 +368,6 @@ custom <- skill_create(
 agent$load_skill(custom)
 ```
 
-### Claude Settings (settingSources)
-
-deputy can load Claude-style settings from `.claude` directories,
-including `CLAUDE.md` memory, `.claude/skills`, `.claude/commands` slash
-commands, and `.claude/agents` definitions. Tool policy settings from
-`settings.json` are also applied to `agent$permissions` (`allowedTools`,
-`disallowedTools`, and `permissionPromptToolName`).
-
-``` r
-
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_file(),
-  setting_sources = c("user", "project", "local")
-)
-
-# Inspect loaded slash commands
-agent$slash_commands()
-```
-
-Settings-defined agents are applied automatically when you use
-`LeadAgent$new(setting_sources = ...)` or the compatibility client.
-Source precedence is fixed as `user`, then `project`, then `local`, with
-`.claude/settings.local.json` overriding the broader settings files
-without loading extra memory, commands, skills, or agents.
-
-Unsupported `.claude/agents` frontmatter fields are warned on and
-ignored. Plugin discovery and marketplace execution are intentionally
-deferred from the current compatibility surface.
-
-Example `.claude/settings.json` tool policy:
-
-``` json
-{
-  "allowedTools": ["read_file", "list_files", "run_r_code"],
-  "disallowedTools": ["run_bash"],
-  "permissionPromptToolName": "AskUserQuestion"
-}
-```
-
 ### Structured Output
 
 Request JSON output that matches a schema:
@@ -479,20 +394,15 @@ deputy provides structured error types for programmatic error handling:
 
 ``` r
 
-# Catch specific error types
+# Detect Deputy errors while preserving their structured classes
 tryCatch(
   agent$run_sync(
     "task",
-    usage_limits = UsageLimits(max_cost_usd = 0.50, on_exceed = "error")
+    usage_limits = UsageLimits(max_requests = 2, on_exceed = "error")
   ),
-  deputy_budget_exceeded = function(e) {
-    message("Budget exceeded: $", e$current_cost, " > $", e$max_cost)
-  },
-  deputy_session_load = function(e) {
-    message("Failed to load session from: ", e$path)
-  },
   deputy_error = function(e) {
-    message("Deputy error: ", conditionMessage(e))
+    stopifnot(is_deputy_error(e))
+    message(conditionMessage(e))
   }
 )
 ```
@@ -521,9 +431,9 @@ result <- lead$run_sync("Review the R code in this project")
 ```
 
 Direct synchronous child usage is aggregated into `result$usage`. Each
-child inherits the lead run’s remaining budget, and the lead enforces
-its limits after delegation. Parallel, background, transitive
-child-tree, and cross-run global budget accounting remain future work.
+child inherits the lead run’s remaining limits, and the lead enforces
+them after delegation. Parallel, background, transitive child-tree, and
+cross-run global usage accounting remain future work.
 
 ## Provider Support
 
@@ -548,8 +458,12 @@ Agent$new(chat = ellmer::chat("ollama/llama3.2"))
 
 - [`vignette("getting-started")`](https://jameshwade.github.io/deputy/articles/getting-started.md) -
   Comprehensive introduction
-- [`vignette("claude-sdk-parity")`](https://jameshwade.github.io/deputy/articles/claude-sdk-parity.md) -
-  Anthropic-compatible surface area and gaps
+- [`vignette("permissions")`](https://jameshwade.github.io/deputy/articles/permissions.md) -
+  Permission modes and custom policies
+- [`vignette("hooks")`](https://jameshwade.github.io/deputy/articles/hooks.md) -
+  Tool lifecycle hooks
+- [`vignette("multi-agent")`](https://jameshwade.github.io/deputy/articles/multi-agent.md) -
+  Delegation with `LeadAgent`
 - [ellmer documentation](https://ellmer.tidyverse.org/) - Underlying LLM
   framework
 
@@ -578,69 +492,52 @@ Core agent class for agentic AI workflows
 
 Built-in tools and tool bundles
 
-- [`tool_ask_user()`](https://jameshwade.github.io/deputy/reference/tool_ask_user.md)
-  : AskUserQuestion tool
-- [`tool_edit_file()`](https://jameshwade.github.io/deputy/reference/tool_edit_file.md)
-  : Edit file contents by replacing text
-- [`tool_glob_files()`](https://jameshwade.github.io/deputy/reference/tool_glob_files.md)
-  : Find files using a glob pattern
-- [`tool_grep_files()`](https://jameshwade.github.io/deputy/reference/tool_grep_files.md)
-  : Search file contents with grep-like matching
-- [`tool_list_files()`](https://jameshwade.github.io/deputy/reference/tool_list_files.md)
-  : List files in a directory
-- [`tool_multi_edit()`](https://jameshwade.github.io/deputy/reference/tool_multi_edit.md)
-  : Apply multiple text edits to a file
-- [`tool_read_csv()`](https://jameshwade.github.io/deputy/reference/tool_read_csv.md)
-  : Read a CSV file
 - [`tool_read_file()`](https://jameshwade.github.io/deputy/reference/tool_read_file.md)
   : Read file contents
 - [`tool_read_markdown()`](https://jameshwade.github.io/deputy/reference/tool_read_markdown.md)
   : Convert a file to markdown using MarkItDown
-- [`tool_run_bash()`](https://jameshwade.github.io/deputy/reference/tool_run_bash.md)
-  : Execute bash commands
+- [`tool_write_file()`](https://jameshwade.github.io/deputy/reference/tool_write_file.md)
+  : Write content to a file
+- [`tool_edit_file()`](https://jameshwade.github.io/deputy/reference/tool_edit_file.md)
+  : Edit file contents by replacing text
+- [`tool_multi_edit()`](https://jameshwade.github.io/deputy/reference/tool_multi_edit.md)
+  : Apply multiple text edits to a file
+- [`tool_list_files()`](https://jameshwade.github.io/deputy/reference/tool_list_files.md)
+  : List files in a directory
+- [`tool_glob_files()`](https://jameshwade.github.io/deputy/reference/tool_glob_files.md)
+  : Find files using a glob pattern
+- [`tool_grep_files()`](https://jameshwade.github.io/deputy/reference/tool_grep_files.md)
+  : Search file contents with grep-like matching
 - [`tool_run_r_code()`](https://jameshwade.github.io/deputy/reference/tool_run_r_code.md)
   : Execute R code
-- [`tool_todo_read()`](https://jameshwade.github.io/deputy/reference/tool_todo_read.md)
-  : Read persisted todo items
-- [`tool_todo_write()`](https://jameshwade.github.io/deputy/reference/tool_todo_write.md)
-  : Write persisted todo items
+- [`tool_run_bash()`](https://jameshwade.github.io/deputy/reference/tool_run_bash.md)
+  : Execute bash commands
+- [`tool_read_csv()`](https://jameshwade.github.io/deputy/reference/tool_read_csv.md)
+  : Read a CSV file
 - [`tool_web_fetch()`](https://jameshwade.github.io/deputy/reference/tool_web_fetch.md)
   : Fetch web page content
 - [`tool_web_search()`](https://jameshwade.github.io/deputy/reference/tool_web_search.md)
   : Search the web
-- [`tool_write_file()`](https://jameshwade.github.io/deputy/reference/tool_write_file.md)
-  : Write content to a file
-- [`tools_all()`](https://jameshwade.github.io/deputy/reference/tools_all.md)
-  : All built-in tools
+- [`tool_ask_user()`](https://jameshwade.github.io/deputy/reference/tool_ask_user.md)
+  : Ask user tool
+- [`tools_file()`](https://jameshwade.github.io/deputy/reference/tools_file.md)
+  : File operation tools
 - [`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md)
   : Code execution tools
 - [`tools_data()`](https://jameshwade.github.io/deputy/reference/tools_data.md)
   : Data reading tools
-- [`tools_file()`](https://jameshwade.github.io/deputy/reference/tools_file.md)
-  : File operation tools
+- [`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md)
+  : Web tools
+- [`tools_all()`](https://jameshwade.github.io/deputy/reference/tools_all.md)
+  : All built-in tools
+- [`tools_preset()`](https://jameshwade.github.io/deputy/reference/tools_preset.md)
+  : Get a tool preset by name
 - [`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md)
   : Tools for interactive workflows
 - [`tools_mcp()`](https://jameshwade.github.io/deputy/reference/tools_mcp.md)
   : Get tools from MCP servers
-- [`tools_preset()`](https://jameshwade.github.io/deputy/reference/tools_preset.md)
-  : Get a tool preset by name
-- [`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md)
-  : Web tools
-- [`ToolPresets`](https://jameshwade.github.io/deputy/reference/ToolPresets.md)
-  : Available tool preset names
-- [`list_presets()`](https://jameshwade.github.io/deputy/reference/list_presets.md)
-  : List available tool presets
 - [`set_ask_user_callback()`](https://jameshwade.github.io/deputy/reference/set_ask_user_callback.md)
   : Set callback for non-interactive user input
-
-## MCP Integration
-
-Model Context Protocol server support
-
-- [`mcp_available()`](https://jameshwade.github.io/deputy/reference/mcp_available.md)
-  : Check if MCP support is available
-- [`mcp_servers()`](https://jameshwade.github.io/deputy/reference/mcp_servers.md)
-  : List available MCP servers
 
 ## Permissions
 
@@ -654,45 +551,35 @@ Control what agents can do
   : Create an allow permission result
 - [`PermissionResultDeny()`](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md)
   : Create a deny permission result
-- [`permissions_full()`](https://jameshwade.github.io/deputy/reference/permissions_full.md)
-  : Create a full access permission policy
-- [`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md)
-  : Create a planning permission policy
-- [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md)
-  : Create a read-only permission policy
 - [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md)
   : Create a standard permission policy
+- [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md)
+  : Create a read-only permission policy
+- [`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md)
+  : Create a planning permission policy
+- [`permissions_full()`](https://jameshwade.github.io/deputy/reference/permissions_full.md)
+  : Create a full access permission policy
 
 ## Hooks
 
 Intercept and customize agent behavior
 
-- [`HookMatcher`](https://jameshwade.github.io/deputy/reference/HookMatcher.md)
-  : HookMatcher R6 Class
-- [`HookRegistry`](https://jameshwade.github.io/deputy/reference/HookRegistry.md)
-  : HookRegistry R6 Class
 - [`HookEvent`](https://jameshwade.github.io/deputy/reference/HookEvent.md)
   : Hook events supported by deputy
+- [`HookMatcher`](https://jameshwade.github.io/deputy/reference/HookMatcher.md)
+  : HookMatcher R6 Class
+- [`HookResultPreToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.md)
+  : Create a PreToolUse hook result
 - [`HookResultPostToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.md)
   : Create a PostToolUse hook result
 - [`HookResultPreCompact()`](https://jameshwade.github.io/deputy/reference/HookResultPreCompact.md)
   : Create a PreCompact hook result
-- [`HookResultPreToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.md)
-  : Create a PreToolUse hook result
-- [`HookResultSessionEnd()`](https://jameshwade.github.io/deputy/reference/HookResultSessionEnd.md)
-  : Create a SessionEnd hook result
-- [`HookResultSessionStart()`](https://jameshwade.github.io/deputy/reference/HookResultSessionStart.md)
-  : Create a SessionStart hook result
-- [`HookResultStop()`](https://jameshwade.github.io/deputy/reference/HookResultStop.md)
-  : Create a Stop hook result
-- [`HookResultSubagentStop()`](https://jameshwade.github.io/deputy/reference/HookResultSubagentStop.md)
-  : Create a SubagentStop hook result
+- [`hook_log_tools()`](https://jameshwade.github.io/deputy/reference/hook_log_tools.md)
+  : Create a hook that logs all tool calls
 - [`hook_block_dangerous_bash()`](https://jameshwade.github.io/deputy/reference/hook_block_dangerous_bash.md)
   : Create a hook that blocks dangerous bash commands
 - [`hook_limit_file_writes()`](https://jameshwade.github.io/deputy/reference/hook_limit_file_writes.md)
   : Create a hook that limits file writes to a directory
-- [`hook_log_tools()`](https://jameshwade.github.io/deputy/reference/hook_log_tools.md)
-  : Create a hook that logs all tool calls
 
 ## Skills
 
@@ -707,31 +594,6 @@ Extend agents with specialized capabilities
 - [`skills_list()`](https://jameshwade.github.io/deputy/reference/skills_list.md)
   : List available skills in a directory
 
-## Settings
-
-Claude-style settings sources
-
-- [`claude_settings_load()`](https://jameshwade.github.io/deputy/reference/claude_settings_load.md)
-  : Load Claude-style settings from settingSources
-- [`claude_settings_apply()`](https://jameshwade.github.io/deputy/reference/claude_settings_apply.md)
-  : Apply Claude-style settings to an Agent
-
-## Claude Compatibility
-
-Anthropic-compatible facade and entrypoints
-
-- [`ClaudeSDKClient`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.md)
-  [`AgentSDKClient`](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.md)
-  : Agent SDK compatibility client
-- [`claude_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md)
-  [`agent_sdk_options()`](https://jameshwade.github.io/deputy/reference/claude_sdk_options.md)
-  : Create Agent SDK compatibility options
-- [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
-  [`agent_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
-  : Run a one-shot Agent SDK compatibility query
-- [`session_store_memory()`](https://jameshwade.github.io/deputy/reference/session_store_memory.md)
-  : Create an in-memory SDK-compatible session store
-
 ## Multi-Agent
 
 Coordinate multiple specialized agents
@@ -740,36 +602,16 @@ Coordinate multiple specialized agents
   : LeadAgent R6 Class
 - [`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
   : Create an Agent Definition
-- [`agent_with_delegation()`](https://jameshwade.github.io/deputy/reference/agent_with_delegation.md)
-  : Create a simple delegation agent
 
 ## Errors
 
-Error classes and constructors
+Identify structured Deputy conditions
 
 - [`deputy-errors`](https://jameshwade.github.io/deputy/reference/deputy-errors.md)
   [`DeputyError`](https://jameshwade.github.io/deputy/reference/deputy-errors.md)
   : Deputy Error Classes
 - [`is_deputy_error()`](https://jameshwade.github.io/deputy/reference/is_deputy_error.md)
   : Check if an object is a deputy error
-- [`abort_budget_exceeded()`](https://jameshwade.github.io/deputy/reference/abort_budget_exceeded.md)
-  : Abort with a budget exceeded error
-- [`abort_deputy()`](https://jameshwade.github.io/deputy/reference/abort_deputy.md)
-  : Abort with a structured deputy error
-- [`abort_hook()`](https://jameshwade.github.io/deputy/reference/abort_hook.md)
-  : Abort with a hook error
-- [`abort_permission_denied()`](https://jameshwade.github.io/deputy/reference/abort_permission_denied.md)
-  : Abort with a permission denied error
-- [`abort_provider()`](https://jameshwade.github.io/deputy/reference/abort_provider.md)
-  : Abort with a provider error
-- [`abort_session_load()`](https://jameshwade.github.io/deputy/reference/abort_session_load.md)
-  : Abort with a session load error
-- [`abort_session_save()`](https://jameshwade.github.io/deputy/reference/abort_session_save.md)
-  : Abort with a session save error
-- [`abort_tool_execution()`](https://jameshwade.github.io/deputy/reference/abort_tool_execution.md)
-  : Abort with a tool execution error
-- [`abort_turn_limit()`](https://jameshwade.github.io/deputy/reference/abort_turn_limit.md)
-  : Abort with a turn limit error
 
 # Articles
 
@@ -792,10 +634,6 @@ Error classes and constructors
   Orchestration](https://jameshwade.github.io/deputy/articles/multi-agent.md):
 - [Structured
   Output](https://jameshwade.github.io/deputy/articles/structured-output.md):
-- [Agent
-  Configuration](https://jameshwade.github.io/deputy/articles/agent-configuration.md):
-- [Agent SDK
-  Parity](https://jameshwade.github.io/deputy/articles/claude-sdk-parity.md):
 
 ### Examples
 

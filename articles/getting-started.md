@@ -4,9 +4,7 @@ deputy is an agentic AI framework for R that builds on
 [ellmer](https://ellmer.tidyverse.org/). It enables you to create AI
 agents that use tools to accomplish multi-step tasks, with built-in
 support for permissions, hooks, and streaming output. The core `Agent`
-and `LeadAgent` APIs are provider-agnostic; deputy also includes an
-opt-in Anthropic-compatible Claude Agent SDK facade for Claude-style
-entrypoints and session workflows.
+and `LeadAgent` APIs are provider-agnostic.
 
 ## Installation
 
@@ -36,42 +34,15 @@ The agent sends your task to the LLM, which may call tools, and loops
 until the task is complete. `run_sync()` blocks until done and returns
 an `AgentResult`.
 
-## Anthropic-Compatible Quick Start
-
-Use the compatibility facade when you want Claude-style options, tool
-aliases, and persisted session ids:
-
-``` r
-
-library(deputy)
-
-options <- claude_sdk_options(
-  chat = ellmer::chat_openai(model = "gpt-4o-mini"),
-  setting_sources = "project",
-  permission_mode = "plan"
-)
-
-client <- ClaudeSDKClient$new(options)
-result <- client$query("Summarize this repository")
-result$session_id
-
-# Resume or fork the persisted session later
-client$resume(result$session_id, fork = TRUE)
-```
-
-[`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
-is a one-shot wrapper around the same compatibility surface when you do
-not need a long-lived client object.
-
 ## Tool Bundles
 
 deputy organises built-in tools into bundles you can mix and match:
 
 | Bundle | Tools | Purpose |
 |----|----|----|
-| [`tools_file()`](https://jameshwade.github.io/deputy/reference/tools_file.md) | `read_file`, `write_file`, `list_files` | File operations |
+| [`tools_file()`](https://jameshwade.github.io/deputy/reference/tools_file.md) | `read_file`, `read_markdown`, `write_file`, `list_files` | File operations |
 | [`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md) | `run_r_code`, `run_bash` | Code execution |
-| [`tools_data()`](https://jameshwade.github.io/deputy/reference/tools_data.md) | `read_csv`, `read_file` | Data reading |
+| [`tools_data()`](https://jameshwade.github.io/deputy/reference/tools_data.md) | `read_csv`, `read_file`, `read_markdown` | Data reading |
 | [`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md) | `web_fetch`, `web_search` | Web access |
 | [`tools_all()`](https://jameshwade.github.io/deputy/reference/tools_all.md) | All of the above | Everything |
 
@@ -89,7 +60,6 @@ There are also named presets available via
 
 ``` r
 
-list_presets()
 tools_preset("dev")
 ```
 
@@ -149,7 +119,7 @@ agent <- Agent$new(
   permissions = permissions_full()
 )
 
-# Planning mode: read-only tools plus AskUserQuestion
+# Planning mode: read-only tools plus ask_user
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
   tools = tools_all(),
@@ -169,9 +139,7 @@ perms <- Permissions$new(
 
   bash = FALSE,
   r_code = TRUE,
-  web = FALSE,
-  max_turns = 10,
-  max_cost_usd = 0.50
+  web = FALSE
 )
 
 agent <- Agent$new(
@@ -201,7 +169,7 @@ perms <- Permissions$new(
 )
 ```
 
-### Tool Allow/Deny Lists (Claude SDK-style)
+### Tool Allow/Deny Lists
 
 Use allow/deny lists when you want an explicit tool policy that is
 separate from the broader mode flags:
@@ -209,10 +177,10 @@ separate from the broader mode flags:
 ``` r
 
 perms <- Permissions$new(
-  mode = "default",
+  mode = "standard",
   tool_allowlist = c("read_file", "list_files", "run_r_code"),
   tool_denylist = c("run_bash"),
-  permission_prompt_tool_name = "AskUserQuestion"
+  permission_prompt_tool_name = "ask_user"
 )
 
 agent <- Agent$new(
@@ -223,38 +191,8 @@ agent <- Agent$new(
 ```
 
 If both lists are present, `tool_denylist` wins. The
-`permission_prompt_tool_name` tool is allowed as an approval escape
-hatch except in `dontAsk` mode, and appears in deny reasons when
-prompting is enabled.
-
-### Applying Tool Policy from `.claude/settings.json`
-
-`setting_sources` now maps Claude-style tool policy keys directly into
-permissions, and can also load `.claude/agents` definitions for
-delegation:
-
-``` r
-
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_all(),
-  setting_sources = "project"
-)
-```
-
-Example `.claude/settings.json`:
-
-``` json
-{
-  "allowedTools": ["read_file", "list_files", "run_r_code"],
-  "disallowedTools": ["run_bash"],
-  "permissionPromptToolName": "AskUserQuestion"
-}
-```
-
-Custom agents under `.claude/agents` are registered automatically when
-you use `LeadAgent$new(setting_sources = ...)` or
-`ClaudeSDKClient$new(...)`.
+`permission_prompt_tool_name` tool can request explicit human approval
+and appears in deny reasons when prompting is enabled.
 
 ## Hooks
 
@@ -305,26 +243,45 @@ agent$add_hook(HookMatcher$new(
 
 ## Session Management
 
-Save and restore agent sessions:
+Every `Agent` has a stable `session_id` used to correlate its events and
+results. Deputy generates one unless you provide it at construction:
 
 ``` r
 
-# Save the current session
-agent$save_session("my_session.rds")
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_file(),
+  session_id = "session_analysis_001"
+)
 
-# Later, restore it
-agent2 <- Agent$new(chat = ellmer::chat("openai"))
-agent2$load_session("my_session.rds")
-
-# Continue the conversation
-result <- agent2$run_sync("Continue where we left off...")
+agent$session_id()
+result <- agent$run_sync("Summarize this package")
+result$session_id
 ```
 
-By default, `Agent$load_session()` restores conversation and prompt
-while keeping the receiving Agent’s configured tools. Pass
-`restore_tools = TRUE` only when you explicitly trust and want to
-restore serialized tools. Constructor-supplied permissions and
-`working_dir` always remain authoritative.
+The identifier does not save or locate state. Save and load are
+explicit, path-based operations:
+
+``` r
+
+agent$save_session("analysis-session.rds")
+
+restored <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_file(),
+  permissions = permissions_readonly(),
+  session_id = "session_analysis_002"
+)
+restored$load_session("analysis-session.rds")
+
+# Continue the conversation
+result <- restored$run_sync("Continue where we left off...")
+```
+
+`Agent$load_session()` restores the conversation, prompt, run context,
+and enabled file checkpoint state. Tools, permissions, hooks, the
+working directory, and the receiving agent’s `session_id` remain
+authoritative.
 
 ## Multi-Agent Systems
 
@@ -389,6 +346,9 @@ result$duration
 result$stop_reason
 #> [1] "complete"
 
+# Stable session correlation
+result$session_id
+
 # All events (for detailed analysis)
 length(result$events)
 #> [1] 12
@@ -424,8 +384,9 @@ agent <- Agent$new(chat = ellmer::chat("ollama/llama3.1"))
 2.  **Use hooks for logging** - Add a `PostToolUse` hook to track what
     your agent does.
 
-3.  **Set cost limits** - Use `max_cost_usd` in permissions to prevent
-    runaway costs.
+3.  **Set run limits** - Use
+    [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+    to bound model requests, tool calls, tokens, or estimated cost.
 
 4.  **Save sessions** - For long-running tasks, save sessions
     periodically.
@@ -439,11 +400,8 @@ agent <- Agent$new(chat = ellmer::chat("ollama/llama3.1"))
 agent <- Agent$new(
   chat = ellmer::chat("openai"),
   tools = tools_file(),
-  permissions = Permissions$new(
-    file_write = getwd(),
-    max_turns = 20,
-    max_cost_usd = 1.00
-  )
+  permissions = permissions_standard(),
+  usage_limits = UsageLimits(max_requests = 20, max_cost_usd = 1)
 )
 ```
 
@@ -457,9 +415,5 @@ agent <- Agent$new(
   – Lifecycle hooks for logging, blocking, and auditing
 - [`vignette("multi-agent")`](https://jameshwade.github.io/deputy/articles/multi-agent.md)
   – Multi-agent delegation with LeadAgent
-- [`vignette("claude-sdk-parity")`](https://jameshwade.github.io/deputy/articles/claude-sdk-parity.md)
-  – Anthropic-compatible facade and mappings
 - [`vignette("structured-output")`](https://jameshwade.github.io/deputy/articles/structured-output.md)
   – JSON schema output and validation
-- [`vignette("agent-configuration")`](https://jameshwade.github.io/deputy/articles/agent-configuration.md)
-  – Settings, skills, sessions, and AgentResult

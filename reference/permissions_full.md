@@ -6,18 +6,8 @@ caution!** This bypasses all permission checks.
 ## Usage
 
 ``` r
-permissions_full(max_turns = 50, max_cost_usd = NULL)
+permissions_full()
 ```
-
-## Arguments
-
-- max_turns:
-
-  Maximum number of turns (default 50)
-
-- max_cost_usd:
-
-  Maximum cost in USD (default NULL = unlimited)
 
 ## Value
 

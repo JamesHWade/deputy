@@ -55,7 +55,7 @@ An `AgentEvent` object
 
 Run-boundary and tool lifecycle events also carry `agent_id`, `run_id`,
 immutable `run_context`, and delegated-run correlation fields when
-applicable. `tool_use_id` remains as a provider-ID compatibility alias.
+applicable.
 
 ## Examples
 
@@ -63,14 +63,14 @@ applicable. `tool_use_id` remains as a provider-ID compatibility alias.
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-08-16 02:25:42 
+#>   timestamp: 2026-08-21 00:37:50 
 #>   task: Analyze data.csv
 
 # Create a text event
 AgentEvent("text", text = "Hello", is_complete = FALSE
 )
 #> <AgentEvent: text >
-#>   timestamp: 2026-08-16 02:25:42 
+#>   timestamp: 2026-08-21 00:37:50 
 #>   text: Hello
 #>   is_complete: FALSE
 ```

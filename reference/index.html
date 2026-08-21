@@ -26,8 +26,6 @@
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -104,10 +102,24 @@
 
       <dl><dt>
 
-          <code><a href="tool_ask_user.html">tool_ask_user()</a></code>
+          <code><a href="tool_read_file.html">tool_read_file()</a></code>
 
         </dt>
-        <dd>AskUserQuestion tool</dd>
+        <dd>Read file contents</dd>
+
+        <dt>
+
+          <code><a href="tool_read_markdown.html">tool_read_markdown()</a></code>
+
+        </dt>
+        <dd>Convert a file to markdown using MarkItDown</dd>
+
+        <dt>
+
+          <code><a href="tool_write_file.html">tool_write_file()</a></code>
+
+        </dt>
+        <dd>Write content to a file</dd>
 
         <dt>
 
@@ -115,6 +127,20 @@
 
         </dt>
         <dd>Edit file contents by replacing text</dd>
+
+        <dt>
+
+          <code><a href="tool_multi_edit.html">tool_multi_edit()</a></code>
+
+        </dt>
+        <dd>Apply multiple text edits to a file</dd>
+
+        <dt>
+
+          <code><a href="tool_list_files.html">tool_list_files()</a></code>
+
+        </dt>
+        <dd>List files in a directory</dd>
 
         <dt>
 
@@ -132,38 +158,10 @@
 
         <dt>
 
-          <code><a href="tool_list_files.html">tool_list_files()</a></code>
+          <code><a href="tool_run_r_code.html">tool_run_r_code()</a></code>
 
         </dt>
-        <dd>List files in a directory</dd>
-
-        <dt>
-
-          <code><a href="tool_multi_edit.html">tool_multi_edit()</a></code>
-
-        </dt>
-        <dd>Apply multiple text edits to a file</dd>
-
-        <dt>
-
-          <code><a href="tool_read_csv.html">tool_read_csv()</a></code>
-
-        </dt>
-        <dd>Read a CSV file</dd>
-
-        <dt>
-
-          <code><a href="tool_read_file.html">tool_read_file()</a></code>
-
-        </dt>
-        <dd>Read file contents</dd>
-
-        <dt>
-
-          <code><a href="tool_read_markdown.html">tool_read_markdown()</a></code>
-
-        </dt>
-        <dd>Convert a file to markdown using MarkItDown</dd>
+        <dd>Execute R code</dd>
 
         <dt>
 
@@ -174,24 +172,10 @@
 
         <dt>
 
-          <code><a href="tool_run_r_code.html">tool_run_r_code()</a></code>
+          <code><a href="tool_read_csv.html">tool_read_csv()</a></code>
 
         </dt>
-        <dd>Execute R code</dd>
-
-        <dt>
-
-          <code><a href="tool_todo_read.html">tool_todo_read()</a></code>
-
-        </dt>
-        <dd>Read persisted todo items</dd>
-
-        <dt>
-
-          <code><a href="tool_todo_write.html">tool_todo_write()</a></code>
-
-        </dt>
-        <dd>Write persisted todo items</dd>
+        <dd>Read a CSV file</dd>
 
         <dt>
 
@@ -209,17 +193,17 @@
 
         <dt>
 
-          <code><a href="tool_write_file.html">tool_write_file()</a></code>
+          <code><a href="tool_ask_user.html">tool_ask_user()</a></code>
 
         </dt>
-        <dd>Write content to a file</dd>
+        <dd>Ask user tool</dd>
 
         <dt>
 
-          <code><a href="tools_all.html">tools_all()</a></code>
+          <code><a href="tools_file.html">tools_file()</a></code>
 
         </dt>
-        <dd>All built-in tools</dd>
+        <dd>File operation tools</dd>
 
         <dt>
 
@@ -237,10 +221,24 @@
 
         <dt>
 
-          <code><a href="tools_file.html">tools_file()</a></code>
+          <code><a href="tools_web.html">tools_web()</a></code>
 
         </dt>
-        <dd>File operation tools</dd>
+        <dd>Web tools</dd>
+
+        <dt>
+
+          <code><a href="tools_all.html">tools_all()</a></code>
+
+        </dt>
+        <dd>All built-in tools</dd>
+
+        <dt>
+
+          <code><a href="tools_preset.html">tools_preset()</a></code>
+
+        </dt>
+        <dd>Get a tool preset by name</dd>
 
         <dt>
 
@@ -258,61 +256,10 @@
 
         <dt>
 
-          <code><a href="tools_preset.html">tools_preset()</a></code>
-
-        </dt>
-        <dd>Get a tool preset by name</dd>
-
-        <dt>
-
-          <code><a href="tools_web.html">tools_web()</a></code>
-
-        </dt>
-        <dd>Web tools</dd>
-
-        <dt>
-
-          <code><a href="ToolPresets.html">ToolPresets</a></code>
-
-        </dt>
-        <dd>Available tool preset names</dd>
-
-        <dt>
-
-          <code><a href="list_presets.html">list_presets()</a></code>
-
-        </dt>
-        <dd>List available tool presets</dd>
-
-        <dt>
-
           <code><a href="set_ask_user_callback.html">set_ask_user_callback()</a></code>
 
         </dt>
         <dd>Set callback for non-interactive user input</dd>
-      </dl></div><div class="section level2">
-      <h2 id="mcp-integration">MCP Integration<a class="anchor" aria-label="anchor" href="#mcp-integration"></a></h2>
-
-      <div class="section-desc"><p>Model Context Protocol server support</p></div>
-
-      <dl></dl></div><div class="section level2">
-
-
-
-
-      <dl><dt>
-
-          <code><a href="mcp_available.html">mcp_available()</a></code>
-
-        </dt>
-        <dd>Check if MCP support is available</dd>
-
-        <dt>
-
-          <code><a href="mcp_servers.html">mcp_servers()</a></code>
-
-        </dt>
-        <dd>List available MCP servers</dd>
       </dl></div><div class="section level2">
       <h2 id="permissions">Permissions<a class="anchor" aria-label="anchor" href="#permissions"></a></h2>
 
@@ -353,17 +300,10 @@
 
         <dt>
 
-          <code><a href="permissions_full.html">permissions_full()</a></code>
+          <code><a href="permissions_standard.html">permissions_standard()</a></code>
 
         </dt>
-        <dd>Create a full access permission policy</dd>
-
-        <dt>
-
-          <code><a href="permissions_plan.html">permissions_plan()</a></code>
-
-        </dt>
-        <dd>Create a planning permission policy</dd>
+        <dd>Create a standard permission policy</dd>
 
         <dt>
 
@@ -374,10 +314,17 @@
 
         <dt>
 
-          <code><a href="permissions_standard.html">permissions_standard()</a></code>
+          <code><a href="permissions_plan.html">permissions_plan()</a></code>
 
         </dt>
-        <dd>Create a standard permission policy</dd>
+        <dd>Create a planning permission policy</dd>
+
+        <dt>
+
+          <code><a href="permissions_full.html">permissions_full()</a></code>
+
+        </dt>
+        <dd>Create a full access permission policy</dd>
       </dl></div><div class="section level2">
       <h2 id="hooks">Hooks<a class="anchor" aria-label="anchor" href="#hooks"></a></h2>
 
@@ -390,6 +337,13 @@
 
       <dl><dt>
 
+          <code><a href="HookEvent.html">HookEvent</a></code>
+
+        </dt>
+        <dd>Hook events supported by deputy</dd>
+
+        <dt>
+
           <code><a href="HookMatcher.html">HookMatcher</a></code>
 
         </dt>
@@ -397,17 +351,10 @@
 
         <dt>
 
-          <code><a href="HookRegistry.html">HookRegistry</a></code>
+          <code><a href="HookResultPreToolUse.html">HookResultPreToolUse()</a></code>
 
         </dt>
-        <dd>HookRegistry R6 Class</dd>
-
-        <dt>
-
-          <code><a href="HookEvent.html">HookEvent</a></code>
-
-        </dt>
-        <dd>Hook events supported by deputy</dd>
+        <dd>Create a PreToolUse hook result</dd>
 
         <dt>
 
@@ -425,38 +372,10 @@
 
         <dt>
 
-          <code><a href="HookResultPreToolUse.html">HookResultPreToolUse()</a></code>
+          <code><a href="hook_log_tools.html">hook_log_tools()</a></code>
 
         </dt>
-        <dd>Create a PreToolUse hook result</dd>
-
-        <dt>
-
-          <code><a href="HookResultSessionEnd.html">HookResultSessionEnd()</a></code>
-
-        </dt>
-        <dd>Create a SessionEnd hook result</dd>
-
-        <dt>
-
-          <code><a href="HookResultSessionStart.html">HookResultSessionStart()</a></code>
-
-        </dt>
-        <dd>Create a SessionStart hook result</dd>
-
-        <dt>
-
-          <code><a href="HookResultStop.html">HookResultStop()</a></code>
-
-        </dt>
-        <dd>Create a Stop hook result</dd>
-
-        <dt>
-
-          <code><a href="HookResultSubagentStop.html">HookResultSubagentStop()</a></code>
-
-        </dt>
-        <dd>Create a SubagentStop hook result</dd>
+        <dd>Create a hook that logs all tool calls</dd>
 
         <dt>
 
@@ -471,13 +390,6 @@
 
         </dt>
         <dd>Create a hook that limits file writes to a directory</dd>
-
-        <dt>
-
-          <code><a href="hook_log_tools.html">hook_log_tools()</a></code>
-
-        </dt>
-        <dd>Create a hook that logs all tool calls</dd>
       </dl></div><div class="section level2">
       <h2 id="skills">Skills<a class="anchor" aria-label="anchor" href="#skills"></a></h2>
 
@@ -516,66 +428,6 @@
         </dt>
         <dd>List available skills in a directory</dd>
       </dl></div><div class="section level2">
-      <h2 id="settings">Settings<a class="anchor" aria-label="anchor" href="#settings"></a></h2>
-
-      <div class="section-desc"><p>Claude-style settings sources</p></div>
-
-      <dl></dl></div><div class="section level2">
-
-
-
-
-      <dl><dt>
-
-          <code><a href="claude_settings_load.html">claude_settings_load()</a></code>
-
-        </dt>
-        <dd>Load Claude-style settings from settingSources</dd>
-
-        <dt>
-
-          <code><a href="claude_settings_apply.html">claude_settings_apply()</a></code>
-
-        </dt>
-        <dd>Apply Claude-style settings to an Agent</dd>
-      </dl></div><div class="section level2">
-      <h2 id="claude-compatibility">Claude Compatibility<a class="anchor" aria-label="anchor" href="#claude-compatibility"></a></h2>
-
-      <div class="section-desc"><p>Anthropic-compatible facade and entrypoints</p></div>
-
-      <dl></dl></div><div class="section level2">
-
-
-
-
-      <dl><dt>
-
-          <code><a href="ClaudeSDKClient.html">ClaudeSDKClient</a></code> <code><a href="ClaudeSDKClient.html">AgentSDKClient</a></code>
-
-        </dt>
-        <dd>Agent SDK compatibility client</dd>
-
-        <dt>
-
-          <code><a href="claude_sdk_options.html">claude_sdk_options()</a></code> <code><a href="claude_sdk_options.html">agent_sdk_options()</a></code>
-
-        </dt>
-        <dd>Create Agent SDK compatibility options</dd>
-
-        <dt>
-
-          <code><a href="claude_sdk_query.html">claude_sdk_query()</a></code> <code><a href="claude_sdk_query.html">agent_sdk_query()</a></code>
-
-        </dt>
-        <dd>Run a one-shot Agent SDK compatibility query</dd>
-
-        <dt>
-
-          <code><a href="session_store_memory.html">session_store_memory()</a></code>
-
-        </dt>
-        <dd>Create an in-memory SDK-compatible session store</dd>
-      </dl></div><div class="section level2">
       <h2 id="multi-agent">Multi-Agent<a class="anchor" aria-label="anchor" href="#multi-agent"></a></h2>
 
       <div class="section-desc"><p>Coordinate multiple specialized agents</p></div>
@@ -598,17 +450,10 @@
 
         </dt>
         <dd>Create an Agent Definition</dd>
-
-        <dt>
-
-          <code><a href="agent_with_delegation.html">agent_with_delegation()</a></code>
-
-        </dt>
-        <dd>Create a simple delegation agent</dd>
       </dl></div><div class="section level2">
       <h2 id="errors">Errors<a class="anchor" aria-label="anchor" href="#errors"></a></h2>
 
-      <div class="section-desc"><p>Error classes and constructors</p></div>
+      <div class="section-desc"><p>Identify structured Deputy conditions</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -628,69 +473,6 @@
 
         </dt>
         <dd>Check if an object is a deputy error</dd>
-
-        <dt>
-
-          <code><a href="abort_budget_exceeded.html">abort_budget_exceeded()</a></code>
-
-        </dt>
-        <dd>Abort with a budget exceeded error</dd>
-
-        <dt>
-
-          <code><a href="abort_deputy.html">abort_deputy()</a></code>
-
-        </dt>
-        <dd>Abort with a structured deputy error</dd>
-
-        <dt>
-
-          <code><a href="abort_hook.html">abort_hook()</a></code>
-
-        </dt>
-        <dd>Abort with a hook error</dd>
-
-        <dt>
-
-          <code><a href="abort_permission_denied.html">abort_permission_denied()</a></code>
-
-        </dt>
-        <dd>Abort with a permission denied error</dd>
-
-        <dt>
-
-          <code><a href="abort_provider.html">abort_provider()</a></code>
-
-        </dt>
-        <dd>Abort with a provider error</dd>
-
-        <dt>
-
-          <code><a href="abort_session_load.html">abort_session_load()</a></code>
-
-        </dt>
-        <dd>Abort with a session load error</dd>
-
-        <dt>
-
-          <code><a href="abort_session_save.html">abort_session_save()</a></code>
-
-        </dt>
-        <dd>Abort with a session save error</dd>
-
-        <dt>
-
-          <code><a href="abort_tool_execution.html">abort_tool_execution()</a></code>
-
-        </dt>
-        <dd>Abort with a tool execution error</dd>
-
-        <dt>
-
-          <code><a href="abort_turn_limit.html">abort_turn_limit()</a></code>
-
-        </dt>
-        <dd>Abort with a turn limit error</dd>
       </dl></div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>

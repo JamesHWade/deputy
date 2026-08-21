@@ -36,11 +36,7 @@ occurred during execution.
 
 - `session_id`:
 
-  Compat session identifier when Claude SDK mode is active
-
-- `snapshot_path`:
-
-  Latest compat snapshot path when session persistence is active
+  Stable session identifier for run correlation
 
 - `run_id`:
 
@@ -114,7 +110,6 @@ Create a new AgentResult object.
       stop_reason = "complete",
       structured_output = NULL,
       session_id = NULL,
-      snapshot_path = NULL,
       run_id = NULL,
       usage = AgentUsage(),
       agent_id = NULL,
@@ -157,11 +152,7 @@ Create a new AgentResult object.
 
 - `session_id`:
 
-  Compat session identifier (if any)
-
-- `snapshot_path`:
-
-  Latest compat snapshot path (if any)
+  Stable session identifier (if any)
 
 - `run_id`:
 

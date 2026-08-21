@@ -7,27 +7,16 @@ configured.
 ## Usage
 
 ``` r
-permissions_plan(
-  max_turns = 25,
-  max_cost_usd = NULL,
-  permission_prompt_tool_name = "AskUserQuestion"
-)
+permissions_plan(permission_prompt_tool_name = "ask_user")
 ```
 
 ## Arguments
 
-- max_turns:
-
-  Maximum number of turns (default 25)
-
-- max_cost_usd:
-
-  Maximum cost in USD (default NULL = unlimited)
-
 - permission_prompt_tool_name:
 
-  Optional tool name that the model can use to request explicit
-  approval. Defaults to `"AskUserQuestion"`.
+  Optional dedicated approval-tool name that the model can use to
+  request explicit approval. Native capability-bearing tools are
+  rejected. Defaults to `"ask_user"`.
 
 ## Value
 

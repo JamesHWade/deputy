@@ -22,7 +22,7 @@ output.
 
     - `deputy_budget_exceeded` - Cost limit exceeded
 
-    - `deputy_turn_limit` - Max turns exceeded
+    - `deputy_request_limit` - Maximum model requests exceeded
 
   - **deputy_provider** - LLM provider failures
 

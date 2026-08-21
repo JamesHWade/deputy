@@ -8,27 +8,15 @@ access, and package installation.
 ## Usage
 
 ``` r
-permissions_standard(
-  working_dir = getwd(),
-  max_turns = 25,
-  max_cost_usd = NULL
-)
+permissions_standard(working_dir = getwd())
 ```
 
 ## Arguments
 
 - working_dir:
 
-  Root directory for file writes (default: current directory). This does
-  not restrict otherwise accessible file reads.
-
-- max_turns:
-
-  Maximum number of turns (default 25)
-
-- max_cost_usd:
-
-  Maximum cost in USD (default NULL = unlimited)
+  Existing absolute root directory for file writes (default: current
+  directory). This does not restrict otherwise accessible file reads.
 
 ## Value
 

@@ -46,8 +46,6 @@
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -94,8 +92,8 @@ stream from <code>chat$stream_async()</code>. Deputy’s
 <code>run()</code> yields <code>AgentEvent</code> objects, while
 <code>run_sync()</code> returns an <code>AgentResult</code>. Calling
 <code>agent$chat$stream_async()</code> directly works but bypasses
-deputy’s turn-level controls like <code>max_turns</code> and
-<code>max_cost_usd</code>.</p>
+Deputy’s permissions, hooks, and run limits from
+<code><a href="../reference/UsageLimits.html">UsageLimits()</a></code>.</p>
 <p><code>run_shiny()</code> bridges this gap: it returns a content
 stream that shinychat understands while still enforcing deputy’s
 permissions, hooks, and limits.</p>
@@ -248,9 +246,9 @@ shinychat drives the streaming loop:</p>
 <span>      file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>      file_write <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>      r_code <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>      bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>      max_cost_usd <span class="op">=</span> <span class="fl">0.50</span></span>
+<span>      bash <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span>    <span class="op">)</span>,</span>
+<span>    usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">10</span>, max_cost_usd <span class="op">=</span> <span class="fl">0.50</span><span class="op">)</span>,</span>
 <span>    working_dir <span class="op">=</span> <span class="va">workspace</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
@@ -288,10 +286,9 @@ response. Cancellation stops further work but cannot retract content
 already emitted. Treat token and cost limits as observed stop
 conditions, not provider-side generation ceilings.</p>
 <p>The <code>max_tool_calls</code> parameter counts individual tool call
-requests, not LLM turns. One turn can include multiple parallel tool
-calls (e.g., the LLM reads three files at once), each counting
-separately. This is more precise than turn counting for controlling
-resource usage.</p>
+requests, not model requests. One model request can include multiple
+parallel tool calls (for example, reading three files at once), each
+counting separately.</p>
 </div>
 <div class="section level2">
 <h2 id="running-the-example">Running the Example<a class="anchor" aria-label="anchor" href="#running-the-example"></a>

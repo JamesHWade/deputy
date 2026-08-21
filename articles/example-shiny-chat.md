@@ -12,8 +12,8 @@ shinychat’s
 expects an ellmer content stream from `chat$stream_async()`. Deputy’s
 `run()` yields `AgentEvent` objects, while `run_sync()` returns an
 `AgentResult`. Calling `agent$chat$stream_async()` directly works but
-bypasses deputy’s turn-level controls like `max_turns` and
-`max_cost_usd`.
+bypasses Deputy’s permissions, hooks, and run limits from
+[`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md).
 
 `run_shiny()` bridges this gap: it returns a content stream that
 shinychat understands while still enforcing deputy’s permissions, hooks,
@@ -119,9 +119,9 @@ server <- function(input, output, session) {
       file_read = TRUE,
       file_write = FALSE,
       r_code = FALSE,
-      bash = FALSE,
-      max_cost_usd = 0.50
+      bash = FALSE
     ),
+    usage_limits = UsageLimits(max_requests = 10, max_cost_usd = 0.50),
     working_dir = workspace
   )
 
@@ -160,9 +160,9 @@ already emitted. Treat token and cost limits as observed stop
 conditions, not provider-side generation ceilings.
 
 The `max_tool_calls` parameter counts individual tool call requests, not
-LLM turns. One turn can include multiple parallel tool calls (e.g., the
-LLM reads three files at once), each counting separately. This is more
-precise than turn counting for controlling resource usage.
+model requests. One model request can include multiple parallel tool
+calls (for example, reading three files at once), each counting
+separately.
 
 ## Running the Example
 

@@ -32,8 +32,6 @@ web access, and package installation."><meta property="og:image" content="https:
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -65,11 +63,7 @@ web access, and package installation.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">permissions_standard</span><span class="op">(</span></span>
-<span>  working_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  max_turns <span class="op">=</span> <span class="fl">25</span>,</span>
-<span>  max_cost_usd <span class="op">=</span> <span class="cn">NULL</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">permissions_standard</span><span class="op">(</span>working_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -77,16 +71,9 @@ web access, and package installation.</p>
 
 
 <dl><dt id="arg-working-dir">working_dir<a class="anchor" aria-label="anchor" href="#arg-working-dir"></a></dt>
-<dd><p>Root directory for file writes (default: current
-directory). This does not restrict otherwise accessible file reads.</p></dd>
-
-
-<dt id="arg-max-turns">max_turns<a class="anchor" aria-label="anchor" href="#arg-max-turns"></a></dt>
-<dd><p>Maximum number of turns (default 25)</p></dd>
-
-
-<dt id="arg-max-cost-usd">max_cost_usd<a class="anchor" aria-label="anchor" href="#arg-max-cost-usd"></a></dt>
-<dd><p>Maximum cost in USD (default NULL = unlimited)</p></dd>
+<dd><p>Existing absolute root directory for file writes (default:
+current directory). This does not restrict otherwise accessible file
+reads.</p></dd>
 
 </dl></div>
     <div class="section level2">

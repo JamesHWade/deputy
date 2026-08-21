@@ -47,14 +47,54 @@ data_analyst <- agent_definition(
 
 Fields:
 
-| Field         | Description                                      |
-|---------------|--------------------------------------------------|
-| `name`        | Unique identifier (used by the lead to delegate) |
-| `description` | What this agent does (shown to the lead LLM)     |
-| `prompt`      | System prompt for the sub-agent                  |
-| `tools`       | Tools available to the sub-agent                 |
-| `model`       | `"inherit"` (default) or a specific model name   |
-| `skills`      | Optional list of skills to load                  |
+| Field | Description |
+|----|----|
+| `name` | Unique identifier (used by the lead to delegate) |
+| `description` | What this agent does (shown to the lead LLM) |
+| `prompt` | System prompt for the sub-agent |
+| `tools` | Tools available to the sub-agent |
+| `model` | `"inherit"` (default) or a specific model name |
+| `skills` | Optional list of skills to load |
+| `disallowed_tools` | Additional tool names that the child must not use |
+| `memory` | Optional context appended to the child’s system prompt |
+| `mcp_servers` | Optional MCP servers loaded for the child |
+| `initial_prompt` | Optional text prepended to delegated tasks |
+| `max_requests` | Optional per-child request limit |
+| `permission_mode` | Optional mode that preserves or narrows the lead policy |
+
+### Delegated Permission Boundaries
+
+A sub-agent cannot gain authority that its lead does not have. Deputy
+intersects the requested child mode with the lead’s capabilities, write
+root, tool gates, and permission callback. `disallowed_tools` adds
+further denials.
+
+The allowed child-mode transitions use the same authority order as
+`Agent$set_permission_mode()`:
+
+| Lead mode    | Allowed child modes                            |
+|--------------|------------------------------------------------|
+| `"readonly"` | `"readonly"`                                   |
+| `"standard"` | `"standard"`, `"readonly"`                     |
+| `"plan"`     | `"plan"`, `"readonly"`                         |
+| `"full"`     | `"full"`, `"standard"`, `"plan"`, `"readonly"` |
+
+For example, a readonly reviewer can be declared beneath a standard lead
+without gaining file reads, web access, or tools that the lead
+explicitly denied:
+
+``` r
+
+reviewer <- agent_definition(
+  name = "reviewer",
+  description = "Reviews files without changing them",
+  prompt = "Review the requested files and report findings.",
+  tools = tools_file(),
+  permission_mode = "readonly",
+  disallowed_tools = "read_csv",
+  max_requests = 5
+)
+```
 
 ## Creating a LeadAgent
 
@@ -103,25 +143,11 @@ result <- lead$run_sync(
 cat(result$response)
 ```
 
-Direct synchronous delegation participates in the lead run’s budget.
-Each child inherits the lead’s remaining `UsageLimits`, and its usage is
-aggregated into `result$usage` and enforced by the lead after
+Direct synchronous delegation participates in the lead run’s usage
+limits. Each child inherits the lead’s remaining `UsageLimits`, and its
+usage is aggregated into `result$usage` and enforced by the lead after
 delegation. This accounting does not yet cover parallel or background
-children, transitive child trees, or cross-run global budgets.
-
-## Convenience Constructor
-
-[`agent_with_delegation()`](https://jameshwade.github.io/deputy/reference/agent_with_delegation.md)
-creates a lead agent with one line:
-
-``` r
-
-lead <- agent_with_delegation(
-  chat = ellmer::chat_anthropic(),
-  sub_agents = list(code_reviewer, data_analyst),
-  tools = tools_file()
-)
-```
+children, transitive child trees, or cross-run global limits.
 
 ## Monitoring with SubagentStop Hooks
 
@@ -133,8 +159,8 @@ hook_monitor <- HookMatcher$new(
   event = "SubagentStop",
   callback = function(agent_name, task, result, context) {
     cli::cli_alert_info("Sub-agent {agent_name} finished")
-    cli::cli_alert("Cost: {result$cost$total}")
-    HookResultSubagentStop()
+    cli::cli_alert("Requests: {result$usage$requests}")
+    NULL
   }
 )
 

@@ -125,7 +125,7 @@ hook_sub_agent_log <- HookMatcher$new(
   event = "SubagentStop",
   callback = function(agent_name, task, result, context) {
     cli::cli_alert_info("Sub-agent {.val {agent_name}} finished")
-    HookResultSubagentStop()
+    NULL
   }
 )
 
@@ -262,8 +262,8 @@ result$duration
 tool_calls <- result$tool_calls()
 cli::cli_alert_info("Total tool calls: {length(tool_calls)}")
 
-# How many turns did it take?
-result$n_turns()
+# How many model requests were used?
+result$usage$requests
 ```
 
 ## Next Steps

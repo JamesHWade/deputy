@@ -46,8 +46,6 @@
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -239,7 +237,10 @@ directory:</p>
 <span>  event <span class="op">=</span> <span class="st">"PreToolUse"</span>,</span>
 <span>  pattern <span class="op">=</span> <span class="st">"^write_file$"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">path</span> <span class="op">&lt;-</span> <span class="va">tool_input</span><span class="op">$</span><span class="va">path</span> <span class="op"><a href="https://rdrr.io/r/base/Control.html" class="external-link">%||%</a></span> <span class="st">""</span></span>
+<span>    <span class="va">path</span> <span class="op">&lt;-</span> <span class="va">tool_input</span><span class="op">$</span><span class="va">path</span></span>
+<span>    <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">path</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="va">path</span> <span class="op">&lt;-</span> <span class="st">""</span></span>
+<span>    <span class="op">}</span></span>
 <span>    <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"\\.env$|secrets"</span>, <span class="va">path</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>      <span class="fu"><a href="../reference/HookResultPreToolUse.html">HookResultPreToolUse</a></span><span class="op">(</span></span>
 <span>        permission <span class="op">=</span> <span class="st">"deny"</span>,</span>
@@ -295,7 +296,7 @@ call:</p>
 <span>  event <span class="op">=</span> <span class="st">"SessionStart"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Session started at "</span>, <span class="fu"><a href="https://rdrr.io/r/base/Sys.time.html" class="external-link">Sys.time</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span>    <span class="fu"><a href="../reference/HookResultSessionStart.html">HookResultSessionStart</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>    <span class="cn">NULL</span></span>
 <span>  <span class="op">}</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -304,7 +305,7 @@ call:</p>
 </h2>
 <p><code>Notification</code> hooks are useful for informational events
 that should not alter control flow, such as permission-denied guidance,
-session restore notices, or compaction fallbacks:</p>
+session-load notices, or compaction fallbacks:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"Notification"</span>,</span>

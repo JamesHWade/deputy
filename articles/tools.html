@@ -46,8 +46,6 @@
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -91,6 +89,11 @@ own.</p>
 </h2>
 <p>deputy includes the following tools out of the box:</p>
 <table class="table">
+<colgroup>
+<col width="18%">
+<col width="40%">
+<col width="40%">
+</colgroup>
 <thead><tr class="header">
 <th>Tool</th>
 <th>Description</th>
@@ -103,39 +106,69 @@ own.</p>
 <td>read-only</td>
 </tr>
 <tr class="even">
+<td><code>tool_read_markdown</code></td>
+<td>Convert a supported document to markdown</td>
+<td>read-only</td>
+</tr>
+<tr class="odd">
 <td><code>tool_write_file</code></td>
 <td>Write or append to a file</td>
 <td>destructive</td>
 </tr>
+<tr class="even">
+<td><code>tool_edit_file</code></td>
+<td>Apply one targeted file edit</td>
+<td>destructive</td>
+</tr>
 <tr class="odd">
+<td><code>tool_multi_edit</code></td>
+<td>Apply multiple file edits</td>
+<td>destructive</td>
+</tr>
+<tr class="even">
 <td><code>tool_list_files</code></td>
 <td>List files in a directory</td>
 <td>read-only</td>
 </tr>
+<tr class="odd">
+<td><code>tool_glob_files</code></td>
+<td>Find files by glob pattern</td>
+<td>read-only</td>
+</tr>
 <tr class="even">
+<td><code>tool_grep_files</code></td>
+<td>Search file contents</td>
+<td>read-only</td>
+</tr>
+<tr class="odd">
 <td><code>tool_run_r_code</code></td>
 <td>Execute R code</td>
 <td>open-world</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>tool_run_bash</code></td>
 <td>Execute a bash command</td>
 <td>destructive, open-world</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>tool_read_csv</code></td>
 <td>Read and summarise a CSV</td>
 <td>read-only</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>tool_web_fetch</code></td>
 <td>Fetch a web page</td>
 <td>read-only, open-world</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>tool_web_search</code></td>
 <td>Search the web</td>
 <td>read-only, open-world</td>
+</tr>
+<tr class="even">
+<td><code>tool_ask_user</code></td>
+<td>Ask structured questions</td>
+<td>read-only</td>
 </tr>
 </tbody>
 </table>
@@ -150,10 +183,10 @@ system uses to decide whether the agent is allowed to use it. See
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># read_file, write_file, list_files</span></span>
+<span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># read_file, read_markdown, write_file, list_files</span></span>
 <span><span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># run_r_code, run_bash</span></span>
-<span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># read_csv, read_file</span></span>
-<span><span class="fu"><a href="../reference/tools_web.html">tools_web</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># web_fetch, web_search (provider-aware)</span></span>
+<span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># read_csv, read_file, read_markdown</span></span>
+<span><span class="fu"><a href="../reference/tools_web.html">tools_web</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># universal web_fetch and web_search</span></span>
 <span><span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># everything</span></span></code></pre></div>
 <p>Combine bundles by concatenating:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
@@ -165,17 +198,11 @@ system uses to decide whether the agent is allowed to use it. See
 </h2>
 <p>Presets are named collections with opinionated defaults:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/list_presets.html">list_presets</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 5 x 3</span></span>
-<span><span class="co">#&gt;   name     n_tools description</span></span>
-<span><span class="co">#&gt;   &lt;chr&gt;      &lt;int&gt; &lt;chr&gt;</span></span>
-<span><span class="co">#&gt; 1 minimal        2 read_file, list_files</span></span>
-<span><span class="co">#&gt; 2 standard       4 read_file, write_file, list_files, run_r_code</span></span>
-<span><span class="co">#&gt; 3 dev            5 standard + run_bash</span></span>
-<span><span class="co">#&gt; 4 data           4 read_file, list_files, read_csv, run_r_code</span></span>
-<span><span class="co">#&gt; 5 full           8 all built-in tools</span></span>
-<span></span>
-<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"dev"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"standard"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"dev"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"data"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"full"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="creating-custom-tools">Creating Custom Tools<a class="anchor" aria-label="anchor" href="#creating-custom-tools"></a>
@@ -244,14 +271,14 @@ input</li>
 <h2 id="web-tools">Web Tools<a class="anchor" aria-label="anchor" href="#web-tools"></a>
 </h2>
 <p>deputy provides web tools that are <strong>provider-aware</strong>.
-When you call <code><a href="../reference/tools_web.html">tools_web()</a></code>, deputy checks whether the
-provider has built-in web search (e.g., Claude’s tool use, Google’s
-grounding) and uses the native version when available:</p>
+Pass the chat to <code><a href="../reference/tools_web.html">tools_web()</a></code> to select provider-native web
+tools when available. Calling it without a chat returns Deputy’s
+universal web tools:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Automatically uses provider's native web tools when available</span></span>
+<code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_web.html">tools_web</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_web.html">tools_web</a></span><span class="op">(</span><span class="va">chat</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>For providers without native support, deputy falls back to
 <code>tool_web_fetch</code> (fetches a URL and extracts text) and
@@ -263,20 +290,15 @@ grounding) and uses the native version when available:</p>
 <p>deputy can load tools from <a href="https://modelcontextprotocol.io/" class="external-link">Model Context Protocol</a>
 servers via the <a href="https://github.com/tidyverse/mcptools" class="external-link">mcptools</a> package:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Check if MCP is available</span></span>
-<span><span class="fu"><a href="../reference/mcp_available.html">mcp_available</a></span><span class="op">(</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># List configured servers</span></span>
-<span><span class="fu"><a href="../reference/mcp_servers.html">mcp_servers</a></span><span class="op">(</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Load MCP tools into an agent</span></span>
+<code class="sourceCode R"><span><span class="co"># Load tools from selected configured servers</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_mcp.html">tools_mcp</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_mcp.html">tools_mcp</a></span><span class="op">(</span>servers <span class="op">=</span> <span class="st">"github"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>MCP servers are configured in
-<code>~/.config/mcptools/config.json</code>. See the mcptools
-documentation for setup instructions.</p>
+<p><code><a href="../reference/tools_mcp.html">tools_mcp()</a></code> returns an empty list with a warning when
+<code>mcptools</code> is not installed or no tools are available. MCP
+servers are configured in <code>~/.config/mcptools/config.json</code>;
+see the mcptools documentation for setup.</p>
 </div>
 <div class="section level2">
 <h2 id="human-in-the-loop">Human-in-the-Loop<a class="anchor" aria-label="anchor" href="#human-in-the-loop"></a>
@@ -293,11 +315,11 @@ clarifications, or collecting input:</p>
 <span><span class="co"># In interactive sessions, a readline prompt appears.</span></span>
 <span><span class="co"># For non-interactive use, set a custom callback:</span></span>
 <span><span class="fu"><a href="../reference/set_ask_user_callback.html">set_ask_user_callback</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">questions</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="co"># Return answers matching the question structure</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    questions <span class="op">=</span> <span class="va">questions</span>,</span>
-<span>    answers <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>answer <span class="op">=</span> <span class="st">"Yes, proceed"</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
+<span>  <span class="va">answers</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  <span class="kw">for</span> <span class="op">(</span><span class="va">question</span> <span class="kw">in</span> <span class="va">questions</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">answers</span><span class="op">[[</span><span class="va">question</span><span class="op">$</span><span class="va">question</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">question</span><span class="op">$</span><span class="va">options</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">label</span></span>
+<span>  <span class="op">}</span></span>
+<span>  <span class="va">answers</span></span>
 <span><span class="op">}</span><span class="op">)</span></span></code></pre></div>
 <p>The <code><a href="../reference/tools_interactive.html">tools_interactive()</a></code> function returns a list
 containing <code>tool_ask_user</code>.</p>

@@ -65,7 +65,7 @@ result <- agent$run_sync(
   "Explore the airquality dataset that comes with R. Give me a
    thorough understanding of the data including quality issues,
    distributions, and interesting patterns.",
-  max_turns = 15
+  usage_limits = UsageLimits(max_requests = 15)
 )
 
 cat(result$response)
@@ -148,10 +148,9 @@ agent <- Agent$new(
   permissions = Permissions$new(
     r_code = TRUE,
     bash = FALSE,
-    file_write = FALSE,
-    max_turns = 20,
-    max_cost_usd = 0.50
-  )
+    file_write = FALSE
+  ),
+  usage_limits = UsageLimits(max_requests = 20, max_cost_usd = 0.50)
 )
 
 # Log every tool call
@@ -165,14 +164,15 @@ result <- agent$run_sync(
 )
 ```
 
-The agent can read data and run R code, but cannot write files, run bash
-commands, or exceed the cost limit.
+The agent can read data and run R code, but cannot write files or run
+bash commands. Deputy stops the run when it observes either configured
+usage limit.
 
 ## Next Steps
 
 - [`vignette("tools")`](https://jameshwade.github.io/deputy/articles/tools.md)
   – Tool bundles and custom tools
-- [`vignette("agent-configuration")`](https://jameshwade.github.io/deputy/articles/agent-configuration.md)
-  – Skills, system prompts, and sessions
+- [`vignette("getting-started")`](https://jameshwade.github.io/deputy/articles/getting-started.md)
+  – Skills, sessions, and run results
 - [`vignette("example-extraction-pipeline")`](https://jameshwade.github.io/deputy/articles/example-extraction-pipeline.md)
   – Prompt chaining for structured extraction

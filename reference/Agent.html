@@ -36,8 +36,6 @@ through private storage when required."><meta property="og:image" content="https
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -109,7 +107,7 @@ mcptools package. Returns invisible self.</p></dd>
 
 
 <p>When <code>enable_file_checkpointing = TRUE</code>, Deputy captures exact preimages for
-writes made through its native and Agent SDK-compatible file tools.</p>
+writes made through its native file tools.</p>
 <dl><dt><code>$checkpoint(name = NULL, metadata = list())</code></dt>
 <dd><p>Create a manual file
 checkpoint and return its checkpoint ID.</p></dd>
@@ -175,7 +173,6 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <li><p><a href="#method-Agent-session_id"><code>Agent$session_id()</code></a></p></li>
 <li><p><a href="#method-Agent-get_permission_mode"><code>Agent$get_permission_mode()</code></a></p></li>
 <li><p><a href="#method-Agent-set_permission_mode"><code>Agent$set_permission_mode()</code></a></p></li>
-<li><p><a href="#method-Agent-configure_sdk_compat"><code>Agent$configure_sdk_compat()</code></a></p></li>
 <li><p><a href="#method-Agent-cost"><code>Agent$cost()</code></a></p></li>
 <li><p><a href="#method-Agent-usage"><code>Agent$usage()</code></a></p></li>
 <li><p><a href="#method-Agent-interrupt"><code>Agent$interrupt()</code></a></p></li>
@@ -189,8 +186,6 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <li><p><a href="#method-Agent-print"><code>Agent$print()</code></a></p></li>
 <li><p><a href="#method-Agent-load_skill"><code>Agent$load_skill()</code></a></p></li>
 <li><p><a href="#method-Agent-skills"><code>Agent$skills()</code></a></p></li>
-<li><p><a href="#method-Agent-slash_commands"><code>Agent$slash_commands()</code></a></p></li>
-<li><p><a href="#method-Agent-settings"><code>Agent$settings()</code></a></p></li>
 <li><p><a href="#method-Agent-load_mcp"><code>Agent$load_mcp()</code></a></p></li>
 <li><p><a href="#method-Agent-mcp_tools"><code>Agent$mcp_tools()</code></a></p></li>
 <li><p><a href="#method-Agent-mcp_status"><code>Agent$mcp_status()</code></a></p></li>
@@ -205,13 +200,12 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  system_prompt <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">25</span><span class="op">)</span>,</span>
 <span>  enable_file_checkpointing <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  file_checkpoint_max_file_bytes <span class="op">=</span> <span class="fl">50</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">^</span><span class="fl">2</span>,</span>
 <span>  file_checkpoint_max_journal_bytes <span class="op">=</span> <span class="fl">250</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">^</span><span class="fl">2</span>,</span>
 <span>  working_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  setting_sources <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  settings <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  session_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  agent_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  agent_name <span class="op">=</span> <span class="cn">NULL</span></span>
@@ -235,9 +229,8 @@ chat object's existing system prompt.</p></dd>
 Defaults to <code><a href="permissions_standard.html">permissions_standard()</a></code>.</p></dd>
 
       <dt><code>usage_limits</code></dt>
-<dd><p>Optional <a href="UsageLimits.html">UsageLimits</a> applied independently to each
-run. NULL request or cost fields inherit the legacy
-<code>permissions$max_turns</code> and <code>permissions$max_cost_usd</code> values.</p></dd>
+<dd><p><a href="UsageLimits.html">UsageLimits</a> applied independently to each run.
+Defaults to 25 model requests. Use <code><a href="UsageLimits.html">UsageLimits()</a></code> for no limits.</p></dd>
 
       <dt><code>enable_file_checkpointing</code></dt>
 <dd><p>Whether to journal exact file preimages
@@ -257,14 +250,9 @@ Defaults to 250 MiB.</p></dd>
 <dd><p>Working directory for file operations. Defaults to
 current directory.</p></dd>
 
-      <dt><code>setting_sources</code></dt>
-<dd><p>Optional character vector of Claude-style
-setting sources (e.g., "project", "user") used to load memory, skills,
-and slash commands.</p></dd>
-
-      <dt><code>settings</code></dt>
-<dd><p>Optional pre-loaded settings list from
-<code><a href="claude_settings_load.html">claude_settings_load()</a></code>. If provided, bypasses <code>setting_sources</code>.</p></dd>
+      <dt><code>session_id</code></dt>
+<dd><p>Optional stable session identifier used for correlation.
+A unique identifier is generated by default.</p></dd>
 
       <dt><code>run_context</code></dt>
 <dd><p>Immutable canonical JSON-compatible product context
@@ -296,7 +284,6 @@ reached, or it is interrupted.</p><div class="section">
 <h4 id="usage-1">Usage<a class="anchor" aria-label="anchor" href="#usage-1"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span></span>
 <span>  <span class="va">task</span>,</span>
-<span>  max_turns <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  include_partial_messages <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  output_format <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -306,10 +293,6 @@ reached, or it is interrupted.</p><div class="section">
 <h4 id="arguments-1">Arguments<a class="anchor" aria-label="anchor" href="#arguments-1"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>task</code></dt>
 <dd><p>The task for the agent to perform</p></dd>
-
-      <dt><code>max_turns</code></dt>
-<dd><p>Legacy alias for the maximum number of model requests.
-Defaults to the value seeded from permissions.</p></dd>
 
       <dt><code>usage_limits</code></dt>
 <dd><p>Optional <a href="UsageLimits.html">UsageLimits</a> override for this run.</p></dd>
@@ -343,7 +326,6 @@ an <a href="AgentResult.html">AgentResult</a>.</p><div class="section">
 <h4 id="usage-2">Usage<a class="anchor" aria-label="anchor" href="#usage-2"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
 <span>  <span class="va">task</span>,</span>
-<span>  max_turns <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  include_partial_messages <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  output_format <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -353,10 +335,6 @@ an <a href="AgentResult.html">AgentResult</a>.</p><div class="section">
 <h4 id="arguments-2">Arguments<a class="anchor" aria-label="anchor" href="#arguments-2"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>task</code></dt>
 <dd><p>The task for the agent to perform</p></dd>
-
-      <dt><code>max_turns</code></dt>
-<dd><p>Legacy alias for the maximum number of model requests.
-Defaults to the value seeded from permissions.</p></dd>
 
       <dt><code>usage_limits</code></dt>
 <dd><p>Optional <a href="UsageLimits.html">UsageLimits</a> override for this run.</p></dd>
@@ -488,12 +466,12 @@ modify behavior (e.g., deny tool calls, log events).</p><div class="section">
 
 <p></p><hr><a id="method-Agent-session_id"></a><div class="section">
 <h3 id="agent-session-id-"><code>Agent$session_id()</code><a class="anchor" aria-label="anchor" href="#agent-session-id-"></a></h3>
-<p>Get the active Claude SDK compatibility session identifier.</p><div class="section">
+<p>Get this agent's session identifier.</p><div class="section">
 <h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">session_id</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-8">Returns<a class="anchor" aria-label="anchor" href="#returns-8"></a></h4>
-<p>Character session id, or NULL when compat mode is inactive</p>
+<p>Character session identifier</p>
 </div>
 
 </div>
@@ -512,7 +490,10 @@ modify behavior (e.g., deny tool calls, log events).</p><div class="section">
 
 <p></p><hr><a id="method-Agent-set_permission_mode"></a><div class="section">
 <h3 id="agent-set-permission-mode-"><code>Agent$set_permission_mode()</code><a class="anchor" aria-label="anchor" href="#agent-set-permission-mode-"></a></h3>
-<p>Change the active permission mode for subsequent tool calls.</p><div class="section">
+<p>Preserve or narrow the active permission mode for subsequent tool calls.
+Reapplying the current mode is a no-op. Widening or incomparable mode
+changes require a newly configured <code>Agent</code> so custom restrictions remain
+an immutable authority ceiling.</p><div class="section">
 <h4 id="usage-10">Usage<a class="anchor" aria-label="anchor" href="#usage-10"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">set_permission_mode</span><span class="op">(</span><span class="va">mode</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
@@ -529,32 +510,13 @@ modify behavior (e.g., deny tool calls, log events).</p><div class="section">
 
 </div>
 
-<p></p><hr><a id="method-Agent-configure_sdk_compat"></a><div class="section">
-<h3 id="agent-configure-sdk-compat-"><code>Agent$configure_sdk_compat()</code><a class="anchor" aria-label="anchor" href="#agent-configure-sdk-compat-"></a></h3>
-<p>Configure Claude SDK compatibility behavior for this agent.</p><div class="section">
-<h4 id="usage-11">Usage<a class="anchor" aria-label="anchor" href="#usage-11"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">configure_sdk_compat</span><span class="op">(</span>config <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-8">Arguments<a class="anchor" aria-label="anchor" href="#arguments-8"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>config</code></dt>
-<dd><p>Named list of compat settings</p></dd>
-
-
-</dl><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-11">Returns<a class="anchor" aria-label="anchor" href="#returns-11"></a></h4>
-<p>Invisible self for chaining</p>
-</div>
-
-</div>
-
 <p></p><hr><a id="method-Agent-cost"></a><div class="section">
 <h3 id="agent-cost-"><code>Agent$cost()</code><a class="anchor" aria-label="anchor" href="#agent-cost-"></a></h3>
 <p>Get cost information for the conversation.</p><div class="section">
-<h4 id="usage-12">Usage<a class="anchor" aria-label="anchor" href="#usage-12"></a></h4>
+<h4 id="usage-11">Usage<a class="anchor" aria-label="anchor" href="#usage-11"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">cost</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-12">Returns<a class="anchor" aria-label="anchor" href="#returns-12"></a></h4>
+<h4 id="returns-11">Returns<a class="anchor" aria-label="anchor" href="#returns-11"></a></h4>
 <p>A list with input, output, cached, and total token costs</p>
 </div>
 
@@ -565,10 +527,10 @@ modify behavior (e.g., deny tool calls, log events).</p><div class="section">
 <p>Get normalized usage for the complete in-memory conversation.</p>
 <p>Per-run usage is available on <a href="AgentResult.html">AgentResult</a> and in the final <code>usage</code>
 event returned by <code>$run()</code>.</p><div class="section">
-<h4 id="usage-13">Usage<a class="anchor" aria-label="anchor" href="#usage-13"></a></h4>
+<h4 id="usage-12">Usage<a class="anchor" aria-label="anchor" href="#usage-12"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">usage</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-13">Returns<a class="anchor" aria-label="anchor" href="#returns-13"></a></h4>
+<h4 id="returns-12">Returns<a class="anchor" aria-label="anchor" href="#returns-12"></a></h4>
 <p>An <a href="AgentUsage.html">AgentUsage</a> object</p>
 </div>
 
@@ -579,17 +541,17 @@ event returned by <code>$run()</code>.</p><div class="section">
 <p>Request cancellation of the active stream.</p>
 <p>Cancellation is cooperative and takes effect at the next provider or tool
 boundary supported by ellmer.</p><div class="section">
-<h4 id="usage-14">Usage<a class="anchor" aria-label="anchor" href="#usage-14"></a></h4>
+<h4 id="usage-13">Usage<a class="anchor" aria-label="anchor" href="#usage-13"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">interrupt</span><span class="op">(</span>reason <span class="op">=</span> <span class="st">"interrupted"</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-9">Arguments<a class="anchor" aria-label="anchor" href="#arguments-9"></a></h4>
+<h4 id="arguments-8">Arguments<a class="anchor" aria-label="anchor" href="#arguments-8"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>reason</code></dt>
 <dd><p>Stable reason stored on the terminal event</p></dd>
 
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-14">Returns<a class="anchor" aria-label="anchor" href="#returns-14"></a></h4>
+<h4 id="returns-13">Returns<a class="anchor" aria-label="anchor" href="#returns-13"></a></h4>
 <p>Invisible logical indicating whether a run was active</p>
 </div>
 
@@ -598,10 +560,10 @@ boundary supported by ellmer.</p><div class="section">
 <p></p><hr><a id="method-Agent-provider"></a><div class="section">
 <h3 id="agent-provider-"><code>Agent$provider()</code><a class="anchor" aria-label="anchor" href="#agent-provider-"></a></h3>
 <p>Get provider information.</p><div class="section">
-<h4 id="usage-15">Usage<a class="anchor" aria-label="anchor" href="#usage-15"></a></h4>
+<h4 id="usage-14">Usage<a class="anchor" aria-label="anchor" href="#usage-14"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">provider</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-15">Returns<a class="anchor" aria-label="anchor" href="#returns-15"></a></h4>
+<h4 id="returns-14">Returns<a class="anchor" aria-label="anchor" href="#returns-14"></a></h4>
 <p>A list with provider name and model</p>
 </div>
 
@@ -610,10 +572,10 @@ boundary supported by ellmer.</p><div class="section">
 <p></p><hr><a id="method-Agent-save_session"></a><div class="section">
 <h3 id="agent-save-session-"><code>Agent$save_session()</code><a class="anchor" aria-label="anchor" href="#agent-save-session-"></a></h3>
 <p>Save the current session to an RDS file.</p><div class="section">
-<h4 id="usage-16">Usage<a class="anchor" aria-label="anchor" href="#usage-16"></a></h4>
+<h4 id="usage-15">Usage<a class="anchor" aria-label="anchor" href="#usage-15"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">save_session</span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-10">Arguments<a class="anchor" aria-label="anchor" href="#arguments-10"></a></h4>
+<h4 id="arguments-9">Arguments<a class="anchor" aria-label="anchor" href="#arguments-9"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>path</code></dt>
 <dd><p>Path to save the session</p></dd>
 
@@ -623,14 +585,12 @@ boundary supported by ellmer.</p><div class="section">
 <h4 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h4>
 <p>The session file contains:</p><ul><li><p>Conversation turns</p></li>
 <li><p>System prompt</p></li>
-<li><p>Tool definitions (serialized)</p></li>
-<li><p>Permissions configuration</p></li>
-<li><p>Working directory</p></li>
-<li><p>Constructor defaults and the latest effective run context</p></li>
+<li><p>Effective run context</p></li>
+<li><p>File checkpoint state, when enabled</p></li>
 <li><p>Metadata (timestamp, version, provider info)</p></li>
 </ul><p></p>
 </div><p></p><div class="section">
-<h4 id="returns-16">Returns<a class="anchor" aria-label="anchor" href="#returns-16"></a></h4>
+<h4 id="returns-15">Returns<a class="anchor" aria-label="anchor" href="#returns-15"></a></h4>
 <p>Invisible path</p>
 </div>
 
@@ -639,29 +599,23 @@ boundary supported by ellmer.</p><div class="section">
 <p></p><hr><a id="method-Agent-load_session"></a><div class="section">
 <h3 id="agent-load-session-"><code>Agent$load_session()</code><a class="anchor" aria-label="anchor" href="#agent-load-session-"></a></h3>
 <p>Load a session from an RDS file.</p><div class="section">
-<h4 id="usage-17">Usage<a class="anchor" aria-label="anchor" href="#usage-17"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_session</span><span class="op">(</span><span class="va">path</span>, restore_tools <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<h4 id="usage-16">Usage<a class="anchor" aria-label="anchor" href="#usage-16"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_session</span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-11">Arguments<a class="anchor" aria-label="anchor" href="#arguments-11"></a></h4>
+<h4 id="arguments-10">Arguments<a class="anchor" aria-label="anchor" href="#arguments-10"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>path</code></dt>
 <dd><p>Path to the session file</p></dd>
-
-      <dt><code>restore_tools</code></dt>
-<dd><p>If TRUE, explicitly trust and restore serialized
-tool definitions. Defaults to FALSE; constructor-registered tools are
-otherwise preserved as control-plane policy.</p></dd>
 
 
 </dl><p></p></div>
 </div><p></p><div class="section">
 <h4 id="details-1">Details<a class="anchor" aria-label="anchor" href="#details-1"></a></h4>
-<p>Hooks are NOT restored from sessions as they contain function closures
-that may not serialize correctly. Constructor permissions and
-<code>working_dir</code> always remain authoritative. Saved run context is validated
-before conversation state changes, then merged with constructor context;
-protected identity conflicts fail the load.</p>
+<p>Tools, permissions, hooks, and the working directory are runtime policy
+and are never restored from a session file. Saved run context is
+validated before conversation state changes and merged with constructor
+context; protected identity conflicts fail the load.</p>
 </div><p></p><div class="section">
-<h4 id="returns-17">Returns<a class="anchor" aria-label="anchor" href="#returns-17"></a></h4>
+<h4 id="returns-16">Returns<a class="anchor" aria-label="anchor" href="#returns-16"></a></h4>
 <p>Invisible self</p>
 </div>
 
@@ -670,10 +624,10 @@ protected identity conflicts fail the load.</p>
 <p></p><hr><a id="method-Agent-checkpoint"></a><div class="section">
 <h3 id="agent-checkpoint-"><code>Agent$checkpoint()</code><a class="anchor" aria-label="anchor" href="#agent-checkpoint-"></a></h3>
 <p>Create a reversible file checkpoint.</p><div class="section">
-<h4 id="usage-18">Usage<a class="anchor" aria-label="anchor" href="#usage-18"></a></h4>
+<h4 id="usage-17">Usage<a class="anchor" aria-label="anchor" href="#usage-17"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">checkpoint</span><span class="op">(</span>name <span class="op">=</span> <span class="cn">NULL</span>, metadata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-12">Arguments<a class="anchor" aria-label="anchor" href="#arguments-12"></a></h4>
+<h4 id="arguments-11">Arguments<a class="anchor" aria-label="anchor" href="#arguments-11"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>name</code></dt>
 <dd><p>Optional checkpoint label.</p></dd>
 
@@ -683,7 +637,7 @@ protected identity conflicts fail the load.</p>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-18">Returns<a class="anchor" aria-label="anchor" href="#returns-18"></a></h4>
+<h4 id="returns-17">Returns<a class="anchor" aria-label="anchor" href="#returns-17"></a></h4>
 <p>The checkpoint ID.</p>
 </div>
 
@@ -692,10 +646,10 @@ protected identity conflicts fail the load.</p>
 <p></p><hr><a id="method-Agent-list_checkpoints"></a><div class="section">
 <h3 id="agent-list-checkpoints-"><code>Agent$list_checkpoints()</code><a class="anchor" aria-label="anchor" href="#agent-list-checkpoints-"></a></h3>
 <p>List reversible file checkpoints.</p><div class="section">
-<h4 id="usage-19">Usage<a class="anchor" aria-label="anchor" href="#usage-19"></a></h4>
+<h4 id="usage-18">Usage<a class="anchor" aria-label="anchor" href="#usage-18"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">list_checkpoints</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-19">Returns<a class="anchor" aria-label="anchor" href="#returns-19"></a></h4>
+<h4 id="returns-18">Returns<a class="anchor" aria-label="anchor" href="#returns-18"></a></h4>
 <p>A data frame ordered from oldest to newest.</p>
 </div>
 
@@ -704,10 +658,10 @@ protected identity conflicts fail the load.</p>
 <p></p><hr><a id="method-Agent-rewind_files"></a><div class="section">
 <h3 id="agent-rewind-files-"><code>Agent$rewind_files()</code><a class="anchor" aria-label="anchor" href="#agent-rewind-files-"></a></h3>
 <p>Rewind files to a checkpoint without changing conversation history.</p><div class="section">
-<h4 id="usage-20">Usage<a class="anchor" aria-label="anchor" href="#usage-20"></a></h4>
+<h4 id="usage-19">Usage<a class="anchor" aria-label="anchor" href="#usage-19"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">rewind_files</span><span class="op">(</span><span class="va">checkpoint_id</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-13">Arguments<a class="anchor" aria-label="anchor" href="#arguments-13"></a></h4>
+<h4 id="arguments-12">Arguments<a class="anchor" aria-label="anchor" href="#arguments-12"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>checkpoint_id</code></dt>
 <dd><p>ID returned by <code>$checkpoint()</code> or present in a
 <code>file_checkpoint</code> run event.</p></dd>
@@ -715,7 +669,7 @@ protected identity conflicts fail the load.</p>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-20">Returns<a class="anchor" aria-label="anchor" href="#returns-20"></a></h4>
+<h4 id="returns-19">Returns<a class="anchor" aria-label="anchor" href="#returns-19"></a></h4>
 <p>A list describing the restored checkpoint and change count.</p>
 </div>
 
@@ -728,10 +682,10 @@ protected identity conflicts fail the load.</p>
 conversation turns, then replaces them with the summary appended to
 the system prompt. This preserves important context while reducing
 token usage.</p><div class="section">
-<h4 id="usage-21">Usage<a class="anchor" aria-label="anchor" href="#usage-21"></a></h4>
+<h4 id="usage-20">Usage<a class="anchor" aria-label="anchor" href="#usage-20"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">compact</span><span class="op">(</span>keep_last <span class="op">=</span> <span class="fl">4</span>, summary <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-14">Arguments<a class="anchor" aria-label="anchor" href="#arguments-14"></a></h4>
+<h4 id="arguments-13">Arguments<a class="anchor" aria-label="anchor" href="#arguments-13"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>keep_last</code></dt>
 <dd><p>Number of recent turns to keep uncompacted (default: 4)</p></dd>
 
@@ -751,7 +705,7 @@ findings, files discussed, and task progress.</p></dd>
 </ol><p>If LLM summarization fails (e.g., no API key), falls back to a simple
 text-based summary with truncated turn contents.</p>
 </div><p></p><div class="section">
-<h4 id="returns-21">Returns<a class="anchor" aria-label="anchor" href="#returns-21"></a></h4>
+<h4 id="returns-20">Returns<a class="anchor" aria-label="anchor" href="#returns-20"></a></h4>
 <p>Invisible self</p>
 </div>
 
@@ -760,7 +714,7 @@ text-based summary with truncated turn contents.</p>
 <p></p><hr><a id="method-Agent-print"></a><div class="section">
 <h3 id="agent-print-"><code>Agent$print()</code><a class="anchor" aria-label="anchor" href="#agent-print-"></a></h3>
 <p>Print the agent configuration.</p><div class="section">
-<h4 id="usage-22">Usage<a class="anchor" aria-label="anchor" href="#usage-22"></a></h4>
+<h4 id="usage-21">Usage<a class="anchor" aria-label="anchor" href="#usage-21"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -769,10 +723,10 @@ text-based summary with truncated turn contents.</p>
 <p></p><hr><a id="method-Agent-load_skill"></a><div class="section">
 <h3 id="agent-load-skill-"><code>Agent$load_skill()</code><a class="anchor" aria-label="anchor" href="#agent-load-skill-"></a></h3>
 <p>Load a <a href="Skill.html">Skill</a> into the agent.</p><div class="section">
-<h4 id="usage-23">Usage<a class="anchor" aria-label="anchor" href="#usage-23"></a></h4>
+<h4 id="usage-22">Usage<a class="anchor" aria-label="anchor" href="#usage-22"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_skill</span><span class="op">(</span><span class="va">skill</span>, allow_conflicts <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-15">Arguments<a class="anchor" aria-label="anchor" href="#arguments-15"></a></h4>
+<h4 id="arguments-14">Arguments<a class="anchor" aria-label="anchor" href="#arguments-14"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>skill</code></dt>
 <dd><p>A <a href="Skill.html">Skill</a> object or path to a skill directory.</p></dd>
 
@@ -783,7 +737,7 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-22">Returns<a class="anchor" aria-label="anchor" href="#returns-22"></a></h4>
+<h4 id="returns-21">Returns<a class="anchor" aria-label="anchor" href="#returns-21"></a></h4>
 <p>Invisible self for chaining.</p>
 </div>
 
@@ -792,35 +746,11 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 <p></p><hr><a id="method-Agent-skills"></a><div class="section">
 <h3 id="agent-skills-"><code>Agent$skills()</code><a class="anchor" aria-label="anchor" href="#agent-skills-"></a></h3>
 <p>Get loaded skills.</p><div class="section">
-<h4 id="usage-24">Usage<a class="anchor" aria-label="anchor" href="#usage-24"></a></h4>
+<h4 id="usage-23">Usage<a class="anchor" aria-label="anchor" href="#usage-23"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">skills</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-23">Returns<a class="anchor" aria-label="anchor" href="#returns-23"></a></h4>
+<h4 id="returns-22">Returns<a class="anchor" aria-label="anchor" href="#returns-22"></a></h4>
 <p>Named list of loaded <a href="Skill.html">Skill</a> objects.</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-Agent-slash_commands"></a><div class="section">
-<h3 id="agent-slash-commands-"><code>Agent$slash_commands()</code><a class="anchor" aria-label="anchor" href="#agent-slash-commands-"></a></h3>
-<p>Get registered slash commands.</p><div class="section">
-<h4 id="usage-25">Usage<a class="anchor" aria-label="anchor" href="#usage-25"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">slash_commands</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-24">Returns<a class="anchor" aria-label="anchor" href="#returns-24"></a></h4>
-<p>Named list of slash command definitions</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-Agent-settings"></a><div class="section">
-<h3 id="agent-settings-"><code>Agent$settings()</code><a class="anchor" aria-label="anchor" href="#agent-settings-"></a></h3>
-<p>Get applied Claude-style settings.</p><div class="section">
-<h4 id="usage-26">Usage<a class="anchor" aria-label="anchor" href="#usage-26"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">settings</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-25">Returns<a class="anchor" aria-label="anchor" href="#returns-25"></a></h4>
-<p>Settings list returned by <code><a href="claude_settings_load.html">claude_settings_load()</a></code></p>
 </div>
 
 </div>
@@ -830,10 +760,10 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 <p>Load tools from MCP (Model Context Protocol) servers.</p>
 <p>Requires the mcptools package. Issues a warning if not installed or if
 tool fetching fails.</p><div class="section">
-<h4 id="usage-27">Usage<a class="anchor" aria-label="anchor" href="#usage-27"></a></h4>
+<h4 id="usage-24">Usage<a class="anchor" aria-label="anchor" href="#usage-24"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_mcp</span><span class="op">(</span>config <span class="op">=</span> <span class="cn">NULL</span>, servers <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-16">Arguments<a class="anchor" aria-label="anchor" href="#arguments-16"></a></h4>
+<h4 id="arguments-15">Arguments<a class="anchor" aria-label="anchor" href="#arguments-15"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>config</code></dt>
 <dd><p>Path to MCP configuration file. If NULL (default), uses
 the mcptools default location (<code>~/.config/mcptools/config.json</code>).</p></dd>
@@ -845,7 +775,7 @@ If NULL, loads from all configured servers.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-26">Returns<a class="anchor" aria-label="anchor" href="#returns-26"></a></h4>
+<h4 id="returns-23">Returns<a class="anchor" aria-label="anchor" href="#returns-23"></a></h4>
 <p>Invisible self for chaining</p>
 </div>
 
@@ -854,10 +784,10 @@ If NULL, loads from all configured servers.</p></dd>
 <p></p><hr><a id="method-Agent-mcp_tools"></a><div class="section">
 <h3 id="agent-mcp-tools-"><code>Agent$mcp_tools()</code><a class="anchor" aria-label="anchor" href="#agent-mcp-tools-"></a></h3>
 <p>Get names of loaded MCP tools.</p><div class="section">
-<h4 id="usage-28">Usage<a class="anchor" aria-label="anchor" href="#usage-28"></a></h4>
+<h4 id="usage-25">Usage<a class="anchor" aria-label="anchor" href="#usage-25"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">mcp_tools</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-27">Returns<a class="anchor" aria-label="anchor" href="#returns-27"></a></h4>
+<h4 id="returns-24">Returns<a class="anchor" aria-label="anchor" href="#returns-24"></a></h4>
 <p>Character vector of MCP tool names</p>
 </div>
 
@@ -866,10 +796,10 @@ If NULL, loads from all configured servers.</p></dd>
 <p></p><hr><a id="method-Agent-mcp_status"></a><div class="section">
 <h3 id="agent-mcp-status-"><code>Agent$mcp_status()</code><a class="anchor" aria-label="anchor" href="#agent-mcp-status-"></a></h3>
 <p>Get MCP runtime status records.</p><div class="section">
-<h4 id="usage-29">Usage<a class="anchor" aria-label="anchor" href="#usage-29"></a></h4>
+<h4 id="usage-26">Usage<a class="anchor" aria-label="anchor" href="#usage-26"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">mcp_status</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-28">Returns<a class="anchor" aria-label="anchor" href="#returns-28"></a></h4>
+<h4 id="returns-25">Returns<a class="anchor" aria-label="anchor" href="#returns-25"></a></h4>
 <p>Data frame describing MCP load attempts and registered tools</p>
 </div>
 
@@ -885,18 +815,18 @@ deputy's own generator. Deputy's permissions, hooks, and observable
 <a href="UsageLimits.html">UsageLimits</a> are still enforced via callbacks and terminal accounting.
 File tools must use absolute paths within <code>working_dir</code>; rejected calls
 still count toward tool usage.</p><div class="section">
-<h4 id="usage-30">Usage<a class="anchor" aria-label="anchor" href="#usage-30"></a></h4>
+<h4 id="usage-27">Usage<a class="anchor" aria-label="anchor" href="#usage-27"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run_shiny</span><span class="op">(</span><span class="va">prompt</span>, max_tool_calls <span class="op">=</span> <span class="cn">NULL</span>, run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-17">Arguments<a class="anchor" aria-label="anchor" href="#arguments-17"></a></h4>
+<h4 id="arguments-16">Arguments<a class="anchor" aria-label="anchor" href="#arguments-16"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>prompt</code></dt>
 <dd><p>The user message to send</p></dd>
 
       <dt><code>max_tool_calls</code></dt>
 <dd><p>Maximum number of tool calls before stopping.
 Overrides <code>usage_limits$max_tool_calls</code>; otherwise falls back to that
-value, <code>permissions$max_turns</code>, or 25. This counts individual tool call
-requests, not LLM turns (one turn can have multiple parallel calls).</p></dd>
+value or 25. This counts individual tool call requests, not LLM turns
+(one turn can have multiple parallel calls).</p></dd>
 
       <dt><code>run_context</code></dt>
 <dd><p>Canonical JSON-compatible context to add to or narrow
@@ -905,7 +835,7 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-29">Returns<a class="anchor" aria-label="anchor" href="#returns-29"></a></h4>
+<h4 id="returns-26">Returns<a class="anchor" aria-label="anchor" href="#returns-26"></a></h4>
 <p>An async content stream suitable for
 <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">shinychat::chat_append()</a></code>.</p>
 </div>
@@ -915,10 +845,10 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 <p></p><hr><a id="method-Agent-clone"></a><div class="section">
 <h3 id="agent-clone-"><code>Agent$clone()</code><a class="anchor" aria-label="anchor" href="#agent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-31">Usage<a class="anchor" aria-label="anchor" href="#usage-31"></a></h4>
+<h4 id="usage-28">Usage<a class="anchor" aria-label="anchor" href="#usage-28"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-18">Arguments<a class="anchor" aria-label="anchor" href="#arguments-18"></a></h4>
+<h4 id="arguments-17">Arguments<a class="anchor" aria-label="anchor" href="#arguments-17"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

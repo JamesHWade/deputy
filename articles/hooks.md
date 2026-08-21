@@ -123,7 +123,10 @@ hook_no_secrets <- HookMatcher$new(
   event = "PreToolUse",
   pattern = "^write_file$",
   callback = function(tool_name, tool_input, context) {
-    path <- tool_input$path %||% ""
+    path <- tool_input$path
+    if (is.null(path)) {
+      path <- ""
+    }
     if (grepl("\\.env$|secrets", path)) {
       HookResultPreToolUse(
         permission = "deny",
@@ -186,7 +189,7 @@ HookMatcher$new(
   event = "SessionStart",
   callback = function(context) {
     message("Session started at ", Sys.time())
-    HookResultSessionStart()
+    NULL
   }
 )
 ```
@@ -194,7 +197,7 @@ HookMatcher$new(
 ## Notification Hooks
 
 `Notification` hooks are useful for informational events that should not
-alter control flow, such as permission-denied guidance, session restore
+alter control flow, such as permission-denied guidance, session-load
 notices, or compaction fallbacks:
 
 ``` r

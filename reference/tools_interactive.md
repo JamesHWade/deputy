@@ -1,8 +1,8 @@
 # Tools for interactive workflows
 
 Returns a list of tools that enable human-in-the-loop interactions.
-Currently includes `tool_ask_user` (AskUserQuestion) for asking
-clarifying questions.
+Currently includes `tool_ask_user` (`ask_user`) for asking clarifying
+questions.
 
 ## Usage
 

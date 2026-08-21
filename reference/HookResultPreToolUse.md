@@ -9,7 +9,6 @@ HookResultPreToolUse(
   permission = c("allow", "deny"),
   reason = NULL,
   continue = TRUE,
-  updated_input = NULL,
   additional_context = NULL,
   stop_reason = NULL
 )
@@ -28,14 +27,6 @@ HookResultPreToolUse(
 - continue:
 
   If FALSE, stop the agent after this hook
-
-- updated_input:
-
-  Reserved for SDK-shape parity. **Not currently supported**: deputy
-  emits a warning and proceeds with the original tool input. ellmer's
-  tool-request callback contract does not yet expose a way to mutate the
-  in-flight request, so use `permission = "deny"` to block a tool call
-  instead of rewriting its arguments.
 
 - additional_context:
 
@@ -63,9 +54,6 @@ HookResultPreToolUse(permission = "allow")
 #> $continue
 #> [1] TRUE
 #> 
-#> $updated_input
-#> NULL
-#> 
 #> $additional_context
 #> NULL
 #> 
@@ -88,9 +76,6 @@ HookResultPreToolUse(
 #> 
 #> $continue
 #> [1] TRUE
-#> 
-#> $updated_input
-#> NULL
 #> 
 #> $additional_context
 #> NULL

@@ -7,16 +7,22 @@ tools for common tasks and makes it easy to create your own.
 
 deputy includes the following tools out of the box:
 
-| Tool              | Description               | Annotations             |
-|-------------------|---------------------------|-------------------------|
-| `tool_read_file`  | Read a file’s contents    | read-only               |
-| `tool_write_file` | Write or append to a file | destructive             |
-| `tool_list_files` | List files in a directory | read-only               |
-| `tool_run_r_code` | Execute R code            | open-world              |
-| `tool_run_bash`   | Execute a bash command    | destructive, open-world |
-| `tool_read_csv`   | Read and summarise a CSV  | read-only               |
-| `tool_web_fetch`  | Fetch a web page          | read-only, open-world   |
-| `tool_web_search` | Search the web            | read-only, open-world   |
+| Tool | Description | Annotations |
+|----|----|----|
+| `tool_read_file` | Read a file’s contents | read-only |
+| `tool_read_markdown` | Convert a supported document to markdown | read-only |
+| `tool_write_file` | Write or append to a file | destructive |
+| `tool_edit_file` | Apply one targeted file edit | destructive |
+| `tool_multi_edit` | Apply multiple file edits | destructive |
+| `tool_list_files` | List files in a directory | read-only |
+| `tool_glob_files` | Find files by glob pattern | read-only |
+| `tool_grep_files` | Search file contents | read-only |
+| `tool_run_r_code` | Execute R code | open-world |
+| `tool_run_bash` | Execute a bash command | destructive, open-world |
+| `tool_read_csv` | Read and summarise a CSV | read-only |
+| `tool_web_fetch` | Fetch a web page | read-only, open-world |
+| `tool_web_search` | Search the web | read-only, open-world |
+| `tool_ask_user` | Ask structured questions | read-only |
 
 Each tool carries **annotations** that the permission system uses to
 decide whether the agent is allowed to use it. See
@@ -31,10 +37,10 @@ Bundles group related tools together:
 
 library(deputy)
 
-tools_file()  # read_file, write_file, list_files
+tools_file()  # read_file, read_markdown, write_file, list_files
 tools_code()  # run_r_code, run_bash
-tools_data()  # read_csv, read_file
-tools_web()   # web_fetch, web_search (provider-aware)
+tools_data()  # read_csv, read_file, read_markdown
+tools_web()   # universal web_fetch and web_search
 tools_all()   # everything
 ```
 
@@ -52,17 +58,11 @@ Presets are named collections with opinionated defaults:
 
 ``` r
 
-list_presets()
-#> # A tibble: 5 x 3
-#>   name     n_tools description
-#>   <chr>      <int> <chr>
-#> 1 minimal        2 read_file, list_files
-#> 2 standard       4 read_file, write_file, list_files, run_r_code
-#> 3 dev            5 standard + run_bash
-#> 4 data           4 read_file, list_files, read_csv, run_r_code
-#> 5 full           8 all built-in tools
-
+tools_preset("minimal")
+tools_preset("standard")
 tools_preset("dev")
+tools_preset("data")
+tools_preset("full")
 ```
 
 ## Creating Custom Tools
@@ -126,18 +126,17 @@ cat(result$response)
 
 ## Web Tools
 
-deputy provides web tools that are **provider-aware**. When you call
-[`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md),
-deputy checks whether the provider has built-in web search (e.g.,
-Claude’s tool use, Google’s grounding) and uses the native version when
-available:
+deputy provides web tools that are **provider-aware**. Pass the chat to
+[`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md)
+to select provider-native web tools when available. Calling it without a
+chat returns Deputy’s universal web tools:
 
 ``` r
 
-# Automatically uses provider's native web tools when available
+chat <- ellmer::chat_anthropic()
 agent <- Agent$new(
-  chat = ellmer::chat_anthropic(),
-  tools = tools_web()
+  chat = chat,
+  tools = tools_web(chat)
 )
 ```
 
@@ -153,21 +152,18 @@ Protocol](https://modelcontextprotocol.io/) servers via the
 
 ``` r
 
-# Check if MCP is available
-mcp_available()
-
-# List configured servers
-mcp_servers()
-
-# Load MCP tools into an agent
+# Load tools from selected configured servers
 agent <- Agent$new(
   chat = ellmer::chat_anthropic(),
-  tools = tools_mcp()
+  tools = c(tools_file(), tools_mcp(servers = "github"))
 )
 ```
 
-MCP servers are configured in `~/.config/mcptools/config.json`. See the
-mcptools documentation for setup instructions.
+[`tools_mcp()`](https://jameshwade.github.io/deputy/reference/tools_mcp.md)
+returns an empty list with a warning when `mcptools` is not installed or
+no tools are available. MCP servers are configured in
+`~/.config/mcptools/config.json`; see the mcptools documentation for
+setup.
 
 ## Human-in-the-Loop
 
@@ -185,11 +181,11 @@ agent <- Agent$new(
 # In interactive sessions, a readline prompt appears.
 # For non-interactive use, set a custom callback:
 set_ask_user_callback(function(questions) {
-  # Return answers matching the question structure
-  list(
-    questions = questions,
-    answers = list(list(answer = "Yes, proceed"))
-  )
+  answers <- list()
+  for (question in questions) {
+    answers[[question$question]] <- question$options[[1]]$label
+  }
+  answers
 })
 ```
 

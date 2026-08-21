@@ -46,8 +46,6 @@
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -93,10 +91,10 @@ policies.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Read-only: only read_file and list_files are allowed</span></span>
+<span><span class="co"># Read-only: known Deputy read tools are allowed</span></span>
 <span><span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Plan: only annotated read-only tools plus AskUserQuestion</span></span>
+<span><span class="co"># Plan: annotated read-only tools plus ask_user</span></span>
 <span><span class="fu"><a href="../reference/permissions_plan.html">permissions_plan</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Standard (default): accessible reads, workspace-scoped writes, R code,</span></span>
@@ -126,9 +124,7 @@ directly:</p>
 <span>  bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  r_code <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  web <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  install_packages <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  max_turns <span class="op">=</span> <span class="fl">10</span>,</span>
-<span>  max_cost_usd <span class="op">=</span> <span class="fl">0.50</span></span>
+<span>  install_packages <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Fields:</p>
 <table class="table">
@@ -174,14 +170,24 @@ directly:</p>
 <td>Allow package installation</td>
 </tr>
 <tr class="odd">
-<td><code>max_turns</code></td>
-<td>integer</td>
-<td>Maximum agentic turns (default 25)</td>
+<td><code>can_use_tool</code></td>
+<td>function</td>
+<td>Apply custom permission decisions</td>
 </tr>
 <tr class="even">
-<td><code>max_cost_usd</code></td>
-<td>numeric / NULL</td>
-<td>Maximum spend in USD</td>
+<td><code>tool_allowlist</code></td>
+<td>character</td>
+<td>Deny tools not explicitly listed</td>
+</tr>
+<tr class="odd">
+<td><code>tool_denylist</code></td>
+<td>character</td>
+<td>Always deny explicitly listed tools</td>
+</tr>
+<tr class="even">
+<td><code>permission_prompt_tool_name</code></td>
+<td>character</td>
+<td>Dedicated approval tool used in gating messages</td>
 </tr>
 </tbody>
 </table>
@@ -201,8 +207,8 @@ directly:</p>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td><code>"default"</code></td>
-<td>Check each tool against the policy fields above</td>
+<td><code>"standard"</code></td>
+<td>Check each tool against the configured capabilities</td>
 </tr>
 <tr class="even">
 <td><code>"readonly"</code></td>
@@ -215,19 +221,15 @@ configured capabilities</td>
 the human approval prompt tool</td>
 </tr>
 <tr class="even">
-<td><code>"acceptEdits"</code></td>
-<td>Auto-approve file writes without prompting</td>
-</tr>
-<tr class="odd">
-<td><code>"bypassPermissions"</code></td>
-<td>Allow everything (dangerous!)</td>
+<td><code>"full"</code></td>
+<td>Allow every tool (dangerous!)</td>
 </tr>
 </tbody>
 </table>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"readonly"</span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="../reference/permissions_plan.html">permissions_plan()</a></code> is a convenience wrapper for
-Claude-style planning flows:</p>
+<p><code><a href="../reference/permissions_plan.html">permissions_plan()</a></code> creates a planning-oriented
+policy:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -236,11 +238,58 @@ Claude-style planning flows:</p>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
+<h2 id="changing-an-agents-mode">Changing an Agent’s Mode<a class="anchor" aria-label="anchor" href="#changing-an-agents-mode"></a>
+</h2>
+<p>An agent’s configured permissions are an authority ceiling. Calling
+<code>set_permission_mode()</code> may preserve or narrow that
+authority, but it cannot widen it or replace it with an incomparable
+policy:</p>
+<table class="table">
+<thead><tr class="header">
+<th>Current mode</th>
+<th>Allowed target modes</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>"readonly"</code></td>
+<td><code>"readonly"</code></td>
+</tr>
+<tr class="even">
+<td><code>"standard"</code></td>
+<td>
+<code>"standard"</code>, <code>"readonly"</code>
+</td>
+</tr>
+<tr class="odd">
+<td><code>"plan"</code></td>
+<td>
+<code>"plan"</code>, <code>"readonly"</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>"full"</code></td>
+<td>
+<code>"full"</code>, <code>"standard"</code>, <code>"plan"</code>,
+<code>"readonly"</code>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Reapplying the current mode is an exact no-op. For an allowed
+narrowing, Deputy intersects the target mode with the existing
+capabilities. Custom restrictions, tool gates, callbacks, and
+directory-scoped write roots therefore remain authoritative.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">set_permission_mode</span><span class="op">(</span><span class="st">"readonly"</span><span class="op">)</span></span></code></pre></div>
+<p>Create a newly configured <code>Agent</code> when broader or
+incomparable authority is required.</p>
+</div>
+<div class="section level2">
 <h2 id="tool-annotations">Tool Annotations<a class="anchor" aria-label="anchor" href="#tool-annotations"></a>
 </h2>
 <p>Tools carry annotations that describe their behaviour. The permission
 system uses these annotations to make decisions:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># A read-only tool</span></span>
 <span><span class="va">tool_safe</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
 <span>  fun <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span>,</span>
@@ -257,14 +306,14 @@ authority. In <code>"readonly"</code> mode, Deputy recognizes its
 built-in read tools and explicit allowlist entries, while still denying
 known writes, destructive tools, and open-world tools when web access is
 disabled. Unknown tools do not become authorized merely by declaring
-<code>read_only_hint = TRUE</code>. In <code>"default"</code> mode,
+<code>read_only_hint = TRUE</code>. In <code>"standard"</code> mode,
 annotations participate in the configured capability checks.</p>
 </div>
 <div class="section level2">
 <h2 id="custom-permission-callbacks">Custom Permission Callbacks<a class="anchor" aria-label="anchor" href="#custom-permission-callbacks"></a>
 </h2>
 <p>For complex logic, provide a <code>can_use_tool</code> callback:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  can_use_tool <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="co"># Block writes to sensitive files</span></span>
@@ -296,7 +345,7 @@ annotations participate in the configured capability checks.</p>
 <h2 id="example-read-only-agent">Example: Read-Only Agent<a class="anchor" aria-label="anchor" href="#example-read-only-agent"></a>
 </h2>
 <p>A read-only agent can explore files but cannot change anything:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
@@ -310,17 +359,26 @@ annotations participate in the configured capability checks.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="cost-and-turn-limits">Cost and Turn Limits<a class="anchor" aria-label="anchor" href="#cost-and-turn-limits"></a>
+<h2 id="run-limits">Run Limits<a class="anchor" aria-label="anchor" href="#run-limits"></a>
 </h2>
-<p>Permissions also enforce resource limits:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  max_turns <span class="op">=</span> <span class="fl">10</span>,      <span class="co"># Stop after 10 agentic turns</span></span>
-<span>  max_cost_usd <span class="op">=</span> <span class="fl">1.00</span>  <span class="co"># Stop if cost exceeds $1.00</span></span>
+<p>Permissions decide whether a tool may run. Configure resource limits
+separately with <code><a href="../reference/UsageLimits.html">UsageLimits()</a></code> on the agent or an individual
+run:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_standard.html">permissions_standard</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span></span>
+<span>    max_requests <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>    max_tool_calls <span class="op">=</span> <span class="fl">20</span>,</span>
+<span>    max_cost_usd <span class="op">=</span> <span class="fl">1</span></span>
+<span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>When a limit is reached, the agent stops and the
-<code>AgentResult$stop_reason</code> indicates what happened
-(<code>"max_turns"</code> or <code>"cost_limit"</code>).</p>
+<code>AgentResult$stop_reason</code> identifies the limit, such as
+<code>"request_limit"</code>, <code>"tool_call_limit"</code>, or
+<code>"cost_limit"</code>.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

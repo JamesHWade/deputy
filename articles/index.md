@@ -19,10 +19,6 @@
   Orchestration](https://jameshwade.github.io/deputy/articles/multi-agent.md):
 - [Structured
   Output](https://jameshwade.github.io/deputy/articles/structured-output.md):
-- [Agent
-  Configuration](https://jameshwade.github.io/deputy/articles/agent-configuration.md):
-- [Agent SDK
-  Parity](https://jameshwade.github.io/deputy/articles/claude-sdk-parity.md):
 
 ### Examples
 

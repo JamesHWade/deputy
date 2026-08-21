@@ -8,35 +8,28 @@ and local models via Ollama.
 
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, and human-in-the-loop capabilities. deputy also
-ships an opt-in Agent SDK-compatible facade for teams that want
-Anthropic-style entrypoints and session semantics on top of the same
-runtime.
+permissions, hooks, human-in-the-loop capabilities, and multi-agent
+delegation.
 
 ## Main Functions
 
 - [Agent](https://jameshwade.github.io/deputy/reference/Agent.md) - The
   main class for creating agents
 
-- [ClaudeSDKClient](https://jameshwade.github.io/deputy/reference/ClaudeSDKClient.md) -
-  Agent SDK-compatible client facade (`AgentSDKClient` is an alias)
+- [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md) -
+  Coordinate specialized delegated agents
 
-- [`claude_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md) -
-  One-shot compatibility query helper
-  ([`agent_sdk_query()`](https://jameshwade.github.io/deputy/reference/claude_sdk_query.md)
-  is an alias)
+- [`tools_preset()`](https://jameshwade.github.io/deputy/reference/tools_preset.md) -
+  Curated built-in tool collections
 
-- [`tools_file()`](https://jameshwade.github.io/deputy/reference/tools_file.md) -
-  File operation tools
-
-- [`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md) -
-  Code execution tools
+- [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md) -
+  Run-scoped request, tool, token, and cost limits
 
 - [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md) -
   Standard permission policy
 
 - [`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md) -
-  Claude-style planning permission policy
+  Planning permission policy
 
 - [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md) -
   Read-only permission policy
@@ -48,7 +41,7 @@ runtime.
     # Create an agent with file tools
     agent <- Agent$new(
       chat = ellmer::chat("openai/gpt-4o"),
-      tools = tools_file()
+      tools = tools_preset("standard")
     )
 
     # Run a task with streaming output

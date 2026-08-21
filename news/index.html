@@ -26,8 +26,6 @@
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -52,19 +50,22 @@
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="development version" id="deputy-development-version">deputy (development version)<a class="anchor" aria-label="anchor" href="#deputy-development-version"></a></h2>
 <ul><li><p>The <code>deputy</code> command now ships as a tested Rapp 0.4 package executable for one-off <code>rx</code> use and persistent <code>ir tool install</code> launchers. Its task and interactive modes now consume streaming generators correctly, report tool failures, and restore persisted sessions from an installed package.</p></li>
-<li><p><code>Agent$new()</code> and per-run methods now accept immutable, canonical JSON-compatible <code>run_context</code>. Results, hooks, session snapshots, and delegated agents retain that context, while paired tool events and delegated results expose Agent, run, parent, tool-call, and delegation identifiers. Generated correlation identifiers no longer advance R’s global RNG stream.</p></li>
+<li><p><code>Agent$new()</code> and per-run methods now accept immutable, canonical JSON-compatible <code>run_context</code>. Results, hooks, saved sessions, and delegated agents retain that context, while paired tool events and delegated results expose Agent, run, parent, tool-call, and delegation identifiers. Generated correlation identifiers no longer advance R’s global RNG stream.</p></li>
+<li><p>Deputy now has a deliberate 51-symbol public API centered on native agents, tools, permissions, hooks, skills, delegation, and run usage. Sessions use a stable <code>session_id</code> for correlation and explicit <code>Agent$save_session()</code> and <code>Agent$load_session()</code> calls for persistence.</p></li>
+<li><p>Removed the pre-release Agent SDK/Claude facades, Claude settings loader, automatic session stores, vendor tool and permission aliases, deprecated run arguments, todo tools, and redundant convenience exports. Saved sessions and file-checkpoint journals now use strict native schemas; unsupported earlier payloads are rejected rather than migrated.</p></li>
 <li><p><code>Agent$provider()</code> no longer errors with “Can’t get S7 properties with <code>$</code>” against current ellmer. ellmer moved <code>model</code> off <code>Provider</code> onto a new <code>Model</code> class, so <code>provider@model</code> fails for every provider and the <code>$</code> fallback threw from inside the error handler. The model is now read with <code>Chat$get_model()</code>.</p></li>
+<li><p><code>Agent$set_permission_mode()</code> now preserves constructor permissions as an immutable authority ceiling. Reapplying the current mode is a no-op; other changes may only narrow authority. Delegated agents use the same rule and retain lead capability, tool-gate, callback, and write-root restrictions.</p></li>
 <li><p><code>compact()</code> now summarizes on a clone of the agent’s own chat instead of constructing a new provider. Previously any provider other than OpenAI, Anthropic, or Google fell through to <code>ellmer::chat_openai("gpt-4o-mini")</code>, sending conversation history to OpenAI when <code>OPENAI_API_KEY</code> happened to be set. The summary clone preserves configured provider behavior while removing tools and callbacks and suppressing console echo.</p></li>
 </ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.0.0.9000" id="deputy-0009000">deputy 0.0.0.9000<a class="anchor" aria-label="anchor" href="#deputy-0009000"></a></h2>
 <ul><li>Added semantic content streaming with <code>tool_start</code>, <code>tool_end</code>, <code>usage</code>, and <code>file_checkpoint</code> events, stable run IDs, cooperative <code>Agent$interrupt()</code>, and run usage on <code>AgentResult</code>.</li>
-<li>Added <code><a href="../reference/UsageLimits.html">UsageLimits()</a></code> and <code><a href="../reference/AgentUsage.html">AgentUsage()</a></code> for per-run request, tool-call, input/output/total-token, and estimated-cost accounting and enforcement, including remaining-budget inheritance and aggregation for synchronous delegated agents.</li>
-<li>Added persisted, bounded byte-exact file checkpoints and rewind through <code>Agent</code> and <code>AgentSDKClient</code> for native and SDK-compatible write/edit tools; lead and delegated agents share one workspace journal. Serialized state is size-bounded and restores are root-validated and transactional.</li>
-<li>Hardened permission checks so native and SDK tool aliases share policy IDs, all mutating file tools enforce configured roots, and readonly mode fails closed for unknown, write/edit/multi-edit/todo, destructive, and disallowed open-world tools. Constructor permissions, workspace roots, and tools remain authoritative when sessions resume unless serialized tools are explicitly trusted.</li>
+<li>Added <code><a href="../reference/UsageLimits.html">UsageLimits()</a></code> and <code><a href="../reference/AgentUsage.html">AgentUsage()</a></code> for per-run request, tool-call, input/output/total-token, and estimated-cost accounting and enforcement, including remaining-limit inheritance and aggregation for synchronous delegated agents.</li>
+<li>Added persisted, bounded byte-exact file checkpoints and rewind through <code>Agent</code> for Deputy write and edit tools; lead and delegated agents share one workspace journal. Serialized state is size-bounded and loads are root-validated and transactional.</li>
+<li>Hardened permission checks so all mutating file tools enforce configured roots and readonly mode fails closed for unknown, mutating, destructive, and disallowed open-world tools. Constructor permissions, workspace roots, and tools remain authoritative when a saved conversation is loaded.</li>
 <li>Post-tool hook output replacement and suppression now apply to emitted tool lifecycle events; interrupting permission denials stop active streams.</li>
-<li>Added lazy, cancellable <code>run_shiny()</code> lifecycle management with the Agent’s run limits, file-root confinement, automatic checkpoints, and incomplete-tool recovery; active runs now reject conflicting session, rewind, and compaction mutations.</li>
-<li>Added external and in-memory session-store adapters, MCP status reporting, richer sub-agent run metadata, and an evidence-backed Agent SDK parity inventory with remaining gaps documented explicitly.</li>
+<li>Added lazy, cancellable <code>run_shiny()</code> lifecycle management with the Agent’s run limits, file-root confinement, automatic checkpoints, and incomplete-tool recovery; active runs now reject conflicting load, rewind, and compaction mutations.</li>
+<li>Added MCP status reporting and richer sub-agent run metadata.</li>
 <li>Initial development version</li>
 <li>Core <code>Agent</code> class with streaming <code>run()</code> and blocking <code>run_sync()</code> methods</li>
 <li>Built-in tools: <code>tool_read_file</code>, <code>tool_write_file</code>, <code>tool_list_files</code>, <code>tool_run_r_code</code>, <code>tool_run_bash</code>, <code>tool_read_csv</code>
@@ -72,12 +73,12 @@
 <li>Tool bundles: <code><a href="../reference/tools_file.html">tools_file()</a></code>, <code><a href="../reference/tools_code.html">tools_code()</a></code>, <code><a href="../reference/tools_data.html">tools_data()</a></code>, <code><a href="../reference/tools_all.html">tools_all()</a></code>
 </li>
 <li>Permission system with <code><a href="../reference/permissions_readonly.html">permissions_readonly()</a></code>, <code><a href="../reference/permissions_standard.html">permissions_standard()</a></code>, <code><a href="../reference/permissions_full.html">permissions_full()</a></code>, and custom <code>Permissions</code> class</li>
-<li>Hook system with <code>HookMatcher</code>, <code>HookRegistry</code>, and events: <code>PreToolUse</code>, <code>PostToolUse</code>, <code>Stop</code>, <code>UserPromptSubmit</code>, <code>PreCompact</code>
+<li>Hook system with <code>HookMatcher</code> and events: <code>PreToolUse</code>, <code>PostToolUse</code>, <code>Stop</code>, <code>UserPromptSubmit</code>, <code>PreCompact</code>
 </li>
 <li>Multi-agent support with <code><a href="../reference/agent_definition.html">agent_definition()</a></code> and <code>LeadAgent</code>
 </li>
 <li>Skills system with <code><a href="../reference/skill_load.html">skill_load()</a></code>, <code><a href="../reference/skill_create.html">skill_create()</a></code>, and <code>Skill</code> class</li>
-<li>Session persistence via <code>save_session()</code> and <code>load_session()</code>
+<li>Explicit session persistence via <code>Agent$save_session()</code> and <code>Agent$load_session()</code>
 </li>
 <li>Provider-agnostic design works with any ellmer-supported LLM</li>
 </ul></div>

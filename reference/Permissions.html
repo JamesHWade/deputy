@@ -7,7 +7,7 @@ tool_allowlist: Optional list of tools that are allowed. When set,
 tools not in the list are denied.
 tool_denylist: Optional list of tools that are always denied.
 permission_prompt_tool_name: Optional tool name to mention in deny
-messages for gated tools (e.g., "AskUserQuestion").
+messages for gated tools (e.g., "ask_user").
 
 
 Security Note: Permission fields are immutable after construction.
@@ -20,7 +20,7 @@ tool_allowlist: Optional list of tools that are allowed. When set,
 tools not in the list are denied.
 tool_denylist: Optional list of tools that are always denied.
 permission_prompt_tool_name: Optional tool name to mention in deny
-messages for gated tools (e.g., "AskUserQuestion").
+messages for gated tools (e.g., "ask_user").
 
 
 Security Note: Permission fields are immutable after construction.
@@ -52,8 +52,6 @@ All fields use active bindings that reject modification attempts.'><meta propert
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -84,7 +82,7 @@ callback for complex logic.</p>
 tools not in the list are denied.</p></li>
 <li><p><code>tool_denylist</code>: Optional list of tools that are always denied.</p></li>
 <li><p><code>permission_prompt_tool_name</code>: Optional tool name to mention in deny
-messages for gated tools (e.g., "AskUserQuestion").</p></li>
+messages for gated tools (e.g., "ask_user").</p></li>
 </ul><p><strong>Security Note:</strong> Permission fields are immutable after construction.
 This prevents adversarial code from modifying permissions at runtime.
 All fields use active bindings that reject modification attempts.</p>
@@ -102,7 +100,8 @@ All fields use active bindings that reject modification attempts.</p>
 
 
     <dt><code>file_write</code></dt>
-<dd><p>Allow file writing. Can be TRUE, FALSE, or a directory path. Read-only after construction.</p></dd>
+<dd><p>Allow file writing. Can be <code>TRUE</code>, <code>FALSE</code>, or a
+canonical absolute directory path. Read-only after construction.</p></dd>
 
 
     <dt><code>bash</code></dt>
@@ -119,14 +118,6 @@ All fields use active bindings that reject modification attempts.</p>
 
     <dt><code>install_packages</code></dt>
 <dd><p>Allow package installation. Read-only after construction.</p></dd>
-
-
-    <dt><code>max_turns</code></dt>
-<dd><p>Maximum number of turns before stopping. Read-only after construction.</p></dd>
-
-
-    <dt><code>max_cost_usd</code></dt>
-<dd><p>Maximum cost in USD before stopping. Read-only after construction.</p></dd>
 
 
     <dt><code>can_use_tool</code></dt>
@@ -161,15 +152,13 @@ All fields use active bindings that reject modification attempts.</p>
 <p>Create a new Permissions object.</p><div class="section">
 <h4 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  mode <span class="op">=</span> <span class="st">"default"</span>,</span>
+<span>  mode <span class="op">=</span> <span class="st">"standard"</span>,</span>
 <span>  file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  file_write <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  file_write <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  r_code <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  web <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  install_packages <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  max_turns <span class="op">=</span> <span class="fl">25</span>,</span>
-<span>  max_cost_usd <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  can_use_tool <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  tool_allowlist <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  tool_denylist <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -184,7 +173,9 @@ All fields use active bindings that reject modification attempts.</p>
 <dd><p>Allow file reading</p></dd>
 
       <dt><code>file_write</code></dt>
-<dd><p>Allow file writing (TRUE, FALSE, or directory path)</p></dd>
+<dd><p>Allow file writing (<code>TRUE</code>, <code>FALSE</code>, or an existing
+absolute directory path). Directory grants are canonicalized once when
+the policy is constructed.</p></dd>
 
       <dt><code>bash</code></dt>
 <dd><p>Allow bash commands</p></dd>
@@ -198,12 +189,6 @@ All fields use active bindings that reject modification attempts.</p>
       <dt><code>install_packages</code></dt>
 <dd><p>Allow package installation</p></dd>
 
-      <dt><code>max_turns</code></dt>
-<dd><p>Maximum turns</p></dd>
-
-      <dt><code>max_cost_usd</code></dt>
-<dd><p>Maximum cost</p></dd>
-
       <dt><code>can_use_tool</code></dt>
 <dd><p>Custom callback function</p></dd>
 
@@ -214,8 +199,9 @@ All fields use active bindings that reject modification attempts.</p>
 <dd><p>Optional character vector of denied tool names</p></dd>
 
       <dt><code>permission_prompt_tool_name</code></dt>
-<dd><p>Optional tool name to suggest in
-permission deny messages for gated tools</p></dd>
+<dd><p>Optional dedicated approval-tool name
+to suggest in permission deny messages for gated tools. Native
+capability-bearing tools cannot be used as approval prompts.</p></dd>
 
 
 </dl><p></p></div>

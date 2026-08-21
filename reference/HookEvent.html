@@ -28,8 +28,6 @@ type has a specific callback signature and context structure."><meta property="o
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -70,14 +68,14 @@ type has a specific callback signature and context structure.</p>
 <p><strong>PreToolUse</strong> - Before a tool is executed (can deny)</p>
 <p>Callback signature: <code>function(tool_name, tool_input, context)</code></p><ul><li><p><code>tool_name</code>: Name of the tool being called (character)</p></li>
 <li><p><code>tool_input</code>: Named list of arguments passed to the tool</p></li>
-<li><p><code>context</code>: Common correlation fields plus <code>tool_call_id</code>, <code>tool_use_id</code>,
-and <code>tool_annotations</code> (if available)</p></li>
+<li><p><code>context</code>: Common correlation fields plus <code>tool_call_id</code> and
+<code>tool_annotations</code> (if available)</p></li>
 <li><p>Return: <code><a href="HookResultPreToolUse.html">HookResultPreToolUse()</a></code> to allow/deny</p></li>
 </ul><p><strong>PostToolUse</strong> - After a tool completes</p>
 <p>Callback signature: <code>function(tool_name, tool_result, tool_error, context)</code></p><ul><li><p><code>tool_name</code>: Name of the tool that was called (character)</p></li>
 <li><p><code>tool_result</code>: Result returned by the tool (or NULL on error)</p></li>
 <li><p><code>tool_error</code>: Error message if tool failed (or NULL on success)</p></li>
-<li><p><code>context</code>: Common correlation fields plus <code>tool_call_id</code> and <code>tool_use_id</code></p></li>
+<li><p><code>context</code>: Common correlation fields plus <code>tool_call_id</code></p></li>
 <li><p>Return: <code><a href="HookResultPostToolUse.html">HookResultPostToolUse()</a></code> to continue/stop</p></li>
 </ul><p><strong>PostToolUseFailure</strong> - After a tool reports an error</p>
 <p>Callback signature: <code>function(tool_name, tool_result, tool_error, context)</code></p><ul><li><p>Same arguments as PostToolUse, fired only when <code>tool_error</code> is not NULL</p></li>
@@ -86,13 +84,13 @@ and <code>tool_annotations</code> (if available)</p></li>
 <code>"request_limit"</code>, <code>"cost_limit"</code>, or <code>"provider_error"</code>)</p></li>
 <li><p><code>context</code>: Common correlation fields plus <code>usage</code> and <code>cost</code>; native
 <code>run()</code> also includes <code>total_turns</code></p></li>
-<li><p>Return: <code><a href="HookResultStop.html">HookResultStop()</a></code></p></li>
+<li><p>Return: NULL (informational only)</p></li>
 </ul><p><strong>SubagentStop</strong> - When a sub-agent completes (LeadAgent only)</p>
 <p>Callback signature: <code>function(agent_name, task, result, context)</code></p><ul><li><p><code>agent_name</code>: Name of the sub-agent that completed (character)</p></li>
 <li><p><code>task</code>: The task that was delegated (character)</p></li>
 <li><p><code>result</code>: Result returned by the sub-agent</p></li>
 <li><p><code>context</code>: Common correlation fields plus parent/child Agent and run IDs</p></li>
-<li><p>Return: <code><a href="HookResultSubagentStop.html">HookResultSubagentStop()</a></code></p></li>
+<li><p>Return: NULL (informational only)</p></li>
 </ul><p><strong>SubagentStart</strong> - When a delegated sub-agent starts (LeadAgent only)</p>
 <p>Callback signature: <code>function(agent_name, task, context)</code></p><ul><li><p><code>agent_name</code>: Name of the sub-agent that started</p></li>
 <li><p><code>task</code>: The delegated task</p></li>
@@ -119,13 +117,13 @@ event-specific metadata</p></li>
 </ul><p><strong>SessionStart</strong> - When an agent session begins</p>
 <p>Callback signature: <code>function(context)</code></p><ul><li><p><code>context</code>: Common correlation fields plus <code>permissions</code>, <code>provider</code>, and
 <code>tools_count</code></p></li>
-<li><p>Return: <code><a href="HookResultSessionStart.html">HookResultSessionStart()</a></code></p></li>
+<li><p>Return: NULL (informational only)</p></li>
 </ul><p><strong>SessionEnd</strong> - When an agent session ends</p>
 <p>Callback signature: <code>function(reason, context)</code></p><ul><li><p><code>reason</code>: Why the agent stopped (for example <code>"complete"</code>,
 <code>"request_limit"</code>, <code>"cost_limit"</code>, or <code>"hook_requested_stop"</code>)</p></li>
 <li><p><code>context</code>: Common correlation fields plus <code>usage</code> and <code>cost</code>; native
 <code>run()</code> also includes <code>total_turns</code></p></li>
-<li><p>Return: <code><a href="HookResultSessionEnd.html">HookResultSessionEnd()</a></code></p></li>
+<li><p>Return: NULL (informational only)</p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="context-structure">Context Structure<a class="anchor" aria-label="anchor" href="#context-structure"></a></h2>
@@ -141,11 +139,9 @@ event-specific metadata</p></li>
 <li><p><code>delegation_id</code>: Delegation identifier for delegated runs and tools</p></li>
 <li><p><code>tool_annotations</code>: (PreToolUse only) Tool annotations from ellmer if available</p></li>
 <li><p><code>tool_call_id</code>: Canonical tool lifecycle identifier</p></li>
-<li><p><code>tool_use_id</code>: Provider tool identifier retained for compatibility</p></li>
 <li><p><code>usage</code>: Run-scoped <a href="AgentUsage.html">AgentUsage</a> for tool and terminal lifecycle hooks</p></li>
 <li><p><code>usage_limits</code>: Active <a href="UsageLimits.html">UsageLimits</a> for tool lifecycle hooks</p></li>
 <li><p><code>run_id</code>: Identifier for the active run</p></li>
-<li><p><code>session_id</code>: Session identifier when compatibility persistence is configured</p></li>
 <li><p><code>total_turns</code>: (native Stop, PreCompact, native SessionEnd) Conversation turns</p></li>
 <li><p><code>cost</code>: (Stop, SessionEnd) List with <code>input</code>, <code>output</code>, <code>cached</code>, and <code>total</code></p></li>
 <li><p><code>compact_count</code>: (PreCompact only) Number of turns being compacted</p></li>

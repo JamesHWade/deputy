@@ -10,10 +10,10 @@ ships with sensible presets and makes it easy to build custom policies.
 
 library(deputy)
 
-# Read-only: only read_file and list_files are allowed
+# Read-only: known Deputy read tools are allowed
 permissions_readonly()
 
-# Plan: only annotated read-only tools plus AskUserQuestion
+# Plan: annotated read-only tools plus ask_user
 permissions_plan()
 
 # Standard (default): accessible reads, workspace-scoped writes, R code,
@@ -47,9 +47,7 @@ perms <- Permissions$new(
   bash = FALSE,
   r_code = TRUE,
   web = FALSE,
-  install_packages = FALSE,
-  max_turns = 10,
-  max_cost_usd = 0.50
+  install_packages = FALSE
 )
 ```
 
@@ -63,8 +61,10 @@ Fields:
 | `r_code` | logical | Allow R code execution |
 | `web` | logical | Allow web access |
 | `install_packages` | logical | Allow package installation |
-| `max_turns` | integer | Maximum agentic turns (default 25) |
-| `max_cost_usd` | numeric / NULL | Maximum spend in USD |
+| `can_use_tool` | function | Apply custom permission decisions |
+| `tool_allowlist` | character | Deny tools not explicitly listed |
+| `tool_denylist` | character | Always deny explicitly listed tools |
+| `permission_prompt_tool_name` | character | Dedicated approval tool used in gating messages |
 
 ## Permission Modes
 
@@ -72,11 +72,10 @@ The `mode` field provides broad policy shortcuts:
 
 | Mode | Behaviour |
 |----|----|
-| `"default"` | Check each tool against the policy fields above |
+| `"standard"` | Check each tool against the configured capabilities |
 | `"readonly"` | Allow known Deputy read tools and explicit allowlist entries within configured capabilities |
 | `"plan"` | Allow read-only annotated tools within configured capabilities and the human approval prompt tool |
-| `"acceptEdits"` | Auto-approve file writes without prompting |
-| `"bypassPermissions"` | Allow everything (dangerous!) |
+| `"full"` | Allow every tool (dangerous!) |
 
 ``` r
 
@@ -84,7 +83,7 @@ perms <- Permissions$new(mode = "readonly")
 ```
 
 [`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md)
-is a convenience wrapper for Claude-style planning flows:
+creates a planning-oriented policy:
 
 ``` r
 
@@ -94,6 +93,32 @@ agent <- Agent$new(
   permissions = permissions_plan()
 )
 ```
+
+## Changing an Agent’s Mode
+
+An agent’s configured permissions are an authority ceiling. Calling
+`set_permission_mode()` may preserve or narrow that authority, but it
+cannot widen it or replace it with an incomparable policy:
+
+| Current mode | Allowed target modes                           |
+|--------------|------------------------------------------------|
+| `"readonly"` | `"readonly"`                                   |
+| `"standard"` | `"standard"`, `"readonly"`                     |
+| `"plan"`     | `"plan"`, `"readonly"`                         |
+| `"full"`     | `"full"`, `"standard"`, `"plan"`, `"readonly"` |
+
+Reapplying the current mode is an exact no-op. For an allowed narrowing,
+Deputy intersects the target mode with the existing capabilities. Custom
+restrictions, tool gates, callbacks, and directory-scoped write roots
+therefore remain authoritative.
+
+``` r
+
+agent$set_permission_mode("readonly")
+```
+
+Create a newly configured `Agent` when broader or incomparable authority
+is required.
 
 ## Tool Annotations
 
@@ -120,8 +145,8 @@ authority. In `"readonly"` mode, Deputy recognizes its built-in read
 tools and explicit allowlist entries, while still denying known writes,
 destructive tools, and open-world tools when web access is disabled.
 Unknown tools do not become authorized merely by declaring
-`read_only_hint = TRUE`. In `"default"` mode, annotations participate in
-the configured capability checks.
+`read_only_hint = TRUE`. In `"standard"` mode, annotations participate
+in the configured capability checks.
 
 ## Custom Permission Callbacks
 
@@ -173,18 +198,27 @@ result <- agent$run_sync("What files are in the current directory?")
 cat(result$response)
 ```
 
-## Cost and Turn Limits
+## Run Limits
 
-Permissions also enforce resource limits:
+Permissions decide whether a tool may run. Configure resource limits
+separately with
+[`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+on the agent or an individual run:
 
 ``` r
 
-perms <- Permissions$new(
-  max_turns = 10,      # Stop after 10 agentic turns
-  max_cost_usd = 1.00  # Stop if cost exceeds $1.00
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = tools_file(),
+  permissions = permissions_standard(),
+  usage_limits = UsageLimits(
+    max_requests = 10,
+    max_tool_calls = 20,
+    max_cost_usd = 1
+  )
 )
 ```
 
 When a limit is reached, the agent stops and the
-`AgentResult$stop_reason` indicates what happened (`"max_turns"` or
-`"cost_limit"`).
+`AgentResult$stop_reason` identifies the limit, such as
+`"request_limit"`, `"tool_call_limit"`, or `"cost_limit"`.

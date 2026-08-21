@@ -46,8 +46,6 @@
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -126,6 +124,10 @@ is usually enough.</p>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Fields:</p>
 <table class="table">
+<colgroup>
+<col width="35%">
+<col width="65%">
+</colgroup>
 <thead><tr class="header">
 <th>Field</th>
 <th>Description</th>
@@ -156,15 +158,93 @@ is usually enough.</p>
 <td><code>skills</code></td>
 <td>Optional list of skills to load</td>
 </tr>
+<tr class="odd">
+<td><code>disallowed_tools</code></td>
+<td>Additional tool names that the child must not use</td>
+</tr>
+<tr class="even">
+<td><code>memory</code></td>
+<td>Optional context appended to the child’s system prompt</td>
+</tr>
+<tr class="odd">
+<td><code>mcp_servers</code></td>
+<td>Optional MCP servers loaded for the child</td>
+</tr>
+<tr class="even">
+<td><code>initial_prompt</code></td>
+<td>Optional text prepended to delegated tasks</td>
+</tr>
+<tr class="odd">
+<td><code>max_requests</code></td>
+<td>Optional per-child request limit</td>
+</tr>
+<tr class="even">
+<td><code>permission_mode</code></td>
+<td>Optional mode that preserves or narrows the lead policy</td>
+</tr>
 </tbody>
 </table>
+<div class="section level3">
+<h3 id="delegated-permission-boundaries">Delegated Permission Boundaries<a class="anchor" aria-label="anchor" href="#delegated-permission-boundaries"></a>
+</h3>
+<p>A sub-agent cannot gain authority that its lead does not have. Deputy
+intersects the requested child mode with the lead’s capabilities, write
+root, tool gates, and permission callback. <code>disallowed_tools</code>
+adds further denials.</p>
+<p>The allowed child-mode transitions use the same authority order as
+<code>Agent$set_permission_mode()</code>:</p>
+<table class="table">
+<thead><tr class="header">
+<th>Lead mode</th>
+<th>Allowed child modes</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>"readonly"</code></td>
+<td><code>"readonly"</code></td>
+</tr>
+<tr class="even">
+<td><code>"standard"</code></td>
+<td>
+<code>"standard"</code>, <code>"readonly"</code>
+</td>
+</tr>
+<tr class="odd">
+<td><code>"plan"</code></td>
+<td>
+<code>"plan"</code>, <code>"readonly"</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>"full"</code></td>
+<td>
+<code>"full"</code>, <code>"standard"</code>, <code>"plan"</code>,
+<code>"readonly"</code>
+</td>
+</tr>
+</tbody>
+</table>
+<p>For example, a readonly reviewer can be declared beneath a standard
+lead without gaining file reads, web access, or tools that the lead
+explicitly denied:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">reviewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
+<span>  name <span class="op">=</span> <span class="st">"reviewer"</span>,</span>
+<span>  description <span class="op">=</span> <span class="st">"Reviews files without changing them"</span>,</span>
+<span>  prompt <span class="op">=</span> <span class="st">"Review the requested files and report findings."</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  permission_mode <span class="op">=</span> <span class="st">"readonly"</span>,</span>
+<span>  disallowed_tools <span class="op">=</span> <span class="st">"read_csv"</span>,</span>
+<span>  max_requests <span class="op">=</span> <span class="fl">5</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="creating-a-leadagent">Creating a LeadAgent<a class="anchor" aria-label="anchor" href="#creating-a-leadagent"></a>
 </h2>
 <p><code>LeadAgent</code> extends <code>Agent</code> with a built-in
 <code>delegate_to_agent</code> tool:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">code_reviewer</span>, <span class="va">data_analyst</span><span class="op">)</span>,</span>
@@ -181,7 +261,7 @@ is usually enough.</p>
 <p>When the lead agent decides to delegate, it calls
 <code>delegate_to_agent</code> internally. The sub-agent runs to
 completion and returns its result to the lead:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">code_reviewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
@@ -202,24 +282,12 @@ completion and returns its result to the lead:</p>
 <span><span class="st">   summarise what this package does."</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span></code></pre></div>
-<p>Direct synchronous delegation participates in the lead run’s budget.
-Each child inherits the lead’s remaining <code>UsageLimits</code>, and
-its usage is aggregated into <code>result$usage</code> and enforced by
-the lead after delegation. This accounting does not yet cover parallel
-or background children, transitive child trees, or cross-run global
-budgets.</p>
-</div>
-<div class="section level2">
-<h2 id="convenience-constructor">Convenience Constructor<a class="anchor" aria-label="anchor" href="#convenience-constructor"></a>
-</h2>
-<p><code><a href="../reference/agent_with_delegation.html">agent_with_delegation()</a></code> creates a lead agent with one
-line:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_with_delegation.html">agent_with_delegation</a></span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">code_reviewer</span>, <span class="va">data_analyst</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<p>Direct synchronous delegation participates in the lead run’s usage
+limits. Each child inherits the lead’s remaining
+<code>UsageLimits</code>, and its usage is aggregated into
+<code>result$usage</code> and enforced by the lead after delegation.
+This accounting does not yet cover parallel or background children,
+transitive child trees, or cross-run global limits.</p>
 </div>
 <div class="section level2">
 <h2 id="monitoring-with-subagentstop-hooks">Monitoring with SubagentStop Hooks<a class="anchor" aria-label="anchor" href="#monitoring-with-subagentstop-hooks"></a>
@@ -231,8 +299,8 @@ results:</p>
 <span>  event <span class="op">=</span> <span class="st">"SubagentStop"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">agent_name</span>, <span class="va">task</span>, <span class="va">result</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Sub-agent {agent_name} finished"</span><span class="op">)</span></span>
-<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert</a></span><span class="op">(</span><span class="st">"Cost: {result$cost$total}"</span><span class="op">)</span></span>
-<span>    <span class="fu"><a href="../reference/HookResultSubagentStop.html">HookResultSubagentStop</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert</a></span><span class="op">(</span><span class="st">"Requests: {result$usage$requests}"</span><span class="op">)</span></span>
+<span>    <span class="cn">NULL</span></span>
 <span>  <span class="op">}</span></span>
 <span><span class="op">)</span></span>
 <span></span>

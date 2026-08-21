@@ -19,8 +19,8 @@ Callback signature: `function(tool_name, tool_input, context)`
 
 - `tool_input`: Named list of arguments passed to the tool
 
-- `context`: Common correlation fields plus `tool_call_id`,
-  `tool_use_id`, and `tool_annotations` (if available)
+- `context`: Common correlation fields plus `tool_call_id` and
+  `tool_annotations` (if available)
 
 - Return:
   [`HookResultPreToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.md)
@@ -37,8 +37,7 @@ Callback signature:
 
 - `tool_error`: Error message if tool failed (or NULL on success)
 
-- `context`: Common correlation fields plus `tool_call_id` and
-  `tool_use_id`
+- `context`: Common correlation fields plus `tool_call_id`
 
 - Return:
   [`HookResultPostToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.md)
@@ -62,8 +61,7 @@ Callback signature: `function(reason, context)`
 - `context`: Common correlation fields plus `usage` and `cost`; native
   `run()` also includes `total_turns`
 
-- Return:
-  [`HookResultStop()`](https://jameshwade.github.io/deputy/reference/HookResultStop.md)
+- Return: NULL (informational only)
 
 **SubagentStop** - When a sub-agent completes (LeadAgent only)
 
@@ -78,8 +76,7 @@ Callback signature: `function(agent_name, task, result, context)`
 - `context`: Common correlation fields plus parent/child Agent and run
   IDs
 
-- Return:
-  [`HookResultSubagentStop()`](https://jameshwade.github.io/deputy/reference/HookResultSubagentStop.md)
+- Return: NULL (informational only)
 
 **SubagentStart** - When a delegated sub-agent starts (LeadAgent only)
 
@@ -150,8 +147,7 @@ Callback signature: `function(context)`
 - `context`: Common correlation fields plus `permissions`, `provider`,
   and `tools_count`
 
-- Return:
-  [`HookResultSessionStart()`](https://jameshwade.github.io/deputy/reference/HookResultSessionStart.md)
+- Return: NULL (informational only)
 
 **SessionEnd** - When an agent session ends
 
@@ -163,8 +159,7 @@ Callback signature: `function(reason, context)`
 - `context`: Common correlation fields plus `usage` and `cost`; native
   `run()` also includes `total_turns`
 
-- Return:
-  [`HookResultSessionEnd()`](https://jameshwade.github.io/deputy/reference/HookResultSessionEnd.md)
+- Return: NULL (informational only)
 
 ## Context Structure
 
@@ -189,8 +184,6 @@ The context parameter is always a named list. Common fields:
 
 - `tool_call_id`: Canonical tool lifecycle identifier
 
-- `tool_use_id`: Provider tool identifier retained for compatibility
-
 - `usage`: Run-scoped
   [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
   for tool and terminal lifecycle hooks
@@ -200,9 +193,6 @@ The context parameter is always a named list. Common fields:
   for tool lifecycle hooks
 
 - `run_id`: Identifier for the active run
-
-- `session_id`: Session identifier when compatibility persistence is
-  configured
 
 - `total_turns`: (native Stop, PreCompact, native SessionEnd)
   Conversation turns

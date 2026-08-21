@@ -3,20 +3,14 @@
 Permission modes control the overall behavior of tool permission
 checking:
 
-- `"default"` - Check each tool against the permission policy
-
-- `"acceptEdits"` - Auto-accept file write tools
+- `"standard"` - Check each tool against the configured capabilities
 
 - `"plan"` - Allow annotated read-only tools within configured
   capabilities plus human approval prompts
 
-- `"dontAsk"` - Check policy without suggesting approval prompts
-
-- `"auto"` - SDK-compatible alias for default deputy permission behavior
-
 - `"readonly"` - Deny all write/execute tools
 
-- `"bypassPermissions"` - Allow all tools (dangerous, use with caution)
+- `"full"` - Allow all tools (dangerous, use with caution)
 
 ## Usage
 
@@ -80,3 +74,12 @@ failure.
         destructive_hint = TRUE
       )
     )
+
+## See also
+
+[Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md),
+[`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md),
+[`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md),
+[`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md),
+and
+[`permissions_full()`](https://jameshwade.github.io/deputy/reference/permissions_full.md).

@@ -30,8 +30,6 @@ metadata about what the agent can do."><meta property="og:image" content="https:
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/agent-configuration.html">Agent Configuration</a></li>
-    <li><a class="dropdown-item" href="../articles/claude-sdk-parity.html">Agent SDK Parity</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -73,9 +71,7 @@ metadata about what the agent can do.</p>
 <span>  memory <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  mcp_servers <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  initial_prompt <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  max_turns <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  background <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  effort <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  max_requests <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  permission_mode <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -124,23 +120,14 @@ metadata about what the agent can do.</p>
 <dd><p>Optional text prepended to delegated tasks</p></dd>
 
 
-<dt id="arg-max-turns">max_turns<a class="anchor" aria-label="anchor" href="#arg-max-turns"></a></dt>
+<dt id="arg-max-requests">max_requests<a class="anchor" aria-label="anchor" href="#arg-max-requests"></a></dt>
 <dd><p>Optional non-negative whole-number sub-agent request limit</p></dd>
 
 
-<dt id="arg-background">background<a class="anchor" aria-label="anchor" href="#arg-background"></a></dt>
-<dd><p>Logical SDK-compatible metadata flag</p></dd>
-
-
-<dt id="arg-effort">effort<a class="anchor" aria-label="anchor" href="#arg-effort"></a></dt>
-<dd><p>Optional reasoning effort metadata</p></dd>
-
-
 <dt id="arg-permission-mode">permission_mode<a class="anchor" aria-label="anchor" href="#arg-permission-mode"></a></dt>
-<dd><p>Optional permission mode. For non-bypass lead agents,
-this must match the lead mode (with <code>"default"</code> and <code>"auto"</code> treated as
-equivalent); use <code>disallowed_tools</code> and <code>max_turns</code> to tighten a child
-policy. A bypass lead may select any mode.</p></dd>
+<dd><p>Optional permission mode. A child may keep the lead
+mode or narrow it to <code>"readonly"</code>; a <code>"full"</code> lead may select any mode.
+Use <code>disallowed_tools</code> and <code>max_requests</code> for additional limits.</p></dd>
 
 </dl></div>
     <div class="section level2">

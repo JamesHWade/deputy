@@ -1,4 +1,4 @@
-# AskUserQuestion tool
+# Ask user tool
 
 A tool that allows the agent to ask the user clarifying questions and
 receive their responses. This enables human-in-the-loop workflows where
@@ -19,14 +19,12 @@ A tool definition created with
 
 - questions:
 
-  JSON string or list of question objects following the SDK format. Each
-  question should have: `question` (string), `header` (string, max 12
-  chars), `options` (list of objects with `label` and `description`),
-  and optionally `multiSelect` (logical).
+  JSON string or list of structured question objects. Each question
+  should have: `question` (string), `header` (string, max 12 chars),
+  `options` (list of objects with `label` and `description`), and
+  optionally `multiSelect` (logical).
 
 ## Details
-
-This tool follows the Anthropic Agent SDK format:
 
 **Input format:**
 
