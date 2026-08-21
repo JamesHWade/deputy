@@ -12,7 +12,7 @@ parse_pdf_page_selector <- function(pages, page_count) {
     tokens <- trimws(unlist(strsplit(pages, ",", fixed = TRUE)))
     tokens <- tokens[nzchar(tokens)]
     if (length(tokens) == 0) {
-      stop("No valid pages specified")
+      cli_abort("No valid pages specified.")
     }
     nums <- integer()
     for (token in tokens) {
@@ -23,22 +23,26 @@ parse_pdf_page_selector <- function(pages, page_count) {
         start <- bounds[1]
         end <- bounds[2]
         if (start > end) {
-          stop("Invalid page range: ", token)
+          cli_abort("Invalid page range: {.val {token}}.")
         }
         nums <- c(nums, seq.int(start, end))
       } else {
-        stop("Invalid page selector token: ", token)
+        cli_abort("Invalid page selector token: {.val {token}}.")
       }
     }
   } else {
-    stop("pages must be NULL, numeric, or a selector string like '1,3-5'")
+    cli_abort(
+      "{.arg pages} must be NULL, numeric, or a selector string like {.val 1,3-5}."
+    )
   }
 
   if (any(is.na(nums)) || any(nums < 1)) {
-    stop("Page numbers must be positive integers")
+    cli_abort("Page numbers must be positive integers.")
   }
   if (any(nums > page_count)) {
-    stop("Page selection exceeds document length (", page_count, " pages)")
+    cli_abort(
+      "Page selection exceeds document length of {page_count} page{?s}."
+    )
   }
 
   sort(unique(nums))
@@ -52,9 +56,10 @@ read_pdf_text_pages <- function(path) {
 
   if (rlang::is_installed("reticulate")) {
     if (!reticulate::py_module_available("pypdf")) {
-      stop(
-        "Python module 'pypdf' not available. Install pypdf or R package 'pdftools'."
-      )
+      cli_abort(c(
+        "Python module {.pkg pypdf} is not available.",
+        "i" = "Install {.pkg pypdf}, or the R package {.pkg pdftools}."
+      ))
     }
 
     pypdf <- reticulate::import("pypdf", delay_load = FALSE)
@@ -73,15 +78,16 @@ read_pdf_text_pages <- function(path) {
     return(text)
   }
 
-  stop(
-    "Reading PDF content requires either package 'pdftools' or package 'reticulate' with Python module 'pypdf'."
-  )
+  cli_abort(c(
+    "Reading PDF content requires {.pkg pdftools}.",
+    "i" = "Alternatively, install {.pkg reticulate} with the Python module {.pkg pypdf}."
+  ))
 }
 
 # Convert a local file to markdown using Python MarkItDown via reticulate
 convert_to_markdown_markitdown <- function(path) {
   if (!rlang::is_installed("reticulate")) {
-    stop("Package 'reticulate' is required for MarkItDown conversion.")
+    cli_abort("{.pkg reticulate} is required for MarkItDown conversion.")
   }
 
   available <- tryCatch(
@@ -89,9 +95,10 @@ convert_to_markdown_markitdown <- function(path) {
     error = function(e) FALSE
   )
   if (!available) {
-    stop(
-      "Python module 'markitdown' is not available. Install with: pip install 'markitdown[all]'"
-    )
+    cli_abort(c(
+      "Python module {.pkg markitdown} is not available.",
+      "i" = "Install with {.code pip install 'markitdown[all]'}."
+    ))
   }
 
   markitdown <- reticulate::import("markitdown", delay_load = FALSE)
@@ -110,7 +117,7 @@ convert_to_markdown_markitdown <- function(path) {
   }
 
   if (is.null(text)) {
-    stop("MarkItDown conversion did not return markdown text.")
+    cli_abort("MarkItDown conversion did not return markdown text.")
   }
 
   if (length(text) > 1) {
@@ -119,7 +126,7 @@ convert_to_markdown_markitdown <- function(path) {
 
   text <- as.character(text[[1]])
   if (!nzchar(text)) {
-    stop("MarkItDown conversion returned empty markdown.")
+    cli_abort("MarkItDown conversion returned empty markdown.")
   }
 
   text
@@ -137,16 +144,19 @@ count_fixed_matches <- function(text, pattern) {
 # Apply a fixed-string replacement with safety checks for edit tools.
 replace_fixed_text <- function(text, old_text, new_text, replace_all = FALSE) {
   if (!nzchar(old_text)) {
-    stop("old_text must not be empty")
+    cli_abort("{.arg old_text} must not be empty.")
   }
 
   occurrences <- count_fixed_matches(text, old_text)
   if (occurrences == 0L) {
-    stop("old_text was not found in the file")
+    cli_abort("{.arg old_text} was not found in the file.")
   }
 
   if (!isTRUE(replace_all) && occurrences > 1L) {
-    stop("old_text matched multiple locations; set replace_all = TRUE")
+    cli_abort(c(
+      "{.arg old_text} matched {occurrences} locations.",
+      "i" = "Set {.code replace_all = TRUE} to replace all of them."
+    ))
   }
 
   updated <- if (isTRUE(replace_all)) {
@@ -167,25 +177,25 @@ parse_multi_edits <- function(edits) {
 
   if (is.character(edits) && length(edits) == 1) {
     if (!rlang::is_installed("jsonlite")) {
-      stop("Parsing JSON edits requires package 'jsonlite'.")
+      cli_abort("Parsing JSON edits requires {.pkg jsonlite}.")
     }
 
     parsed <- tryCatch(
       jsonlite::fromJSON(edits, simplifyVector = FALSE),
       error = function(e) {
-        stop("Could not parse edits JSON: ", e$message)
+        cli_abort("Could not parse {.arg edits} as JSON.", parent = e)
       }
     )
   }
 
   if (!is.list(parsed) || length(parsed) == 0) {
-    stop("edits must be a non-empty list or JSON array")
+    cli_abort("{.arg edits} must be a non-empty list or JSON array.")
   }
 
   lapply(seq_along(parsed), function(i) {
     edit <- parsed[[i]]
     if (!is.list(edit)) {
-      stop("Edit ", i, " must be an object")
+      cli_abort("Edit {i} must be an object.")
     }
 
     old_text <- edit$old_text %||% edit$old_string
@@ -193,7 +203,7 @@ parse_multi_edits <- function(edits) {
     replace_all <- isTRUE(edit$replace_all %||% edit$replaceAll)
 
     if (is.null(old_text) || is.null(new_text)) {
-      stop("Edit ", i, " must include old_text/new_text")
+      cli_abort("Edit {i} must include {.arg old_text} and {.arg new_text}.")
     }
 
     list(
@@ -219,7 +229,7 @@ glob_pattern_to_regex <- function(pattern) {
 # List files relative to a base directory using a glob-style filter.
 glob_relative_paths <- function(path = ".", pattern = "*", recursive = TRUE) {
   if (!dir.exists(path)) {
-    stop("Directory not found: ", path)
+    cli_abort("Directory not found: {.path {path}}.")
   }
 
   base <- normalizePath(path, mustWork = TRUE)
