@@ -4,7 +4,9 @@ This file provides guidance for AI assistants working with the deputy codebase.
 
 ## Project Overview
 
-**deputy** is an R package implementing Anthropic's Claude Agent SDK patterns. It provides a provider-agnostic framework for building agentic AI workflows in R, built on the [ellmer](https://ellmer.tidyverse.org/) LLM framework.
+**deputy** is a provider-agnostic R runtime for building agentic workflows on
+the [ellmer](https://ellmer.tidyverse.org/) LLM framework. Its native `Agent`
+and `LeadAgent` APIs are the only supported runtime surface.
 
 Key capabilities:
 - Multi-step AI reasoning with tool use
@@ -12,7 +14,8 @@ Key capabilities:
 - Hook-based lifecycle event interception
 - Human-in-the-loop via `tool_ask_user`
 - Multi-agent delegation (LeadAgent)
-- Session persistence
+- Explicit session persistence through `Agent$save_session()` and
+  `Agent$load_session()`
 - Streaming output support
 
 ## Directory Structure
@@ -25,9 +28,6 @@ deputy/
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
 │   ├── permissions.R       # Permission system and tool annotations
 │   ├── hooks.R             # HookRegistry for lifecycle events
-│   ├── settings.R          # Claude settings loading and application
-│   ├── sdk-compat.R        # Anthropic-compatible SDK facade and client API
-│   ├── session-store.R     # File-backed session persistence helpers
 │   ├── skills.R            # Skill loading system
 │   ├── tools-builtin.R     # Built-in tools (read_file, write_file, etc.)
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
@@ -86,6 +86,10 @@ air format R/
 
 # Generate documentation
 Rscript -e "devtools::document()"
+
+# Validate and build the pkgdown site
+Rscript -e "pkgdown::check_pkgdown()"
+Rscript -e "pkgdown::build_site()"
 ```
 
 ### Building
@@ -207,10 +211,14 @@ test_that("descriptive test name", {
 
 ### Permission Modes
 
-- `"default"` - Check each tool against policy
-- `"readonly"` - Only allow read_only_hint tools
-- `"acceptEdits"` - Auto-accept file writes
-- `"bypassPermissions"` - Allow everything (dangerous)
+- `"standard"` - Check tools against configured capabilities
+- `"plan"` - Allow constrained reads and a dedicated approval prompt
+- `"readonly"` - Allow known reads within configured capabilities
+- `"full"` - Allow all capabilities (dangerous)
+
+Permissions configured at construction are an immutable authority ceiling.
+`Agent$set_permission_mode()` may keep or narrow a policy but cannot widen it;
+delegated agents are bounded by the same rule and by their lead's restrictions.
 
 ### Tool Presets
 
@@ -301,16 +309,10 @@ bd sync                               # Sync with git remote
 bd sync --status                      # Check sync status
 ```
 
-### When to Use Beads vs TodoWrite
+### Tracking Work
 
-| Use **Beads (`bd`)** for | Use **TodoWrite** for |
-|--------------------------|----------------------|
-| Multi-session work | Single-session execution |
-| Work with dependencies | Simple task checklists |
-| Discovered work needing tracking | Immediate step-by-step tasks |
-| Collaborative/handed-off work | Personal progress tracking |
-
-When in doubt, prefer beads—persistence you don't need beats lost context.
+Use Beads (`bd`) for work that must persist across sessions, has dependencies,
+or needs a handoff. Transient personal notes do not replace the Beads record.
 
 ## Feature Branch + PR Workflow
 

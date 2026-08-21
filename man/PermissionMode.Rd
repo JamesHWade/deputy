@@ -76,3 +76,8 @@ tool_delete <- ellmer::tool(
 )
 }\if{html}{\out{</div>}}
 }
+
+\seealso{
+\link{Permissions}, \code{\link[=permissions_standard]{permissions_standard()}}, \code{\link[=permissions_plan]{permissions_plan()}},
+\code{\link[=permissions_readonly]{permissions_readonly()}}, and \code{\link[=permissions_full]{permissions_full()}}.
+}

@@ -24,7 +24,7 @@ with sensible presets and makes it easy to build custom policies.
 ```{r, eval = FALSE}
 library(deputy)
 
-# Read-only: only read_file and list_files are allowed
+# Read-only: known Deputy read tools are allowed
 permissions_readonly()
 
 # Plan: annotated read-only tools plus ask_user
@@ -73,6 +73,10 @@ Fields:
 | `r_code` | logical | Allow R code execution |
 | `web` | logical | Allow web access |
 | `install_packages` | logical | Allow package installation |
+| `can_use_tool` | function | Apply custom permission decisions |
+| `tool_allowlist` | character | Deny tools not explicitly listed |
+| `tool_denylist` | character | Always deny explicitly listed tools |
+| `permission_prompt_tool_name` | character | Dedicated approval tool used in gating messages |
 
 ## Permission Modes
 
@@ -98,6 +102,31 @@ agent <- Agent$new(
   permissions = permissions_plan()
 )
 ```
+
+## Changing an Agent's Mode
+
+An agent's configured permissions are an authority ceiling. Calling
+`set_permission_mode()` may preserve or narrow that authority, but it cannot
+widen it or replace it with an incomparable policy:
+
+| Current mode | Allowed target modes |
+|--------------|----------------------|
+| `"readonly"` | `"readonly"` |
+| `"standard"` | `"standard"`, `"readonly"` |
+| `"plan"` | `"plan"`, `"readonly"` |
+| `"full"` | `"full"`, `"standard"`, `"plan"`, `"readonly"` |
+
+Reapplying the current mode is an exact no-op. For an allowed narrowing,
+Deputy intersects the target mode with the existing capabilities. Custom
+restrictions, tool gates, callbacks, and directory-scoped write roots therefore
+remain authoritative.
+
+```{r, eval = FALSE}
+agent$set_permission_mode("readonly")
+```
+
+Create a newly configured `Agent` when broader or incomparable authority is
+required.
 
 ## Tool Annotations
 

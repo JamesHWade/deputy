@@ -27,6 +27,11 @@
   class, so `provider@model` fails for every provider and the `$` fallback threw
   from inside the error handler. The model is now read with `Chat$get_model()`.
 
+* `Agent$set_permission_mode()` now preserves constructor permissions as an
+  immutable authority ceiling. Reapplying the current mode is a no-op; other
+  changes may only narrow authority. Delegated agents use the same rule and
+  retain lead capability, tool-gate, callback, and write-root restrictions.
+
 * `compact()` now summarizes on a clone of the agent's own chat instead of
   constructing a new provider. Previously any provider other than OpenAI,
   Anthropic, or Google fell through to `ellmer::chat_openai("gpt-4o-mini")`,

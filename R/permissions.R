@@ -67,6 +67,9 @@
 #'   )
 #' )
 #' ```
+#'
+#' @seealso [Permissions], [permissions_standard()], [permissions_plan()],
+#'   [permissions_readonly()], and [permissions_full()].
 #' @export
 PermissionMode <- c(
   "standard",
