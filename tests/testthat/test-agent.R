@@ -384,14 +384,10 @@ test_that("compaction summary clone is isolated, callback-free, and silent", {
   request_calls <- 0L
   result_calls <- 0L
   probe <- new.env(parent = emptyenv())
-  provider <- ellmer::Provider(
+  provider <- create_mock_provider(
     name = "private-gateway",
     model = "private-model",
-    base_url = "https://gateway.invalid",
-    params = list(),
-    extra_args = list(),
-    extra_headers = character(),
-    credentials = function() "test-token"
+    base_url = "https://gateway.invalid"
   )
   mock_chat <- create_compaction_mock_chat(
     responses = list("A summary."),

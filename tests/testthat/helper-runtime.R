@@ -127,7 +127,7 @@ create_content_stream_chat <- function(
         do.call(rbind, state$token_rows)
       },
       get_provider = function() provider,
-      get_model = function() provider@model,
+      get_model = function() mock_provider_model(provider),
       last_turn = function(role = "assistant") {
         if (length(state$turns) == 0L) NULL else tail(state$turns, 1L)[[1]]
       },

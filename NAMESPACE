@@ -57,21 +57,27 @@ export(tools_preset)
 export(tools_web)
 importFrom(R6,R6Class)
 importFrom(Rapp,run)
-importFrom(cli,cli_abort)
-importFrom(cli,cli_alert)
-importFrom(cli,cli_alert_danger)
-importFrom(cli,cli_alert_info)
-importFrom(cli,cli_alert_success)
-importFrom(cli,cli_alert_warning)
-importFrom(cli,cli_inform)
-importFrom(cli,cli_warn)
-importFrom(coro,exhausted)
-importFrom(coro,generator)
-importFrom(coro,is_exhausted)
+importFrom(cli,
+  cli_abort,
+  cli_alert,
+  cli_alert_danger,
+  cli_alert_info,
+  cli_alert_success,
+  cli_alert_warning,
+  cli_inform,
+  cli_warn
+)
+importFrom(coro,
+  exhausted,
+  generator,
+  is_exhausted
+)
 importFrom(digest,digest)
-importFrom(rlang,"%||%")
-importFrom(rlang,abort)
-importFrom(rlang,check_installed)
-importFrom(rlang,inform)
-importFrom(rlang,is_installed)
-importFrom(rlang,warn)
+importFrom(rlang,
+  "%||%",
+  abort,
+  check_installed,
+  inform,
+  is_installed,
+  warn
+)

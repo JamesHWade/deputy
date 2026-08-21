@@ -1189,177 +1189,18 @@ Agent <- R6::R6Class(
         "max_tool_calls",
         integer = TRUE
       )
+      shiny_limits <- self$usage_limits
+      shiny_limits$max_tool_calls <- max_tool_calls
 
       agent <- self
-      stream_state <- new.env(parent = emptyenv())
-      stream_state$reason <- "complete"
-      stream_state$active_run_id <- NULL
-      stream_state$session_started <- FALSE
-      stream_state$finished <- FALSE
-
-      wrapped_stream <- coro::async_generator(function() {
-        if (isTRUE(agent$.__enclos_env__$private$run_active)) {
-          cli::cli_abort(
-            "This agent already has an active run",
-            class = c("deputy_run_active", "deputy_error")
-          )
-        }
-
-        agent$.__enclos_env__$private$run_active <- TRUE
-        agent$.__enclos_env__$private$current_run_id <-
-          agent$.__enclos_env__$private$new_run_id()
-        agent$.__enclos_env__$private$current_run_context <-
-          effective_run_context
-        active_run_id <- agent$.__enclos_env__$private$current_run_id
-        stream_state$active_run_id <- active_run_id
-        on.exit(
-          agent$.__enclos_env__$private$finish_shiny_stream(stream_state),
-          add = TRUE
-        )
-
-        # Initialize lazily on first consumption. Merely constructing and
-        # abandoning a Shiny stream must not reserve this Agent forever.
-        agent$.__enclos_env__$private$tool_call_count <- 0L
-        agent$.__enclos_env__$private$tool_call_limit <- max_tool_calls
-        agent$.__enclos_env__$private$should_stop <- FALSE
-        agent$.__enclos_env__$private$stop_reason_from_hook <- NULL
-        shiny_limits <- agent$usage_limits
-        shiny_limits$max_tool_calls <- max_tool_calls
-        agent$.__enclos_env__$private$current_usage_limits <- shiny_limits
-        agent$.__enclos_env__$private$current_usage_baseline <-
-          agent_usage_snapshot(agent$chat)
-        agent$.__enclos_env__$private$current_tool_calls <- 0L
-        agent$.__enclos_env__$private$current_tool_results <- 0L
-        agent$.__enclos_env__$private$current_outer_requests <- 0L
-        agent$.__enclos_env__$private$current_external_usage <- AgentUsage()
-        agent$.__enclos_env__$private$current_stream_controller <- tryCatch(
-          ellmer::stream_controller(),
-          error = function(e) NULL
-        )
-        agent$.__enclos_env__$private$current_stream_content <- TRUE
-        agent$.__enclos_env__$private$pending_events <- list()
-        agent$.__enclos_env__$private$tool_started_at <- list()
-        agent$.__enclos_env__$private$tool_event_overrides <- list()
-        agent$.__enclos_env__$private$tool_call_records <- list()
-        agent$.__enclos_env__$private$pending_delegations <- list()
-        agent$.__enclos_env__$private$last_limit_status <- NULL
-        agent$.__enclos_env__$private$last_run_usage <- AgentUsage()
-        agent$.__enclos_env__$private$current_run_checkpoint_id <- NULL
-        agent$.__enclos_env__$private$current_run_requires_absolute_file_paths <-
-          TRUE
-
-        if (!is.null(agent$.__enclos_env__$private$.file_checkpoints)) {
-          checkpoint_id <- agent$.__enclos_env__$private$.file_checkpoints$checkpoint(
-            paste0("run ", active_run_id),
-            metadata = list(run_id = active_run_id, task = prompt)
-          )
-          agent$.__enclos_env__$private$current_run_checkpoint_id <-
-            checkpoint_id
-        }
-
-        agent$hooks$fire(
-          "SessionStart",
-          context = agent$.__enclos_env__$private$hook_context(
-            permissions = agent$permissions,
-            provider = agent$provider(),
-            tools_count = length(agent$chat$get_tools()),
-            run_id = active_run_id
-          )
-        )
-        stream_state$session_started <- TRUE
-        agent$hooks$fire(
-          "UserPromptSubmit",
-          prompt = prompt,
-          context = agent$.__enclos_env__$private$hook_context(
-            run_id = active_run_id
-          )
-        )
-
-        initial_limit_status <- usage_limit_status(
-          agent$.__enclos_env__$private$current_run_usage(),
-          agent$.__enclos_env__$private$current_usage_limits,
-          require_followup = TRUE
-        )
-        if (!is.null(initial_limit_status)) {
-          agent$.__enclos_env__$private$mark_usage_limit(initial_limit_status)
-          stream_state$reason <- initial_limit_status$reason
-        }
-
-        if (agent$.__enclos_env__$private$should_stop) {
-          stream <- coro::async_generator(function() {
-            if (FALSE) coro::yield("unreachable")
-          })()
-        } else {
-          stream <- tryCatch(
-            agent$.__enclos_env__$private$start_async_stream(prompt),
-            error = function(error) {
-              stream_state$reason <- "error"
-              stop(error)
-            }
-          )
-        }
-        is_generator <- inherits(stream, "coro_generator_instance")
-
-        repeat {
-          if (agent$.__enclos_env__$private$should_stop) {
-            stream_state$reason <-
-              agent$.__enclos_env__$private$stop_reason_from_hook %||%
-              "interrupted"
-            break
-          }
-
-          stream_error <- NULL
-          chunk <- NULL
-          if (isTRUE(is_generator)) {
-            chunk <- tryCatch(
-              stream(),
-              error = function(error) {
-                stream_error <<- error
-                NULL
-              }
-            )
-          } else {
-            chunk <- stream
-          }
-
-          if (is.null(stream_error) && promises::is.promising(chunk)) {
-            chunk <- tryCatch(
-              coro::await(chunk),
-              error = function(error) {
-                stream_error <<- error
-                NULL
-              }
-            )
-          }
-
-          if (!is.null(stream_error)) {
-            if (agent$.__enclos_env__$private$should_stop) {
-              stream_state$reason <-
-                agent$.__enclos_env__$private$stop_reason_from_hook %||%
-                "interrupted"
-              break
-            }
-            stream_state$reason <- "error"
-            stop(stream_error)
-          }
-
-          if (agent$.__enclos_env__$private$should_stop) {
-            stream_state$reason <-
-              agent$.__enclos_env__$private$stop_reason_from_hook %||%
-              "interrupted"
-            break
-          }
-
-          if (coro::is_exhausted(chunk)) {
-            break
-          }
-
-          coro::yield(chunk)
-          if (!isTRUE(is_generator)) {
-            break
-          }
-        }
-      })()
+      stream_state <- private$new_callback_run_state()
+      wrapped_stream <- private$callback_run_stream(
+        prompt,
+        limits = shiny_limits,
+        run_context = effective_run_context,
+        require_absolute_file_paths = TRUE,
+        state = stream_state
+      )
       reg.finalizer(
         environment(wrapped_stream),
         function(environment) {
@@ -1373,7 +1214,7 @@ Agent <- R6::R6Class(
               silent = TRUE
             )
             try(
-              agent$.__enclos_env__$private$finish_shiny_stream(stream_state),
+              agent$.__enclos_env__$private$finish_callback_run(stream_state),
               silent = TRUE
             )
           }
@@ -1381,9 +1222,103 @@ Agent <- R6::R6Class(
         onexit = TRUE
       )
       wrapped_stream
+    },
+
+    #' @description
+    #' Run an agentic task asynchronously and resolve to an [AgentResult].
+    #'
+    #' Like `run_shiny()`, the multi-turn loop is driven by ellmer's
+    #' `stream_async()`, so the R process is never blocked while the model or
+    #' tools work: other Shiny sessions, `later` callbacks, and promise chains
+    #' keep running. Unlike `run_shiny()`, nothing is streamed to a UI. The
+    #' returned promise resolves once the run stops and carries the final
+    #' response, run-scoped usage, and stop reason. Permissions, hooks, and
+    #' [UsageLimits] are enforced as in `run_shiny()` (callbacks plus terminal
+    #' accounting). File tools may use relative paths resolved against
+    #' `working_dir`, as in `run()`; the absolute-path rule is specific to
+    #' `run_shiny()`.
+    #'
+    #' Use this when an Agent is a *worker* inside a larger async system, for
+    #' example a delegated sub-agent executed from the tool of a parent chat
+    #' that is itself streaming. `output_format` is not supported here;
+    #' structured output still requires `run()` or `run_sync()`.
+    #'
+    #' @param task The task for the agent to perform
+    #' @param usage_limits Optional [UsageLimits] override for this run. Unset
+    #'   fields fall back to the Agent's limits. With `on_exceed = "error"`,
+    #'   hitting a limit rejects the promise with the structured limit error
+    #'   instead of resolving with a typed `stop_reason`.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run. Protected constructor identity fields cannot change.
+    #' @return A `promises::promise` resolving to an [AgentResult]. It is
+    #'   rejected if the provider stream fails or a limit configured with
+    #'   `on_exceed = "error"` is reached.
+    run_async = function(task, usage_limits = NULL, run_context = list()) {
+      rlang::check_installed("promises", reason = "for run_async()")
+
+      if (isTRUE(private$run_active)) {
+        cli::cli_abort(
+          "This agent already has an active run",
+          class = c("deputy_run_active", "deputy_error")
+        )
+      }
+
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
+      )
+
+      limits <- if (is.null(usage_limits)) {
+        self$usage_limits
+      } else {
+        merge_usage_limits(usage_limits, self$usage_limits)
+      }
+      limits <- normalize_usage_limits(limits)
+
+      agent <- self
+      start_time <- Sys.time()
+      stream_state <- private$new_callback_run_state()
+      stream <- private$callback_run_stream(
+        task,
+        limits = limits,
+        run_context = effective_run_context,
+        require_absolute_file_paths = FALSE,
+        state = stream_state
+      )
+
+      coro::async(function() {
+        # Text emitted before a tool call is working narration, not the
+        # answer. Reset on every tool result so `response` is the text of the
+        # final assistant turn, matching `run_sync()`'s `text_complete`.
+        response_parts <- character()
+        repeat {
+          chunk <- coro::await(stream())
+          if (coro::is_exhausted(chunk)) {
+            break
+          }
+          if (inherits(chunk, "ellmer::ContentToolResult")) {
+            response_parts <- character()
+          } else if (inherits(chunk, "ellmer::ContentText")) {
+            response_parts <- c(response_parts, chunk@text)
+          } else if (is.character(chunk)) {
+            response_parts <- c(response_parts, chunk)
+          }
+        }
+
+        # The stream's exit handler has finalized the run by now: hooks have
+        # fired, run-scoped state is cleared, and `stream_state` carries the
+        # terminal reason, usage, and cost. (Assembled outside the async body
+        # because coro's state-machine parser rejects `x <- if (...)`.)
+        agent$.__enclos_env__$private$callback_run_result(
+          response_parts,
+          limits = limits,
+          state = stream_state,
+          run_context = effective_run_context,
+          start_time = start_time
+        )
+      })()
     }
   ),
-
   active = list(
     #' @field agent_id Stable Agent instance identifier. Read-only.
     agent_id = function(value) {
@@ -1624,7 +1559,251 @@ Agent <- R6::R6Class(
       private$.file_checkpoints$finalize_pending()
     },
 
-    finish_shiny_stream = function(state) {
+    # Shared state for one callback-driven run (`run_shiny()`/`run_async()`).
+    # The stream body and its exit handler communicate through this env so a
+    # consumer can read the terminal reason, usage, and cost after the stream
+    # is exhausted and run-scoped private fields have been cleared.
+    new_callback_run_state = function() {
+      state <- new.env(parent = emptyenv())
+      state$reason <- "complete"
+      state$active_run_id <- NULL
+      state$session_started <- FALSE
+      state$finished <- FALSE
+      state$usage <- NULL
+      state$cost <- NULL
+      state
+    },
+
+    # Assemble the `AgentResult` for a finished `run_async()` run. Honors
+    # `on_exceed = "error"` by signalling the structured limit error when the
+    # run stopped because of the recorded limit.
+    callback_run_result = function(
+      response_parts,
+      limits,
+      state,
+      run_context,
+      start_time
+    ) {
+      response <- if (length(response_parts) > 0L) {
+        paste(response_parts, collapse = "")
+      } else {
+        tryCatch(private$get_last_response(), error = function(e) NULL)
+      }
+
+      limit_status <- private$last_limit_status
+      if (
+        !is.null(limit_status) &&
+          identical(limits$on_exceed, "error") &&
+          identical(state$reason, limit_status$reason)
+      ) {
+        private$abort_usage_limit(limit_status)
+      }
+
+      AgentResult$new(
+        response = response,
+        turns = self$chat$get_turns(),
+        cost = state$cost %||% self$cost(),
+        events = list(),
+        duration = as.numeric(Sys.time() - start_time, units = "secs"),
+        stop_reason = state$reason %||% "complete",
+        structured_output = NULL,
+        session_id = private$.session_id,
+        run_id = state$active_run_id,
+        agent_id = self$agent_id,
+        agent_name = self$agent_name,
+        parent_agent_id = private$.parent_agent_id,
+        parent_run_id = private$.parent_run_id,
+        delegation_id = private$.delegation_id,
+        run_context = run_context,
+        usage = state$usage %||% AgentUsage()
+      )
+    },
+
+    # The engine behind `run_shiny()` and `run_async()`: a lazily-started
+    # async generator that drives ellmer's `stream_async()` while deputy's
+    # permissions, hooks, and usage limits are enforced through the
+    # `on_tool_request`/`on_tool_result` callbacks. Yields whatever the
+    # provider stream yields (content objects in content mode).
+    callback_run_stream = function(
+      prompt,
+      limits,
+      run_context,
+      require_absolute_file_paths,
+      state
+    ) {
+      agent <- self
+      stream_state <- state
+      effective_run_context <- run_context
+      run_limits <- limits
+
+      coro::async_generator(function() {
+        if (isTRUE(agent$.__enclos_env__$private$run_active)) {
+          cli::cli_abort(
+            "This agent already has an active run",
+            class = c("deputy_run_active", "deputy_error")
+          )
+        }
+
+        agent$.__enclos_env__$private$run_active <- TRUE
+        agent$.__enclos_env__$private$current_run_id <-
+          agent$.__enclos_env__$private$new_run_id()
+        agent$.__enclos_env__$private$current_run_context <-
+          effective_run_context
+        active_run_id <- agent$.__enclos_env__$private$current_run_id
+        stream_state$active_run_id <- active_run_id
+        on.exit(
+          agent$.__enclos_env__$private$finish_callback_run(stream_state),
+          add = TRUE
+        )
+
+        # Initialize lazily on first consumption. Merely constructing and
+        # abandoning a stream must not reserve this Agent forever.
+        agent$.__enclos_env__$private$tool_call_count <- 0L
+        agent$.__enclos_env__$private$tool_call_limit <-
+          run_limits$max_tool_calls
+        agent$.__enclos_env__$private$should_stop <- FALSE
+        agent$.__enclos_env__$private$stop_reason_from_hook <- NULL
+        agent$.__enclos_env__$private$current_usage_limits <- run_limits
+        agent$.__enclos_env__$private$current_usage_baseline <-
+          agent_usage_snapshot(agent$chat)
+        agent$.__enclos_env__$private$current_tool_calls <- 0L
+        agent$.__enclos_env__$private$current_tool_results <- 0L
+        agent$.__enclos_env__$private$current_outer_requests <- 0L
+        agent$.__enclos_env__$private$current_external_usage <- AgentUsage()
+        agent$.__enclos_env__$private$current_stream_controller <- tryCatch(
+          ellmer::stream_controller(),
+          error = function(e) NULL
+        )
+        agent$.__enclos_env__$private$current_stream_content <- TRUE
+        agent$.__enclos_env__$private$pending_events <- list()
+        agent$.__enclos_env__$private$tool_started_at <- list()
+        agent$.__enclos_env__$private$tool_event_overrides <- list()
+        agent$.__enclos_env__$private$tool_call_records <- list()
+        agent$.__enclos_env__$private$pending_delegations <- list()
+        agent$.__enclos_env__$private$last_limit_status <- NULL
+        agent$.__enclos_env__$private$last_run_usage <- AgentUsage()
+        agent$.__enclos_env__$private$current_run_checkpoint_id <- NULL
+        agent$.__enclos_env__$private$current_run_requires_absolute_file_paths <-
+          isTRUE(require_absolute_file_paths)
+
+        if (!is.null(agent$.__enclos_env__$private$.file_checkpoints)) {
+          checkpoint_id <- agent$.__enclos_env__$private$.file_checkpoints$checkpoint(
+            paste0("run ", active_run_id),
+            metadata = list(run_id = active_run_id, task = prompt)
+          )
+          agent$.__enclos_env__$private$current_run_checkpoint_id <-
+            checkpoint_id
+        }
+
+        agent$hooks$fire(
+          "SessionStart",
+          context = agent$.__enclos_env__$private$hook_context(
+            permissions = agent$permissions,
+            provider = agent$provider(),
+            tools_count = length(agent$chat$get_tools()),
+            run_id = active_run_id
+          )
+        )
+        stream_state$session_started <- TRUE
+        agent$hooks$fire(
+          "UserPromptSubmit",
+          prompt = prompt,
+          context = agent$.__enclos_env__$private$hook_context(
+            run_id = active_run_id
+          )
+        )
+
+        initial_limit_status <- usage_limit_status(
+          agent$.__enclos_env__$private$current_run_usage(),
+          agent$.__enclos_env__$private$current_usage_limits,
+          require_followup = TRUE
+        )
+        if (!is.null(initial_limit_status)) {
+          agent$.__enclos_env__$private$mark_usage_limit(initial_limit_status)
+          stream_state$reason <- initial_limit_status$reason
+        }
+
+        if (agent$.__enclos_env__$private$should_stop) {
+          stream <- coro::async_generator(function() {
+            if (FALSE) coro::yield("unreachable")
+          })()
+        } else {
+          stream <- tryCatch(
+            agent$.__enclos_env__$private$start_async_stream(prompt),
+            error = function(error) {
+              stream_state$reason <- "error"
+              stop(error)
+            }
+          )
+        }
+        is_generator <- inherits(stream, "coro_generator_instance")
+
+        repeat {
+          if (agent$.__enclos_env__$private$should_stop) {
+            stream_state$reason <-
+              agent$.__enclos_env__$private$stop_reason_from_hook %||%
+              "interrupted"
+            break
+          }
+
+          stream_error <- NULL
+          chunk <- NULL
+          if (isTRUE(is_generator)) {
+            chunk <- tryCatch(
+              stream(),
+              error = function(error) {
+                stream_error <<- error
+                NULL
+              }
+            )
+          } else {
+            chunk <- stream
+          }
+
+          if (is.null(stream_error) && promises::is.promising(chunk)) {
+            chunk <- tryCatch(
+              coro::await(chunk),
+              error = function(error) {
+                stream_error <<- error
+                NULL
+              }
+            )
+          }
+
+          if (!is.null(stream_error)) {
+            if (agent$.__enclos_env__$private$should_stop) {
+              stream_state$reason <-
+                agent$.__enclos_env__$private$stop_reason_from_hook %||%
+                "interrupted"
+              break
+            }
+            stream_state$reason <- "error"
+            stop(stream_error)
+          }
+
+          if (agent$.__enclos_env__$private$should_stop) {
+            stream_state$reason <-
+              agent$.__enclos_env__$private$stop_reason_from_hook %||%
+              "interrupted"
+            break
+          }
+
+          if (coro::is_exhausted(chunk)) {
+            break
+          }
+
+          coro::yield(chunk)
+          if (!isTRUE(is_generator)) {
+            break
+          }
+        }
+      })()
+    },
+
+    # Terminal accounting for a callback-driven run (`run_shiny()` /
+    # `run_async()`): settles the stop reason, fires Stop/SessionEnd, records
+    # run-scoped usage and cost on `state`, and releases the active run.
+    finish_callback_run = function(state) {
       active_run_id <- state$active_run_id
       if (
         isTRUE(state$finished) ||
@@ -1642,6 +1821,9 @@ Agent <- R6::R6Class(
             private$current_tool_calls > private$current_tool_results
           private$finalize_pending_checkpoints()
           usage <- private$current_run_usage()
+          state$usage <- usage
+          state$cost <- tryCatch(self$cost(), error = function(e) NULL)
+          private$last_run_usage <- usage
           limits <- private$current_usage_limits
           if (
             identical(state$reason, "complete") &&
