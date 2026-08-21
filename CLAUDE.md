@@ -40,9 +40,15 @@ deputy/
 ├── exec/deputy.R           # Terminal CLI using Rapp
 ├── vignettes/              # User documentation (R Markdown)
 ├── man/                    # Auto-generated roxygen2 docs
+├── dev/agents/             # Agent skill configuration (issue tracker, labels, domain)
+├── dev/adr/                # Architecture decision records
+├── CONTEXT.md              # Domain glossary - use these terms in issues and docs
 ├── .claude/                # Claude Code environment setup
 └── .github/workflows/      # CI/CD pipelines
 ```
+
+> `docs/` is the generated pkgdown site and is gitignored. Hand-written docs for
+> humans go in `vignettes/`; docs for agents go in `dev/`.
 
 ## Development Setup
 
@@ -109,7 +115,8 @@ Rscript -e "devtools::install()"
 - **Formatter**: Air (configuration in `air.toml`)
 - **Documentation**: roxygen2 with markdown support
 - **Classes**: R6 for complex objects (Agent, Permissions, HookRegistry, Skill)
-- **Errors**: Use custom error classes from `R/errors.R` (e.g., `deputy_error_permission_denied`)
+- **Errors**: Signal with the `abort_*()` constructors in `R/errors.R` (e.g. `abort_permission_denied()`), never bare `stop()`
+- **Messages**: All user-facing output goes through cli — `cli_abort()`, `cli_warn()`, `cli_inform()`, never `stop()`/`warning()`/`message()`
 
 ### R6 Class Pattern
 
@@ -163,20 +170,28 @@ tool_name <- ellmer::tool(
 ### Error Handling
 
 ```r
-# Use custom error constructors
-stop(deputy_error_permission_denied(
+# Signalling: abort_*() constructors signal directly, so don't wrap in stop()
+abort_permission_denied(
+  "Write operations not allowed in {.val readonly} mode",
   tool_name = "write_file",
-  reason = "Write operations not allowed in readonly mode"
-))
+  permission_mode = "readonly"
+)
 
-# Catching errors
+# Catching: classes are prefixed with deputy_ and inherit from deputy_error
 tryCatch(
   agent$run_sync(task),
-  deputy_error_permission_denied = function(e) {
-    cli::cli_alert_danger("Permission denied: {e$message}")
+  deputy_permission_denied = function(e) {
+    cli::cli_alert_danger("Permission denied: {conditionMessage(e)}")
+  },
+  deputy_error = function(e) {
+    cli::cli_alert_danger("Deputy error: {conditionMessage(e)}")
   }
 )
 ```
+
+Available constructors: `abort_deputy()`, `abort_permission_denied()`, `abort_tool_execution()`,
+`abort_budget_exceeded()`, `abort_turn_limit()`, `abort_provider()`, `abort_session_load()`,
+`abort_session_save()`, `abort_hook()`. Test membership with `is_deputy_error(x, class)`.
 
 ### Testing Pattern
 
@@ -269,50 +284,55 @@ delegated agents are bounded by the same rule and by their lead's restrictions.
 - `shiny` - Shiny framework
 - `shinychat` - Chat UI component
 
-## Issue Tracking with Beads
+## Agent skills
 
-This project uses **bd** (beads) for issue tracking. Issues are stored in `.beads/` and synced via git.
+### Issue tracker
 
-### Git Integration
+Issues live in GitHub Issues on `JamesHWade/deputy`, managed with the `gh` CLI. See `dev/agents/issue-tracker.md`.
 
-Beads integrates with git via:
-- **JSONL sync**: Issues stored in `.beads/issues.jsonl` (git-tracked)
-- **Merge driver**: Intelligent JSONL conflict resolution (auto-configured)
-- **Hooks**: Auto-sync on git operations
+### Triage labels
 
-Files that should be committed: `.beads/.gitignore`, `.gitattributes`
-Files that are gitignored: `.beads/beads.db`, daemon files
+The five canonical triage roles use their default label strings. See `dev/agents/triage-labels.md`.
 
-### Essential Commands
+### Domain docs
+
+Single-context: `CONTEXT.md` at the root, ADRs in `dev/adr/`. See `dev/agents/domain.md`.
+
+## Issue Tracking
+
+Issues live in GitHub Issues. Use the `gh` CLI.
 
 ```bash
 # Finding work
-bd ready                              # Show issues ready to work (no blockers)
-bd list --status=open                 # All open issues
-bd show <id>                          # Detailed issue view with dependencies
+gh issue list --state open                       # All open issues
+gh issue list --state open --label ready-for-agent
+gh issue view <number> --comments                # Detailed view
 
 # Working on issues
-bd update <id> --status=in_progress   # Claim work
-bd close <id>                         # Mark complete
-bd close <id1> <id2> ...              # Close multiple issues
+gh issue edit <number> --add-assignee @me        # Claim work
+gh issue close <number> --comment "Fixed in #<pr>"
 
-# Creating issues (always include description for context)
-bd create "Fix bug" --description="Details here" -t bug -p 1
+# Creating issues (always include a body with context)
+gh issue create --title "Fix bug" --body "Details here" --label bug
+```
 
-# Dependencies
-bd dep add <issue> <depends-on>       # Add dependency
-bd blocked                            # Show blocked issues
-bd dep tree <id>                      # View dependency tree
+Use a heredoc for multi-line bodies:
 
-# Sync
-bd sync                               # Sync with git remote
-bd sync --status                      # Check sync status
+```bash
+gh issue create --title "..." --body "$(cat <<'BODY'
+## Problem
+...
+
+## Proposed fix
+...
+BODY
+)"
 ```
 
 ### Tracking Work
 
-Use Beads (`bd`) for work that must persist across sessions, has dependencies,
-or needs a handoff. Transient personal notes do not replace the Beads record.
+Use GitHub Issues for work that must persist across sessions, has dependencies,
+or needs a handoff. Transient personal notes do not replace the issue record.
 
 ## Feature Branch + PR Workflow
 
@@ -331,24 +351,17 @@ or needs a handoff. Transient personal notes do not replace the Beads record.
 **⚠️ IMPORTANT: Create the feature branch BEFORE claiming the issue or writing any code.**
 
 ```bash
-bd ready                              # Find available work
-bd show <id>                          # Review issue details
+gh issue list --state open            # Find available work
+gh issue view <number>                # Review issue details
 
 # CREATE BRANCH FIRST - before any code changes!
 git checkout -b feature/<short-description>
 # or: git checkout -b fix/<short-description>
 
-bd update <id> --status=in_progress   # Now claim the work
+gh issue edit <number> --add-assignee @me   # Now claim the work
 ```
 
-### 2. Work and Sync
-
-```bash
-# Make changes...
-bd sync                               # Sync beads periodically
-```
-
-### 3. Run Quality Gates
+### 2. Run Quality Gates
 
 ```bash
 # Format ALL code with air (R/ and tests/)
@@ -367,26 +380,22 @@ Rscript -e "devtools::check()"
 Rscript -e "devtools::document(); pkgdown::build_site(preview = FALSE)"
 ```
 
-### 4. Create PR and Close Issue
-
-When code is complete and ready for review:
+### 3. Create PR
 
 ```bash
 git add .
-git commit -m "feat: description (deputy-xxx)"  # Include beads issue ID!
-bd close <id>                         # Close beads issue - work is done
-bd sync
+git commit -m "feat: description (#<issue-number>)"   # Reference the issue!
 git push -u origin HEAD
-gh pr create --title "..." --body "Resolves deputy-XXX"
+gh pr create --title "..." --body "Closes #<issue-number>"
 ```
 
-**Important**: Close the beads issue when the *work* is complete, not when the PR is merged. The issue tracks your work; the PR tracks the review/merge process.
+Putting `Closes #<n>` in the PR body lets GitHub close the issue automatically when the PR merges. Don't close the issue by hand.
 
-### 5. Human Reviews and Merges PR
+### 4. Human Reviews and Merges PR
 
 Agents create PRs but **do not merge them**. Humans review and merge PRs to main.
 
-### 6. After PR Merged (Cleanup)
+### 5. After PR Merged (Cleanup)
 
 ```bash
 git checkout main
@@ -403,34 +412,27 @@ usethis::pr_finish()
 
 **CRITICAL**: Before ending a session, complete ALL steps. Work is NOT complete until `git push` succeeds.
 
-### Mandatory Checklist (Feature Branch Workflow)
-
 ```bash
 # 1. Verify you're on a feature branch (NOT main!)
 git branch --show-current  # Should NOT be 'main'
 
 # 2. File issues for remaining work
-bd create "Follow-up task" --description="..." -t task -p 2
+gh issue create --title "Follow-up task" --body "..."
 
 # 3. Run quality gates (if code changed)
 air format R/ tests/testthat/
 jarl check R/
 Rscript -e "devtools::check()"
 
-# 4. Update issue status
-bd close <completed-issues>           # Include reason if helpful
-bd update <in-progress-issues> --status=open  # If not finished
-
-# 5. Commit with beads issue ID
+# 4. Commit referencing the issue
 git add .
-git commit -m "feat: description (deputy-xxx)"  # Always include issue ID!
-bd sync
+git commit -m "feat: description (#<issue-number>)"
 git push -u origin HEAD
 
-# 6. Create PR (if not already created)
-gh pr create --title "..." --body "Resolves deputy-xxx"
+# 5. Create PR (if not already created)
+gh pr create --title "..." --body "Closes #<issue-number>"
 
-# 7. Verify
+# 6. Verify
 git status  # Should show "up to date with origin"
 ```
 
@@ -441,41 +443,22 @@ git status  # Should show "up to date with origin"
 - NEVER stop before pushing—that leaves work stranded locally
 - NEVER say "ready to push when you are"—YOU must push
 - If push fails, resolve and retry until it succeeds
-- Always run `bd sync` before ending session
-- Always include beads issue ID in commit messages (enables `bd doctor` to detect orphans)
+- Always reference the issue number in commit messages and PR bodies
 
 ## Parallel Sessions & Worktrees
 
-This project supports parallel work via git worktrees. The beads daemon commits changes to a dedicated branch, preventing conflicts when multiple Claude sessions run simultaneously.
-
-### Creating Worktrees for Parallel Features
+This project supports parallel work via git worktrees.
 
 ```bash
 # From main repo, create worktree for a feature
 git worktree add ../deputy-feature-x -b feature/feature-x
 cd ../deputy-feature-x
-
-# Beads commands work normally - shared database, safe daemon
-bd ready
-bd create "Implement feature" -t task -p 2
-bd sync
 ```
-
-All worktrees share the same `.beads` database in the main repo. Changes are immediately visible across sessions.
 
 ### Cleanup After PR Merged
 
 ```bash
 git worktree remove ../deputy-feature-x
-git worktree prune
-```
-
-### Troubleshooting: "Branch already checked out"
-
-If git says a branch is checked out in a beads worktree:
-
-```bash
-rm -rf .git/beads-worktrees
 git worktree prune
 ```
 
