@@ -11,7 +11,8 @@
 ^pkgdown$
 ^codecov\.yml$
 ^\.claude$
-^\.beads$
 ^\.mcp\.json$
 ^doc$
 ^Meta$
+^dev$
+^CONTEXT\.md$
