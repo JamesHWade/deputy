@@ -156,6 +156,8 @@ for writes made through its native file tools.
 
 - [`Agent$run_shiny()`](#method-Agent-run_shiny)
 
+- [`Agent$run_async()`](#method-Agent-run_async)
+
 - [`Agent$clone()`](#method-Agent-clone)
 
 ------------------------------------------------------------------------
@@ -926,6 +928,62 @@ toward tool usage.
 
 An async content stream suitable for
 [`shinychat::chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
+
+------------------------------------------------------------------------
+
+### `Agent$run_async()`
+
+Run an agentic task asynchronously and resolve to an
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md).
+
+Like `run_shiny()`, the multi-turn loop is driven by ellmer's
+`stream_async()`, so the R process is never blocked while the model or
+tools work: other Shiny sessions, `later` callbacks, and promise chains
+keep running. Unlike `run_shiny()`, nothing is streamed to a UI. The
+returned promise resolves once the run stops and carries the final
+response, run-scoped usage, and stop reason. Permissions, hooks, and
+[UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+are enforced as in `run_shiny()` (callbacks plus terminal accounting).
+File tools may use relative paths resolved against `working_dir`, as in
+`run()`; the absolute-path rule is specific to `run_shiny()`.
+
+Use this when an Agent is a *worker* inside a larger async system, for
+example a delegated sub-agent executed from the tool of a parent chat
+that is itself streaming. `output_format` is not supported here;
+structured output still requires `run()` or `run_sync()`.
+
+#### Usage
+
+    Agent$run_async(task, usage_limits = NULL, run_context = list())
+
+#### Arguments
+
+- `task`:
+
+  The task for the agent to perform
+
+- `usage_limits`:
+
+  Optional
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  override for this run. Unset fields fall back to the Agent's limits.
+  With `on_exceed = "error"`, hitting a limit rejects the promise with
+  the structured limit error instead of resolving with a typed
+  `stop_reason`.
+
+- `run_context`:
+
+  Canonical JSON-compatible context to add to or narrow for this run.
+  Protected constructor identity fields cannot change.
+
+#### Returns
+
+A
+[`promises::promise`](https://rstudio.github.io/promises/reference/promise.html)
+resolving to an
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md).
+It is rejected if the provider stream fails or a limit configured with
+`on_exceed = "error"` is reached.
 
 ------------------------------------------------------------------------
 

@@ -80,6 +80,36 @@ repeat {
 }
 ```
 
+### Async Runs
+
+`run_async()` runs a task without blocking the R process and returns a
+promise that resolves to an `AgentResult`. It uses the same
+callback-enforced permissions, hooks, and `UsageLimits` as
+`run_shiny()`, but collects the result instead of streaming to a UI.
+Reach for it when an Agent is a worker inside a larger async system,
+such as a sub-agent invoked from a tool of a chat that is itself
+streaming in Shiny:
+
+``` r
+
+worker <- Agent$new(
+  chat = parent_chat$clone()$set_turns(list()),
+  system_prompt = "You are a literature scout. Report sources with DOIs.",
+  tools = tools_web(),
+  usage_limits = UsageLimits(max_requests = 8, max_tool_calls = 12)
+)
+
+worker$run_async("Find three recent reviews on PFAS remediation") |>
+  promises::then(function(result) {
+    cat(result$stop_reason, "-", result$usage$tool_calls, "tool calls\n")
+    result$response
+  })
+```
+
+With `UsageLimits(on_exceed = "error")` the promise is rejected with the
+structured limit error instead of resolving with a typed `stop_reason`.
+Structured `output_format` still requires `run()` or `run_sync()`.
+
 ### CLI (`exec/deputy.R`)
 
 deputy ships a [Rapp](https://github.com/r-lib/Rapp) package executable

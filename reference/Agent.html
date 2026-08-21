@@ -190,6 +190,7 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <li><p><a href="#method-Agent-mcp_tools"><code>Agent$mcp_tools()</code></a></p></li>
 <li><p><a href="#method-Agent-mcp_status"><code>Agent$mcp_status()</code></a></p></li>
 <li><p><a href="#method-Agent-run_shiny"><code>Agent$run_shiny()</code></a></p></li>
+<li><p><a href="#method-Agent-run_async"><code>Agent$run_async()</code></a></p></li>
 <li><p><a href="#method-Agent-clone"><code>Agent$clone()</code></a></p></li>
 </ul></div><p></p><hr><a id="method-Agent-initialize"></a><div class="section">
 <h3 id="agent-new-"><code>Agent$new()</code><a class="anchor" aria-label="anchor" href="#agent-new-"></a></h3>
@@ -842,13 +843,58 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 
 </div>
 
+<p></p><hr><a id="method-Agent-run_async"></a><div class="section">
+<h3 id="agent-run-async-"><code>Agent$run_async()</code><a class="anchor" aria-label="anchor" href="#agent-run-async-"></a></h3>
+<p>Run an agentic task asynchronously and resolve to an <a href="AgentResult.html">AgentResult</a>.</p>
+<p>Like <code>run_shiny()</code>, the multi-turn loop is driven by ellmer's
+<code>stream_async()</code>, so the R process is never blocked while the model or
+tools work: other Shiny sessions, <code>later</code> callbacks, and promise chains
+keep running. Unlike <code>run_shiny()</code>, nothing is streamed to a UI. The
+returned promise resolves once the run stops and carries the final
+response, run-scoped usage, and stop reason. Permissions, hooks, and
+<a href="UsageLimits.html">UsageLimits</a> are enforced as in <code>run_shiny()</code> (callbacks plus terminal
+accounting). File tools may use relative paths resolved against
+<code>working_dir</code>, as in <code>run()</code>; the absolute-path rule is specific to
+<code>run_shiny()</code>.</p>
+<p>Use this when an Agent is a <em>worker</em> inside a larger async system, for
+example a delegated sub-agent executed from the tool of a parent chat
+that is itself streaming. <code>output_format</code> is not supported here;
+structured output still requires <code>run()</code> or <code>run_sync()</code>.</p><div class="section">
+<h4 id="usage-28">Usage<a class="anchor" aria-label="anchor" href="#usage-28"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run_async</span><span class="op">(</span><span class="va">task</span>, usage_limits <span class="op">=</span> <span class="cn">NULL</span>, run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-17">Arguments<a class="anchor" aria-label="anchor" href="#arguments-17"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>task</code></dt>
+<dd><p>The task for the agent to perform</p></dd>
+
+      <dt><code>usage_limits</code></dt>
+<dd><p>Optional <a href="UsageLimits.html">UsageLimits</a> override for this run. Unset
+fields fall back to the Agent's limits. With <code>on_exceed = "error"</code>,
+hitting a limit rejects the promise with the structured limit error
+instead of resolving with a typed <code>stop_reason</code>.</p></dd>
+
+      <dt><code>run_context</code></dt>
+<dd><p>Canonical JSON-compatible context to add to or narrow
+for this run. Protected constructor identity fields cannot change.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-27">Returns<a class="anchor" aria-label="anchor" href="#returns-27"></a></h4>
+<p>A <code><a href="https://rstudio.github.io/promises/reference/promise.html" class="external-link">promises::promise</a></code> resolving to an <a href="AgentResult.html">AgentResult</a>. It is
+rejected if the provider stream fails or a limit configured with
+<code>on_exceed = "error"</code> is reached.</p>
+</div>
+
+</div>
+
 <p></p><hr><a id="method-Agent-clone"></a><div class="section">
 <h3 id="agent-clone-"><code>Agent$clone()</code><a class="anchor" aria-label="anchor" href="#agent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-28">Usage<a class="anchor" aria-label="anchor" href="#usage-28"></a></h4>
+<h4 id="usage-29">Usage<a class="anchor" aria-label="anchor" href="#usage-29"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-17">Arguments<a class="anchor" aria-label="anchor" href="#arguments-17"></a></h4>
+<h4 id="arguments-18">Arguments<a class="anchor" aria-label="anchor" href="#arguments-18"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

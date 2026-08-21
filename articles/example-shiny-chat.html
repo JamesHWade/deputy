@@ -175,9 +175,45 @@ stream</td>
 </table>
 </div>
 <div class="section level2">
+<h2 id="sub-agents-inside-a-streaming-chat-run_async">Sub-Agents Inside a Streaming Chat: <code>run_async()</code><a class="anchor" aria-label="anchor" href="#sub-agents-inside-a-streaming-chat-run_async"></a>
+</h2>
+<p><code>run_shiny()</code> is for the agent that owns the chat UI. When
+a Deputy Agent is instead a <em>worker</em> – for example a delegated
+sub-agent invoked from an ellmer tool of a chat that is already
+streaming – use <code>run_async()</code>. It drives the same
+callback-enforced loop but returns a promise that resolves to an
+<code>AgentResult</code>, so the tool body can <code>await</code> it
+without blocking other Shiny sessions:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">scout</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="va">chat</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="fu">set_turns</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  system_prompt <span class="op">=</span> <span class="st">"You are a literature scout. Report sources with DOIs."</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_web.html">tools_web</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">8</span>, max_tool_calls <span class="op">=</span> <span class="fl">12</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">tool_scout</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
+<span>  fun <span class="op">=</span> <span class="fu">coro</span><span class="fu">::</span><span class="fu"><a href="https://coro.r-lib.org/reference/async.html" class="external-link">async</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">prompt</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">result</span> <span class="op">&lt;-</span> <span class="fu">coro</span><span class="fu">::</span><span class="fu"><a href="https://coro.r-lib.org/reference/async.html" class="external-link">await</a></span><span class="op">(</span><span class="va">scout</span><span class="op">$</span><span class="fu">run_async</span><span class="op">(</span><span class="va">prompt</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span>, <span class="st">"\n\n(stopped: "</span>, <span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span>, <span class="st">")"</span><span class="op">)</span></span>
+<span>  <span class="op">}</span><span class="op">)</span>,</span>
+<span>  name <span class="op">=</span> <span class="st">"agent_scout"</span>,</span>
+<span>  description <span class="op">=</span> <span class="st">"Delegate a literature search to the scout sub-agent."</span>,</span>
+<span>  arguments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>prompt <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="st">"Self-contained task"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="va">tool_scout</span><span class="op">)</span></span></code></pre></div>
+<p><code>run_async()</code> enforces everything in the table above
+except file path confinement, which is a <code>run_shiny()</code> rule:
+worker agents resolve relative paths against their
+<code>working_dir</code> like <code>run()</code> does. Pass
+<code>UsageLimits(on_exceed = "error")</code> to have the promise
+rejected on a limit instead of resolving with a typed
+<code>stop_reason</code>.</p>
+</div>
+<div class="section level2">
 <h2 id="basic-setup">Basic Setup<a class="anchor" aria-label="anchor" href="#basic-setup"></a>
 </h2>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://shiny.posit.co/" class="external-link">shiny</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://posit-dev.github.io/shinychat/r/" class="external-link">shinychat</a></span><span class="op">)</span></span>
@@ -224,7 +260,7 @@ stream</td>
 </h2>
 <p>Deputy’s permissions and hooks fire on every tool call, even though
 shinychat drives the streaming loop:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">workspace</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/normalizePath.html" class="external-link">normalizePath</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>, mustWork <span class="op">=</span> <span class="cn">TRUE</span>, winslash <span class="op">=</span> <span class="st">"/"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
@@ -294,7 +330,7 @@ counting separately.</p>
 <h2 id="running-the-example">Running the Example<a class="anchor" aria-label="anchor" href="#running-the-example"></a>
 </h2>
 <p>A complete example app is included in the package:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples/shiny-chat"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

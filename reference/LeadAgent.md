@@ -55,6 +55,7 @@ Inherited methods
 - [`Agent$register_tools()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-register_tools)
 - [`Agent$rewind_files()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-rewind_files)
 - [`Agent$run()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run)
+- [`Agent$run_async()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_async)
 - [`Agent$run_shiny()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_shiny)
 - [`Agent$run_sync()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_sync)
 - [`Agent$save_session()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-save_session)
