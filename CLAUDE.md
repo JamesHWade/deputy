@@ -108,6 +108,13 @@ Rscript -e "devtools::build()"
 Rscript -e "devtools::install()"
 ```
 
+### Versioning
+
+deputy stays on development versions (`0.0.0.9xxx`) until it is ready for CRAN.
+Do not bump to `0.1.0` or any release version as a way of marking progress — a
+release number means "submitted to CRAN", nothing else. Milestones carry
+direction; the version carries release state.
+
 ## Code Conventions
 
 ### Style
