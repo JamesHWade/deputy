@@ -54,6 +54,23 @@
   the same rule and retain lead capability, tool-gate, callback, and
   write-root restrictions.
 
+- `Agent` now rejects a provider tool request whose name is missing,
+  unreadable, or malformed before it reaches usage accounting,
+  permissions, hooks, or execution
+  ([\#26](https://github.com/JamesHWade/deputy/issues/26)).
+
+- `HookMatcher$new()` now rejects callbacks that cannot accept an
+  event’s arguments and regex patterns that do not compile, reporting
+  both problems at construction instead of during a run
+  ([\#35](https://github.com/JamesHWade/deputy/issues/35),
+  [\#36](https://github.com/JamesHWade/deputy/issues/36)).
+
+- `Skill$check_requirements()` now treats malformed or unmatched
+  provider names as mismatches while preserving compatibility when a
+  skill and chat name the same generic provider. Internal provider
+  normalization returns `NA` for unknown names as documented
+  ([\#30](https://github.com/JamesHWade/deputy/issues/30)).
+
 - `compact()` now summarizes on a clone of the agent’s own chat instead
   of constructing a new provider. Previously any provider other than
   OpenAI, Anthropic, or Google fell through to
