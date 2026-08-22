@@ -53,9 +53,10 @@
   arguments and regex patterns that do not compile, reporting both problems at
   construction instead of during a run (#35, #36).
 
-* `Skill$check_requirements()` now treats an unknown current provider as a
-  mismatch, and internal provider normalization returns `NA` for unknown names
-  as documented (#30).
+* `Skill$check_requirements()` now treats malformed or unmatched provider names
+  as mismatches while preserving compatibility when a skill and chat name the
+  same generic provider. Internal provider normalization returns `NA` for
+  unknown names as documented (#30).
 
 * `compact()` now summarizes on a clone of the agent's own chat instead of
   constructing a new provider. Previously any provider other than OpenAI,

@@ -30,14 +30,10 @@ validate_hook_callback <- function(event, callback) {
   callback_formals <- formals(callback)
   expected <- hook_callback_arguments[[event]]
   signature <- paste0("function(", paste(expected, collapse = ", "), ")")
-
-  if (!is.null(callback_formals) && "..." %in% names(callback_formals)) {
-    return(invisible(callback))
-  }
-
   actual <- names(callback_formals)
+  accepts_dots <- !is.null(callback_formals) && "..." %in% actual
   missing_expected <- setdiff(expected, actual)
-  extra <- setdiff(actual, expected)
+  extra <- setdiff(actual, c(expected, "..."))
   required_extra <- extra[vapply(
     callback_formals[extra],
     function(value) identical(value, quote(expr = )),
@@ -46,7 +42,7 @@ validate_hook_callback <- function(event, callback) {
 
   if (
     is.null(callback_formals) ||
-      length(missing_expected) > 0L ||
+      (!accepts_dots && length(missing_expected) > 0L) ||
       length(required_extra) > 0L
   ) {
     cli_abort(c(

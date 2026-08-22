@@ -262,6 +262,21 @@ test_that("check_requirements rejects unknown provider names", {
   expect_equal(check$current_provider, "anthropc")
 })
 
+test_that("check_requirements matches generic provider identities", {
+  skill <- Skill$new(
+    name = "test",
+    requires = list(providers = "deepseek")
+  )
+
+  matching <- skill$check_requirements(current_provider = "deepseek")
+  misspelled <- skill$check_requirements(current_provider = "deepseak")
+
+  expect_identical(matching$ok, TRUE)
+  expect_identical(matching$provider_mismatch, FALSE)
+  expect_identical(misspelled$ok, FALSE)
+  expect_identical(misspelled$provider_mismatch, TRUE)
+})
+
 test_that("check_requirements handles normalized provider names", {
   skill <- Skill$new(
     name = "test",

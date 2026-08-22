@@ -43,6 +43,20 @@ normalize_provider_name <- function(provider) {
   )
 }
 
+# Compare known provider aliases while preserving exact matching for generic
+# providers supported by ellmer::chat().
+provider_requirement_key <- function(provider) {
+  normalized <- normalize_provider_name(provider)
+  if (!is.na(normalized)) {
+    return(paste0("known:", normalized))
+  }
+  if (!is_nonempty_string(provider)) {
+    return(NA_character_)
+  }
+
+  paste0("generic:", tolower(provider))
+}
+
 #' Skill R6 Class
 #'
 #' @description
@@ -127,30 +141,21 @@ Skill <- R6::R6Class(
       if (!is.null(current_provider) && !is.null(self$requires$providers)) {
         required_providers <- self$requires$providers
         if (length(required_providers) > 0) {
-          # Normalize provider name for comparison
-          normalized_provider <- normalize_provider_name(current_provider)
+          provider_key <- provider_requirement_key(current_provider)
+          required_keys <- vapply(
+            required_providers,
+            provider_requirement_key,
+            character(1),
+            USE.NAMES = FALSE
+          )
+          required_keys <- required_keys[!is.na(required_keys)]
 
-          if (is.na(normalized_provider)) {
+          if (
+            is.na(provider_key) ||
+              length(required_keys) == 0L ||
+              !provider_key %in% required_keys
+          ) {
             provider_mismatch <- TRUE
-          } else {
-            # Check if current provider is in the required list
-            normalized_required <- vapply(
-              required_providers,
-              normalize_provider_name,
-              character(1),
-              USE.NAMES = FALSE
-            )
-            # Remove any NULLs that became NA
-            normalized_required <- normalized_required[
-              !is.na(normalized_required)
-            ]
-
-            if (
-              length(normalized_required) == 0L ||
-                !normalized_provider %in% normalized_required
-            ) {
-              provider_mismatch <- TRUE
-            }
           }
         }
       }

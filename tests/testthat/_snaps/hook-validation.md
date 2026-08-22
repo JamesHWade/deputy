@@ -17,6 +17,15 @@
       ! Invalid callback for "SessionStart" hook.
       i Expected signature: function(context) or a callback accepting `...`.
 
+---
+
+    Code
+      HookMatcher$new(event = "SessionStart", callback = function(..., required) NULL)
+    Condition
+      Error in `validate_hook_callback()`:
+      ! Invalid callback for "SessionStart" hook.
+      i Expected signature: function(context) or a callback accepting `...`.
+
 # HookMatcher rejects invalid regex patterns at construction
 
     Code
