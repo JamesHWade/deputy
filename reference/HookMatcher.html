@@ -80,7 +80,9 @@ accidentally at runtime.</p>
 
 
     <dt><code>timeout</code></dt>
-<dd><p>Maximum execution time for the callback in seconds. Read-only after construction.</p></dd>
+<dd><p>Maximum execution time for the callback in seconds. Zero
+runs in the caller's process; a positive value uses a clean subprocess.
+Read-only after construction.</p></dd>
 
 
 </dl><p></p></div>
@@ -98,7 +100,7 @@ accidentally at runtime.</p>
 <h3 id="hookmatcher-new-"><code>HookMatcher$new()</code><a class="anchor" aria-label="anchor" href="#hookmatcher-new-"></a></h3>
 <p>Create a new HookMatcher.</p><div class="section">
 <h4 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="va">event</span>, <span class="va">callback</span>, pattern <span class="op">=</span> <span class="cn">NULL</span>, timeout <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="va">event</span>, <span class="va">callback</span>, pattern <span class="op">=</span> <span class="cn">NULL</span>, timeout <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>event</code></dt>
@@ -125,7 +127,10 @@ accidentally at runtime.</p>
 Only applies to PreToolUse and PostToolUse events.</p></dd>
 
       <dt><code>timeout</code></dt>
-<dd><p>Maximum callback execution time in seconds</p></dd>
+<dd><p>Maximum callback execution time in seconds. The default,
+<code>0</code>, runs the callback in the caller's process. Positive values run the
+callback in a clean <code><a href="https://callr.r-lib.org/reference/r.html" class="external-link">callr::r()</a></code> subprocess, where caller-process state
+and side effects are not available.</p></dd>
 
 
 </dl><p></p></div>

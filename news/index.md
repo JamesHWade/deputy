@@ -59,11 +59,20 @@
   permissions, hooks, or execution
   ([\#26](https://github.com/JamesHWade/deputy/issues/26)).
 
-- `HookMatcher$new()` now rejects callbacks that cannot accept an
-  event’s arguments and regex patterns that do not compile, reporting
-  both problems at construction instead of during a run
+- [`hook_limit_file_writes()`](https://jameshwade.github.io/deputy/reference/hook_limit_file_writes.md)
+  now delegates path decisions to the canonical permission policy,
+  rejects sibling-prefix and symlink escapes, and covers all native file
+  mutation tools
+  ([\#75](https://github.com/JamesHWade/deputy/issues/75)).
+
+- `HookMatcher$new()` now runs callbacks in the caller’s process by
+  default, validates timeout configuration at construction, and
+  preserves detailed subprocess errors when isolated execution is
+  explicitly requested. It also rejects callbacks that cannot accept an
+  event’s arguments and regex patterns that do not compile
   ([\#35](https://github.com/JamesHWade/deputy/issues/35),
-  [\#36](https://github.com/JamesHWade/deputy/issues/36)).
+  [\#36](https://github.com/JamesHWade/deputy/issues/36),
+  [\#74](https://github.com/JamesHWade/deputy/issues/74)).
 
 - `Skill$check_requirements()` now treats malformed or unmatched
   provider names as mismatches while preserving compatibility when a

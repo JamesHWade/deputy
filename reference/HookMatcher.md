@@ -27,8 +27,9 @@ swapped out accidentally at runtime.
 
 - `timeout`:
 
-  Maximum execution time for the callback in seconds. Read-only after
-  construction.
+  Maximum execution time for the callback in seconds. Zero runs in the
+  caller's process; a positive value uses a clean subprocess. Read-only
+  after construction.
 
 ## Methods
 
@@ -50,7 +51,7 @@ Create a new HookMatcher.
 
 #### Usage
 
-    HookMatcher$new(event, callback, pattern = NULL, timeout = 30)
+    HookMatcher$new(event, callback, pattern = NULL, timeout = 0)
 
 #### Arguments
 
@@ -98,7 +99,11 @@ Create a new HookMatcher.
 
 - `timeout`:
 
-  Maximum callback execution time in seconds
+  Maximum callback execution time in seconds. The default, `0`, runs the
+  callback in the caller's process. Positive values run the callback in
+  a clean [`callr::r()`](https://callr.r-lib.org/reference/r.html)
+  subprocess, where caller-process state and side effects are not
+  available.
 
 #### Returns
 

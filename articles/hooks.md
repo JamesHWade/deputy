@@ -44,6 +44,14 @@ Add hooks to an agent with `add_hook()`:
 agent$add_hook(hook)
 ```
 
+Hooks run in the caller’s R process by default, so callbacks can use
+ordinary R state and side effects. Set a positive `timeout` only when
+you deliberately want a clean `callr` subprocess with a hard deadline.
+An isolated callback cannot rely on caller-process state; qualify
+package functions such as
+[`deputy::HookResultPostToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.md)
+when using that mode.
+
 ### Filtering by Tool Name
 
 The optional `pattern` argument is a regex that filters which tools the
@@ -103,12 +111,19 @@ agent$add_hook(hook_block_dangerous_bash(
 
 ### Limiting File Writes
 
+Configure the Agent’s `Permissions` when a directory is an authority
+boundary.
 [`hook_limit_file_writes()`](https://jameshwade.github.io/deputy/reference/hook_limit_file_writes.md)
-restricts writes to a specific directory:
+is a defense-in-depth convenience hook that delegates to the same
+canonical path policy for `write_file`, `edit_file`, and `multi_edit`.
+The directory must already exist:
 
 ``` r
 
-agent$add_hook(hook_limit_file_writes(allowed_dir = "/safe/output/dir"))
+output_dir <- file.path(getwd(), "output")
+dir.create(output_dir, showWarnings = FALSE)
+
+agent$add_hook(hook_limit_file_writes(output_dir))
 ```
 
 ## Custom PreToolUse Hooks
@@ -213,8 +228,9 @@ agent$add_hook(HookMatcher$new(
 
 ## Error Handling in Hooks
 
-If a hook callback throws an error, the agent logs it and continues. The
-error does not crash the agent. You can inspect recent hook errors with:
+If a `PreToolUse` hook throws an error, Deputy fails closed and denies
+the tool call. Other hook errors are logged and the run continues. You
+can inspect recent hook errors with:
 
 ``` r
 
