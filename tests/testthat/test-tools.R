@@ -423,6 +423,18 @@ test_that("tool_run_r_code handles runtime errors", {
   expect_true(grepl("intentional error", result, ignore.case = TRUE))
 })
 
+test_that("tool_run_r_code rejects subprocess timeouts readably", {
+  skip_if_not_installed("callr")
+
+  error <- tryCatch(
+    run_r_code_impl("Sys.sleep(10)", timeout = 0.05),
+    ellmer_tool_reject = identity
+  )
+
+  expect_s3_class(error, "ellmer_tool_reject")
+  expect_snapshot(error)
+})
+
 test_that("tool_run_bash handles command not found", {
   result <- tryCatch(
     tool_run_bash("nonexistent_command_xyz123"),

@@ -881,6 +881,66 @@ tool_grep_files <- ellmer::tool(
   )
 )
 
+run_r_code_impl <- function(code, timeout = 30) {
+  if (!rlang::is_installed("callr")) {
+    ellmer::tool_reject(
+      paste(
+        "Cannot execute R code: package 'callr' is required for",
+        "subprocess execution. Install with install.packages('callr')"
+      )
+    )
+  }
+
+  result <- tryCatch(
+    callr::r(
+      function(code_string) {
+        output <- utils::capture.output({
+          result <- tryCatch(
+            base::eval(base::parse(text = code_string)),
+            error = function(e) list(.deputy_error = e$message)
+          )
+        })
+        list(
+          output = paste(output, collapse = "\n"),
+          result = if (is.list(result) && ".deputy_error" %in% names(result)) {
+            paste("Error:", result$.deputy_error)
+          } else {
+            utils::capture.output(print(result))
+          }
+        )
+      },
+      args = list(code_string = code),
+      timeout = timeout
+    ),
+    error = function(e) {
+      if (inherits(e, "callr_timeout_error")) {
+        ellmer::tool_reject(sprintf(
+          "R code execution timed out after %s seconds",
+          format(timeout, trim = TRUE)
+        ))
+      }
+      ellmer::tool_reject(paste(
+        "R code execution failed:",
+        conditionMessage(e)
+      ))
+    }
+  )
+
+  parts <- character()
+  if (nchar(result$output) > 0) {
+    parts <- c(parts, "Output:", result$output)
+  }
+  if (length(result$result) > 0 && any(nchar(result$result) > 0)) {
+    parts <- c(parts, "Result:", paste(result$result, collapse = "\n"))
+  }
+
+  if (length(parts) == 0) {
+    return("Code executed successfully (no output)")
+  }
+
+  paste(parts, collapse = "\n")
+}
+
 #' Execute R code
 #'
 #' @description
@@ -912,85 +972,7 @@ tool_grep_files <- ellmer::tool(
 #' @export
 tool_run_r_code <- ellmer::tool(
   fun = function(code) {
-    # Internal parameters (not exposed to LLM)
-    sandbox <- TRUE
-    timeout <- 30
-
-    execute_r_code <- function(code_string) {
-      # Parse and evaluate the code, capturing output
-      output <- utils::capture.output({
-        result <- tryCatch(
-          base::eval(base::parse(text = code_string)),
-          error = function(e) {
-            list(.deputy_error = e$message)
-          }
-        )
-      })
-
-      list(
-        output = paste(output, collapse = "\n"),
-        result = if (is.list(result) && ".deputy_error" %in% names(result)) {
-          paste("Error:", result$.deputy_error)
-        } else {
-          utils::capture.output(print(result))
-        }
-      )
-    }
-
-    if (sandbox && rlang::is_installed("callr")) {
-      tryCatch(
-        {
-          result <- callr::r(
-            function(code_string) {
-              output <- utils::capture.output({
-                result <- tryCatch(
-                  base::eval(base::parse(text = code_string)),
-                  error = function(e) list(.deputy_error = e$message)
-                )
-              })
-              list(
-                output = paste(output, collapse = "\n"),
-                result = if (
-                  is.list(result) && ".deputy_error" %in% names(result)
-                ) {
-                  paste("Error:", result$.deputy_error)
-                } else {
-                  utils::capture.output(print(result))
-                }
-              )
-            },
-            args = list(code_string = code),
-            timeout = timeout
-          )
-        },
-        error = function(e) {
-          return(paste("Execution error:", e$message))
-        }
-      )
-    } else if (sandbox && !rlang::is_installed("callr")) {
-      # Security: Require callr for sandboxed execution - don't fall back to unsafe
-      return(ellmer::tool_reject(
-        "Cannot execute R code: package 'callr' is required for sandboxed execution. Install with install.packages('callr')"
-      ))
-    } else {
-      # sandbox = FALSE (not exposed to LLM, only for internal use)
-      result <- execute_r_code(code)
-    }
-
-    # Format output
-    parts <- character()
-    if (nchar(result$output) > 0) {
-      parts <- c(parts, "Output:", result$output)
-    }
-    if (length(result$result) > 0 && any(nchar(result$result) > 0)) {
-      parts <- c(parts, "Result:", paste(result$result, collapse = "\n"))
-    }
-
-    if (length(parts) == 0) {
-      return("Code executed successfully (no output)")
-    }
-
-    paste(parts, collapse = "\n")
+    run_r_code_impl(code)
   },
   name = "run_r_code",
   description = "Execute R code and return the output and result. By default runs in a sandboxed process for safety.",
