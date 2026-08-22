@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Getting Started with deputy • deputy</title>
+<title>Getting Started with Deputy • deputy</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Getting Started with deputy">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Getting Started with Deputy">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -38,20 +38,25 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started</a></li>
+<li><h6 class="dropdown-header" data-toc-skip>Intro</h6></li>
+    <li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started</a></li>
     <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Concepts</h6></li>
     <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
     <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
     <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Hosts</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Examples</h6></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
     <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
     <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
   </ul>
 </li>
       </ul>
@@ -72,7 +77,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Getting Started with deputy</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Getting Started with Deputy</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/vignettes/getting-started.Rmd" class="external-link"><code>vignettes/getting-started.Rmd</code></a></small>
@@ -81,460 +86,244 @@
 
     
     
-<p>deputy is an agentic AI framework for R that builds on <a href="https://ellmer.tidyverse.org/" class="external-link">ellmer</a>. It enables you to
-create AI agents that use tools to accomplish multi-step tasks, with
-built-in support for permissions, hooks, and streaming output. The core
-<code>Agent</code> and <code>LeadAgent</code> APIs are
-provider-agnostic.</p>
+<p>Deputy turns an ellmer chat into a governed R Agent. In this guide
+you will create a bounded, read-only Agent; inspect its result; then
+deliberately grant one workspace-scoped write capability and protect it
+with a checkpoint.</p>
 <div class="section level2">
-<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+<h2 id="before-you-begin">Before you begin<a class="anchor" aria-label="anchor" href="#before-you-begin"></a>
 </h2>
+<p>Install Deputy and the development version of ellmer:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Install from GitHub</span></span>
-<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"JamesHWade/deputy"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"tidyverse/ellmer"</span>, <span class="st">"JamesHWade/deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>You also need credentials for one <a href="https://ellmer.tidyverse.org/reference/index.html" class="external-link">ellmer
+provider</a>. The examples use OpenAI, but the Deputy API is
+provider-independent.</p>
 </div>
 <div class="section level2">
-<h2 id="quick-start">Quick Start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
+<h2 id="define-the-workspace-and-limits">1. Define the workspace and limits<a class="anchor" aria-label="anchor" href="#define-the-workspace-and-limits"></a>
 </h2>
-<p>An agent wraps an ellmer chat object and gives it tools, permissions,
-and lifecycle hooks:</p>
+<p>Make the authority for the first run visible before creating a chat.
+The <code>minimal</code> preset contains only <code>read_file</code>,
+<code>read_markdown</code>, and <code>list_files</code>. The permission
+policy denies writes, code execution, shell commands, web requests, and
+package installation. The run also has finite request and tool-call
+budgets.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="va">chat</span>, tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">workspace</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/normalizePath.html" class="external-link">normalizePath</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>, winslash <span class="op">=</span> <span class="st">"/"</span><span class="op">)</span></span>
+<span><span class="va">first_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span></span>
+<span><span class="va">first_permissions</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">first_limits</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"List the files in the current directory"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span></code></pre></div>
-<p>The agent sends your task to the LLM, which may call tools, and loops
-until the task is complete. <code>run_sync()</code> blocks until done
-and returns an <code>AgentResult</code>.</p>
+<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.exists</a></span><span class="op">(</span><span class="va">workspace</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">first_tools</span><span class="op">)</span> <span class="op">==</span> <span class="fl">3L</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">first_permissions</span><span class="op">$</span><span class="va">mode</span>, <span class="st">"readonly"</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">first_limits</span><span class="op">$</span><span class="va">max_tool_calls</span>, <span class="fl">8L</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Run this from the package you want to inspect, or replace
+<code><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd()</a></code> with that package’s absolute path.</p>
+<p><code>working_dir</code> gives relative paths a stable base. It does
+not create a read sandbox: a read permission can reach files that the R
+process can reach. Keep the task narrow and run Deputy with
+operating-system isolation when the input or generated code is
+untrusted.</p>
 </div>
 <div class="section level2">
-<h2 id="tool-bundles">Tool Bundles<a class="anchor" aria-label="anchor" href="#tool-bundles"></a>
+<h2 id="create-the-agent">2. Create the Agent<a class="anchor" aria-label="anchor" href="#create-the-agent"></a>
 </h2>
-<p>deputy organises built-in tools into bundles you can mix and
-match:</p>
+<p>An <code>Agent</code> combines an ellmer chat with the runtime policy
+you just defined. This chunk makes a provider request, so it is
+displayed but not run while the vignette is built.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
+<span>  tools <span class="op">=</span> <span class="va">first_tools</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="va">first_permissions</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="va">first_limits</span>,</span>
+<span>  working_dir <span class="op">=</span> <span class="va">workspace</span>,</span>
+<span>  agent_name <span class="op">=</span> <span class="st">"package-scout"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The chat owns provider interaction. Deputy owns the tool loop around
+it: permissions, hooks, limits, events, persistence, checkpoints, and
+delegation.</p>
+</div>
+<div class="section level2">
+<h2 id="run-one-useful-task">3. Run one useful task<a class="anchor" aria-label="anchor" href="#run-one-useful-task"></a>
+</h2>
+<p>Ask for an answer that the available tools can support. A read-only
+package inspection is a better first task than an open-ended request to
+“improve the code.”</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span></span>
+<span>    <span class="st">"Read DESCRIPTION and list the R/ directory."</span>,</span>
+<span>    <span class="st">"Explain the package purpose and identify three good entry-point files."</span>,</span>
+<span>    <span class="st">"Cite the paths you used. Do not propose or make edits."</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><code>run_sync()</code> blocks until the run stops and returns an
+<code>AgentResult</code>. The result keeps the outcome and the evidence
+needed to understand how it happened:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">usage</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">session_id</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">run_id</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="fu">tool_calls</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="fu">tool_results</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>Check <code>stop_reason</code> before treating the response as
+complete. A request, tool-call, token, or cost limit produces a typed
+stop reason rather than a silently truncated success.</p>
+</div>
+<div class="section level2">
+<h2 id="grant-writes-deliberately">4. Grant writes deliberately<a class="anchor" aria-label="anchor" href="#grant-writes-deliberately"></a>
+</h2>
+<p>When a task really needs to create a file, replace the read-only
+policy with an explicit one. This policy permits Deputy’s native file
+tools to write only inside the canonical workspace. R execution, shell
+access, web access, and package installation remain off.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">write_permissions</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  mode <span class="op">=</span> <span class="st">"standard"</span>,</span>
+<span>  file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  file_write <span class="op">=</span> <span class="va">workspace</span>,</span>
+<span>  bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  r_code <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  web <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  install_packages <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">write_permissions</span><span class="op">$</span><span class="va">file_write</span>, <span class="va">workspace</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">write_permissions</span><span class="op">$</span><span class="va">r_code</span>, <span class="cn">FALSE</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">write_permissions</span><span class="op">$</span><span class="va">bash</span>, <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Create a separate Agent with file checkpointing enabled. The
+checkpoint marks the state before the task. Deputy records preimages
+when its native write, edit, and multi-edit tools change files.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">write_agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="va">chat</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="fu">set_turns</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="va">write_permissions</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="va">first_limits</span>,</span>
+<span>  enable_file_checkpointing <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  working_dir <span class="op">=</span> <span class="va">workspace</span>,</span>
+<span>  agent_name <span class="op">=</span> <span class="st">"summary-writer"</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">checkpoint_id</span> <span class="op">&lt;-</span> <span class="va">write_agent</span><span class="op">$</span><span class="fu">checkpoint</span><span class="op">(</span><span class="st">"before package summary"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">write_result</span> <span class="op">&lt;-</span> <span class="va">write_agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span></span>
+<span>    <span class="st">"Read DESCRIPTION and write a concise package summary to deputy-summary.md."</span>,</span>
+<span>    <span class="st">"Do not modify any other file."</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Review the result and the actual diff. If the native file-tool
+changes are not useful, rewind them:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">write_result</span><span class="op">$</span><span class="va">stop_reason</span></span>
+<span><span class="va">write_agent</span><span class="op">$</span><span class="fu">list_checkpoints</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">write_agent</span><span class="op">$</span><span class="fu">rewind_files</span><span class="op">(</span><span class="va">checkpoint_id</span><span class="op">)</span></span></code></pre></div>
+<p>Checkpoints do not capture changes made outside Deputy’s native file
+tools, and they do not replace Git or backups.</p>
+</div>
+<div class="section level2">
+<h2 id="common-failures">Common failures<a class="anchor" aria-label="anchor" href="#common-failures"></a>
+</h2>
+<div class="section level3">
+<h3 id="the-provider-cannot-authenticate">The provider cannot authenticate<a class="anchor" aria-label="anchor" href="#the-provider-cannot-authenticate"></a>
+</h3>
+<p>Configure the credential expected by your chosen ellmer provider,
+then verify a plain ellmer chat before adding Deputy. Deputy does not
+manage provider keys.</p>
+</div>
+<div class="section level3">
+<h3 id="a-tool-call-is-denied">A tool call is denied<a class="anchor" aria-label="anchor" href="#a-tool-call-is-denied"></a>
+</h3>
+<p>Treat the denial as useful policy feedback. Check that the tool
+belongs in this task, that it is registered, and that the relevant
+capability is explicit. Do not switch to <code><a href="../reference/permissions_full.html">permissions_full()</a></code>
+merely to make the error disappear.</p>
+</div>
+<div class="section level3">
+<h3 id="the-run-stops-at-a-limit">The run stops at a limit<a class="anchor" aria-label="anchor" href="#the-run-stops-at-a-limit"></a>
+</h3>
+<p>Inspect <code>result$stop_reason</code> and
+<code>result$usage</code>. Tighten the task first; increase only the
+specific limit whose additional work is justified.</p>
+</div>
+<div class="section level3">
+<h3 id="code-execution-sounds-safer-than-it-is">Code execution sounds safer than it is<a class="anchor" aria-label="anchor" href="#code-execution-sounds-safer-than-it-is"></a>
+</h3>
+<p><code>run_r_code</code> starts a separate R process, but process
+separation is not an OS sandbox. <code>run_bash</code> runs with the
+current user’s privileges. Use containers, virtual machines, or another
+real isolation boundary for untrusted code.</p>
+</div>
+<div class="section level3">
+<h3 id="a-shiny-task-reads-the-wrong-directory">A Shiny task reads the wrong directory<a class="anchor" aria-label="anchor" href="#a-shiny-task-reads-the-wrong-directory"></a>
+</h3>
+<p>Shiny process working directories can differ from the app directory.
+Pass an existing absolute <code>working_dir</code> and construct any
+directory-valued write grant from that same path.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="where-next">Where next?<a class="anchor" aria-label="anchor" href="#where-next"></a>
+</h2>
 <table class="table">
 <colgroup>
-<col width="33%">
-<col width="29%">
-<col width="37%">
+<col width="50%">
+<col width="50%">
 </colgroup>
 <thead><tr class="header">
-<th>Bundle</th>
-<th>Tools</th>
-<th>Purpose</th>
+<th>If you want to…</th>
+<th>Continue with…</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td><code><a href="../reference/tools_file.html">tools_file()</a></code></td>
-<td>
-<code>read_file</code>, <code>read_markdown</code>,
-<code>write_file</code>, <code>list_files</code>
-</td>
-<td>File operations</td>
+<td>Choose or build tools</td>
+<td><code><a href="../articles/tools.html">vignette("tools", package = "deputy")</a></code></td>
 </tr>
 <tr class="even">
-<td><code><a href="../reference/tools_code.html">tools_code()</a></code></td>
-<td>
-<code>run_r_code</code>, <code>run_bash</code>
-</td>
-<td>Code execution</td>
+<td>Design permission policy</td>
+<td><code><a href="../articles/permissions.html">vignette("permissions", package = "deputy")</a></code></td>
 </tr>
 <tr class="odd">
-<td><code><a href="../reference/tools_data.html">tools_data()</a></code></td>
-<td>
-<code>read_csv</code>, <code>read_file</code>,
-<code>read_markdown</code>
-</td>
-<td>Data reading</td>
+<td>Observe and intervene in runs</td>
+<td><code><a href="../articles/hooks.html">vignette("hooks", package = "deputy")</a></code></td>
 </tr>
 <tr class="even">
-<td><code><a href="../reference/tools_web.html">tools_web()</a></code></td>
-<td>
-<code>web_fetch</code>, <code>web_search</code>
-</td>
-<td>Web access</td>
+<td>Stream an Agent into an app</td>
+<td><code><a href="../articles/example-shiny-chat.html">vignette("example-shiny-chat", package = "deputy")</a></code></td>
 </tr>
 <tr class="odd">
-<td><code><a href="../reference/tools_all.html">tools_all()</a></code></td>
-<td>All of the above</td>
-<td>Everything</td>
+<td>Delegate to specialist Agents</td>
+<td><code><a href="../articles/multi-agent.html">vignette("multi-agent", package = "deputy")</a></code></td>
+</tr>
+<tr class="even">
+<td>Require typed model output</td>
+<td><code><a href="../articles/structured-output.html">vignette("structured-output", package = "deputy")</a></code></td>
+</tr>
+<tr class="odd">
+<td>Build a concrete workflow</td>
+<td><code><a href="../articles/example-data-analysis.html">vignette("example-data-analysis", package = "deputy")</a></code></td>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Combine bundles</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>There are also named presets available via
-<code><a href="../reference/tools_preset.html">tools_preset()</a></code>:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"dev"</span><span class="op">)</span></span></code></pre></div>
-<p>See <code><a href="../articles/tools.html">vignette("tools")</a></code> for custom tools, web tools, MCP
-integration, and human-in-the-loop.</p>
-</div>
-<div class="section level2">
-<h2 id="streaming">Streaming<a class="anchor" aria-label="anchor" href="#streaming"></a>
-</h2>
-<p>For real-time feedback, use <code>run()</code> which returns a
-generator:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="va">chat</span>, tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">events</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span><span class="st">"What is the name of this package?"</span><span class="op">)</span></span>
-<span><span class="kw">repeat</span> <span class="op">{</span></span>
-<span>  <span class="va">event</span> <span class="op">&lt;-</span> <span class="fu">events</span><span class="op">(</span><span class="op">)</span></span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu">coro</span><span class="fu">::</span><span class="fu"><a href="https://coro.r-lib.org/reference/iterator.html" class="external-link">is_exhausted</a></span><span class="op">(</span><span class="va">event</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="kw">break</span></span>
-<span>  <span class="op">}</span></span>
-<span>  <span class="kw"><a href="https://rdrr.io/r/base/switch.html" class="external-link">switch</a></span><span class="op">(</span><span class="va">event</span><span class="op">$</span><span class="va">type</span>,</span>
-<span>    <span class="st">"text"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">event</span><span class="op">$</span><span class="va">text</span><span class="op">)</span>,</span>
-<span>    <span class="st">"tool_start"</span> <span class="op">=</span> <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Calling {event$tool_name}..."</span><span class="op">)</span>,</span>
-<span>    <span class="st">"tool_end"</span> <span class="op">=</span> <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_success</a></span><span class="op">(</span><span class="st">"Done"</span><span class="op">)</span>,</span>
-<span>    <span class="st">"stop"</span> <span class="op">=</span> <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert</a></span><span class="op">(</span><span class="st">"Finished!"</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">}</span></span></code></pre></div>
-<p>Events stream as they happen – you see text tokens arrive, tool calls
-start and finish, and a final stop event.</p>
-</div>
-<div class="section level2">
-<h2 id="permissions">Permissions<a class="anchor" aria-label="anchor" href="#permissions"></a>
-</h2>
-<div class="section level3">
-<h3 id="read-only-permissions">Read-Only Permissions<a class="anchor" aria-label="anchor" href="#read-only-permissions"></a>
-</h3>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Only allows reading files - no writes, no code execution</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="full-permissions">Full Permissions<a class="anchor" aria-label="anchor" href="#full-permissions"></a>
-</h3>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Allows everything - use with caution!</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_full.html">permissions_full</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Planning mode: read-only tools plus ask_user</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_plan.html">permissions_plan</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="custom-permissions">Custom Permissions<a class="anchor" aria-label="anchor" href="#custom-permissions"></a>
-</h3>
-<p>For fine-grained control:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  file_write <span class="op">=</span> <span class="st">"/path/to/allowed/dir"</span>, <span class="co"># Restrict to specific directory</span></span>
-<span></span>
-<span>  bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  r_code <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  web <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="va">perms</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="custom-permission-callbacks">Custom Permission Callbacks<a class="anchor" aria-label="anchor" href="#custom-permission-callbacks"></a>
-</h3>
-<p>For complex permission logic:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  can_use_tool <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="co"># Block any file writes to sensitive directories</span></span>
-<span>    <span class="kw">if</span> <span class="op">(</span><span class="va">tool_name</span> <span class="op">==</span> <span class="st">"write_file"</span><span class="op">)</span> <span class="op">{</span></span>
-<span>      <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"^\\.env|secrets|credentials"</span>, <span class="va">tool_input</span><span class="op">$</span><span class="va">path</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>        <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="fu"><a href="../reference/PermissionResultDeny.html">PermissionResultDeny</a></span><span class="op">(</span></span>
-<span>          reason <span class="op">=</span> <span class="st">"Cannot write to sensitive files"</span></span>
-<span>        <span class="op">)</span><span class="op">)</span></span>
-<span>      <span class="op">}</span></span>
-<span>    <span class="op">}</span></span>
-<span>    <span class="fu"><a href="../reference/PermissionResultAllow.html">PermissionResultAllow</a></span><span class="op">(</span><span class="op">)</span></span>
-<span>  <span class="op">}</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="tool-allowdeny-lists">Tool Allow/Deny Lists<a class="anchor" aria-label="anchor" href="#tool-allowdeny-lists"></a>
-</h3>
-<p>Use allow/deny lists when you want an explicit tool policy that is
-separate from the broader mode flags:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  mode <span class="op">=</span> <span class="st">"standard"</span>,</span>
-<span>  tool_allowlist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"read_file"</span>, <span class="st">"list_files"</span>, <span class="st">"run_r_code"</span><span class="op">)</span>,</span>
-<span>  tool_denylist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"run_bash"</span><span class="op">)</span>,</span>
-<span>  permission_prompt_tool_name <span class="op">=</span> <span class="st">"ask_user"</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="va">perms</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>If both lists are present, <code>tool_denylist</code> wins. The
-<code>permission_prompt_tool_name</code> tool can request explicit human
-approval and appears in deny reasons when prompting is enabled.</p>
-</div>
-</div>
-<div class="section level2">
-<h2 id="hooks">Hooks<a class="anchor" aria-label="anchor" href="#hooks"></a>
-</h2>
-<p>Hooks let you intercept and customize agent behavior at key
-points:</p>
-<div class="section level3">
-<h3 id="available-hook-events">Available Hook Events<a class="anchor" aria-label="anchor" href="#available-hook-events"></a>
-</h3>
-<table class="table">
-<thead><tr class="header">
-<th>Event</th>
-<th>When it Fires</th>
-<th>Can Modify</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code>PreToolUse</code></td>
-<td>Before a tool executes</td>
-<td>Allow/deny, input</td>
-</tr>
-<tr class="even">
-<td><code>PostToolUse</code></td>
-<td>After a tool executes</td>
-<td>Continue flag</td>
-</tr>
-<tr class="odd">
-<td><code>Stop</code></td>
-<td>When agent stops</td>
-<td>-</td>
-</tr>
-<tr class="even">
-<td><code>UserPromptSubmit</code></td>
-<td>When user sends a message</td>
-<td>-</td>
-</tr>
-<tr class="odd">
-<td><code>PreCompact</code></td>
-<td>Before conversation compaction</td>
-<td>Summary</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="section level3">
-<h3 id="example-logging-all-tool-calls">Example: Logging All Tool Calls<a class="anchor" aria-label="anchor" href="#example-logging-all-tool-calls"></a>
-</h3>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  event <span class="op">=</span> <span class="st">"PostToolUse"</span>,</span>
-<span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_result</span>, <span class="va">tool_error</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Tool {tool_name} completed"</span><span class="op">)</span></span>
-<span>    <span class="fu"><a href="../reference/HookResultPostToolUse.html">HookResultPostToolUse</a></span><span class="op">(</span><span class="op">)</span></span>
-<span>  <span class="op">}</span></span>
-<span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="example-block-dangerous-commands">Example: Block Dangerous Commands<a class="anchor" aria-label="anchor" href="#example-block-dangerous-commands"></a>
-</h3>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  event <span class="op">=</span> <span class="st">"PreToolUse"</span>,</span>
-<span>  pattern <span class="op">=</span> <span class="st">"^run_bash$"</span>, <span class="co"># Only match bash tool</span></span>
-<span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"rm -rf|sudo|chmod 777"</span>, <span class="va">tool_input</span><span class="op">$</span><span class="va">command</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>      <span class="fu"><a href="../reference/HookResultPreToolUse.html">HookResultPreToolUse</a></span><span class="op">(</span></span>
-<span>        permission <span class="op">=</span> <span class="st">"deny"</span>,</span>
-<span>        reason <span class="op">=</span> <span class="st">"Dangerous command pattern detected"</span></span>
-<span>      <span class="op">)</span></span>
-<span>    <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>      <span class="fu"><a href="../reference/HookResultPreToolUse.html">HookResultPreToolUse</a></span><span class="op">(</span>permission <span class="op">=</span> <span class="st">"allow"</span><span class="op">)</span></span>
-<span>    <span class="op">}</span></span>
-<span>  <span class="op">}</span></span>
-<span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-</div>
-</div>
-<div class="section level2">
-<h2 id="session-management">Session Management<a class="anchor" aria-label="anchor" href="#session-management"></a>
-</h2>
-<p>Every <code>Agent</code> has a stable <code>session_id</code> used to
-correlate its events and results. Deputy generates one unless you
-provide it at construction:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  session_id <span class="op">=</span> <span class="st">"session_analysis_001"</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">agent</span><span class="op">$</span><span class="fu">session_id</span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Summarize this package"</span><span class="op">)</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">session_id</span></span></code></pre></div>
-<p>The identifier does not save or locate state. Save and load are
-explicit, path-based operations:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">save_session</span><span class="op">(</span><span class="st">"analysis-session.rds"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">restored</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  session_id <span class="op">=</span> <span class="st">"session_analysis_002"</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">restored</span><span class="op">$</span><span class="fu">load_session</span><span class="op">(</span><span class="st">"analysis-session.rds"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Continue the conversation</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">restored</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Continue where we left off..."</span><span class="op">)</span></span></code></pre></div>
-<p><code>Agent$load_session()</code> restores the conversation, prompt,
-run context, and enabled file checkpoint state. Tools, permissions,
-hooks, the working directory, and the receiving agent’s
-<code>session_id</code> remain authoritative.</p>
-</div>
-<div class="section level2">
-<h2 id="multi-agent-systems">Multi-Agent Systems<a class="anchor" aria-label="anchor" href="#multi-agent-systems"></a>
-</h2>
-<p>For complex tasks, you can create a lead agent that delegates to
-specialized sub-agents:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Define specialized sub-agents</span></span>
-<span><span class="va">code_agent</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
-<span>  name <span class="op">=</span> <span class="st">"code_analyst"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Analyzes R code and suggests improvements"</span>,</span>
-<span>  prompt <span class="op">=</span> <span class="st">"You are an expert R programmer. Analyze code for best practices."</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">data_agent</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
-<span>  name <span class="op">=</span> <span class="st">"data_analyst"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Analyzes data files and provides statistical summaries"</span>,</span>
-<span>  prompt <span class="op">=</span> <span class="st">"You are a data analyst. Provide clear statistical insights."</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Create a lead agent that can delegate</span></span>
-<span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
-<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">code_agent</span>, <span class="va">data_agent</span><span class="op">)</span>,</span>
-<span>  system_prompt <span class="op">=</span> <span class="st">"You coordinate between specialized agents to complete tasks."</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># The lead agent will automatically delegate to sub-agents as needed</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
-<span>  <span class="st">"Review the R code in src/ and analyze the data in data/"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="working-with-results">Working with Results<a class="anchor" aria-label="anchor" href="#working-with-results"></a>
-</h2>
-<p>The <code>AgentResult</code> object contains useful information:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Analyze this project"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># The final response</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Cost information</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">cost</span></span>
-<span><span class="co">#&gt; $input</span></span>
-<span><span class="co">#&gt; [1] 1250</span></span>
-<span><span class="co">#&gt; $output</span></span>
-<span><span class="co">#&gt; [1] 450</span></span>
-<span><span class="co">#&gt; $total</span></span>
-<span><span class="co">#&gt; [1] 0.0045</span></span>
-<span></span>
-<span><span class="co"># Execution duration</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">duration</span></span>
-<span><span class="co">#&gt; [1] 3.45  # seconds</span></span>
-<span></span>
-<span><span class="co"># Stop reason</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span></span>
-<span><span class="co">#&gt; [1] "complete"</span></span>
-<span></span>
-<span><span class="co"># Stable session correlation</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">session_id</span></span>
-<span></span>
-<span><span class="co"># All events (for detailed analysis)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">events</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 12</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="provider-support">Provider Support<a class="anchor" aria-label="anchor" href="#provider-support"></a>
-</h2>
-<p>deputy works with any LLM provider that ellmer supports:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># OpenAI</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Anthropic</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-4-5-20250929"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Google</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"google/gemini-1.5-pro"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Local models via Ollama</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"ollama/llama3.1"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="best-practices">Best Practices<a class="anchor" aria-label="anchor" href="#best-practices"></a>
-</h2>
-<ol style="list-style-type: decimal">
-<li><p><strong>Start with minimal permissions</strong> - Use
-<code><a href="../reference/permissions_readonly.html">permissions_readonly()</a></code> or
-<code><a href="../reference/permissions_standard.html">permissions_standard()</a></code> and only expand as needed.</p></li>
-<li><p><strong>Use hooks for logging</strong> - Add a
-<code>PostToolUse</code> hook to track what your agent does.</p></li>
-<li><p><strong>Set run limits</strong> - Use <code><a href="../reference/UsageLimits.html">UsageLimits()</a></code>
-to bound model requests, tool calls, tokens, or estimated cost.</p></li>
-<li><p><strong>Save sessions</strong> - For long-running tasks, save
-sessions periodically.</p></li>
-<li><p><strong>Use streaming for UX</strong> - The <code>run()</code>
-method provides real-time feedback.</p></li>
-</ol>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Example combining best practices</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_standard.html">permissions_standard</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">20</span>, max_cost_usd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="next-steps">Next Steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>
-</h2>
-<ul>
-<li>
-<code><a href="../articles/tools.html">vignette("tools")</a></code> – Custom tools, web tools, MCP, and
-human-in-the-loop</li>
-<li>
-<code><a href="../articles/permissions.html">vignette("permissions")</a></code> – Permission presets, modes,
-and custom policies</li>
-<li>
-<code><a href="../articles/hooks.html">vignette("hooks")</a></code> – Lifecycle hooks for logging,
-blocking, and auditing</li>
-<li>
-<code><a href="../articles/multi-agent.html">vignette("multi-agent")</a></code> – Multi-agent delegation with
-LeadAgent</li>
-<li>
-<code><a href="../articles/structured-output.html">vignette("structured-output")</a></code> – JSON schema output and
-validation</li>
-</ul>
+<p>The durable pattern is the same in every host: make the workspace,
+tools, permissions, and limits explicit; run one bounded job; then
+inspect the typed result before granting more authority.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
