@@ -353,6 +353,9 @@ HookMatcher <- R6::R6Class(
         cli_abort("{.arg callback} must be a function")
       }
 
+      validate_hook_callback(event, callback)
+      validate_hook_pattern(pattern)
+
       private$.event <- event
       private$.callback <- callback
       private$.pattern <- pattern

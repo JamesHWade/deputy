@@ -507,3 +507,29 @@ test_that("pre-tool effects are applied before a real hook rejection", {
   )
   expect_match(mock$chat$get_system_prompt(), "Persist this hook context")
 })
+
+test_that("malformed tool identity is rejected before permission checks", {
+  checked <- new.env(parent = emptyenv())
+  checked$value <- FALSE
+  permissions <- Permissions$new(
+    mode = "standard",
+    can_use_tool = function(tool_name, tool_input, context) {
+      checked$value <- TRUE
+      PermissionResultAllow()
+    }
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    permissions = permissions
+  )
+  request <- create_mock_tool_request(name = "run_bash")
+  attr(request, "name") <- list("run_bash")
+
+  expect_snapshot(
+    agent$.__enclos_env__$private$on_tool_request(request),
+    error = TRUE
+  )
+
+  expect_false(checked$value)
+  expect_identical(agent$.__enclos_env__$private$current_tool_calls, 0L)
+})

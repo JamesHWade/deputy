@@ -14,7 +14,7 @@ normalize_provider_name <- function(provider) {
   provider <- tolower(provider)
 
   # Handle common variations
-  provider <- switch(
+  switch(
     provider,
     "openai" = "openai",
     "chat_openai" = "openai",
@@ -39,11 +39,8 @@ normalize_provider_name <- function(provider) {
     "chat_openrouter" = "openrouter",
     "groq" = "groq",
     "chat_groq" = "groq",
-    # Default: return as-is
-    provider
+    NA_character_
   )
-
-  provider
 }
 
 #' Skill R6 Class
@@ -116,7 +113,6 @@ Skill <- R6::R6Class(
     check_requirements = function(current_provider = NULL) {
       missing <- character()
       provider_mismatch <- FALSE
-      mismatched_provider <- NULL
 
       # Check required packages
       if (!is.null(self$requires$packages)) {
@@ -134,8 +130,9 @@ Skill <- R6::R6Class(
           # Normalize provider name for comparison
           normalized_provider <- normalize_provider_name(current_provider)
 
-          # Only check if we could normalize the provider name
-          if (!is.na(normalized_provider)) {
+          if (is.na(normalized_provider)) {
+            provider_mismatch <- TRUE
+          } else {
             # Check if current provider is in the required list
             normalized_required <- vapply(
               required_providers,
@@ -149,11 +146,10 @@ Skill <- R6::R6Class(
             ]
 
             if (
-              length(normalized_required) > 0 &&
+              length(normalized_required) == 0L ||
                 !normalized_provider %in% normalized_required
             ) {
               provider_mismatch <- TRUE
-              mismatched_provider <- current_provider
             }
           }
         }

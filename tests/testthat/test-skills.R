@@ -195,7 +195,7 @@ test_that("normalize_provider_name handles edge cases", {
   expect_true(is.na(normalize_provider_name(NULL)))
   expect_true(is.na(normalize_provider_name(123)))
   expect_true(is.na(normalize_provider_name(c("openai", "anthropic"))))
-  expect_equal(normalize_provider_name("unknown_provider"), "unknown_provider")
+  expect_true(is.na(normalize_provider_name("unknown_provider")))
 })
 
 test_that("normalize_provider_name handles chat_* prefixes", {
@@ -247,6 +247,19 @@ test_that("check_requirements detects provider mismatch", {
   expect_true(check$provider_mismatch)
   expect_equal(check$current_provider, "anthropic")
   expect_equal(check$required_providers, "openai")
+})
+
+test_that("check_requirements rejects unknown provider names", {
+  skill <- Skill$new(
+    name = "test",
+    requires = list(providers = "openai")
+  )
+
+  check <- skill$check_requirements(current_provider = "anthropc")
+
+  expect_false(check$ok)
+  expect_true(check$provider_mismatch)
+  expect_equal(check$current_provider, "anthropc")
 })
 
 test_that("check_requirements handles normalized provider names", {
