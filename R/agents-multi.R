@@ -765,16 +765,48 @@ LeadAgent <- R6::R6Class(
       }
 
       disallowed <- tolower(trimws(as.character(disallowed_tools)))
-      Filter(
-        function(tool) {
-          name <- tryCatch(tool@name, error = function(e) NULL)
-          if (is.null(name)) {
-            return(TRUE)
+      tool_names <- names(tools)
+      keep <- vapply(
+        seq_along(tools),
+        function(index) {
+          tool <- tools[[index]]
+          label <- if (
+            !is.null(tool_names) &&
+              length(tool_names) >= index &&
+              is_nonempty_string(tool_names[[index]])
+          ) {
+            tool_names[[index]]
+          } else {
+            paste0("#", index)
           }
-          !tolower(name) %in% disallowed
+          name <- read_optional_value(
+            function() tool@name,
+            validator = is_nonempty_string
+          )
+
+          if (identical(name$status, "unreadable")) {
+            cli_warn(c(
+              "Dropping tool {.val {label}} because its name could not be read.",
+              "i" = "Tool object class: {.cls {class(tool)}}.",
+              "x" = conditionMessage(name$error)
+            ))
+            return(FALSE)
+          }
+
+          if (!identical(name$status, "present")) {
+            cli_warn(c(
+              "Dropping tool {.val {label}} because it has no usable name.",
+              "i" = "Tool object class: {.cls {class(tool)}}."
+            ))
+            return(FALSE)
+          }
+
+          !tolower(trimws(name$value)) %in% disallowed
         },
-        tools
+        logical(1)
       )
+
+      tools[keep]
     },
 
     subagent_runs = list()

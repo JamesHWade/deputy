@@ -2813,9 +2813,10 @@ Agent <- R6::R6Class(
         }
       )
 
-      provider_tool_call_id <- tryCatch(
-        request@id,
-        error = function(e) NULL
+      provider_tool_call_id <- read_provider_tool_call_id(
+        function() request@id,
+        source = "request",
+        object = request
       )
 
       # Tool annotations
@@ -2909,15 +2910,16 @@ Agent <- R6::R6Class(
         }
       )
 
-      provider_tool_call_id <- tryCatch(
-        {
+      provider_tool_call_id <- read_provider_tool_call_id(
+        function() {
           if (!is.null(result@request)) {
             result@request@id
           } else {
             NULL
           }
         },
-        error = function(e) NULL
+        source = "result",
+        object = result
       )
 
       list(

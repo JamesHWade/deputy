@@ -552,3 +552,46 @@ test_that("extract_tool_result_data handles NULL result", {
   expect_null(result$tool_result)
   expect_equal(result$tool_error, "NULL result received")
 })
+
+test_that("provider tool call IDs distinguish absence from invalid values", {
+  agent <- Agent$new(chat = create_mock_chat())
+
+  absent_request <- create_mock_tool_request()
+  attr(absent_request, "id") <- NULL
+  expect_no_warning(
+    absent <- agent$.__enclos_env__$private$extract_tool_request_data(
+      absent_request
+    )
+  )
+  expect_null(absent$provider_tool_call_id)
+
+  invalid_request <- create_mock_tool_request()
+  attr(invalid_request, "id") <- list("call_123")
+  invalid_result <- ellmer::ContentToolResult(
+    value = "ok",
+    request = invalid_request
+  )
+
+  request_data <- result_data <- NULL
+  expect_snapshot({
+    request_data <- agent$.__enclos_env__$private$extract_tool_request_data(
+      invalid_request
+    )
+    result_data <- agent$.__enclos_env__$private$extract_tool_result_data(
+      invalid_result
+    )
+  })
+  expect_null(request_data$provider_tool_call_id)
+  expect_null(result_data$provider_tool_call_id)
+
+  unreadable_request <- new.env(parent = emptyenv())
+  unreadable_id <- NULL
+  expect_snapshot(
+    unreadable_id <- read_provider_tool_call_id(
+      function() unreadable_request@id,
+      source = "request",
+      object = unreadable_request
+    )
+  )
+  expect_null(unreadable_id)
+})
