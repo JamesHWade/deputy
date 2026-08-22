@@ -62,3 +62,24 @@ test_that("HookMatcher rejects invalid regex patterns at construction", {
     error = TRUE
   )
 })
+
+test_that("HookMatcher rejects invalid timeouts at construction", {
+  callback <- function(...) NULL
+
+  expect_snapshot(
+    HookMatcher$new("PreToolUse", callback, timeout = -1),
+    error = TRUE
+  )
+  expect_snapshot(
+    HookMatcher$new("PreToolUse", callback, timeout = Inf),
+    error = TRUE
+  )
+  expect_snapshot(
+    HookMatcher$new("PreToolUse", callback, timeout = c(1, 2)),
+    error = TRUE
+  )
+  expect_snapshot(
+    HookMatcher$new("PreToolUse", callback, timeout = "5"),
+    error = TRUE
+  )
+})

@@ -83,3 +83,17 @@ validate_hook_pattern <- function(pattern) {
 
   invisible(pattern)
 }
+
+validate_hook_timeout <- function(timeout) {
+  if (
+    !is.numeric(timeout) ||
+      length(timeout) != 1L ||
+      is.na(timeout) ||
+      !is.finite(timeout) ||
+      timeout < 0
+  ) {
+    cli_abort("{.arg timeout} must be one finite non-negative number")
+  }
+
+  as.numeric(timeout)
+}
