@@ -475,6 +475,23 @@ test_that("sub-agent disallowed tools override permission prompts", {
   expect_false(grepl("Use ask_user", result$reason, fixed = TRUE))
 })
 
+test_that("sub-agent tool denylist drops tools with unreadable names", {
+  lead <- LeadAgent$new(chat = create_mock_chat())
+  readable <- tools_file()[[1L]]
+  tools <- list(readable = readable, unreadable = new.env(parent = emptyenv()))
+
+  filtered <- NULL
+  expect_snapshot(
+    filtered <- lead$.__enclos_env__$private$filter_disallowed_tools(
+      tools,
+      disallowed_tools = "run_bash"
+    )
+  )
+
+  expect_named(filtered, "readable")
+  expect_identical(filtered[[1L]], readable)
+})
+
 test_that("sub-agents retain inherited prompt-tool gates", {
   definition <- agent_definition(
     name = "gated-prompt",

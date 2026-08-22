@@ -1,5 +1,77 @@
 # Internal utility functions for deputy
 
+# Read an optional value without collapsing absence and read failures.
+#
+# @param reader Zero-argument function that reads the value.
+# @param validator Optional predicate for validating a present value.
+# @return A list with `status`, `value`, and `error`. Status is one of
+#   `"present"`, `"absent"`, `"invalid"`, or `"unreadable"`.
+# @noRd
+read_optional_value <- function(reader, validator = NULL) {
+  attempt <- tryCatch(
+    list(value = reader(), error = NULL),
+    error = function(error) list(value = NULL, error = error)
+  )
+
+  if (!is.null(attempt$error)) {
+    return(list(
+      status = "unreadable",
+      value = NULL,
+      error = attempt$error
+    ))
+  }
+
+  if (is.null(attempt$value)) {
+    return(list(status = "absent", value = NULL, error = NULL))
+  }
+
+  if (!is.null(validator) && !isTRUE(validator(attempt$value))) {
+    return(list(
+      status = "invalid",
+      value = attempt$value,
+      error = NULL
+    ))
+  }
+
+  list(status = "present", value = attempt$value, error = NULL)
+}
+
+# @noRd
+is_nonempty_string <- function(value) {
+  is.character(value) &&
+    length(value) == 1L &&
+    !is.na(value) &&
+    nzchar(trimws(value))
+}
+
+# Read an optional provider tool call ID and report malformed values.
+# @noRd
+read_provider_tool_call_id <- function(reader, source, object) {
+  id <- read_optional_value(reader, validator = is_nonempty_string)
+
+  if (identical(id$status, "present")) {
+    return(id$value)
+  }
+  if (identical(id$status, "absent")) {
+    return(NULL)
+  }
+
+  if (identical(id$status, "unreadable")) {
+    cli_warn(c(
+      "Failed to read provider tool call ID from {source}.",
+      "i" = "Source class: {.cls {class(object)}}.",
+      "x" = conditionMessage(id$error)
+    ))
+  } else {
+    cli_warn(c(
+      "Ignoring invalid provider tool call ID from {source}.",
+      "i" = "Expected one non-empty string; got {.cls {class(id$value)}}."
+    ))
+  }
+
+  NULL
+}
+
 #' Resolve symlinks in a path (follows symlink chains)
 #'
 #' Recursively resolves symlinks to get the final target path.
