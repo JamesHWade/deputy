@@ -13,478 +13,157 @@ experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](h
 coverage](https://codecov.io/gh/JamesHWade/deputy/graph/badge.svg)](https://app.codecov.io/gh/JamesHWade/deputy)
 <!-- badges: end -->
 
-deputy is a provider-agnostic agent runtime for R, built on
-[ellmer](https://ellmer.tidyverse.org/). It enables you to create AI
-agents that can use tools to accomplish multi-step tasks, with built-in
-support for permissions, hooks, streaming output, explicit persistence,
-and multi-agent delegation.
+Deputy turns an [ellmer](https://ellmer.tidyverse.org/) chat into a
+governed R Agent. Give it tools, a workspace, and explicit limits; get
+back an observable run you can inspect, stream into Shiny, save, or
+delegate.
 
-## Features
+## Why Deputy?
 
-- **Provider-agnostic** - Works with OpenAI, Anthropic, Google, Ollama,
-  and any provider ellmer supports
-- **Tool bundles** - Pre-built tools for file operations, code
-  execution, and data analysis
-- **Permission system** - Fine-grained control over what agents can do
-- **Hooks** - Intercept and customize agent behavior at key points
-- **Semantic streaming** - Text, content, tool lifecycle, usage, and
-  stop events with run IDs
-- **Run limits** - Request, tool-call, token, and estimated-cost limits
-- **File checkpoints** - Bounded, persisted byte-exact rewind for Deputy
-  file tools
-- **Multi-agent** - Coordinate specialized sub-agents for complex tasks
-- **Explicit persistence** - Save and load conversations with native RDS
-  files
+ellmer gives R a provider-independent chat interface and tools. Deputy
+adds the runtime around that chat when a tool-using conversation becomes
+a real job:
+
+| Start with ellmer       | Add Deputy when you need                          |
+|-------------------------|---------------------------------------------------|
+| Chats and provider APIs | Explicit tool permissions and run limits          |
+| Tool registration       | Hooks, semantic events, and inspectable results   |
+| Streaming model output  | A stable stream for terminals and Shiny hosts     |
+| Conversation state      | Explicit session persistence and file checkpoints |
+| One tool-using chat     | Correlated delegation to specialist Agents        |
+
+The core object model stays small:
+
+``` text
+ellmer Chat + Tools + Permissions + Limits
+                     |
+                  Deputy Agent
+                     |
+        AgentResult + Events + Checkpoints
+```
 
 ## Installation
 
-You can install the development version of deputy from GitHub:
+Deputy currently follows development versions of ellmer:
 
 ``` r
 # install.packages("pak")
-pak::pak("JamesHWade/deputy")
+pak::pak(c("tidyverse/ellmer", "JamesHWade/deputy"))
 ```
 
-You’ll also need ellmer:
+For the optional Shiny host, also install shinychat:
 
 ``` r
-pak::pak("tidyverse/ellmer")
+pak::pak("posit-dev/shinychat")
 ```
 
-## Quick Start
+## A safe first run
 
-### Create an Agent
+Start with a small, read-only toolset and a bounded run. This setup is
+provider-independent and is executed whenever the README is rendered:
 
 ``` r
 library(deputy)
 
-# Create an agent with file tools
+workspace <- normalizePath(getwd(), winslash = "/")
+first_tools <- tools_preset("minimal")
+first_permissions <- permissions_readonly()
+first_limits <- UsageLimits(max_requests = 6, max_tool_calls = 8)
+
+stopifnot(
+  length(first_tools) == 3L,
+  identical(first_permissions$mode, "readonly"),
+  identical(first_limits$max_requests, 6L)
+)
+```
+
+Then choose any provider supported by ellmer and run a task. The model
+call is not executed while building the documentation:
+
+``` r
+chat <- ellmer::chat("openai")
+
 agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_file()
+  chat = chat,
+  tools = first_tools,
+  permissions = first_permissions,
+  usage_limits = first_limits,
+  working_dir = workspace
 )
 
-# Run a task (blocking)
-result <- agent$run_sync("What R files are in the current directory?")
+result <- agent$run_sync(
+  "Explain what this R package does. Support the answer with file paths."
+)
+```
+
+`run_sync()` returns an `AgentResult`, not just text:
+
+``` r
 cat(result$response)
+result$stop_reason
+result$usage
+result$tool_calls()
+result$tool_results()
 ```
 
-### Streaming Output
+Read [Getting
+Started](https://jameshwade.github.io/deputy/articles/getting-started.html)
+to turn on a workspace-scoped write permission deliberately, create a
+file checkpoint, and recover from common failures.
 
-For real-time feedback as the agent works:
+## The safety boundary
 
-``` r
-events <- agent$run("Analyze the structure of this project")
-repeat {
-  event <- events()
-  if (coro::is_exhausted(event)) {
-    break
-  }
-  switch(
-    event$type,
-    "text" = cat(event$text),
-    "tool_start" = message("Calling ", event$tool_name, "..."),
-    "stop" = message("\nDone! Cost: $", round(event$cost$total, 4))
-  )
-}
-```
+Deputy enforces application-level policy at tool boundaries. It does not
+turn model-generated code into untrusted code you can execute safely:
 
-### Async Runs
+- `permissions_readonly()` denies Deputy’s write, shell, R execution,
+  web, and package-install capabilities.
+- A directory-valued `file_write` permission confines Deputy’s native
+  file writes to that canonical root. File reads remain limited by the R
+  process, not by an operating-system sandbox.
+- `run_r_code` uses a separate R process; that process separation is not
+  an OS security sandbox. `run_bash` executes with the current user’s
+  privileges.
+- File checkpoints cover Deputy’s native write, edit, and multi-edit
+  tools. They are recovery machinery, not a substitute for version
+  control or backups.
 
-`run_async()` runs a task without blocking the R process and returns a
-promise that resolves to an `AgentResult`. It uses the same
-callback-enforced permissions, hooks, and `UsageLimits` as `run_shiny()`,
-but collects the result instead of streaming to a UI. Reach for it when an
-Agent is a worker inside a larger async system, such as a sub-agent invoked
-from a tool of a chat that is itself streaming in Shiny:
+Start read-only, grant the narrowest capability that completes the job,
+and use a real isolation boundary for untrusted code.
 
-``` r
-worker <- Agent$new(
-  chat = parent_chat$clone()$set_turns(list()),
-  system_prompt = "You are a literature scout. Report sources with DOIs.",
-  tools = tools_web(),
-  usage_limits = UsageLimits(max_requests = 8, max_tool_calls = 12)
-)
+## Choose your path
 
-worker$run_async("Find three recent reviews on PFAS remediation") |>
-  promises::then(function(result) {
-    cat(result$stop_reason, "-", result$usage$tool_calls, "tool calls\n")
-    result$response
-  })
-```
+| Goal | Read next |
+|----|----|
+| Understand tools and presets | [Tools](https://jameshwade.github.io/deputy/articles/tools.html) |
+| Design a least-authority policy | [Permissions and Safety](https://jameshwade.github.io/deputy/articles/permissions.html) |
+| Observe or intervene in a run | [Hooks](https://jameshwade.github.io/deputy/articles/hooks.html) |
+| Embed an Agent in an app | [Shiny Chat](https://jameshwade.github.io/deputy/articles/example-shiny-chat.html) |
+| Delegate to specialist Agents | [Multi-Agent Orchestration](https://jameshwade.github.io/deputy/articles/multi-agent.html) |
+| Build a concrete workflow | [Recipes](https://jameshwade.github.io/deputy/articles/example-data-analysis.html) |
 
-With `UsageLimits(on_exceed = "error")` the promise is rejected with the
-structured limit error instead of resolving with a typed `stop_reason`.
-Structured `output_format` still requires `run()` or `run_sync()`.
+## Terminal use
 
-### CLI (`exec/deputy.R`)
-
-deputy ships a [Rapp](https://github.com/r-lib/Rapp) package executable
-that works with [`ir`](https://r-lib.github.io/ir/tools.html). Install
-`ir` once, then run the package directly from GitHub without installing
-deputy globally:
+Deputy also ships a [Rapp](https://github.com/r-lib/Rapp) package
+executable. Run it without a global Deputy installation, or install a
+persistent launcher:
 
 ``` bash
 uv tool install r-lib-ir
 rx --from github::JamesHWade/deputy deputy --help
 rx --from github::JamesHWade/deputy deputy \
   --provider openai "Summarize the R files in this project"
-```
 
-For a persistent `deputy` command, install its launcher:
-
-``` bash
 ir tool install github::JamesHWade/deputy
-deputy --provider openai --model gpt-4o --tools standard
+deputy --provider openai --tools minimal
 ```
 
-If deputy is already installed in an R library, Rapp can install the
-same launcher:
-
-``` r
-Rapp::install_pkg_cli_apps("deputy")
-```
-
-The optional positional task selects non-interactive mode; omit it to
-start an interactive session. Common options include short aliases
-(`-p`, `-m`, `-t`, `-P`, `-n`, `-c`, `-d`, `-v`, etc.) and repeatable
-Rapp 0.4 flags:
-
-``` bash
-deputy --mcp --mcp-server github --mcp-server slack
-deputy --debug --debug-file /tmp/deputy-debug.log
-```
-
-### Sessions and Persistence
-
-Every agent has a stable `session_id` for correlating results and
-events. Pass one at construction when another system owns the
-identifier, or let Deputy generate it:
-
-``` r
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_file(),
-  session_id = "session_research_001"
-)
-
-agent$session_id()
-result <- agent$run_sync("Summarize this package")
-result$session_id
-```
-
-`session_id` is correlation metadata, not a storage key. Persistence is
-an explicit file operation:
-
-``` r
-agent$save_session("research-session.rds")
-
-restored <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_file(),
-  permissions = permissions_readonly(),
-  session_id = "session_research_002"
-)
-restored$load_session("research-session.rds")
-```
-
-Loading restores the saved conversation, prompt, run context, and
-enabled file checkpoint state. The receiving agent keeps its own tools,
-permissions, working directory, and `session_id`.
-
-### Tools
-
-deputy provides tool presets for common use cases:
-
-``` r
-# Use presets for quick setup
-tools_preset("minimal")   # read_file, list_files
-tools_preset("standard")  # + write_file, run_r_code
-tools_preset("dev")       # + run_bash (full development)
-tools_preset("data")      # read_file, list_files, read_csv, run_r_code
-tools_preset("full")      # all tools
-
-# Or use individual bundles
-tools_file()  # File operations
-tools_code()  # Code execution
-tools_data()  # Data reading
-tools_all()   # Everything
-
-# Optional: read selected pages from a PDF
-tool_read_file("report.pdf", pages = "1,3-5")
-
-# Optional: convert rich docs to markdown with MarkItDown
-tool_read_markdown("slides.pptx")
-```
-
-PDF page extraction uses `pdftools` when available, with a fallback to
-`reticulate` + Python `pypdf`. `tool_read_markdown()` uses
-`reticulate` + Python `markitdown`.
-
-### Permissions
-
-Control what your agent can do:
-
-``` r
-# Read-only: no writes, no code execution
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_file(),
-  permissions = permissions_readonly()
-)
-
-# Standard: accessible reads, workspace-scoped writes, R code, no bash
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_file(),
-  permissions = permissions_standard()
-)
-
-# Custom permissions
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_all(),
-  permissions = Permissions$new(
-    file_write = getwd(),
-    bash = FALSE,
-    r_code = TRUE
-  )
-)
-
-# Explicit tool policy gates
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_all(),
-  permissions = Permissions$new(
-    tool_allowlist = c("read_file", "list_files", "run_r_code"),
-    tool_denylist = c("run_bash"),
-    permission_prompt_tool_name = "ask_user"
-  )
-)
-
-# Planning mode: read-only tools plus ask_user
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_all(),
-  permissions = permissions_plan()
-)
-```
-
-When both are set, `tool_denylist` takes precedence over
-`tool_allowlist`. `permission_prompt_tool_name` identifies the tool that
-can request explicit human approval. `permissions_plan()` allows
-read-only annotated tools and `ask_user`.
-
-### Run Limits and File Rewind
-
-Limits are scoped to one run, so loading a saved conversation does not
-inherit usage from earlier runs:
-
-``` r
-agent <- Agent$new(
-  chat = ellmer::chat("openai"),
-  tools = tools_file(),
-  usage_limits = UsageLimits(
-    max_requests = 12,
-    max_tool_calls = 20,
-    max_total_tokens = 50000,
-    max_cost_usd = 1
-  )
-)
-
-result <- agent$run_sync("Inspect this package")
-result$run_id
-result$usage
-result$tool_calls()
-result$tool_results()
-```
-
-Request and tool-call limits are checked at model and tool boundaries.
-Token and cost limits use usage reported after a model response, so a
-run stops once an overage is observed and can exceed the configured
-threshold by one response.
-
-Enable reversible file journals when an agent may edit its workspace:
-
-``` r
-agent <- Agent$new(
-  chat = ellmer::chat("anthropic"),
-  tools = tools_file(),
-  enable_file_checkpointing = TRUE,
-  working_dir = getwd()
-)
-
-checkpoint_id <- agent$checkpoint("before refactor")
-agent$run_sync("Refactor R/parser.R")
-agent$rewind_files(checkpoint_id)
-```
-
-Deputy automatically creates a checkpoint at the beginning of each run
-and includes the journal when `save_session()` is called. Captures
-default to 50 MiB per file. The default maximum aggregate serialized
-checkpoint-state size is 250 MiB, counting journal records, checkpoint
-markers, metadata, and pending captures. The bounds apply to live
-captures and restored session state; violations signal
-`deputy_file_checkpoint_limit_error`. Lead agents and their delegated
-agents share one workspace journal, so child-agent edits participate in
-lead-level rewind. Rewind covers writes through Deputy’s write, edit,
-and multi-edit tools; it does not capture writes performed by Bash, R
-code, or arbitrary custom tools.
-
-### Hooks
-
-Intercept agent behavior:
-
-``` r
-# Log all tool calls
-agent$add_hook(HookMatcher$new(
-  event = "PostToolUse",
-  callback = function(tool_name, tool_result, tool_error, context) {
-    message("[", Sys.time(), "] ", tool_name)
-    HookResultPostToolUse()
-  }
-))
-
-# Block dangerous bash commands
-agent$add_hook(HookMatcher$new(
-  event = "PreToolUse",
-  pattern = "^run_bash$",
-  callback = function(tool_name, tool_input, context) {
-    if (grepl("rm -rf|sudo", tool_input$command)) {
-      HookResultPreToolUse(permission = "deny", reason = "Dangerous command")
-    } else {
-      HookResultPreToolUse(permission = "allow")
-    }
-  }
-))
-
-# Replace emitted tool output without changing the model-visible result
-agent$add_hook(HookMatcher$new(
-  event = "PostToolUse",
-  pattern = "^read_file$",
-  callback = function(tool_name, tool_result, tool_error, context) {
-    HookResultPostToolUse(updated_tool_output = "File read completed")
-  }
-))
-```
-
-### Skills
-
-Skills bundle tools and prompt extensions. You can load them from disk
-or create them programmatically. deputy ships with a built-in example
-skill under `inst/skills`.
-
-``` r
-# Discover bundled skills
-skills_dir <- system.file("skills", package = "deputy")
-skills_list(skills_dir)
-
-# Load a skill by path
-agent$load_skill(file.path(skills_dir, "data_analysis"))
-
-# Inspect loaded skills
-agent$skills()
-
-# Create and load a skill programmatically
-custom <- skill_create(
-  name = "my_skill",
-  description = "Custom helpers",
-  prompt = "You are a focused assistant for project-specific tasks."
-)
-agent$load_skill(custom)
-```
-
-### Structured Output
-
-Request JSON output that matches a schema:
-
-``` r
-schema <- list(
-  type = "object",
-  properties = list(status = list(type = "string")),
-  required = list("status")
-)
-
-result <- agent$run_sync(
-  "Respond with status = ok",
-  output_format = list(type = "json_schema", schema = schema)
-)
-
-result$structured_output
-```
-
-### Error Handling
-
-deputy provides structured error types for programmatic error handling:
-
-``` r
-# Detect Deputy errors while preserving their structured classes
-tryCatch(
-  agent$run_sync(
-    "task",
-    usage_limits = UsageLimits(max_requests = 2, on_exceed = "error")
-  ),
-  deputy_error = function(e) {
-    stopifnot(is_deputy_error(e))
-    message(conditionMessage(e))
-  }
-)
-```
-
-### Multi-Agent Systems
-
-Coordinate specialized agents:
-
-``` r
-# Define sub-agents
-code_agent <- agent_definition(
-  name = "code_analyst",
-  description = "Analyzes R code",
-  prompt = "You are an expert R programmer.",
-  tools = tools_file()
-)
-
-# Create lead agent that can delegate
-lead <- LeadAgent$new(
-  chat = ellmer::chat("openai"),
-  sub_agents = list(code_agent)
-)
-
-result <- lead$run_sync("Review the R code in this project")
-```
-
-Direct synchronous child usage is aggregated into `result$usage`. Each
-child inherits the lead run’s remaining limits, and the lead enforces
-them after delegation. Parallel, background, transitive child-tree, and
-cross-run global usage accounting remain future work.
-
-## Provider Support
-
-deputy works with any LLM provider that ellmer supports:
-
-``` r
-# OpenAI
-Agent$new(chat = ellmer::chat("openai"))
-
-# Anthropic
-Agent$new(chat = ellmer::chat("anthropic"))
-
-# Google
-Agent$new(chat = ellmer::chat("google_gemini"))
-
-# Local via Ollama
-Agent$new(chat = ellmer::chat("ollama/llama3.2"))
-```
-
-## Learn More
-
-- `vignette("getting-started")` - Comprehensive introduction
-- `vignette("permissions")` - Permission modes and custom policies
-- `vignette("hooks")` - Tool lifecycle hooks
-- `vignette("multi-agent")` - Delegation with `LeadAgent`
-- [ellmer documentation](https://ellmer.tidyverse.org/) - Underlying LLM
-  framework
+## Status
+
+Deputy is experimental. Its contracts are being sharpened through real
+package, CLI, and Shiny integrations. Please report problems and design
+gaps in [GitHub Issues](https://github.com/JamesHWade/deputy/issues).
 
 ## License
 
-MIT
+MIT © James Wade
