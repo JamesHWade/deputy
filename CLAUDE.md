@@ -62,6 +62,10 @@ The repository includes a SessionStart hook (`.claude/setup-r.sh`) that automati
 # Install dependencies
 Rscript -e "devtools::install_deps(dependencies = TRUE)"
 
+# deputy tracks the DEVELOPMENT versions of ellmer and shinychat, not CRAN.
+# Install them from GitHub or you will be working against an older API.
+Rscript -e "pak::pak(c('tidyverse/ellmer', 'posit-dev/shinychat'))"
+
 # Load package for development
 Rscript -e "devtools::load_all()"
 ```
@@ -110,10 +114,22 @@ Rscript -e "devtools::install()"
 
 ### Versioning
 
-deputy stays on development versions (`0.0.0.9xxx`) until it is ready for CRAN.
-Do not bump to `0.1.0` or any release version as a way of marking progress — a
-release number means "submitted to CRAN", nothing else. Milestones carry
-direction; the version carries release state.
+deputy stays on `0.0.0.9xxx` until it is ready for CRAN.
+
+- **Do not bump the major or minor version.** Not to `0.1.0`, not to mark a
+  milestone, not to signal that a batch of work is done. A release number
+  means "submitted to CRAN" and nothing else.
+- **Do not add a release heading to `NEWS.md`.** New entries go under
+  `# deputy (development version)`. A `# deputy 0.1.0` heading reads as a
+  release announcement.
+- Milestones carry direction; the version carries release state.
+
+### Upstream dependencies
+
+deputy develops against the **development** versions of ellmer and shinychat,
+not their CRAN releases — see `dev/adr/0004-track-upstream-development-versions.md`.
+Install them from GitHub before working on the package. An upstream break is
+something to absorb promptly and report upstream, not to work around locally.
 
 ## Code Conventions
 
