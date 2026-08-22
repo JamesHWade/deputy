@@ -11,10 +11,10 @@ sub-agents based on registered AgentDefinitions.
 \section{Super class}{
 \code{\link[deputy:Agent]{Agent}} -> \code{LeadAgent}
 }
-\section{Public fields}{
-  \if{html}{\out{<div class="r6-fields">}}
+\section{Active bindings}{
+  \if{html}{\out{<div class="r6-active-bindings">}}
   \describe{
-    \item{\code{sub_agent_defs}}{List of AgentDefinition objects}
+    \item{\code{sub_agent_defs}}{Read-only snapshot of registered AgentDefinitions.}
   }
   \if{html}{\out{</div>}}
 }

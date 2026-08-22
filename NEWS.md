@@ -45,6 +45,11 @@
   changes may only narrow authority. Delegated agents use the same rule and
   retain lead capability, tool-gate, callback, and write-root restrictions.
 
+* `agent_definition()` now validates and canonicalizes AgentDefinition routing
+  keys and fields. `LeadAgent` rejects duplicate names and keeps its registry
+  private behind a read-only snapshot, so delegation, displayed definitions,
+  and the lead prompt cannot diverge (#79).
+
 * `Agent` now rejects a provider tool request whose name is missing,
   unreadable, or malformed before it reaches usage accounting, permissions,
   hooks, or execution (#26).
@@ -74,6 +79,11 @@
 * `tool_run_r_code()` now rejects timed-out or failed `callr` subprocesses with
   readable tool errors instead of failing later while formatting an unbound
   result (#27).
+
+* `tools_interactive()` now creates an `ask_user` tool with an instance-scoped
+  human-input handler and routing context, allowing concurrent Agents to remain
+  isolated. Missing handlers signal `deputy_human_input_unavailable`;
+  `set_ask_user_callback()` remains a legacy process-wide fallback (#76).
 
 # deputy 0.0.0.9000
 

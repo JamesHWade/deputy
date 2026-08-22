@@ -59,6 +59,54 @@ test_that("agent_definition accepts custom model", {
   expect_equal(def$model, "anthropic/claude-sonnet-4-20250514")
 })
 
+test_that("agent_definition canonicalizes routing keys", {
+  def <- agent_definition(
+    name = "  Review-Agent_1  ",
+    description = "Reviews code",
+    prompt = "Review the code"
+  )
+
+  expect_identical(def$name, "review-agent_1")
+})
+
+test_that("agent_definition validates scalar and collection fields", {
+  base <- list(
+    name = "reviewer",
+    description = "Reviews code",
+    prompt = "Review the code"
+  )
+  invalid <- list(
+    list(args = list(name = "two words"), field = "name"),
+    list(args = list(name = "1reviewer"), field = "name"),
+    list(args = list(description = ""), field = "description"),
+    list(args = list(prompt = NA_character_), field = "prompt"),
+    list(args = list(model = character()), field = "model"),
+    list(args = list(tools = tool_read_file), field = "tools"),
+    list(args = list(skills = "review"), field = "skills"),
+    list(
+      args = list(disallowed_tools = list("run_bash")),
+      field = "disallowed_tools"
+    ),
+    list(args = list(memory = list("memory")), field = "memory"),
+    list(
+      args = list(mcp_servers = c("github", NA_character_)),
+      field = "mcp_servers"
+    ),
+    list(
+      args = list(initial_prompt = c("one", "two")),
+      field = "initial_prompt"
+    )
+  )
+
+  for (case in invalid) {
+    condition <- rlang::catch_cnd(
+      do.call(agent_definition, utils::modifyList(base, case$args))
+    )
+    expect_s3_class(condition, "error")
+    expect_match(conditionMessage(condition), case$field, fixed = TRUE)
+  }
+})
+
 test_that("agent_definition print works", {
   def <- agent_definition(
     name = "print_test",
@@ -765,8 +813,7 @@ test_that("LeadAgent with no sub-agents is valid", {
   expect_equal(length(lead$available_sub_agents()), 0)
 })
 
-test_that("LeadAgent duplicate sub-agent names allowed", {
-  # Not validated - this is a user mistake but doesn't crash
+test_that("LeadAgent rejects duplicate normalized routing keys", {
   mock_chat <- create_mock_chat()
 
   agent1 <- agent_definition(
@@ -775,20 +822,68 @@ test_that("LeadAgent duplicate sub-agent names allowed", {
     prompt = "Prompt 1"
   )
   agent2 <- agent_definition(
-    name = "duplicate",
+    name = "DUPLICATE",
     description = "Second agent with same name",
     prompt = "Prompt 2"
   )
 
-  lead <- LeadAgent$new(
-    chat = mock_chat,
-    sub_agents = list(agent1, agent2)
+  condition <- rlang::catch_cnd(
+    LeadAgent$new(
+      chat = mock_chat,
+      sub_agents = list(agent1, agent2)
+    )
   )
 
-  available <- lead$available_sub_agents()
-  # Both are in the list (though this could cause confusion)
-  expect_equal(length(available), 2)
-  expect_true(all(available == "duplicate"))
+  expect_s3_class(condition, "error")
+  expect_match(conditionMessage(condition), "Duplicate", fixed = TRUE)
+  expect_match(conditionMessage(condition), "duplicate", fixed = TRUE)
+})
+
+test_that("LeadAgent registry is a read-only snapshot", {
+  definition <- agent_definition(
+    name = "helper",
+    description = "Helps with tasks",
+    prompt = "Help"
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(definition)
+  )
+
+  snapshot <- lead$sub_agent_defs
+  snapshot[[1]]$name <- "changed"
+  definition$name <- "also-changed"
+
+  expect_identical(lead$available_sub_agents(), "helper")
+  expect_identical(lead$sub_agent_defs[[1]]$name, "helper")
+
+  condition <- rlang::catch_cnd({
+    lead$sub_agent_defs <- list()
+  })
+  expect_s3_class(condition, "error")
+  expect_match(conditionMessage(condition), "read-only", fixed = TRUE)
+})
+
+test_that("LeadAgent rejects duplicate registration", {
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(agent_definition(
+      name = "helper",
+      description = "Helps",
+      prompt = "Help"
+    ))
+  )
+
+  duplicate <- agent_definition(
+    name = "HELPER",
+    description = "Also helps",
+    prompt = "Help again"
+  )
+  condition <- rlang::catch_cnd(lead$register_sub_agent(duplicate))
+
+  expect_s3_class(condition, "error")
+  expect_match(conditionMessage(condition), "already registered", fixed = TRUE)
+  expect_identical(lead$available_sub_agents(), "helper")
 })
 
 test_that("LeadAgent registers additional tools", {

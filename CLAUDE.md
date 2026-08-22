@@ -258,6 +258,21 @@ Permissions configured at construction are an immutable authority ceiling.
 `Agent$set_permission_mode()` may keep or narrow a policy but cannot widen it;
 delegated agents are bounded by the same rule and by their lead's restrictions.
 
+### AgentDefinition Routing
+
+`agent_definition()` canonicalizes names to lowercase routing keys. A
+`LeadAgent` keeps definitions in a private, uniquely keyed registry;
+`sub_agent_defs` is a read-only snapshot, and new definitions must go through
+`register_sub_agent()` so the registry and lead prompt stay synchronized.
+
+### Human Input
+
+Concurrent and hosted Agents bind their own handler with
+`tools_interactive(callback, context)`. The context carries stable routing
+values and may be resolved lazily. `set_ask_user_callback()` is only a legacy
+process-wide fallback for single-Agent scripts; do not use it for Shiny or
+other concurrent hosts.
+
 ### Tool Presets
 
 - `tools_preset("minimal")` - read_file, list_files

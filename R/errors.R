@@ -26,6 +26,8 @@
 #'     - `deputy_session_load` - Failed to load session
 #'     - `deputy_session_save` - Failed to save session
 #'   - **deputy_hook** - Hook execution failures
+#'   - **deputy_human_input_unavailable** - No interactive or bound handler
+#'     is available for an `ask_user` request
 #'
 #' @section Usage:
 #'

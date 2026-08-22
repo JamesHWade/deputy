@@ -20,7 +20,9 @@ agent_definition(
 )
 }
 \arguments{
-\item{name}{Unique name for this agent type}
+\item{name}{Unique routing key for this Agent type. Names are trimmed,
+converted to lowercase, and must start with a letter followed only by
+letters, numbers, underscores, or hyphens.}
 
 \item{description}{Brief description of what this agent does (shown to lead agent)}
 

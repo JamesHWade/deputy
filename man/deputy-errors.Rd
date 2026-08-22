@@ -34,6 +34,8 @@ information for debugging. Errors use cli formatting for readable output.
 \item \code{deputy_session_save} - Failed to save session
 }
 \item \strong{deputy_hook} - Hook execution failures
+\item \strong{deputy_human_input_unavailable} - No interactive or bound handler
+is available for an \code{ask_user} request
 }
 }
 }

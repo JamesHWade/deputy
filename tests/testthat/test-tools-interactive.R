@@ -1,5 +1,17 @@
 # Tests for interactive tools
 
+interaction_test_questions <- function() {
+  list(list(
+    question = "Which format?",
+    header = "Format",
+    options = list(
+      list(label = "JSON", description = "Structured JSON"),
+      list(label = "YAML", description = "Readable YAML")
+    ),
+    multiSelect = FALSE
+  ))
+}
+
 test_that("tool_ask_user has correct structure", {
   expect_true(inherits(tool_ask_user, "ellmer::ToolDef"))
 
@@ -18,6 +30,115 @@ test_that("tools_interactive returns tool list", {
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("ask_user" %in% tool_names)
+})
+
+test_that("tools_interactive isolates handlers and routing context", {
+  set_ask_user_callback(NULL)
+  seen <- list()
+  make_handler <- function(key) {
+    force(key)
+    function(questions, context) {
+      seen[[key]] <<- context
+      stats::setNames(list(key), questions[[1]]$question)
+    }
+  }
+
+  chat_a <- create_mock_chat()
+  chat_b <- create_mock_chat()
+  agent_a <- Agent$new(
+    chat = chat_a,
+    tools = tools_interactive(
+      callback = make_handler("agent-a"),
+      context = list(agent_id = "agent-a", session_id = "session-a")
+    ),
+    agent_id = "agent-a",
+    session_id = "session-a"
+  )
+  agent_b <- Agent$new(
+    chat = chat_b,
+    tools = tools_interactive(
+      callback = make_handler("agent-b"),
+      context = list(agent_id = "agent-b", session_id = "session-b")
+    ),
+    agent_id = "agent-b",
+    session_id = "session-b"
+  )
+
+  result_a <- chat_a$get_tools()[["ask_user"]](interaction_test_questions())
+  result_b <- chat_b$get_tools()[["ask_user"]](interaction_test_questions())
+
+  expect_s3_class(agent_a, "Agent")
+  expect_s3_class(agent_b, "Agent")
+  expect_identical(result_a$answers[["Which format?"]], "agent-a")
+  expect_identical(result_b$answers[["Which format?"]], "agent-b")
+  expect_identical(seen[["agent-a"]]$session_id, "session-a")
+  expect_identical(seen[["agent-b"]]$session_id, "session-b")
+})
+
+test_that("per-tool handler takes precedence over the legacy global fallback", {
+  set_ask_user_callback(function(questions) {
+    stats::setNames(list("global"), questions[[1]]$question)
+  })
+  withr::defer(set_ask_user_callback(NULL))
+
+  tool <- tools_interactive(
+    callback = function(questions, context) {
+      stats::setNames(list(context$route), questions[[1]]$question)
+    },
+    context = list(route = "instance")
+  )[[1]]
+  result <- tool(interaction_test_questions())
+
+  expect_identical(result$answers[["Which format?"]], "instance")
+})
+
+test_that("tools_interactive resolves dynamic context for each request", {
+  current_run <- "run-one"
+  seen <- character()
+  tool <- tools_interactive(
+    callback = function(questions, context) {
+      seen <<- c(seen, context$run_id)
+      stats::setNames(list(context$run_id), questions[[1]]$question)
+    },
+    context = function() list(run_id = current_run)
+  )[[1]]
+
+  first <- tool(interaction_test_questions())
+  current_run <- "run-two"
+  second <- tool(interaction_test_questions())
+
+  expect_identical(first$answers[["Which format?"]], "run-one")
+  expect_identical(second$answers[["Which format?"]], "run-two")
+  expect_identical(seen, c("run-one", "run-two"))
+})
+
+test_that("tools_interactive validates handler dependencies", {
+  callback_condition <- rlang::catch_cnd(
+    tools_interactive(callback = "not a function")
+  )
+  context_condition <- rlang::catch_cnd(
+    tools_interactive(
+      callback = function(questions, context) list(),
+      context = "route"
+    )
+  )
+
+  expect_s3_class(callback_condition, "error")
+  expect_match(conditionMessage(callback_condition), "callback", fixed = TRUE)
+  expect_s3_class(context_condition, "error")
+  expect_match(conditionMessage(context_condition), "context", fixed = TRUE)
+})
+
+test_that("missing non-interactive handler is a structured Deputy error", {
+  set_ask_user_callback(NULL)
+  skip_if(interactive(), "Test requires non-interactive session")
+  tool <- tools_interactive()[[1]]
+
+  condition <- rlang::catch_cnd(tool(interaction_test_questions()))
+
+  expect_s3_class(condition, "deputy_human_input_unavailable")
+  expect_s3_class(condition, "deputy_error")
+  expect_match(conditionMessage(condition), "handler", fixed = TRUE)
 })
 
 test_that("set_ask_user_callback validates input", {
@@ -112,7 +233,7 @@ test_that("ask_user_impl uses callback when set", {
   expect_equal(result[["What format do you prefer?"]], "JSON")
 })
 
-test_that("ask_user_impl errors in non-interactive without callback", {
+test_that("ask_user_impl reports missing non-interactive handler", {
   # Ensure no callback is set
   set_ask_user_callback(NULL)
 
@@ -130,10 +251,10 @@ test_that("ask_user_impl errors in non-interactive without callback", {
     )
   )
 
-  expect_error(
-    ask_user_impl(test_questions),
-    "not interactive"
-  )
+  condition <- rlang::catch_cnd(ask_user_impl(test_questions))
+
+  expect_s3_class(condition, "deputy_human_input_unavailable")
+  expect_match(conditionMessage(condition), "handler", fixed = TRUE)
 })
 
 test_that("tool_ask_user works with callback", {
