@@ -7,18 +7,25 @@
 hook_limit_file_writes(allowed_dir)
 }
 \arguments{
-\item{allowed_dir}{Directory where writes are allowed}
+\item{allowed_dir}{Existing directory where writes are allowed. The path is
+canonicalized when the hook is created.}
 }
 \value{
 A \link{HookMatcher} object
 }
 \description{
-Convenience function to create a PreToolUse hook that only allows
-file writes within a specified directory.
+Convenience function to create a PreToolUse hook that applies Deputy's
+canonical file-write permission policy to \code{write_file}, \code{edit_file}, and
+\code{multi_edit}. Prefer configuring \link{Permissions} as the Agent's authority
+policy; this helper is useful as an additional hook-level restriction.
 }
 \examples{
 \dontrun{
-agent$add_hook(hook_limit_file_writes("./output"))
+dir.create("output", showWarnings = FALSE)
+agent$add_hook(hook_limit_file_writes("output"))
 }
 
+}
+\seealso{
+\link{Permissions}
 }

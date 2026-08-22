@@ -323,7 +323,10 @@ HookMatcher <- R6::R6Class(
     #'   * SessionEnd: `function(reason, context)`
     #' @param pattern Optional regex pattern to filter by tool name.
     #'   Only applies to PreToolUse and PostToolUse events.
-    #' @param timeout Maximum callback execution time in seconds
+    #' @param timeout Maximum callback execution time in seconds. The default,
+    #'   `0`, runs the callback in the caller's process. Positive values run the
+    #'   callback in a clean [callr::r()] subprocess, where caller-process state
+    #'   and side effects are not available.
     #' @return A new `HookMatcher` object
     #'
     #' @examples
@@ -341,7 +344,7 @@ HookMatcher <- R6::R6Class(
     #'   }
     #' )
     #' }
-    initialize = function(event, callback, pattern = NULL, timeout = 30) {
+    initialize = function(event, callback, pattern = NULL, timeout = 0) {
       if (!event %in% HookEvent) {
         cli_abort(c(
           "Invalid hook event: {.val {event}}",
@@ -355,6 +358,7 @@ HookMatcher <- R6::R6Class(
 
       validate_hook_callback(event, callback)
       validate_hook_pattern(pattern)
+      timeout <- validate_hook_timeout(timeout)
 
       private$.event <- event
       private$.callback <- callback
@@ -428,7 +432,9 @@ HookMatcher <- R6::R6Class(
       )
     },
 
-    #' @field timeout Maximum execution time for the callback in seconds. Read-only after construction.
+    #' @field timeout Maximum execution time for the callback in seconds. Zero
+    #'   runs in the caller's process; a positive value uses a clean subprocess.
+    #'   Read-only after construction.
     timeout = function(value) {
       if (missing(value)) {
         return(private$.timeout)
@@ -543,11 +549,13 @@ HookRegistry <- R6::R6Class(
             }
           },
           error = function(e) {
+            error_message <- conditionMessage(e)
+
             # Track the error for programmatic access
             error_info <- list(
               event = event,
               tool_name = tool_name,
-              error = e$message,
+              error = error_message,
               timestamp = Sys.time()
             )
             private$hook_errors <- c(private$hook_errors, list(error_info))
@@ -557,11 +565,11 @@ HookRegistry <- R6::R6Class(
             if (event == "PreToolUse") {
               cli::cli_alert_danger(c(
                 "PreToolUse hook failed - denying tool for safety",
-                "x" = e$message
+                "x" = error_message
               ))
               return(HookResultPreToolUse(
                 permission = "deny",
-                reason = paste("Hook error:", e$message)
+                reason = paste("Hook error:", error_message)
               ))
             }
 
@@ -578,7 +586,7 @@ HookRegistry <- R6::R6Class(
 
             cli::cli_alert_danger(c(
               severity,
-              "x" = e$message,
+              "x" = error_message,
               "i" = "Use registry$last_errors to inspect hook failures"
             ))
 
@@ -919,33 +927,43 @@ hook_block_dangerous_bash <- function(
 #' Create a hook that limits file writes to a directory
 #'
 #' @description
-#' Convenience function to create a PreToolUse hook that only allows
-#' file writes within a specified directory.
+#' Convenience function to create a PreToolUse hook that applies Deputy's
+#' canonical file-write permission policy to `write_file`, `edit_file`, and
+#' `multi_edit`. Prefer configuring [Permissions] as the Agent's authority
+#' policy; this helper is useful as an additional hook-level restriction.
 #'
-#' @param allowed_dir Directory where writes are allowed
+#' @param allowed_dir Existing directory where writes are allowed. The path is
+#'   canonicalized when the hook is created.
 #' @return A [HookMatcher] object
 #'
 #' @examples
 #' \dontrun{
-#' agent$add_hook(hook_limit_file_writes("./output"))
+#' dir.create("output", showWarnings = FALSE)
+#' agent$add_hook(hook_limit_file_writes("output"))
 #' }
 #'
+#' @seealso [Permissions]
 #' @export
 hook_limit_file_writes <- function(allowed_dir) {
-  allowed_dir <- normalizePath(allowed_dir, mustWork = FALSE)
+  allowed_dir <- normalizePath(allowed_dir, mustWork = TRUE)
+  permissions <- Permissions$new(
+    file_write = allowed_dir,
+    bash = FALSE,
+    r_code = FALSE,
+    web = FALSE,
+    install_packages = FALSE
+  )
 
   HookMatcher$new(
     event = "PreToolUse",
-    pattern = "^write_file$",
+    pattern = "^(write_file|edit_file|multi_edit)$",
     timeout = 0, # Run in main process
     callback = function(tool_name, tool_input, context) {
-      path <- tool_input$path %||% ""
-      full_path <- normalizePath(path, mustWork = FALSE)
-
-      if (!startsWith(full_path, allowed_dir)) {
+      result <- permissions$check(tool_name, tool_input, context)
+      if (identical(result$decision, "deny")) {
         HookResultPreToolUse(
           permission = "deny",
-          reason = paste("File writes only allowed in:", allowed_dir)
+          reason = result$reason
         )
       } else {
         HookResultPreToolUse(permission = "allow")

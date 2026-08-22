@@ -71,8 +71,9 @@ test_that("Agent rejects tool when PreToolUse hook denies", {
   expect_equal(reject_reason, "Blocked by security hook")
 })
 
-test_that("Agent allows tool when PreToolUse hook permits", {
+test_that("Agent runs default PreToolUse hooks in the caller process", {
   reject_called <- FALSE
+  hook_called <- FALSE
 
   local_mocked_bindings(
     tool_reject = function(reason) {
@@ -88,17 +89,41 @@ test_that("Agent allows tool when PreToolUse hook permits", {
     tools = list(tool_read_file)
   )
 
-  agent$hooks$add(HookMatcher$new(
+  agent$add_hook(HookMatcher$new(
     event = "PreToolUse",
-    timeout = 0,
     callback = function(tool_name, tool_input, context) {
+      hook_called <<- TRUE
       HookResultPreToolUse(permission = "allow")
     }
   ))
 
   simulate_tool_request(mock$get_callback())
 
+  expect_equal(hook_called, TRUE)
   expect_false(reject_called)
+})
+
+test_that("Agent preserves isolated hook failure details", {
+  agent <- Agent$new(chat = create_mock_chat())
+  agent$add_hook(HookMatcher$new(
+    event = "PreToolUse",
+    timeout = 5,
+    callback = function(...) stop("isolated hook failed")
+  ))
+
+  result <- suppressMessages(agent$hooks$fire(
+    "PreToolUse",
+    tool_name = "read_file",
+    tool_input = list(path = "DESCRIPTION"),
+    context = list()
+  ))
+
+  expect_match(result$reason, "isolated hook failed", fixed = TRUE)
+  expect_match(
+    agent$hooks$last_errors()[[1]]$error,
+    "isolated hook failed",
+    fixed = TRUE
+  )
 })
 
 test_that("Hook denial takes precedence over permission allow", {

@@ -694,6 +694,87 @@ test_that("hook_limit_file_writes restricts directory", {
   expect_equal(outside_result$permission, "deny")
 })
 
+test_that("hook_limit_file_writes rejects prefix-collision siblings", {
+  withr::local_tempdir(pattern = "deputy-test") -> parent_dir
+  parent_dir <- normalizePath(parent_dir, mustWork = TRUE)
+  allowed_dir <- file.path(parent_dir, "allowed")
+  sibling_dir <- file.path(parent_dir, "allowed-outside")
+  dir.create(allowed_dir)
+  dir.create(sibling_dir)
+
+  hook <- hook_limit_file_writes(allowed_dir)
+  result <- hook$callback(
+    tool_name = "write_file",
+    tool_input = list(path = file.path(sibling_dir, "attack.txt")),
+    context = list()
+  )
+
+  expect_equal(result$permission, "deny")
+})
+
+test_that("hook_limit_file_writes covers every native file mutation tool", {
+  withr::local_tempdir(pattern = "deputy-test") -> allowed_dir
+  allowed_dir <- normalizePath(allowed_dir, mustWork = TRUE)
+  outside_dir <- paste0(allowed_dir, "-outside")
+  dir.create(outside_dir)
+  hook <- hook_limit_file_writes(allowed_dir)
+  mutation_tools <- c("write_file", "edit_file", "multi_edit")
+
+  matches <- vapply(
+    c(mutation_tools, "read_file"),
+    hook$matches,
+    logical(1)
+  )
+
+  expect_equal(
+    matches,
+    c(
+      write_file = TRUE,
+      edit_file = TRUE,
+      multi_edit = TRUE,
+      read_file = FALSE
+    )
+  )
+
+  for (tool_name in mutation_tools) {
+    inside <- hook$callback(
+      tool_name,
+      list(path = file.path(allowed_dir, "inside.txt")),
+      list()
+    )
+    outside <- hook$callback(
+      tool_name,
+      list(path = file.path(outside_dir, "outside.txt")),
+      list()
+    )
+
+    expect_equal(inside$permission, "allow", info = tool_name)
+    expect_equal(outside$permission, "deny", info = tool_name)
+  }
+})
+
+test_that("hook_limit_file_writes rejects symlink escapes", {
+  withr::local_tempdir(pattern = "deputy-test") -> parent_dir
+  parent_dir <- normalizePath(parent_dir, mustWork = TRUE)
+  allowed_dir <- file.path(parent_dir, "allowed")
+  outside_dir <- file.path(parent_dir, "outside")
+  link_path <- file.path(allowed_dir, "escape")
+  dir.create(allowed_dir)
+  dir.create(outside_dir)
+  if (!file.symlink(outside_dir, link_path)) {
+    skip("Symbolic links are unavailable on this platform")
+  }
+
+  hook <- hook_limit_file_writes(allowed_dir)
+  result <- hook$callback(
+    "write_file",
+    list(path = file.path(link_path, "attack.txt")),
+    list()
+  )
+
+  expect_equal(result$permission, "deny")
+})
+
 # Hook timeout tests
 test_that("HookMatcher stores timeout value", {
   hook <- HookMatcher$new(
@@ -709,7 +790,7 @@ test_that("HookMatcher stores timeout value", {
     event = "PreToolUse",
     callback = function(...) NULL
   )
-  expect_equal(hook_default$timeout, 30)
+  expect_equal(hook_default$timeout, 0)
 })
 
 test_that("HookMatcher with timeout=0 runs in main process", {

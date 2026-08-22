@@ -41,7 +41,9 @@ HookMatcher$new(
 
     \item{\code{callback}}{The function to call when the hook fires. Read-only after construction.}
 
-    \item{\code{timeout}}{Maximum execution time for the callback in seconds. Read-only after construction.}
+    \item{\code{timeout}}{Maximum execution time for the callback in seconds. Zero
+runs in the caller's process; a positive value uses a clean subprocess.
+Read-only after construction.}
   }
   \if{html}{\out{</div>}}
 }
@@ -61,7 +63,7 @@ HookMatcher$new(
   Create a new HookMatcher.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{HookMatcher$new(event, callback, pattern = NULL, timeout = 30)}
+    \preformatted{HookMatcher$new(event, callback, pattern = NULL, timeout = 0)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -86,7 +88,10 @@ HookMatcher$new(
 }}
       \item{\code{pattern}}{Optional regex pattern to filter by tool name.
 Only applies to PreToolUse and PostToolUse events.}
-      \item{\code{timeout}}{Maximum callback execution time in seconds}
+      \item{\code{timeout}}{Maximum callback execution time in seconds. The default,
+\code{0}, runs the callback in the caller's process. Positive values run the
+callback in a clean \code{\link[callr:r]{callr::r()}} subprocess, where caller-process state
+and side effects are not available.}
     }
     \if{html}{\out{</div>}}
   }

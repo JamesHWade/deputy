@@ -43,3 +43,35 @@
     Condition
       Error in `validate_hook_pattern()`:
       ! `pattern` must be NULL or one non-missing string
+
+# HookMatcher rejects invalid timeouts at construction
+
+    Code
+      HookMatcher$new("PreToolUse", callback, timeout = -1)
+    Condition
+      Error in `validate_hook_timeout()`:
+      ! `timeout` must be one finite non-negative number
+
+---
+
+    Code
+      HookMatcher$new("PreToolUse", callback, timeout = Inf)
+    Condition
+      Error in `validate_hook_timeout()`:
+      ! `timeout` must be one finite non-negative number
+
+---
+
+    Code
+      HookMatcher$new("PreToolUse", callback, timeout = c(1, 2))
+    Condition
+      Error in `validate_hook_timeout()`:
+      ! `timeout` must be one finite non-negative number
+
+---
+
+    Code
+      HookMatcher$new("PreToolUse", callback, timeout = "5")
+    Condition
+      Error in `validate_hook_timeout()`:
+      ! `timeout` must be one finite non-negative number
