@@ -2515,6 +2515,9 @@ Agent <- R6::R6Class(
     on_tool_request = function(request) {
       # Validate and extract request data safely
       extracted <- private$extract_tool_request_data(request)
+      if (!is.null(extracted$tool_identity_error)) {
+        ellmer::tool_reject(extracted$tool_identity_error)
+      }
       tool_name <- extracted$tool_name
       tool_input <- extracted$tool_input
       tool_annotations <- extracted$tool_annotations
@@ -2767,6 +2770,7 @@ Agent <- R6::R6Class(
       tool_input <- list()
       tool_annotations <- NULL
       provider_tool_call_id <- NULL
+      tool_identity_error <- NULL
 
       # Check if we have a valid request object
       if (is.null(request)) {
@@ -2775,7 +2779,8 @@ Agent <- R6::R6Class(
           tool_name = tool_name,
           tool_input = tool_input,
           tool_annotations = tool_annotations,
-          provider_tool_call_id = provider_tool_call_id
+          provider_tool_call_id = provider_tool_call_id,
+          tool_identity_error = tool_request_identity_error(request)
         ))
       }
 
@@ -2790,19 +2795,16 @@ Agent <- R6::R6Class(
           tool_name = tool_name,
           tool_input = tool_input,
           tool_annotations = tool_annotations,
-          provider_tool_call_id = provider_tool_call_id
+          provider_tool_call_id = provider_tool_call_id,
+          tool_identity_error = tool_request_identity_error(request)
         ))
       }
 
       # Extract from S7 object with error handling
       # Tool name
-      tool_name <- tryCatch(
-        request@name %||% "unknown",
-        error = function(e) {
-          cli_warn("Failed to extract tool name from request: {e$message}")
-          "unknown"
-        }
-      )
+      request_name <- read_tool_request_name(request)
+      tool_name <- request_name$value
+      tool_identity_error <- request_name$error
 
       # Tool arguments
       tool_input <- tryCatch(
@@ -2838,7 +2840,8 @@ Agent <- R6::R6Class(
         tool_name = tool_name,
         tool_input = tool_input,
         tool_annotations = tool_annotations,
-        provider_tool_call_id = provider_tool_call_id
+        provider_tool_call_id = provider_tool_call_id,
+        tool_identity_error = tool_identity_error
       )
     },
 

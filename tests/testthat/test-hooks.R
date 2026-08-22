@@ -1123,7 +1123,7 @@ test_that("HookRegistry tracks errors in last_errors()", {
   hook <- HookMatcher$new(
     event = "PostToolUse",
     timeout = 0,
-    callback = function(tool_name, tool_input, tool_result, context) {
+    callback = function(tool_name, tool_result, tool_error, context) {
       stop("Logging failed!")
     }
   )
@@ -1140,8 +1140,8 @@ test_that("HookRegistry tracks errors in last_errors()", {
     registry$fire(
       "PostToolUse",
       tool_name = "test_tool",
-      tool_input = list(),
       tool_result = "result",
+      tool_error = NULL,
       context = list()
     )
   )

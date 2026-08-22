@@ -14,7 +14,7 @@ normalize_provider_name <- function(provider) {
   provider <- tolower(provider)
 
   # Handle common variations
-  provider <- switch(
+  switch(
     provider,
     "openai" = "openai",
     "chat_openai" = "openai",
@@ -39,11 +39,22 @@ normalize_provider_name <- function(provider) {
     "chat_openrouter" = "openrouter",
     "groq" = "groq",
     "chat_groq" = "groq",
-    # Default: return as-is
-    provider
+    NA_character_
   )
+}
 
-  provider
+# Compare known provider aliases while preserving exact matching for generic
+# providers supported by ellmer::chat().
+provider_requirement_key <- function(provider) {
+  normalized <- normalize_provider_name(provider)
+  if (!is.na(normalized)) {
+    return(paste0("known:", normalized))
+  }
+  if (!is_nonempty_string(provider)) {
+    return(NA_character_)
+  }
+
+  paste0("generic:", tolower(provider))
 }
 
 #' Skill R6 Class
@@ -116,7 +127,6 @@ Skill <- R6::R6Class(
     check_requirements = function(current_provider = NULL) {
       missing <- character()
       provider_mismatch <- FALSE
-      mismatched_provider <- NULL
 
       # Check required packages
       if (!is.null(self$requires$packages)) {
@@ -131,30 +141,21 @@ Skill <- R6::R6Class(
       if (!is.null(current_provider) && !is.null(self$requires$providers)) {
         required_providers <- self$requires$providers
         if (length(required_providers) > 0) {
-          # Normalize provider name for comparison
-          normalized_provider <- normalize_provider_name(current_provider)
+          provider_key <- provider_requirement_key(current_provider)
+          required_keys <- vapply(
+            required_providers,
+            provider_requirement_key,
+            character(1),
+            USE.NAMES = FALSE
+          )
+          required_keys <- required_keys[!is.na(required_keys)]
 
-          # Only check if we could normalize the provider name
-          if (!is.na(normalized_provider)) {
-            # Check if current provider is in the required list
-            normalized_required <- vapply(
-              required_providers,
-              normalize_provider_name,
-              character(1),
-              USE.NAMES = FALSE
-            )
-            # Remove any NULLs that became NA
-            normalized_required <- normalized_required[
-              !is.na(normalized_required)
-            ]
-
-            if (
-              length(normalized_required) > 0 &&
-                !normalized_provider %in% normalized_required
-            ) {
-              provider_mismatch <- TRUE
-              mismatched_provider <- current_provider
-            }
+          if (
+            is.na(provider_key) ||
+              length(required_keys) == 0L ||
+              !provider_key %in% required_keys
+          ) {
+            provider_mismatch <- TRUE
           }
         }
       }
