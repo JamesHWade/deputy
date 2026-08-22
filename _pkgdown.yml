@@ -12,9 +12,11 @@ navbar:
     articles:
       text: Articles
       menu:
+      - text: "Intro"
       - text: Getting Started
         href: articles/getting-started.html
       - text: "---"
+      - text: "Concepts"
       - text: Tools and Tool Bundles
         href: articles/tools.html
       - text: Permissions and Safety
@@ -22,20 +24,23 @@ navbar:
       - text: Hooks
         href: articles/hooks.html
       - text: "---"
+      - text: "Hosts"
+      - text: Shiny Chat
+        href: articles/example-shiny-chat.html
+      - text: "---"
+      - text: "Advanced"
       - text: Multi-Agent Orchestration
         href: articles/multi-agent.html
       - text: Structured Output
         href: articles/structured-output.html
       - text: "---"
-      - text: "Examples"
+      - text: "Recipes"
       - text: Data Analysis Agent
         href: articles/example-data-analysis.html
       - text: Extraction Pipeline
         href: articles/example-extraction-pipeline.html
       - text: Code Review (Multi-Agent)
         href: articles/example-code-review.html
-      - text: Shiny Chat
-        href: articles/example-shiny-chat.html
 
 reference:
 - title: Agent
@@ -122,22 +127,24 @@ reference:
   - is_deputy_error
 
 articles:
-- title: Getting Started
+- title: Intro
   navbar: ~
   contents:
   - getting-started
-- title: Core Concepts
+- title: Concepts
   contents:
   - tools
   - permissions
   - hooks
+- title: Hosts
+  contents:
+  - example-shiny-chat
 - title: Advanced
   contents:
   - multi-agent
   - structured-output
-- title: Examples
+- title: Recipes
   contents:
   - example-data-analysis
   - example-extraction-pipeline
   - example-code-review
-  - example-shiny-chat
