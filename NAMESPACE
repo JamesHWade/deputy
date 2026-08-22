@@ -75,9 +75,6 @@ importFrom(coro,
 importFrom(digest,digest)
 importFrom(rlang,
   "%||%",
-  abort,
   check_installed,
-  inform,
-  is_installed,
-  warn
+  is_installed
 )
