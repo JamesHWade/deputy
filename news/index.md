@@ -62,6 +62,11 @@
   preserves configured provider behavior while removing tools and
   callbacks and suppressing console echo.
 
+- [`tool_run_r_code()`](https://jameshwade.github.io/deputy/reference/tool_run_r_code.md)
+  now rejects timed-out or failed `callr` subprocesses with readable
+  tool errors instead of failing later while formatting an unbound
+  result ([\#27](https://github.com/JamesHWade/deputy/issues/27)).
+
 ## deputy 0.0.0.9000
 
 - Added semantic content streaming with `tool_start`, `tool_end`,
