@@ -32,6 +32,9 @@
 #'   event and then signals a structured Deputy limit error.
 #'
 #' @return A `UsageLimits` object.
+#' @examples
+#' UsageLimits(max_requests = 5, max_tool_calls = 10)
+#' UsageLimits(max_cost_usd = 0.25, on_exceed = "error")
 #' @export
 UsageLimits <- function(
   max_requests = NULL,
@@ -109,6 +112,14 @@ print.UsageLimits <- function(x, ...) {
 #' @param cost_usd Provider-reported estimated cost in US dollars.
 #'
 #' @return An `AgentUsage` object.
+#' @examples
+#' AgentUsage(
+#'   requests = 2,
+#'   tool_calls = 1,
+#'   input_tokens = 120,
+#'   output_tokens = 30,
+#'   cost_usd = 0.002
+#' )
 #' @export
 AgentUsage <- function(
   requests = 0L,

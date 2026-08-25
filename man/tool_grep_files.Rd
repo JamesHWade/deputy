@@ -26,6 +26,17 @@ tool_grep_files(
 
 \item{max_matches}{Maximum matching lines to return (tool argument)}
 }
+\value{
+When called directly, a character summary of matching file lines.
+}
 \description{
 Search text files under a directory and return matching lines.
+}
+\examples{
+directory <- tempfile()
+dir.create(directory)
+writeLines("needle", file.path(directory, "example.txt"))
+tool_grep_files("needle", directory)
+unlink(directory, recursive = TRUE)
+
 }

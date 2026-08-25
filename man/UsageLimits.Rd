@@ -53,3 +53,7 @@ response. A \code{NULL} field leaves that limit unset on this object; when the
 object configures or overrides an \link{Agent}, Deputy may fill unset fields from
 the agent's defaults.
 }
+\examples{
+UsageLimits(max_requests = 5, max_tool_calls = 10)
+UsageLimits(max_cost_usd = 0.25, on_exceed = "error")
+}

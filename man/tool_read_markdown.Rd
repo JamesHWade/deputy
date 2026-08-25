@@ -12,6 +12,10 @@ tool_read_markdown(path)
 \arguments{
 \item{path}{Path to the file to convert (tool argument, not R function argument)}
 }
+\value{
+When called directly, a character string containing the converted
+markdown.
+}
 \description{
 Converts a local file to markdown text using Python
 \href{https://github.com/microsoft/markitdown}{MarkItDown} via \code{reticulate}.

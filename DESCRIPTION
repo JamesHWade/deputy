@@ -1,16 +1,17 @@
 Package: deputy
-Title: Agentic AI Workflows for R
+Title: Governed Agentic Artificial Intelligence Workflows
 Version: 0.0.0.9000
 Authors@R:
-    person("James", "Wade", , "github@jameshwade.com", role = c("aut", "cre"),
+    person("James", "Wade", , "github@jameshwade.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0002-9740-1905"))
-Author: James Wade [aut, cre] (ORCID: <https://orcid.org/0000-0002-9740-1905>)
-Maintainer: James Wade <github@jameshwade.com>
-Description: A provider-agnostic framework for building agentic AI workflows
-    in R. Built on ellmer, it enables multi-step reasoning with tool use,
-    permissions, hooks, and human-in-the-loop capabilities. Works with any
-    LLM provider that ellmer supports including OpenAI, Anthropic, Google,
-    and local models via Ollama.
+Description: Run provider-agnostic, agentic artificial intelligence (AI)
+    workflows with explicit boundaries for tools, permissions, budgets, and
+    filesystem access. Builds on 'ellmer' to provide multi-step reasoning,
+    lifecycle hooks, structured events, human input, session persistence, and
+    delegation. Returns inspectable results and supports synchronous,
+    asynchronous, terminal, and 'Shiny' hosts. Designed for applications that
+    need governance and observability around tool-using language models in
+    'R'.
 URL: https://github.com/JamesHWade/deputy, https://jameshwade.github.io/deputy/
 BugReports: https://github.com/JamesHWade/deputy/issues
 License: MIT + file LICENSE

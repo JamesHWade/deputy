@@ -12,6 +12,10 @@ tool_run_bash(command)
 \arguments{
 \item{command}{The bash command to execute (tool argument)}
 }
+\value{
+When called directly, a character string containing command output
+or a success message.
+}
 \description{
 A tool that executes bash/shell commands and returns the output.
 \strong{Use with caution!} This can execute arbitrary system commands.

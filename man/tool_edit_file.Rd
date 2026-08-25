@@ -19,6 +19,17 @@ tool_edit_file(path, old_text, new_text, replace_all = FALSE)
 \item{replace_all}{If TRUE, replace all matches instead of requiring a
 unique match (tool argument)}
 }
+\value{
+When called directly, a character status message describing the
+edit and replacement count.
+}
 \description{
 Replace a specific text span in an existing file.
+}
+\examples{
+path <- tempfile(fileext = ".txt")
+writeLines("alpha", path)
+tool_edit_file(path, "alpha", "beta")
+unlink(path)
+
 }

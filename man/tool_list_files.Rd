@@ -23,6 +23,10 @@ tool_list_files(
 
 \item{full_names}{If TRUE, return full paths (tool argument)}
 }
+\value{
+When called directly, a character summary of the matching files and
+directories.
+}
 \description{
 A tool that lists files and directories within a specified path.
 }

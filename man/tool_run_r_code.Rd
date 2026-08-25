@@ -12,6 +12,10 @@ tool_run_r_code(code)
 \arguments{
 \item{code}{R code to execute (tool argument)}
 }
+\value{
+When called directly, a character string containing captured output
+and the returned value.
+}
 \description{
 A tool that executes R code and returns the result. By default, runs in
 a separate process for safety (requires the callr package).

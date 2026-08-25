@@ -10,6 +10,8 @@
 #' with a custom tool implementation.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character string containing the fetched and
+#'   normalized page content.
 #'
 #' @param url The URL of the web page to fetch (tool argument)
 #'
@@ -107,6 +109,8 @@ tool_web_fetch <- ellmer::tool(
 #' HTML search results by default.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character string containing formatted search
+#'   results.
 #'
 #' @param query The search query (tool argument)
 #' @param num_results Maximum number of results to return (tool argument)
