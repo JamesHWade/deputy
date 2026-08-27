@@ -20,11 +20,10 @@ one workspace-scoped write capability and protect it with a checkpoint.
 
 ## Before you begin
 
-Install Deputy and the development version of ellmer:
+Install Deputy and its required dependencies from CRAN:
 
 ```r
-# install.packages("pak")
-pak::pak(c("tidyverse/ellmer", "JamesHWade/deputy"))
+install.packages("deputy")
 ```
 
 You also need credentials for one

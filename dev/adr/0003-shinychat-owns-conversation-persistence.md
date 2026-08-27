@@ -18,11 +18,15 @@ The store also works headless. `FileConversationStore$new(dir)` instantiates and
 
 ## Timing
 
-The store is **unreleased**. `ConversationStore`, `FileConversationStore`, `chat_enable_history()` and `history_options()` are all in shinychat's development version (upstream #264, #266); CRAN has 0.4.0, which has none of it.
+The store API described here is not part of the released shinychat dependency
+targeted by deputy 0.1.0. This decision therefore describes planned integration,
+not functionality in the CRAN package.
 
-That is fortunate rather than a problem. An API that has not shipped can still change shape, so the export request in issue #66 arrives while it is cheap to act on — and better still as a pull request than an issue. After a release the same request competes against backward compatibility.
+Before deputy can depend on the store:
 
-It does mean two things must be true before deputy can depend on this:
-
-- CI has to test against shinychat's development version. Today it installs from CRAN, where the store does not exist, so nothing deputy writes against it would be exercised.
-- deputy needs actual shinychat integration tests. There are currently none, despite ADR-0002 naming it the primary host.
+- The required API must ship in a shinychat release and deputy must declare that
+  released version as its minimum. Focused checks against upstream development
+  versions can inform the integration work, but they do not replace the
+  released-dependency CI policy in ADR-0004.
+- deputy needs actual shinychat integration tests. There are currently none,
+  despite ADR-0002 naming it the primary host.
