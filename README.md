@@ -44,7 +44,16 @@ ellmer Chat + Tools + Permissions + Limits
 
 ## Installation
 
-Install Deputy and its required dependencies from CRAN:
+Before Deputy’s first CRAN release, install the development version from
+GitHub:
+
+``` r
+# install.packages("pak")
+pak::pak("JamesHWade/deputy")
+```
+
+After the release is available from CRAN, install the released package
+with:
 
 ``` r
 install.packages("deputy")
@@ -54,13 +63,6 @@ For the optional Shiny host, also install shinychat:
 
 ``` r
 install.packages("shinychat")
-```
-
-You can install the development version of Deputy from GitHub with:
-
-``` r
-# install.packages("pak")
-pak::pak("JamesHWade/deputy")
 ```
 
 ## A safe first run
