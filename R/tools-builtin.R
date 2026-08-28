@@ -988,16 +988,16 @@ run_r_code_impl <- function(code, timeout = 30) {
 #' Execute R code
 #'
 #' @description
-#' A tool that executes R code and returns the result. By default, runs in
-#' a separate process for safety (requires the callr package).
+#' A tool that executes R code and returns the result. It runs in a separate
+#' process for fault isolation and timeout enforcement (requires callr).
 #'
 #' @details
 #' This tool intentionally uses R's code evaluation capabilities to execute
 #' arbitrary R code provided by the LLM. This is a core feature for agentic
 #' workflows where the agent needs to perform data analysis or other R tasks.
 #'
-#' For safety:
-#' - By default, code runs in a sandboxed subprocess via callr
+#' The execution boundary is explicit:
+#' - Code runs in a separate callr subprocess, not an OS security sandbox
 #' - A timeout prevents runaway execution
 #' - The Permissions system can disable this tool entirely
 #'
@@ -1021,10 +1021,13 @@ tool_run_r_code <- ellmer::tool(
     run_r_code_impl(code)
   },
   name = "run_r_code",
-  description = "Execute R code and return the output and result. By default runs in a sandboxed process for safety.",
+  description = paste(
+    "Execute R code in a separate process and return the output and result.",
+    "Process isolation is not an OS security sandbox."
+  ),
   arguments = list(
     code = ellmer::type_string("R code to execute")
-    # Note: sandbox and timeout are internal parameters, not exposed to LLM
+    # Note: process isolation and timeout are internal, not exposed to the LLM
   ),
   annotations = ellmer::tool_annotations(
     read_only_hint = FALSE,

@@ -12,7 +12,7 @@ A list of tool definitions
 \description{
 Returns a list of tools for code execution:
 \itemize{
-\item \code{run_r_code} - Execute R code (sandboxed by default)
+\item \code{run_r_code} - Execute R code in a separate process
 \item \code{run_bash} - Execute bash commands
 }
 

@@ -256,9 +256,14 @@ test_that("tool_list_files handles empty directory", {
 test_that("tool_run_r_code executes code", {
   skip_on_cran()
   skip_if_not_installed("callr")
-  # Note: sandbox parameter is no longer exposed (security fix)
   result <- tool_run_r_code("1 + 1")
   expect_true(grepl("2", result))
+})
+
+test_that("tool_run_r_code describes its process boundary accurately", {
+  expect_match(tool_run_r_code@description, "separate process")
+  expect_match(tool_run_r_code@description, "not an OS security sandbox")
+  expect_false(grepl("sandboxed", tool_run_r_code@description))
 })
 
 test_that("tool_run_r_code captures output", {
@@ -446,7 +451,7 @@ test_that("tool_run_bash handles command not found", {
   expect_true(is.character(result))
 })
 
-test_that("tool_run_r_code requires callr for sandbox", {
+test_that("tool_run_r_code requires callr for process isolation", {
   # Mock is_installed to return FALSE for callr
   local_mocked_bindings(
     is_installed = function(pkg) {
