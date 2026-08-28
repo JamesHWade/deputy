@@ -31,19 +31,28 @@ ellmer Chat + Tools + Permissions + Limits
 
 ## Installation
 
-Deputy currently follows development versions of ellmer:
+Before Deputy’s first CRAN release, install the development version from
+GitHub:
 
 ``` r
 
 # install.packages("pak")
-pak::pak(c("tidyverse/ellmer", "JamesHWade/deputy"))
+pak::pak("JamesHWade/deputy")
+```
+
+After the release is available from CRAN, install the released package
+with:
+
+``` r
+
+install.packages("deputy")
 ```
 
 For the optional Shiny host, also install shinychat:
 
 ``` r
 
-pak::pak("posit-dev/shinychat")
+install.packages("shinychat")
 ```
 
 ## A safe first run

@@ -23,6 +23,11 @@ A tool definition created with
 
   The URL of the web page to fetch (tool argument)
 
+## Value
+
+When called directly, a character string containing the fetched and
+normalized page content.
+
 ## Details
 
 This tool uses httr2 to fetch web content and extracts text from HTML.

@@ -24,6 +24,11 @@ A tool definition created with
   `options` (list of objects with `label` and `description`), and
   optionally `multiSelect` (logical).
 
+## Value
+
+When called directly, a list containing the original `questions` and a
+named `answers` list.
+
 ## Details
 
 **Input format:**

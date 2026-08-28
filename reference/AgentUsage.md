@@ -49,3 +49,21 @@ AgentUsage(
 ## Value
 
 An `AgentUsage` object.
+
+## Examples
+
+``` r
+AgentUsage(
+  requests = 2,
+  tool_calls = 1,
+  input_tokens = 120,
+  output_tokens = 30,
+  cost_usd = 0.002
+)
+#> <AgentUsage>
+#>   requests: 2
+#>   tool_calls: 1
+#>   tokens: 150
+#>   cached_tokens: 0
+#>   cost_usd: $0.0020
+```

@@ -7,12 +7,21 @@ with a checkpoint.
 
 ## Before you begin
 
-Install Deputy and the development version of ellmer:
+Before Deputy’s first CRAN release, install the development version from
+GitHub:
 
 ``` r
 
 # install.packages("pak")
-pak::pak(c("tidyverse/ellmer", "JamesHWade/deputy"))
+pak::pak("JamesHWade/deputy")
+```
+
+After the release is available from CRAN, install the released package
+with:
+
+``` r
+
+install.packages("deputy")
 ```
 
 You also need credentials for one [ellmer

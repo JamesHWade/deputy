@@ -24,6 +24,11 @@ A tool definition created with
   Optional PDF page selection. Accepts comma-separated pages and ranges
   (e.g. `"1,3-5"`). Only supported for PDF files.
 
+## Value
+
+When called directly, a character string with the file contents, or a
+structured list when selected PDF pages are requested.
+
 ## Examples
 
 ``` r

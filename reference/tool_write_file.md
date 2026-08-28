@@ -27,6 +27,10 @@ A tool definition created with
 
   If TRUE, append to existing file (tool argument)
 
+## Value
+
+When called directly, a character status message describing the write.
+
 ## Examples
 
 ``` r

@@ -22,6 +22,11 @@ A tool definition created with
 
   Path to the file to convert (tool argument, not R function argument)
 
+## Value
+
+When called directly, a character string containing the converted
+markdown.
+
 ## Details
 
 Requires:

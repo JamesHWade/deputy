@@ -20,6 +20,11 @@ A tool definition created with
 
   R code to execute (tool argument)
 
+## Value
+
+When called directly, a character string containing captured output and
+the returned value.
+
 ## Details
 
 This tool intentionally uses R's code evaluation capabilities to execute

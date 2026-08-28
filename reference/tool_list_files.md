@@ -36,6 +36,11 @@ A tool definition created with
 
   If TRUE, return full paths (tool argument)
 
+## Value
+
+When called directly, a character summary of the matching files and
+directories.
+
 ## Examples
 
 ``` r

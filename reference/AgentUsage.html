@@ -110,6 +110,23 @@ reported separately and are not added again to <code>total_tokens</code>.</p></d
     <p>An <code>AgentUsage</code> object.</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">AgentUsage</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  requests <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>  tool_calls <span class="op">=</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  input_tokens <span class="op">=</span> <span class="fl">120</span>,</span></span>
+<span class="r-in"><span>  output_tokens <span class="op">=</span> <span class="fl">30</span>,</span></span>
+<span class="r-in"><span>  cost_usd <span class="op">=</span> <span class="fl">0.002</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;AgentUsage&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   requests: 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   tool_calls: 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   tokens: 150</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   cached_tokens: 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   cost_usd: $0.0020</span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 

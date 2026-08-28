@@ -31,3 +31,18 @@ A tool definition created with
 
   If TRUE, replace all matches instead of requiring a unique match (tool
   argument)
+
+## Value
+
+When called directly, a character status message describing the edit and
+replacement count.
+
+## Examples
+
+``` r
+path <- tempfile(fileext = ".txt")
+writeLines("alpha", path)
+tool_edit_file(path, "alpha", "beta")
+#> [1] "Successfully edited /tmp/Rtmpb8Hf95/file1b4b4ceffc9d.txt (1 replacement)"
+unlink(path)
+```

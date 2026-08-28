@@ -24,6 +24,11 @@ A tool definition created with
 
   Maximum number of results to return (tool argument)
 
+## Value
+
+When called directly, a character string containing formatted search
+results.
+
 ## Details
 
 This tool searches the web using DuckDuckGo and returns a list of

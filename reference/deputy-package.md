@@ -1,10 +1,13 @@
-# deputy: Agentic AI Workflows for R
+# deputy: Governed Agentic Artificial Intelligence Workflows
 
-A provider-agnostic framework for building agentic AI workflows in R.
-Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, and human-in-the-loop capabilities. Works with any
-LLM provider that ellmer supports including OpenAI, Anthropic, Google,
-and local models via Ollama.
+Run provider-agnostic, agentic artificial intelligence (AI) workflows
+with explicit boundaries for tools, permissions, budgets, and filesystem
+access. Builds on 'ellmer' to provide multi-step reasoning, lifecycle
+hooks, structured events, human input, session persistence, and
+delegation. Returns inspectable results and supports synchronous,
+asynchronous, terminal, and 'Shiny' hosts. Designed for applications
+that need governance and observability around tool-using language models
+in 'R'.
 
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
@@ -65,9 +68,9 @@ Useful links:
 ## Author
 
 **Maintainer**: James Wade <github@jameshwade.com>
-([ORCID](https://orcid.org/0000-0002-9740-1905))
+([ORCID](https://orcid.org/0000-0002-9740-1905)) \[copyright holder\]
 
 Authors:
 
 - James Wade <github@jameshwade.com>
-  ([ORCID](https://orcid.org/0000-0002-9740-1905))
+  ([ORCID](https://orcid.org/0000-0002-9740-1905)) \[copyright holder\]

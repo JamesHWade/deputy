@@ -28,6 +28,11 @@ A tool definition created with
 
   Number of rows to show in preview (tool argument)
 
+## Value
+
+When called directly, a character summary of the CSV structure and
+preview rows.
+
 ## Examples
 
 ``` r

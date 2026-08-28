@@ -68,3 +68,26 @@ UsageLimits(
 ## Value
 
 A `UsageLimits` object.
+
+## Examples
+
+``` r
+UsageLimits(max_requests = 5, max_tool_calls = 10)
+#> <UsageLimits>
+#>   max_requests: 5
+#>   max_tool_calls: 10
+#>   max_input_tokens: unlimited
+#>   max_output_tokens: unlimited
+#>   max_total_tokens: unlimited
+#>   max_cost_usd: unlimited
+#>   on_exceed: stop
+UsageLimits(max_cost_usd = 0.25, on_exceed = "error")
+#> <UsageLimits>
+#>   max_requests: unlimited
+#>   max_tool_calls: unlimited
+#>   max_input_tokens: unlimited
+#>   max_output_tokens: unlimited
+#>   max_total_tokens: unlimited
+#>   max_cost_usd: 0.25
+#>   on_exceed: error
+```

@@ -26,3 +26,19 @@ A tool definition created with
 - recursive:
 
   If TRUE, search subdirectories recursively (tool argument)
+
+## Value
+
+When called directly, a character summary of paths matching the glob
+pattern.
+
+## Examples
+
+``` r
+directory <- tempfile()
+dir.create(directory)
+writeLines("example", file.path(directory, "example.txt"))
+tool_glob_files("*.txt", directory)
+#> [1] "Base path: /tmp/Rtmpb8Hf95/file1b4b51ba5df2\nMatches: 1\n\nexample.txt"
+unlink(directory, recursive = TRUE)
+```

@@ -20,6 +20,11 @@ A tool definition created with
 
   The bash command to execute (tool argument)
 
+## Value
+
+When called directly, a character string containing command output or a
+success message.
+
 ## Examples
 
 ``` r

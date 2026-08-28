@@ -148,7 +148,7 @@ For providers without native support, deputy falls back to
 
 deputy can load tools from [Model Context
 Protocol](https://modelcontextprotocol.io/) servers via the
-[mcptools](https://github.com/tidyverse/mcptools) package:
+[mcptools](https://github.com/posit-dev/mcptools) package:
 
 ``` r
 

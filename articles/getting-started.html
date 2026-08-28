@@ -93,10 +93,15 @@ with a checkpoint.</p>
 <div class="section level2">
 <h2 id="before-you-begin">Before you begin<a class="anchor" aria-label="anchor" href="#before-you-begin"></a>
 </h2>
-<p>Install Deputy and the development version of ellmer:</p>
+<p>Before Deputy’s first CRAN release, install the development version
+from GitHub:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
-<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"tidyverse/ellmer"</span>, <span class="st">"JamesHWade/deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"JamesHWade/deputy"</span><span class="op">)</span></span></code></pre></div>
+<p>After the release is available from CRAN, install the released
+package with:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"deputy"</span><span class="op">)</span></span></code></pre></div>
 <p>You also need credentials for one <a href="https://ellmer.tidyverse.org/reference/index.html" class="external-link">ellmer
 provider</a>. The examples use OpenAI, but the Deputy API is
 provider-independent.</p>
@@ -110,7 +115,7 @@ The <code>minimal</code> preset contains only <code>read_file</code>,
 policy denies writes, code execution, shell commands, web requests, and
 package installation. The run also has finite request and tool-call
 budgets.</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">workspace</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/normalizePath.html" class="external-link">normalizePath</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>, winslash <span class="op">=</span> <span class="st">"/"</span><span class="op">)</span></span>
@@ -138,7 +143,7 @@ untrusted.</p>
 <p>An <code>Agent</code> combines an ellmer chat with the runtime policy
 you just defined. This chunk makes a provider request, so it is
 displayed but not run while the vignette is built.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
@@ -159,7 +164,7 @@ delegation.</p>
 <p>Ask for an answer that the available tools can support. A read-only
 package inspection is a better first task than an open-ended request to
 “improve the code.”</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span></span>
 <span>    <span class="st">"Read DESCRIPTION and list the R/ directory."</span>,</span>
@@ -170,7 +175,7 @@ package inspection is a better first task than an open-ended request to
 <p><code>run_sync()</code> blocks until the run stops and returns an
 <code>AgentResult</code>. The result keeps the outcome and the evidence
 needed to understand how it happened:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span></span>
@@ -190,7 +195,7 @@ stop reason rather than a silently truncated success.</p>
 policy with an explicit one. This policy permits Deputy’s native file
 tools to write only inside the canonical workspace. R execution, shell
 access, web access, and package installation remain off.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">write_permissions</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  mode <span class="op">=</span> <span class="st">"standard"</span>,</span>
 <span>  file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -209,7 +214,7 @@ access, web access, and package installation remain off.</p>
 <p>Create a separate Agent with file checkpointing enabled. The
 checkpoint marks the state before the task. Deputy records preimages
 when its native write, edit, and multi-edit tools change files.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">write_agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="va">chat</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="fu">set_turns</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -230,7 +235,7 @@ when its native write, edit, and multi-edit tools change files.</p>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Review the result and the actual diff. If the native file-tool
 changes are not useful, rewind them:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">write_result</span><span class="op">$</span><span class="va">stop_reason</span></span>
 <span><span class="va">write_agent</span><span class="op">$</span><span class="fu">list_checkpoints</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">write_agent</span><span class="op">$</span><span class="fu">rewind_files</span><span class="op">(</span><span class="va">checkpoint_id</span><span class="op">)</span></span></code></pre></div>
