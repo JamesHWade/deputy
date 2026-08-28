@@ -173,22 +173,34 @@ collecting input:
 
 ``` r
 
+agent_id <- "agent-analysis"
+session_id <- "session-analysis"
+
 agent <- Agent$new(
   chat = ellmer::chat_openai(),
-  tools = c(tools_file(), tools_interactive())
+  tools = c(
+    tools_file(),
+    tools_interactive(
+      callback = function(questions, context) {
+        # Route a modal to this Agent's host session and collect its answers.
+        collect_answers(questions, route = context$session_id)
+      },
+      context = list(agent_id = agent_id, session_id = session_id)
+    )
+  ),
+  agent_id = agent_id,
+  session_id = session_id
 )
-
-# In interactive sessions, a readline prompt appears.
-# For non-interactive use, set a custom callback:
-set_ask_user_callback(function(questions) {
-  answers <- list()
-  for (question in questions) {
-    answers[[question$question]] <- question$options[[1]]$label
-  }
-  answers
-})
 ```
 
-The
 [`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md)
-function returns a list containing `tool_ask_user`.
+creates a fresh `tool_ask_user` instance. Its handler and routing
+context belong to that tool, so concurrent Agents cannot overwrite one
+another. The context may also be a zero-argument function when routing
+values must be resolved for each request. Omit the callback in an
+interactive console to use
+[`readline()`](https://rdrr.io/r/base/readline.html).
+
+[`set_ask_user_callback()`](https://jameshwade.github.io/deputy/reference/set_ask_user_callback.md)
+remains a process-wide compatibility fallback for single-Agent scripts.
+Do not use it to route Shiny or other concurrent hosts.

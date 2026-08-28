@@ -1,8 +1,9 @@
 # Set callback for non-interactive user input
 
-In non-interactive sessions (scripts, Shiny apps, etc.), set a callback
-function that will be called when the agent needs user input via
-`ask_user`.
+Sets a legacy process-wide callback for non-interactive sessions. This
+fallback cannot isolate concurrent Agents or Shiny sessions. New code
+should bind a handler to a tool instance with
+[`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md).
 
 ## Usage
 
@@ -28,13 +29,12 @@ Invisibly returns the previous callback (or NULL).
 
 ``` r
 if (FALSE) { # \dontrun{
-# For a Shiny app:
+# Legacy fallback for a single-Agent script:
 set_ask_user_callback(function(questions) {
   # Display questions in modal and collect answers
   answers <- list()
   for (q in questions) {
-    # Show q$question with q$options
-    # Collect user selection
+    # Collect one answer for each question.
     answers[[q$question]] <- selected_label
   }
   answers

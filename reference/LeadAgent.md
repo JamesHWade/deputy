@@ -9,11 +9,11 @@ it to spawn sub-agents based on registered AgentDefinitions.
 [`Agent`](https://jameshwade.github.io/deputy/reference/Agent.md) -\>
 `LeadAgent`
 
-## Public fields
+## Active bindings
 
 - `sub_agent_defs`:
 
-  List of AgentDefinition objects
+  Read-only snapshot of registered AgentDefinitions.
 
 ## Methods
 

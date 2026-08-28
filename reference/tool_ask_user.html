@@ -101,13 +101,14 @@ and a named <code>answers</code> list.</p>
 </ul></li>
 <li><p>For multi-select, labels are joined with ", "</p></li>
 <li><p>Users can also type free-form responses</p></li>
-</ul><p>In interactive R sessions, the tool uses <code><a href="https://rdrr.io/r/base/readline.html" class="external-link">readline()</a></code> to get input.
-For non-interactive use (scripts, Shiny apps), set a callback with
-<code><a href="set_ask_user_callback.html">set_ask_user_callback()</a></code>.</p>
+</ul><p>In interactive R sessions, the tool uses <code><a href="https://rdrr.io/r/base/readline.html" class="external-link">readline()</a></code> to get input. The
+exported object uses <code><a href="set_ask_user_callback.html">set_ask_user_callback()</a></code> only as a legacy process-wide
+fallback. Non-interactive and concurrent hosts should create an isolated
+tool with <code><a href="tools_interactive.html">tools_interactive()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="set_ask_user_callback.html">set_ask_user_callback()</a></code> for non-interactive usage</p></div>
+    <div class="dont-index"><p><code><a href="tools_interactive.html">tools_interactive()</a></code> for instance-scoped non-interactive usage</p></div>
     </div>
 
     <div class="section level2">

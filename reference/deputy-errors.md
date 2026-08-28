@@ -34,6 +34,9 @@ output.
 
   - **deputy_hook** - Hook execution failures
 
+  - **deputy_human_input_unavailable** - No interactive or bound handler
+    is available for an `ask_user` request
+
 ## Usage
 
 Errors can be caught using

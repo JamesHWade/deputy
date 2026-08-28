@@ -49,7 +49,7 @@ Fields:
 
 | Field | Description |
 |----|----|
-| `name` | Unique identifier (used by the lead to delegate) |
+| `name` | Unique routing key: lowercase letter first, then letters, numbers, `_`, or `-` |
 | `description` | What this agent does (shown to the lead LLM) |
 | `prompt` | System prompt for the sub-agent |
 | `tools` | Tools available to the sub-agent |
@@ -112,6 +112,13 @@ lead <- LeadAgent$new(
 lead$available_sub_agents()
 #> [1] "code_reviewer" "data_analyst"
 ```
+
+Names are trimmed and converted to lowercase by
+[`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md).
+A `LeadAgent` rejects duplicate normalized names at construction and
+registration. Its `sub_agent_defs` field returns a read-only snapshot;
+use `register_sub_agent()` so the registry and lead prompt stay
+synchronized.
 
 ## Running a Delegation Task
 

@@ -140,7 +140,9 @@ is usually enough.</p>
 <tbody>
 <tr class="odd">
 <td><code>name</code></td>
-<td>Unique identifier (used by the lead to delegate)</td>
+<td>Unique routing key: lowercase letter first, then letters, numbers,
+<code>_</code>, or <code>-</code>
+</td>
 </tr>
 <tr class="even">
 <td><code>description</code></td>
@@ -259,6 +261,12 @@ explicitly denied:</p>
 <span></span>
 <span><span class="va">lead</span><span class="op">$</span><span class="fu">available_sub_agents</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "code_reviewer" "data_analyst"</span></span></code></pre></div>
+<p>Names are trimmed and converted to lowercase by
+<code><a href="../reference/agent_definition.html">agent_definition()</a></code>. A <code>LeadAgent</code> rejects
+duplicate normalized names at construction and registration. Its
+<code>sub_agent_defs</code> field returns a read-only snapshot; use
+<code>register_sub_agent()</code> so the registry and lead prompt stay
+synchronized.</p>
 </div>
 <div class="section level2">
 <h2 id="running-a-delegation-task">Running a Delegation Task<a class="anchor" aria-label="anchor" href="#running-a-delegation-task"></a>

@@ -27,7 +27,9 @@ agent_definition(
 
 - name:
 
-  Unique name for this agent type
+  Unique routing key for this Agent type. Names are trimmed, converted
+  to lowercase, and must start with a letter followed only by letters,
+  numbers, underscores, or hyphens.
 
 - description:
 

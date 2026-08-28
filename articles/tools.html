@@ -312,22 +312,33 @@ see the mcptools documentation for setup.</p>
 question during execution. This is useful for confirmations,
 clarifications, or collecting input:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_interactive.html">tools_interactive</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">agent_id</span> <span class="op">&lt;-</span> <span class="st">"agent-analysis"</span></span>
+<span><span class="va">session_id</span> <span class="op">&lt;-</span> <span class="st">"session-analysis"</span></span>
 <span></span>
-<span><span class="co"># In interactive sessions, a readline prompt appears.</span></span>
-<span><span class="co"># For non-interactive use, set a custom callback:</span></span>
-<span><span class="fu"><a href="../reference/set_ask_user_callback.html">set_ask_user_callback</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">questions</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">answers</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
-<span>  <span class="kw">for</span> <span class="op">(</span><span class="va">question</span> <span class="kw">in</span> <span class="va">questions</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">answers</span><span class="op">[[</span><span class="va">question</span><span class="op">$</span><span class="va">question</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">question</span><span class="op">$</span><span class="va">options</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">label</span></span>
-<span>  <span class="op">}</span></span>
-<span>  <span class="va">answers</span></span>
-<span><span class="op">}</span><span class="op">)</span></span></code></pre></div>
-<p>The <code><a href="../reference/tools_interactive.html">tools_interactive()</a></code> function returns a list
-containing <code>tool_ask_user</code>.</p>
+<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="../reference/tools_interactive.html">tools_interactive</a></span><span class="op">(</span></span>
+<span>      callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">questions</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
+<span>        <span class="co"># Route a modal to this Agent's host session and collect its answers.</span></span>
+<span>        <span class="fu">collect_answers</span><span class="op">(</span><span class="va">questions</span>, route <span class="op">=</span> <span class="va">context</span><span class="op">$</span><span class="va">session_id</span><span class="op">)</span></span>
+<span>      <span class="op">}</span>,</span>
+<span>      context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>agent_id <span class="op">=</span> <span class="va">agent_id</span>, session_id <span class="op">=</span> <span class="va">session_id</span><span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  agent_id <span class="op">=</span> <span class="va">agent_id</span>,</span>
+<span>  session_id <span class="op">=</span> <span class="va">session_id</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/tools_interactive.html">tools_interactive()</a></code> creates a fresh
+<code>tool_ask_user</code> instance. Its handler and routing context
+belong to that tool, so concurrent Agents cannot overwrite one another.
+The context may also be a zero-argument function when routing values
+must be resolved for each request. Omit the callback in an interactive
+console to use <code><a href="https://rdrr.io/r/base/readline.html" class="external-link">readline()</a></code>.</p>
+<p><code><a href="../reference/set_ask_user_callback.html">set_ask_user_callback()</a></code> remains a process-wide
+compatibility fallback for single-Agent scripts. Do not use it to route
+Shiny or other concurrent hosts.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

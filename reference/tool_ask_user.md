@@ -58,14 +58,17 @@ named `answers` list.
 - Users can also type free-form responses
 
 In interactive R sessions, the tool uses
-[`readline()`](https://rdrr.io/r/base/readline.html) to get input. For
-non-interactive use (scripts, Shiny apps), set a callback with
-[`set_ask_user_callback()`](https://jameshwade.github.io/deputy/reference/set_ask_user_callback.md).
+[`readline()`](https://rdrr.io/r/base/readline.html) to get input. The
+exported object uses
+[`set_ask_user_callback()`](https://jameshwade.github.io/deputy/reference/set_ask_user_callback.md)
+only as a legacy process-wide fallback. Non-interactive and concurrent
+hosts should create an isolated tool with
+[`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md).
 
 ## See also
 
-[`set_ask_user_callback()`](https://jameshwade.github.io/deputy/reference/set_ask_user_callback.md)
-for non-interactive usage
+[`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md)
+for instance-scoped non-interactive usage
 
 ## Examples
 

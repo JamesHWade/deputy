@@ -59,7 +59,7 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">ask_user_impl</span><span class="op">(</span><span class="va">questions</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">ask_user_impl</span><span class="op">(</span><span class="va">questions</span>, callback <span class="op">=</span> <span class="cn">NULL</span>, context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -68,6 +68,17 @@
 
 <dl><dt id="arg-questions">questions<a class="anchor" aria-label="anchor" href="#arg-questions"></a></dt>
 <dd><p>List of structured question objects</p></dd>
+
+
+<dt id="arg-callback">callback<a class="anchor" aria-label="anchor" href="#arg-callback"></a></dt>
+<dd><p>Optional instance-scoped handler. It receives <code>questions</code>
+and the resolved <code>context</code>. When omitted, the legacy process-wide fallback
+is used.</p></dd>
+
+
+<dt id="arg-context">context<a class="anchor" aria-label="anchor" href="#arg-context"></a></dt>
+<dd><p>Named routing context or a zero-argument function that returns
+it.</p></dd>
 
 </dl></div>
     <div class="section level2">
