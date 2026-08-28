@@ -12,6 +12,10 @@ tool_web_fetch(url)
 \arguments{
 \item{url}{The URL of the web page to fetch (tool argument)}
 }
+\value{
+When called directly, a character string containing the fetched and
+normalized page content.
+}
 \description{
 A tool that fetches the content of a web page and returns it as text
 or markdown. Requires the httr2 package for HTTP requests.

@@ -266,6 +266,8 @@ glob_relative_paths <- function(path = ".", pattern = "*", recursive = TRUE) {
 #' A tool that reads the contents of a file and returns it as a string.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character string with the file contents, or
+#'   a structured list when selected PDF pages are requested.
 #'
 #' @param path Path to the file to read (tool argument, not R function argument)
 #' @param pages Optional PDF page selection. Accepts comma-separated pages and
@@ -359,6 +361,8 @@ tool_read_file <- ellmer::tool(
 #' a markdown representation instead of raw file text.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character string containing the converted
+#'   markdown.
 #'
 #' @param path Path to the file to convert (tool argument, not R function argument)
 #'
@@ -406,6 +410,8 @@ tool_read_markdown <- ellmer::tool(
 #' A tool that writes content to a file, creating it if it doesn't exist.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character status message describing the
+#'   write.
 #'
 #' @param path Path to the file to write (tool argument)
 #' @param content Content to write to the file (tool argument)
@@ -465,12 +471,20 @@ tool_write_file <- ellmer::tool(
 #' Replace a specific text span in an existing file.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character status message describing the
+#'   edit and replacement count.
 #'
 #' @param path Path to the file to edit (tool argument)
 #' @param old_text Existing text to replace (tool argument)
 #' @param new_text Replacement text (tool argument)
 #' @param replace_all If TRUE, replace all matches instead of requiring a
 #'   unique match (tool argument)
+#'
+#' @examples
+#' path <- tempfile(fileext = ".txt")
+#' writeLines("alpha", path)
+#' tool_edit_file(path, "alpha", "beta")
+#' unlink(path)
 #'
 #' @export
 tool_edit_file <- ellmer::tool(
@@ -528,9 +542,20 @@ tool_edit_file <- ellmer::tool(
 #' Apply a sequence of exact-match text replacements to a file.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character status message describing the
+#'   edits and total replacement count.
 #'
 #' @param path Path to the file to edit (tool argument)
 #' @param edits List or JSON string of edit operations (tool argument)
+#'
+#' @examples
+#' path <- tempfile(fileext = ".txt")
+#' writeLines(c("alpha", "beta"), path)
+#' tool_multi_edit(
+#'   path,
+#'   list(list(old_text = "alpha", new_text = "gamma"))
+#' )
+#' unlink(path)
 #'
 #' @export
 tool_multi_edit <- ellmer::tool(
@@ -596,6 +621,8 @@ tool_multi_edit <- ellmer::tool(
 #' A tool that lists files and directories within a specified path.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character summary of the matching files and
+#'   directories.
 #'
 #' @param path Directory path to list (tool argument)
 #' @param pattern Optional regex pattern to filter files (tool argument)
@@ -701,10 +728,19 @@ tool_list_files <- ellmer::tool(
 #' Search for files under a directory using shell-style glob matching.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character summary of paths matching the
+#'   glob pattern.
 #'
 #' @param pattern Glob pattern to match (tool argument)
 #' @param path Base directory to search (tool argument)
 #' @param recursive If TRUE, search subdirectories recursively (tool argument)
+#'
+#' @examples
+#' directory <- tempfile()
+#' dir.create(directory)
+#' writeLines("example", file.path(directory, "example.txt"))
+#' tool_glob_files("*.txt", directory)
+#' unlink(directory, recursive = TRUE)
 #'
 #' @export
 tool_glob_files <- ellmer::tool(
@@ -761,12 +797,20 @@ tool_glob_files <- ellmer::tool(
 #' Search text files under a directory and return matching lines.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character summary of matching file lines.
 #'
 #' @param pattern Regex pattern to search for (tool argument)
 #' @param path Base directory to search (tool argument)
 #' @param recursive If TRUE, search subdirectories recursively (tool argument)
 #' @param ignore_case If TRUE, ignore case when matching (tool argument)
 #' @param max_matches Maximum matching lines to return (tool argument)
+#'
+#' @examples
+#' directory <- tempfile()
+#' dir.create(directory)
+#' writeLines("needle", file.path(directory, "example.txt"))
+#' tool_grep_files("needle", directory)
+#' unlink(directory, recursive = TRUE)
 #'
 #' @export
 tool_grep_files <- ellmer::tool(
@@ -958,6 +1002,8 @@ run_r_code_impl <- function(code, timeout = 30) {
 #' - The Permissions system can disable this tool entirely
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character string containing captured output
+#'   and the returned value.
 #'
 #' @param code R code to execute (tool argument)
 #'
@@ -994,6 +1040,8 @@ tool_run_r_code <- ellmer::tool(
 #' **Use with caution!** This can execute arbitrary system commands.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character string containing command output
+#'   or a success message.
 #'
 #' @param command The bash command to execute (tool argument)
 #'
@@ -1081,6 +1129,8 @@ tool_run_bash <- ellmer::tool(
 #' along with the first few rows.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a character summary of the CSV structure and
+#'   preview rows.
 #'
 #' @param path Path to the CSV file to read (tool argument)
 #' @param n_max Maximum number of rows to read (tool argument)

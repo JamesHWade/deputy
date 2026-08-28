@@ -16,6 +16,10 @@ tool_write_file(path, content, append = FALSE)
 
 \item{append}{If TRUE, append to existing file (tool argument)}
 }
+\value{
+When called directly, a character status message describing the
+write.
+}
 \description{
 A tool that writes content to a file, creating it if it doesn't exist.
 }

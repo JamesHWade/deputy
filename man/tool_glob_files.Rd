@@ -16,6 +16,18 @@ tool_glob_files(pattern = "*", path = ".", recursive = TRUE)
 
 \item{recursive}{If TRUE, search subdirectories recursively (tool argument)}
 }
+\value{
+When called directly, a character summary of paths matching the
+glob pattern.
+}
 \description{
 Search for files under a directory using shell-style glob matching.
+}
+\examples{
+directory <- tempfile()
+dir.create(directory)
+writeLines("example", file.path(directory, "example.txt"))
+tool_glob_files("*.txt", directory)
+unlink(directory, recursive = TRUE)
+
 }

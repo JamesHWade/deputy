@@ -36,3 +36,12 @@ An \code{AgentUsage} object.
 run \code{usage}/\code{stop} events are scoped to that run, while \link{Agent}\verb{$usage()}
 describes the complete in-memory conversation at the time it is called.
 }
+\examples{
+AgentUsage(
+  requests = 2,
+  tool_calls = 1,
+  input_tokens = 120,
+  output_tokens = 30,
+  cost_usd = 0.002
+)
+}

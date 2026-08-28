@@ -4,11 +4,11 @@
 \name{deputy-package}
 \alias{deputy-package}
 \alias{deputy}
-\title{deputy: Agentic AI Workflows for R}
+\title{deputy: Governed Agentic Artificial Intelligence Workflows}
 \description{
 \if{html}{\figure{logo.svg}{options: style='float: right' alt='logo' width='120'}}
 
-A provider-agnostic framework for building agentic AI workflows in R. Built on ellmer, it enables multi-step reasoning with tool use, permissions, hooks, and human-in-the-loop capabilities. Works with any LLM provider that ellmer supports including OpenAI, Anthropic, Google, and local models via Ollama.
+Run provider-agnostic, agentic artificial intelligence (AI) workflows with explicit boundaries for tools, permissions, budgets, and filesystem access. Builds on 'ellmer' to provide multi-step reasoning, lifecycle hooks, structured events, human input, session persistence, and delegation. Returns inspectable results and supports synchronous, asynchronous, terminal, and 'Shiny' hosts. Designed for applications that need governance and observability around tool-using language models in 'R'.
 
 A provider-agnostic framework for building agentic AI workflows in R.
 Built on ellmer, it enables multi-step reasoning with tool use,
@@ -59,11 +59,11 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: James Wade \email{github@jameshwade.com} (\href{https://orcid.org/0000-0002-9740-1905}{ORCID})
+\strong{Maintainer}: James Wade \email{github@jameshwade.com} (\href{https://orcid.org/0000-0002-9740-1905}{ORCID}) [copyright holder]
 
 Authors:
 \itemize{
-  \item James Wade \email{github@jameshwade.com} (\href{https://orcid.org/0000-0002-9740-1905}{ORCID})
+  \item James Wade \email{github@jameshwade.com} (\href{https://orcid.org/0000-0002-9740-1905}{ORCID}) [copyright holder]
 }
 
 }

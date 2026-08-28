@@ -62,9 +62,8 @@ The repository includes a SessionStart hook (`.claude/setup-r.sh`) that automati
 # Install dependencies
 Rscript -e "devtools::install_deps(dependencies = TRUE)"
 
-# deputy tracks the DEVELOPMENT versions of ellmer and shinychat, not CRAN.
-# Install them from GitHub or you will be working against an older API.
-Rscript -e "pak::pak(c('tidyverse/ellmer', 'posit-dev/shinychat'))"
+# Install the released dependency set used by CRAN and CI.
+Rscript -e "pak::pak()"
 
 # Load package for development
 Rscript -e "devtools::load_all()"
@@ -126,10 +125,10 @@ deputy stays on `0.0.0.9xxx` until it is ready for CRAN.
 
 ### Upstream dependencies
 
-deputy develops against the **development** versions of ellmer and shinychat,
-not their CRAN releases — see `dev/adr/0004-track-upstream-development-versions.md`.
-Install them from GitHub before working on the package. An upstream break is
-something to absorb promptly and report upstream, not to work around locally.
+deputy's primary compatibility target is the released dependency set available
+from CRAN; see `dev/adr/0004-track-upstream-development-versions.md`. Test
+upstream development versions in focused compatibility work before raising a
+minimum version or adopting an unreleased API.
 
 ## Code Conventions
 

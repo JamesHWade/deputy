@@ -229,6 +229,8 @@ validate_questions <- function(questions) {
 #'   `multiSelect` (logical).
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a list containing the original `questions`
+#'   and a named `answers` list.
 #'
 #' @details
 #' **Input format:**

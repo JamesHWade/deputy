@@ -15,6 +15,10 @@ Each question should have: \code{question} (string), \code{header} (string, max 
 \code{options} (list of objects with \code{label} and \code{description}), and optionally
 \code{multiSelect} (logical).}
 }
+\value{
+When called directly, a list containing the original \code{questions}
+and a named \code{answers} list.
+}
 \description{
 A tool that allows the agent to ask the user clarifying questions and
 receive their responses. This enables human-in-the-loop workflows where
