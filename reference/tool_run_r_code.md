@@ -1,7 +1,8 @@
 # Execute R code
 
-A tool that executes R code and returns the result. By default, runs in
-a separate process for safety (requires the callr package).
+A tool that executes R code and returns the result. It runs in a
+separate process for fault isolation and timeout enforcement (requires
+callr).
 
 ## Usage
 
@@ -32,9 +33,9 @@ arbitrary R code provided by the LLM. This is a core feature for agentic
 workflows where the agent needs to perform data analysis or other R
 tasks.
 
-For safety:
+The execution boundary is explicit:
 
-- By default, code runs in a sandboxed subprocess via callr
+- Code runs in a separate callr subprocess, not an OS security sandbox
 
 - A timeout prevents runaway execution
 

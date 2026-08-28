@@ -2,7 +2,7 @@
 
 Returns a list of tools for code execution:
 
-- `run_r_code` - Execute R code (sandboxed by default)
+- `run_r_code` - Execute R code in a separate process
 
 - `run_bash` - Execute bash commands
 
