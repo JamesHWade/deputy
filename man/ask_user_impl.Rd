@@ -4,10 +4,17 @@
 \alias{ask_user_impl}
 \title{Ask user questions (internal implementation)}
 \usage{
-ask_user_impl(questions)
+ask_user_impl(questions, callback = NULL, context = list())
 }
 \arguments{
 \item{questions}{List of structured question objects}
+
+\item{callback}{Optional instance-scoped handler. It receives \code{questions}
+and the resolved \code{context}. When omitted, the legacy process-wide fallback
+is used.}
+
+\item{context}{Named routing context or a zero-argument function that returns
+it.}
 }
 \value{
 Named list mapping question text to selected answers

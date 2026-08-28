@@ -1,5 +1,97 @@
 # Multi-agent orchestration for deputy
 
+normalize_agent_definition_name <- function(name, arg = "name") {
+  if (!is_nonempty_string(name)) {
+    cli_abort("{.arg {arg}} must be one non-empty string")
+  }
+
+  name <- tolower(trimws(name))
+  if (!grepl("^[a-z][a-z0-9_-]*$", name)) {
+    cli_abort(c(
+      "{.arg {arg}} must be a valid AgentDefinition routing key",
+      "i" = paste(
+        "Use a letter first, followed only by lowercase letters, numbers,",
+        "underscores, or hyphens."
+      )
+    ))
+  }
+
+  name
+}
+
+validate_agent_definition_text <- function(value, arg, optional = FALSE) {
+  if (is.null(value) && optional) {
+    return(NULL)
+  }
+  if (!is_nonempty_string(value)) {
+    cli_abort("{.arg {arg}} must be one non-empty string")
+  }
+  value
+}
+
+validate_agent_definition_character <- function(
+  value,
+  arg,
+  optional = TRUE,
+  normalize = FALSE
+) {
+  if (is.null(value) && optional) {
+    return(NULL)
+  }
+  if (
+    !is.character(value) ||
+      anyNA(value) ||
+      !all(nzchar(trimws(value)))
+  ) {
+    cli_abort("{.arg {arg}} must be a character vector of non-empty strings")
+  }
+
+  value <- trimws(value)
+  if (normalize) {
+    value <- tolower(value)
+  }
+  unique(value)
+}
+
+copy_agent_definition <- function(definition, arg = "definition") {
+  if (!inherits(definition, "AgentDefinition")) {
+    cli_abort("{.arg {arg}} must be an AgentDefinition object")
+  }
+
+  fields <- setdiff(names(formals(agent_definition)), "...")
+  do.call(agent_definition, unclass(definition)[fields])
+}
+
+normalize_agent_definitions <- function(definitions, arg = "sub_agents") {
+  if (!is.list(definitions)) {
+    cli_abort("{.arg {arg}} must be a list of AgentDefinition objects")
+  }
+
+  definitions <- lapply(
+    seq_along(definitions),
+    function(index) {
+      copy_agent_definition(
+        definitions[[index]],
+        arg = paste0(arg, "[[", index, "]]")
+      )
+    }
+  )
+  keys <- vapply(
+    definitions,
+    function(definition) definition$name,
+    character(1)
+  )
+  duplicate_keys <- unique(keys[duplicated(keys)])
+  if (length(duplicate_keys) > 0) {
+    cli_abort(c(
+      "Duplicate AgentDefinition routing keys are not allowed",
+      "x" = "Duplicated: {.val {duplicate_keys}}"
+    ))
+  }
+
+  stats::setNames(definitions, keys)
+}
+
 #' Create an Agent Definition
 #'
 #' @description
@@ -7,7 +99,9 @@
 #' agent to delegate tasks. It bundles together a system prompt, tools, and
 #' metadata about what the agent can do.
 #'
-#' @param name Unique name for this agent type
+#' @param name Unique routing key for this Agent type. Names are trimmed,
+#'   converted to lowercase, and must start with a letter followed only by
+#'   letters, numbers, underscores, or hyphens.
 #' @param description Brief description of what this agent does (shown to lead agent)
 #' @param prompt System prompt for this agent
 #' @param tools Optional list of tools for this agent
@@ -55,6 +149,31 @@ agent_definition <- function(
   max_requests = NULL,
   permission_mode = NULL
 ) {
+  name <- normalize_agent_definition_name(name)
+  description <- validate_agent_definition_text(description, "description")
+  prompt <- validate_agent_definition_text(prompt, "prompt")
+  model <- validate_agent_definition_text(model, "model")
+  if (!is.list(tools)) {
+    cli_abort("{.arg tools} must be a list")
+  }
+  if (!is.list(skills)) {
+    cli_abort("{.arg skills} must be a list")
+  }
+  disallowed_tools <- validate_agent_definition_character(
+    disallowed_tools,
+    "disallowed_tools",
+    normalize = TRUE
+  )
+  memory <- validate_agent_definition_character(memory, "memory")
+  mcp_servers <- validate_agent_definition_character(
+    mcp_servers,
+    "mcp_servers"
+  )
+  initial_prompt <- validate_agent_definition_text(
+    initial_prompt,
+    "initial_prompt",
+    optional = TRUE
+  )
   if (!is.null(permission_mode)) {
     permission_mode <- validate_permission_mode_value(
       permission_mode,
@@ -114,9 +233,6 @@ LeadAgent <- R6::R6Class(
   inherit = Agent,
 
   public = list(
-    #' @field sub_agent_defs List of AgentDefinition objects
-    sub_agent_defs = NULL,
-
     #' @description
     #' Create a new LeadAgent.
     #'
@@ -158,17 +274,13 @@ LeadAgent <- R6::R6Class(
       agent_id = NULL,
       agent_name = NULL
     ) {
-      # Validate sub-agent definitions
-      for (def in sub_agents) {
-        if (!inherits(def, "AgentDefinition")) {
-          cli_abort("All sub_agents must be AgentDefinition objects")
-        }
-      }
-
-      self$sub_agent_defs <- sub_agents
+      private$.sub_agent_defs <- normalize_agent_definitions(sub_agents)
 
       # Build enhanced system prompt
-      enhanced_prompt <- private$build_lead_prompt(system_prompt, sub_agents)
+      enhanced_prompt <- private$build_lead_prompt(
+        system_prompt,
+        private$.sub_agent_defs
+      )
 
       # Create the delegate tool
       delegate_tool <- private$create_delegate_tool()
@@ -204,13 +316,22 @@ LeadAgent <- R6::R6Class(
         cli_abort("{.arg definition} must be an AgentDefinition object")
       }
 
-      self$sub_agent_defs <- c(self$sub_agent_defs, list(definition))
+      definition <- copy_agent_definition(definition)
+      if (definition$name %in% names(private$.sub_agent_defs)) {
+        cli_abort(
+          "AgentDefinition {.val {definition$name}} is already registered"
+        )
+      }
+      private$.sub_agent_defs[[definition$name]] <- definition
 
       # Rebuild and update system prompt to include new sub-agent
       # Extract base prompt (before sub-agent section) if possible
       current_prompt <- self$chat$get_system_prompt()
       base_prompt <- private$extract_base_prompt(current_prompt)
-      new_prompt <- private$build_lead_prompt(base_prompt, self$sub_agent_defs)
+      new_prompt <- private$build_lead_prompt(
+        base_prompt,
+        private$.sub_agent_defs
+      )
       self$chat$set_system_prompt(new_prompt)
 
       cli_alert_info("Registered sub-agent: {.val {definition$name}}")
@@ -222,7 +343,11 @@ LeadAgent <- R6::R6Class(
     #'
     #' @return Character vector of sub-agent names
     available_sub_agents = function() {
-      sapply(self$sub_agent_defs, function(d) d$name)
+      unname(vapply(
+        private$.sub_agent_defs,
+        function(definition) definition$name,
+        character(1)
+      ))
     },
 
     #' @description
@@ -324,12 +449,22 @@ LeadAgent <- R6::R6Class(
     #' Print the lead agent.
     print = function() {
       super$print()
-      cat("  sub_agents:", length(self$sub_agent_defs), "\n")
-      if (length(self$sub_agent_defs) > 0) {
+      cat("  sub_agents:", length(private$.sub_agent_defs), "\n")
+      if (length(private$.sub_agent_defs) > 0) {
         names <- self$available_sub_agents()
         cat("    ", paste(names, collapse = ", "), "\n")
       }
       invisible(self)
+    }
+  ),
+
+  active = list(
+    #' @field sub_agent_defs Read-only snapshot of registered AgentDefinitions.
+    sub_agent_defs = function(value) {
+      if (!missing(value)) {
+        cli_abort("{.field sub_agent_defs} is read-only")
+      }
+      unname(lapply(private$.sub_agent_defs, copy_agent_definition))
     }
   ),
 
@@ -401,14 +536,12 @@ LeadAgent <- R6::R6Class(
         fun = function(agent_name, task) {
           correlation <- private$claim_delegation()
 
-          # Find the agent definition
-          def <- NULL
-          for (d in lead_agent$sub_agent_defs) {
-            if (d$name == agent_name) {
-              def <- d
-              break
-            }
+          route_key <- if (is_nonempty_string(agent_name)) {
+            tolower(trimws(agent_name))
+          } else {
+            ""
           }
+          def <- private$.sub_agent_defs[[route_key]]
 
           if (is.null(def)) {
             available <- lead_agent$available_sub_agents()
@@ -809,6 +942,7 @@ LeadAgent <- R6::R6Class(
       tools[keep]
     },
 
+    .sub_agent_defs = list(),
     subagent_runs = list()
   )
 )

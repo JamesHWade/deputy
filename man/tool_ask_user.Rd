@@ -48,9 +48,10 @@ the agent can request clarification or choices from the user.
 \item Users can also type free-form responses
 }
 
-In interactive R sessions, the tool uses \code{readline()} to get input.
-For non-interactive use (scripts, Shiny apps), set a callback with
-\code{\link[=set_ask_user_callback]{set_ask_user_callback()}}.
+In interactive R sessions, the tool uses \code{readline()} to get input. The
+exported object uses \code{\link[=set_ask_user_callback]{set_ask_user_callback()}} only as a legacy process-wide
+fallback. Non-interactive and concurrent hosts should create an isolated
+tool with \code{\link[=tools_interactive]{tools_interactive()}}.
 }
 \examples{
 \dontrun{
@@ -76,5 +77,5 @@ agent <- Agent$new(
 
 }
 \seealso{
-\code{\link[=set_ask_user_callback]{set_ask_user_callback()}} for non-interactive usage
+\code{\link[=tools_interactive]{tools_interactive()}} for instance-scoped non-interactive usage
 }
