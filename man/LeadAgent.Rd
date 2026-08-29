@@ -99,6 +99,7 @@ sub-agents based on registered AgentDefinitions.
   system_prompt = NULL,
   permissions = NULL,
   usage_limits = NULL,
+  context_policy = ContextPolicy(),
   enable_file_checkpointing = FALSE,
   file_checkpoint_max_file_bytes = 50 * 1024^2,
   file_checkpoint_max_journal_bytes = 250 * 1024^2,
@@ -119,6 +120,9 @@ sub-agents based on registered AgentDefinitions.
       \item{\code{system_prompt}}{System prompt for the lead agent}
       \item{\code{permissions}}{Permissions for the lead agent (also applied to sub-agents)}
       \item{\code{usage_limits}}{Optional \link{UsageLimits} for each lead-agent run.}
+      \item{\code{context_policy}}{A \link{ContextPolicy} controlling automatic compaction
+and durable offloading of large tool results for the lead agent and its
+delegated agents.}
       \item{\code{enable_file_checkpointing}}{Whether to journal reversible file
 preimages in one workspace journal shared by the lead agent and its
 delegated agents.}

@@ -14,6 +14,12 @@
   own usage. Version 2 saved sessions retain cumulative summaries and portable
   copies of offloaded results. Native relative tool paths resolve against the
   Agent workspace without changing the R process working directory.
+  `LeadAgent` accepts the same policy and propagates it to delegated agents.
+
+* Concurrent `LeadAgent` delegations reserve their child budgets before launch,
+  so siblings share the lead's remaining usage limits instead of each receiving
+  the full balance. Cloned lead agents also recreate their delegate tool against
+  the clone's own registry, hooks, and run history.
 
 * The `deputy` command now ships as a tested Rapp 0.4 package executable for
   one-off `rx` use and persistent `ir tool install` launchers. Its task and

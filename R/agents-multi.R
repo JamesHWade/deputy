@@ -242,6 +242,9 @@ LeadAgent <- R6::R6Class(
     #' @param system_prompt System prompt for the lead agent
     #' @param permissions Permissions for the lead agent (also applied to sub-agents)
     #' @param usage_limits Optional [UsageLimits] for each lead-agent run.
+    #' @param context_policy A [ContextPolicy] controlling automatic compaction
+    #'   and durable offloading of large tool results for the lead agent and its
+    #'   delegated agents.
     #' @param enable_file_checkpointing Whether to journal reversible file
     #'   preimages in one workspace journal shared by the lead agent and its
     #'   delegated agents.
@@ -265,6 +268,7 @@ LeadAgent <- R6::R6Class(
       system_prompt = NULL,
       permissions = NULL,
       usage_limits = NULL,
+      context_policy = ContextPolicy(),
       enable_file_checkpointing = FALSE,
       file_checkpoint_max_file_bytes = 50 * 1024^2,
       file_checkpoint_max_journal_bytes = 250 * 1024^2,
@@ -295,6 +299,7 @@ LeadAgent <- R6::R6Class(
         system_prompt = enhanced_prompt,
         permissions = permissions,
         usage_limits = usage_limits,
+        context_policy = context_policy,
         enable_file_checkpointing = enable_file_checkpointing,
         file_checkpoint_max_file_bytes = file_checkpoint_max_file_bytes,
         file_checkpoint_max_journal_bytes = file_checkpoint_max_journal_bytes,
@@ -554,8 +559,15 @@ LeadAgent <- R6::R6Class(
             ))
           }
 
-          # Create the sub-agent
-          sub_agent <- private$create_sub_agent(def, correlation)
+          # Derive the child budget before creating it. The reservation is
+          # recorded before this tool returns its promise, so concurrent tool
+          # calls cannot all receive the same remaining lead-agent budget.
+          child_usage_limits <- private$derive_subagent_usage_limits(def)
+          sub_agent <- private$create_sub_agent(
+            def,
+            correlation,
+            usage_limits = child_usage_limits
+          )
 
           # Run the task
           cli::cli_alert_info("Delegating to {.val {agent_name}}: {task}")
@@ -621,12 +633,27 @@ LeadAgent <- R6::R6Class(
             )
           }
 
+          private$reserve_delegation_usage(
+            correlation$delegation_id,
+            child_usage_limits
+          )
+          reservation_active <- TRUE
+          settle_usage <- function(usage) {
+            if (!isTRUE(reservation_active)) {
+              return(invisible(NULL))
+            }
+            private$release_delegation_usage(correlation$delegation_id)
+            reservation_active <<- FALSE
+            private$add_external_usage(usage)
+            invisible(NULL)
+          }
+
           promises::promise_resolve(NULL) |>
             promises::then(function(...) {
               sub_agent$run_async(task_to_run)
             }) |>
             promises::then(function(sub_result) {
-              private$add_external_usage(sub_result$usage)
+              settle_usage(sub_result$usage)
               result <- sub_result$response
 
               lead_agent$hooks$fire(
@@ -657,7 +684,7 @@ LeadAgent <- R6::R6Class(
             }) |>
             promises::catch(function(e) {
               failed_usage <- sub_agent$.__enclos_env__$private$last_run_usage
-              private$add_external_usage(failed_usage)
+              settle_usage(failed_usage)
               cli::cli_alert_danger(
                 "Sub-agent {.val {agent_name}} failed: {e$message}"
               )
@@ -711,7 +738,7 @@ LeadAgent <- R6::R6Class(
     },
 
     # Create a sub-agent from a definition
-    create_sub_agent = function(def, correlation = NULL) {
+    create_sub_agent = function(def, correlation = NULL, usage_limits = NULL) {
       correlation <- correlation %||% private$claim_delegation()
 
       # Get the model to use
@@ -772,7 +799,9 @@ LeadAgent <- R6::R6Class(
         tools = sub_tools,
         system_prompt = sub_prompt,
         permissions = sub_permissions,
-        usage_limits = private$derive_subagent_usage_limits(def),
+        usage_limits = usage_limits %||%
+          private$derive_subagent_usage_limits(def),
+        context_policy = self$context_policy,
         working_dir = self$working_dir,
         session_id = new_deputy_id("session_"),
         run_context = child_run_context,
@@ -867,12 +896,18 @@ LeadAgent <- R6::R6Class(
         max_total_tokens = "total_tokens",
         max_cost_usd = "cost_usd"
       )
+      reserved <- private$reserved_delegation_usage()
       remaining <- lapply(names(usage_fields), function(limit_field) {
         limit <- limits[[limit_field]]
         if (is.null(limit)) {
           return(NULL)
         }
-        max(0, limit - current[[usage_fields[[limit_field]]]])
+        max(
+          0,
+          limit -
+            current[[usage_fields[[limit_field]]]] -
+            reserved[[limit_field]]
+        )
       })
       names(remaining) <- names(usage_fields)
       if (!is.null(def$max_requests)) {
@@ -887,6 +922,58 @@ LeadAgent <- R6::R6Class(
         UsageLimits,
         c(remaining, list(on_exceed = limits$on_exceed))
       )
+    },
+
+    reserve_delegation_usage = function(delegation_id, limits) {
+      fields <- c(
+        "max_requests",
+        "max_tool_calls",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_total_tokens",
+        "max_cost_usd"
+      )
+      private$delegation_usage_reservations[[delegation_id]] <- vapply(
+        fields,
+        function(field) limits[[field]] %||% 0,
+        numeric(1)
+      )
+      invisible(NULL)
+    },
+
+    release_delegation_usage = function(delegation_id) {
+      private$delegation_usage_reservations[[delegation_id]] <- NULL
+      invisible(NULL)
+    },
+
+    reserved_delegation_usage = function() {
+      fields <- c(
+        "max_requests",
+        "max_tool_calls",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_total_tokens",
+        "max_cost_usd"
+      )
+      reserved <- stats::setNames(numeric(length(fields)), fields)
+      for (reservation in private$delegation_usage_reservations) {
+        reserved <- reserved + reservation[fields]
+      }
+      reserved
+    },
+
+    prepare_cloned_tool = function(tool) {
+      name <- read_optional_value(
+        function() tool@name,
+        validator = is_nonempty_string
+      )
+      if (
+        identical(name$status, "present") &&
+          identical(name$value, "delegate_to_agent")
+      ) {
+        return(private$adapt_tool(private$create_delegate_tool()))
+      }
+      private$adapt_tool(tool)
     },
 
     filter_disallowed_tools = function(tools, disallowed_tools) {
@@ -940,6 +1027,7 @@ LeadAgent <- R6::R6Class(
     },
 
     .sub_agent_defs = list(),
-    subagent_runs = list()
+    subagent_runs = list(),
+    delegation_usage_reservations = list()
   )
 )

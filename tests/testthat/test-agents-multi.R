@@ -176,6 +176,61 @@ test_that("LeadAgent adds delegate_to_agent tool", {
   expect_true("delegate_to_agent" %in% names(tools))
 })
 
+test_that("LeadAgent propagates context policy to sub-agents", {
+  directory <- withr::local_tempdir(pattern = "deputy-lead-context-")
+  policy <- ContextPolicy(
+    max_tokens = 8000,
+    compact_to = 0.25,
+    fallback = "text",
+    max_tool_result_bytes = 1024,
+    offload_dir = directory
+  )
+  definition <- agent_definition(
+    name = "helper",
+    description = "A helper agent",
+    prompt = "You help with tasks"
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(definition),
+    context_policy = policy
+  )
+
+  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+
+  expect_identical(lead$context_policy, policy)
+  expect_identical(child$context_policy, policy)
+})
+
+test_that("LeadAgent clones bind delegation to the cloned registry", {
+  original_definition <- agent_definition(
+    name = "original",
+    description = "Original helper",
+    prompt = "You help with original tasks"
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(original_definition)
+  )
+  cloned <- lead$clone()
+  clone_definition <- agent_definition(
+    name = "clone_only",
+    description = "Clone-only helper",
+    prompt = "You help with cloned tasks"
+  )
+
+  cloned$register_sub_agent(clone_definition)
+
+  expect_error(
+    cloned$get_tools()[["delegate_to_agent"]]("missing", "Do something"),
+    "original.*clone_only|clone_only.*original"
+  )
+  expect_error(
+    lead$get_tools()[["delegate_to_agent"]]("missing", "Do something"),
+    "Available agents: original$"
+  )
+})
+
 test_that("LeadAgent validates sub_agents", {
   mock_chat <- create_mock_chat()
 
@@ -652,6 +707,20 @@ test_that("sub-agents inherit remaining lead run budgets", {
   expect_identical(child$usage_limits$max_tool_calls, 3L)
   expect_equal(child$usage_limits$max_total_tokens, 550)
   expect_equal(child$usage_limits$max_cost_usd, 0.20)
+
+  private$reserve_delegation_usage("delegation-one", child$usage_limits)
+  sibling_limits <- private$derive_subagent_usage_limits(definition)
+  expect_identical(sibling_limits$max_requests, 1L)
+  expect_identical(sibling_limits$max_tool_calls, 0L)
+  expect_identical(sibling_limits$max_total_tokens, 0L)
+  expect_identical(sibling_limits$max_cost_usd, 0)
+  private$release_delegation_usage("delegation-one")
+
+  restored_limits <- private$derive_subagent_usage_limits(definition)
+  expect_identical(restored_limits$max_requests, 3L)
+  expect_identical(restored_limits$max_tool_calls, 3L)
+  expect_identical(restored_limits$max_total_tokens, 550L)
+  expect_equal(restored_limits$max_cost_usd, 0.20)
 
   private$current_stream_controller <- NULL
   private$add_external_usage(AgentUsage(requests = 1))
@@ -1203,6 +1272,10 @@ test_that("delegation executes sub-agent and returns result", {
   result <- resolve_async_value(delegate_tool("worker", "Complete the task"))
 
   expect_equal(result, "Task completed successfully")
+  expect_length(
+    lead$.__enclos_env__$private$delegation_usage_reservations,
+    0L
+  )
 })
 
 test_that("delegation passes permissions to sub-agent", {
@@ -1296,6 +1369,10 @@ test_that("delegation handles sub-agent execution failure", {
       delegate_tool("failer", "Do something")
     )),
     "Sub-agent 'failer' failed"
+  )
+  expect_length(
+    lead$.__enclos_env__$private$delegation_usage_reservations,
+    0L
   )
 })
 

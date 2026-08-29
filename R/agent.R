@@ -1719,7 +1719,9 @@ Agent <- R6::R6Class(
       tools[["deputy_read_tool_result"]] <- NULL
       private$.chat$set_tools(list())
       if (length(tools) > 0L) {
-        private$.chat$register_tools(lapply(tools, private$adapt_tool))
+        private$.chat$register_tools(
+          lapply(tools, private$prepare_cloned_tool)
+        )
       }
       private$.tool_result_reader_registered <- FALSE
       if (isTRUE(had_result_reader)) {
@@ -1734,6 +1736,10 @@ Agent <- R6::R6Class(
         private$.chat$on_tool_result(callback)
       }
       invisible(NULL)
+    },
+
+    prepare_cloned_tool = function(tool) {
+      private$adapt_tool(tool)
     },
 
     new_file_checkpoint_store = function() {
