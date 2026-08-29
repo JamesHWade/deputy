@@ -18,7 +18,8 @@ runtime_wrap_tool <- function(
   tool,
   resolve_arguments,
   process_result,
-  begin_execution = function(tool_name) NULL
+  begin_execution = function(tool_name) NULL,
+  execute = function(tool, arguments) do.call(tool, arguments)
 ) {
   if (!inherits(tool, "ellmer::ToolDef")) {
     cli_abort("{.arg tool} must be an ellmer tool definition")
@@ -26,7 +27,8 @@ runtime_wrap_tool <- function(
   if (
     !is.function(resolve_arguments) ||
       !is.function(process_result) ||
-      !is.function(begin_execution)
+      !is.function(begin_execution) ||
+      !is.function(execute)
   ) {
     cli_abort("Runtime tool adapters must be functions")
   }
@@ -41,6 +43,7 @@ runtime_wrap_tool <- function(
     resolve_arguments = resolve_arguments,
     process_result = process_result,
     begin_execution = begin_execution,
+    execute = execute,
     tool_name = source_tool@name
   )
   wrapper <- rlang::new_function(
@@ -52,7 +55,7 @@ runtime_wrap_tool <- function(
         arguments
       )
       execution_id <- begin_execution(tool_name)
-      value <- do.call(original, arguments)
+      value <- execute(original, arguments)
       if (promises::is.promising(value)) {
         return(promises::then(value, function(resolved) {
           process_result(tool_name, resolved, execution_id)
@@ -104,6 +107,195 @@ tool_result_offload_dir <- function(policy, session_id) {
   file.path(path.expand(root), session_id)
 }
 
+tool_result_text_path <- function(directory, result_id) {
+  file.path(directory, paste0(result_id, ".txt"))
+}
+
+tool_result_manifest_path <- function(directory, result_id) {
+  file.path(directory, paste0(result_id, ".meta.rds"))
+}
+
+tool_result_text_stats <- function(path) {
+  connection <- file(path, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  chars <- 0
+  repeat {
+    chunk <- readChar(connection, nchars = 65536L, useBytes = FALSE)
+    if (length(chunk) == 0L || !nzchar(chunk)) {
+      break
+    }
+    chars <- chars + nchar(chunk, type = "chars")
+  }
+  list(
+    chars = as.numeric(chars),
+    sha256 = digest::digest(
+      file = path,
+      algo = "sha256",
+      serialize = FALSE
+    )
+  )
+}
+
+write_tool_result_text <- function(value, path) {
+  if (is.character(value)) {
+    connection <- file(path, open = "wb")
+    on.exit(close(connection), add = TRUE)
+    for (index in seq_along(value)) {
+      if (index > 1L) {
+        writeChar("\n", connection, eos = NULL, useBytes = TRUE)
+      }
+      piece <- if (is.na(value[[index]])) "NA" else value[[index]]
+      writeChar(
+        enc2utf8(piece),
+        connection,
+        eos = NULL,
+        useBytes = TRUE
+      )
+    }
+    close(connection)
+    on.exit(NULL, add = FALSE)
+  } else {
+    dput(value, file = path)
+  }
+  Sys.chmod(path, mode = "0600")
+  tool_result_text_stats(path)
+}
+
+validate_tool_result_text <- function(path, envelope) {
+  if (!file.exists(path)) {
+    return(FALSE)
+  }
+  stats <- tool_result_text_stats(path)
+  valid <- identical(stats$chars, envelope$text_chars) &&
+    identical(stats$sha256, envelope$text_sha256)
+  if (!isTRUE(valid)) {
+    cli_abort("Offloaded tool-result text failed integrity validation")
+  }
+  TRUE
+}
+
+ensure_tool_result_text <- function(envelope, directory) {
+  path <- tool_result_text_path(directory, envelope$id)
+  if (file.exists(path)) {
+    validate_tool_result_text(path, envelope)
+    return(path)
+  }
+
+  temporary <- tempfile("result-text-", tmpdir = directory, fileext = ".txt")
+  on.exit(unlink(temporary), add = TRUE)
+  stats <- write_tool_result_text(envelope$value, temporary)
+  if (
+    !identical(stats$chars, envelope$text_chars) ||
+      !identical(stats$sha256, envelope$text_sha256)
+  ) {
+    cli_abort("Offloaded tool-result text does not match its envelope")
+  }
+  if (!file.rename(temporary, path)) {
+    cli_abort("Could not commit the chunkable tool-result text")
+  }
+  path
+}
+
+validate_tool_result_manifest <- function(
+  manifest,
+  result_id = NULL,
+  session_id = NULL
+) {
+  valid <- is.list(manifest) &&
+    identical(manifest$schema_version, 1L) &&
+    is.character(manifest$id) &&
+    length(manifest$id) == 1L &&
+    grepl("^result_[a-f0-9]{64}$", manifest$id) &&
+    (is.null(result_id) || identical(manifest$id, result_id)) &&
+    is.character(manifest$session_id) &&
+    length(manifest$session_id) == 1L &&
+    !is.na(manifest$session_id) &&
+    nzchar(manifest$session_id) &&
+    (is.null(session_id) || identical(manifest$session_id, session_id)) &&
+    is.numeric(manifest$text_chars) &&
+    length(manifest$text_chars) == 1L &&
+    !is.na(manifest$text_chars) &&
+    is.finite(manifest$text_chars) &&
+    manifest$text_chars >= 0 &&
+    manifest$text_chars == floor(manifest$text_chars) &&
+    is.character(manifest$text_sha256) &&
+    length(manifest$text_sha256) == 1L &&
+    grepl("^[a-f0-9]{64}$", manifest$text_sha256)
+  if (!isTRUE(valid)) {
+    cli_abort("Offloaded tool-result manifest failed integrity validation")
+  }
+  manifest
+}
+
+ensure_tool_result_manifest <- function(envelope, directory) {
+  manifest <- list(
+    schema_version = 1L,
+    id = envelope$id,
+    session_id = envelope$session_id,
+    text_chars = envelope$text_chars,
+    text_sha256 = envelope$text_sha256
+  )
+  path <- tool_result_manifest_path(directory, envelope$id)
+  if (file.exists(path)) {
+    stored <- validate_tool_result_manifest(
+      readRDS(path),
+      result_id = envelope$id,
+      session_id = envelope$session_id
+    )
+    if (
+      !identical(stored$text_chars, envelope$text_chars) ||
+        !identical(stored$text_sha256, envelope$text_sha256)
+    ) {
+      cli_abort("Offloaded tool-result manifest does not match its envelope")
+    }
+    return(path)
+  }
+
+  temporary <- tempfile(
+    "result-manifest-",
+    tmpdir = directory,
+    fileext = ".rds"
+  )
+  on.exit(unlink(temporary), add = TRUE)
+  saveRDS(manifest, temporary, version = 3)
+  Sys.chmod(temporary, mode = "0600")
+  if (!file.rename(temporary, path)) {
+    cli_abort("Could not commit the tool-result manifest")
+  }
+  path
+}
+
+ensure_tool_result_artifacts <- function(envelope, directory) {
+  c(
+    text = ensure_tool_result_text(envelope, directory),
+    manifest = ensure_tool_result_manifest(envelope, directory)
+  )
+}
+
+read_tool_result_manifest <- function(reference, policy, session_id) {
+  details <- parse_tool_result_text_reference(reference)
+  result_id <- details$id
+  directory <- tool_result_offload_dir(policy, session_id)
+  path <- tool_result_manifest_path(directory, result_id)
+  if (!file.exists(path)) {
+    cli_abort("Offloaded tool-result manifest not found: {.val {result_id}}")
+  }
+  manifest <- validate_tool_result_manifest(
+    readRDS(path),
+    result_id = result_id,
+    session_id = session_id
+  )
+  if (!identical(manifest$text_sha256, details$text_sha256)) {
+    cli_abort("Tool-result reference does not match its chunkable text")
+  }
+  text_path <- tool_result_text_path(directory, result_id)
+  if (!file.exists(text_path)) {
+    cli_abort("Chunkable tool-result text not found: {.val {result_id}}")
+  }
+  validate_tool_result_text(text_path, manifest)
+  list(manifest = manifest, text_path = text_path)
+}
+
 offload_tool_result <- function(
   value,
   tool_name,
@@ -135,14 +327,23 @@ offload_tool_result <- function(
 
   path <- file.path(directory, paste0(result_id, ".rds"))
   if (!file.exists(path)) {
+    text_temporary <- tempfile(
+      "result-text-",
+      tmpdir = directory,
+      fileext = ".txt"
+    )
+    on.exit(unlink(text_temporary), add = TRUE)
+    text_stats <- write_tool_result_text(value, text_temporary)
     envelope <- list(
-      schema_version = 1L,
+      schema_version = 2L,
       id = result_id,
       tool_name = tool_name,
       session_id = session_id,
       agent_id = agent_id,
       bytes = bytes,
       sha256 = sha256,
+      text_chars = text_stats$chars,
+      text_sha256 = text_stats$sha256,
       created_at = Sys.time(),
       value = value
     )
@@ -150,14 +351,33 @@ offload_tool_result <- function(
     on.exit(unlink(temporary), add = TRUE)
     saveRDS(envelope, temporary, version = 3)
     Sys.chmod(temporary, mode = "0600")
+    text_path <- tool_result_text_path(directory, result_id)
+    if (file.exists(text_path)) {
+      validate_tool_result_text(text_path, envelope)
+    } else if (!file.rename(text_temporary, text_path)) {
+      cli_abort("Could not commit the chunkable tool-result text")
+    }
     if (!file.rename(temporary, path)) {
       cli_abort("Could not commit the offloaded tool result")
     }
+    ensure_tool_result_manifest(envelope, directory)
+  } else {
+    envelope <- validate_tool_result_envelope(
+      readRDS(path),
+      result_id = result_id,
+      session_id = session_id
+    )
+    ensure_tool_result_artifacts(envelope, directory)
   }
 
   list(
     id = result_id,
-    uri = paste0("deputy://tool-result/", result_id),
+    uri = paste0(
+      "deputy://tool-result/",
+      result_id,
+      "?text_sha256=",
+      envelope$text_sha256
+    ),
     bytes = bytes,
     sha256 = sha256,
     preview = tool_result_preview(value),
@@ -178,13 +398,6 @@ tool_result_reference_text <- function(record) {
     ),
     sep = "\n"
   )
-}
-
-tool_result_model_text <- function(value) {
-  if (is.character(value)) {
-    return(paste(value, collapse = "\n"))
-  }
-  paste(utils::capture.output(dput(value)), collapse = "\n")
 }
 
 tool_result_character_preview <- function(value, max_chars) {
@@ -273,7 +486,7 @@ validate_tool_result_envelope <- function(
     digest::digest(serialized, algo = "sha256", serialize = FALSE)
   }
   valid <- is.list(envelope) &&
-    identical(envelope$schema_version, 1L) &&
+    identical(envelope$schema_version, 2L) &&
     is.character(envelope$id) &&
     length(envelope$id) == 1L &&
     grepl("^result_[a-f0-9]{64}$", envelope$id) &&
@@ -285,7 +498,16 @@ validate_tool_result_envelope <- function(
     nzchar(envelope$session_id) &&
     (is.null(session_id) || identical(envelope$session_id, session_id)) &&
     identical(envelope$bytes, length(serialized)) &&
-    identical(envelope$sha256, sha256)
+    identical(envelope$sha256, sha256) &&
+    is.numeric(envelope$text_chars) &&
+    length(envelope$text_chars) == 1L &&
+    !is.na(envelope$text_chars) &&
+    is.finite(envelope$text_chars) &&
+    envelope$text_chars >= 0 &&
+    envelope$text_chars == floor(envelope$text_chars) &&
+    is.character(envelope$text_sha256) &&
+    length(envelope$text_sha256) == 1L &&
+    grepl("^[a-f0-9]{64}$", envelope$text_sha256)
   if (!isTRUE(valid)) {
     cli_abort("Offloaded tool result failed integrity validation")
   }
@@ -403,11 +625,18 @@ import_tool_result_envelopes <- function(
     envelope$session_id <- target_session_id
     path <- file.path(directory, paste0(result_id, ".rds"))
     if (file.exists(path)) {
-      validate_tool_result_envelope(
+      stored <- validate_tool_result_envelope(
         readRDS(path),
         result_id = result_id,
         session_id = target_session_id
       )
+      artifact_paths <- c(
+        tool_result_text_path(directory, result_id),
+        tool_result_manifest_path(directory, result_id)
+      )
+      artifact_existed <- file.exists(artifact_paths)
+      created <- c(created, artifact_paths[!artifact_existed])
+      ensure_tool_result_artifacts(stored, directory)
       next
     }
 
@@ -419,6 +648,13 @@ import_tool_result_envelopes <- function(
       cli_abort("Could not restore an offloaded tool result")
     }
     created <- c(created, path)
+    artifact_paths <- c(
+      tool_result_text_path(directory, result_id),
+      tool_result_manifest_path(directory, result_id)
+    )
+    artifact_existed <- file.exists(artifact_paths)
+    created <- c(created, artifact_paths[!artifact_existed])
+    ensure_tool_result_artifacts(envelope, directory)
   }
 
   committed <- TRUE
@@ -455,20 +691,46 @@ read_tool_result_chunk <- function(
     cli_abort("{.arg max_chars} must not exceed 16384")
   }
 
-  envelope <- read_tool_result_envelope(reference, policy, session_id)
-  text <- tool_result_model_text(envelope$value)
-  total_chars <- nchar(text, type = "chars")
+  artifact <- read_tool_result_manifest(reference, policy, session_id)
+  manifest <- artifact$manifest
+  text_path <- artifact$text_path
+  total_chars <- manifest$text_chars
   if (offset > total_chars) {
     cli_abort("{.arg offset} exceeds the result length of {total_chars}")
   }
-  chunk <- substr(
-    text,
-    offset + 1L,
-    min(total_chars, offset + max_chars)
-  )
+  connection <- file(text_path, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  remaining <- offset
+  while (remaining > 0) {
+    skipped <- readChar(
+      connection,
+      nchars = min(65536, remaining),
+      useBytes = FALSE
+    )
+    skipped_chars <- if (length(skipped) == 0L) {
+      0L
+    } else {
+      nchar(skipped, type = "chars")
+    }
+    if (skipped_chars == 0L) {
+      break
+    }
+    remaining <- remaining - skipped_chars
+  }
+  chunk <- if (offset == total_chars) {
+    ""
+  } else {
+    value <- readChar(connection, nchars = max_chars, useBytes = FALSE)
+    if (length(value) == 0L) "" else value
+  }
   next_offset <- offset + nchar(chunk, type = "chars")
   paste(
-    paste0("reference: deputy://tool-result/", envelope$id),
+    paste0(
+      "reference: deputy://tool-result/",
+      manifest$id,
+      "?text_sha256=",
+      manifest$text_sha256
+    ),
     paste0("offset: ", offset),
     paste0("next_offset: ", next_offset),
     paste0("total_chars: ", total_chars),
@@ -527,4 +789,28 @@ parse_tool_result_reference <- function(reference) {
     cli_abort("{.arg reference} is not a Deputy tool-result reference")
   }
   captured[[2]]
+}
+
+parse_tool_result_text_reference <- function(reference) {
+  if (
+    !is.character(reference) ||
+      length(reference) != 1L ||
+      is.na(reference)
+  ) {
+    cli_abort("{.arg reference} must be one Deputy tool-result reference")
+  }
+  match <- regexec(
+    paste0(
+      "deputy://tool-result/(result_[a-f0-9]{64})",
+      "\\?text_sha256=([a-f0-9]{64})"
+    ),
+    reference
+  )
+  captured <- regmatches(reference, match)[[1]]
+  if (length(captured) != 3L) {
+    cli_abort(
+      "{.arg reference} is not a chunkable Deputy tool-result reference"
+    )
+  }
+  list(id = captured[[2]], text_sha256 = captured[[3]])
 }

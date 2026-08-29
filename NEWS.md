@@ -12,8 +12,9 @@
   durable offloading of large tool results. Compaction reports whether it used
   the LLM, a hook, or an explicitly configured text fallback, and includes its
   own usage. Version 2 saved sessions retain cumulative summaries and portable
-  copies of offloaded results. Native relative tool paths resolve against the
-  Agent workspace without changing the R process working directory.
+  copies of offloaded results. Chunkable text sidecars keep model retrieval
+  memory-bounded. Native file and code tools execute against the Agent
+  workspace without changing the R process working directory.
   `LeadAgent` accepts the same policy and propagates it to delegated agents.
   Prompt updates and sub-agent registration preserve cumulative compaction
   state, while post-tool hooks inspect the original result before large values

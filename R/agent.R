@@ -1769,8 +1769,21 @@ Agent <- R6::R6Class(
         tool,
         resolve_arguments = private$resolve_tool_arguments,
         process_result = private$offload_tool_result,
-        begin_execution = private$begin_tool_execution
+        begin_execution = private$begin_tool_execution,
+        execute = private$execute_tool
       )
+    },
+
+    execute_tool = function(tool, arguments) {
+      workspace_runner <- attr(
+        tool,
+        "deputy_workspace_runner",
+        exact = TRUE
+      )
+      if (is.function(workspace_runner)) {
+        return(workspace_runner(arguments, private$.working_dir))
+      }
+      do.call(tool, arguments)
     },
 
     offload_tool_result = function(tool_name, value, execution_id = NULL) {

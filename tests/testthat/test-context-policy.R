@@ -188,7 +188,79 @@ test_that("large tool results become durable integrity-checked references", {
   )
   expect_match(model_chunk, "next_offset:")
   expect_match(model_chunk, "large result")
-  expect_length(list.files(directory, recursive = TRUE), 1L)
+  expect_length(list.files(directory, recursive = TRUE), 3L)
+})
+
+test_that("tool-result reader pages through persisted text", {
+  directory <- withr::local_tempdir(pattern = "deputy-chunked-results-")
+  value <- c(strrep("a", 20000), "marker", rep("tail", 10000))
+  tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_result",
+    description = "Return a large character vector.",
+    arguments = list()
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(tool),
+    context_policy = ContextPolicy(
+      max_tokens = NULL,
+      max_tool_result_bytes = 32,
+      offload_dir = directory
+    )
+  )
+
+  reference <- agent$get_tools()[["large_result"]]()
+  result_path <- list.files(
+    directory,
+    pattern = "^result_[a-f0-9]{64}\\.rds$",
+    recursive = TRUE,
+    full.names = TRUE
+  )
+  backup_path <- paste0(result_path, ".backup")
+  expect_true(file.rename(result_path, backup_path))
+  chunk <- agent$get_tools()[["deputy_read_tool_result"]](
+    reference,
+    offset = 19998L,
+    max_chars = 16L
+  )
+  expect_true(file.rename(backup_path, result_path))
+
+  expect_match(chunk, "marker", fixed = TRUE)
+  expect_match(chunk, "next_offset: 20014", fixed = TRUE)
+  expect_length(
+    list.files(directory, pattern = "\\.(rds|txt)$", recursive = TRUE),
+    3L
+  )
+})
+
+test_that("non-character tool results use chunkable sidecars", {
+  directory <- withr::local_tempdir(pattern = "deputy-list-results-")
+  value <- rep(list(list(payload = strrep("nested", 100))), 1000)
+  tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_list",
+    description = "Return a large nested list.",
+    arguments = list()
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(tool),
+    context_policy = ContextPolicy(
+      max_tokens = NULL,
+      max_tool_result_bytes = 32,
+      offload_dir = directory
+    )
+  )
+
+  reference <- agent$get_tools()[["large_list"]]()
+  chunk <- agent$get_tools()[["deputy_read_tool_result"]](
+    reference,
+    max_chars = 128L
+  )
+
+  expect_match(chunk, "payload", fixed = TRUE)
+  expect_match(chunk, "complete: FALSE", fixed = TRUE)
 })
 
 test_that("post-tool hooks inspect original offloaded results", {
@@ -626,4 +698,52 @@ test_that("native tool paths resolve against the Agent workspace", {
   expect_identical(returned, expected)
   expect_identical(readLines(expected), "inside")
   expect_false(file.exists(file.path(outside, "note.txt")))
+})
+
+test_that("R code tools execute from the Agent workspace", {
+  skip_on_cran()
+  skip_if_not_installed("callr")
+  root <- withr::local_tempdir(pattern = "deputy-r-workspace-")
+  outside <- withr::local_tempdir(pattern = "deputy-r-outside-")
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(tool_run_r_code),
+    working_dir = root,
+    context_policy = ContextPolicy(max_tool_result_bytes = NULL)
+  )
+  withr::local_dir(outside)
+
+  result <- agent$get_tools()[["run_r_code"]](paste(
+    "writeLines(getwd(), 'r-working-dir.txt')",
+    "getwd()",
+    sep = "; "
+  ))
+
+  expected <- file.path(root, "r-working-dir.txt")
+  expect_match(result, normalizePath(root, winslash = "/"), fixed = TRUE)
+  expect_true(file.exists(expected))
+  expect_false(file.exists(file.path(outside, "r-working-dir.txt")))
+})
+
+test_that("bash tools execute from the Agent workspace", {
+  skip_on_cran()
+  skip_on_os("windows")
+  root <- withr::local_tempdir(pattern = "deputy-bash-workspace-")
+  outside <- withr::local_tempdir(pattern = "deputy-bash-outside-")
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(tool_run_bash),
+    working_dir = root,
+    context_policy = ContextPolicy(max_tool_result_bytes = NULL)
+  )
+  withr::local_dir(outside)
+
+  result <- agent$get_tools()[["run_bash"]](
+    "pwd > bash-working-dir.txt; pwd"
+  )
+
+  expected <- file.path(root, "bash-working-dir.txt")
+  expect_match(result, normalizePath(root, winslash = "/"), fixed = TRUE)
+  expect_true(file.exists(expected))
+  expect_false(file.exists(file.path(outside, "bash-working-dir.txt")))
 })
