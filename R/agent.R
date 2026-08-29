@@ -553,6 +553,12 @@ Agent <- R6::R6Class(
     #' @return Invisible self.
     set_turns = function(value) {
       private$.chat$set_turns(value)
+      prompt <- private$.chat$get_system_prompt()
+      parts <- private$compaction_prompt_parts(prompt)
+      if (!is.null(parts)) {
+        private$.chat$set_system_prompt(paste0(parts$before, parts$after))
+      }
+      private$.compaction_summary <- NULL
       invisible(self)
     },
 
@@ -3306,24 +3312,16 @@ Agent <- R6::R6Class(
         delegation_id = record$delegation_id
       )
 
-      # Deputy's session-local result reader is not part of the user-configured
-      # tool surface, so an allowlist must not make offloaded results
-      # unreadable. The exact registered tool is marked internally; a public
-      # tool with the same name does not receive this exception.
-      internal_result_reader <-
-        identical(
-          extracted$internal_tool,
-          deputy_tool_result_reader_marker
-        ) &&
-        identical(tool_name, "deputy_read_tool_result")
-      perm_result <- if (
-        isTRUE(internal_result_reader) &&
-          !tool_name %in% self$permissions$tool_denylist
-      ) {
-        PermissionResultAllow()
-      } else {
-        self$permissions$check(tool_name, tool_input, context)
-      }
+      # Deputy's session-local result reader is not part of the configured tool
+      # surface. Its private marker exempts only the allowlist gate; ordinary
+      # denylist, callback, mode, and capability checks still apply.
+      permission_context <- context
+      permission_context$.deputy_internal_tool <- extracted$internal_tool
+      perm_result <- self$permissions$check(
+        tool_name,
+        tool_input,
+        permission_context
+      )
 
       if (inherits(perm_result, "PermissionResultDeny")) {
         request_result <- self$hooks$fire(

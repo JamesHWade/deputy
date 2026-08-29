@@ -25,8 +25,9 @@ closed; \code{"text"} uses a deterministic truncated-text summary.}
 \item{max_tool_result_bytes}{Serialized size above which a tool result is
 stored outside the model context. Use \code{NULL} to disable result offloading.}
 
-\item{offload_dir}{Directory for durable result envelopes. \code{NULL} uses the
-Deputy user cache, partitioned by Agent session.}
+\item{offload_dir}{Directory for durable result envelopes. Relative paths
+are anchored to the current working directory when the policy is created.
+\code{NULL} uses the Deputy user cache, partitioned by Agent session.}
 }
 \value{
 A \code{ContextPolicy} object.

@@ -27,6 +27,43 @@ test_that("ContextPolicy validates context and offload thresholds", {
   expect_error(ContextPolicy(offload_dir = ""), "non-empty path")
 })
 
+test_that("ContextPolicy anchors relative offload roots at construction", {
+  first <- withr::local_tempdir(pattern = "deputy-policy-first-")
+  second <- withr::local_tempdir(pattern = "deputy-policy-second-")
+  withr::local_dir(first)
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = 32,
+    offload_dir = "tool-results"
+  )
+  expected_root <- policy$offload_dir
+  expect_true(is_absolute_path(expected_root))
+
+  value <- paste(rep("anchored result", 100), collapse = " ")
+  tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_result",
+    description = "Return a large value.",
+    arguments = list()
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(tool),
+    context_policy = policy
+  )
+  reference <- agent$get_tools()[["large_result"]]()
+
+  withr::local_dir(second)
+  chunk <- agent$get_tools()[["deputy_read_tool_result"]](
+    reference,
+    max_chars = 64L
+  )
+
+  expect_match(chunk, "anchored result", fixed = TRUE)
+  expect_true(dir.exists(expected_root))
+  expect_false(dir.exists(file.path(second, "tool-results")))
+})
+
 test_that("the run kernel compacts automatically before the provider call", {
   chat <- token_counting_chat()
   chat$set_turns(list(
@@ -403,6 +440,72 @@ test_that("the internal result reader remains available behind an allowlist", {
   )
 })
 
+test_that("the internal result reader preserves explicit permission vetoes", {
+  directory <- withr::local_tempdir(pattern = "deputy-reader-vetoes-")
+  value <- paste(rep("private result", 100), collapse = " ")
+  large_tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_result",
+    description = "Return a large private value.",
+    arguments = list()
+  )
+  make_reader_request <- function(permissions, session_id) {
+    agent <- Agent$new(
+      chat = create_mock_chat(),
+      tools = list(large_tool),
+      permissions = permissions,
+      context_policy = ContextPolicy(
+        max_tokens = NULL,
+        max_tool_result_bytes = 32,
+        offload_dir = directory
+      ),
+      session_id = session_id
+    )
+    reference <- agent$get_tools()[["large_result"]]()
+    reader <- agent$get_tools()[["deputy_read_tool_result"]]
+    list(
+      agent = agent,
+      request = ellmer::ContentToolRequest(
+        id = paste0(session_id, "-reader"),
+        name = reader@name,
+        arguments = list(reference = reference, offset = 0L),
+        tool = reader
+      )
+    )
+  }
+
+  denied <- make_reader_request(
+    Permissions$new(
+      tool_allowlist = "large_result",
+      tool_denylist = "DEPUTY_READ_TOOL_RESULT"
+    ),
+    "denylisted-reader"
+  )
+  expect_error(
+    denied$agent$.__enclos_env__$private$handle_tool_request(denied$request),
+    "denylist",
+    class = "ellmer_tool_reject"
+  )
+
+  vetoed <- make_reader_request(
+    Permissions$new(
+      tool_allowlist = "large_result",
+      can_use_tool = function(tool_name, tool_input, context) {
+        if (identical(tool_name, "deputy_read_tool_result")) {
+          return(PermissionResultDeny("Reader vetoed"))
+        }
+        PermissionResultAllow()
+      }
+    ),
+    "callback-vetoed-reader"
+  )
+  expect_error(
+    vetoed$agent$.__enclos_env__$private$handle_tool_request(vetoed$request),
+    "Reader vetoed",
+    class = "ellmer_tool_reject"
+  )
+})
+
 test_that("saved sessions carry offloaded tool results to a new Agent", {
   directory <- withr::local_tempdir(pattern = "deputy-portable-results-")
   value <- paste(rep("portable result", 100), collapse = " ")
@@ -667,6 +770,27 @@ test_that("set_system_prompt recovers a retained compaction summary", {
     fixed = TRUE
   )
   expect_match(agent$get_system_prompt(), "Keep this addition", fixed = TRUE)
+})
+
+test_that("set_turns clears compacted history but preserves prompt additions", {
+  chat <- create_mock_chat()
+  chat$set_system_prompt("Base prompt")
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  agent <- Agent$new(chat = chat)
+  agent$compact(keep_last = 1L, summary = "History to clear")
+  agent$.__enclos_env__$private$append_hook_context("Keep this context")
+
+  agent$set_turns(list())
+
+  expect_length(agent$get_turns(), 0L)
+  expect_match(agent$get_system_prompt(), "Base prompt", fixed = TRUE)
+  expect_match(agent$get_system_prompt(), "Keep this context", fixed = TRUE)
+  expect_no_match(agent$get_system_prompt(), "History to clear", fixed = TRUE)
+  expect_null(agent$.__enclos_env__$private$.compaction_summary)
 })
 
 test_that("native tool paths resolve against the Agent workspace", {

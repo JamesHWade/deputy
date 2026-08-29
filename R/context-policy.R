@@ -16,8 +16,9 @@
 #'   closed; `"text"` uses a deterministic truncated-text summary.
 #' @param max_tool_result_bytes Serialized size above which a tool result is
 #'   stored outside the model context. Use `NULL` to disable result offloading.
-#' @param offload_dir Directory for durable result envelopes. `NULL` uses the
-#'   Deputy user cache, partitioned by Agent session.
+#' @param offload_dir Directory for durable result envelopes. Relative paths
+#'   are anchored to the current working directory when the policy is created.
+#'   `NULL` uses the Deputy user cache, partitioned by Agent session.
 #' @return A `ContextPolicy` object.
 #' @export
 ContextPolicy <- function(
@@ -52,6 +53,16 @@ ContextPolicy <- function(
         !nzchar(trimws(offload_dir)))
   ) {
     cli_abort("{.arg offload_dir} must be NULL or one non-empty path")
+  }
+  if (!is.null(offload_dir)) {
+    offload_dir <- path.expand(offload_dir)
+    if (!is_absolute_path(offload_dir)) {
+      offload_dir <- file.path(getwd(), offload_dir)
+    }
+    offload_dir <- expand_and_normalize(offload_dir)
+    if (is.na(offload_dir)) {
+      cli_abort("{.arg offload_dir} could not be resolved")
+    }
   }
 
   structure(
