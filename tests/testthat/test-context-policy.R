@@ -191,6 +191,38 @@ test_that("large tool results become durable integrity-checked references", {
   expect_length(list.files(directory, recursive = TRUE), 1L)
 })
 
+test_that("tool-result previews render bounded slices", {
+  character_value <- c(
+    strrep("a", 1000),
+    rep("tail should not be rendered", 100000)
+  )
+  nested_value <- rep(
+    list(list(payload = strrep("nested", 1000))),
+    10000
+  )
+  wide_frame <- structure(
+    rep(list(strrep("column", 1000)), 10000),
+    names = paste0("column_", seq_len(10000)),
+    row.names = 1L,
+    class = "data.frame"
+  )
+
+  character_preview <- tool_result_preview(character_value, max_chars = 64L)
+  nested_preview <- tool_result_preview(nested_value, max_chars = 256L)
+  frame_preview <- tool_result_preview(wide_frame, max_chars = 256L)
+
+  expect_match(character_preview, "^a+")
+  expect_no_match(
+    character_preview,
+    "tail should not be rendered",
+    fixed = TRUE
+  )
+  expect_match(character_preview, "[preview truncated]", fixed = TRUE)
+  expect_lte(nchar(character_preview), 84L)
+  expect_lte(nchar(nested_preview), 276L)
+  expect_lte(nchar(frame_preview), 276L)
+})
+
 test_that("the internal result reader remains available behind an allowlist", {
   directory <- withr::local_tempdir(pattern = "deputy-results-allowlist-")
   value <- paste(rep("large result", 100), collapse = " ")

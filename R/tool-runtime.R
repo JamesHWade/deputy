@@ -176,8 +176,70 @@ tool_result_model_text <- function(value) {
   paste(utils::capture.output(dput(value)), collapse = "\n")
 }
 
+tool_result_character_preview <- function(value, max_chars) {
+  if (length(value) == 0L) {
+    return("")
+  }
+
+  max_elements <- min(length(value), max(1L, max_chars + 1L))
+  pieces <- character(max_elements)
+  used <- 0L
+  count <- 0L
+  truncated <- FALSE
+  for (index in seq_len(max_elements)) {
+    separator <- if (index == 1L) "" else "\n"
+    available <- max_chars - used - nchar(separator, type = "chars")
+    if (available <= 0L) {
+      truncated <- TRUE
+      break
+    }
+
+    piece <- value[[index]]
+    if (is.na(piece)) {
+      piece <- "NA"
+    }
+    piece_chars <- nchar(piece, type = "chars")
+    if (piece_chars > available) {
+      piece <- substr(piece, 1L, available)
+      truncated <- TRUE
+    }
+    count <- count + 1L
+    pieces[[count]] <- paste0(separator, piece)
+    used <- used + nchar(pieces[[count]], type = "chars")
+    if (truncated) {
+      break
+    }
+  }
+  if (count < length(value)) {
+    truncated <- TRUE
+  }
+
+  text <- paste0(pieces[seq_len(count)], collapse = "")
+  if (truncated) {
+    paste0(text, "\n[preview truncated]")
+  } else {
+    text
+  }
+}
+
 tool_result_preview <- function(value, max_chars = 4000L) {
-  text <- tool_result_model_text(value)
+  if (is.character(value)) {
+    return(tool_result_character_preview(value, max_chars))
+  }
+
+  text <- paste(
+    utils::capture.output(utils::str(
+      value,
+      max.level = 2L,
+      vec.len = 8L,
+      list.len = 8L,
+      nchar.max = 80L,
+      give.attr = FALSE,
+      strict.width = "cut",
+      width = 80L
+    )),
+    collapse = "\n"
+  )
   if (nchar(text, type = "chars") <= max_chars) {
     return(text)
   }

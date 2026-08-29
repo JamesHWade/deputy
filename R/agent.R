@@ -2613,7 +2613,7 @@ Agent <- R6::R6Class(
 
     build_session_payload = function() {
       list(
-        schema_version = 1L,
+        schema_version = 2L,
         turns = private$.chat$get_turns(),
         system_prompt = private$.chat$get_system_prompt(),
         compaction_summary = private$.compaction_summary,
@@ -2647,8 +2647,24 @@ Agent <- R6::R6Class(
         )
       }
 
+      if (!"schema_version" %in% names(session)) {
+        abort_session_load(
+          c(
+            "Invalid session file - missing required fields",
+            "x" = "Missing: schema_version"
+          ),
+          path = source
+        )
+      }
+
+      if (!identical(session$schema_version, 2L)) {
+        abort_session_load(
+          "Unsupported session schema - expected version 2",
+          path = source
+        )
+      }
+
       required_fields <- c(
-        "schema_version",
         "turns",
         "system_prompt",
         "compaction_summary",
@@ -2665,13 +2681,6 @@ Agent <- R6::R6Class(
             "Invalid session file - missing required fields",
             "x" = "Missing: {.val {missing}}"
           ),
-          path = source
-        )
-      }
-
-      if (!identical(session$schema_version, 1L)) {
-        abort_session_load(
-          "Unsupported session schema - expected version 1",
           path = source
         )
       }
@@ -3975,11 +3984,20 @@ Agent <- R6::R6Class(
         character(1)
       )
 
-      paste0(
+      excerpt_summary <- paste0(
         "[Compacted ",
         length(turns),
         " earlier turns - LLM summary unavailable]\n\n",
         paste(summary_parts, collapse = "\n\n")
+      )
+      if (is.null(private$.compaction_summary)) {
+        return(excerpt_summary)
+      }
+      paste0(
+        "[Prior compacted conversation]\n",
+        private$.compaction_summary,
+        "\n\n",
+        excerpt_summary
       )
     },
 

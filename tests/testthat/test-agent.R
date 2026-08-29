@@ -172,7 +172,7 @@ test_that("Agent save_session creates file", {
 
   # Check session contents
   session <- readRDS(session_file)
-  expect_identical(session$schema_version, 1L)
+  expect_identical(session$schema_version, 2L)
   expect_named(
     session,
     c(
@@ -270,7 +270,7 @@ test_that("Agent load_session validates payload before mutating conversation", {
 
   saveRDS(
     list(
-      schema_version = 1L,
+      schema_version = 2L,
       turns = list(create_mock_user_turn("new turn")),
       system_prompt = "new prompt",
       compaction_summary = NULL,
@@ -292,7 +292,7 @@ test_that("Agent load_session validates payload before mutating conversation", {
 
   saveRDS(
     list(
-      schema_version = 0L,
+      schema_version = 1L,
       turns = list(create_mock_user_turn("unsafe session")),
       system_prompt = "unsafe prompt",
       run_context = list(),
@@ -304,6 +304,7 @@ test_that("Agent load_session validates payload before mutating conversation", {
   )
   expect_error(
     suppressMessages(agent$load_session(session_file)),
+    "expected version 2",
     class = "deputy_session_load"
   )
   expect_equal(chat$get_turns(), old_turns)
@@ -416,6 +417,33 @@ test_that("generate_fallback_summary creates text summary", {
   expect_true(grepl("2 earlier turns", fallback))
   expect_true(grepl("User msg", fallback))
   expect_true(grepl("Asst msg", fallback))
+})
+
+test_that("deterministic fallback carries prior compaction context forward", {
+  chat <- create_compaction_mock_chat(chat_error = "provider failed")
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  agent <- Agent$new(chat = chat)
+  agent$compact(keep_last = 1L, summary = "Earlier compacted context")
+  chat$set_turns(c(
+    chat$get_turns(),
+    list(
+      create_mock_assistant_turn("A2"),
+      create_mock_user_turn("Q3")
+    )
+  ))
+
+  result <- suppressWarnings(suppressMessages(
+    agent$compact(keep_last = 1L, fallback = "text")
+  ))
+
+  expect_identical(result$method, "text")
+  expect_match(result$summary, "Earlier compacted context", fixed = TRUE)
+  expect_match(result$summary, "User: Q2", fixed = TRUE)
+  expect_match(result$summary, "Assistant: A2", fixed = TRUE)
 })
 
 test_that("compaction summary clone is isolated, callback-free, and silent", {
