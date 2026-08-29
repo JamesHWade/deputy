@@ -16,7 +16,9 @@
   memory-bounded, and explicit relative offload roots remain stable after the
   policy is created. Native file and code tools execute against the Agent
   workspace without changing the R process working directory. Replacing turns
-  clears compacted conversation state while preserving other prompt content.
+  clears Deputy-owned compacted conversation state while preserving other
+  prompt content. Automatic compaction honors run limits before making its
+  summary request.
   `LeadAgent` accepts the same policy and propagates it to delegated agents.
   Prompt updates and sub-agent registration preserve cumulative compaction
   state, while post-tool hooks inspect the original result before large values

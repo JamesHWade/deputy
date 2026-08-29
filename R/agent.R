@@ -554,9 +554,9 @@ Agent <- R6::R6Class(
     set_turns = function(value) {
       private$.chat$set_turns(value)
       prompt <- private$.chat$get_system_prompt()
-      parts <- private$compaction_prompt_parts(prompt)
-      if (!is.null(parts)) {
-        private$.chat$set_system_prompt(paste0(parts$before, parts$after))
+      prompt_without_compaction <- private$system_prompt_without_compaction()
+      if (!identical(prompt, prompt_without_compaction)) {
+        private$.chat$set_system_prompt(prompt_without_compaction)
       }
       private$.compaction_summary <- NULL
       invisible(self)
@@ -572,9 +572,14 @@ Agent <- R6::R6Class(
     #' @param value The new system prompt or `NULL`.
     #' @return Invisible self.
     set_system_prompt = function(value) {
+      previous_summary <- private$.compaction_summary
       private$.chat$set_system_prompt(value)
       parts <- private$compaction_prompt_parts(value)
-      private$.compaction_summary <- if (is.null(parts)) {
+      private$.compaction_summary <- if (
+        is.null(previous_summary) ||
+          is.null(parts) ||
+          !identical(parts$summary, previous_summary)
+      ) {
         NULL
       } else {
         parts$summary
@@ -2189,7 +2194,11 @@ Agent <- R6::R6Class(
           )
         }
 
-        compaction <- agent$.__enclos_env__$private$maybe_auto_compact(messages)
+        compaction <- agent$.__enclos_env__$private$maybe_auto_compact(
+          messages,
+          limits = run_limits,
+          usage = AgentUsage()
+        )
         compaction_usage <- AgentUsage()
         if (!is.null(compaction)) {
           compaction_usage <- compaction$usage
@@ -3779,8 +3788,14 @@ Agent <- R6::R6Class(
 
     system_prompt_without_compaction = function() {
       prompt <- private$.chat$get_system_prompt() %||% ""
+      if (is.null(private$.compaction_summary)) {
+        return(prompt)
+      }
       parts <- private$compaction_prompt_parts(prompt)
-      if (is.null(parts)) {
+      if (
+        is.null(parts) ||
+          !identical(parts$summary, private$.compaction_summary)
+      ) {
         return(prompt)
       }
       paste0(parts$before, parts$after)
@@ -3888,7 +3903,7 @@ Agent <- R6::R6Class(
       as.integer(max(minimum_keep, length(turns) - recent + 1L))
     },
 
-    maybe_auto_compact = function(messages) {
+    maybe_auto_compact = function(messages, limits = NULL, usage = NULL) {
       policy <- private$.context_policy
       if (is.null(policy$max_tokens)) {
         return(NULL)
@@ -3896,6 +3911,30 @@ Agent <- R6::R6Class(
       turns <- private$.chat$get_turns()
       if (length(turns) == 0L) {
         return(NULL)
+      }
+
+      if (is.null(limits) && isTRUE(private$run_active)) {
+        limits <- private$current_usage_limits
+      }
+      if (!is.null(limits)) {
+        if (is.null(usage)) {
+          usage <- if (isTRUE(private$run_active)) {
+            private$current_run_usage()
+          } else {
+            AgentUsage()
+          }
+        }
+        limit_status <- usage_limit_status(
+          usage,
+          limits,
+          require_followup = TRUE
+        )
+        if (!is.null(limit_status)) {
+          if (isTRUE(private$run_active)) {
+            private$mark_usage_limit(limit_status)
+          }
+          return(NULL)
+        }
       }
 
       estimated <- private$context_token_count(messages)

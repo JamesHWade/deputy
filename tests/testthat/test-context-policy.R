@@ -103,6 +103,32 @@ test_that("the run kernel compacts automatically before the provider call", {
   expect_match(agent$get_system_prompt(), "Previous Conversation Summary")
 })
 
+test_that("automatic compaction does not spend an exhausted run budget", {
+  probe <- new.env(parent = emptyenv())
+  chat <- create_compaction_mock_chat(
+    responses = list("Summary that must not be requested"),
+    probe = probe
+  )
+  chat$token_count <- function(..., include = c("new", "complete")) 100
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  agent <- Agent$new(
+    chat = chat,
+    usage_limits = UsageLimits(max_requests = 0),
+    context_policy = ContextPolicy(max_tokens = 50)
+  )
+
+  result <- suppressWarnings(agent$run_sync("Continue"))
+
+  expect_identical(result$stop_reason, "request_limit")
+  expect_identical(result$usage$requests, 0L)
+  expect_null(probe$summary_call)
+  expect_null(agent$last_compaction())
+})
+
 test_that("the run kernel rechecks context between provider tool turns", {
   active_chat <- NULL
   fixture <- create_shiny_tool_chat(
@@ -791,6 +817,29 @@ test_that("set_turns clears compacted history but preserves prompt additions", {
   expect_match(agent$get_system_prompt(), "Keep this context", fixed = TRUE)
   expect_no_match(agent$get_system_prompt(), "History to clear", fixed = TRUE)
   expect_null(agent$.__enclos_env__$private$.compaction_summary)
+})
+
+test_that("set_turns preserves user-authored summary headings", {
+  prompt <- paste(
+    "Base prompt",
+    "",
+    "## Previous Conversation Summary",
+    "This section belongs to the user.",
+    "",
+    "## End Previous Conversation Summary",
+    "Keep the trailing instructions.",
+    sep = "\n"
+  )
+  chat <- create_mock_chat()
+  chat$set_system_prompt(prompt)
+  agent <- Agent$new(chat = chat)
+
+  agent$set_turns(list())
+  expect_identical(agent$get_system_prompt(), prompt)
+
+  agent$set_system_prompt(prompt)
+  agent$set_turns(list(create_mock_user_turn("Replacement")))
+  expect_identical(agent$get_system_prompt(), prompt)
 })
 
 test_that("native tool paths resolve against the Agent workspace", {
