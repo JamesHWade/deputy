@@ -16,9 +16,9 @@ knitr::opts_chunk$set(
 ```
 
 Deputy Agents implement the ellmer chat methods used by
-[shinychat](https://posit-dev.github.io/shinychat/). Pass
-`agent$stream_async()` directly to `chat_append()`; there is no separate Shiny
-bridge and no path that bypasses Deputy's governance.
+[shinychat](https://posit-dev.github.io/shinychat/). Pass an Agent directly to
+`chat_server()`; there is no separate Shiny bridge and no path that bypasses
+Deputy's governance.
 
 ```text
 shinychat input -> Agent$stream_async() -> one governed run kernel -> ellmer

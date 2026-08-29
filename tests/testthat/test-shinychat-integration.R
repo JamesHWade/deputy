@@ -1,6 +1,10 @@
 test_that("Agent stream_async is consumed directly by shinychat", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat")
+  skip_if_not(
+    "chat_server" %in% getNamespaceExports("shinychat"),
+    "shinychat::chat_server() is not available"
+  )
 
   chat <- create_mock_chat()
   chat$stream_async <- function(
