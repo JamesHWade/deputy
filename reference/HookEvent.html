@@ -115,10 +115,14 @@ type has a specific callback signature and context structure.</p>
 event-specific metadata</p></li>
 <li><p>Return: NULL (informational only)</p></li>
 </ul><p><strong>PreCompact</strong> - Before conversation compaction</p>
-<p>Callback signature: <code>function(turns_to_compact, turns_to_keep, context)</code></p><ul><li><p><code>turns_to_compact</code>: List of turns that will be compacted into a summary</p></li>
+<p>Hook signature: <code>function(turns_to_compact, turns_to_keep, context)</code></p><ul><li><p><code>turns_to_compact</code>: List of turns that will be compacted into a summary</p></li>
 <li><p><code>turns_to_keep</code>: List of recent turns that will be preserved</p></li>
 <li><p><code>context</code>: Common correlation fields plus <code>total_turns</code> and <code>compact_count</code></p></li>
 <li><p>Return: <code><a href="HookResultPreCompact.html">HookResultPreCompact()</a></code> to allow/cancel or provide custom summary</p></li>
+</ul><p><strong>PostCompact</strong> - After conversation compaction</p>
+<p>Hook signature: <code>function(result, context)</code></p><ul><li><p><code>result</code>: The <code>DeputyCompaction</code> outcome, including method and usage</p></li>
+<li><p><code>context</code>: Common correlation fields plus <code>compact_count</code> and <code>automatic</code></p></li>
+<li><p>Return: NULL (informational only)</p></li>
 </ul><p><strong>SessionStart</strong> - When an agent session begins</p>
 <p>Callback signature: <code>function(context)</code></p><ul><li><p><code>context</code>: Common correlation fields plus <code>permissions</code>, <code>provider</code>, and
 <code>tools_count</code></p></li>
@@ -150,6 +154,7 @@ event-specific metadata</p></li>
 <li><p><code>total_turns</code>: (native Stop, PreCompact, native SessionEnd) Conversation turns</p></li>
 <li><p><code>cost</code>: (Stop, SessionEnd) List with <code>input</code>, <code>output</code>, <code>cached</code>, and <code>total</code></p></li>
 <li><p><code>compact_count</code>: (PreCompact only) Number of turns being compacted</p></li>
+<li><p><code>automatic</code>: (PostCompact only) Whether the run kernel triggered compaction</p></li>
 <li><p><code>level</code>: (Notification only) Informational severity such as <code>"info"</code> or <code>"warning"</code></p></li>
 <li><p><code>code</code>: (Notification only) Stable notification code when available</p></li>
 <li><p><code>permissions</code>: (SessionStart only) The agent's permissions configuration</p></li>

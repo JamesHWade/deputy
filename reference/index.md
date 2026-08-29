@@ -14,6 +14,8 @@ Core agent class for agentic AI workflows
   : Create an agent usage record
 - [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
   : Configure run-scoped usage limits
+- [`ContextPolicy()`](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
+  : Configure automatic context management
 
 ## Tools
 

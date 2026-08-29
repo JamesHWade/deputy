@@ -140,16 +140,16 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <dd><p>Default canonical product context. Read-only.</p></dd>
 
 
-    <dt><code>chat</code></dt>
-<dd><p>The wrapped ellmer Chat object. Read-only after construction.</p></dd>
-
-
     <dt><code>permissions</code></dt>
 <dd><p>Permission policy for the agent. Read-only after construction.</p></dd>
 
 
     <dt><code>usage_limits</code></dt>
 <dd><p>Default per-run <a href="UsageLimits.html">UsageLimits</a>. Read-only after construction.</p></dd>
+
+
+    <dt><code>context_policy</code></dt>
+<dd><p>Automatic context-management policy. Read-only.</p></dd>
 
 
     <dt><code>working_dir</code></dt>
@@ -170,8 +170,32 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <p></p><ul><li><p><a href="#method-Agent-initialize"><code>Agent$new()</code></a></p></li>
 <li><p><a href="#method-Agent-run"><code>Agent$run()</code></a></p></li>
 <li><p><a href="#method-Agent-run_sync"><code>Agent$run_sync()</code></a></p></li>
+<li><p><a href="#method-Agent-chat"><code>Agent$chat()</code></a></p></li>
+<li><p><a href="#method-Agent-chat_async"><code>Agent$chat_async()</code></a></p></li>
+<li><p><a href="#method-Agent-chat_structured"><code>Agent$chat_structured()</code></a></p></li>
+<li><p><a href="#method-Agent-chat_structured_async"><code>Agent$chat_structured_async()</code></a></p></li>
+<li><p><a href="#method-Agent-stream"><code>Agent$stream()</code></a></p></li>
+<li><p><a href="#method-Agent-stream_async"><code>Agent$stream_async()</code></a></p></li>
+<li><p><a href="#method-Agent-last_run"><code>Agent$last_run()</code></a></p></li>
+<li><p><a href="#method-Agent-last_compaction"><code>Agent$last_compaction()</code></a></p></li>
+<li><p><a href="#method-Agent-resolve_tool_result"><code>Agent$resolve_tool_result()</code></a></p></li>
+<li><p><a href="#method-Agent-add_turn"><code>Agent$add_turn()</code></a></p></li>
+<li><p><a href="#method-Agent-get_turns"><code>Agent$get_turns()</code></a></p></li>
+<li><p><a href="#method-Agent-set_turns"><code>Agent$set_turns()</code></a></p></li>
+<li><p><a href="#method-Agent-get_system_prompt"><code>Agent$get_system_prompt()</code></a></p></li>
+<li><p><a href="#method-Agent-set_system_prompt"><code>Agent$set_system_prompt()</code></a></p></li>
+<li><p><a href="#method-Agent-get_tools"><code>Agent$get_tools()</code></a></p></li>
+<li><p><a href="#method-Agent-set_tools"><code>Agent$set_tools()</code></a></p></li>
+<li><p><a href="#method-Agent-get_tokens"><code>Agent$get_tokens()</code></a></p></li>
+<li><p><a href="#method-Agent-get_cost"><code>Agent$get_cost()</code></a></p></li>
+<li><p><a href="#method-Agent-token_count"><code>Agent$token_count()</code></a></p></li>
+<li><p><a href="#method-Agent-get_provider"><code>Agent$get_provider()</code></a></p></li>
+<li><p><a href="#method-Agent-get_model"><code>Agent$get_model()</code></a></p></li>
+<li><p><a href="#method-Agent-set_model"><code>Agent$set_model()</code></a></p></li>
 <li><p><a href="#method-Agent-register_tool"><code>Agent$register_tool()</code></a></p></li>
 <li><p><a href="#method-Agent-register_tools"><code>Agent$register_tools()</code></a></p></li>
+<li><p><a href="#method-Agent-on_tool_request"><code>Agent$on_tool_request()</code></a></p></li>
+<li><p><a href="#method-Agent-on_tool_result"><code>Agent$on_tool_result()</code></a></p></li>
 <li><p><a href="#method-Agent-add_hook"><code>Agent$add_hook()</code></a></p></li>
 <li><p><a href="#method-Agent-turns"><code>Agent$turns()</code></a></p></li>
 <li><p><a href="#method-Agent-last_turn"><code>Agent$last_turn()</code></a></p></li>
@@ -194,7 +218,6 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <li><p><a href="#method-Agent-load_mcp"><code>Agent$load_mcp()</code></a></p></li>
 <li><p><a href="#method-Agent-mcp_tools"><code>Agent$mcp_tools()</code></a></p></li>
 <li><p><a href="#method-Agent-mcp_status"><code>Agent$mcp_status()</code></a></p></li>
-<li><p><a href="#method-Agent-run_shiny"><code>Agent$run_shiny()</code></a></p></li>
 <li><p><a href="#method-Agent-run_async"><code>Agent$run_async()</code></a></p></li>
 <li><p><a href="#method-Agent-clone"><code>Agent$clone()</code></a></p></li>
 </ul></div><p></p><hr><a id="method-Agent-initialize"></a><div class="section">
@@ -207,6 +230,7 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <span>  system_prompt <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">25</span><span class="op">)</span>,</span>
+<span>  context_policy <span class="op">=</span> <span class="fu"><a href="../reference/ContextPolicy.html">ContextPolicy</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  enable_file_checkpointing <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  file_checkpoint_max_file_bytes <span class="op">=</span> <span class="fl">50</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">^</span><span class="fl">2</span>,</span>
 <span>  file_checkpoint_max_journal_bytes <span class="op">=</span> <span class="fl">250</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">^</span><span class="fl">2</span>,</span>
@@ -237,6 +261,10 @@ Defaults to <code><a href="permissions_standard.html">permissions_standard()</a>
       <dt><code>usage_limits</code></dt>
 <dd><p><a href="UsageLimits.html">UsageLimits</a> applied independently to each run.
 Defaults to 25 model requests. Use <code><a href="UsageLimits.html">UsageLimits()</a></code> for no limits.</p></dd>
+
+      <dt><code>context_policy</code></dt>
+<dd><p>A <a href="ContextPolicy.html">ContextPolicy</a> controlling automatic compaction
+and durable offloading of large tool results.</p></dd>
 
       <dt><code>enable_file_checkpointing</code></dt>
 <dd><p>Whether to journal exact file preimages
@@ -283,7 +311,7 @@ A unique identifier is generated by default.</p></dd>
 
 <p></p><hr><a id="method-Agent-run"></a><div class="section">
 <h3 id="agent-run-"><code>Agent$run()</code><a class="anchor" aria-label="anchor" href="#agent-run-"></a></h3>
-<p>Run an agentic task with streaming output.</p>
+<p>Run an agentic task with semantic streaming events.</p>
 <p>Returns a generator that yields <a href="AgentEvent.html">AgentEvent</a> objects as the agent works.
 The agent will continue until the task is complete, a run limit is
 reached, or it is interrupted.</p><div class="section">
@@ -366,20 +394,461 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 
 </div>
 
+<p></p><hr><a id="method-Agent-chat"></a><div class="section">
+<h3 id="agent-chat-"><code>Agent$chat()</code><a class="anchor" aria-label="anchor" href="#agent-chat-"></a></h3>
+<p>Send messages synchronously using the ellmer Chat interface.</p>
+<p>All requests pass through Deputy's run kernel. The return value matches
+<code>ellmer::Chat$chat()</code>; inspect <a href="AgentResult.html">AgentResult</a> metadata with <code>$last_run()</code>.</p><div class="section">
+<h4 id="usage-3">Usage<a class="anchor" aria-label="anchor" href="#usage-3"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="va">...</span>, echo <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>...</code></dt>
+<dd><p>User content accepted by ellmer.</p></dd>
+
+      <dt><code>echo</code></dt>
+<dd><p>Accepted for ellmer compatibility.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<p>The final assistant text.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-chat_async"></a><div class="section">
+<h3 id="agent-chat-async-"><code>Agent$chat_async()</code><a class="anchor" aria-label="anchor" href="#agent-chat-async-"></a></h3>
+<p>Send messages asynchronously using the ellmer Chat interface.</p><div class="section">
+<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat_async</span><span class="op">(</span><span class="va">...</span>, tool_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"concurrent"</span>, <span class="st">"sequential"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>...</code></dt>
+<dd><p>User content accepted by ellmer.</p></dd>
+
+      <dt><code>tool_mode</code></dt>
+<dd><p>Whether ellmer executes tool calls concurrently or
+sequentially.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
+<p>A promise resolving to the final assistant text.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-chat_structured"></a><div class="section">
+<h3 id="agent-chat-structured-"><code>Agent$chat_structured()</code><a class="anchor" aria-label="anchor" href="#agent-chat-structured-"></a></h3>
+<p>Send a structured request through the governed run kernel.</p><div class="section">
+<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat_structured</span><span class="op">(</span><span class="va">...</span>, <span class="va">type</span>, echo <span class="op">=</span> <span class="st">"none"</span>, convert <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-5">Arguments<a class="anchor" aria-label="anchor" href="#arguments-5"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>...</code></dt>
+<dd><p>User content accepted by ellmer.</p></dd>
+
+      <dt><code>type</code></dt>
+<dd><p>An ellmer structured-output type.</p></dd>
+
+      <dt><code>echo</code></dt>
+<dd><p>Echo mode forwarded to ellmer.</p></dd>
+
+      <dt><code>convert</code></dt>
+<dd><p>Whether ellmer converts the structured response.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
+<p>Structured response data.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-chat_structured_async"></a><div class="section">
+<h3 id="agent-chat-structured-async-"><code>Agent$chat_structured_async()</code><a class="anchor" aria-label="anchor" href="#agent-chat-structured-async-"></a></h3>
+<p>Send an asynchronous structured request through Deputy.</p><div class="section">
+<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat_structured_async</span><span class="op">(</span><span class="va">...</span>, <span class="va">type</span>, echo <span class="op">=</span> <span class="st">"none"</span>, convert <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-6">Arguments<a class="anchor" aria-label="anchor" href="#arguments-6"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>...</code></dt>
+<dd><p>User content accepted by ellmer.</p></dd>
+
+      <dt><code>type</code></dt>
+<dd><p>An ellmer structured-output type.</p></dd>
+
+      <dt><code>echo</code></dt>
+<dd><p>Echo mode forwarded to ellmer.</p></dd>
+
+      <dt><code>convert</code></dt>
+<dd><p>Whether ellmer converts the structured response.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
+<p>A promise resolving to structured response data.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-stream"></a><div class="section">
+<h3 id="agent-stream-"><code>Agent$stream()</code><a class="anchor" aria-label="anchor" href="#agent-stream-"></a></h3>
+<p>Stream synchronously using the ellmer Chat interface.</p><div class="section">
+<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">stream</span><span class="op">(</span><span class="va">...</span>, stream <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"text"</span>, <span class="st">"content"</span><span class="op">)</span>, controller <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-7">Arguments<a class="anchor" aria-label="anchor" href="#arguments-7"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>...</code></dt>
+<dd><p>User content accepted by ellmer.</p></dd>
+
+      <dt><code>stream</code></dt>
+<dd><p>Yield text or semantic ellmer content.</p></dd>
+
+      <dt><code>controller</code></dt>
+<dd><p>Optional ellmer stream controller.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-7">Returns<a class="anchor" aria-label="anchor" href="#returns-7"></a></h4>
+<p>A synchronous generator.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-stream_async"></a><div class="section">
+<h3 id="agent-stream-async-"><code>Agent$stream_async()</code><a class="anchor" aria-label="anchor" href="#agent-stream-async-"></a></h3>
+<p>Stream asynchronously using the ellmer Chat interface.</p>
+<p>This is the primary interface for shinychat. It returns the same content
+stream as ellmer while enforcing Deputy permissions, hooks, limits,
+workspace resolution, context management, and run accounting.</p><div class="section">
+<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">stream_async</span><span class="op">(</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  tool_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"concurrent"</span>, <span class="st">"sequential"</span><span class="op">)</span>,</span>
+<span>  stream <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"text"</span>, <span class="st">"content"</span><span class="op">)</span>,</span>
+<span>  controller <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-8">Arguments<a class="anchor" aria-label="anchor" href="#arguments-8"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>...</code></dt>
+<dd><p>User content accepted by ellmer, including shinychat's list of
+attachment-enabled <code>Content</code> objects.</p></dd>
+
+      <dt><code>tool_mode</code></dt>
+<dd><p>Whether ellmer executes tool calls concurrently or
+sequentially.</p></dd>
+
+      <dt><code>stream</code></dt>
+<dd><p>Yield text or semantic ellmer content.</p></dd>
+
+      <dt><code>controller</code></dt>
+<dd><p>Optional ellmer stream controller.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-8">Returns<a class="anchor" aria-label="anchor" href="#returns-8"></a></h4>
+<p>An asynchronous generator suitable for <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">shinychat::chat_append()</a></code>.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-last_run"></a><div class="section">
+<h3 id="agent-last-run-"><code>Agent$last_run()</code><a class="anchor" aria-label="anchor" href="#agent-last-run-"></a></h3>
+<p>Return the most recently completed governed run.</p><div class="section">
+<h4 id="usage-9">Usage<a class="anchor" aria-label="anchor" href="#usage-9"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">last_run</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-9">Returns<a class="anchor" aria-label="anchor" href="#returns-9"></a></h4>
+<p>An <a href="AgentResult.html">AgentResult</a>, or <code>NULL</code> before the first run completes.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-last_compaction"></a><div class="section">
+<h3 id="agent-last-compaction-"><code>Agent$last_compaction()</code><a class="anchor" aria-label="anchor" href="#agent-last-compaction-"></a></h3>
+<p>Return the most recent compaction outcome.</p><div class="section">
+<h4 id="usage-10">Usage<a class="anchor" aria-label="anchor" href="#usage-10"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">last_compaction</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-10">Returns<a class="anchor" aria-label="anchor" href="#returns-10"></a></h4>
+<p>A <code>DeputyCompaction</code>, or <code>NULL</code> before compaction occurs.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-resolve_tool_result"></a><div class="section">
+<h3 id="agent-resolve-tool-result-"><code>Agent$resolve_tool_result()</code><a class="anchor" aria-label="anchor" href="#agent-resolve-tool-result-"></a></h3>
+<p>Resolve a durable tool-result reference.</p><div class="section">
+<h4 id="usage-11">Usage<a class="anchor" aria-label="anchor" href="#usage-11"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">resolve_tool_result</span><span class="op">(</span><span class="va">reference</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-9">Arguments<a class="anchor" aria-label="anchor" href="#arguments-9"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>reference</code></dt>
+<dd><p>A <code>deputy://tool-result/...</code> URI or reference text
+emitted into model context.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-11">Returns<a class="anchor" aria-label="anchor" href="#returns-11"></a></h4>
+<p>The complete original R value.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-add_turn"></a><div class="section">
+<h3 id="agent-add-turn-"><code>Agent$add_turn()</code><a class="anchor" aria-label="anchor" href="#agent-add-turn-"></a></h3>
+<p>Add a user/assistant turn pair, as in ellmer Chat.</p><div class="section">
+<h4 id="usage-12">Usage<a class="anchor" aria-label="anchor" href="#usage-12"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">add_turn</span><span class="op">(</span><span class="va">user</span>, <span class="va">assistant</span>, log_tokens <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-10">Arguments<a class="anchor" aria-label="anchor" href="#arguments-10"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>user</code></dt>
+<dd><p>User turn or content.</p></dd>
+
+      <dt><code>assistant</code></dt>
+<dd><p>Assistant turn or content.</p></dd>
+
+      <dt><code>log_tokens</code></dt>
+<dd><p>Whether ellmer should log token metadata.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-12">Returns<a class="anchor" aria-label="anchor" href="#returns-12"></a></h4>
+<p>Invisible self.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-get_turns"></a><div class="section">
+<h3 id="agent-get-turns-"><code>Agent$get_turns()</code><a class="anchor" aria-label="anchor" href="#agent-get-turns-"></a></h3>
+<p>Return conversation turns, as in ellmer Chat.</p><div class="section">
+<h4 id="usage-13">Usage<a class="anchor" aria-label="anchor" href="#usage-13"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">get_turns</span><span class="op">(</span>include_system_prompt <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-11">Arguments<a class="anchor" aria-label="anchor" href="#arguments-11"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>include_system_prompt</code></dt>
+<dd><p>Include the system prompt as a turn.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-13">Returns<a class="anchor" aria-label="anchor" href="#returns-13"></a></h4>
+<p>A list of ellmer turns.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-set_turns"></a><div class="section">
+<h3 id="agent-set-turns-"><code>Agent$set_turns()</code><a class="anchor" aria-label="anchor" href="#agent-set-turns-"></a></h3>
+<p>Replace conversation turns, as in ellmer Chat.</p><div class="section">
+<h4 id="usage-14">Usage<a class="anchor" aria-label="anchor" href="#usage-14"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">set_turns</span><span class="op">(</span><span class="va">value</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-12">Arguments<a class="anchor" aria-label="anchor" href="#arguments-12"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>value</code></dt>
+<dd><p>A list of ellmer turns.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-14">Returns<a class="anchor" aria-label="anchor" href="#returns-14"></a></h4>
+<p>Invisible self.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-get_system_prompt"></a><div class="section">
+<h3 id="agent-get-system-prompt-"><code>Agent$get_system_prompt()</code><a class="anchor" aria-label="anchor" href="#agent-get-system-prompt-"></a></h3>
+<p>Return the system prompt, as in ellmer Chat.</p><div class="section">
+<h4 id="usage-15">Usage<a class="anchor" aria-label="anchor" href="#usage-15"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">get_system_prompt</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-15">Returns<a class="anchor" aria-label="anchor" href="#returns-15"></a></h4>
+<p>The system prompt or <code>NULL</code>.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-set_system_prompt"></a><div class="section">
+<h3 id="agent-set-system-prompt-"><code>Agent$set_system_prompt()</code><a class="anchor" aria-label="anchor" href="#agent-set-system-prompt-"></a></h3>
+<p>Replace the system prompt, as in ellmer Chat.</p><div class="section">
+<h4 id="usage-16">Usage<a class="anchor" aria-label="anchor" href="#usage-16"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">set_system_prompt</span><span class="op">(</span><span class="va">value</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-13">Arguments<a class="anchor" aria-label="anchor" href="#arguments-13"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>value</code></dt>
+<dd><p>The new system prompt or <code>NULL</code>.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-16">Returns<a class="anchor" aria-label="anchor" href="#returns-16"></a></h4>
+<p>Invisible self.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-get_tools"></a><div class="section">
+<h3 id="agent-get-tools-"><code>Agent$get_tools()</code><a class="anchor" aria-label="anchor" href="#agent-get-tools-"></a></h3>
+<p>Return registered tools, as in ellmer Chat.</p><div class="section">
+<h4 id="usage-17">Usage<a class="anchor" aria-label="anchor" href="#usage-17"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">get_tools</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-17">Returns<a class="anchor" aria-label="anchor" href="#returns-17"></a></h4>
+<p>A named list of ellmer tool definitions.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-set_tools"></a><div class="section">
+<h3 id="agent-set-tools-"><code>Agent$set_tools()</code><a class="anchor" aria-label="anchor" href="#agent-set-tools-"></a></h3>
+<p>Replace registered tools, preserving Deputy adaptation.</p><div class="section">
+<h4 id="usage-18">Usage<a class="anchor" aria-label="anchor" href="#usage-18"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">set_tools</span><span class="op">(</span><span class="va">tools</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-14">Arguments<a class="anchor" aria-label="anchor" href="#arguments-14"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>tools</code></dt>
+<dd><p>A list of ellmer tool definitions.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-18">Returns<a class="anchor" aria-label="anchor" href="#returns-18"></a></h4>
+<p>Invisible self.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-get_tokens"></a><div class="section">
+<h3 id="agent-get-tokens-"><code>Agent$get_tokens()</code><a class="anchor" aria-label="anchor" href="#agent-get-tokens-"></a></h3>
+<p>Return provider token records, as in ellmer Chat.</p><div class="section">
+<h4 id="usage-19">Usage<a class="anchor" aria-label="anchor" href="#usage-19"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">get_tokens</span><span class="op">(</span>include_system_prompt <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-15">Arguments<a class="anchor" aria-label="anchor" href="#arguments-15"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>include_system_prompt</code></dt>
+<dd><p>Deprecated ellmer compatibility argument.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-19">Returns<a class="anchor" aria-label="anchor" href="#returns-19"></a></h4>
+<p>A token data frame.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-get_cost"></a><div class="section">
+<h3 id="agent-get-cost-"><code>Agent$get_cost()</code><a class="anchor" aria-label="anchor" href="#agent-get-cost-"></a></h3>
+<p>Return provider cost records, as in ellmer Chat.</p><div class="section">
+<h4 id="usage-20">Usage<a class="anchor" aria-label="anchor" href="#usage-20"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">get_cost</span><span class="op">(</span>include <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"all"</span>, <span class="st">"last"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-16">Arguments<a class="anchor" aria-label="anchor" href="#arguments-16"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>include</code></dt>
+<dd><p>Return all costs or only the latest request.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-20">Returns<a class="anchor" aria-label="anchor" href="#returns-20"></a></h4>
+<p>Provider cost information.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-token_count"></a><div class="section">
+<h3 id="agent-token-count-"><code>Agent$token_count()</code><a class="anchor" aria-label="anchor" href="#agent-token-count-"></a></h3>
+<p>Estimate tokens, as in ellmer Chat.</p><div class="section">
+<h4 id="usage-21">Usage<a class="anchor" aria-label="anchor" href="#usage-21"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">token_count</span><span class="op">(</span><span class="va">...</span>, include <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"new"</span>, <span class="st">"complete"</span><span class="op">)</span>, type <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-17">Arguments<a class="anchor" aria-label="anchor" href="#arguments-17"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>...</code></dt>
+<dd><p>User content accepted by ellmer.</p></dd>
+
+      <dt><code>include</code></dt>
+<dd><p>Count only new content or the complete context.</p></dd>
+
+      <dt><code>type</code></dt>
+<dd><p>Optional provider content type.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-21">Returns<a class="anchor" aria-label="anchor" href="#returns-21"></a></h4>
+<p>Estimated token count.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-get_provider"></a><div class="section">
+<h3 id="agent-get-provider-"><code>Agent$get_provider()</code><a class="anchor" aria-label="anchor" href="#agent-get-provider-"></a></h3>
+<p>Return the ellmer provider.</p><div class="section">
+<h4 id="usage-22">Usage<a class="anchor" aria-label="anchor" href="#usage-22"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">get_provider</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-22">Returns<a class="anchor" aria-label="anchor" href="#returns-22"></a></h4>
+<p>An ellmer provider object.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-get_model"></a><div class="section">
+<h3 id="agent-get-model-"><code>Agent$get_model()</code><a class="anchor" aria-label="anchor" href="#agent-get-model-"></a></h3>
+<p>Return the configured model name.</p><div class="section">
+<h4 id="usage-23">Usage<a class="anchor" aria-label="anchor" href="#usage-23"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">get_model</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-23">Returns<a class="anchor" aria-label="anchor" href="#returns-23"></a></h4>
+<p>Model identifier.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-set_model"></a><div class="section">
+<h3 id="agent-set-model-"><code>Agent$set_model()</code><a class="anchor" aria-label="anchor" href="#agent-set-model-"></a></h3>
+<p>Replace the configured model.</p><div class="section">
+<h4 id="usage-24">Usage<a class="anchor" aria-label="anchor" href="#usage-24"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">set_model</span><span class="op">(</span><span class="va">model</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-18">Arguments<a class="anchor" aria-label="anchor" href="#arguments-18"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>model</code></dt>
+<dd><p>Model identifier.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-24">Returns<a class="anchor" aria-label="anchor" href="#returns-24"></a></h4>
+<p>Invisible self.</p>
+</div>
+
+</div>
+
 <p></p><hr><a id="method-Agent-register_tool"></a><div class="section">
 <h3 id="agent-register-tool-"><code>Agent$register_tool()</code><a class="anchor" aria-label="anchor" href="#agent-register-tool-"></a></h3>
 <p>Register a tool with the agent.</p><div class="section">
-<h4 id="usage-3">Usage<a class="anchor" aria-label="anchor" href="#usage-3"></a></h4>
+<h4 id="usage-25">Usage<a class="anchor" aria-label="anchor" href="#usage-25"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="va">tool</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
+<h4 id="arguments-19">Arguments<a class="anchor" aria-label="anchor" href="#arguments-19"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>tool</code></dt>
 <dd><p>A tool created with <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code></p></dd>
 
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<h4 id="returns-25">Returns<a class="anchor" aria-label="anchor" href="#returns-25"></a></h4>
 <p>Invisible self for chaining</p>
 </div>
 
@@ -388,18 +857,56 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 <p></p><hr><a id="method-Agent-register_tools"></a><div class="section">
 <h3 id="agent-register-tools-"><code>Agent$register_tools()</code><a class="anchor" aria-label="anchor" href="#agent-register-tools-"></a></h3>
 <p>Register multiple tools with the agent.</p><div class="section">
-<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<h4 id="usage-26">Usage<a class="anchor" aria-label="anchor" href="#usage-26"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">register_tools</span><span class="op">(</span><span class="va">tools</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
+<h4 id="arguments-20">Arguments<a class="anchor" aria-label="anchor" href="#arguments-20"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>tools</code></dt>
 <dd><p>A list of tools created with <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code></p></dd>
 
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
+<h4 id="returns-26">Returns<a class="anchor" aria-label="anchor" href="#returns-26"></a></h4>
 <p>Invisible self for chaining</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-on_tool_request"></a><div class="section">
+<h3 id="agent-on-tool-request-"><code>Agent$on_tool_request()</code><a class="anchor" aria-label="anchor" href="#agent-on-tool-request-"></a></h3>
+<p>Register an additional ellmer tool-request observer.</p><div class="section">
+<h4 id="usage-27">Usage<a class="anchor" aria-label="anchor" href="#usage-27"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">on_tool_request</span><span class="op">(</span><span class="va">callback</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-21">Arguments<a class="anchor" aria-label="anchor" href="#arguments-21"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>callback</code></dt>
+<dd><p>A function with one <code>request</code> argument.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-27">Returns<a class="anchor" aria-label="anchor" href="#returns-27"></a></h4>
+<p>A function that removes the observer.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-on_tool_result"></a><div class="section">
+<h3 id="agent-on-tool-result-"><code>Agent$on_tool_result()</code><a class="anchor" aria-label="anchor" href="#agent-on-tool-result-"></a></h3>
+<p>Register an additional ellmer tool-result observer.</p><div class="section">
+<h4 id="usage-28">Usage<a class="anchor" aria-label="anchor" href="#usage-28"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">on_tool_result</span><span class="op">(</span><span class="va">callback</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-22">Arguments<a class="anchor" aria-label="anchor" href="#arguments-22"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>callback</code></dt>
+<dd><p>A function with one <code>result</code> argument.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-28">Returns<a class="anchor" aria-label="anchor" href="#returns-28"></a></h4>
+<p>A function that removes the observer.</p>
 </div>
 
 </div>
@@ -409,17 +916,17 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 <p>Add a hook to the agent.</p>
 <p>Hooks are called at specific points during agent execution and can
 modify behavior (e.g., deny tool calls, log events).</p><div class="section">
-<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
+<h4 id="usage-29">Usage<a class="anchor" aria-label="anchor" href="#usage-29"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va">hook</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-5">Arguments<a class="anchor" aria-label="anchor" href="#arguments-5"></a></h4>
+<h4 id="arguments-23">Arguments<a class="anchor" aria-label="anchor" href="#arguments-23"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>hook</code></dt>
 <dd><p>A <a href="HookMatcher.html">HookMatcher</a> object</p></dd>
 
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
+<h4 id="returns-29">Returns<a class="anchor" aria-label="anchor" href="#returns-29"></a></h4>
 <p>Invisible self for chaining</p>
 </div><p></p><div class="section">
 <h4 id="examples">Examples<a class="anchor" aria-label="anchor" href="#examples"></a></h4>
@@ -442,10 +949,10 @@ modify behavior (e.g., deny tool calls, log events).</p><div class="section">
 <p></p><hr><a id="method-Agent-turns"></a><div class="section">
 <h3 id="agent-turns-"><code>Agent$turns()</code><a class="anchor" aria-label="anchor" href="#agent-turns-"></a></h3>
 <p>Get the conversation history.</p><div class="section">
-<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
+<h4 id="usage-30">Usage<a class="anchor" aria-label="anchor" href="#usage-30"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">turns</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
+<h4 id="returns-30">Returns<a class="anchor" aria-label="anchor" href="#returns-30"></a></h4>
 <p>A list of Turn objects</p>
 </div>
 
@@ -454,17 +961,17 @@ modify behavior (e.g., deny tool calls, log events).</p><div class="section">
 <p></p><hr><a id="method-Agent-last_turn"></a><div class="section">
 <h3 id="agent-last-turn-"><code>Agent$last_turn()</code><a class="anchor" aria-label="anchor" href="#agent-last-turn-"></a></h3>
 <p>Get the last turn in the conversation.</p><div class="section">
-<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">last_turn</span><span class="op">(</span>role <span class="op">=</span> <span class="st">"assistant"</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<h4 id="usage-31">Usage<a class="anchor" aria-label="anchor" href="#usage-31"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">last_turn</span><span class="op">(</span>role <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"assistant"</span>, <span class="st">"user"</span>, <span class="st">"system"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-6">Arguments<a class="anchor" aria-label="anchor" href="#arguments-6"></a></h4>
+<h4 id="arguments-24">Arguments<a class="anchor" aria-label="anchor" href="#arguments-24"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>role</code></dt>
 <dd><p>Role to filter by ("assistant", "user", or "system")</p></dd>
 
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-7">Returns<a class="anchor" aria-label="anchor" href="#returns-7"></a></h4>
+<h4 id="returns-31">Returns<a class="anchor" aria-label="anchor" href="#returns-31"></a></h4>
 <p>A Turn object or NULL</p>
 </div>
 
@@ -473,10 +980,10 @@ modify behavior (e.g., deny tool calls, log events).</p><div class="section">
 <p></p><hr><a id="method-Agent-session_id"></a><div class="section">
 <h3 id="agent-session-id-"><code>Agent$session_id()</code><a class="anchor" aria-label="anchor" href="#agent-session-id-"></a></h3>
 <p>Get this agent's session identifier.</p><div class="section">
-<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
+<h4 id="usage-32">Usage<a class="anchor" aria-label="anchor" href="#usage-32"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">session_id</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-8">Returns<a class="anchor" aria-label="anchor" href="#returns-8"></a></h4>
+<h4 id="returns-32">Returns<a class="anchor" aria-label="anchor" href="#returns-32"></a></h4>
 <p>Character session identifier</p>
 </div>
 
@@ -485,10 +992,10 @@ modify behavior (e.g., deny tool calls, log events).</p><div class="section">
 <p></p><hr><a id="method-Agent-get_permission_mode"></a><div class="section">
 <h3 id="agent-get-permission-mode-"><code>Agent$get_permission_mode()</code><a class="anchor" aria-label="anchor" href="#agent-get-permission-mode-"></a></h3>
 <p>Get the active permission mode.</p><div class="section">
-<h4 id="usage-9">Usage<a class="anchor" aria-label="anchor" href="#usage-9"></a></h4>
+<h4 id="usage-33">Usage<a class="anchor" aria-label="anchor" href="#usage-33"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">get_permission_mode</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-9">Returns<a class="anchor" aria-label="anchor" href="#returns-9"></a></h4>
+<h4 id="returns-33">Returns<a class="anchor" aria-label="anchor" href="#returns-33"></a></h4>
 <p>Character permission mode</p>
 </div>
 
@@ -500,17 +1007,17 @@ modify behavior (e.g., deny tool calls, log events).</p><div class="section">
 Reapplying the current mode is a no-op. Widening or incomparable mode
 changes require a newly configured <code>Agent</code> so custom restrictions remain
 an immutable authority ceiling.</p><div class="section">
-<h4 id="usage-10">Usage<a class="anchor" aria-label="anchor" href="#usage-10"></a></h4>
+<h4 id="usage-34">Usage<a class="anchor" aria-label="anchor" href="#usage-34"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">set_permission_mode</span><span class="op">(</span><span class="va">mode</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-7">Arguments<a class="anchor" aria-label="anchor" href="#arguments-7"></a></h4>
+<h4 id="arguments-25">Arguments<a class="anchor" aria-label="anchor" href="#arguments-25"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>mode</code></dt>
 <dd><p>Permission mode, see <a href="PermissionMode.html">PermissionMode</a></p></dd>
 
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-10">Returns<a class="anchor" aria-label="anchor" href="#returns-10"></a></h4>
+<h4 id="returns-34">Returns<a class="anchor" aria-label="anchor" href="#returns-34"></a></h4>
 <p>Invisible self</p>
 </div>
 
@@ -519,10 +1026,10 @@ an immutable authority ceiling.</p><div class="section">
 <p></p><hr><a id="method-Agent-cost"></a><div class="section">
 <h3 id="agent-cost-"><code>Agent$cost()</code><a class="anchor" aria-label="anchor" href="#agent-cost-"></a></h3>
 <p>Get cost information for the conversation.</p><div class="section">
-<h4 id="usage-11">Usage<a class="anchor" aria-label="anchor" href="#usage-11"></a></h4>
+<h4 id="usage-35">Usage<a class="anchor" aria-label="anchor" href="#usage-35"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">cost</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-11">Returns<a class="anchor" aria-label="anchor" href="#returns-11"></a></h4>
+<h4 id="returns-35">Returns<a class="anchor" aria-label="anchor" href="#returns-35"></a></h4>
 <p>A list with input, output, cached, and total token costs</p>
 </div>
 
@@ -533,10 +1040,10 @@ an immutable authority ceiling.</p><div class="section">
 <p>Get normalized usage for the complete in-memory conversation.</p>
 <p>Per-run usage is available on <a href="AgentResult.html">AgentResult</a> and in the final <code>usage</code>
 event returned by <code>$run()</code>.</p><div class="section">
-<h4 id="usage-12">Usage<a class="anchor" aria-label="anchor" href="#usage-12"></a></h4>
+<h4 id="usage-36">Usage<a class="anchor" aria-label="anchor" href="#usage-36"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">usage</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-12">Returns<a class="anchor" aria-label="anchor" href="#returns-12"></a></h4>
+<h4 id="returns-36">Returns<a class="anchor" aria-label="anchor" href="#returns-36"></a></h4>
 <p>An <a href="AgentUsage.html">AgentUsage</a> object</p>
 </div>
 
@@ -547,17 +1054,17 @@ event returned by <code>$run()</code>.</p><div class="section">
 <p>Request cancellation of the active stream.</p>
 <p>Cancellation is cooperative and takes effect at the next provider or tool
 boundary supported by ellmer.</p><div class="section">
-<h4 id="usage-13">Usage<a class="anchor" aria-label="anchor" href="#usage-13"></a></h4>
+<h4 id="usage-37">Usage<a class="anchor" aria-label="anchor" href="#usage-37"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">interrupt</span><span class="op">(</span>reason <span class="op">=</span> <span class="st">"interrupted"</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-8">Arguments<a class="anchor" aria-label="anchor" href="#arguments-8"></a></h4>
+<h4 id="arguments-26">Arguments<a class="anchor" aria-label="anchor" href="#arguments-26"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>reason</code></dt>
 <dd><p>Stable reason stored on the terminal event</p></dd>
 
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-13">Returns<a class="anchor" aria-label="anchor" href="#returns-13"></a></h4>
+<h4 id="returns-37">Returns<a class="anchor" aria-label="anchor" href="#returns-37"></a></h4>
 <p>Invisible logical indicating whether a run was active</p>
 </div>
 
@@ -566,10 +1073,10 @@ boundary supported by ellmer.</p><div class="section">
 <p></p><hr><a id="method-Agent-provider"></a><div class="section">
 <h3 id="agent-provider-"><code>Agent$provider()</code><a class="anchor" aria-label="anchor" href="#agent-provider-"></a></h3>
 <p>Get provider information.</p><div class="section">
-<h4 id="usage-14">Usage<a class="anchor" aria-label="anchor" href="#usage-14"></a></h4>
+<h4 id="usage-38">Usage<a class="anchor" aria-label="anchor" href="#usage-38"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">provider</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-14">Returns<a class="anchor" aria-label="anchor" href="#returns-14"></a></h4>
+<h4 id="returns-38">Returns<a class="anchor" aria-label="anchor" href="#returns-38"></a></h4>
 <p>A list with provider name and model</p>
 </div>
 
@@ -578,10 +1085,10 @@ boundary supported by ellmer.</p><div class="section">
 <p></p><hr><a id="method-Agent-save_session"></a><div class="section">
 <h3 id="agent-save-session-"><code>Agent$save_session()</code><a class="anchor" aria-label="anchor" href="#agent-save-session-"></a></h3>
 <p>Save the current session to an RDS file.</p><div class="section">
-<h4 id="usage-15">Usage<a class="anchor" aria-label="anchor" href="#usage-15"></a></h4>
+<h4 id="usage-39">Usage<a class="anchor" aria-label="anchor" href="#usage-39"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">save_session</span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-9">Arguments<a class="anchor" aria-label="anchor" href="#arguments-9"></a></h4>
+<h4 id="arguments-27">Arguments<a class="anchor" aria-label="anchor" href="#arguments-27"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>path</code></dt>
 <dd><p>Path to save the session</p></dd>
 
@@ -591,12 +1098,14 @@ boundary supported by ellmer.</p><div class="section">
 <h4 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h4>
 <p>The session file contains:</p><ul><li><p>Conversation turns</p></li>
 <li><p>System prompt</p></li>
+<li><p>The cumulative compaction summary</p></li>
+<li><p>Portable copies of offloaded tool results</p></li>
 <li><p>Effective run context</p></li>
 <li><p>File checkpoint state, when enabled</p></li>
 <li><p>Metadata (timestamp, version, provider info)</p></li>
 </ul><p></p>
 </div><p></p><div class="section">
-<h4 id="returns-15">Returns<a class="anchor" aria-label="anchor" href="#returns-15"></a></h4>
+<h4 id="returns-39">Returns<a class="anchor" aria-label="anchor" href="#returns-39"></a></h4>
 <p>Invisible path</p>
 </div>
 
@@ -605,10 +1114,10 @@ boundary supported by ellmer.</p><div class="section">
 <p></p><hr><a id="method-Agent-load_session"></a><div class="section">
 <h3 id="agent-load-session-"><code>Agent$load_session()</code><a class="anchor" aria-label="anchor" href="#agent-load-session-"></a></h3>
 <p>Load a session from an RDS file.</p><div class="section">
-<h4 id="usage-16">Usage<a class="anchor" aria-label="anchor" href="#usage-16"></a></h4>
+<h4 id="usage-40">Usage<a class="anchor" aria-label="anchor" href="#usage-40"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_session</span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-10">Arguments<a class="anchor" aria-label="anchor" href="#arguments-10"></a></h4>
+<h4 id="arguments-28">Arguments<a class="anchor" aria-label="anchor" href="#arguments-28"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>path</code></dt>
 <dd><p>Path to the session file</p></dd>
 
@@ -619,9 +1128,11 @@ boundary supported by ellmer.</p><div class="section">
 <p>Tools, permissions, hooks, and the working directory are runtime policy
 and are never restored from a session file. Saved run context is
 validated before conversation state changes and merged with constructor
-context; protected identity conflicts fail the load.</p>
+context; protected identity conflicts fail the load. Compaction summaries
+and integrity-checked tool-result envelopes are restored as conversational
+state under the receiving Agent's session identity.</p>
 </div><p></p><div class="section">
-<h4 id="returns-16">Returns<a class="anchor" aria-label="anchor" href="#returns-16"></a></h4>
+<h4 id="returns-40">Returns<a class="anchor" aria-label="anchor" href="#returns-40"></a></h4>
 <p>Invisible self</p>
 </div>
 
@@ -630,10 +1141,10 @@ context; protected identity conflicts fail the load.</p>
 <p></p><hr><a id="method-Agent-checkpoint"></a><div class="section">
 <h3 id="agent-checkpoint-"><code>Agent$checkpoint()</code><a class="anchor" aria-label="anchor" href="#agent-checkpoint-"></a></h3>
 <p>Create a reversible file checkpoint.</p><div class="section">
-<h4 id="usage-17">Usage<a class="anchor" aria-label="anchor" href="#usage-17"></a></h4>
+<h4 id="usage-41">Usage<a class="anchor" aria-label="anchor" href="#usage-41"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">checkpoint</span><span class="op">(</span>name <span class="op">=</span> <span class="cn">NULL</span>, metadata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-11">Arguments<a class="anchor" aria-label="anchor" href="#arguments-11"></a></h4>
+<h4 id="arguments-29">Arguments<a class="anchor" aria-label="anchor" href="#arguments-29"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>name</code></dt>
 <dd><p>Optional checkpoint label.</p></dd>
 
@@ -643,7 +1154,7 @@ context; protected identity conflicts fail the load.</p>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-17">Returns<a class="anchor" aria-label="anchor" href="#returns-17"></a></h4>
+<h4 id="returns-41">Returns<a class="anchor" aria-label="anchor" href="#returns-41"></a></h4>
 <p>The checkpoint ID.</p>
 </div>
 
@@ -652,10 +1163,10 @@ context; protected identity conflicts fail the load.</p>
 <p></p><hr><a id="method-Agent-list_checkpoints"></a><div class="section">
 <h3 id="agent-list-checkpoints-"><code>Agent$list_checkpoints()</code><a class="anchor" aria-label="anchor" href="#agent-list-checkpoints-"></a></h3>
 <p>List reversible file checkpoints.</p><div class="section">
-<h4 id="usage-18">Usage<a class="anchor" aria-label="anchor" href="#usage-18"></a></h4>
+<h4 id="usage-42">Usage<a class="anchor" aria-label="anchor" href="#usage-42"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">list_checkpoints</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-18">Returns<a class="anchor" aria-label="anchor" href="#returns-18"></a></h4>
+<h4 id="returns-42">Returns<a class="anchor" aria-label="anchor" href="#returns-42"></a></h4>
 <p>A data frame ordered from oldest to newest.</p>
 </div>
 
@@ -664,10 +1175,10 @@ context; protected identity conflicts fail the load.</p>
 <p></p><hr><a id="method-Agent-rewind_files"></a><div class="section">
 <h3 id="agent-rewind-files-"><code>Agent$rewind_files()</code><a class="anchor" aria-label="anchor" href="#agent-rewind-files-"></a></h3>
 <p>Rewind files to a checkpoint without changing conversation history.</p><div class="section">
-<h4 id="usage-19">Usage<a class="anchor" aria-label="anchor" href="#usage-19"></a></h4>
+<h4 id="usage-43">Usage<a class="anchor" aria-label="anchor" href="#usage-43"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">rewind_files</span><span class="op">(</span><span class="va">checkpoint_id</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-12">Arguments<a class="anchor" aria-label="anchor" href="#arguments-12"></a></h4>
+<h4 id="arguments-30">Arguments<a class="anchor" aria-label="anchor" href="#arguments-30"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>checkpoint_id</code></dt>
 <dd><p>ID returned by <code>$checkpoint()</code> or present in a
 <code>file_checkpoint</code> run event.</p></dd>
@@ -675,7 +1186,7 @@ context; protected identity conflicts fail the load.</p>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-19">Returns<a class="anchor" aria-label="anchor" href="#returns-19"></a></h4>
+<h4 id="returns-43">Returns<a class="anchor" aria-label="anchor" href="#returns-43"></a></h4>
 <p>A list describing the restored checkpoint and change count.</p>
 </div>
 
@@ -688,17 +1199,34 @@ context; protected identity conflicts fail the load.</p>
 conversation turns, then replaces them with the summary appended to
 the system prompt. This preserves important context while reducing
 token usage.</p><div class="section">
-<h4 id="usage-20">Usage<a class="anchor" aria-label="anchor" href="#usage-20"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">compact</span><span class="op">(</span>keep_last <span class="op">=</span> <span class="fl">4</span>, summary <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<h4 id="usage-44">Usage<a class="anchor" aria-label="anchor" href="#usage-44"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">compact</span><span class="op">(</span></span>
+<span>  keep_last <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  summary <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  fallback <span class="op">=</span> <span class="va">self</span><span class="op">$</span><span class="va">context_policy</span><span class="op">$</span><span class="va">fallback</span>,</span>
+<span>  automatic <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  estimated_tokens <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-13">Arguments<a class="anchor" aria-label="anchor" href="#arguments-13"></a></h4>
+<h4 id="arguments-31">Arguments<a class="anchor" aria-label="anchor" href="#arguments-31"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>keep_last</code></dt>
-<dd><p>Number of recent turns to keep uncompacted (default: 4)</p></dd>
+<dd><p>Number of recent turns to retain. <code>NULL</code> chooses a
+complete conversational boundary using the context policy's token
+target.</p></dd>
 
       <dt><code>summary</code></dt>
 <dd><p>Optional custom summary to use instead of auto-generating.
 If NULL, the LLM will generate a summary focusing on key decisions,
 findings, files discussed, and task progress.</p></dd>
+
+      <dt><code>fallback</code></dt>
+<dd><p>What to do when LLM summary generation fails.</p></dd>
+
+      <dt><code>automatic</code></dt>
+<dd><p>Whether the run kernel triggered this compaction.</p></dd>
+
+      <dt><code>estimated_tokens</code></dt>
+<dd><p>Optional pre-compaction token estimate.</p></dd>
 
 
 </dl><p></p></div>
@@ -708,11 +1236,12 @@ findings, files discussed, and task progress.</p></dd>
 <li><p>If no custom summary, uses LLM to summarize compacted turns</p></li>
 <li><p>Appends summary to system prompt under "Previous Conversation Summary"</p></li>
 <li><p>Keeps only the most recent <code>keep_last</code> turns</p></li>
-</ol><p>If LLM summarization fails (e.g., no API key), falls back to a simple
-text-based summary with truncated turn contents.</p>
+</ol><p>LLM summary-generation failures are errors by default. A deterministic
+truncated-text summary is used only when <code>fallback = "text"</code> is
+explicitly configured. The returned object records that degraded method.</p>
 </div><p></p><div class="section">
-<h4 id="returns-20">Returns<a class="anchor" aria-label="anchor" href="#returns-20"></a></h4>
-<p>Invisible self</p>
+<h4 id="returns-44">Returns<a class="anchor" aria-label="anchor" href="#returns-44"></a></h4>
+<p>A <code>DeputyCompaction</code> describing the method and usage.</p>
 </div>
 
 </div>
@@ -720,7 +1249,7 @@ text-based summary with truncated turn contents.</p>
 <p></p><hr><a id="method-Agent-print"></a><div class="section">
 <h3 id="agent-print-"><code>Agent$print()</code><a class="anchor" aria-label="anchor" href="#agent-print-"></a></h3>
 <p>Print the agent configuration.</p><div class="section">
-<h4 id="usage-21">Usage<a class="anchor" aria-label="anchor" href="#usage-21"></a></h4>
+<h4 id="usage-45">Usage<a class="anchor" aria-label="anchor" href="#usage-45"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -729,10 +1258,10 @@ text-based summary with truncated turn contents.</p>
 <p></p><hr><a id="method-Agent-load_skill"></a><div class="section">
 <h3 id="agent-load-skill-"><code>Agent$load_skill()</code><a class="anchor" aria-label="anchor" href="#agent-load-skill-"></a></h3>
 <p>Load a <a href="Skill.html">Skill</a> into the agent.</p><div class="section">
-<h4 id="usage-22">Usage<a class="anchor" aria-label="anchor" href="#usage-22"></a></h4>
+<h4 id="usage-46">Usage<a class="anchor" aria-label="anchor" href="#usage-46"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_skill</span><span class="op">(</span><span class="va">skill</span>, allow_conflicts <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-14">Arguments<a class="anchor" aria-label="anchor" href="#arguments-14"></a></h4>
+<h4 id="arguments-32">Arguments<a class="anchor" aria-label="anchor" href="#arguments-32"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>skill</code></dt>
 <dd><p>A <a href="Skill.html">Skill</a> object or path to a skill directory.</p></dd>
 
@@ -743,7 +1272,7 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-21">Returns<a class="anchor" aria-label="anchor" href="#returns-21"></a></h4>
+<h4 id="returns-45">Returns<a class="anchor" aria-label="anchor" href="#returns-45"></a></h4>
 <p>Invisible self for chaining.</p>
 </div>
 
@@ -752,10 +1281,10 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 <p></p><hr><a id="method-Agent-skills"></a><div class="section">
 <h3 id="agent-skills-"><code>Agent$skills()</code><a class="anchor" aria-label="anchor" href="#agent-skills-"></a></h3>
 <p>Get loaded skills.</p><div class="section">
-<h4 id="usage-23">Usage<a class="anchor" aria-label="anchor" href="#usage-23"></a></h4>
+<h4 id="usage-47">Usage<a class="anchor" aria-label="anchor" href="#usage-47"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">skills</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-22">Returns<a class="anchor" aria-label="anchor" href="#returns-22"></a></h4>
+<h4 id="returns-46">Returns<a class="anchor" aria-label="anchor" href="#returns-46"></a></h4>
 <p>Named list of loaded <a href="Skill.html">Skill</a> objects.</p>
 </div>
 
@@ -766,10 +1295,10 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 <p>Load tools from MCP (Model Context Protocol) servers.</p>
 <p>Requires the mcptools package. Issues a warning if not installed or if
 tool fetching fails.</p><div class="section">
-<h4 id="usage-24">Usage<a class="anchor" aria-label="anchor" href="#usage-24"></a></h4>
+<h4 id="usage-48">Usage<a class="anchor" aria-label="anchor" href="#usage-48"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_mcp</span><span class="op">(</span>config <span class="op">=</span> <span class="cn">NULL</span>, servers <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-15">Arguments<a class="anchor" aria-label="anchor" href="#arguments-15"></a></h4>
+<h4 id="arguments-33">Arguments<a class="anchor" aria-label="anchor" href="#arguments-33"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>config</code></dt>
 <dd><p>Path to MCP configuration file. If NULL (default), uses
 the mcptools default location (<code>~/.config/mcptools/config.json</code>).</p></dd>
@@ -781,7 +1310,7 @@ If NULL, loads from all configured servers.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-23">Returns<a class="anchor" aria-label="anchor" href="#returns-23"></a></h4>
+<h4 id="returns-47">Returns<a class="anchor" aria-label="anchor" href="#returns-47"></a></h4>
 <p>Invisible self for chaining</p>
 </div>
 
@@ -790,10 +1319,10 @@ If NULL, loads from all configured servers.</p></dd>
 <p></p><hr><a id="method-Agent-mcp_tools"></a><div class="section">
 <h3 id="agent-mcp-tools-"><code>Agent$mcp_tools()</code><a class="anchor" aria-label="anchor" href="#agent-mcp-tools-"></a></h3>
 <p>Get names of loaded MCP tools.</p><div class="section">
-<h4 id="usage-25">Usage<a class="anchor" aria-label="anchor" href="#usage-25"></a></h4>
+<h4 id="usage-49">Usage<a class="anchor" aria-label="anchor" href="#usage-49"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">mcp_tools</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-24">Returns<a class="anchor" aria-label="anchor" href="#returns-24"></a></h4>
+<h4 id="returns-48">Returns<a class="anchor" aria-label="anchor" href="#returns-48"></a></h4>
 <p>Character vector of MCP tool names</p>
 </div>
 
@@ -802,48 +1331,11 @@ If NULL, loads from all configured servers.</p></dd>
 <p></p><hr><a id="method-Agent-mcp_status"></a><div class="section">
 <h3 id="agent-mcp-status-"><code>Agent$mcp_status()</code><a class="anchor" aria-label="anchor" href="#agent-mcp-status-"></a></h3>
 <p>Get MCP runtime status records.</p><div class="section">
-<h4 id="usage-26">Usage<a class="anchor" aria-label="anchor" href="#usage-26"></a></h4>
+<h4 id="usage-50">Usage<a class="anchor" aria-label="anchor" href="#usage-50"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">mcp_status</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-25">Returns<a class="anchor" aria-label="anchor" href="#returns-25"></a></h4>
+<h4 id="returns-49">Returns<a class="anchor" aria-label="anchor" href="#returns-49"></a></h4>
 <p>Data frame describing MCP load attempts and registered tools</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-Agent-run_shiny"></a><div class="section">
-<h3 id="agent-run-shiny-"><code>Agent$run_shiny()</code><a class="anchor" aria-label="anchor" href="#agent-run-shiny-"></a></h3>
-<p>Run an agentic task for use in Shiny applications with shinychat.</p>
-<p>Returns an async content stream suitable for passing to
-<code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">shinychat::chat_append()</a></code>. Unlike <code>run()</code> and <code>run_sync()</code>, the
-multi-turn loop is driven by ellmer's <code>stream_async()</code> rather than
-deputy's own generator. Deputy's permissions, hooks, and observable
-<a href="UsageLimits.html">UsageLimits</a> are still enforced via callbacks and terminal accounting.
-File tools must use absolute paths within <code>working_dir</code>; rejected calls
-still count toward tool usage.</p><div class="section">
-<h4 id="usage-27">Usage<a class="anchor" aria-label="anchor" href="#usage-27"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run_shiny</span><span class="op">(</span><span class="va">prompt</span>, max_tool_calls <span class="op">=</span> <span class="cn">NULL</span>, run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-16">Arguments<a class="anchor" aria-label="anchor" href="#arguments-16"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>prompt</code></dt>
-<dd><p>The user message to send</p></dd>
-
-      <dt><code>max_tool_calls</code></dt>
-<dd><p>Maximum number of tool calls before stopping.
-Overrides <code>usage_limits$max_tool_calls</code>; otherwise falls back to that
-value or 25. This counts individual tool call requests, not LLM turns
-(one turn can have multiple parallel calls).</p></dd>
-
-      <dt><code>run_context</code></dt>
-<dd><p>Canonical JSON-compatible context to add to or narrow
-for this run. Protected constructor identity fields cannot change.</p></dd>
-
-
-</dl><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-26">Returns<a class="anchor" aria-label="anchor" href="#returns-26"></a></h4>
-<p>An async content stream suitable for
-<code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">shinychat::chat_append()</a></code>.</p>
 </div>
 
 </div>
@@ -851,24 +1343,17 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 <p></p><hr><a id="method-Agent-run_async"></a><div class="section">
 <h3 id="agent-run-async-"><code>Agent$run_async()</code><a class="anchor" aria-label="anchor" href="#agent-run-async-"></a></h3>
 <p>Run an agentic task asynchronously and resolve to an <a href="AgentResult.html">AgentResult</a>.</p>
-<p>Like <code>run_shiny()</code>, the multi-turn loop is driven by ellmer's
-<code>stream_async()</code>, so the R process is never blocked while the model or
-tools work: other Shiny sessions, <code>later</code> callbacks, and promise chains
-keep running. Unlike <code>run_shiny()</code>, nothing is streamed to a UI. The
-returned promise resolves once the run stops and carries the final
-response, run-scoped usage, and stop reason. Permissions, hooks, and
-<a href="UsageLimits.html">UsageLimits</a> are enforced as in <code>run_shiny()</code> (callbacks plus terminal
-accounting). File tools may use relative paths resolved against
-<code>working_dir</code>, as in <code>run()</code>; the absolute-path rule is specific to
-<code>run_shiny()</code>.</p>
+<p>Uses the same run kernel as <code>$stream_async()</code>, <code>$stream()</code>, <code>$chat()</code>,
+and <code>$run_sync()</code>. It collects the final response and run metadata rather
+than returning the content stream.</p>
 <p>Use this when an Agent is a <em>worker</em> inside a larger async system, for
 example a delegated sub-agent executed from the tool of a parent chat
 that is itself streaming. <code>output_format</code> is not supported here;
 structured output still requires <code>run()</code> or <code>run_sync()</code>.</p><div class="section">
-<h4 id="usage-28">Usage<a class="anchor" aria-label="anchor" href="#usage-28"></a></h4>
+<h4 id="usage-51">Usage<a class="anchor" aria-label="anchor" href="#usage-51"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run_async</span><span class="op">(</span><span class="va">task</span>, usage_limits <span class="op">=</span> <span class="cn">NULL</span>, run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-17">Arguments<a class="anchor" aria-label="anchor" href="#arguments-17"></a></h4>
+<h4 id="arguments-34">Arguments<a class="anchor" aria-label="anchor" href="#arguments-34"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>task</code></dt>
 <dd><p>The task for the agent to perform</p></dd>
 
@@ -885,7 +1370,7 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-27">Returns<a class="anchor" aria-label="anchor" href="#returns-27"></a></h4>
+<h4 id="returns-50">Returns<a class="anchor" aria-label="anchor" href="#returns-50"></a></h4>
 <p>A <code><a href="https://rstudio.github.io/promises/reference/promise.html" class="external-link">promises::promise</a></code> resolving to an <a href="AgentResult.html">AgentResult</a>. It is
 rejected if the provider stream fails or a limit configured with
 <code>on_exceed = "error"</code> is reached.</p>
@@ -896,10 +1381,10 @@ rejected if the provider stream fails or a limit configured with
 <p></p><hr><a id="method-Agent-clone"></a><div class="section">
 <h3 id="agent-clone-"><code>Agent$clone()</code><a class="anchor" aria-label="anchor" href="#agent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-29">Usage<a class="anchor" aria-label="anchor" href="#usage-29"></a></h4>
+<h4 id="usage-52">Usage<a class="anchor" aria-label="anchor" href="#usage-52"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-18">Arguments<a class="anchor" aria-label="anchor" href="#arguments-18"></a></h4>
+<h4 id="arguments-35">Arguments<a class="anchor" aria-label="anchor" href="#arguments-35"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

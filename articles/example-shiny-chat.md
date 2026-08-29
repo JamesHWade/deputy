@@ -1,85 +1,18 @@
 # Example: Shiny Chat with shinychat
 
-This example shows how to use deputy with
-[shinychat](https://posit-dev.github.io/shinychat/) to build an
-interactive chat application with permissions, hooks, and tool call
-limits.
+Deputy Agents implement the ellmer chat methods used by
+[shinychat](https://posit-dev.github.io/shinychat/). Pass an Agent
+directly to `chat_server()`; there is no separate Shiny bridge and no
+path that bypasses Deputy’s governance.
 
-## The Problem
-
-shinychat’s
-[`chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html)
-expects an ellmer content stream from `chat$stream_async()`. Deputy’s
-`run()` yields `AgentEvent` objects, while `run_sync()` returns an
-`AgentResult`. Calling `agent$chat$stream_async()` directly works but
-bypasses Deputy’s permissions, hooks, and run limits from
-[`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md).
-
-`run_shiny()` bridges this gap: it returns a content stream that
-shinychat understands while still enforcing deputy’s permissions, hooks,
-and limits.
-
-`run_shiny()` is deliberately strict about file tools: every supplied
-file path must be absolute and resolve within the Agent’s immutable
-`working_dir`. Relative paths, omitted path defaults, and paths outside
-that root are rejected. Bind a normalized workspace and include its
-exact path in the model’s system prompt, as both examples below do.
-
-Following shinychat’s recommended pattern, pass that stream directly to
-[`chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
-[`chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html)
-returns the completion promise, so make it the last expression in your
-observer if you want shinychat to surface streaming errors in the chat
-UI.
-
-## What `run_shiny()` Enforces
-
-| Feature | Enforced? | How |
-|----|----|----|
-| Permissions (file_read, bash, etc.) | Yes | `on_tool_request` callback |
-| PreToolUse / PostToolUse hooks | Yes | `on_tool_request` / `on_tool_result` callbacks |
-| File path confinement | Yes | Every recognized file path must be absolute and inside `working_dir` |
-| Tool call limit | Yes | Checked at each tool request; an overage cancels the active stream |
-| Request, token, and cost limits | Yes | Checked when usage is observed; an overage cancels the active stream |
-| SessionStart / SessionEnd hooks | Yes | Fired before/after the stream |
-| Stall detection | No | Requires deputy’s own loop |
-| `output_format` (structured output) | No | Requires deputy’s own loop |
-
-## Sub-Agents Inside a Streaming Chat: `run_async()`
-
-`run_shiny()` is for the agent that owns the chat UI. When a Deputy
-Agent is instead a *worker* – for example a delegated sub-agent invoked
-from an ellmer tool of a chat that is already streaming – use
-`run_async()`. It drives the same callback-enforced loop but returns a
-promise that resolves to an `AgentResult`, so the tool body can `await`
-it without blocking other Shiny sessions:
-
-``` r
-
-scout <- Agent$new(
-  chat = chat$clone()$set_turns(list()),
-  system_prompt = "You are a literature scout. Report sources with DOIs.",
-  tools = tools_web(),
-  usage_limits = UsageLimits(max_requests = 8, max_tool_calls = 12)
-)
-
-tool_scout <- ellmer::tool(
-  fun = coro::async(function(prompt) {
-    result <- coro::await(scout$run_async(prompt))
-    paste0(result$response, "\n\n(stopped: ", result$stop_reason, ")")
-  }),
-  name = "agent_scout",
-  description = "Delegate a literature search to the scout sub-agent.",
-  arguments = list(prompt = ellmer::type_string("Self-contained task"))
-)
-chat$register_tool(tool_scout)
+``` text
+shinychat input -> Agent$stream_async() -> one governed run kernel -> ellmer
+                                      \-> AgentResult + hooks + usage
 ```
 
-`run_async()` enforces everything in the table above except file path
-confinement, which is a `run_shiny()` rule: worker agents resolve
-relative paths against their `working_dir` like `run()` does. Pass
-`UsageLimits(on_exceed = "error")` to have the promise rejected on a
-limit instead of resolving with a typed `stop_reason`.
+The stream keeps ellmer’s native chunks, so shinychat can render
+incremental text, tool activity, and attachment-enabled input. After it
+finishes, `agent$last_run()` exposes the corresponding `AgentResult`.
 
 ## Basic Setup
 
@@ -92,117 +25,118 @@ library(shinychat)
 workspace <- normalizePath(getwd(), mustWork = TRUE, winslash = "/")
 
 ui <- bslib::page_fluid(
-  chat_ui("chat", fill = TRUE)
+  chat_ui("chat", fill = TRUE, allow_attachments = TRUE)
 )
 
 server <- function(input, output, session) {
   chat <- ellmer::chat_openai(
     model = "gpt-4o-mini",
-    system_prompt = paste(
-      "You are a helpful assistant. Be concise.",
-      sprintf(
-        "For every file tool, use an absolute path inside: %s",
-        workspace
-      )
-    )
-  )
-
-  agent <- Agent$new(
-    chat = chat,
-    tools = tools_file(),
-    permissions = permissions_standard(workspace),
-    working_dir = workspace
-  )
-
-  observeEvent(input$chat_user_input, {
-    req(input$chat_user_input)
-
-    chat_append(
-      "chat",
-      agent$run_shiny(input$chat_user_input)
-    )
-  })
-}
-
-shinyApp(ui, server)
-```
-
-## With Permissions and Hooks
-
-Deputy’s permissions and hooks fire on every tool call, even though
-shinychat drives the streaming loop:
-
-``` r
-
-workspace <- normalizePath(getwd(), mustWork = TRUE, winslash = "/")
-
-server <- function(input, output, session) {
-  chat <- ellmer::chat_anthropic(
-    model = "claude-sonnet-4-5-20250929",
-    system_prompt = paste(
-      "You are a data analyst. Be concise.",
-      sprintf(
-        "For every file tool, use an absolute path inside: %s",
-        workspace
-      )
-    )
+    system_prompt = "You are a concise data assistant."
   )
 
   agent <- Agent$new(
     chat = chat,
     tools = c(tools_file(), tools_data()),
-    permissions = Permissions$new(
-      file_read = TRUE,
-      file_write = FALSE,
-      r_code = FALSE,
-      bash = FALSE
+    permissions = permissions_readonly(),
+    usage_limits = UsageLimits(
+      max_requests = 10,
+      max_tool_calls = 12,
+      max_cost_usd = 0.50
     ),
-    usage_limits = UsageLimits(max_requests = 10, max_cost_usd = 0.50),
+    context_policy = ContextPolicy(
+      max_tokens = 32000,
+      fallback = "error"
+    ),
     working_dir = workspace
   )
 
-  # Hooks still fire normally
-  agent$add_hook(hook_log_tools(verbose = TRUE))
-
-  observeEvent(input$chat_user_input, {
-    req(input$chat_user_input)
-
-    # max_tool_calls limits how many tool calls the agent can make
-    chat_append(
-      "chat",
-      agent$run_shiny(
-        input$chat_user_input,
-        max_tool_calls = 10
-      )
-    )
-  })
+  chat_server("chat", agent)
 }
+
+shinyApp(ui, server)
 ```
 
-## How Limits Work
+`chat_server()` passes both plain text and attachment-enabled ellmer
+content to the Agent unchanged. It also supplies shinychat history and
+cancellation around Deputy’s governed stream.
 
-`run_shiny()` starts with the Agent’s run limits and lets
-`max_tool_calls` override that one field. When Deputy observes a
-request, tool, token, or cost overage, it marks the run stopped and asks
-ellmer’s stream controller to cancel active generation. An overage found
-at a tool boundary also rejects that tool call. `Stop` and `SessionEnd`
-hooks receive the corresponding limit reason.
+## What the Agent Adds
 
-Provider token and cost usage is not observable until a response
-arrives. The initial response can therefore cross one of those limits
-before cancellation; it may overshoot the configured threshold by one
-response. Cancellation stops further work but cannot retract content
-already emitted. Treat token and cost limits as observed stop
-conditions, not provider-side generation ceilings.
+Every public chat and run method uses the same kernel:
 
-The `max_tool_calls` parameter counts individual tool call requests, not
-model requests. One model request can include multiple parallel tool
-calls (for example, reading three files at once), each counting
-separately.
+| Method | Native return | Typical host |
+|----|----|----|
+| `chat()` | final text | scripts and consoles |
+| `chat_async()` | promise of final text | async applications |
+| `chat_structured()` / `chat_structured_async()` | typed data | structured-output hosts |
+| `stream()` | synchronous ellmer stream | terminal hosts |
+| `stream_async()` | asynchronous ellmer stream | shinychat |
+| `run_sync()` | `AgentResult` | inspected workflows |
+| `run_async()` | promise of `AgentResult` | subagents |
+
+All interfaces enforce the Agent’s permissions, hooks, `UsageLimits`,
+workspace path resolution, file checkpoints, automatic context
+compaction, large-result offloading, and run accounting. Native relative
+file paths resolve against the Agent’s immutable `working_dir`; Deputy
+never changes the process working directory.
+
+[`ContextPolicy()`](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
+checks the estimated complete context before a run and again between
+provider tool turns, compacting whenever it crosses the token threshold.
+The default fails closed if LLM summary generation fails. Set
+`fallback = "text"` only when a deterministic degraded summary is
+acceptable. `agent$last_compaction()` reports which method was used and
+the compaction usage.
+
+Large tool results are stored as integrity-checked envelopes and
+replaced in model context with a preview and `deputy://tool-result/...`
+reference. The Agent registers `deputy_read_tool_result()` so the model
+can page through the stored result in bounded chunks. Applications can
+retrieve the original R value with
+`agent$resolve_tool_result(reference)`.
+
+## Hooks and Cancellation
+
+Hooks attach to the Agent as usual:
+
+``` r
+
+agent$add_hook(hook_log_tools(verbose = TRUE))
+
+agent$add_hook(HookMatcher$new(
+  event = "PostCompact",
+  callback = function(result, context) {
+    cli::cli_inform("Compacted with: {result$method}")
+  }
+))
+```
+
+[`chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html)
+owns the completion promise and surfaces stream errors in the chat UI.
+shinychat cancellation propagates through ellmer’s stream controller;
+Deputy still finalizes checkpoints and fires `Stop` and `SessionEnd`.
+
+## Subagents
+
+`LeadAgent` delegation uses `run_async()` internally, so a subagent does
+not block the Shiny R process while the parent chat is streaming. A
+custom async tool can use the same contract:
+
+``` r
+
+tool_scout <- ellmer::tool(
+  fun = coro::async(function(prompt) {
+    result <- coro::await(scout$run_async(prompt))
+    result$response
+  }),
+  name = "agent_scout",
+  description = "Delegate a literature search.",
+  arguments = list(prompt = ellmer::type_string("Self-contained task"))
+)
+agent$register_tool(tool_scout)
+```
 
 ## Running the Example
-
-A complete example app is included in the package:
 
 ``` r
 

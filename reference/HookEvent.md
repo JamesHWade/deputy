@@ -126,7 +126,7 @@ Callback signature: `function(message, context)`
 
 **PreCompact** - Before conversation compaction
 
-Callback signature: `function(turns_to_compact, turns_to_keep, context)`
+Hook signature: `function(turns_to_compact, turns_to_keep, context)`
 
 - `turns_to_compact`: List of turns that will be compacted into a
   summary
@@ -139,6 +139,17 @@ Callback signature: `function(turns_to_compact, turns_to_keep, context)`
 - Return:
   [`HookResultPreCompact()`](https://jameshwade.github.io/deputy/reference/HookResultPreCompact.md)
   to allow/cancel or provide custom summary
+
+**PostCompact** - After conversation compaction
+
+Hook signature: `function(result, context)`
+
+- `result`: The `DeputyCompaction` outcome, including method and usage
+
+- `context`: Common correlation fields plus `compact_count` and
+  `automatic`
+
+- Return: NULL (informational only)
 
 **SessionStart** - When an agent session begins
 
@@ -201,6 +212,9 @@ The context parameter is always a named list. Common fields:
   `total`
 
 - `compact_count`: (PreCompact only) Number of turns being compacted
+
+- `automatic`: (PostCompact only) Whether the run kernel triggered
+  compaction
 
 - `level`: (Notification only) Informational severity such as `"info"`
   or `"warning"`

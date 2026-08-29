@@ -38,11 +38,25 @@ it to spawn sub-agents based on registered AgentDefinitions.
 Inherited methods
 
 - [`Agent$add_hook()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-add_hook)
+- [`Agent$add_turn()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-add_turn)
+- [`Agent$chat()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-chat)
+- [`Agent$chat_async()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-chat_async)
+- [`Agent$chat_structured()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-chat_structured)
+- [`Agent$chat_structured_async()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-chat_structured_async)
 - [`Agent$checkpoint()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-checkpoint)
 - [`Agent$compact()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-compact)
 - [`Agent$cost()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-cost)
+- [`Agent$get_cost()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_cost)
+- [`Agent$get_model()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_model)
 - [`Agent$get_permission_mode()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_permission_mode)
+- [`Agent$get_provider()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_provider)
+- [`Agent$get_system_prompt()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_system_prompt)
+- [`Agent$get_tokens()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_tokens)
+- [`Agent$get_tools()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_tools)
+- [`Agent$get_turns()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_turns)
 - [`Agent$interrupt()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-interrupt)
+- [`Agent$last_compaction()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-last_compaction)
+- [`Agent$last_run()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-last_run)
 - [`Agent$last_turn()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-last_turn)
 - [`Agent$list_checkpoints()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-list_checkpoints)
 - [`Agent$load_mcp()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-load_mcp)
@@ -50,18 +64,27 @@ Inherited methods
 - [`Agent$load_skill()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-load_skill)
 - [`Agent$mcp_status()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-mcp_status)
 - [`Agent$mcp_tools()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-mcp_tools)
+- [`Agent$on_tool_request()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-on_tool_request)
+- [`Agent$on_tool_result()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-on_tool_result)
 - [`Agent$provider()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-provider)
 - [`Agent$register_tool()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-register_tool)
 - [`Agent$register_tools()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-register_tools)
+- [`Agent$resolve_tool_result()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-resolve_tool_result)
 - [`Agent$rewind_files()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-rewind_files)
 - [`Agent$run()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run)
 - [`Agent$run_async()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_async)
-- [`Agent$run_shiny()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_shiny)
 - [`Agent$run_sync()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_sync)
 - [`Agent$save_session()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-save_session)
 - [`Agent$session_id()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-session_id)
+- [`Agent$set_model()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_model)
 - [`Agent$set_permission_mode()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_permission_mode)
+- [`Agent$set_system_prompt()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_system_prompt)
+- [`Agent$set_tools()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_tools)
+- [`Agent$set_turns()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_turns)
 - [`Agent$skills()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-skills)
+- [`Agent$stream()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-stream)
+- [`Agent$stream_async()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-stream_async)
+- [`Agent$token_count()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-token_count)
 - [`Agent$turns()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-turns)
 - [`Agent$usage()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-usage)
 
@@ -80,6 +103,7 @@ Create a new LeadAgent.
       system_prompt = NULL,
       permissions = NULL,
       usage_limits = NULL,
+      context_policy = ContextPolicy(),
       enable_file_checkpointing = FALSE,
       file_checkpoint_max_file_bytes = 50 * 1024^2,
       file_checkpoint_max_journal_bytes = 250 * 1024^2,
@@ -119,6 +143,13 @@ Create a new LeadAgent.
   Optional
   [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
   for each lead-agent run.
+
+- `context_policy`:
+
+  A
+  [ContextPolicy](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
+  controlling automatic compaction and durable offloading of large tool
+  results for the lead agent and its delegated agents.
 
 - `enable_file_checkpointing`:
 

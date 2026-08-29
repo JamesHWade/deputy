@@ -90,8 +90,8 @@
 <p>ellmer gives R a provider-independent chat interface and tools. Deputy adds the runtime around that chat when a tool-using conversation becomes a real job:</p>
 <table class="table">
 <colgroup>
-<col width="32%">
-<col width="67%">
+<col width="50%">
+<col width="50%">
 </colgroup>
 <thead><tr>
 <th>Start with ellmer</th>
@@ -112,7 +112,7 @@
 </tr>
 <tr>
 <td>Conversation state</td>
-<td>Explicit session persistence and file checkpoints</td>
+<td>Automatic compaction, persistence, and checkpoints</td>
 </tr>
 <tr>
 <td>One tool-using chat</td>
@@ -126,6 +126,7 @@
                   Deputy Agent
                      |
         AgentResult + Events + Checkpoints</code></pre>
+<p>The Agent itself implements ellmer’s Chat protocol. Use <code>agent$chat()</code> and <code>agent$stream()</code> in synchronous code, or pass the Agent directly to <code>shinychat::chat_server()</code>. Those paths use the same governed kernel as <code>run_sync()</code> and <code>run_async()</code>; the latter pair return richer <code>AgentResult</code> metadata when the host needs to inspect the run.</p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -152,6 +153,7 @@
 <span><span class="va">first_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span></span>
 <span><span class="va">first_permissions</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">first_limits</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span></span>
+<span><span class="va">first_context</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/ContextPolicy.html">ContextPolicy</a></span><span class="op">(</span>max_tokens <span class="op">=</span> <span class="fl">32000</span>, fallback <span class="op">=</span> <span class="st">"error"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">first_tools</span><span class="op">)</span> <span class="op">==</span> <span class="fl">3L</span>,</span>
@@ -167,6 +169,7 @@
 <span>  tools <span class="op">=</span> <span class="va">first_tools</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="va">first_permissions</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="va">first_limits</span>,</span>
+<span>  context_policy <span class="op">=</span> <span class="va">first_context</span>,</span>
 <span>  working_dir <span class="op">=</span> <span class="va">workspace</span></span>
 <span><span class="op">)</span></span>
 <span></span>

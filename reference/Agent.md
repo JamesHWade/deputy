@@ -74,10 +74,6 @@ for writes made through its native file tools.
 
   Default canonical product context. Read-only.
 
-- `chat`:
-
-  The wrapped ellmer Chat object. Read-only after construction.
-
 - `permissions`:
 
   Permission policy for the agent. Read-only after construction.
@@ -87,6 +83,10 @@ for writes made through its native file tools.
   Default per-run
   [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md).
   Read-only after construction.
+
+- `context_policy`:
+
+  Automatic context-management policy. Read-only.
 
 - `working_dir`:
 
@@ -106,9 +106,57 @@ for writes made through its native file tools.
 
 - [`Agent$run_sync()`](#method-Agent-run_sync)
 
+- [`Agent$chat()`](#method-Agent-chat)
+
+- [`Agent$chat_async()`](#method-Agent-chat_async)
+
+- [`Agent$chat_structured()`](#method-Agent-chat_structured)
+
+- [`Agent$chat_structured_async()`](#method-Agent-chat_structured_async)
+
+- [`Agent$stream()`](#method-Agent-stream)
+
+- [`Agent$stream_async()`](#method-Agent-stream_async)
+
+- [`Agent$last_run()`](#method-Agent-last_run)
+
+- [`Agent$last_compaction()`](#method-Agent-last_compaction)
+
+- [`Agent$resolve_tool_result()`](#method-Agent-resolve_tool_result)
+
+- [`Agent$add_turn()`](#method-Agent-add_turn)
+
+- [`Agent$get_turns()`](#method-Agent-get_turns)
+
+- [`Agent$set_turns()`](#method-Agent-set_turns)
+
+- [`Agent$get_system_prompt()`](#method-Agent-get_system_prompt)
+
+- [`Agent$set_system_prompt()`](#method-Agent-set_system_prompt)
+
+- [`Agent$get_tools()`](#method-Agent-get_tools)
+
+- [`Agent$set_tools()`](#method-Agent-set_tools)
+
+- [`Agent$get_tokens()`](#method-Agent-get_tokens)
+
+- [`Agent$get_cost()`](#method-Agent-get_cost)
+
+- [`Agent$token_count()`](#method-Agent-token_count)
+
+- [`Agent$get_provider()`](#method-Agent-get_provider)
+
+- [`Agent$get_model()`](#method-Agent-get_model)
+
+- [`Agent$set_model()`](#method-Agent-set_model)
+
 - [`Agent$register_tool()`](#method-Agent-register_tool)
 
 - [`Agent$register_tools()`](#method-Agent-register_tools)
+
+- [`Agent$on_tool_request()`](#method-Agent-on_tool_request)
+
+- [`Agent$on_tool_result()`](#method-Agent-on_tool_result)
 
 - [`Agent$add_hook()`](#method-Agent-add_hook)
 
@@ -154,8 +202,6 @@ for writes made through its native file tools.
 
 - [`Agent$mcp_status()`](#method-Agent-mcp_status)
 
-- [`Agent$run_shiny()`](#method-Agent-run_shiny)
-
 - [`Agent$run_async()`](#method-Agent-run_async)
 
 - [`Agent$clone()`](#method-Agent-clone)
@@ -174,6 +220,7 @@ Create a new Agent.
       system_prompt = NULL,
       permissions = NULL,
       usage_limits = UsageLimits(max_requests = 25),
+      context_policy = ContextPolicy(),
       enable_file_checkpointing = FALSE,
       file_checkpoint_max_file_bytes = 50 * 1024^2,
       file_checkpoint_max_journal_bytes = 250 * 1024^2,
@@ -222,6 +269,13 @@ Create a new Agent.
   [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
   for no limits.
 
+- `context_policy`:
+
+  A
+  [ContextPolicy](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
+  controlling automatic compaction and durable offloading of large tool
+  results.
+
 - `enable_file_checkpointing`:
 
   Whether to journal exact file preimages for Deputy's mutating file
@@ -268,7 +322,7 @@ A new `Agent` object
 
 ### `Agent$run()`
 
-Run an agentic task with streaming output.
+Run an agentic task with semantic streaming events.
 
 Returns a generator that yields
 [AgentEvent](https://jameshwade.github.io/deputy/reference/AgentEvent.md)
@@ -373,6 +427,497 @@ object
 
 ------------------------------------------------------------------------
 
+### `Agent$chat()`
+
+Send messages synchronously using the ellmer Chat interface.
+
+All requests pass through Deputy's run kernel. The return value matches
+`ellmer::Chat$chat()`; inspect
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
+metadata with `$last_run()`.
+
+#### Usage
+
+    Agent$chat(..., echo = NULL)
+
+#### Arguments
+
+- `...`:
+
+  User content accepted by ellmer.
+
+- `echo`:
+
+  Accepted for ellmer compatibility.
+
+#### Returns
+
+The final assistant text.
+
+------------------------------------------------------------------------
+
+### `Agent$chat_async()`
+
+Send messages asynchronously using the ellmer Chat interface.
+
+#### Usage
+
+    Agent$chat_async(..., tool_mode = c("concurrent", "sequential"))
+
+#### Arguments
+
+- `...`:
+
+  User content accepted by ellmer.
+
+- `tool_mode`:
+
+  Whether ellmer executes tool calls concurrently or sequentially.
+
+#### Returns
+
+A promise resolving to the final assistant text.
+
+------------------------------------------------------------------------
+
+### `Agent$chat_structured()`
+
+Send a structured request through the governed run kernel.
+
+#### Usage
+
+    Agent$chat_structured(..., type, echo = "none", convert = TRUE)
+
+#### Arguments
+
+- `...`:
+
+  User content accepted by ellmer.
+
+- `type`:
+
+  An ellmer structured-output type.
+
+- `echo`:
+
+  Echo mode forwarded to ellmer.
+
+- `convert`:
+
+  Whether ellmer converts the structured response.
+
+#### Returns
+
+Structured response data.
+
+------------------------------------------------------------------------
+
+### `Agent$chat_structured_async()`
+
+Send an asynchronous structured request through Deputy.
+
+#### Usage
+
+    Agent$chat_structured_async(..., type, echo = "none", convert = TRUE)
+
+#### Arguments
+
+- `...`:
+
+  User content accepted by ellmer.
+
+- `type`:
+
+  An ellmer structured-output type.
+
+- `echo`:
+
+  Echo mode forwarded to ellmer.
+
+- `convert`:
+
+  Whether ellmer converts the structured response.
+
+#### Returns
+
+A promise resolving to structured response data.
+
+------------------------------------------------------------------------
+
+### `Agent$stream()`
+
+Stream synchronously using the ellmer Chat interface.
+
+#### Usage
+
+    Agent$stream(..., stream = c("text", "content"), controller = NULL)
+
+#### Arguments
+
+- `...`:
+
+  User content accepted by ellmer.
+
+- `stream`:
+
+  Yield text or semantic ellmer content.
+
+- `controller`:
+
+  Optional ellmer stream controller.
+
+#### Returns
+
+A synchronous generator.
+
+------------------------------------------------------------------------
+
+### `Agent$stream_async()`
+
+Stream asynchronously using the ellmer Chat interface.
+
+This is the primary interface for shinychat. It returns the same content
+stream as ellmer while enforcing Deputy permissions, hooks, limits,
+workspace resolution, context management, and run accounting.
+
+#### Usage
+
+    Agent$stream_async(
+      ...,
+      tool_mode = c("concurrent", "sequential"),
+      stream = c("text", "content"),
+      controller = NULL
+    )
+
+#### Arguments
+
+- `...`:
+
+  User content accepted by ellmer, including shinychat's list of
+  attachment-enabled `Content` objects.
+
+- `tool_mode`:
+
+  Whether ellmer executes tool calls concurrently or sequentially.
+
+- `stream`:
+
+  Yield text or semantic ellmer content.
+
+- `controller`:
+
+  Optional ellmer stream controller.
+
+#### Returns
+
+An asynchronous generator suitable for
+[`shinychat::chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
+
+------------------------------------------------------------------------
+
+### `Agent$last_run()`
+
+Return the most recently completed governed run.
+
+#### Usage
+
+    Agent$last_run()
+
+#### Returns
+
+An
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md),
+or `NULL` before the first run completes.
+
+------------------------------------------------------------------------
+
+### `Agent$last_compaction()`
+
+Return the most recent compaction outcome.
+
+#### Usage
+
+    Agent$last_compaction()
+
+#### Returns
+
+A `DeputyCompaction`, or `NULL` before compaction occurs.
+
+------------------------------------------------------------------------
+
+### `Agent$resolve_tool_result()`
+
+Resolve a durable tool-result reference.
+
+#### Usage
+
+    Agent$resolve_tool_result(reference)
+
+#### Arguments
+
+- `reference`:
+
+  A `deputy://tool-result/...` URI or reference text emitted into model
+  context.
+
+#### Returns
+
+The complete original R value.
+
+------------------------------------------------------------------------
+
+### `Agent$add_turn()`
+
+Add a user/assistant turn pair, as in ellmer Chat.
+
+#### Usage
+
+    Agent$add_turn(user, assistant, log_tokens = TRUE)
+
+#### Arguments
+
+- `user`:
+
+  User turn or content.
+
+- `assistant`:
+
+  Assistant turn or content.
+
+- `log_tokens`:
+
+  Whether ellmer should log token metadata.
+
+#### Returns
+
+Invisible self.
+
+------------------------------------------------------------------------
+
+### `Agent$get_turns()`
+
+Return conversation turns, as in ellmer Chat.
+
+#### Usage
+
+    Agent$get_turns(include_system_prompt = FALSE)
+
+#### Arguments
+
+- `include_system_prompt`:
+
+  Include the system prompt as a turn.
+
+#### Returns
+
+A list of ellmer turns.
+
+------------------------------------------------------------------------
+
+### `Agent$set_turns()`
+
+Replace conversation turns, as in ellmer Chat.
+
+#### Usage
+
+    Agent$set_turns(value)
+
+#### Arguments
+
+- `value`:
+
+  A list of ellmer turns.
+
+#### Returns
+
+Invisible self.
+
+------------------------------------------------------------------------
+
+### `Agent$get_system_prompt()`
+
+Return the system prompt, as in ellmer Chat.
+
+#### Usage
+
+    Agent$get_system_prompt()
+
+#### Returns
+
+The system prompt or `NULL`.
+
+------------------------------------------------------------------------
+
+### `Agent$set_system_prompt()`
+
+Replace the system prompt, as in ellmer Chat.
+
+#### Usage
+
+    Agent$set_system_prompt(value)
+
+#### Arguments
+
+- `value`:
+
+  The new system prompt or `NULL`.
+
+#### Returns
+
+Invisible self.
+
+------------------------------------------------------------------------
+
+### `Agent$get_tools()`
+
+Return registered tools, as in ellmer Chat.
+
+#### Usage
+
+    Agent$get_tools()
+
+#### Returns
+
+A named list of ellmer tool definitions.
+
+------------------------------------------------------------------------
+
+### `Agent$set_tools()`
+
+Replace registered tools, preserving Deputy adaptation.
+
+#### Usage
+
+    Agent$set_tools(tools)
+
+#### Arguments
+
+- `tools`:
+
+  A list of ellmer tool definitions.
+
+#### Returns
+
+Invisible self.
+
+------------------------------------------------------------------------
+
+### `Agent$get_tokens()`
+
+Return provider token records, as in ellmer Chat.
+
+#### Usage
+
+    Agent$get_tokens(include_system_prompt = NULL)
+
+#### Arguments
+
+- `include_system_prompt`:
+
+  Deprecated ellmer compatibility argument.
+
+#### Returns
+
+A token data frame.
+
+------------------------------------------------------------------------
+
+### `Agent$get_cost()`
+
+Return provider cost records, as in ellmer Chat.
+
+#### Usage
+
+    Agent$get_cost(include = c("all", "last"))
+
+#### Arguments
+
+- `include`:
+
+  Return all costs or only the latest request.
+
+#### Returns
+
+Provider cost information.
+
+------------------------------------------------------------------------
+
+### `Agent$token_count()`
+
+Estimate tokens, as in ellmer Chat.
+
+#### Usage
+
+    Agent$token_count(..., include = c("new", "complete"), type = NULL)
+
+#### Arguments
+
+- `...`:
+
+  User content accepted by ellmer.
+
+- `include`:
+
+  Count only new content or the complete context.
+
+- `type`:
+
+  Optional provider content type.
+
+#### Returns
+
+Estimated token count.
+
+------------------------------------------------------------------------
+
+### `Agent$get_provider()`
+
+Return the ellmer provider.
+
+#### Usage
+
+    Agent$get_provider()
+
+#### Returns
+
+An ellmer provider object.
+
+------------------------------------------------------------------------
+
+### `Agent$get_model()`
+
+Return the configured model name.
+
+#### Usage
+
+    Agent$get_model()
+
+#### Returns
+
+Model identifier.
+
+------------------------------------------------------------------------
+
+### `Agent$set_model()`
+
+Replace the configured model.
+
+#### Usage
+
+    Agent$set_model(model)
+
+#### Arguments
+
+- `model`:
+
+  Model identifier.
+
+#### Returns
+
+Invisible self.
+
+------------------------------------------------------------------------
+
 ### `Agent$register_tool()`
 
 Register a tool with the agent.
@@ -412,6 +957,46 @@ Register multiple tools with the agent.
 #### Returns
 
 Invisible self for chaining
+
+------------------------------------------------------------------------
+
+### `Agent$on_tool_request()`
+
+Register an additional ellmer tool-request observer.
+
+#### Usage
+
+    Agent$on_tool_request(callback)
+
+#### Arguments
+
+- `callback`:
+
+  A function with one `request` argument.
+
+#### Returns
+
+A function that removes the observer.
+
+------------------------------------------------------------------------
+
+### `Agent$on_tool_result()`
+
+Register an additional ellmer tool-result observer.
+
+#### Usage
+
+    Agent$on_tool_result(callback)
+
+#### Arguments
+
+- `callback`:
+
+  A function with one `result` argument.
+
+#### Returns
+
+A function that removes the observer.
 
 ------------------------------------------------------------------------
 
@@ -475,7 +1060,7 @@ Get the last turn in the conversation.
 
 #### Usage
 
-    Agent$last_turn(role = "assistant")
+    Agent$last_turn(role = c("assistant", "user", "system"))
 
 #### Arguments
 
@@ -634,6 +1219,10 @@ The session file contains:
 
 - System prompt
 
+- The cumulative compaction summary
+
+- Portable copies of offloaded tool results
+
 - Effective run context
 
 - File checkpoint state, when enabled
@@ -665,7 +1254,9 @@ Load a session from an RDS file.
 Tools, permissions, hooks, and the working directory are runtime policy
 and are never restored from a session file. Saved run context is
 validated before conversation state changes and merged with constructor
-context; protected identity conflicts fail the load.
+context; protected identity conflicts fail the load. Compaction
+summaries and integrity-checked tool-result envelopes are restored as
+conversational state under the receiving Agent's session identity.
 
 #### Returns
 
@@ -743,19 +1334,38 @@ usage.
 
 #### Usage
 
-    Agent$compact(keep_last = 4, summary = NULL)
+    Agent$compact(
+      keep_last = NULL,
+      summary = NULL,
+      fallback = self$context_policy$fallback,
+      automatic = FALSE,
+      estimated_tokens = NULL
+    )
 
 #### Arguments
 
 - `keep_last`:
 
-  Number of recent turns to keep uncompacted (default: 4)
+  Number of recent turns to retain. `NULL` chooses a complete
+  conversational boundary using the context policy's token target.
 
 - `summary`:
 
   Optional custom summary to use instead of auto-generating. If NULL,
   the LLM will generate a summary focusing on key decisions, findings,
   files discussed, and task progress.
+
+- `fallback`:
+
+  What to do when LLM summary generation fails.
+
+- `automatic`:
+
+  Whether the run kernel triggered this compaction.
+
+- `estimated_tokens`:
+
+  Optional pre-compaction token estimate.
 
 #### Details
 
@@ -770,12 +1380,13 @@ The compaction process:
 
 4.  Keeps only the most recent `keep_last` turns
 
-If LLM summarization fails (e.g., no API key), falls back to a simple
-text-based summary with truncated turn contents.
+LLM summary-generation failures are errors by default. A deterministic
+truncated-text summary is used only when `fallback = "text"` is
+explicitly configured. The returned object records that degraded method.
 
 #### Returns
 
-Invisible self
+A `DeputyCompaction` describing the method and usage.
 
 ------------------------------------------------------------------------
 
@@ -888,64 +1499,14 @@ Data frame describing MCP load attempts and registered tools
 
 ------------------------------------------------------------------------
 
-### `Agent$run_shiny()`
-
-Run an agentic task for use in Shiny applications with shinychat.
-
-Returns an async content stream suitable for passing to
-[`shinychat::chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
-Unlike `run()` and `run_sync()`, the multi-turn loop is driven by
-ellmer's `stream_async()` rather than deputy's own generator. Deputy's
-permissions, hooks, and observable
-[UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
-are still enforced via callbacks and terminal accounting. File tools
-must use absolute paths within `working_dir`; rejected calls still count
-toward tool usage.
-
-#### Usage
-
-    Agent$run_shiny(prompt, max_tool_calls = NULL, run_context = list())
-
-#### Arguments
-
-- `prompt`:
-
-  The user message to send
-
-- `max_tool_calls`:
-
-  Maximum number of tool calls before stopping. Overrides
-  `usage_limits$max_tool_calls`; otherwise falls back to that value
-  or 25. This counts individual tool call requests, not LLM turns (one
-  turn can have multiple parallel calls).
-
-- `run_context`:
-
-  Canonical JSON-compatible context to add to or narrow for this run.
-  Protected constructor identity fields cannot change.
-
-#### Returns
-
-An async content stream suitable for
-[`shinychat::chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
-
-------------------------------------------------------------------------
-
 ### `Agent$run_async()`
 
 Run an agentic task asynchronously and resolve to an
 [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md).
 
-Like `run_shiny()`, the multi-turn loop is driven by ellmer's
-`stream_async()`, so the R process is never blocked while the model or
-tools work: other Shiny sessions, `later` callbacks, and promise chains
-keep running. Unlike `run_shiny()`, nothing is streamed to a UI. The
-returned promise resolves once the run stops and carries the final
-response, run-scoped usage, and stop reason. Permissions, hooks, and
-[UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
-are enforced as in `run_shiny()` (callbacks plus terminal accounting).
-File tools may use relative paths resolved against `working_dir`, as in
-`run()`; the absolute-path rule is specific to `run_shiny()`.
+Uses the same run kernel as `$stream_async()`, `$stream()`, `$chat()`,
+and `$run_sync()`. It collects the final response and run metadata
+rather than returning the content stream.
 
 Use this when an Agent is a *worker* inside a larger async system, for
 example a delegated sub-agent executed from the tool of a parent chat
