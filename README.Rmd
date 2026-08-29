@@ -49,9 +49,9 @@ ellmer Chat + Tools + Permissions + Limits
         AgentResult + Events + Checkpoints
 ```
 
-The Agent itself keeps ellmer's chat shape. Use `agent$chat()` and
-`agent$stream()` in synchronous code, or pass `agent$stream_async()` directly
-to `shinychat::chat_append()`. Those paths use the same governed kernel as
+The Agent itself implements ellmer's Chat protocol. Use `agent$chat()` and
+`agent$stream()` in synchronous code, or pass the Agent directly to
+`shinychat::chat_server()`. Those paths use the same governed kernel as
 `run_sync()` and `run_async()`; the latter pair return richer `AgentResult`
 metadata when the host needs to inspect the run.
 

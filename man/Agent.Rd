@@ -123,6 +123,8 @@ agent$add_hook(HookMatcher$new(
     \item \href{#method-Agent-run_sync}{\code{Agent$run_sync()}}
     \item \href{#method-Agent-chat}{\code{Agent$chat()}}
     \item \href{#method-Agent-chat_async}{\code{Agent$chat_async()}}
+    \item \href{#method-Agent-chat_structured}{\code{Agent$chat_structured()}}
+    \item \href{#method-Agent-chat_structured_async}{\code{Agent$chat_structured_async()}}
     \item \href{#method-Agent-stream}{\code{Agent$stream()}}
     \item \href{#method-Agent-stream_async}{\code{Agent$stream_async()}}
     \item \href{#method-Agent-last_run}{\code{Agent$last_run()}}
@@ -143,6 +145,8 @@ agent$add_hook(HookMatcher$new(
     \item \href{#method-Agent-set_model}{\code{Agent$set_model()}}
     \item \href{#method-Agent-register_tool}{\code{Agent$register_tool()}}
     \item \href{#method-Agent-register_tools}{\code{Agent$register_tools()}}
+    \item \href{#method-Agent-on_tool_request}{\code{Agent$on_tool_request()}}
+    \item \href{#method-Agent-on_tool_result}{\code{Agent$on_tool_result()}}
     \item \href{#method-Agent-add_hook}{\code{Agent$add_hook()}}
     \item \href{#method-Agent-turns}{\code{Agent$turns()}}
     \item \href{#method-Agent-last_turn}{\code{Agent$last_turn()}}
@@ -359,6 +363,56 @@ sequentially.}
   }
   \subsection{Returns}{
     A promise resolving to the final assistant text.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-chat_structured"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-chat_structured}{}}}
+\subsection{\code{Agent$chat_structured()}}{
+  Send a structured request through the governed run kernel.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$chat_structured(..., type, echo = "none", convert = TRUE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{...}}{User content accepted by ellmer.}
+      \item{\code{type}}{An ellmer structured-output type.}
+      \item{\code{echo}}{Echo mode forwarded to ellmer.}
+      \item{\code{convert}}{Whether ellmer converts the structured response.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Structured response data.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-chat_structured_async"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-chat_structured_async}{}}}
+\subsection{\code{Agent$chat_structured_async()}}{
+  Send an asynchronous structured request through Deputy.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$chat_structured_async(..., type, echo = "none", convert = TRUE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{...}}{User content accepted by ellmer.}
+      \item{\code{type}}{An ellmer structured-output type.}
+      \item{\code{echo}}{Echo mode forwarded to ellmer.}
+      \item{\code{convert}}{Whether ellmer converts the structured response.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A promise resolving to structured response data.
   }
 }
 
@@ -782,6 +836,50 @@ emitted into model context.}
 }
 
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-on_tool_request"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-on_tool_request}{}}}
+\subsection{\code{Agent$on_tool_request()}}{
+  Register an additional ellmer tool-request observer.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$on_tool_request(callback)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{callback}}{A function with one \code{request} argument.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A function that removes the observer.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-on_tool_result"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-on_tool_result}{}}}
+\subsection{\code{Agent$on_tool_result()}}{
+  Register an additional ellmer tool-result observer.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$on_tool_result(callback)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{callback}}{A function with one \code{result} argument.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A function that removes the observer.
+  }
+}
+
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-add_hook"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-add_hook}{}}}
 \subsection{\code{Agent$add_hook()}}{
@@ -845,7 +943,7 @@ agent$add_hook(HookMatcher$new(
   Get the last turn in the conversation.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$last_turn(role = "assistant")}
+    \preformatted{Agent$last_turn(role = c("assistant", "user", "system"))}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -1139,7 +1237,7 @@ target.}
       \item{\code{summary}}{Optional custom summary to use instead of auto-generating.
 If NULL, the LLM will generate a summary focusing on key decisions,
 findings, files discussed, and task progress.}
-      \item{\code{fallback}}{What to do when LLM summarization fails.}
+      \item{\code{fallback}}{What to do when LLM summary generation fails.}
       \item{\code{automatic}}{Whether the run kernel triggered this compaction.}
       \item{\code{estimated_tokens}}{Optional pre-compaction token estimate.}
     }
@@ -1154,7 +1252,7 @@ findings, files discussed, and task progress.}
 \item Keeps only the most recent \code{keep_last} turns
 }
 
-LLM summarization failures are errors by default. A deterministic
+LLM summary-generation failures are errors by default. A deterministic
 truncated-text summary is used only when \code{fallback = "text"} is
 explicitly configured. The returned object records that degraded method.
   }

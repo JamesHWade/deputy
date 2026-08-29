@@ -19,7 +19,7 @@ compaction. Use \code{NULL} to disable automatic compaction.}
 \item{compact_to}{Fraction of \code{max_tokens} that the retained recent context
 should occupy after compaction.}
 
-\item{fallback}{What to do when LLM summarization fails. \code{"error"} fails
+\item{fallback}{What to do when LLM summary generation fails. \code{"error"} fails
 closed; \code{"text"} uses a deterministic truncated-text summary.}
 
 \item{max_tool_result_bytes}{Serialized size above which a tool result is

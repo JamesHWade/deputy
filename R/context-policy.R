@@ -12,7 +12,7 @@
 #'   compaction. Use `NULL` to disable automatic compaction.
 #' @param compact_to Fraction of `max_tokens` that the retained recent context
 #'   should occupy after compaction.
-#' @param fallback What to do when LLM summarization fails. `"error"` fails
+#' @param fallback What to do when LLM summary generation fails. `"error"` fails
 #'   closed; `"text"` uses a deterministic truncated-text summary.
 #' @param max_tool_result_bytes Serialized size above which a tool result is
 #'   stored outside the model context. Use `NULL` to disable result offloading.
@@ -76,9 +76,25 @@ context_policy_whole_number <- function(value, argument) {
       is.na(value) ||
       !is.finite(value) ||
       value < 1 ||
-      value != as.integer(value)
+      value > .Machine$integer.max ||
+      value != floor(value)
   ) {
     cli_abort("{.arg {argument}} must be NULL or one positive whole number")
+  }
+  as.integer(value)
+}
+
+context_policy_nonnegative_whole_number <- function(value, argument) {
+  if (
+    !is.numeric(value) ||
+      length(value) != 1L ||
+      is.na(value) ||
+      !is.finite(value) ||
+      value < 0 ||
+      value > .Machine$integer.max ||
+      value != floor(value)
+  ) {
+    cli_abort("{.arg {argument}} must be one non-negative whole number")
   }
   as.integer(value)
 }

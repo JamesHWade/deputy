@@ -37,6 +37,8 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_turn"><a href='../../deputy/html/Agent.html#method-Agent-add_turn'><code>Agent$add_turn()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat"><a href='../../deputy/html/Agent.html#method-Agent-chat'><code>Agent$chat()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_async"><a href='../../deputy/html/Agent.html#method-Agent-chat_async'><code>Agent$chat_async()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_structured"><a href='../../deputy/html/Agent.html#method-Agent-chat_structured'><code>Agent$chat_structured()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_structured_async"><a href='../../deputy/html/Agent.html#method-Agent-chat_structured_async'><code>Agent$chat_structured_async()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="checkpoint"><a href='../../deputy/html/Agent.html#method-Agent-checkpoint'><code>Agent$checkpoint()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href='../../deputy/html/Agent.html#method-Agent-compact'><code>Agent$compact()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href='../../deputy/html/Agent.html#method-Agent-cost'><code>Agent$cost()</code></a></span></li>
@@ -58,6 +60,8 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_skill"><a href='../../deputy/html/Agent.html#method-Agent-load_skill'><code>Agent$load_skill()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_status"><a href='../../deputy/html/Agent.html#method-Agent-mcp_status'><code>Agent$mcp_status()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_tools"><a href='../../deputy/html/Agent.html#method-Agent-mcp_tools'><code>Agent$mcp_tools()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="on_tool_request"><a href='../../deputy/html/Agent.html#method-Agent-on_tool_request'><code>Agent$on_tool_request()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="on_tool_result"><a href='../../deputy/html/Agent.html#method-Agent-on_tool_result'><code>Agent$on_tool_result()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="provider"><a href='../../deputy/html/Agent.html#method-Agent-provider'><code>Agent$provider()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tool"><a href='../../deputy/html/Agent.html#method-Agent-register_tool'><code>Agent$register_tool()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tools"><a href='../../deputy/html/Agent.html#method-Agent-register_tools'><code>Agent$register_tools()</code></a></span></li>

@@ -83,7 +83,7 @@
 #'
 #' **PreCompact** - Before conversation compaction
 #'
-#' Callback signature: `function(turns_to_compact, turns_to_keep, context)`
+#' Hook signature: `function(turns_to_compact, turns_to_keep, context)`
 #' - `turns_to_compact`: List of turns that will be compacted into a summary
 #' - `turns_to_keep`: List of recent turns that will be preserved
 #' - `context`: Common correlation fields plus `total_turns` and `compact_count`
@@ -91,7 +91,7 @@
 #'
 #' **PostCompact** - After conversation compaction
 #'
-#' Callback signature: `function(result, context)`
+#' Hook signature: `function(result, context)`
 #' - `result`: The `DeputyCompaction` outcome, including method and usage
 #' - `context`: Common correlation fields plus `compact_count` and `automatic`
 #' - Return: NULL (informational only)

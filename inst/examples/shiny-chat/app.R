@@ -26,16 +26,9 @@ server <- function(input, output, session) {
   )
   agent$add_hook(hook_log_tools(verbose = TRUE))
 
-  # Agent is a drop-in ellmer chat for shinychat. The native stream still
-  # passes through Deputy's permissions, hooks, limits, and accounting.
-  observeEvent(input$chat_user_input, {
-    req(input$chat_user_input)
-
-    chat_append(
-      "chat",
-      agent$stream_async(input$chat_user_input)
-    )
-  })
+  # Agent is a drop-in ellmer chat. shinychat owns input, attachments,
+  # cancellation, and history while Deputy governs every run.
+  chat_server("chat", agent)
 }
 
 shinyApp(ui, server)

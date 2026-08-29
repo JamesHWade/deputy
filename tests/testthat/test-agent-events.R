@@ -454,7 +454,7 @@ test_that("pre-tool effects are applied before a real hook rejection", {
   )
 
   rejection <- tryCatch(
-    agent$.__enclos_env__$private$on_tool_request(request),
+    agent$.__enclos_env__$private$handle_tool_request(request),
     ellmer_tool_reject = function(error) error
   )
 
@@ -485,7 +485,7 @@ test_that("malformed tool identity is rejected before permission checks", {
   attr(request, "name") <- list("run_bash")
 
   expect_snapshot(
-    agent$.__enclos_env__$private$on_tool_request(request),
+    agent$.__enclos_env__$private$handle_tool_request(request),
     error = TRUE
   )
 

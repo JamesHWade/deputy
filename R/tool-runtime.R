@@ -12,50 +12,54 @@ native_file_tool_names <- c(
   "read_csv"
 )
 
-runtime_wrap_tool <- function(tool, agent) {
+runtime_wrap_tool <- function(tool, resolve_arguments, process_result) {
   if (!inherits(tool, "ellmer::ToolDef")) {
     cli_abort("{.arg tool} must be an ellmer tool definition")
   }
-  if (isTRUE(attr(tool, "deputy_runtime_tool"))) {
-    return(tool)
+  if (!is.function(resolve_arguments) || !is.function(process_result)) {
+    cli_abort("Runtime tool adapters must be functions")
+  }
+
+  source_tool <- attr(tool, "deputy_runtime_source_tool", exact = TRUE)
+  if (is.null(source_tool)) {
+    source_tool <- tool
   }
 
   wrapper_env <- rlang::env(
-    original = tool,
-    agent = agent,
-    tool_name = tool@name
+    original = source_tool,
+    resolve_arguments = resolve_arguments,
+    process_result = process_result,
+    tool_name = source_tool@name
   )
   wrapper <- rlang::new_function(
-    formals(tool),
+    formals(source_tool),
     quote({
       arguments <- as.list(environment(), all.names = TRUE)
-      arguments <- agent$.__enclos_env__$private$resolve_tool_arguments(
+      arguments <- resolve_arguments(
         tool_name,
         arguments
       )
       value <- do.call(original, arguments)
       if (promises::is.promising(value)) {
         return(promises::then(value, function(resolved) {
-          agent$.__enclos_env__$private$offload_tool_result(
-            tool_name,
-            resolved
-          )
+          process_result(tool_name, resolved)
         }))
       }
-      agent$.__enclos_env__$private$offload_tool_result(tool_name, value)
+      process_result(tool_name, value)
     }),
     wrapper_env
   )
 
   wrapped <- ellmer::tool(
     fun = wrapper,
-    name = tool@name,
-    description = tool@description,
-    arguments = tool@arguments@properties,
-    convert = tool@convert,
-    annotations = tool@annotations
+    name = source_tool@name,
+    description = source_tool@description,
+    arguments = source_tool@arguments@properties,
+    convert = source_tool@convert,
+    annotations = source_tool@annotations
   )
   attr(wrapped, "deputy_runtime_tool") <- TRUE
+  attr(wrapped, "deputy_runtime_source_tool") <- source_tool
   wrapped
 }
 
@@ -139,6 +143,7 @@ offload_tool_result <- function(
     uri = paste0("deputy://tool-result/", result_id),
     bytes = bytes,
     sha256 = sha256,
+    preview = tool_result_preview(value),
     path = path
   )
 }
@@ -149,8 +154,125 @@ tool_result_reference_text <- function(record) {
     paste0("reference: ", record$uri),
     paste0("bytes: ", record$bytes),
     paste0("sha256: ", record$sha256),
-    "Use Agent$resolve_tool_result(reference) to retrieve the complete value.",
+    paste0("preview:\n", record$preview),
+    paste0(
+      "Call deputy_read_tool_result(reference, offset) for bounded chunks; ",
+      "the host can recover the R value with Agent$resolve_tool_result()."
+    ),
     sep = "\n"
+  )
+}
+
+tool_result_model_text <- function(value) {
+  if (is.character(value)) {
+    return(paste(value, collapse = "\n"))
+  }
+  paste(utils::capture.output(dput(value)), collapse = "\n")
+}
+
+tool_result_preview <- function(value, max_chars = 4000L) {
+  text <- tool_result_model_text(value)
+  if (nchar(text, type = "chars") <= max_chars) {
+    return(text)
+  }
+  paste0(substr(text, 1L, max_chars), "\n[preview truncated]")
+}
+
+read_tool_result_envelope <- function(reference, policy, session_id) {
+  result_id <- parse_tool_result_reference(reference)
+  path <- file.path(
+    tool_result_offload_dir(policy, session_id),
+    paste0(result_id, ".rds")
+  )
+  if (!file.exists(path)) {
+    cli_abort("Offloaded tool result not found: {.val {result_id}}")
+  }
+
+  envelope <- readRDS(path)
+  valid <- is.list(envelope) &&
+    identical(envelope$schema_version, 1L) &&
+    identical(envelope$id, result_id) &&
+    identical(envelope$session_id, session_id) &&
+    identical(
+      digest::digest(
+        serialize(envelope$value, NULL, version = 3),
+        algo = "sha256",
+        serialize = FALSE
+      ),
+      envelope$sha256
+    )
+  if (!isTRUE(valid)) {
+    cli_abort("Offloaded tool result failed integrity validation")
+  }
+  envelope
+}
+
+read_tool_result_chunk <- function(
+  reference,
+  offset,
+  max_chars,
+  policy,
+  session_id
+) {
+  offset <- context_policy_nonnegative_whole_number(offset, "offset")
+  max_chars <- context_policy_whole_number(max_chars, "max_chars")
+  if (max_chars > 16384L) {
+    cli_abort("{.arg max_chars} must not exceed 16384")
+  }
+
+  envelope <- read_tool_result_envelope(reference, policy, session_id)
+  text <- tool_result_model_text(envelope$value)
+  total_chars <- nchar(text, type = "chars")
+  if (offset > total_chars) {
+    cli_abort("{.arg offset} exceeds the result length of {total_chars}")
+  }
+  chunk <- substr(
+    text,
+    offset + 1L,
+    min(total_chars, offset + max_chars)
+  )
+  next_offset <- offset + nchar(chunk, type = "chars")
+  paste(
+    paste0("reference: deputy://tool-result/", envelope$id),
+    paste0("offset: ", offset),
+    paste0("next_offset: ", next_offset),
+    paste0("total_chars: ", total_chars),
+    paste0("complete: ", next_offset >= total_chars),
+    "content:",
+    chunk,
+    sep = "\n"
+  )
+}
+
+tool_result_reader_tool <- function(read_chunk) {
+  ellmer::tool(
+    fun = function(reference, offset = 0L, max_chars = 8192L) {
+      read_chunk(reference, offset, max_chars)
+    },
+    name = "deputy_read_tool_result",
+    description = paste(
+      "Read a bounded chunk of a large tool result offloaded by Deputy.",
+      "Use next_offset to continue until complete is true."
+    ),
+    arguments = list(
+      reference = ellmer::type_string(
+        "The deputy://tool-result reference returned by a tool."
+      ),
+      offset = ellmer::type_integer(
+        "Zero-based character offset.",
+        required = FALSE
+      ),
+      max_chars = ellmer::type_integer(
+        "Maximum characters to return, up to 16384.",
+        required = FALSE
+      )
+    ),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      destructive_hint = FALSE,
+      open_world_hint = FALSE,
+      idempotent_hint = TRUE
+    )
   )
 }
 

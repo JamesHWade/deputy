@@ -221,13 +221,22 @@ create_mock_chat <- function(responses = list("Hello!")) {
 
 create_mock_callback_manager <- function(callbacks = list()) {
   state <- new.env(parent = emptyenv())
-  state$callbacks <- callbacks
+  state$callbacks <- stats::setNames(
+    callbacks,
+    as.character(seq_along(callbacks))
+  )
+  state$next_id <- length(callbacks) + 1L
 
   structure(
     list(
       add = function(callback) {
-        state$callbacks <- c(state$callbacks, list(callback))
-        invisible(NULL)
+        id <- as.character(state$next_id)
+        state$next_id <- state$next_id + 1L
+        state$callbacks[[id]] <- callback
+        invisible(function() {
+          state$callbacks[[id]] <- NULL
+          invisible(NULL)
+        })
       },
       clear = function() {
         state$callbacks <- list()

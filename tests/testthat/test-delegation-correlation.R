@@ -452,7 +452,7 @@ test_that("denied delegation requests do not leave stale correlation", {
   )
 
   rejection <- tryCatch(
-    lead$.__enclos_env__$private$on_tool_request(request),
+    lead$.__enclos_env__$private$handle_tool_request(request),
     ellmer_tool_reject = identity
   )
 

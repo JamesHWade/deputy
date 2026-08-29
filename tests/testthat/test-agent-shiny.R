@@ -21,15 +21,15 @@ test_that("on_tool_request enforces tool_call_limit", {
   )
 
   # First two calls should pass (count goes to 1, then 2)
-  expect_no_error(agent$.__enclos_env__$private$on_tool_request(request))
+  expect_no_error(agent$.__enclos_env__$private$handle_tool_request(request))
   expect_equal(agent$.__enclos_env__$private$tool_call_count, 1L)
 
-  expect_no_error(agent$.__enclos_env__$private$on_tool_request(request))
+  expect_no_error(agent$.__enclos_env__$private$handle_tool_request(request))
   expect_equal(agent$.__enclos_env__$private$tool_call_count, 2L)
 
   # Third call exceeds limit -- should call tool_reject
   expect_error(
-    agent$.__enclos_env__$private$on_tool_request(request),
+    agent$.__enclos_env__$private$handle_tool_request(request),
     "Tool call limit reached"
   )
 })
@@ -52,7 +52,7 @@ test_that("on_tool_request enforces cost limit in callback mode", {
 
   # mock_chat returns cost = 0.001 which matches the limit
   expect_error(
-    agent$.__enclos_env__$private$on_tool_request(request),
+    agent$.__enclos_env__$private$handle_tool_request(request),
     "estimated cost"
   )
 })
@@ -71,7 +71,7 @@ test_that("on_tool_request skips limit checks when tool_call_limit is NULL", {
 
   # Should not increment or check limits
 
-  expect_no_error(agent$.__enclos_env__$private$on_tool_request(request))
+  expect_no_error(agent$.__enclos_env__$private$handle_tool_request(request))
   expect_equal(agent$.__enclos_env__$private$tool_call_count, 0L)
 })
 

@@ -64,49 +64,48 @@ server <- function(input, output, session) {
     working_dir = workspace
   )
 
-  observeEvent(input$chat_user_input, {
-    req(input$chat_user_input)
-    chat_append(
-      "chat",
-      agent$stream_async(input$chat_user_input)
-    )
-  })
+  chat_server("chat", agent)
 }
 
 shinyApp(ui, server)
 ```
 
-`input$chat_user_input` may be a string or shinychat's list of ellmer content
-objects for attachments. Deputy forwards it unchanged.
+`chat_server()` passes both plain text and attachment-enabled ellmer content to
+the Agent unchanged. It also supplies shinychat history and cancellation around
+Deputy's governed stream.
 
 ## What the Agent Adds
 
-Every public execution method uses the same kernel:
+Every public chat and run method uses the same kernel:
 
 | Method | Native return | Typical host |
 |---|---|---|
 | `chat()` | final text | scripts and consoles |
 | `chat_async()` | promise of final text | async applications |
+| `chat_structured()` / `chat_structured_async()` | typed data | structured-output hosts |
 | `stream()` | synchronous ellmer stream | terminal hosts |
 | `stream_async()` | asynchronous ellmer stream | shinychat |
 | `run_sync()` | `AgentResult` | inspected workflows |
-| `run_async()` | promise of `AgentResult` | delegated workers |
+| `run_async()` | promise of `AgentResult` | subagents |
 
-All six enforce the Agent's permissions, hooks, `UsageLimits`, workspace path
+All interfaces enforce the Agent's permissions, hooks, `UsageLimits`, workspace path
 resolution, file checkpoints, automatic context compaction, large-result
 offloading, and run accounting. Native relative file paths resolve against the
 Agent's immutable `working_dir`; Deputy never changes the process working
 directory.
 
-`ContextPolicy()` compacts before the estimated complete context crosses its
-token threshold. The default fails closed if LLM summarization fails. Set
+`ContextPolicy()` checks the estimated complete context before a run and again
+between provider tool turns, compacting whenever it crosses the token
+threshold. The default fails closed if LLM summary generation fails. Set
 `fallback = "text"` only when a deterministic degraded summary is acceptable.
-`agent$last_compaction()` reports which method was used and the summarization
+`agent$last_compaction()` reports which method was used and the compaction
 usage.
 
 Large tool results are stored as integrity-checked envelopes and replaced in
-model context with a `deputy://tool-result/...` reference. Applications can
-retrieve the original R value with `agent$resolve_tool_result(reference)`.
+model context with a preview and `deputy://tool-result/...` reference. The
+Agent registers `deputy_read_tool_result()` so the model can page through the
+stored result in bounded chunks. Applications can retrieve the original R
+value with `agent$resolve_tool_result(reference)`.
 
 ## Hooks and Cancellation
 
@@ -118,7 +117,7 @@ agent$add_hook(hook_log_tools(verbose = TRUE))
 agent$add_hook(HookMatcher$new(
   event = "PostCompact",
   callback = function(result, context) {
-    message("Compacted with: ", result$method)
+    cli::cli_inform("Compacted with: {result$method}")
   }
 ))
 ```
@@ -127,9 +126,9 @@ agent$add_hook(HookMatcher$new(
 chat UI. shinychat cancellation propagates through ellmer's stream controller;
 Deputy still finalizes checkpoints and fires `Stop` and `SessionEnd`.
 
-## Delegated Workers
+## Subagents
 
-`LeadAgent` delegation uses `run_async()` internally, so a child Agent does not
+`LeadAgent` delegation uses `run_async()` internally, so a subagent does not
 block the Shiny R process while the parent chat is streaming. A custom async
 tool can use the same contract:
 

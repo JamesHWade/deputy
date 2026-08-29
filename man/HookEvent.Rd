@@ -106,7 +106,7 @@ event-specific metadata
 
 \strong{PreCompact} - Before conversation compaction
 
-Callback signature: \verb{function(turns_to_compact, turns_to_keep, context)}
+Hook signature: \verb{function(turns_to_compact, turns_to_keep, context)}
 \itemize{
 \item \code{turns_to_compact}: List of turns that will be compacted into a summary
 \item \code{turns_to_keep}: List of recent turns that will be preserved
@@ -116,7 +116,7 @@ Callback signature: \verb{function(turns_to_compact, turns_to_keep, context)}
 
 \strong{PostCompact} - After conversation compaction
 
-Callback signature: \verb{function(result, context)}
+Hook signature: \verb{function(result, context)}
 \itemize{
 \item \code{result}: The \code{DeputyCompaction} outcome, including method and usage
 \item \code{context}: Common correlation fields plus \code{compact_count} and \code{automatic}
