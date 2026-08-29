@@ -36,7 +36,7 @@ parse_pdf_page_selector <- function(pages, page_count) {
     )
   }
 
-  if (any(is.na(nums)) || any(nums < 1)) {
+  if (anyNA(nums) || any(nums < 1)) {
     cli_abort("Page numbers must be positive integers.")
   }
   if (any(nums > page_count)) {

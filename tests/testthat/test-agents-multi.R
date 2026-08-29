@@ -636,7 +636,7 @@ test_that("sub-agents inherit remaining lead run budgets", {
     max_total_tokens = 700,
     max_cost_usd = 0.30
   )
-  private$current_usage_baseline <- agent_usage_snapshot(lead$chat)
+  private$current_usage_baseline <- lead$usage()
   private$current_external_usage <- AgentUsage(
     requests = 2,
     tool_calls = 1,
@@ -1149,7 +1149,7 @@ test_that("SubagentStop hook fires after successful delegation", {
   tools <- mock_chat$get_tools()
   delegate_tool <- tools[["delegate_to_agent"]]
 
-  result <- delegate_tool("helper", "Do a task")
+  result <- resolve_async_value(delegate_tool("helper", "Do a task"))
 
   # Verify hook was fired with correct arguments
 
@@ -1200,7 +1200,7 @@ test_that("delegation executes sub-agent and returns result", {
   tools <- mock_chat$get_tools()
   delegate_tool <- tools[["delegate_to_agent"]]
 
-  result <- delegate_tool("worker", "Complete the task")
+  result <- resolve_async_value(delegate_tool("worker", "Complete the task"))
 
   expect_equal(result, "Task completed successfully")
 })
@@ -1254,7 +1254,7 @@ test_that("delegation passes permissions to sub-agent", {
   tools <- mock_chat$get_tools()
   delegate_tool <- tools[["delegate_to_agent"]]
 
-  result <- delegate_tool("sub", "Read something")
+  result <- resolve_async_value(delegate_tool("sub", "Read something"))
   expect_equal(result, "Done")
 })
 
@@ -1292,7 +1292,9 @@ test_that("delegation handles sub-agent execution failure", {
 
   # Should throw an error from tool_reject
   expect_error(
-    suppressWarnings(delegate_tool("failer", "Do something")),
+    suppressWarnings(resolve_async_value(
+      delegate_tool("failer", "Do something")
+    )),
     "Sub-agent 'failer' failed"
   )
 })
@@ -1344,7 +1346,7 @@ test_that("SubagentStop hook receives working_dir in context", {
 
   tools <- mock_chat$get_tools()
   delegate_tool <- tools[["delegate_to_agent"]]
-  delegate_tool("helper", "Help me")
+  resolve_async_value(delegate_tool("helper", "Help me"))
 
   expect_equal(
     captured_context$working_dir,

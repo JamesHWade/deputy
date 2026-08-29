@@ -262,7 +262,7 @@ cli_process_command <- function(input, agent) {
       return(list(is_command = TRUE, action = "continue"))
     },
     "/clear" = {
-      agent$chat$set_turns(list())
+      agent$set_turns(list())
       cli::cli_alert_success("Conversation cleared")
       return(list(is_command = TRUE, action = "continue"))
     },

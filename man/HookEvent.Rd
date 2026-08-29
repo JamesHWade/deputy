@@ -114,6 +114,15 @@ Callback signature: \verb{function(turns_to_compact, turns_to_keep, context)}
 \item Return: \code{\link[=HookResultPreCompact]{HookResultPreCompact()}} to allow/cancel or provide custom summary
 }
 
+\strong{PostCompact} - After conversation compaction
+
+Callback signature: \verb{function(result, context)}
+\itemize{
+\item \code{result}: The \code{DeputyCompaction} outcome, including method and usage
+\item \code{context}: Common correlation fields plus \code{compact_count} and \code{automatic}
+\item Return: NULL (informational only)
+}
+
 \strong{SessionStart} - When an agent session begins
 
 Callback signature: \verb{function(context)}
@@ -155,6 +164,7 @@ The context parameter is always a named list. Common fields:
 \item \code{total_turns}: (native Stop, PreCompact, native SessionEnd) Conversation turns
 \item \code{cost}: (Stop, SessionEnd) List with \code{input}, \code{output}, \code{cached}, and \code{total}
 \item \code{compact_count}: (PreCompact only) Number of turns being compacted
+\item \code{automatic}: (PostCompact only) Whether the run kernel triggered compaction
 \item \code{level}: (Notification only) Informational severity such as \code{"info"} or \code{"warning"}
 \item \code{code}: (Notification only) Stable notification code when available
 \item \code{permissions}: (SessionStart only) The agent's permissions configuration

@@ -22,6 +22,7 @@ hook_callback_arguments <- list(
   ),
   ConfigChange = c("key", "old_value", "new_value", "context"),
   PreCompact = c("turns_to_compact", "turns_to_keep", "context"),
+  PostCompact = c("result", "context"),
   SessionStart = "context",
   SessionEnd = c("reason", "context")
 )

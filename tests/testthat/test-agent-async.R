@@ -37,7 +37,7 @@ test_that("run_async resolves to an AgentResult with the final turn's text", {
   expect_false(agent$.__enclos_env__$private$run_active)
 })
 
-test_that("run_async accepts plain text chunks and falls back to last turn", {
+test_that("run_async accepts text chunks and never reuses a stale turn", {
   skip_if_not_installed("promises")
   skip_if_not_installed("later")
 
@@ -68,10 +68,7 @@ test_that("run_async accepts plain text chunks and falls back to last turn", {
     create_mock_assistant_turn(text = "from last turn")
   }
   agent <- Agent$new(chat = silent)
-  expect_identical(
-    resolve_async_value(agent$run_async("x"))$response,
-    "from last turn"
-  )
+  expect_null(resolve_async_value(agent$run_async("x"))$response)
 })
 
 test_that("run_async enforces tool-call limits and releases the run", {
@@ -261,7 +258,7 @@ test_that("run_async refuses to start while another run is active", {
   expect_identical(resolve_async_value(agent$run_async("z"))$response, "done")
 })
 
-test_that("run_async allows relative file paths unlike run_shiny", {
+test_that("run_async resolves relative native-tool paths in the workspace", {
   skip_if_not_installed("promises")
   skip_if_not_installed("later")
 
@@ -301,7 +298,7 @@ test_that("run_async reports clean interruption", {
   expect_identical(result$stop_reason, "user_cancelled")
 })
 
-test_that("run_shiny still records usage on the shared callback state", {
+test_that("stream_async records usage on the shared callback state", {
   skip_if_not_installed("promises")
   skip_if_not_installed("later")
 
@@ -310,6 +307,6 @@ test_that("run_shiny still records usage on the shared callback state", {
     coro::async_generator(function() coro::yield("done"))()
   }
   agent <- Agent$new(chat = chat)
-  expect_equal(collect_async_stream(agent$run_shiny("x")), list("done"))
+  expect_equal(collect_async_stream(agent$stream_async("x")), list("done"))
   expect_s3_class(agent$.__enclos_env__$private$last_run_usage, "AgentUsage")
 })

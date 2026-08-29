@@ -326,13 +326,13 @@ LeadAgent <- R6::R6Class(
 
       # Rebuild and update system prompt to include new sub-agent
       # Extract base prompt (before sub-agent section) if possible
-      current_prompt <- self$chat$get_system_prompt()
+      current_prompt <- private$.chat$get_system_prompt()
       base_prompt <- private$extract_base_prompt(current_prompt)
       new_prompt <- private$build_lead_prompt(
         base_prompt,
         private$.sub_agent_defs
       )
-      self$chat$set_system_prompt(new_prompt)
+      private$.chat$set_system_prompt(new_prompt)
 
       cli_alert_info("Registered sub-agent: {.val {definition$name}}")
       invisible(self)
@@ -621,15 +621,41 @@ LeadAgent <- R6::R6Class(
             )
           }
 
-          result <- tryCatch(
-            {
-              sub_result <- sub_agent$run_sync(
-                task_to_run
-              )
+          promises::promise_resolve(NULL) |>
+            promises::then(function(...) {
+              sub_agent$run_async(task_to_run)
+            }) |>
+            promises::then(function(sub_result) {
               private$add_external_usage(sub_result$usage)
-              sub_result$response
-            },
-            error = function(e) {
+              result <- sub_result$response
+
+              lead_agent$hooks$fire(
+                "SubagentStop",
+                agent_name = agent_name,
+                task = task,
+                result = result,
+                context = private$hook_context(
+                  status = "completed",
+                  tool_call_id = correlation$tool_call_id,
+                  parent_agent_id = correlation$parent_agent_id,
+                  parent_run_id = correlation$parent_run_id,
+                  child_agent_id = sub_agent$agent_id,
+                  child_agent_name = sub_agent$agent_name,
+                  child_run_id = sub_result$run_id,
+                  child_run_context = sub_result$run_context,
+                  delegation_id = correlation$delegation_id
+                )
+              )
+
+              record_run(
+                status = "completed",
+                result_text = result,
+                usage = sub_result$usage,
+                agent_result = sub_result
+              )
+              result
+            }) |>
+            promises::catch(function(e) {
               failed_usage <- sub_agent$.__enclos_env__$private$last_run_usage
               private$add_external_usage(failed_usage)
               cli::cli_alert_danger(
@@ -667,36 +693,7 @@ LeadAgent <- R6::R6Class(
                 "Error: ",
                 e$message
               ))
-            }
-          )
-
-          # Fire SubagentStop hook (success path)
-          lead_agent$hooks$fire(
-            "SubagentStop",
-            agent_name = agent_name,
-            task = task,
-            result = result,
-            context = private$hook_context(
-              status = "completed",
-              tool_call_id = correlation$tool_call_id,
-              parent_agent_id = correlation$parent_agent_id,
-              parent_run_id = correlation$parent_run_id,
-              child_agent_id = sub_agent$agent_id,
-              child_agent_name = sub_agent$agent_name,
-              child_run_id = sub_result$run_id,
-              child_run_context = sub_result$run_context,
-              delegation_id = correlation$delegation_id
-            )
-          )
-
-          record_run(
-            status = "completed",
-            result_text = result,
-            usage = sub_result$usage,
-            agent_result = sub_result
-          )
-
-          result
+            })
         },
         name = "delegate_to_agent",
         description = "Delegate a task to a specialized sub-agent. The sub-agent will complete the task and return results.",
@@ -723,7 +720,7 @@ LeadAgent <- R6::R6Class(
         # then clear conversation history so the sub-agent starts fresh.
         sub_chat <- tryCatch(
           {
-            cloned <- self$chat$clone()
+            cloned <- private$.chat$clone()
             cloned$set_turns(list())
             cloned
           },

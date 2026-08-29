@@ -265,7 +265,7 @@ test_that("Agent can access S7 turn properties via @ accessor", {
   agent <- Agent$new(chat = mock_chat)
 
   mock_chat$chat("prompt")
-  last <- agent$chat$last_turn()
+  last <- agent$last_turn()
 
   # Should be able to access S7 properties
   expect_equal(last@text, "Response text")
@@ -276,82 +276,24 @@ test_that("Agent can access S7 turn properties via @ accessor", {
 # Streaming fallback warning event tests
 # ============================================================================
 
-test_that("run emits warning event when streaming fails and falls back", {
-  # This test verifies that when streaming fails, the agent emits a "warning"
-  # AgentEvent that applications can use to surface the degraded mode to users
-
+test_that("run surfaces provider stream failures without retrying chat", {
+  chat_calls <- 0L
   mock_chat <- create_mock_chat(responses = list("Fallback response"))
-
-  # Override stream to fail
   mock_chat$stream <- function(prompt = NULL) {
     stop("Simulated streaming failure")
   }
-
-  # Override chat (fallback) to succeed
   mock_chat$chat <- function(prompt = NULL) {
+    chat_calls <<- chat_calls + 1L
     "Fallback response"
   }
-
-  # Override last_turn
-  mock_chat$last_turn <- function(role = "assistant") {
-    create_mock_assistant_turn(text = "Fallback response")
-  }
-
   agent <- Agent$new(chat = mock_chat)
 
-  # Collect events from the generator
-  events <- list()
-  gen <- agent$run("Test task")
-  suppressWarnings({
-    while (!coro::is_exhausted(e <- gen())) {
-      events <- c(events, list(e))
-    }
-  })
-
-  # Find warning events
-  warning_events <- Filter(function(e) e$type == "warning", events)
-
-  # Should have at least one warning event
-
-  expect_true(length(warning_events) >= 1)
-
-  # Warning event should contain relevant information
-  warning_event <- warning_events[[1]]
-  expect_equal(
-    warning_event$message,
-    "Streaming failed, falling back to non-streaming"
+  expect_error(
+    agent$run_sync("Test task"),
+    "Simulated streaming failure"
   )
-  expect_true(grepl("Simulated streaming failure", warning_event$details))
-})
-
-test_that("run_sync collects warning events in result", {
-  # This test verifies that warning events are collected in the AgentResult
-  # so applications using run_sync can also access them
-
-  mock_chat <- create_mock_chat(responses = list("Fallback response"))
-
-  # Override stream to fail
-  mock_chat$stream <- function(prompt = NULL) {
-    stop("Stream error")
-  }
-
-  # Override chat (fallback) to succeed
-  mock_chat$chat <- function(prompt = NULL) {
-    "Fallback response"
-  }
-
-  # Override last_turn
-  mock_chat$last_turn <- function(role = "assistant") {
-    create_mock_assistant_turn(text = "Fallback response")
-  }
-
-  agent <- Agent$new(chat = mock_chat)
-
-  result <- suppressWarnings(agent$run_sync("Test task"))
-
-  # Result should contain events including the warning
-  warning_events <- Filter(function(e) e$type == "warning", result$events)
-  expect_true(length(warning_events) >= 1)
+  expect_identical(chat_calls, 0L)
+  expect_false(agent$.__enclos_env__$private$run_active)
 })
 
 test_that("AgentEvent warning type has correct structure", {
@@ -632,108 +574,6 @@ test_that("run_sync stops when cost limit is reached", {
   expect_equal(result$stop_reason, "cost_limit")
 })
 
-test_that("run_sync detects stalled responses", {
-  # This test verifies that a warning is issued when agent returns identical
-  # responses (indicating a possible stall)
-
-  call_count <- 0
-
-  mock_chat <- create_mock_chat()
-
-  # Override stream to return the same response twice (simulating stall)
-  mock_chat$stream <- function(prompt = NULL) {
-    call_count <<- call_count + 1
-    yielded <- FALSE
-    function() {
-      if (yielded) {
-        return(coro::exhausted())
-      }
-      yielded <<- TRUE
-      "I am stuck in a loop" # Same response every time
-    }
-  }
-
-  # Override last_turn to return a turn that looks like it has tool requests
-  # (to keep the agent running for multiple turns)
-  turn_count <- 0
-  mock_chat$last_turn <- function(role = "assistant") {
-    turn_count <<- turn_count + 1
-    if (turn_count <= 2) {
-      # First two turns have a tool request to keep agent running
-      create_mock_turn_with_tool_request(
-        tool_name = "test_tool",
-        tool_args = list(),
-        text = "I am stuck in a loop"
-      )
-    } else {
-      # Third turn is just text (no tool request) to stop
-      create_mock_assistant_turn(text = "I am stuck in a loop")
-    }
-  }
-
-  # Create a simple test tool
-  test_tool <- ellmer::tool(
-    fun = function() "result",
-    name = "test_tool",
-    description = "A test tool",
-    arguments = list()
-  )
-
-  agent <- Agent$new(
-    chat = mock_chat,
-    tools = list(test_tool),
-    usage_limits = UsageLimits(max_requests = 5)
-  )
-
-  # Capture warnings
-  warnings_raised <- character()
-  result <- withCallingHandlers(
-    agent$run_sync("Test task"),
-    warning = function(w) {
-      warnings_raised <<- c(warnings_raised, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
-
-  # Should have received a stall warning
-  stall_warnings <- grep("stalled", warnings_raised, value = TRUE)
-  expect_true(length(stall_warnings) > 0)
-})
-
-# ============================================================================
-# S7 inherits() Regression Tests
-# These tests ensure the ellmer:: namespace prefix is used correctly
-# ============================================================================
-
-test_that("has_tool_requests correctly identifies S7 ContentToolRequest", {
-  # This test verifies the S7 inherits() fix for has_tool_requests
-  # If someone reverts to inherits(x, "ContentToolRequest") this will fail
-  mock_chat <- create_mock_chat()
-  agent <- Agent$new(chat = mock_chat)
-
-  # Create a turn WITH a tool request using actual S7 objects
-
-  turn_with_request <- create_mock_turn_with_tool_request(
-    tool_name = "read_file",
-    tool_args = list(path = "test.txt")
-  )
-
-  # Access private method - should return TRUE for turn with tool request
-  result <- agent$.__enclos_env__$private$has_tool_requests(turn_with_request)
-  expect_true(result)
-
-  # Create a turn WITHOUT tool requests
-  turn_without_request <- create_mock_assistant_turn(text = "Just text")
-  result2 <- agent$.__enclos_env__$private$has_tool_requests(
-    turn_without_request
-  )
-  expect_false(result2)
-
-  # NULL turn should return FALSE
-  result3 <- agent$.__enclos_env__$private$has_tool_requests(NULL)
-  expect_false(result3)
-})
-
 test_that("get_tool_annotation works with S7 ToolDef objects", {
   # This test verifies the S7 inherits() fix for get_tool_annotation
   # If someone reverts to inherits(tool, "ToolDef") this will fail
@@ -770,11 +610,14 @@ test_that("get_tool_annotation works with S7 ToolDef objects", {
   expect_null(get_tool_annotation("not a tool", "annotation"))
 })
 
-test_that("run_sync stops with request_limit reason when limit reached", {
+test_that("run_sync reports terminal request usage limits", {
   mock_chat <- create_mock_chat()
 
-  # Keep returning tool requests to force multiple turns
   mock_chat$stream <- function(prompt = NULL) {
+    mock_chat$set_turns(list(
+      create_mock_assistant_turn("First response"),
+      create_mock_assistant_turn("Second response")
+    ))
     yielded <- FALSE
     function() {
       if (yielded) {
@@ -785,28 +628,9 @@ test_that("run_sync stops with request_limit reason when limit reached", {
     }
   }
 
-  turn_count <- 0
-  mock_chat$last_turn <- function(role = "assistant") {
-    turn_count <<- turn_count + 1
-    # Always return turn with tool request to keep looping
-    create_mock_turn_with_tool_request(
-      tool_name = "test_tool",
-      tool_args = list(),
-      text = paste("Response", turn_count)
-    )
-  }
-
-  test_tool <- ellmer::tool(
-    fun = function() "result",
-    name = "test_tool",
-    description = "A test tool",
-    arguments = list()
-  )
-
   agent <- Agent$new(
     chat = mock_chat,
-    tools = list(test_tool),
-    usage_limits = UsageLimits(max_requests = 2)
+    usage_limits = UsageLimits(max_requests = 1)
   )
 
   result <- suppressWarnings(agent$run_sync("Test task"))

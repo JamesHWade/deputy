@@ -90,6 +90,18 @@ create_delegation_child_chat <- function() {
     ),
     class = "Chat"
   )
+  chat$stream_async <- function(
+    prompt = NULL,
+    tool_mode = c("concurrent", "sequential"),
+    stream = c("text", "content"),
+    controller = NULL
+  ) {
+    as_mock_async_stream(chat$stream(
+      prompt,
+      stream = match.arg(stream),
+      controller = controller
+    ))
+  }
 
   list(chat = chat, state = state)
 }
@@ -207,6 +219,64 @@ create_delegation_parent_chat <- function(child_chat) {
     ),
     class = "Chat"
   )
+  chat$stream_async <- function(
+    prompt = NULL,
+    tool_mode = c("concurrent", "sequential"),
+    stream = c("text", "content"),
+    controller = NULL
+  ) {
+    tool <- state$tools[["delegate_to_agent"]]
+    request <- ellmer::ContentToolRequest(
+      id = "parent-delegate-call-1",
+      name = "delegate_to_agent",
+      arguments = list(
+        agent_name = "evidence_reviewer",
+        task = "Review claim-1"
+      ),
+      tool = tool
+    )
+    coro::async_generator(function() {
+      add_turn(list(request))
+      coro::yield(request)
+      state$on_tool_request(request)
+
+      tool_error <- NULL
+      value <- tryCatch(
+        tool(
+          agent_name = request@arguments$agent_name,
+          task = request@arguments$task
+        ),
+        error = function(error) {
+          tool_error <<- error
+          NULL
+        }
+      )
+      if (is.null(tool_error) && promises::is.promising(value)) {
+        value <- tryCatch(
+          coro::await(value),
+          error = function(error) {
+            tool_error <<- error
+            NULL
+          }
+        )
+      }
+
+      if (is.null(tool_error)) {
+        result <- ellmer::ContentToolResult(value = value, request = request)
+      } else {
+        result <- ellmer::ContentToolResult(
+          error = conditionMessage(tool_error),
+          request = request
+        )
+      }
+      state$on_tool_result(result)
+      coro::yield(result)
+
+      text <- ellmer::ContentText("lead complete")
+      add_turn(list(text))
+      coro::yield(text)
+    })()
+  }
 
   list(chat = chat, state = state)
 }
@@ -244,10 +314,14 @@ test_that("delegated runs retain end-to-end correlation", {
     agent_name = "moderator"
   )
 
-  parent_result <- lead$run_sync("Delegate evidence review")
+  chunks <- collect_async_stream(
+    lead$stream_async("Delegate evidence review", stream = "content")
+  )
+  parent_result <- lead$last_run()
   parent_start <- parent_result$tool_calls()[[1L]]
   parent_end <- parent_result$tool_results()[[1L]]
 
+  expect_true(length(chunks) > 0L)
   expect_identical(parent_result$response, "lead complete")
   expect_identical(parent_start$tool_name, "delegate_to_agent")
   expect_identical(parent_end$tool_name, "delegate_to_agent")
@@ -369,7 +443,7 @@ test_that("denied delegation requests do not leave stale correlation", {
       HookResultPreToolUse(permission = "deny", reason = "not this turn")
     }
   ))
-  tool <- lead$chat$get_tools()[["delegate_to_agent"]]
+  tool <- lead$get_tools()[["delegate_to_agent"]]
   request <- ellmer::ContentToolRequest(
     id = "denied-delegation",
     name = "delegate_to_agent",

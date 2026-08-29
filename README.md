@@ -24,13 +24,13 @@ ellmer gives R a provider-independent chat interface and tools. Deputy
 adds the runtime around that chat when a tool-using conversation becomes
 a real job:
 
-| Start with ellmer       | Add Deputy when you need                          |
-|-------------------------|---------------------------------------------------|
-| Chats and provider APIs | Explicit tool permissions and run limits          |
-| Tool registration       | Hooks, semantic events, and inspectable results   |
-| Streaming model output  | A stable stream for terminals and Shiny hosts     |
-| Conversation state      | Explicit session persistence and file checkpoints |
-| One tool-using chat     | Correlated delegation to specialist Agents        |
+| Start with ellmer | Add Deputy when you need |
+|----|----|
+| Chats and provider APIs | Explicit tool permissions and run limits |
+| Tool registration | Hooks, semantic events, and inspectable results |
+| Streaming model output | A stable stream for terminals and Shiny hosts |
+| Conversation state | Automatic compaction, persistence, and checkpoints |
+| One tool-using chat | Correlated delegation to specialist Agents |
 
 The core object model stays small:
 
@@ -41,6 +41,13 @@ ellmer Chat + Tools + Permissions + Limits
                      |
         AgentResult + Events + Checkpoints
 ```
+
+The Agent itself keeps ellmer’s chat shape. Use `agent$chat()` and
+`agent$stream()` in synchronous code, or pass `agent$stream_async()`
+directly to `shinychat::chat_append()`. Those paths use the same
+governed kernel as `run_sync()` and `run_async()`; the latter pair
+return richer `AgentResult` metadata when the host needs to inspect the
+run.
 
 ## Installation
 
@@ -77,6 +84,7 @@ workspace <- normalizePath(getwd(), winslash = "/")
 first_tools <- tools_preset("minimal")
 first_permissions <- permissions_readonly()
 first_limits <- UsageLimits(max_requests = 6, max_tool_calls = 8)
+first_context <- ContextPolicy(max_tokens = 32000, fallback = "error")
 
 stopifnot(
   length(first_tools) == 3L,
@@ -96,6 +104,7 @@ agent <- Agent$new(
   tools = first_tools,
   permissions = first_permissions,
   usage_limits = first_limits,
+  context_policy = first_context,
   working_dir = workspace
 )
 

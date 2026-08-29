@@ -474,7 +474,7 @@ test_that("unsupported session schemas are rejected", {
     suppressMessages(agent$load_session(path)),
     class = "deputy_session_load"
   )
-  expect_length(agent$chat$get_turns(), 0L)
+  expect_length(agent$get_turns(), 0L)
 })
 
 test_that("unsafe restored context is rejected before conversation mutation", {

@@ -29,7 +29,7 @@ test_that("Agent core fields are immutable after construction", {
 
   expect_error(
     agent$chat <- create_mock_chat(),
-    "immutable after construction"
+    "locked binding"
   )
   expect_error(
     agent$permissions <- permissions_readonly(),
@@ -44,7 +44,7 @@ test_that("Agent core fields are immutable after construction", {
     "immutable after construction"
   )
 
-  expect_identical(agent$chat, mock_chat)
+  expect_true(is.function(agent$chat))
   expect_identical(agent$permissions, original_permissions)
   expect_identical(agent$hooks, original_hooks)
   expect_identical(agent$working_dir, original_working_dir)
@@ -313,7 +313,8 @@ test_that("compact does nothing when not enough turns", {
     type = "message"
   )
 
-  expect_identical(result, agent)
+  expect_s3_class(result, "DeputyCompaction")
+  expect_identical(result$method, "none")
 })
 
 test_that("compact accepts custom summary", {
@@ -428,7 +429,9 @@ test_that("compaction summary clone is isolated, callback-free, and silent", {
     original_turns
   )
 
-  expect_equal(summary, "A summary.")
+  expect_equal(summary$summary, "A summary.")
+  expect_identical(summary$method, "llm")
+  expect_s3_class(summary$usage, "AgentUsage")
   expect_identical(probe$clone_calls, 1L)
   expect_identical(probe$clone_deep, TRUE)
   expect_length(probe$summary_call$turns, 0L)
@@ -507,17 +510,21 @@ test_that("compaction falls back only after clone or summary runtime failure", {
 
   clone_fallback <- suppressWarnings(suppressMessages(
     clone_failure_agent$.__enclos_env__$private$generate_compaction_summary(
-      turns
+      turns,
+      fallback = "text"
     )
   ))
   runtime_fallback <- suppressWarnings(suppressMessages(
     runtime_failure_agent$.__enclos_env__$private$generate_compaction_summary(
-      turns
+      turns,
+      fallback = "text"
     )
   ))
 
-  expect_match(clone_fallback, "Compacted 2 earlier turns")
-  expect_match(runtime_fallback, "Compacted 2 earlier turns")
+  expect_match(clone_fallback$summary, "Compacted 2 earlier turns")
+  expect_match(runtime_fallback$summary, "Compacted 2 earlier turns")
+  expect_identical(clone_fallback$method, "text")
+  expect_identical(runtime_fallback$method, "text")
 })
 
 # Tool data extraction tests
