@@ -26,16 +26,9 @@ server <- function(input, output, session) {
   )
   agent$add_hook(hook_log_tools(verbose = TRUE))
 
-  # Pass run_shiny() directly to chat_append(); chat_append() owns the
-  # completion promise and surfaces streaming errors in the UI.
-  observeEvent(input$chat_user_input, {
-    req(input$chat_user_input)
-
-    chat_append(
-      "chat",
-      agent$run_shiny(input$chat_user_input)
-    )
-  })
+  # Agent is a drop-in ellmer chat. shinychat owns input, attachments,
+  # cancellation, and history while Deputy governs every run.
+  chat_server("chat", agent)
 }
 
 shinyApp(ui, server)

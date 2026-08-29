@@ -144,6 +144,18 @@ create_content_stream_chat <- function(
     ),
     class = "Chat"
   )
+  chat$stream_async <- function(
+    prompt = NULL,
+    tool_mode = c("concurrent", "sequential"),
+    stream = c("text", "content"),
+    controller = NULL
+  ) {
+    as_mock_async_stream(chat$stream(
+      prompt,
+      stream = match.arg(stream),
+      controller = controller
+    ))
+  }
 
   list(chat = chat, tool = tool, state = state)
 }

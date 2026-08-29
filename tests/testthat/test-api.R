@@ -5,6 +5,7 @@ test_that("public API is deliberate", {
     "AgentResult",
     "AgentUsage",
     "UsageLimits",
+    "ContextPolicy",
     "LeadAgent",
     "agent_definition",
     "Permissions",

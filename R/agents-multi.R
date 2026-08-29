@@ -220,6 +220,11 @@ print.AgentDefinition <- function(x, ...) {
   invisible(x)
 }
 
+deputy_lead_routing_start_marker <-
+  "<!-- deputy-lead-routing:v1:start -->"
+deputy_lead_routing_end_marker <-
+  "<!-- deputy-lead-routing:v1:end -->"
+
 #' LeadAgent R6 Class
 #'
 #' @description
@@ -242,6 +247,9 @@ LeadAgent <- R6::R6Class(
     #' @param system_prompt System prompt for the lead agent
     #' @param permissions Permissions for the lead agent (also applied to sub-agents)
     #' @param usage_limits Optional [UsageLimits] for each lead-agent run.
+    #' @param context_policy A [ContextPolicy] controlling automatic compaction
+    #'   and durable offloading of large tool results for the lead agent and its
+    #'   delegated agents.
     #' @param enable_file_checkpointing Whether to journal reversible file
     #'   preimages in one workspace journal shared by the lead agent and its
     #'   delegated agents.
@@ -265,6 +273,7 @@ LeadAgent <- R6::R6Class(
       system_prompt = NULL,
       permissions = NULL,
       usage_limits = NULL,
+      context_policy = ContextPolicy(),
       enable_file_checkpointing = FALSE,
       file_checkpoint_max_file_bytes = 50 * 1024^2,
       file_checkpoint_max_journal_bytes = 250 * 1024^2,
@@ -295,6 +304,7 @@ LeadAgent <- R6::R6Class(
         system_prompt = enhanced_prompt,
         permissions = permissions,
         usage_limits = usage_limits,
+        context_policy = context_policy,
         enable_file_checkpointing = enable_file_checkpointing,
         file_checkpoint_max_file_bytes = file_checkpoint_max_file_bytes,
         file_checkpoint_max_journal_bytes = file_checkpoint_max_journal_bytes,
@@ -324,15 +334,14 @@ LeadAgent <- R6::R6Class(
       }
       private$.sub_agent_defs[[definition$name]] <- definition
 
-      # Rebuild and update system prompt to include new sub-agent
-      # Extract base prompt (before sub-agent section) if possible
-      current_prompt <- self$chat$get_system_prompt()
-      base_prompt <- private$extract_base_prompt(current_prompt)
-      new_prompt <- private$build_lead_prompt(
-        base_prompt,
+      # Replace only the generated routing section so compaction summaries,
+      # skills, and hook-provided context remain intact.
+      current_prompt <- private$.chat$get_system_prompt()
+      new_prompt <- private$replace_lead_prompt(
+        current_prompt,
         private$.sub_agent_defs
       )
-      self$chat$set_system_prompt(new_prompt)
+      private$.chat$set_system_prompt(new_prompt)
 
       cli_alert_info("Registered sub-agent: {.val {definition$name}}")
       invisible(self)
@@ -480,6 +489,7 @@ LeadAgent <- R6::R6Class(
       if (length(sub_agents) > 0) {
         lines <- c(
           lines,
+          deputy_lead_routing_start_marker,
           "# Available Sub-Agents",
           "",
           "You can delegate specialized tasks to these sub-agents using the",
@@ -495,6 +505,9 @@ LeadAgent <- R6::R6Class(
           lines,
           "When delegating, provide a clear task description. The sub-agent",
           "will complete the task and return results to you.",
+          "",
+          "# End Available Sub-Agents",
+          deputy_lead_routing_end_marker,
           ""
         )
       }
@@ -502,29 +515,32 @@ LeadAgent <- R6::R6Class(
       paste(lines, collapse = "\n")
     },
 
-    # Extract base prompt (before sub-agent section) from full prompt
-    extract_base_prompt = function(full_prompt) {
-      if (is.null(full_prompt) || nchar(full_prompt) == 0) {
-        return(NULL)
+    replace_lead_prompt = function(full_prompt, sub_agents) {
+      section <- private$build_lead_prompt(NULL, sub_agents)
+      if (!is_nonempty_string(full_prompt)) {
+        return(section)
       }
 
-      # Look for the sub-agent section marker
-      marker <- "# Available Sub-Agents"
-      marker_pos <- regexpr(marker, full_prompt, fixed = TRUE)
-
-      if (marker_pos > 0) {
-        # Extract everything before the marker
-        base <- substr(full_prompt, 1, marker_pos - 1)
-        # Trim trailing whitespace
-        base <- sub("\\s+$", "", base)
-        if (nchar(base) == 0) {
-          return(NULL)
-        }
-        return(base)
+      start_marker <- deputy_lead_routing_start_marker
+      end_marker <- deputy_lead_routing_end_marker
+      start <- regexpr(start_marker, full_prompt, fixed = TRUE)
+      if (start[[1L]] < 0L) {
+        return(private$build_lead_prompt(full_prompt, sub_agents))
+      }
+      remainder <- substr(full_prompt, start[[1L]], nchar(full_prompt))
+      end <- regexpr(end_marker, remainder, fixed = TRUE)
+      if (end[[1L]] < 0L) {
+        return(private$build_lead_prompt(full_prompt, sub_agents))
       }
 
-      # No marker found, return the full prompt as base
-      full_prompt
+      before <- substr(full_prompt, 1L, start[[1L]] - 1L)
+      after_start <- start[[1L]] + end[[1L]] - 1L + attr(end, "match.length")
+      after <- if (after_start > nchar(full_prompt)) {
+        ""
+      } else {
+        substr(full_prompt, after_start, nchar(full_prompt))
+      }
+      paste0(before, section, after)
     },
 
     # Create the delegate_to_agent tool
@@ -554,8 +570,15 @@ LeadAgent <- R6::R6Class(
             ))
           }
 
-          # Create the sub-agent
-          sub_agent <- private$create_sub_agent(def, correlation)
+          # Derive the child budget before creating it. The reservation is
+          # recorded before this tool returns its promise, so concurrent tool
+          # calls cannot all receive the same remaining lead-agent budget.
+          child_usage_limits <- private$derive_subagent_usage_limits(def)
+          sub_agent <- private$create_sub_agent(
+            def,
+            correlation,
+            usage_limits = child_usage_limits
+          )
 
           # Run the task
           cli::cli_alert_info("Delegating to {.val {agent_name}}: {task}")
@@ -621,17 +644,58 @@ LeadAgent <- R6::R6Class(
             )
           }
 
-          result <- tryCatch(
-            {
-              sub_result <- sub_agent$run_sync(
-                task_to_run
+          private$reserve_delegation_usage(
+            correlation$delegation_id,
+            child_usage_limits
+          )
+          reservation_active <- TRUE
+          settle_usage <- function(usage) {
+            if (!isTRUE(reservation_active)) {
+              return(invisible(NULL))
+            }
+            private$release_delegation_usage(correlation$delegation_id)
+            reservation_active <<- FALSE
+            private$add_external_usage(usage)
+            invisible(NULL)
+          }
+
+          promises::promise_resolve(NULL) |>
+            promises::then(function(...) {
+              sub_agent$run_async(task_to_run)
+            }) |>
+            promises::then(function(sub_result) {
+              settle_usage(sub_result$usage)
+              result <- sub_result$response
+
+              lead_agent$hooks$fire(
+                "SubagentStop",
+                agent_name = agent_name,
+                task = task,
+                result = result,
+                context = private$hook_context(
+                  status = "completed",
+                  tool_call_id = correlation$tool_call_id,
+                  parent_agent_id = correlation$parent_agent_id,
+                  parent_run_id = correlation$parent_run_id,
+                  child_agent_id = sub_agent$agent_id,
+                  child_agent_name = sub_agent$agent_name,
+                  child_run_id = sub_result$run_id,
+                  child_run_context = sub_result$run_context,
+                  delegation_id = correlation$delegation_id
+                )
               )
-              private$add_external_usage(sub_result$usage)
-              sub_result$response
-            },
-            error = function(e) {
+
+              record_run(
+                status = "completed",
+                result_text = result,
+                usage = sub_result$usage,
+                agent_result = sub_result
+              )
+              result
+            }) |>
+            promises::catch(function(e) {
               failed_usage <- sub_agent$.__enclos_env__$private$last_run_usage
-              private$add_external_usage(failed_usage)
+              settle_usage(failed_usage)
               cli::cli_alert_danger(
                 "Sub-agent {.val {agent_name}} failed: {e$message}"
               )
@@ -667,36 +731,7 @@ LeadAgent <- R6::R6Class(
                 "Error: ",
                 e$message
               ))
-            }
-          )
-
-          # Fire SubagentStop hook (success path)
-          lead_agent$hooks$fire(
-            "SubagentStop",
-            agent_name = agent_name,
-            task = task,
-            result = result,
-            context = private$hook_context(
-              status = "completed",
-              tool_call_id = correlation$tool_call_id,
-              parent_agent_id = correlation$parent_agent_id,
-              parent_run_id = correlation$parent_run_id,
-              child_agent_id = sub_agent$agent_id,
-              child_agent_name = sub_agent$agent_name,
-              child_run_id = sub_result$run_id,
-              child_run_context = sub_result$run_context,
-              delegation_id = correlation$delegation_id
-            )
-          )
-
-          record_run(
-            status = "completed",
-            result_text = result,
-            usage = sub_result$usage,
-            agent_result = sub_result
-          )
-
-          result
+            })
         },
         name = "delegate_to_agent",
         description = "Delegate a task to a specialized sub-agent. The sub-agent will complete the task and return results.",
@@ -714,7 +749,7 @@ LeadAgent <- R6::R6Class(
     },
 
     # Create a sub-agent from a definition
-    create_sub_agent = function(def, correlation = NULL) {
+    create_sub_agent = function(def, correlation = NULL, usage_limits = NULL) {
       correlation <- correlation %||% private$claim_delegation()
 
       # Get the model to use
@@ -723,7 +758,7 @@ LeadAgent <- R6::R6Class(
         # then clear conversation history so the sub-agent starts fresh.
         sub_chat <- tryCatch(
           {
-            cloned <- self$chat$clone()
+            cloned <- private$.chat$clone()
             cloned$set_turns(list())
             cloned
           },
@@ -775,7 +810,9 @@ LeadAgent <- R6::R6Class(
         tools = sub_tools,
         system_prompt = sub_prompt,
         permissions = sub_permissions,
-        usage_limits = private$derive_subagent_usage_limits(def),
+        usage_limits = usage_limits %||%
+          private$derive_subagent_usage_limits(def),
+        context_policy = self$context_policy,
         working_dir = self$working_dir,
         session_id = new_deputy_id("session_"),
         run_context = child_run_context,
@@ -870,12 +907,18 @@ LeadAgent <- R6::R6Class(
         max_total_tokens = "total_tokens",
         max_cost_usd = "cost_usd"
       )
+      reserved <- private$reserved_delegation_usage()
       remaining <- lapply(names(usage_fields), function(limit_field) {
         limit <- limits[[limit_field]]
         if (is.null(limit)) {
           return(NULL)
         }
-        max(0, limit - current[[usage_fields[[limit_field]]]])
+        max(
+          0,
+          limit -
+            current[[usage_fields[[limit_field]]]] -
+            reserved[[limit_field]]
+        )
       })
       names(remaining) <- names(usage_fields)
       if (!is.null(def$max_requests)) {
@@ -890,6 +933,58 @@ LeadAgent <- R6::R6Class(
         UsageLimits,
         c(remaining, list(on_exceed = limits$on_exceed))
       )
+    },
+
+    reserve_delegation_usage = function(delegation_id, limits) {
+      fields <- c(
+        "max_requests",
+        "max_tool_calls",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_total_tokens",
+        "max_cost_usd"
+      )
+      private$delegation_usage_reservations[[delegation_id]] <- vapply(
+        fields,
+        function(field) limits[[field]] %||% 0,
+        numeric(1)
+      )
+      invisible(NULL)
+    },
+
+    release_delegation_usage = function(delegation_id) {
+      private$delegation_usage_reservations[[delegation_id]] <- NULL
+      invisible(NULL)
+    },
+
+    reserved_delegation_usage = function() {
+      fields <- c(
+        "max_requests",
+        "max_tool_calls",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_total_tokens",
+        "max_cost_usd"
+      )
+      reserved <- stats::setNames(numeric(length(fields)), fields)
+      for (reservation in private$delegation_usage_reservations) {
+        reserved <- reserved + reservation[fields]
+      }
+      reserved
+    },
+
+    prepare_cloned_tool = function(tool) {
+      name <- read_optional_value(
+        function() tool@name,
+        validator = is_nonempty_string
+      )
+      if (
+        identical(name$status, "present") &&
+          identical(name$value, "delegate_to_agent")
+      ) {
+        return(private$adapt_tool(private$create_delegate_tool()))
+      }
+      private$adapt_tool(tool)
     },
 
     filter_disallowed_tools = function(tools, disallowed_tools) {
@@ -943,6 +1038,7 @@ LeadAgent <- R6::R6Class(
     },
 
     .sub_agent_defs = list(),
-    subagent_runs = list()
+    subagent_runs = list(),
+    delegation_usage_reservations = list()
   )
 )

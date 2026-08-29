@@ -36,7 +36,7 @@ parse_pdf_page_selector <- function(pages, page_count) {
     )
   }
 
-  if (any(is.na(nums)) || any(nums < 1)) {
+  if (anyNA(nums) || any(nums < 1)) {
     cli_abort("Page numbers must be positive integers.")
   }
   if (any(nums > page_count)) {
@@ -925,7 +925,7 @@ tool_grep_files <- ellmer::tool(
   )
 )
 
-run_r_code_impl <- function(code, timeout = 30) {
+run_r_code_impl <- function(code, timeout = 30, working_dir = getwd()) {
   if (!rlang::is_installed("callr")) {
     ellmer::tool_reject(
       paste(
@@ -954,7 +954,8 @@ run_r_code_impl <- function(code, timeout = 30) {
         )
       },
       args = list(code_string = code),
-      timeout = timeout
+      timeout = timeout,
+      wd = working_dir
     ),
     error = function(e) {
       if (inherits(e, "callr_timeout_error")) {
@@ -1035,6 +1036,63 @@ tool_run_r_code <- ellmer::tool(
     open_world_hint = TRUE
   )
 )
+attr(tool_run_r_code, "deputy_workspace_runner") <-
+  function(arguments, working_dir) {
+    run_r_code_impl(arguments$code, working_dir = working_dir)
+  }
+
+run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
+  # Use callr for reliable timeout enforcement if available
+  if (rlang::is_installed("callr")) {
+    tryCatch(
+      {
+        result <- callr::r(
+          function(cmd) {
+            system(cmd, intern = TRUE)
+          },
+          args = list(cmd = command),
+          timeout = timeout,
+          wd = working_dir
+        )
+        if (length(result) == 0) {
+          "Command executed successfully (no output)"
+        } else {
+          paste(result, collapse = "\n")
+        }
+      },
+      error = function(e) {
+        if (grepl("timeout", e$message, ignore.case = TRUE)) {
+          ellmer::tool_reject(paste(
+            "Command timed out after",
+            timeout,
+            "seconds"
+          ))
+        } else {
+          ellmer::tool_reject(paste("Command failed:", e$message))
+        }
+      }
+    )
+  } else {
+    # Keep the host process directory unchanged in the fallback path.
+    command <- paste("cd", shQuote(working_dir), "&&", command)
+    tryCatch(
+      {
+        result <- system(command, intern = TRUE, timeout = timeout)
+        if (length(result) == 0) {
+          "Command executed successfully (no output)"
+        } else {
+          paste(result, collapse = "\n")
+        }
+      },
+      error = function(e) {
+        ellmer::tool_reject(paste("Command failed:", e$message))
+      },
+      warning = function(w) {
+        paste("Warning:", w$message)
+      }
+    )
+  }
+}
 
 #' Execute bash commands
 #'
@@ -1060,57 +1118,7 @@ tool_run_r_code <- ellmer::tool(
 #' @export
 tool_run_bash <- ellmer::tool(
   fun = function(command) {
-    # Internal parameter (not exposed to LLM)
-    timeout <- 30
-
-    # Use callr for reliable timeout enforcement if available
-    if (rlang::is_installed("callr")) {
-      tryCatch(
-        {
-          result <- callr::r(
-            function(cmd) {
-              system(cmd, intern = TRUE)
-            },
-            args = list(cmd = command),
-            timeout = timeout
-          )
-          if (length(result) == 0) {
-            "Command executed successfully (no output)"
-          } else {
-            paste(result, collapse = "\n")
-          }
-        },
-        error = function(e) {
-          if (grepl("timeout", e$message, ignore.case = TRUE)) {
-            ellmer::tool_reject(paste(
-              "Command timed out after",
-              timeout,
-              "seconds"
-            ))
-          } else {
-            ellmer::tool_reject(paste("Command failed:", e$message))
-          }
-        }
-      )
-    } else {
-      # Fallback to system() - timeout may not be reliable
-      tryCatch(
-        {
-          result <- system(command, intern = TRUE, timeout = timeout)
-          if (length(result) == 0) {
-            "Command executed successfully (no output)"
-          } else {
-            paste(result, collapse = "\n")
-          }
-        },
-        error = function(e) {
-          ellmer::tool_reject(paste("Command failed:", e$message))
-        },
-        warning = function(w) {
-          paste("Warning:", w$message)
-        }
-      )
-    }
+    run_bash_impl(command)
   },
   name = "run_bash",
   description = "Execute a bash/shell command and return the output. Use with caution - this can execute arbitrary system commands.",
@@ -1124,6 +1132,10 @@ tool_run_bash <- ellmer::tool(
     open_world_hint = TRUE
   )
 )
+attr(tool_run_bash, "deputy_workspace_runner") <-
+  function(arguments, working_dir) {
+    run_bash_impl(arguments$command, working_dir = working_dir)
+  }
 
 #' Read a CSV file
 #'

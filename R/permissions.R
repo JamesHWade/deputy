@@ -468,10 +468,30 @@ Permissions <- R6::R6Class(
     #' @param context Additional context (e.g., working_dir, tool_annotations)
     #' @return A [PermissionResultAllow] or [PermissionResultDeny]
     check = function(tool_name, tool_input, context = list()) {
+      allowlist_exempt <- private$is_allowlist_exempt(tool_name, context)
       # Explicit tool gating (denylist/allowlist) takes precedence
-      gating_result <- private$check_tool_gating(tool_name)
+      gating_result <- private$check_tool_gating(
+        tool_name,
+        allowlist_exempt = allowlist_exempt
+      )
       if (!is.null(gating_result)) {
         return(gating_result)
+      }
+
+      # The internal result reader must remain vetoable even in modes that
+      # otherwise short-circuit custom callbacks. An allow result does not
+      # override the remaining mode and capability checks.
+      callback_checked <- FALSE
+      if (isTRUE(allowlist_exempt)) {
+        callback_result <- private$check_permission_callback(
+          tool_name,
+          tool_input,
+          context
+        )
+        callback_checked <- TRUE
+        if (inherits(callback_result, "PermissionResultDeny")) {
+          return(callback_result)
+        }
       }
 
       # Allow the configured prompt tool so gated workflows can request
@@ -493,7 +513,8 @@ Permissions <- R6::R6Class(
         explicitly_allowed <- private$tool_name_in_list(
           tool_name,
           self$tool_allowlist
-        )
+        ) ||
+          isTRUE(allowlist_exempt)
 
         # Known mutating tools remain denied even if annotations are absent or
         # incorrectly mark a tool as read-only.
@@ -537,6 +558,9 @@ Permissions <- R6::R6Class(
           return(private$apply_callback_veto(tool_name, tool_input, context))
         }
         if (isTRUE(explicitly_allowed)) {
+          if (isTRUE(callback_checked)) {
+            return(PermissionResultAllow())
+          }
           return(private$apply_callback_veto(tool_name, tool_input, context))
         }
         return(PermissionResultDeny(
@@ -555,11 +579,11 @@ Permissions <- R6::R6Class(
       }
 
       # Custom callback takes precedence in standard mode.
-      callback_result <- private$check_permission_callback(
-        tool_name,
-        tool_input,
-        context
-      )
+      callback_result <- if (isTRUE(callback_checked)) {
+        NULL
+      } else {
+        private$check_permission_callback(tool_name, tool_input, context)
+      }
       if (!is.null(callback_result)) {
         return(callback_result)
       }
@@ -851,7 +875,18 @@ Permissions <- R6::R6Class(
       TRUE
     },
 
-    check_tool_gating = function(tool_name) {
+    is_allowlist_exempt = function(tool_name, context) {
+      identical(
+        context$.deputy_internal_tool,
+        deputy_tool_result_reader_marker
+      ) &&
+        identical(
+          normalize_native_tool_id(tool_name),
+          "deputy_read_tool_result"
+        )
+    },
+
+    check_tool_gating = function(tool_name, allowlist_exempt = FALSE) {
       if (private$tool_name_in_list(tool_name, private$.tool_denylist)) {
         return(PermissionResultDeny(
           reason = private$gating_reason(
@@ -864,7 +899,7 @@ Permissions <- R6::R6Class(
         ))
       }
 
-      if (!is.null(private$.tool_allowlist)) {
+      if (!is.null(private$.tool_allowlist) && !isTRUE(allowlist_exempt)) {
         if (!private$tool_name_in_list(tool_name, private$.tool_allowlist)) {
           return(PermissionResultDeny(
             reason = private$gating_reason(

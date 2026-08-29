@@ -282,12 +282,22 @@ test_that("relative native tool paths execute inside Agent working_dir", {
   outside <- withr::local_tempdir(pattern = "deputy-process-cwd-")
   writeLines("before", file.path(root, "input.txt"))
   writeLines("outside", file.path(outside, "input.txt"))
+  agent <- NULL
   mock <- create_content_stream_chat(
     tool_name = "write_file",
     tool_result = "input.txt",
     execute = function(request) {
-      writeLines("after", request@arguments$path)
+      do.call(agent$get_tools()[["write_file"]], request@arguments)
     }
+  )
+  mock$tool <- ellmer::tool(
+    fun = function(path) {
+      writeLines("after", path)
+      path
+    },
+    name = "write_file",
+    description = "Write a test file.",
+    arguments = list(path = ellmer::type_string("File path"))
   )
   agent <- Agent$new(
     chat = mock$chat,
@@ -354,20 +364,10 @@ test_that("cancellation before the first chunk never falls back", {
   expect_identical(stop$reason, "user_cancelled")
 })
 
-test_that("non-streaming fallbacks retain tool lifecycle events", {
+test_that("stream failures are surfaced without a second provider request", {
   for (failure_mode in c("stream_setup", "first_chunk")) {
-    state <- new.env(parent = emptyenv())
-    state$on_tool_request <- NULL
-    state$on_tool_result <- NULL
-    state$tool_executed <- FALSE
-
+    chat_calls <- 0L
     chat <- create_mock_chat("fallback response")
-    chat$on_tool_request <- function(callback) {
-      state$on_tool_request <- callback
-    }
-    chat$on_tool_result <- function(callback) {
-      state$on_tool_result <- callback
-    }
     chat$stream <- if (identical(failure_mode, "stream_setup")) {
       function(
         prompt = NULL,
@@ -386,66 +386,25 @@ test_that("non-streaming fallbacks retain tool lifecycle events", {
       }
     }
     chat$chat <- function(prompt = NULL) {
-      request <- ellmer::ContentToolRequest(
-        id = paste0("fallback-tool-", failure_mode),
-        name = "read_file",
-        arguments = list(path = "input.txt")
-      )
-      state$on_tool_request(request)
-      state$tool_executed <- TRUE
-      state$on_tool_result(ellmer::ContentToolResult(
-        value = "fallback contents",
-        request = request
-      ))
+      chat_calls <<- chat_calls + 1L
       "fallback response"
-    }
-    chat$last_turn <- function(role = "assistant") {
-      create_mock_assistant_turn("fallback response")
     }
 
     root <- withr::local_tempdir(pattern = "deputy-fallback-")
-    writeLines("fallback contents", file.path(root, "input.txt"))
     agent <- Agent$new(
       chat = chat,
       permissions = permissions_standard(root),
       working_dir = root
     )
 
-    result <- suppressWarnings(agent$run_sync("Read input.txt"))
-    event_types <- vapply(
-      result$events,
-      function(event) event$type,
-      character(1)
-    )
-
-    expect_identical(state$tool_executed, TRUE, info = failure_mode)
-    expect_identical(
-      event_types,
-      c(
-        "start",
-        "warning",
-        "tool_start",
-        "tool_end",
-        "text",
-        "text_complete",
-        "turn",
-        "usage",
-        "stop"
-      ),
+    expect_error(
+      agent$run_sync("Read input.txt"),
+      paste0(gsub("_", " ", failure_mode), " failed"),
+      fixed = TRUE,
       info = failure_mode
     )
-    expect_length(result$tool_calls(), 1L)
-    expect_length(result$tool_results(), 1L)
-    expect_identical(
-      result$tool_calls()[[1L]]$tool_call_id,
-      paste0("fallback-tool-", failure_mode),
-      info = failure_mode
-    )
-    expect_identical(
-      result$tool_results()[[1L]]$tool_result,
-      "fallback contents",
-      info = failure_mode
-    )
+    expect_identical(chat_calls, 0L, info = failure_mode)
+    expect_false(agent$.__enclos_env__$private$run_active)
   }
 })
 
@@ -495,7 +454,7 @@ test_that("pre-tool effects are applied before a real hook rejection", {
   )
 
   rejection <- tryCatch(
-    agent$.__enclos_env__$private$on_tool_request(request),
+    agent$.__enclos_env__$private$handle_tool_request(request),
     ellmer_tool_reject = function(error) error
   )
 
@@ -526,7 +485,7 @@ test_that("malformed tool identity is rejected before permission checks", {
   attr(request, "name") <- list("run_bash")
 
   expect_snapshot(
-    agent$.__enclos_env__$private$on_tool_request(request),
+    agent$.__enclos_env__$private$handle_tool_request(request),
     error = TRUE
   )
 

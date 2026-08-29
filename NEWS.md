@@ -1,17 +1,38 @@
 # deputy (development version)
 
-* New `Agent$run_async()` runs a task without blocking the R process and
-  returns a promise that resolves to an `AgentResult`. It shares
-  `run_shiny()`'s engine -- ellmer's `stream_async()` with permissions, hooks,
-  and `UsageLimits` enforced through callbacks and terminal accounting -- but
-  collects the final response, run-scoped usage, and stop reason instead of
-  streaming to a UI, accepts a per-run `UsageLimits` override (including
-  `on_exceed = "error"`, which rejects the promise with the structured limit
-  error), and does not impose `run_shiny()`'s absolute-file-path rule. Use it
-  when an Agent is a worker inside a larger async system, such as a sub-agent
-  invoked from a streaming parent chat's tool. Callback-driven runs now also
-  record their run-scoped usage so `AgentResult$usage` and the Agent's last
-  run usage reflect `run_shiny()`/`run_async()` runs.
+* `Agent` is now a governed, drop-in chat: `chat()`, `chat_async()`, `stream()`,
+  `stream_async()`, `run_sync()`, and `run_async()` are adapters over one async
+  run kernel. The public backend escape hatch and separate `run_shiny()` bridge
+  are removed. shinychat can consume `agent$stream_async()` directly, including
+  attachment content, while permissions, hooks, limits, checkpoints, and
+  accounting remain active. `LeadAgent` delegation now uses `run_async()` and
+  no longer blocks the R process.
+
+* New `ContextPolicy()` enables automatic pre-request context compaction and
+  durable offloading of large tool results. Compaction reports whether it used
+  the LLM, a hook, or an explicitly configured text fallback, and includes its
+  own usage. Version 2 saved sessions retain cumulative summaries and portable
+  copies of offloaded results. Chunkable text sidecars keep model retrieval
+  memory-bounded, and explicit relative offload roots remain stable after the
+  policy is created. Native file and code tools execute against the Agent
+  workspace without changing the R process working directory. Replacing turns
+  clears Deputy-owned compacted conversation state while preserving other
+  prompt content. Automatic compaction honors run limits before making its
+  summary request. Prompt-owned routing and compaction boundaries cannot
+  collide with ordinary user headings or summary text, and replacing a prompt
+  resets hook-context de-duplication state.
+  Loading a saved session transactionally replaces the receiver's active
+  offloaded-result set, so results from an earlier conversation cannot leak
+  into later session saves.
+  `LeadAgent` accepts the same policy and propagates it to delegated agents.
+  Prompt updates and sub-agent registration preserve cumulative compaction
+  state, while post-tool hooks inspect the original result before large values
+  are represented to the model by bounded references.
+
+* Concurrent `LeadAgent` delegations reserve their child budgets before launch,
+  so siblings share the lead's remaining usage limits instead of each receiving
+  the full balance. Cloned lead agents also recreate their delegate tool against
+  the clone's own registry, hooks, and run history.
 
 * The `deputy` command now ships as a tested Rapp 0.4 package executable for
   one-off `rx` use and persistent `ir tool install` launchers. Its task and
@@ -24,7 +45,7 @@
   results expose Agent, run, parent, tool-call, and delegation identifiers.
   Generated correlation identifiers no longer advance R's global RNG stream.
 
-* Deputy now has a deliberate 51-symbol public API centered on native agents,
+* Deputy now has a deliberate 52-symbol public API centered on native agents,
   tools, permissions, hooks, skills, delegation, and run usage. Sessions use a
   stable `session_id` for correlation and explicit `Agent$save_session()` and
   `Agent$load_session()` calls for persistence.
