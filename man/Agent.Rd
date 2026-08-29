@@ -1108,6 +1108,8 @@ boundary supported by ellmer.
 \itemize{
 \item Conversation turns
 \item System prompt
+\item The cumulative compaction summary
+\item Portable copies of offloaded tool results
 \item Effective run context
 \item File checkpoint state, when enabled
 \item Metadata (timestamp, version, provider info)
@@ -1139,7 +1141,9 @@ boundary supported by ellmer.
     Tools, permissions, hooks, and the working directory are runtime policy
 and are never restored from a session file. Saved run context is
 validated before conversation state changes and merged with constructor
-context; protected identity conflicts fail the load.
+context; protected identity conflicts fail the load. Compaction summaries
+and integrity-checked tool-result envelopes are restored as conversational
+state under the receiving Agent's session identity.
   }
   \subsection{Returns}{
     Invisible self

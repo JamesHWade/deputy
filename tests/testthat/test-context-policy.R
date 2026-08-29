@@ -191,6 +191,158 @@ test_that("large tool results become durable integrity-checked references", {
   expect_length(list.files(directory, recursive = TRUE), 1L)
 })
 
+test_that("the internal result reader remains available behind an allowlist", {
+  directory <- withr::local_tempdir(pattern = "deputy-results-allowlist-")
+  value <- paste(rep("large result", 100), collapse = " ")
+  large_tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_result",
+    description = "Return a large test value.",
+    arguments = list()
+  )
+  other_tool <- ellmer::tool(
+    fun = function() "other",
+    name = "other_tool",
+    description = "Return another value.",
+    arguments = list()
+  )
+  permissions <- Permissions$new(
+    mode = "standard",
+    file_read = FALSE,
+    file_write = FALSE,
+    bash = FALSE,
+    r_code = FALSE,
+    web = FALSE,
+    install_packages = FALSE,
+    tool_allowlist = "large_result"
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(large_tool, other_tool),
+    permissions = permissions,
+    context_policy = ContextPolicy(
+      max_tokens = NULL,
+      max_tool_result_bytes = 32,
+      offload_dir = directory
+    )
+  )
+  reference <- agent$get_tools()[["large_result"]]()
+  reader <- agent$get_tools()[["deputy_read_tool_result"]]
+  reader_request <- ellmer::ContentToolRequest(
+    id = "reader-call",
+    name = reader@name,
+    arguments = list(reference = reference, offset = 0L),
+    tool = reader
+  )
+  other <- agent$get_tools()[["other_tool"]]
+  other_request <- ellmer::ContentToolRequest(
+    id = "other-call",
+    name = other@name,
+    arguments = list(),
+    tool = other
+  )
+
+  expect_no_error(
+    agent$.__enclos_env__$private$handle_tool_request(reader_request)
+  )
+  expect_error(
+    agent$.__enclos_env__$private$handle_tool_request(other_request),
+    class = "ellmer_tool_reject"
+  )
+})
+
+test_that("saved sessions carry offloaded tool results to a new Agent", {
+  directory <- withr::local_tempdir(pattern = "deputy-portable-results-")
+  value <- paste(rep("portable result", 100), collapse = " ")
+  large_tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_result",
+    description = "Return a portable result.",
+    arguments = list()
+  )
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = 32,
+    offload_dir = directory
+  )
+  source <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(large_tool),
+    context_policy = policy,
+    session_id = "source-results-session"
+  )
+  reference <- source$get_tools()[["large_result"]]()
+  source$set_turns(list(create_mock_user_turn(reference)))
+  session_file <- file.path(directory, "session.rds")
+  suppressMessages(source$save_session(session_file))
+
+  receiver <- Agent$new(
+    chat = create_mock_chat(),
+    context_policy = policy,
+    session_id = "receiver-results-session"
+  )
+  suppressMessages(receiver$load_session(session_file))
+
+  expect_identical(receiver$session_id(), "receiver-results-session")
+  expect_identical(receiver$resolve_tool_result(reference), value)
+  expect_true("deputy_read_tool_result" %in% names(receiver$get_tools()))
+  expect_match(
+    receiver$get_tools()[["deputy_read_tool_result"]](
+      reference,
+      max_chars = 64L
+    ),
+    "portable result"
+  )
+})
+
+test_that("session tool-result integrity failures are atomic", {
+  directory <- withr::local_tempdir(pattern = "deputy-corrupt-results-")
+  large_tool <- ellmer::tool(
+    fun = function() paste(rep("large result", 100), collapse = " "),
+    name = "large_result",
+    description = "Return a large result.",
+    arguments = list()
+  )
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = 32,
+    offload_dir = directory
+  )
+  source <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(large_tool),
+    context_policy = policy,
+    session_id = "corrupt-source-session"
+  )
+  source$get_tools()[["large_result"]]()
+  session_file <- file.path(directory, "session.rds")
+  suppressMessages(source$save_session(session_file))
+  payload <- readRDS(session_file)
+  payload$tool_result_envelopes[[1L]]$value <- "tampered"
+  saveRDS(payload, session_file)
+
+  old_turns <- list(create_mock_user_turn("Keep this turn"))
+  receiver_chat <- create_mock_chat()
+  receiver_chat$set_turns(old_turns)
+  receiver_chat$set_system_prompt("Keep this prompt")
+  receiver <- Agent$new(
+    chat = receiver_chat,
+    context_policy = policy,
+    session_id = "corrupt-receiver-session"
+  )
+
+  expect_error(
+    suppressMessages(receiver$load_session(session_file)),
+    class = "deputy_session_load"
+  )
+  expect_equal(receiver$get_turns(), old_turns)
+  expect_identical(receiver$get_system_prompt(), "Keep this prompt")
+  expect_false(dir.exists(tool_result_offload_dir(
+    policy,
+    "corrupt-receiver-session"
+  )))
+})
+
 test_that("tool replacement restores the model result reader when needed", {
   directory <- withr::local_tempdir(pattern = "deputy-tool-results-")
   large_tool <- ellmer::tool(

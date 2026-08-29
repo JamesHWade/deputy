@@ -179,6 +179,8 @@ test_that("Agent save_session creates file", {
       "schema_version",
       "turns",
       "system_prompt",
+      "compaction_summary",
+      "tool_result_envelopes",
       "run_context",
       "appended_hook_context_hashes",
       "file_checkpoint_state",
@@ -224,6 +226,39 @@ test_that("Agent load_session restores chat state but preserves authority", {
   expect_identical(receiver$working_dir, configured_working_dir)
 })
 
+test_that("Agent sessions preserve cumulative compaction context", {
+  root <- withr::local_tempdir(pattern = "deputy-session-compaction-")
+  source_chat <- create_mock_chat()
+  source_chat$set_turns(list(
+    create_mock_user_turn("Original question"),
+    create_mock_assistant_turn("Original answer"),
+    create_mock_user_turn("Follow-up")
+  ))
+  source <- Agent$new(chat = source_chat)
+  source$compact(keep_last = 1L, summary = "Saved cumulative summary")
+  session_file <- file.path(root, "session.rds")
+  suppressMessages(source$save_session(session_file))
+
+  probe <- new.env(parent = emptyenv())
+  receiver <- Agent$new(
+    chat = create_compaction_mock_chat(
+      responses = list("Merged summary"),
+      probe = probe
+    )
+  )
+  suppressMessages(receiver$load_session(session_file))
+  receiver$.__enclos_env__$private$generate_compaction_summary(list(
+    create_mock_user_turn("New question"),
+    create_mock_assistant_turn("New answer")
+  ))
+
+  expect_match(
+    probe$summary_call$prompt,
+    "Existing summary from earlier compactions:\nSaved cumulative summary",
+    fixed = TRUE
+  )
+})
+
 test_that("Agent load_session validates payload before mutating conversation", {
   root <- withr::local_tempdir(pattern = "deputy-session-atomic-")
   session_file <- file.path(root, "malformed.rds")
@@ -238,10 +273,12 @@ test_that("Agent load_session validates payload before mutating conversation", {
       schema_version = 1L,
       turns = list(create_mock_user_turn("new turn")),
       system_prompt = "new prompt",
+      compaction_summary = NULL,
+      tool_result_envelopes = list(),
       run_context = list(),
       appended_hook_context_hashes = new.env(parent = emptyenv()),
       file_checkpoint_state = NULL,
-      metadata = list()
+      metadata = list(session_id = "malformed-session")
     ),
     session_file
   )

@@ -504,10 +504,12 @@ test_that("unsafe restored context is rejected before conversation mutation", {
         schema_version = 1L,
         turns = unsafe_turns,
         system_prompt = "Unsafe prompt",
+        compaction_summary = NULL,
+        tool_result_envelopes = list(),
         run_context = case$context,
         appended_hook_context_hashes = character(),
         file_checkpoint_state = NULL,
-        metadata = list()
+        metadata = list(session_id = paste0("unsafe-", case_name))
       ),
       path
     )

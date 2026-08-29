@@ -12,6 +12,8 @@ native_file_tool_names <- c(
   "read_csv"
 )
 
+deputy_tool_result_reader_marker <- new.env(parent = emptyenv())
+
 runtime_wrap_tool <- function(tool, resolve_arguments, process_result) {
   if (!inherits(tool, "ellmer::ToolDef")) {
     cli_abort("{.arg tool} must be an ellmer tool definition")
@@ -60,6 +62,10 @@ runtime_wrap_tool <- function(tool, resolve_arguments, process_result) {
   )
   attr(wrapped, "deputy_runtime_tool") <- TRUE
   attr(wrapped, "deputy_runtime_source_tool") <- source_tool
+  internal_tool <- attr(source_tool, "deputy_internal_tool", exact = TRUE)
+  if (!is.null(internal_tool)) {
+    attr(wrapped, "deputy_internal_tool") <- internal_tool
+  }
   wrapped
 }
 
@@ -178,6 +184,174 @@ tool_result_preview <- function(value, max_chars = 4000L) {
   paste0(substr(text, 1L, max_chars), "\n[preview truncated]")
 }
 
+validate_tool_result_envelope <- function(
+  envelope,
+  result_id = NULL,
+  session_id = NULL
+) {
+  serialized <- if (is.list(envelope) && "value" %in% names(envelope)) {
+    serialize(envelope$value, NULL, version = 3)
+  } else {
+    NULL
+  }
+  sha256 <- if (is.null(serialized)) {
+    NULL
+  } else {
+    digest::digest(serialized, algo = "sha256", serialize = FALSE)
+  }
+  valid <- is.list(envelope) &&
+    identical(envelope$schema_version, 1L) &&
+    is.character(envelope$id) &&
+    length(envelope$id) == 1L &&
+    grepl("^result_[a-f0-9]{64}$", envelope$id) &&
+    identical(envelope$id, paste0("result_", sha256)) &&
+    (is.null(result_id) || identical(envelope$id, result_id)) &&
+    is.character(envelope$session_id) &&
+    length(envelope$session_id) == 1L &&
+    !is.na(envelope$session_id) &&
+    nzchar(envelope$session_id) &&
+    (is.null(session_id) || identical(envelope$session_id, session_id)) &&
+    identical(envelope$bytes, length(serialized)) &&
+    identical(envelope$sha256, sha256)
+  if (!isTRUE(valid)) {
+    cli_abort("Offloaded tool result failed integrity validation")
+  }
+  envelope
+}
+
+validate_tool_result_envelopes <- function(envelopes, session_id) {
+  if (
+    !is.character(session_id) ||
+      length(session_id) != 1L ||
+      is.na(session_id) ||
+      !nzchar(session_id) ||
+      !grepl("^[A-Za-z0-9][A-Za-z0-9._-]*$", session_id)
+  ) {
+    cli_abort("Saved tool results require one non-empty session identifier")
+  }
+  if (!is.list(envelopes)) {
+    cli_abort("Saved tool results must be a named list")
+  }
+  if (length(envelopes) == 0L) {
+    return(list())
+  }
+  result_ids <- names(envelopes)
+  if (
+    is.null(result_ids) ||
+      anyNA(result_ids) ||
+      !all(nzchar(result_ids)) ||
+      anyDuplicated(result_ids)
+  ) {
+    cli_abort("Saved tool results must have unique result identifiers")
+  }
+
+  Map(
+    function(envelope, result_id) {
+      validate_tool_result_envelope(
+        envelope,
+        result_id = result_id,
+        session_id = session_id
+      )
+    },
+    envelopes,
+    result_ids
+  )
+}
+
+collect_tool_result_envelopes <- function(policy, session_id) {
+  directory <- tool_result_offload_dir(policy, session_id)
+  if (!dir.exists(directory)) {
+    return(list())
+  }
+  paths <- list.files(
+    directory,
+    pattern = "^result_[a-f0-9]{64}\\.rds$",
+    full.names = TRUE
+  )
+  if (length(paths) == 0L) {
+    return(list())
+  }
+  result_ids <- sub("\\.rds$", "", basename(paths))
+  envelopes <- Map(
+    function(path, result_id) {
+      validate_tool_result_envelope(
+        readRDS(path),
+        result_id = result_id,
+        session_id = session_id
+      )
+    },
+    paths,
+    result_ids
+  )
+  names(envelopes) <- result_ids
+  envelopes
+}
+
+import_tool_result_envelopes <- function(
+  envelopes,
+  policy,
+  source_session_id,
+  target_session_id
+) {
+  target_session_id <- validate_deputy_id(
+    target_session_id,
+    argument = "target_session_id"
+  )
+  envelopes <- validate_tool_result_envelopes(
+    envelopes,
+    source_session_id
+  )
+  if (length(envelopes) == 0L) {
+    return(character())
+  }
+
+  directory <- tool_result_offload_dir(policy, target_session_id)
+  if (!dir.exists(directory)) {
+    dir.create(directory, recursive = TRUE, showWarnings = FALSE)
+    Sys.chmod(directory, mode = "0700")
+  }
+  if (!dir.exists(directory)) {
+    cli_abort("Could not create the tool-result offload directory")
+  }
+
+  created <- character()
+  committed <- FALSE
+  on.exit(
+    {
+      if (!committed && length(created) > 0L) {
+        unlink(created)
+      }
+    },
+    add = TRUE
+  )
+
+  for (result_id in names(envelopes)) {
+    envelope <- envelopes[[result_id]]
+    envelope$session_id <- target_session_id
+    path <- file.path(directory, paste0(result_id, ".rds"))
+    if (file.exists(path)) {
+      validate_tool_result_envelope(
+        readRDS(path),
+        result_id = result_id,
+        session_id = target_session_id
+      )
+      next
+    }
+
+    temporary <- tempfile("result-", tmpdir = directory, fileext = ".rds")
+    on.exit(unlink(temporary), add = TRUE)
+    saveRDS(envelope, temporary, version = 3)
+    Sys.chmod(temporary, mode = "0600")
+    if (!file.rename(temporary, path)) {
+      cli_abort("Could not restore an offloaded tool result")
+    }
+    created <- c(created, path)
+  }
+
+  committed <- TRUE
+  created
+}
+
 read_tool_result_envelope <- function(reference, policy, session_id) {
   result_id <- parse_tool_result_reference(reference)
   path <- file.path(
@@ -188,23 +362,11 @@ read_tool_result_envelope <- function(reference, policy, session_id) {
     cli_abort("Offloaded tool result not found: {.val {result_id}}")
   }
 
-  envelope <- readRDS(path)
-  valid <- is.list(envelope) &&
-    identical(envelope$schema_version, 1L) &&
-    identical(envelope$id, result_id) &&
-    identical(envelope$session_id, session_id) &&
-    identical(
-      digest::digest(
-        serialize(envelope$value, NULL, version = 3),
-        algo = "sha256",
-        serialize = FALSE
-      ),
-      envelope$sha256
-    )
-  if (!isTRUE(valid)) {
-    cli_abort("Offloaded tool result failed integrity validation")
-  }
-  envelope
+  validate_tool_result_envelope(
+    readRDS(path),
+    result_id = result_id,
+    session_id = session_id
+  )
 }
 
 read_tool_result_chunk <- function(
@@ -245,7 +407,7 @@ read_tool_result_chunk <- function(
 }
 
 tool_result_reader_tool <- function(read_chunk) {
-  ellmer::tool(
+  tool <- ellmer::tool(
     fun = function(reference, offset = 0L, max_chars = 8192L) {
       read_chunk(reference, offset, max_chars)
     },
@@ -274,6 +436,8 @@ tool_result_reader_tool <- function(read_chunk) {
       idempotent_hint = TRUE
     )
   )
+  attr(tool, "deputy_internal_tool") <- deputy_tool_result_reader_marker
+  tool
 }
 
 parse_tool_result_reference <- function(reference) {

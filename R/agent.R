@@ -934,14 +934,15 @@ Agent <- R6::R6Class(
     #' The session file contains:
     #' - Conversation turns
     #' - System prompt
+    #' - The cumulative compaction summary
+    #' - Portable copies of offloaded tool results
     #' - Effective run context
     #' - File checkpoint state, when enabled
     #' - Metadata (timestamp, version, provider info)
     save_session = function(path) {
-      session <- private$build_session_payload()
-
       tryCatch(
         {
+          session <- private$build_session_payload()
           saveRDS(session, path)
           cli_alert_success("Session saved to {.path {path}}")
           invisible(path)
@@ -969,7 +970,9 @@ Agent <- R6::R6Class(
     #' Tools, permissions, hooks, and the working directory are runtime policy
     #' and are never restored from a session file. Saved run context is
     #' validated before conversation state changes and merged with constructor
-    #' context; protected identity conflicts fail the load.
+    #' context; protected identity conflicts fail the load. Compaction summaries
+    #' and integrity-checked tool-result envelopes are restored as conversational
+    #' state under the receiving Agent's session identity.
     load_session = function(path) {
       if (isTRUE(private$run_active)) {
         cli::cli_abort(
@@ -2613,6 +2616,11 @@ Agent <- R6::R6Class(
         schema_version = 1L,
         turns = private$.chat$get_turns(),
         system_prompt = private$.chat$get_system_prompt(),
+        compaction_summary = private$.compaction_summary,
+        tool_result_envelopes = collect_tool_result_envelopes(
+          private$.context_policy,
+          private$.session_id
+        ),
         run_context = private$snapshot_run_context(),
         appended_hook_context_hashes = private$appended_hook_context_hashes,
         file_checkpoint_state = if (is.null(private$.file_checkpoints)) {
@@ -2643,6 +2651,8 @@ Agent <- R6::R6Class(
         "schema_version",
         "turns",
         "system_prompt",
+        "compaction_summary",
+        "tool_result_envelopes",
         "run_context",
         "appended_hook_context_hashes",
         "file_checkpoint_state",
@@ -2690,6 +2700,34 @@ Agent <- R6::R6Class(
           path = source
         )
       }
+      if (
+        !is.null(session$compaction_summary) &&
+          (!is.character(session$compaction_summary) ||
+            length(session$compaction_summary) != 1L ||
+            is.na(session$compaction_summary))
+      ) {
+        abort_session_load(
+          "Invalid session file - compaction_summary must be one string or NULL",
+          path = source
+        )
+      }
+
+      restored_tool_results <- tryCatch(
+        validate_tool_result_envelopes(
+          session$tool_result_envelopes,
+          metadata$session_id
+        ),
+        error = function(error) {
+          abort_session_load(
+            c(
+              "Invalid session file - saved tool results failed validation",
+              "x" = error$message
+            ),
+            path = source,
+            parent = error
+          )
+        }
+      )
 
       restored_run_context <- tryCatch(
         {
@@ -2739,14 +2777,31 @@ Agent <- R6::R6Class(
 
       previous_turns <- private$.chat$get_turns()
       previous_prompt <- private$.chat$get_system_prompt()
+      previous_tools <- private$.chat$get_tools()
+      previous_reader_registered <- private$.tool_result_reader_registered
+      imported_tool_results <- character()
       tryCatch(
         {
+          imported_tool_results <- import_tool_result_envelopes(
+            restored_tool_results,
+            policy = private$.context_policy,
+            source_session_id = metadata$session_id,
+            target_session_id = private$.session_id
+          )
           private$.chat$set_turns(session$turns)
           private$.chat$set_system_prompt(session$system_prompt)
+          if (length(restored_tool_results) > 0L) {
+            private$ensure_tool_result_reader()
+          }
         },
         error = function(error) {
           try(private$.chat$set_turns(previous_turns), silent = TRUE)
           try(private$.chat$set_system_prompt(previous_prompt), silent = TRUE)
+          try(private$.chat$set_tools(previous_tools), silent = TRUE)
+          private$.tool_result_reader_registered <- previous_reader_registered
+          if (length(imported_tool_results) > 0L) {
+            unlink(imported_tool_results)
+          }
           abort_session_load(
             c(
               "Failed to restore session conversation state",
@@ -2770,6 +2825,7 @@ Agent <- R6::R6Class(
       private$.run_context <- restored_run_context
       private$last_run_context <- clone_run_context(restored_run_context)
       private$appended_hook_context_hashes <- restored_hashes
+      private$.compaction_summary <- session$compaction_summary
     },
 
     notify = function(message, level = "info", code = NULL, ...) {
@@ -3175,8 +3231,24 @@ Agent <- R6::R6Class(
         delegation_id = record$delegation_id
       )
 
-      # Check permissions first
-      perm_result <- self$permissions$check(tool_name, tool_input, context)
+      # Deputy's session-local result reader is not part of the user-configured
+      # tool surface, so an allowlist must not make offloaded results
+      # unreadable. The exact registered tool is marked internally; a public
+      # tool with the same name does not receive this exception.
+      internal_result_reader <-
+        identical(
+          extracted$internal_tool,
+          deputy_tool_result_reader_marker
+        ) &&
+        identical(tool_name, "deputy_read_tool_result")
+      perm_result <- if (
+        isTRUE(internal_result_reader) &&
+          !tool_name %in% self$permissions$tool_denylist
+      ) {
+        PermissionResultAllow()
+      } else {
+        self$permissions$check(tool_name, tool_input, context)
+      }
 
       if (inherits(perm_result, "PermissionResultDeny")) {
         request_result <- self$hooks$fire(
@@ -3373,6 +3445,7 @@ Agent <- R6::R6Class(
       tool_name <- "unknown"
       tool_input <- list()
       tool_annotations <- NULL
+      internal_tool <- NULL
       provider_tool_call_id <- NULL
       tool_identity_error <- NULL
 
@@ -3383,6 +3456,7 @@ Agent <- R6::R6Class(
           tool_name = tool_name,
           tool_input = tool_input,
           tool_annotations = tool_annotations,
+          internal_tool = internal_tool,
           provider_tool_call_id = provider_tool_call_id,
           tool_identity_error = tool_request_identity_error(request)
         ))
@@ -3399,6 +3473,7 @@ Agent <- R6::R6Class(
           tool_name = tool_name,
           tool_input = tool_input,
           tool_annotations = tool_annotations,
+          internal_tool = internal_tool,
           provider_tool_call_id = provider_tool_call_id,
           tool_identity_error = tool_request_identity_error(request)
         ))
@@ -3439,11 +3514,22 @@ Agent <- R6::R6Class(
           NULL
         }
       )
+      internal_tool <- tryCatch(
+        {
+          if (is.null(request@tool)) {
+            NULL
+          } else {
+            attr(request@tool, "deputy_internal_tool", exact = TRUE)
+          }
+        },
+        error = function(e) NULL
+      )
 
       list(
         tool_name = tool_name,
         tool_input = tool_input,
         tool_annotations = tool_annotations,
+        internal_tool = internal_tool,
         provider_tool_call_id = provider_tool_call_id,
         tool_identity_error = tool_identity_error
       )

@@ -11,8 +11,9 @@
 * New `ContextPolicy()` enables automatic pre-request context compaction and
   durable offloading of large tool results. Compaction reports whether it used
   the LLM, a hook, or an explicitly configured text fallback, and includes its
-  own usage. Native relative tool paths resolve against the Agent workspace
-  without changing the R process working directory.
+  own usage. Saved sessions retain cumulative summaries and portable copies of
+  offloaded results. Native relative tool paths resolve against the Agent
+  workspace without changing the R process working directory.
 
 * The `deputy` command now ships as a tested Rapp 0.4 package executable for
   one-off `rx` use and persistent `ir tool install` launchers. Its task and
