@@ -574,6 +574,7 @@ Agent <- R6::R6Class(
     set_system_prompt = function(value) {
       previous_summary <- private$.compaction_summary
       private$.chat$set_system_prompt(value)
+      private$appended_hook_context_hashes <- character()
       parts <- private$compaction_prompt_parts(value)
       private$.compaction_summary <- if (
         is.null(previous_summary) ||
@@ -1214,12 +1215,11 @@ Agent <- R6::R6Class(
         }
       }
 
+      summary <- paste(as.character(summary), collapse = "\n")
       current_system <- private$system_prompt_without_compaction()
       new_system <- paste0(
         current_system,
-        "\n\n## Previous Conversation Summary\n",
-        summary,
-        "\n\n## End Previous Conversation Summary"
+        private$compaction_prompt_block(summary)
       )
 
       private$.chat$set_system_prompt(new_system)
@@ -3761,29 +3761,74 @@ Agent <- R6::R6Class(
       ) {
         return(NULL)
       }
-      start_marker <- "\n\n## Previous Conversation Summary\n"
-      end_marker <- "\n\n## End Previous Conversation Summary"
-      start <- regexpr(start_marker, prompt, fixed = TRUE)
-      if (start[[1L]] < 0L) {
+      start_pattern <- paste0(
+        "\\n\\n<!-- deputy-compaction-summary:v1 chars=([0-9]+) ",
+        "sha256=([a-f0-9]{64}) -->\\n",
+        "## Previous Conversation Summary\\n"
+      )
+      start <- regexec(start_pattern, prompt, perl = TRUE)[[1L]]
+      captured <- regmatches(prompt, list(start))[[1L]]
+      if (length(captured) != 3L) {
         return(NULL)
       }
-      summary_start <- start[[1L]] + attr(start, "match.length")
-      remainder <- substr(prompt, summary_start, nchar(prompt))
-      end <- regexpr(end_marker, remainder, fixed = TRUE)
-      if (end[[1L]] < 0L) {
+      summary_chars <- suppressWarnings(as.numeric(captured[[2L]]))
+      if (
+        length(summary_chars) != 1L ||
+          is.na(summary_chars) ||
+          !is.finite(summary_chars) ||
+          summary_chars < 0 ||
+          summary_chars != floor(summary_chars)
+      ) {
         return(NULL)
       }
 
-      end_start <- summary_start + end[[1L]] - 1L
+      summary_start <- start[[1L]] + attr(start, "match.length")[[1L]]
+      summary_end <- summary_start + summary_chars - 1
+      summary <- if (summary_chars == 0) {
+        ""
+      } else {
+        substr(prompt, summary_start, summary_end)
+      }
+      if (
+        !identical(
+          digest::digest(summary, algo = "sha256", serialize = FALSE),
+          captured[[3L]]
+        )
+      ) {
+        return(NULL)
+      }
+
+      end_marker <- paste0(
+        "\n\n## End Previous Conversation Summary\n",
+        "<!-- deputy-compaction-summary:v1:end -->"
+      )
+      end_start <- summary_start + summary_chars
+      end_end <- end_start + nchar(end_marker, type = "chars") - 1
+      if (!identical(substr(prompt, end_start, end_end), end_marker)) {
+        return(NULL)
+      }
+
       before <- substr(prompt, 1L, start[[1L]] - 1L)
-      summary <- substr(prompt, summary_start, end_start - 1L)
-      after_start <- end_start + attr(end, "match.length")
+      after_start <- end_end + 1
       after <- if (after_start > nchar(prompt)) {
         ""
       } else {
         substr(prompt, after_start, nchar(prompt))
       }
       list(before = before, summary = summary, after = after)
+    },
+
+    compaction_prompt_block = function(summary) {
+      paste0(
+        "\n\n<!-- deputy-compaction-summary:v1 chars=",
+        nchar(summary, type = "chars"),
+        " sha256=",
+        digest::digest(summary, algo = "sha256", serialize = FALSE),
+        " -->\n## Previous Conversation Summary\n",
+        summary,
+        "\n\n## End Previous Conversation Summary\n",
+        "<!-- deputy-compaction-summary:v1:end -->"
+      )
     },
 
     system_prompt_without_compaction = function() {

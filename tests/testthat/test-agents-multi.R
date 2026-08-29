@@ -1103,6 +1103,48 @@ test_that("register_sub_agent preserves prompt content outside routing", {
   )
 })
 
+test_that("register_sub_agent ignores user-authored routing headings", {
+  user_section <- paste(
+    "Base prompt",
+    "# Available Sub-Agents",
+    "These headings are user-authored instructions.",
+    "# End Available Sub-Agents",
+    sep = "\n"
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(agent_definition(
+      name = "first",
+      description = "First generated helper",
+      prompt = "Act as the first helper"
+    )),
+    system_prompt = user_section
+  )
+
+  lead$register_sub_agent(agent_definition(
+    name = "second",
+    description = "Second generated helper",
+    prompt = "Act as the second helper"
+  ))
+
+  prompt <- lead$get_system_prompt()
+  expect_match(prompt, "user-authored instructions", fixed = TRUE)
+  expect_match(prompt, "First generated helper", fixed = TRUE)
+  expect_match(prompt, "Second generated helper", fixed = TRUE)
+  expect_length(
+    gregexpr("# Available Sub-Agents", prompt, fixed = TRUE)[[1L]],
+    2L
+  )
+  expect_length(
+    gregexpr(
+      "<!-- deputy-lead-routing:v1:start -->",
+      prompt,
+      fixed = TRUE
+    )[[1L]],
+    1L
+  )
+})
+
 test_that("agent_definition accepts all parameter types", {
   def <- agent_definition(
     name = "full_agent",

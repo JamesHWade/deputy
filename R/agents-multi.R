@@ -220,6 +220,11 @@ print.AgentDefinition <- function(x, ...) {
   invisible(x)
 }
 
+deputy_lead_routing_start_marker <-
+  "<!-- deputy-lead-routing:v1:start -->"
+deputy_lead_routing_end_marker <-
+  "<!-- deputy-lead-routing:v1:end -->"
+
 #' LeadAgent R6 Class
 #'
 #' @description
@@ -484,6 +489,7 @@ LeadAgent <- R6::R6Class(
       if (length(sub_agents) > 0) {
         lines <- c(
           lines,
+          deputy_lead_routing_start_marker,
           "# Available Sub-Agents",
           "",
           "You can delegate specialized tasks to these sub-agents using the",
@@ -501,6 +507,7 @@ LeadAgent <- R6::R6Class(
           "will complete the task and return results to you.",
           "",
           "# End Available Sub-Agents",
+          deputy_lead_routing_end_marker,
           ""
         )
       }
@@ -514,8 +521,8 @@ LeadAgent <- R6::R6Class(
         return(section)
       }
 
-      start_marker <- "# Available Sub-Agents"
-      end_marker <- "# End Available Sub-Agents"
+      start_marker <- deputy_lead_routing_start_marker
+      end_marker <- deputy_lead_routing_end_marker
       start <- regexpr(start_marker, full_prompt, fixed = TRUE)
       if (start[[1L]] < 0L) {
         return(private$build_lead_prompt(full_prompt, sub_agents))

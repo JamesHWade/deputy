@@ -798,6 +798,22 @@ test_that("set_system_prompt recovers a retained compaction summary", {
   expect_match(agent$get_system_prompt(), "Keep this addition", fixed = TRUE)
 })
 
+test_that("set_system_prompt resets hook-context de-duplication", {
+  agent <- Agent$new(chat = create_mock_chat())
+  context <- "Required repeated hook context"
+  agent$.__enclos_env__$private$append_hook_context(context)
+
+  agent$set_system_prompt("Replacement prompt")
+  agent$.__enclos_env__$private$append_hook_context(context)
+
+  expect_match(agent$get_system_prompt(), "Replacement prompt", fixed = TRUE)
+  expect_match(agent$get_system_prompt(), context, fixed = TRUE)
+  expect_length(
+    agent$.__enclos_env__$private$appended_hook_context_hashes,
+    1L
+  )
+})
+
 test_that("set_turns clears compacted history but preserves prompt additions", {
   chat <- create_mock_chat()
   chat$set_system_prompt("Base prompt")
@@ -840,6 +856,62 @@ test_that("set_turns preserves user-authored summary headings", {
   agent$set_system_prompt(prompt)
   agent$set_turns(list(create_mock_user_turn("Replacement")))
   expect_identical(agent$get_system_prompt(), prompt)
+})
+
+test_that("compaction summary delimiters cannot terminate their own block", {
+  collision_summary <- paste(
+    "Retain the first part.",
+    "## End Previous Conversation Summary",
+    "Retain text after the embedded delimiter.",
+    sep = "\n\n"
+  )
+  chat <- create_mock_chat()
+  chat$set_system_prompt("Base prompt")
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  agent <- Agent$new(chat = chat)
+
+  agent$compact(keep_last = 1L, summary = collision_summary)
+  expect_match(
+    agent$get_system_prompt(),
+    "Retain text after the embedded delimiter.",
+    fixed = TRUE
+  )
+  expect_identical(
+    agent$.__enclos_env__$private$.compaction_summary,
+    collision_summary
+  )
+
+  chat$set_turns(list(
+    create_mock_user_turn("Q2"),
+    create_mock_assistant_turn("A2"),
+    create_mock_user_turn("Q3")
+  ))
+  agent$compact(keep_last = 1L, summary = "Replacement summary")
+  prompt <- agent$get_system_prompt()
+  expect_no_match(
+    prompt,
+    "Retain text after the embedded delimiter.",
+    fixed = TRUE
+  )
+  expect_length(
+    gregexpr(
+      "<!-- deputy-compaction-summary:v1 chars=",
+      prompt,
+      fixed = TRUE
+    )[[1L]],
+    1L
+  )
+
+  agent$set_turns(list())
+  expect_no_match(
+    agent$get_system_prompt(),
+    "deputy-compaction-summary",
+    fixed = TRUE
+  )
 })
 
 test_that("native tool paths resolve against the Agent workspace", {
