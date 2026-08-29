@@ -329,12 +329,11 @@ LeadAgent <- R6::R6Class(
       }
       private$.sub_agent_defs[[definition$name]] <- definition
 
-      # Rebuild and update system prompt to include new sub-agent
-      # Extract base prompt (before sub-agent section) if possible
+      # Replace only the generated routing section so compaction summaries,
+      # skills, and hook-provided context remain intact.
       current_prompt <- private$.chat$get_system_prompt()
-      base_prompt <- private$extract_base_prompt(current_prompt)
-      new_prompt <- private$build_lead_prompt(
-        base_prompt,
+      new_prompt <- private$replace_lead_prompt(
+        current_prompt,
         private$.sub_agent_defs
       )
       private$.chat$set_system_prompt(new_prompt)
@@ -500,6 +499,8 @@ LeadAgent <- R6::R6Class(
           lines,
           "When delegating, provide a clear task description. The sub-agent",
           "will complete the task and return results to you.",
+          "",
+          "# End Available Sub-Agents",
           ""
         )
       }
@@ -507,29 +508,32 @@ LeadAgent <- R6::R6Class(
       paste(lines, collapse = "\n")
     },
 
-    # Extract base prompt (before sub-agent section) from full prompt
-    extract_base_prompt = function(full_prompt) {
-      if (is.null(full_prompt) || nchar(full_prompt) == 0) {
-        return(NULL)
+    replace_lead_prompt = function(full_prompt, sub_agents) {
+      section <- private$build_lead_prompt(NULL, sub_agents)
+      if (!is_nonempty_string(full_prompt)) {
+        return(section)
       }
 
-      # Look for the sub-agent section marker
-      marker <- "# Available Sub-Agents"
-      marker_pos <- regexpr(marker, full_prompt, fixed = TRUE)
-
-      if (marker_pos > 0) {
-        # Extract everything before the marker
-        base <- substr(full_prompt, 1, marker_pos - 1)
-        # Trim trailing whitespace
-        base <- sub("\\s+$", "", base)
-        if (nchar(base) == 0) {
-          return(NULL)
-        }
-        return(base)
+      start_marker <- "# Available Sub-Agents"
+      end_marker <- "# End Available Sub-Agents"
+      start <- regexpr(start_marker, full_prompt, fixed = TRUE)
+      if (start[[1L]] < 0L) {
+        return(private$build_lead_prompt(full_prompt, sub_agents))
+      }
+      remainder <- substr(full_prompt, start[[1L]], nchar(full_prompt))
+      end <- regexpr(end_marker, remainder, fixed = TRUE)
+      if (end[[1L]] < 0L) {
+        return(private$build_lead_prompt(full_prompt, sub_agents))
       }
 
-      # No marker found, return the full prompt as base
-      full_prompt
+      before <- substr(full_prompt, 1L, start[[1L]] - 1L)
+      after_start <- start[[1L]] + end[[1L]] - 1L + attr(end, "match.length")
+      after <- if (after_start > nchar(full_prompt)) {
+        ""
+      } else {
+        substr(full_prompt, after_start, nchar(full_prompt))
+      }
+      paste0(before, section, after)
     },
 
     # Create the delegate_to_agent tool

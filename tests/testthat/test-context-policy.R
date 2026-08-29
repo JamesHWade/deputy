@@ -191,6 +191,54 @@ test_that("large tool results become durable integrity-checked references", {
   expect_length(list.files(directory, recursive = TRUE), 1L)
 })
 
+test_that("post-tool hooks inspect original offloaded results", {
+  directory <- withr::local_tempdir(pattern = "deputy-hook-results-")
+  value <- paste(rep("sensitive large result", 100), collapse = " ")
+  tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_result",
+    description = "Return a large test value.",
+    arguments = list()
+  )
+  captured <- NULL
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(tool),
+    context_policy = ContextPolicy(
+      max_tokens = NULL,
+      max_tool_result_bytes = 32,
+      offload_dir = directory
+    )
+  )
+  agent$add_hook(HookMatcher$new(
+    event = "PostToolUse",
+    timeout = 0,
+    callback = function(tool_name, tool_result, tool_error, context) {
+      captured <<- tool_result
+      NULL
+    }
+  ))
+  wrapped <- agent$get_tools()[["large_result"]]
+  request <- ellmer::ContentToolRequest(
+    id = "large-result-call",
+    name = wrapped@name,
+    arguments = list(),
+    tool = wrapped
+  )
+  private <- agent$.__enclos_env__$private
+
+  private$handle_tool_request(request)
+  model_result <- wrapped()
+  private$handle_tool_result(ellmer::ContentToolResult(
+    value = model_result,
+    request = request
+  ))
+
+  expect_match(model_result, "deputy://tool-result/result_")
+  expect_identical(captured, value)
+  expect_length(private$original_tool_results, 0L)
+})
+
 test_that("tool-result previews render bounded slices", {
   character_value <- c(
     strrep("a", 1000),
@@ -512,6 +560,41 @@ test_that("repeated compaction preserves prompt additions after the summary", {
   expect_match(prompt, "Keep this context")
   expect_match(prompt, "Second summary")
   expect_no_match(prompt, "First summary")
+})
+
+test_that("set_system_prompt recovers a retained compaction summary", {
+  probe <- new.env(parent = emptyenv())
+  chat <- create_compaction_mock_chat(
+    responses = list("Replacement summary"),
+    probe = probe
+  )
+  chat$set_system_prompt("Base prompt")
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  agent <- Agent$new(chat = chat)
+  agent$compact(keep_last = 1L, summary = "Retained summary")
+
+  agent$set_system_prompt(paste(
+    agent$get_system_prompt(),
+    "Keep this addition",
+    sep = "\n\n"
+  ))
+  chat$set_turns(list(
+    create_mock_user_turn("Q2"),
+    create_mock_assistant_turn("A2"),
+    create_mock_user_turn("Q3")
+  ))
+  agent$compact(keep_last = 1L)
+
+  expect_match(
+    probe$summary_call$prompt,
+    "Existing summary from earlier compactions:\nRetained summary",
+    fixed = TRUE
+  )
+  expect_match(agent$get_system_prompt(), "Keep this addition", fixed = TRUE)
 })
 
 test_that("native tool paths resolve against the Agent workspace", {

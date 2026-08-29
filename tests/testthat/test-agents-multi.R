@@ -1068,6 +1068,41 @@ test_that("LeadAgent register_sub_agent updates system prompt", {
   expect_true(grepl("newly added helper", prompt_after))
 })
 
+test_that("register_sub_agent preserves prompt content outside routing", {
+  chat <- create_mock_chat()
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  lead <- LeadAgent$new(
+    chat = chat,
+    sub_agents = list(agent_definition(
+      name = "first",
+      description = "First helper",
+      prompt = "You are the first helper"
+    )),
+    system_prompt = "Base prompt"
+  )
+  lead$compact(keep_last = 1L, summary = "Retained lead summary")
+  lead$.__enclos_env__$private$append_hook_context("Retained hook context")
+
+  lead$register_sub_agent(agent_definition(
+    name = "second",
+    description = "Second helper",
+    prompt = "You are the second helper"
+  ))
+
+  prompt <- lead$get_system_prompt()
+  expect_match(prompt, "Retained lead summary", fixed = TRUE)
+  expect_match(prompt, "Retained hook context", fixed = TRUE)
+  expect_match(prompt, "second", fixed = TRUE)
+  expect_length(
+    gregexpr("# Available Sub-Agents", prompt, fixed = TRUE)[[1L]],
+    1L
+  )
+})
+
 test_that("agent_definition accepts all parameter types", {
   def <- agent_definition(
     name = "full_agent",

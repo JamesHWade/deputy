@@ -567,7 +567,12 @@ Agent <- R6::R6Class(
     #' @return Invisible self.
     set_system_prompt = function(value) {
       private$.chat$set_system_prompt(value)
-      private$.compaction_summary <- NULL
+      parts <- private$compaction_prompt_parts(value)
+      private$.compaction_summary <- if (is.null(parts)) {
+        NULL
+      } else {
+        parts$summary
+      }
       invisible(self)
     },
 
@@ -1671,6 +1676,7 @@ Agent <- R6::R6Class(
     tool_event_overrides = list(),
     tool_call_records = list(),
     pending_delegations = list(),
+    original_tool_results = list(),
     last_run_usage = NULL,
     .last_run_result = NULL,
     last_limit_status = NULL,
@@ -1762,11 +1768,12 @@ Agent <- R6::R6Class(
       runtime_wrap_tool(
         tool,
         resolve_arguments = private$resolve_tool_arguments,
-        process_result = private$offload_tool_result
+        process_result = private$offload_tool_result,
+        begin_execution = private$begin_tool_execution
       )
     },
 
-    offload_tool_result = function(tool_name, value) {
+    offload_tool_result = function(tool_name, value, execution_id = NULL) {
       if (identical(tool_name, "deputy_read_tool_result")) {
         return(value)
       }
@@ -1790,6 +1797,9 @@ Agent <- R6::R6Class(
         result_bytes = record$bytes,
         result_sha256 = record$sha256
       )
+      if (is_nonempty_string(execution_id)) {
+        private$original_tool_results[[execution_id]] <- value
+      }
       tool_result_reference_text(record)
     },
 
@@ -2211,6 +2221,7 @@ Agent <- R6::R6Class(
         agent$.__enclos_env__$private$tool_event_overrides <- list()
         agent$.__enclos_env__$private$tool_call_records <- list()
         agent$.__enclos_env__$private$pending_delegations <- list()
+        agent$.__enclos_env__$private$original_tool_results <- list()
         agent$.__enclos_env__$private$last_limit_status <- NULL
         agent$.__enclos_env__$private$last_run_usage <- AgentUsage()
         agent$.__enclos_env__$private$current_run_checkpoint_id <- NULL
@@ -2600,6 +2611,7 @@ Agent <- R6::R6Class(
       private$tool_event_overrides <- list()
       private$tool_call_records <- list()
       private$pending_delegations <- list()
+      private$original_tool_results <- list()
       if (!is.null(private$current_run_context)) {
         private$last_run_context <- clone_run_context(
           private$current_run_context
@@ -3018,6 +3030,7 @@ Agent <- R6::R6Class(
             NULL
           },
           delegation_queued = FALSE,
+          execution_started = FALSE,
           start_seen = FALSE,
           request_seen = FALSE,
           result_seen = FALSE,
@@ -3031,6 +3044,40 @@ Agent <- R6::R6Class(
       private$tool_call_records <- records
       record$record_index <- index
       record
+    },
+
+    begin_tool_execution = function(tool_name) {
+      records <- private$tool_call_records
+      matches <- which(vapply(
+        records,
+        function(record) {
+          identical(record$tool_name, tool_name) &&
+            isTRUE(record$request_seen) &&
+            !isTRUE(record$result_seen) &&
+            !isTRUE(record$execution_started)
+        },
+        logical(1)
+      ))
+      if (length(matches) == 0L) {
+        return(NULL)
+      }
+
+      index <- matches[[1L]]
+      records[[index]]$execution_started <- TRUE
+      private$tool_call_records <- records
+      records[[index]]$tool_call_id
+    },
+
+    claim_original_tool_result = function(tool_call_id, fallback) {
+      if (
+        !is_nonempty_string(tool_call_id) ||
+          !tool_call_id %in% names(private$original_tool_results)
+      ) {
+        return(fallback)
+      }
+      value <- private$original_tool_results[[tool_call_id]]
+      private$original_tool_results[[tool_call_id]] <- NULL
+      value
     },
 
     queue_delegation = function(record) {
@@ -3378,6 +3425,10 @@ Agent <- R6::R6Class(
       private$current_tool_results <- private$current_tool_results + 1L
       record <- private$tool_call_record(extracted, "result")
       extracted$tool_call_id <- record$tool_call_id
+      hook_tool_result <- private$claim_original_tool_result(
+        record$tool_call_id,
+        extracted$tool_result
+      )
 
       if (!is.null(private$.file_checkpoints)) {
         tryCatch(
@@ -3412,7 +3463,7 @@ Agent <- R6::R6Class(
       hook_result <- self$hooks$fire(
         "PostToolUse",
         tool_name = extracted$tool_name,
-        tool_result = extracted$tool_result,
+        tool_result = hook_tool_result,
         tool_error = extracted$tool_error,
         context = context
       )
@@ -3437,7 +3488,7 @@ Agent <- R6::R6Class(
         self$hooks$fire(
           "PostToolUseFailure",
           tool_name = extracted$tool_name,
-          tool_result = extracted$tool_result,
+          tool_result = hook_tool_result,
           tool_error = extracted$tool_error,
           context = context
         )
@@ -3682,29 +3733,46 @@ Agent <- R6::R6Class(
       last@text
     },
 
-    system_prompt_without_compaction = function() {
-      prompt <- private$.chat$get_system_prompt() %||% ""
+    compaction_prompt_parts = function(prompt) {
+      if (
+        !is.character(prompt) ||
+          length(prompt) != 1L ||
+          is.na(prompt)
+      ) {
+        return(NULL)
+      }
       start_marker <- "\n\n## Previous Conversation Summary\n"
       end_marker <- "\n\n## End Previous Conversation Summary"
       start <- regexpr(start_marker, prompt, fixed = TRUE)
       if (start[[1L]] < 0L) {
-        return(prompt)
+        return(NULL)
       }
       summary_start <- start[[1L]] + attr(start, "match.length")
       remainder <- substr(prompt, summary_start, nchar(prompt))
       end <- regexpr(end_marker, remainder, fixed = TRUE)
       if (end[[1L]] < 0L) {
-        return(prompt)
+        return(NULL)
       }
 
+      end_start <- summary_start + end[[1L]] - 1L
       before <- substr(prompt, 1L, start[[1L]] - 1L)
-      after_start <- summary_start + end[[1L]] - 1L + attr(end, "match.length")
+      summary <- substr(prompt, summary_start, end_start - 1L)
+      after_start <- end_start + attr(end, "match.length")
       after <- if (after_start > nchar(prompt)) {
         ""
       } else {
         substr(prompt, after_start, nchar(prompt))
       }
-      paste0(before, after)
+      list(before = before, summary = summary, after = after)
+    },
+
+    system_prompt_without_compaction = function() {
+      prompt <- private$.chat$get_system_prompt() %||% ""
+      parts <- private$compaction_prompt_parts(prompt)
+      if (is.null(parts)) {
+        return(prompt)
+      }
+      paste0(parts$before, parts$after)
     },
 
     context_token_count = function(messages, turns = NULL) {

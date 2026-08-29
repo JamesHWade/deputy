@@ -15,6 +15,9 @@
   copies of offloaded results. Native relative tool paths resolve against the
   Agent workspace without changing the R process working directory.
   `LeadAgent` accepts the same policy and propagates it to delegated agents.
+  Prompt updates and sub-agent registration preserve cumulative compaction
+  state, while post-tool hooks inspect the original result before large values
+  are represented to the model by bounded references.
 
 * Concurrent `LeadAgent` delegations reserve their child budgets before launch,
   so siblings share the lead's remaining usage limits instead of each receiving

@@ -14,11 +14,20 @@ native_file_tool_names <- c(
 
 deputy_tool_result_reader_marker <- new.env(parent = emptyenv())
 
-runtime_wrap_tool <- function(tool, resolve_arguments, process_result) {
+runtime_wrap_tool <- function(
+  tool,
+  resolve_arguments,
+  process_result,
+  begin_execution = function(tool_name) NULL
+) {
   if (!inherits(tool, "ellmer::ToolDef")) {
     cli_abort("{.arg tool} must be an ellmer tool definition")
   }
-  if (!is.function(resolve_arguments) || !is.function(process_result)) {
+  if (
+    !is.function(resolve_arguments) ||
+      !is.function(process_result) ||
+      !is.function(begin_execution)
+  ) {
     cli_abort("Runtime tool adapters must be functions")
   }
 
@@ -31,6 +40,7 @@ runtime_wrap_tool <- function(tool, resolve_arguments, process_result) {
     original = source_tool,
     resolve_arguments = resolve_arguments,
     process_result = process_result,
+    begin_execution = begin_execution,
     tool_name = source_tool@name
   )
   wrapper <- rlang::new_function(
@@ -41,13 +51,14 @@ runtime_wrap_tool <- function(tool, resolve_arguments, process_result) {
         tool_name,
         arguments
       )
+      execution_id <- begin_execution(tool_name)
       value <- do.call(original, arguments)
       if (promises::is.promising(value)) {
         return(promises::then(value, function(resolved) {
-          process_result(tool_name, resolved)
+          process_result(tool_name, resolved, execution_id)
         }))
       }
-      process_result(tool_name, value)
+      process_result(tool_name, value, execution_id)
     }),
     wrapper_env
   )
