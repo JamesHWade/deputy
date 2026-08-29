@@ -21,6 +21,9 @@
   summary request. Prompt-owned routing and compaction boundaries cannot
   collide with ordinary user headings or summary text, and replacing a prompt
   resets hook-context de-duplication state.
+  Loading a saved session transactionally replaces the receiver's active
+  offloaded-result set, so results from an earlier conversation cannot leak
+  into later session saves.
   `LeadAgent` accepts the same policy and propagates it to delegated agents.
   Prompt updates and sub-agent registration preserve cumulative compaction
   state, while post-tool hooks inspect the original result before large values

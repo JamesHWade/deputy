@@ -2834,10 +2834,10 @@ Agent <- R6::R6Class(
       previous_prompt <- private$.chat$get_system_prompt()
       previous_tools <- private$.chat$get_tools()
       previous_reader_registered <- private$.tool_result_reader_registered
-      imported_tool_results <- character()
+      tool_result_replacement <- NULL
       tryCatch(
         {
-          imported_tool_results <- import_tool_result_envelopes(
+          tool_result_replacement <- begin_tool_result_envelope_replacement(
             restored_tool_results,
             policy = private$.context_policy,
             source_session_id = metadata$session_id,
@@ -2848,14 +2848,20 @@ Agent <- R6::R6Class(
           if (length(restored_tool_results) > 0L) {
             private$ensure_tool_result_reader()
           }
+          commit_tool_result_envelope_replacement(tool_result_replacement)
         },
         error = function(error) {
           try(private$.chat$set_turns(previous_turns), silent = TRUE)
           try(private$.chat$set_system_prompt(previous_prompt), silent = TRUE)
           try(private$.chat$set_tools(previous_tools), silent = TRUE)
           private$.tool_result_reader_registered <- previous_reader_registered
-          if (length(imported_tool_results) > 0L) {
-            unlink(imported_tool_results)
+          if (!is.null(tool_result_replacement)) {
+            try(
+              rollback_tool_result_envelope_replacement(
+                tool_result_replacement
+              ),
+              silent = TRUE
+            )
           }
           abort_session_load(
             c(

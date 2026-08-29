@@ -576,6 +576,134 @@ test_that("saved sessions carry offloaded tool results to a new Agent", {
   )
 })
 
+test_that("loading a session replaces stale offloaded tool results", {
+  directory <- withr::local_tempdir(pattern = "deputy-replaced-results-")
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = 32,
+    offload_dir = directory
+  )
+  result_tool <- function(value) {
+    ellmer::tool(
+      fun = function() value,
+      name = "large_result",
+      description = "Return a large result.",
+      arguments = list()
+    )
+  }
+
+  receiver <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(result_tool(paste(rep("stale", 100), collapse = " "))),
+    context_policy = policy,
+    session_id = "replaced-results-receiver"
+  )
+  stale_reference <- receiver$get_tools()[["large_result"]]()
+
+  loaded_value <- paste(rep("loaded", 100), collapse = " ")
+  source <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(result_tool(loaded_value)),
+    context_policy = policy,
+    session_id = "replaced-results-source"
+  )
+  loaded_reference <- source$get_tools()[["large_result"]]()
+  source$set_turns(list(create_mock_user_turn(loaded_reference)))
+  session_file <- file.path(directory, "session.rds")
+  suppressMessages(source$save_session(session_file))
+
+  suppressMessages(receiver$load_session(session_file))
+
+  expect_error(
+    receiver$resolve_tool_result(stale_reference),
+    "not found"
+  )
+  expect_identical(
+    receiver$resolve_tool_result(loaded_reference),
+    loaded_value
+  )
+
+  roundtrip_file <- file.path(directory, "roundtrip.rds")
+  suppressMessages(receiver$save_session(roundtrip_file))
+  roundtrip <- readRDS(roundtrip_file)
+  expect_identical(
+    names(roundtrip$tool_result_envelopes),
+    parse_tool_result_reference(loaded_reference)
+  )
+  expect_length(roundtrip$tool_result_envelopes, 1L)
+
+  empty_source <- Agent$new(
+    chat = create_mock_chat(),
+    context_policy = policy,
+    session_id = "replaced-results-empty-source"
+  )
+  empty_session_file <- file.path(directory, "empty-session.rds")
+  suppressMessages(empty_source$save_session(empty_session_file))
+  suppressMessages(receiver$load_session(empty_session_file))
+  expect_error(
+    receiver$resolve_tool_result(loaded_reference),
+    "not found"
+  )
+  suppressMessages(receiver$save_session(roundtrip_file))
+  expect_length(readRDS(roundtrip_file)$tool_result_envelopes, 0L)
+})
+
+test_that("failed session loads restore the previous offloaded result set", {
+  directory <- withr::local_tempdir(pattern = "deputy-rollback-results-")
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = 32,
+    offload_dir = directory
+  )
+  result_tool <- function(value) {
+    ellmer::tool(
+      fun = function() value,
+      name = "large_result",
+      description = "Return a large result.",
+      arguments = list()
+    )
+  }
+
+  receiver_chat <- create_mock_chat()
+  stale_value <- paste(rep("stale", 100), collapse = " ")
+  receiver <- Agent$new(
+    chat = receiver_chat,
+    tools = list(result_tool(stale_value)),
+    context_policy = policy,
+    session_id = "rollback-results-receiver"
+  )
+  stale_reference <- receiver$get_tools()[["large_result"]]()
+
+  source <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(result_tool(paste(rep("loaded", 100), collapse = " "))),
+    context_policy = policy,
+    session_id = "rollback-results-source"
+  )
+  loaded_reference <- source$get_tools()[["large_result"]]()
+  source$set_turns(list(create_mock_user_turn(loaded_reference)))
+  session_file <- file.path(directory, "session.rds")
+  suppressMessages(source$save_session(session_file))
+
+  receiver_chat$set_turns <- function(new_turns) {
+    stop("turn replacement failed")
+  }
+  expect_error(
+    suppressMessages(receiver$load_session(session_file)),
+    "turn replacement failed",
+    class = "deputy_session_load"
+  )
+
+  expect_identical(
+    receiver$resolve_tool_result(stale_reference),
+    stale_value
+  )
+  expect_error(
+    receiver$resolve_tool_result(loaded_reference),
+    "not found"
+  )
+})
+
 test_that("session tool-result integrity failures are atomic", {
   directory <- withr::local_tempdir(pattern = "deputy-corrupt-results-")
   large_tool <- ellmer::tool(

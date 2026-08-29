@@ -582,7 +582,7 @@ collect_tool_result_envelopes <- function(policy, session_id) {
   envelopes
 }
 
-import_tool_result_envelopes <- function(
+begin_tool_result_envelope_replacement <- function(
   envelopes,
   policy,
   source_session_id,
@@ -596,69 +596,97 @@ import_tool_result_envelopes <- function(
     envelopes,
     source_session_id
   )
-  if (length(envelopes) == 0L) {
-    return(character())
-  }
 
   directory <- tool_result_offload_dir(policy, target_session_id)
-  if (!dir.exists(directory)) {
-    dir.create(directory, recursive = TRUE, showWarnings = FALSE)
-    Sys.chmod(directory, mode = "0700")
+  if (length(envelopes) == 0L && !file.exists(directory)) {
+    return(list(directory = directory, backup = NULL))
   }
-  if (!dir.exists(directory)) {
-    cli_abort("Could not create the tool-result offload directory")
+  root <- dirname(directory)
+  if (!dir.exists(root)) {
+    dir.create(root, recursive = TRUE, showWarnings = FALSE)
+    Sys.chmod(root, mode = "0700")
+  }
+  if (!dir.exists(root)) {
+    cli_abort("Could not create the tool-result offload root")
   }
 
-  created <- character()
-  committed <- FALSE
+  staging <- NULL
+  installed <- FALSE
   on.exit(
     {
-      if (!committed && length(created) > 0L) {
-        unlink(created)
+      if (!installed && !is.null(staging) && dir.exists(staging)) {
+        unlink(staging, recursive = TRUE)
       }
     },
     add = TRUE
   )
 
-  for (result_id in names(envelopes)) {
-    envelope <- envelopes[[result_id]]
-    envelope$session_id <- target_session_id
-    path <- file.path(directory, paste0(result_id, ".rds"))
-    if (file.exists(path)) {
-      stored <- validate_tool_result_envelope(
-        readRDS(path),
-        result_id = result_id,
-        session_id = target_session_id
-      )
-      artifact_paths <- c(
-        tool_result_text_path(directory, result_id),
-        tool_result_manifest_path(directory, result_id)
-      )
-      artifact_existed <- file.exists(artifact_paths)
-      created <- c(created, artifact_paths[!artifact_existed])
-      ensure_tool_result_artifacts(stored, directory)
-      next
+  if (length(envelopes) > 0L) {
+    staging <- tempfile(
+      paste0(".", basename(directory), "-staging-"),
+      tmpdir = root
+    )
+    dir.create(staging, showWarnings = FALSE)
+    Sys.chmod(staging, mode = "0700")
+    if (!dir.exists(staging)) {
+      cli_abort("Could not stage restored tool results")
     }
 
-    temporary <- tempfile("result-", tmpdir = directory, fileext = ".rds")
-    on.exit(unlink(temporary), add = TRUE)
-    saveRDS(envelope, temporary, version = 3)
-    Sys.chmod(temporary, mode = "0600")
-    if (!file.rename(temporary, path)) {
-      cli_abort("Could not restore an offloaded tool result")
+    for (result_id in names(envelopes)) {
+      envelope <- envelopes[[result_id]]
+      envelope$session_id <- target_session_id
+      path <- file.path(staging, paste0(result_id, ".rds"))
+      saveRDS(envelope, path, version = 3)
+      Sys.chmod(path, mode = "0600")
+      ensure_tool_result_artifacts(envelope, staging)
     }
-    created <- c(created, path)
-    artifact_paths <- c(
-      tool_result_text_path(directory, result_id),
-      tool_result_manifest_path(directory, result_id)
-    )
-    artifact_existed <- file.exists(artifact_paths)
-    created <- c(created, artifact_paths[!artifact_existed])
-    ensure_tool_result_artifacts(envelope, directory)
   }
 
-  committed <- TRUE
-  created
+  if (file.exists(directory) && !dir.exists(directory)) {
+    cli_abort("Tool-result offload path is not a directory")
+  }
+  backup <- NULL
+  if (dir.exists(directory)) {
+    backup <- tempfile(
+      paste0(".", basename(directory), "-backup-"),
+      tmpdir = root
+    )
+    if (!file.rename(directory, backup)) {
+      cli_abort("Could not preserve the existing tool-result offloads")
+    }
+  }
+
+  if (!is.null(staging) && !file.rename(staging, directory)) {
+    if (!is.null(backup)) {
+      file.rename(backup, directory)
+    }
+    cli_abort("Could not activate the restored tool results")
+  }
+  installed <- TRUE
+
+  list(
+    directory = directory,
+    backup = backup
+  )
+}
+
+rollback_tool_result_envelope_replacement <- function(replacement) {
+  if (dir.exists(replacement$directory)) {
+    unlink(replacement$directory, recursive = TRUE)
+  }
+  if (!is.null(replacement$backup) && dir.exists(replacement$backup)) {
+    if (!file.rename(replacement$backup, replacement$directory)) {
+      cli_abort("Could not roll back the tool-result offloads")
+    }
+  }
+  invisible(NULL)
+}
+
+commit_tool_result_envelope_replacement <- function(replacement) {
+  if (!is.null(replacement$backup) && dir.exists(replacement$backup)) {
+    unlink(replacement$backup, recursive = TRUE)
+  }
+  invisible(NULL)
 }
 
 read_tool_result_envelope <- function(reference, policy, session_id) {
