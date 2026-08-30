@@ -15,7 +15,8 @@ execution.
 
     \item{\code{turns}}{List of conversation turns}
 
-    \item{\code{cost}}{Cost information (list with input, output, cached, total)}
+    \item{\code{cost}}{Cost information with input, output, cached, total,
+complete, and missing fields. An incomplete total is \code{NA_real_}.}
 
     \item{\code{events}}{List of all AgentEvent objects from execution}
 
@@ -73,7 +74,8 @@ execution.
     \preformatted{AgentResult$new(
   response = NULL,
   turns = list(),
-  cost = list(input = 0, output = 0, cached = 0, total = 0),
+  cost = list(input = 0, output = 0, cached = 0, total = 0, complete = TRUE, missing =
+    0L),
   events = list(),
   duration = NULL,
   stop_reason = "complete",
@@ -95,7 +97,7 @@ execution.
     \describe{
       \item{\code{response}}{Final text response}
       \item{\code{turns}}{List of conversation turns}
-      \item{\code{cost}}{Cost information}
+      \item{\code{cost}}{Cost information, including provider coverage metadata}
       \item{\code{events}}{List of AgentEvent objects}
       \item{\code{duration}}{Execution duration in seconds}
       \item{\code{stop_reason}}{Reason for stopping}

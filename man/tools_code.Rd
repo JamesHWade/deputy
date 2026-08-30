@@ -16,8 +16,9 @@ Returns a list of tools for code execution:
 \item \code{run_bash} - Execute bash commands
 }
 
-\strong{Note:} These tools require appropriate permissions. By default,
-\code{\link[=permissions_standard]{permissions_standard()}} allows R code but not bash.
+\strong{Note:} These tools execute trusted code and require explicit permissions.
+Process separation is not an OS sandbox; \code{\link[=permissions_standard]{permissions_standard()}} denies
+both tools.
 }
 \examples{
 \dontrun{

@@ -26,7 +26,8 @@ before execution.}
 \item{cached_tokens}{Provider-reported cached input tokens. These are
 reported separately and are not added again to \code{total_tokens}.}
 
-\item{cost_usd}{Provider-reported estimated cost in US dollars.}
+\item{cost_usd}{Provider-reported estimated cost in US dollars, or \code{NA_real_}
+when the provider did not report complete cost information.}
 }
 \value{
 An \code{AgentUsage} object.

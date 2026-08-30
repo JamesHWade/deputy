@@ -47,7 +47,8 @@ Callback signature: \verb{function(tool_name, tool_result, tool_error, context)}
 Callback signature: \verb{function(reason, context)}
 \itemize{
 \item \code{reason}: Why the agent stopped (for example \code{"complete"},
-\code{"request_limit"}, \code{"cost_limit"}, or \code{"provider_error"})
+\code{"request_limit"}, \code{"cost_limit"}, \code{"cost_unavailable"}, \code{"tool_loop"},
+or \code{"provider_error"})
 \item \code{context}: Common correlation fields plus \code{usage} and \code{cost}; native
 \code{run()} also includes \code{total_turns}
 \item Return: NULL (informational only)
@@ -137,7 +138,8 @@ Callback signature: \verb{function(context)}
 Callback signature: \verb{function(reason, context)}
 \itemize{
 \item \code{reason}: Why the agent stopped (for example \code{"complete"},
-\code{"request_limit"}, \code{"cost_limit"}, or \code{"hook_requested_stop"})
+\code{"request_limit"}, \code{"cost_unavailable"}, \code{"tool_loop"}, or
+\code{"hook_requested_stop"})
 \item \code{context}: Common correlation fields plus \code{usage} and \code{cost}; native
 \code{run()} also includes \code{total_turns}
 \item Return: NULL (informational only)

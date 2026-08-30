@@ -62,6 +62,18 @@ _Avoid_: tool metadata, hints, flags
 The policy governing which tools an Agent may call in a run.
 _Avoid_: security level, access mode, sandbox mode
 
+**Trusted-code tool**:
+A tool that executes model-supplied R or shell code with the current user's
+authority. A separate process may improve fault isolation, but does not make
+the code untrusted or confined.
+_Avoid_: sandboxed tool, safe execution
+
+**OS sandbox**:
+A platform-enforced boundary that constrains an already authorized process.
+Deputy delegates this boundary to mcp-repl and verifies the requested policy;
+permission modes do not substitute for it.
+_Avoid_: permission mode, subprocess isolation
+
 **Hook**:
 A callback fired at a named point in an Agent's lifecycle, able to observe a run and, at some points, alter or block it.
 _Avoid_: callback, middleware, listener, interceptor

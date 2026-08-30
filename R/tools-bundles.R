@@ -37,8 +37,9 @@ tools_file <- function() {
 #' * `run_r_code` - Execute R code in a separate process
 #' * `run_bash` - Execute bash commands
 #'
-#' **Note:** These tools require appropriate permissions. By default,
-#' [permissions_standard()] allows R code but not bash.
+#' **Note:** These tools execute trusted code and require explicit permissions.
+#' Process separation is not an OS sandbox; [permissions_standard()] denies
+#' both tools.
 #'
 #' @return A list of tool definitions
 #'
@@ -123,7 +124,10 @@ tools_data <- function() {
 #' agent <- Agent$new(
 #'   chat = chat,
 #'   tools = tools_web(chat),  # Uses Claude's native web tools
-#'   permissions = Permissions$new(web = TRUE)
+#'   permissions = Permissions$new(
+#'     web = TRUE,
+#'     tool_allowlist = c("web_search", "web_fetch")
+#'   )
 #' )
 #'
 #' # Force universal tools even with Claude
@@ -253,8 +257,8 @@ ToolPresets <- c("minimal", "standard", "dev", "data", "full")
 #' @param name The preset name. One of:
 #'   * `"minimal"` - Read-only tools for safe exploration
 #'     (`read_file`, `read_markdown`, `list_files`)
-#'   * `"standard"` - Balanced toolset for R development
-#'     (`read_file`, `read_markdown`, `write_file`, `list_files`, `run_r_code`)
+#'   * `"standard"` - File-oriented toolset for ordinary work
+#'     (`read_file`, `read_markdown`, `write_file`, `list_files`)
 #'   * `"dev"` - Full development with shell access
 #'     (`read_file`, `read_markdown`, `write_file`, `list_files`, `run_r_code`, `run_bash`)
 #'   * `"data"` - Data analysis focused tools
@@ -306,8 +310,7 @@ tools_preset <- function(name) {
       tool_read_file,
       tool_read_markdown,
       tool_write_file,
-      tool_list_files,
-      tool_run_r_code
+      tool_list_files
     ),
     dev = list(
       tool_read_file,

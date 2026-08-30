@@ -92,7 +92,8 @@ All interfaces enforce the Agent's permissions, hooks, `UsageLimits`, workspace 
 resolution, file checkpoints, automatic context compaction, large-result
 offloading, and run accounting. Native relative file paths resolve against the
 Agent's immutable `working_dir`; Deputy never changes the process working
-directory.
+directory. Custom hosts can pass `run_context` to any chat, stream, or run
+method to correlate a request with product-owned session and stage identities.
 
 `ContextPolicy()` checks the estimated complete context before a run and again
 between provider tool turns, compacting whenever it crosses the token

@@ -298,7 +298,16 @@ cli_process_command <- function(input, agent) {
         "*" = "Input tokens: {.val {cost$input}}",
         "*" = "Output tokens: {.val {cost$output}}",
         "*" = "Cached tokens: {.val {cost$cached}}",
-        "*" = "Total cost: {.val {sprintf('$%.4f', cost$total)}}"
+        "*" = "Total cost: {.val {format_cost(cost$total)}}",
+        "*" = if (isTRUE(cost$complete)) {
+          "Provider cost records: {.val complete}"
+        } else {
+          paste0(
+            "Provider cost records: {.val incomplete} (",
+            cost$missing,
+            " missing)"
+          )
+        }
       ))
       return(list(is_command = TRUE, action = "continue"))
     },

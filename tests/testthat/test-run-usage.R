@@ -69,6 +69,43 @@ test_that("AgentUsage rejects malformed counters", {
   expect_error(AgentUsage(cost_usd = NULL), "non-negative")
 })
 
+test_that("AgentUsage preserves unknown provider cost", {
+  usage <- AgentUsage(cost_usd = NA_real_)
+
+  expect_identical(usage$cost_usd, NA_real_)
+  expect_identical(
+    agent_usage_difference(usage, AgentUsage())$cost_usd,
+    NA_real_
+  )
+  expect_identical(
+    agent_usage_add(AgentUsage(cost_usd = 0.1), usage)$cost_usd,
+    NA_real_
+  )
+})
+
+test_that("provider cost summaries distinguish zero from unknown", {
+  complete <- provider_cost_summary(data.frame(cost = c(0, 0)))
+  incomplete <- provider_cost_summary(data.frame(cost = c(0, NA_real_)))
+  absent <- provider_cost_summary(data.frame(input = 1))
+  missing_record <- provider_cost_summary(
+    data.frame(cost = numeric()),
+    expected_records = 1L
+  )
+
+  expect_identical(complete$total, 0)
+  expect_identical(complete$complete, TRUE)
+  expect_identical(complete$missing, 0L)
+  expect_identical(incomplete$total, NA_real_)
+  expect_identical(incomplete$complete, FALSE)
+  expect_identical(incomplete$missing, 1L)
+  expect_identical(absent$total, NA_real_)
+  expect_identical(absent$complete, FALSE)
+  expect_identical(absent$missing, 1L)
+  expect_identical(missing_record$total, NA_real_)
+  expect_identical(missing_record$complete, FALSE)
+  expect_identical(missing_record$missing, 1L)
+})
+
 test_that("usage differences are scoped to the current run", {
   before <- AgentUsage(
     requests = 4,
@@ -95,6 +132,32 @@ test_that("usage differences are scoped to the current run", {
   expect_equal(usage$cost_usd, 0.06, tolerance = 1e-12)
 })
 
+test_that("run cost ignores incomplete records from earlier turns", {
+  turns <- list(create_mock_assistant_turn(cost = NA_real_))
+  costs <- NA_real_
+  chat <- create_mock_chat()
+  chat$get_turns <- function() turns
+  chat$get_tokens <- function() {
+    data.frame(
+      input = rep(1, length(costs)),
+      output = rep(1, length(costs)),
+      cached_input = rep(0, length(costs)),
+      cost = costs
+    )
+  }
+
+  baseline <- agent_usage_snapshot(chat)
+  turns <- c(turns, list(create_mock_assistant_turn(cost = 0.02)))
+  costs <- c(costs, 0.02)
+  current <- agent_usage_snapshot(chat)
+
+  expect_identical(baseline$cost_usd, NA_real_)
+  expect_equal(
+    agent_usage_difference(current, baseline)$cost_usd,
+    0.02
+  )
+})
+
 test_that("usage limit status distinguishes reached request limits", {
   limits <- UsageLimits(max_requests = 2, max_tool_calls = 3)
   usage <- AgentUsage(requests = 2, tool_calls = 3)
@@ -115,6 +178,19 @@ test_that("usage limit status distinguishes reached request limits", {
     limits
   )
   expect_equal(tool_status$reason, "tool_call_limit")
+})
+
+test_that("cost limits fail closed when provider cost is unknown", {
+  status <- usage_limit_status(
+    AgentUsage(cost_usd = NA_real_),
+    UsageLimits(max_cost_usd = 1)
+  )
+
+  expect_identical(status$reason, "cost_unavailable")
+  expect_identical(status$field, "max_cost_usd")
+  expect_identical(status$actual, NA_real_)
+  expect_identical(status$limit, 1)
+  expect_match(usage_limit_message(status), "cannot be enforced")
 })
 
 test_that("usage limit defaults use the native request limit", {

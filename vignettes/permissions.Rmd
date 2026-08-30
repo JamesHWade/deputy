@@ -30,8 +30,8 @@ permissions_readonly()
 # Plan: annotated read-only tools plus ask_user
 permissions_plan()
 
-# Standard (default): accessible reads, workspace-scoped writes, R code,
-# no bash/web
+# Standard (default): accessible reads and workspace-scoped writes;
+# no R code, bash, or web
 permissions_standard()
 
 # Full: everything allowed (use with caution!)
@@ -62,6 +62,11 @@ perms <- Permissions$new(
   install_packages = FALSE
 )
 ```
+
+Setting `r_code = TRUE` or `bash = TRUE` authorizes Deputy's built-in
+trusted-code tools. It does not confine the subprocess. Use this only when the
+model, prompt, inputs, and current-user filesystem authority are all within the
+same trust boundary.
 
 Fields:
 
@@ -220,4 +225,56 @@ agent <- Agent$new(
 
 When a limit is reached, the agent stops and the `AgentResult$stop_reason`
 identifies the limit, such as `"request_limit"`, `"tool_call_limit"`, or
-`"cost_limit"`.
+`"cost_limit"`. If `max_cost_usd` is configured and the provider omits a cost
+record, Deputy fails closed with `"cost_unavailable"`. `Agent$cost()` and
+`AgentResult$cost` expose `complete` and `missing`; an incomplete `total` is
+`NA`, never an understated sum.
+
+Deputy also stops a run with `"tool_loop"` after three consecutive requests for
+the same tool and canonical arguments. Cosmetic changes in surrounding model
+text do not reset that progress signal; changing the tool or its arguments
+does.
+
+## Trusted Code and OS Sandboxes
+
+Permissions and sandboxes answer different questions. A permission decides
+whether the model may call a tool. An OS sandbox constrains what already
+authorized code can read, write, execute, or reach over the network.
+
+`tool_run_r_code` and `tool_run_bash` are trusted-code tools. `callr` gives the
+R tool a separate process and a timeout, but the subprocess retains the current
+user's filesystem and network authority. Deputy therefore excludes R execution
+from both the standard permission policy and the standard tool preset.
+
+For model-generated R that needs confinement, use mcp-repl as the execution
+backend. Its server entry must name the policy explicitly:
+
+```json
+{
+  "mcpServers": {
+    "r": {
+      "command": "/absolute/path/to/mcp-repl",
+      "args": [
+        "--sandbox", "workspace-write",
+        "--interpreter", "r"
+      ]
+    }
+  }
+}
+```
+
+```{r, eval = FALSE}
+repl_tools <- tools_mcp_repl(
+  server = "r",
+  sandbox = "workspace-write"
+)
+```
+
+`tools_mcp_repl()` checks the exact final `--sandbox` setting before starting
+the server. It accepts only `"read-only"` and `"workspace-write"`. It rejects
+implicit defaults, `danger-full-access`, `external-sandbox`, and
+`inherit-codex`; the latter needs per-call metadata that mcptools does not
+provide. mcp-repl owns the platform-specific enforcement and fails rather than
+downgrading when it cannot establish the requested OS boundary. See mcp-repl's
+[sandbox contract](https://github.com/posit-dev/mcp-repl/blob/main/docs/sandbox.md)
+for its filesystem, network, and platform guarantees.

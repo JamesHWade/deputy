@@ -276,11 +276,13 @@ extraction_pipeline <- function(package_dir = ".") {
     ))
   )
 
+  costs <- c(step1$cost$total, step2$cost$total, step3$cost$total)
+
   list(
     metadata = step1$structured_output$parsed,
     enriched = step2$structured_output$parsed,
     report = step3$response,
-    total_cost = step1$cost$total + step2$cost$total + step3$cost$total
+    total_cost = if (anyNA(costs)) NA_real_ else sum(costs)
   )
 }
 

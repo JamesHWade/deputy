@@ -45,7 +45,10 @@ chat <- ellmer::chat_claude()
 agent <- Agent$new(
   chat = chat,
   tools = tools_web(chat),  # Uses Claude's native web tools
-  permissions = Permissions$new(web = TRUE)
+  permissions = Permissions$new(
+    web = TRUE,
+    tool_allowlist = c("web_search", "web_fetch")
+  )
 )
 
 # Force universal tools even with Claude

@@ -492,14 +492,14 @@ test_that("tools_preset returns correct tools for minimal", {
 test_that("tools_preset returns correct tools for standard", {
   tools <- tools_preset("standard")
   expect_type(tools, "list")
-  expect_length(tools, 5)
+  expect_length(tools, 4)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
   expect_true("read_markdown" %in% tool_names)
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
-  expect_true("run_r_code" %in% tool_names)
+  expect_false("run_r_code" %in% tool_names)
 })
 
 test_that("tools_preset returns correct tools for dev", {
@@ -559,4 +559,40 @@ test_that("tools_preset errors on invalid preset name", {
     tools_preset("invalid"),
     "Unknown tool preset"
   )
+})
+
+test_that("provider-native web tools require explicit registration authority", {
+  native_web <- ellmer::openai_tool_web_search()
+
+  expect_error(
+    Agent$new(
+      chat = create_mock_chat(),
+      tools = list(native_web),
+      permissions = Permissions$new(
+        web = FALSE,
+        tool_allowlist = "web_search"
+      )
+    ),
+    "not authorized"
+  )
+
+  expect_error(
+    Agent$new(
+      chat = create_mock_chat(),
+      tools = list(native_web),
+      permissions = Permissions$new(web = TRUE)
+    ),
+    "not explicitly allowed"
+  )
+
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(native_web),
+    permissions = Permissions$new(
+      web = TRUE,
+      tool_allowlist = "web_search"
+    )
+  )
+
+  expect_s3_class(agent$get_tools()$web_search, "ellmer::ToolBuiltIn")
 })
