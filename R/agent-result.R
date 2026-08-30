@@ -124,7 +124,8 @@ AgentResult <- R6::R6Class(
     #' @field turns List of conversation turns
     turns = NULL,
 
-    #' @field cost Cost information (list with input, output, cached, total)
+    #' @field cost Cost information with input, output, cached, total,
+    #'   complete, and missing fields. An incomplete total is `NA_real_`.
     cost = NULL,
 
     #' @field events List of all AgentEvent objects from execution
@@ -168,7 +169,7 @@ AgentResult <- R6::R6Class(
     #'
     #' @param response Final text response
     #' @param turns List of conversation turns
-    #' @param cost Cost information
+    #' @param cost Cost information, including provider coverage metadata
     #' @param events List of AgentEvent objects
     #' @param duration Execution duration in seconds
     #' @param stop_reason Reason for stopping
@@ -186,7 +187,14 @@ AgentResult <- R6::R6Class(
     initialize = function(
       response = NULL,
       turns = list(),
-      cost = list(input = 0, output = 0, cached = 0, total = 0),
+      cost = list(
+        input = 0,
+        output = 0,
+        cached = 0,
+        total = 0,
+        complete = TRUE,
+        missing = 0L
+      ),
       events = list(),
       duration = NULL,
       stop_reason = "complete",

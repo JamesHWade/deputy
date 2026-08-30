@@ -35,7 +35,8 @@
 #'
 #' Callback signature: `function(reason, context)`
 #' - `reason`: Why the agent stopped (for example `"complete"`,
-#'   `"request_limit"`, `"cost_limit"`, or `"provider_error"`)
+#'   `"request_limit"`, `"cost_limit"`, `"cost_unavailable"`, `"tool_loop"`,
+#'   or `"provider_error"`)
 #' - `context`: Common correlation fields plus `usage` and `cost`; native
 #'   `run()` also includes `total_turns`
 #' - Return: NULL (informational only)
@@ -107,7 +108,8 @@
 #'
 #' Callback signature: `function(reason, context)`
 #' - `reason`: Why the agent stopped (for example `"complete"`,
-#'   `"request_limit"`, `"cost_limit"`, or `"hook_requested_stop"`)
+#'   `"request_limit"`, `"cost_unavailable"`, `"tool_loop"`, or
+#'   `"hook_requested_stop"`)
 #' - `context`: Common correlation fields plus `usage` and `cost`; native
 #'   `run()` also includes `total_turns`
 #' - Return: NULL (informational only)

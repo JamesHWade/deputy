@@ -495,7 +495,7 @@ secure_read_file <- function(path, allowed_dir = NULL) {
 #' @noRd
 format_cost <- function(cost) {
   if (is.null(cost) || is.na(cost)) {
-    return("$0.00")
+    return("unknown")
   }
   sprintf("$%.4f", cost)
 }

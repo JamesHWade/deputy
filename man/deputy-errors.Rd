@@ -25,6 +25,7 @@ information for debugging. Errors use cli formatting for readable output.
 \item \strong{deputy_budget} - Resource limit violations
 \itemize{
 \item \code{deputy_budget_exceeded} - Cost limit exceeded
+\item \code{deputy_cost_unavailable} - Cost limit could not be measured
 \item \code{deputy_request_limit} - Maximum model requests exceeded
 }
 \item \strong{deputy_provider} - LLM provider failures

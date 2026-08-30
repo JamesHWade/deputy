@@ -180,6 +180,41 @@ test_that("sequential runs do not leak per-run context", {
   expect_null(agent$.__enclos_env__$private$event_correlation()$run_id)
 })
 
+test_that("drop-in Chat streams accept per-run product context", {
+  chat <- create_mock_chat("context response")
+  agent <- Agent$new(
+    chat = chat,
+    run_context = list(product = "tempest", session = "research-1")
+  )
+
+  methods <- c(
+    "chat",
+    "chat_async",
+    "chat_structured",
+    "chat_structured_async",
+    "stream",
+    "stream_async"
+  )
+  for (method in methods) {
+    expect_true("run_context" %in% names(formals(agent[[method]])))
+  }
+
+  stream <- agent$stream_async(
+    "Research",
+    run_context = list(stage = "dialogue", completion = "completion-1")
+  )
+  expect_equal(collect_async_stream(stream), list("context response"))
+  expect_identical(
+    agent$last_run()$run_context,
+    list(
+      completion = "completion-1",
+      product = "tempest",
+      session = "research-1",
+      stage = "dialogue"
+    )
+  )
+})
+
 test_that("lazy generators retain their intended run contexts", {
   agent <- Agent$new(
     chat = create_mock_chat(c("first", "second")),

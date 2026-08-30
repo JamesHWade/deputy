@@ -53,7 +53,9 @@ The Agent itself implements ellmer's Chat protocol. Use `agent$chat()` and
 `agent$stream()` in synchronous code, or pass the Agent directly to
 `shinychat::chat_server()`. Those paths use the same governed kernel as
 `run_sync()` and `run_async()`; the latter pair return richer `AgentResult`
-metadata when the host needs to inspect the run.
+metadata when the host needs to inspect the run. Product hosts may attach
+per-run correlation with the optional `run_context` argument on every chat,
+stream, and run method.
 
 ## Installation
 
@@ -139,6 +141,8 @@ model-generated code into untrusted code you can execute safely:
 
 - `permissions_readonly()` denies Deputy's write, shell, R execution, web, and
   package-install capabilities.
+- `permissions_standard()` permits accessible reads and workspace-scoped native
+  file writes, but denies arbitrary R and shell execution by default.
 - A directory-valued `file_write` permission confines Deputy's native file
   writes to that canonical root. File reads remain limited by the R process,
   not by an operating-system sandbox.
@@ -148,7 +152,10 @@ model-generated code into untrusted code you can execute safely:
   They are recovery machinery, not a substitute for version control or backups.
 
 Start read-only, grant the narrowest capability that completes the job, and use
-a real isolation boundary for untrusted code.
+a real isolation boundary for untrusted code. `tools_mcp_repl()` loads an
+explicitly configured [mcp-repl](https://github.com/posit-dev/mcp-repl) R
+session only after verifying that its `read-only` or `workspace-write` OS
+sandbox matches the requested policy; a missing or weaker policy is an error.
 
 ## Choose your path
 

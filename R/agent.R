@@ -373,12 +373,18 @@ Agent <- R6::R6Class(
     #' `ellmer::Chat$chat()`; inspect [AgentResult] metadata with `$last_run()`.
     #' @param ... User content accepted by ellmer.
     #' @param echo Accepted for ellmer compatibility.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
     #' @return The final assistant text.
-    chat = function(..., echo = NULL) {
+    chat = function(..., echo = NULL, run_context = list()) {
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
+      )
       governed_run <- private$start_governed_stream(
         messages = list(...),
         limits = self$usage_limits,
-        run_context = private$.run_context,
+        run_context = effective_run_context,
         stream = "content"
       )
       result <- private$resolve_promise(private$collect_governed_stream(
@@ -393,14 +399,24 @@ Agent <- R6::R6Class(
     #' @param ... User content accepted by ellmer.
     #' @param tool_mode Whether ellmer executes tool calls concurrently or
     #'   sequentially.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
     #' @return A promise resolving to the final assistant text.
-    chat_async = function(..., tool_mode = c("concurrent", "sequential")) {
+    chat_async = function(
+      ...,
+      tool_mode = c("concurrent", "sequential"),
+      run_context = list()
+    ) {
       tool_mode <- match.arg(tool_mode)
       messages <- list(...)
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
+      )
       governed_run <- private$start_governed_stream(
         messages = messages,
         limits = self$usage_limits,
-        run_context = private$.run_context,
+        run_context = effective_run_context,
         tool_mode = tool_mode,
         stream = "content"
       )
@@ -413,13 +429,22 @@ Agent <- R6::R6Class(
     #' @param type An ellmer structured-output type.
     #' @param echo Echo mode forwarded to ellmer.
     #' @param convert Whether ellmer converts the structured response.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
     #' @return Structured response data.
-    chat_structured = function(..., type, echo = "none", convert = TRUE) {
+    chat_structured = function(
+      ...,
+      type,
+      echo = "none",
+      convert = TRUE,
+      run_context = list()
+    ) {
       private$resolve_promise(self$chat_structured_async(
         ...,
         type = type,
         echo = echo,
-        convert = convert
+        convert = convert,
+        run_context = run_context
       ))
     },
 
@@ -428,17 +453,24 @@ Agent <- R6::R6Class(
     #' @param type An ellmer structured-output type.
     #' @param echo Echo mode forwarded to ellmer.
     #' @param convert Whether ellmer converts the structured response.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
     #' @return A promise resolving to structured response data.
     chat_structured_async = function(
       ...,
       type,
       echo = "none",
-      convert = TRUE
+      convert = TRUE,
+      run_context = list()
     ) {
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
+      )
       governed_run <- private$start_governed_stream(
         messages = list(...),
         limits = self$usage_limits,
-        run_context = private$.run_context,
+        run_context = effective_run_context,
         stream = "content",
         structured = list(type = type, echo = echo, convert = convert)
       )
@@ -451,17 +483,24 @@ Agent <- R6::R6Class(
     #' @param ... User content accepted by ellmer.
     #' @param stream Yield text or semantic ellmer content.
     #' @param controller Optional ellmer stream controller.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
     #' @return A synchronous generator.
     stream = function(
       ...,
       stream = c("text", "content"),
-      controller = NULL
+      controller = NULL,
+      run_context = list()
     ) {
       stream <- match.arg(stream)
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
+      )
       governed_run <- private$start_governed_stream(
         messages = list(...),
         limits = self$usage_limits,
-        run_context = private$.run_context,
+        run_context = effective_run_context,
         stream = stream,
         controller = controller
       )
@@ -480,19 +519,26 @@ Agent <- R6::R6Class(
     #'   sequentially.
     #' @param stream Yield text or semantic ellmer content.
     #' @param controller Optional ellmer stream controller.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
     #' @return An asynchronous generator suitable for `shinychat::chat_append()`.
     stream_async = function(
       ...,
       tool_mode = c("concurrent", "sequential"),
       stream = c("text", "content"),
-      controller = NULL
+      controller = NULL,
+      run_context = list()
     ) {
       tool_mode <- match.arg(tool_mode)
       stream <- match.arg(stream)
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
+      )
       private$start_governed_stream(
         messages = list(...),
         limits = self$usage_limits,
-        run_context = private$.run_context,
+        run_context = effective_run_context,
         tool_mode = tool_mode,
         stream = stream,
         controller = controller
@@ -666,7 +712,13 @@ Agent <- R6::R6Class(
     #' @description
     #' Register a tool with the agent.
     #'
-    #' @param tool A tool created with `ellmer::tool()`
+    #' Function tools are wrapped with Deputy's runtime enforcement. Known
+    #' provider-native web tools are authorized once, before registration,
+    #' because their execution occurs inside the provider rather than R. Native
+    #' tools therefore require static permissions and cannot be registered with
+    #' a custom `can_use_tool` callback.
+    #' @param tool A tool created with `ellmer::tool()` or a supported
+    #'   provider-native web tool.
     #' @return Invisible self for chaining
     register_tool = function(tool) {
       private$.chat$register_tool(private$adapt_tool(tool))
@@ -676,7 +728,8 @@ Agent <- R6::R6Class(
     #' @description
     #' Register multiple tools with the agent.
     #'
-    #' @param tools A list of tools created with `ellmer::tool()`
+    #' @param tools A list of function tools or supported provider-native web
+    #'   tools.
     #' @return Invisible self for chaining
     register_tools = function(tools) {
       wrapped <- lapply(tools, private$adapt_tool)
@@ -809,7 +862,9 @@ Agent <- R6::R6Class(
     #' Preserve or narrow the active permission mode for subsequent tool calls.
     #' Reapplying the current mode is a no-op. Widening or incomparable mode
     #' changes require a newly configured `Agent` so custom restrictions remain
-    #' an immutable authority ceiling.
+    #' an immutable authority ceiling. When narrowing removes web access,
+    #' registered provider-native web tools are removed before the new policy
+    #' becomes active because Deputy cannot interpose on provider-side calls.
     #'
     #' @param mode Permission mode, see [PermissionMode]
     #' @return Invisible self
@@ -847,7 +902,7 @@ Agent <- R6::R6Class(
         permission_mode_capabilities(mode, self$working_dir)
       )
 
-      private$.permissions <- Permissions$new(
+      narrowed_permissions <- Permissions$new(
         mode = mode,
         file_read = capabilities$file_read,
         file_write = capabilities$file_write,
@@ -860,6 +915,25 @@ Agent <- R6::R6Class(
         tool_denylist = existing$tool_denylist,
         permission_prompt_tool_name = capabilities$permission_prompt_tool_name
       )
+
+      registered_tools <- private$.chat$get_tools()
+      provider_native <- vapply(
+        registered_tools,
+        inherits,
+        logical(1),
+        what = "ellmer::ToolBuiltIn"
+      )
+      removed_provider_tools <- character()
+      if (!isTRUE(narrowed_permissions$web) && any(provider_native)) {
+        removed_provider_tools <- vapply(
+          registered_tools[provider_native],
+          \(tool) tool@name,
+          character(1)
+        )
+        private$.chat$set_tools(registered_tools[!provider_native])
+      }
+
+      private$.permissions <- narrowed_permissions
 
       self$hooks$fire(
         "ConfigChange",
@@ -874,7 +948,8 @@ Agent <- R6::R6Class(
         level = "info",
         code = "permission_mode_changed",
         previous_mode = old_mode,
-        permission_mode = mode
+        permission_mode = mode,
+        removed_provider_tools = removed_provider_tools
       )
 
       invisible(self)
@@ -883,15 +958,12 @@ Agent <- R6::R6Class(
     #' @description
     #' Get cost information for the conversation.
     #'
-    #' @return A list with input, output, cached, and total token costs
+    #' @return A list with input, output, and cached token counts; total
+    #'   estimated cost; and `complete` and `missing` fields describing provider
+    #'   cost coverage. An incomplete total is `NA_real_`.
     cost = function() {
-      tokens <- private$.chat$get_tokens()
-      list(
-        input = sum(tokens$input, na.rm = TRUE),
-        output = sum(tokens$output, na.rm = TRUE),
-        cached = sum(tokens$cached_input, na.rm = TRUE),
-        total = sum(tokens$cost, na.rm = TRUE)
-      )
+      summary <- provider_usage_summary(private$.chat)
+      summary[c("input", "output", "cached", "total", "complete", "missing")]
     },
 
     #' @description
@@ -1691,6 +1763,8 @@ Agent <- R6::R6Class(
     last_run_usage = NULL,
     .last_run_result = NULL,
     last_limit_status = NULL,
+    last_tool_cycle_signature = NULL,
+    consecutive_tool_cycles = 0L,
     .last_compaction = NULL,
     .compaction_summary = NULL,
     .tool_result_reader_registered = FALSE,
@@ -1776,6 +1850,69 @@ Agent <- R6::R6Class(
     },
 
     adapt_tool = function(tool) {
+      if (inherits(tool, "ellmer::ToolBuiltIn")) {
+        tool_name <- tryCatch(tool@name, error = function(error) NULL)
+        tool_id <- normalize_native_tool_id(tool_name %||% "")
+        if (!tool_id %in% c("web_search", "web_fetch")) {
+          cli_abort(c(
+            "Unsupported provider-native tool: {.val {tool_name %||% '<unknown>'}}",
+            "x" = paste0(
+              "Deputy cannot interpose on provider-side execution for this ",
+              "tool."
+            )
+          ))
+        }
+        if (!isTRUE(self$permissions$web)) {
+          cli_abort(c(
+            "Provider-native web tool {.val {tool_name}} is not authorized.",
+            "i" = "Set {.code web = TRUE} and explicitly allow the tool."
+          ))
+        }
+        allowlist <- self$permissions$tool_allowlist %||% character()
+        allowlist_ids <- unique(vapply(
+          allowlist,
+          normalize_native_tool_id,
+          character(1)
+        ))
+        if (!tool_id %in% allowlist_ids) {
+          cli_abort(c(
+            "Provider-native web tool {.val {tool_name}} is not explicitly allowed.",
+            "i" = "Add the tool name to {.arg tool_allowlist}."
+          ))
+        }
+        if (!is.null(self$permissions$can_use_tool)) {
+          cli_abort(c(
+            "Provider-native tool {.val {tool_name}} cannot use a custom permission callback.",
+            "x" = paste0(
+              "Provider-side requests cannot be checked against request ",
+              "arguments or run context."
+            ),
+            "i" = paste0(
+              "Remove {.arg can_use_tool} or use Deputy's universal ",
+              "function tool."
+            )
+          ))
+        }
+        permission <- self$permissions$check(
+          tool_name,
+          list(),
+          list(
+            working_dir = private$.working_dir,
+            tool_annotations = tool@annotations
+          )
+        )
+        if (inherits(permission, "PermissionResultDeny")) {
+          cli_abort(c(
+            "Provider-native tool {.val {tool_name}} was denied at registration.",
+            "x" = permission$reason,
+            "i" = paste0(
+              "Provider-native tools are authorized before a request because ",
+              "they execute inside the provider."
+            )
+          ))
+        }
+        return(tool)
+      }
       runtime_wrap_tool(
         tool,
         resolve_arguments = private$resolve_tool_arguments,
@@ -2251,6 +2388,8 @@ Agent <- R6::R6Class(
         agent$.__enclos_env__$private$pending_delegations <- list()
         agent$.__enclos_env__$private$original_tool_results <- list()
         agent$.__enclos_env__$private$last_limit_status <- NULL
+        agent$.__enclos_env__$private$last_tool_cycle_signature <- NULL
+        agent$.__enclos_env__$private$consecutive_tool_cycles <- 0L
         agent$.__enclos_env__$private$last_run_usage <- AgentUsage()
         agent$.__enclos_env__$private$current_run_checkpoint_id <- NULL
 
@@ -2520,6 +2659,7 @@ Agent <- R6::R6Class(
           if (
             is.null(private$last_limit_status) &&
               !is.null(limits$max_cost_usd) &&
+              is.finite(usage$cost_usd) &&
               usage$cost_usd >= limits$max_cost_usd * 0.9
           ) {
             private$notify(
@@ -2601,6 +2741,8 @@ Agent <- R6::R6Class(
 
       private$tool_call_limit <- NULL
       private$tool_call_count <- 0L
+      private$last_tool_cycle_signature <- NULL
+      private$consecutive_tool_cycles <- 0L
       private$should_stop <- FALSE
       private$stop_reason_from_hook <- NULL
       tryCatch(
@@ -2640,6 +2782,8 @@ Agent <- R6::R6Class(
       private$tool_call_records <- list()
       private$pending_delegations <- list()
       private$original_tool_results <- list()
+      private$last_tool_cycle_signature <- NULL
+      private$consecutive_tool_cycles <- 0L
       if (!is.null(private$current_run_context)) {
         private$last_run_context <- clone_run_context(
           private$current_run_context
@@ -3154,12 +3298,17 @@ Agent <- R6::R6Class(
 
     current_run_usage = function() {
       baseline <- private$current_usage_baseline %||% AgentUsage()
-      usage <- agent_usage_difference(
-        agent_usage_snapshot(private$.chat),
-        baseline,
-        tool_calls = private$current_tool_calls
+      current <- agent_usage_snapshot(private$.chat)
+      requests <- max(
+        current$requests - baseline$requests,
+        private$current_outer_requests
       )
-      usage$requests <- max(usage$requests, private$current_outer_requests)
+      usage <- agent_usage_difference(
+        current,
+        baseline,
+        tool_calls = private$current_tool_calls,
+        requests = requests
+      )
       agent_usage_add(
         usage,
         private$current_external_usage %||% AgentUsage()
@@ -3220,6 +3369,13 @@ Agent <- R6::R6Class(
           message,
           current_requests = status$actual,
           max_requests = status$limit,
+          run_id = private$current_run_id
+        )
+      }
+      if (identical(status$reason, "cost_unavailable")) {
+        abort_cost_unavailable(
+          message,
+          max_cost = status$limit,
           run_id = private$current_run_id
         )
       }
@@ -3301,6 +3457,8 @@ Agent <- R6::R6Class(
       private$current_tool_calls <- private$current_tool_calls + 1L
       record <- private$tool_call_record(extracted, "request")
       extracted$tool_call_id <- record$tool_call_id
+      private$tool_call_records[[record$record_index]]$request_signature <-
+        tool_request_signature(tool_name, tool_input)
       if (!isTRUE(record$start_seen)) {
         private$record_run_event(private$tool_start_event(extracted))
       }
@@ -3315,6 +3473,25 @@ Agent <- R6::R6Class(
       if (!is.null(limit_status)) {
         private$mark_usage_limit(limit_status)
         ellmer::tool_reject(usage_limit_message(limit_status))
+      }
+
+      # Retain the adapter-specific counter for callers that configure it
+      # directly. The governed run limit above counts all requests.
+      if (!is.null(private$tool_call_limit)) {
+        private$tool_call_count <- private$tool_call_count + 1L
+        if (private$tool_call_count > private$tool_call_limit) {
+          private$request_stream_stop("tool_call_limit")
+          message <- paste0(
+            "Tool call limit reached. Please provide your final answer with ",
+            "the information gathered so far."
+          )
+          private$notify(
+            message,
+            level = "warning",
+            code = "tool_call_limit"
+          )
+          ellmer::tool_reject(message)
+        }
       }
 
       file_info <- private$file_tool_path_info(tool_name, tool_input)
@@ -3394,22 +3571,6 @@ Agent <- R6::R6Class(
         }
         if (hook_result$permission == "deny") {
           ellmer::tool_reject(hook_result$reason %||% "Denied by hook")
-        }
-      }
-
-      # Enforce tool limits for every adapter over the governed run kernel.
-      if (!is.null(private$tool_call_limit)) {
-        private$tool_call_count <- private$tool_call_count + 1L
-        if (private$tool_call_count > private$tool_call_limit) {
-          private$request_stream_stop("tool_call_limit")
-          private$notify(
-            "Tool call limit reached. Please provide your final answer with the information gathered so far.",
-            level = "warning",
-            code = "tool_call_limit"
-          )
-          ellmer::tool_reject(
-            "Tool call limit reached. Please provide your final answer with the information gathered so far."
-          )
         }
       }
 
@@ -3521,6 +3682,47 @@ Agent <- R6::R6Class(
       }
 
       private$record_run_event(private$tool_end_event(extracted))
+
+      record_state <- private$tool_call_records[[record$record_index]]
+      request_signature <- record_state$request_signature
+      cycle_signature <- if (is.null(request_signature)) {
+        NULL
+      } else {
+        tool_cycle_signature(
+          request_signature,
+          hook_tool_result,
+          extracted$tool_error
+        )
+      }
+      if (is.null(cycle_signature)) {
+        private$last_tool_cycle_signature <- NULL
+        private$consecutive_tool_cycles <- 0L
+      } else {
+        loop <- advance_tool_loop(
+          signature = cycle_signature,
+          last_signature = private$last_tool_cycle_signature,
+          consecutive_calls = private$consecutive_tool_cycles
+        )
+        private$last_tool_cycle_signature <- loop$signature
+        private$consecutive_tool_cycles <- loop$consecutive_calls
+        if (isTRUE(loop$stalled) && !isTRUE(private$should_stop)) {
+          message <- paste0(
+            "Tool request `",
+            extracted$tool_name,
+            "` completed with the same result ",
+            loop$consecutive_calls,
+            " times without progress."
+          )
+          private$request_stream_stop("tool_loop")
+          private$notify(
+            message,
+            level = "warning",
+            code = "tool_loop",
+            tool_name = extracted$tool_name,
+            repeated = loop$consecutive_calls
+          )
+        }
+      }
 
       # ellmer may make another provider request after this tool result. Check
       # the complete context again while the run is between provider turns.

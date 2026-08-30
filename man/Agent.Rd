@@ -326,7 +326,7 @@ All requests pass through Deputy's run kernel. The return value matches
 \code{ellmer::Chat$chat()}; inspect \link{AgentResult} metadata with \verb{$last_run()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$chat(..., echo = NULL)}
+    \preformatted{Agent$chat(..., echo = NULL, run_context = list())}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -334,6 +334,8 @@ All requests pass through Deputy's run kernel. The return value matches
     \describe{
       \item{\code{...}}{User content accepted by ellmer.}
       \item{\code{echo}}{Accepted for ellmer compatibility.}
+      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
+for this run.}
     }
     \if{html}{\out{</div>}}
   }
@@ -349,7 +351,11 @@ All requests pass through Deputy's run kernel. The return value matches
   Send messages asynchronously using the ellmer Chat interface.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$chat_async(..., tool_mode = c("concurrent", "sequential"))}
+    \preformatted{Agent$chat_async(
+  ...,
+  tool_mode = c("concurrent", "sequential"),
+  run_context = list()
+)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -358,6 +364,8 @@ All requests pass through Deputy's run kernel. The return value matches
       \item{\code{...}}{User content accepted by ellmer.}
       \item{\code{tool_mode}}{Whether ellmer executes tool calls concurrently or
 sequentially.}
+      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
+for this run.}
     }
     \if{html}{\out{</div>}}
   }
@@ -373,7 +381,13 @@ sequentially.}
   Send a structured request through the governed run kernel.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$chat_structured(..., type, echo = "none", convert = TRUE)}
+    \preformatted{Agent$chat_structured(
+  ...,
+  type,
+  echo = "none",
+  convert = TRUE,
+  run_context = list()
+)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -383,6 +397,8 @@ sequentially.}
       \item{\code{type}}{An ellmer structured-output type.}
       \item{\code{echo}}{Echo mode forwarded to ellmer.}
       \item{\code{convert}}{Whether ellmer converts the structured response.}
+      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
+for this run.}
     }
     \if{html}{\out{</div>}}
   }
@@ -398,7 +414,13 @@ sequentially.}
   Send an asynchronous structured request through Deputy.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$chat_structured_async(..., type, echo = "none", convert = TRUE)}
+    \preformatted{Agent$chat_structured_async(
+  ...,
+  type,
+  echo = "none",
+  convert = TRUE,
+  run_context = list()
+)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -408,6 +430,8 @@ sequentially.}
       \item{\code{type}}{An ellmer structured-output type.}
       \item{\code{echo}}{Echo mode forwarded to ellmer.}
       \item{\code{convert}}{Whether ellmer converts the structured response.}
+      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
+for this run.}
     }
     \if{html}{\out{</div>}}
   }
@@ -423,7 +447,12 @@ sequentially.}
   Stream synchronously using the ellmer Chat interface.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$stream(..., stream = c("text", "content"), controller = NULL)}
+    \preformatted{Agent$stream(
+  ...,
+  stream = c("text", "content"),
+  controller = NULL,
+  run_context = list()
+)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -432,6 +461,8 @@ sequentially.}
       \item{\code{...}}{User content accepted by ellmer.}
       \item{\code{stream}}{Yield text or semantic ellmer content.}
       \item{\code{controller}}{Optional ellmer stream controller.}
+      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
+for this run.}
     }
     \if{html}{\out{</div>}}
   }
@@ -455,7 +486,8 @@ workspace resolution, context management, and run accounting.
   ...,
   tool_mode = c("concurrent", "sequential"),
   stream = c("text", "content"),
-  controller = NULL
+  controller = NULL,
+  run_context = list()
 )}
     \if{html}{\out{</div>}}
   }
@@ -468,6 +500,8 @@ attachment-enabled \code{Content} objects.}
 sequentially.}
       \item{\code{stream}}{Yield text or semantic ellmer content.}
       \item{\code{controller}}{Optional ellmer stream controller.}
+      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
+for this run.}
     }
     \if{html}{\out{</div>}}
   }
@@ -796,6 +830,12 @@ emitted into model context.}
 \if{latex}{\out{\hypertarget{method-Agent-register_tool}{}}}
 \subsection{\code{Agent$register_tool()}}{
   Register a tool with the agent.
+
+Function tools are wrapped with Deputy's runtime enforcement. Known
+provider-native web tools are authorized once, before registration,
+because their execution occurs inside the provider rather than R. Native
+tools therefore require static permissions and cannot be registered with
+a custom \code{can_use_tool} callback.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$register_tool(tool)}
@@ -804,7 +844,8 @@ emitted into model context.}
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{tool}}{A tool created with \code{ellmer::tool()}}
+      \item{\code{tool}}{A tool created with \code{ellmer::tool()} or a supported
+provider-native web tool.}
     }
     \if{html}{\out{</div>}}
   }
@@ -826,7 +867,8 @@ emitted into model context.}
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{tools}}{A list of tools created with \code{ellmer::tool()}}
+      \item{\code{tools}}{A list of function tools or supported provider-native web
+tools.}
     }
     \if{html}{\out{</div>}}
   }
@@ -995,7 +1037,9 @@ agent$add_hook(HookMatcher$new(
   Preserve or narrow the active permission mode for subsequent tool calls.
 Reapplying the current mode is a no-op. Widening or incomparable mode
 changes require a newly configured \code{Agent} so custom restrictions remain
-an immutable authority ceiling.
+an immutable authority ceiling. When narrowing removes web access,
+registered provider-native web tools are removed before the new policy
+becomes active because Deputy cannot interpose on provider-side calls.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_permission_mode(mode)}
@@ -1024,7 +1068,9 @@ an immutable authority ceiling.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A list with input, output, cached, and total token costs
+    A list with input, output, and cached token counts; total
+estimated cost; and \code{complete} and \code{missing} fields describing provider
+cost coverage. An incomplete total is \code{NA_real_}.
   }
 }
 

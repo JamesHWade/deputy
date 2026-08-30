@@ -26,12 +26,15 @@ deputy/
 │   ├── agent.R             # Agent class - main agentic workflow engine
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
+│   ├── run-usage.R         # Run accounting and fail-closed limits
+│   ├── stall-detection.R   # Canonical repeated-tool progress signal
 │   ├── permissions.R       # Permission system and tool annotations
 │   ├── hooks.R             # HookRegistry for lifecycle events
 │   ├── skills.R            # Skill loading system
 │   ├── tools-builtin.R     # Built-in tools (read_file, write_file, etc.)
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
+│   ├── tools-mcp.R         # MCP discovery and sandboxed mcp-repl boundary
 │   ├── errors.R            # Custom error hierarchy
 │   └── utils.R             # Internal utilities
 ├── tests/testthat/         # Unit tests (testthat edition 3)
@@ -275,8 +278,8 @@ other concurrent hosts.
 ### Tool Presets
 
 - `tools_preset("minimal")` - read_file, list_files
-- `tools_preset("standard")` - + write_file, run_r_code
-- `tools_preset("dev")` - + run_bash
+- `tools_preset("standard")` - + write_file; no code execution
+- `tools_preset("dev")` - + trusted run_r_code and run_bash
 - `tools_preset("data")` - read_file, list_files, read_csv, run_r_code
 - `tools_preset("full")` - all built-in tools
 
@@ -310,7 +313,9 @@ other concurrent hosts.
 - `coro` - Coroutines for streaming
 - `digest` - Hashing
 - `Rapp` (>= 0.4.0) - CLI framework
-- `callr` - Subprocess isolation for the standard CLI tool preset
+- `callr` - Fault isolation and timeouts for explicitly trusted R code
+- `mcp-repl` (optional, through mcptools) - OS-sandboxed model-generated R;
+  `tools_mcp_repl()` verifies an explicit fail-closed policy before loading it
 
 **Development** (in Suggests):
 - `testthat` (>= 3.0.0) - Testing

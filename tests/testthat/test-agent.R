@@ -120,10 +120,31 @@ test_that("Agent cost returns correct structure", {
 
   cost <- agent$cost()
 
-  expect_true("input" %in% names(cost))
-  expect_true("output" %in% names(cost))
-  expect_true("cached" %in% names(cost))
-  expect_true("total" %in% names(cost))
+  expect_named(
+    cost,
+    c("input", "output", "cached", "total", "complete", "missing")
+  )
+  expect_identical(cost$complete, TRUE)
+  expect_identical(cost$missing, 0L)
+})
+
+test_that("Agent cost reports incomplete provider records", {
+  mock_chat <- create_mock_chat()
+  mock_chat$get_tokens <- function() {
+    data.frame(
+      input = c(10, 20),
+      output = c(2, 4),
+      cached_input = c(0, 5),
+      cost = c(0.01, NA_real_)
+    )
+  }
+  agent <- Agent$new(chat = mock_chat)
+
+  cost <- agent$cost()
+
+  expect_identical(cost$total, NA_real_)
+  expect_identical(cost$complete, FALSE)
+  expect_identical(cost$missing, 1L)
 })
 
 test_that("Agent provider returns correct structure", {

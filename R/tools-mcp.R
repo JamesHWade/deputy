@@ -19,6 +19,190 @@ mcp_available <- function() {
   requireNamespace("mcptools", quietly = TRUE)
 }
 
+mcp_repl_sandbox_setting <- function(arguments) {
+  arguments <- unlist(arguments %||% list(), use.names = FALSE)
+  if (length(arguments) == 0L) {
+    return(NULL)
+  }
+  if (!is.character(arguments) || anyNA(arguments)) {
+    cli_abort("mcp-repl arguments must be character strings")
+  }
+
+  positions <- integer()
+  values <- character()
+  for (index in seq_along(arguments)) {
+    argument <- arguments[[index]]
+    if (identical(argument, "--sandbox")) {
+      if (
+        index == length(arguments) || startsWith(arguments[[index + 1L]], "--")
+      ) {
+        cli_abort("mcp-repl {.code --sandbox} requires a value")
+      }
+      positions <- c(positions, index)
+      values <- c(values, arguments[[index + 1L]])
+    } else if (startsWith(argument, "--sandbox=")) {
+      positions <- c(positions, index)
+      values <- c(values, sub("^--sandbox=", "", argument))
+    }
+  }
+
+  if (length(values) == 0L) {
+    return(NULL)
+  }
+  values[[which.max(positions)]]
+}
+
+validate_mcp_repl_sandbox_server <- function(server, sandbox) {
+  if (!is.list(server)) {
+    cli_abort("The selected MCP server must be a configuration object")
+  }
+  command <- server$command
+  if (
+    !is.character(command) ||
+      length(command) != 1L ||
+      is.na(command) ||
+      !basename(command) %in%
+        c(
+          "mcp-repl",
+          "mcp-repl.exe",
+          "posit-mcp-repl",
+          "posit-mcp-repl.exe"
+        )
+  ) {
+    cli_abort("The selected server must invoke the mcp-repl executable")
+  }
+
+  configured <- mcp_repl_sandbox_setting(server$args)
+  if (is.null(configured) || !nzchar(configured)) {
+    cli_abort(c(
+      "The mcp-repl server must explicitly set {.code --sandbox}.",
+      "i" = "Deputy will not infer a sandbox guarantee from backend defaults."
+    ))
+  }
+  if (configured %in% c("inherit", "inherit-codex")) {
+    cli_abort(c(
+      "mcp-repl sandbox mode {.val {configured}} is not valid here.",
+      "i" = "mcptools does not send Codex per-call sandbox metadata."
+    ))
+  }
+  if (configured %in% c("danger-full-access", "external-sandbox")) {
+    cli_abort(
+      "mcp-repl sandbox mode {.val {configured}} does not enforce the requested boundary."
+    )
+  }
+  if (!configured %in% c("read-only", "workspace-write")) {
+    cli_abort("Unsupported mcp-repl sandbox mode: {.val {configured}}")
+  }
+  if (!identical(configured, sandbox)) {
+    cli_abort(c(
+      "Requested sandbox {.val {sandbox}}, but mcp-repl is configured for {.val {configured}}.",
+      "i" = "Change the server configuration or request its configured mode."
+    ))
+  }
+  configured
+}
+
+#' Load an R REPL with an enforced OS sandbox
+#'
+#' @description
+#' Loads one explicitly configured [mcp-repl](https://github.com/posit-dev/mcp-repl)
+#' server after verifying that its command requests the exact sandbox policy.
+#' Deputy refuses missing, inherited, external, and unrestricted policies.
+#'
+#' This is the supported path for model-generated code that requires an OS
+#' security boundary. Deputy's built-in [tool_run_r_code] and [tool_run_bash]
+#' are trusted-code tools; their subprocesses provide fault isolation, not
+#' filesystem or network confinement.
+#'
+#' @param config Path to an mcptools JSON configuration. Defaults to
+#'   `~/.config/mcptools/config.json`.
+#' @param server Exact MCP server name. Defaults to `"r"`, the name used by
+#'   mcp-repl's installation examples.
+#' @param sandbox Required mcp-repl policy. `"workspace-write"` confines writes
+#'   to configured roots and `"read-only"` denies workspace writes. mcp-repl
+#'   also controls network access according to its server configuration.
+#'
+#' @return A list of ellmer-compatible tools from the selected mcp-repl server.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' repl_tools <- tools_mcp_repl(
+#'   config = "~/.config/mcptools/config.json",
+#'   server = "r",
+#'   sandbox = "workspace-write"
+#' )
+#' agent <- Agent$new(
+#'   chat = ellmer::chat("openai"),
+#'   tools = repl_tools,
+#'   permissions = Permissions$new(web = FALSE)
+#' )
+#' }
+tools_mcp_repl <- function(
+  config = NULL,
+  server = "r",
+  sandbox = c("workspace-write", "read-only")
+) {
+  sandbox <- match.arg(sandbox)
+  if (
+    !is.character(server) ||
+      length(server) != 1L ||
+      is.na(server) ||
+      !nzchar(server)
+  ) {
+    cli_abort("{.arg server} must be one non-empty string")
+  }
+  if (!rlang::is_installed("jsonlite")) {
+    cli_abort("{.pkg jsonlite} is required to validate MCP configuration")
+  }
+
+  config <- path.expand(
+    config %||%
+      file.path(
+        "~",
+        ".config",
+        "mcptools",
+        "config.json"
+      )
+  )
+  if (!file.exists(config)) {
+    cli_abort("MCP configuration not found: {.path {config}}")
+  }
+  payload <- tryCatch(
+    jsonlite::fromJSON(config, simplifyVector = FALSE),
+    error = function(error) {
+      cli_abort("Could not parse MCP configuration", parent = error)
+    }
+  )
+  servers <- payload$mcpServers
+  if (!is.list(servers) || is.null(servers[[server]])) {
+    cli_abort("MCP configuration has no server named {.val {server}}")
+  }
+  selected <- servers[[server]]
+  validate_mcp_repl_sandbox_server(selected, sandbox)
+
+  if (!mcp_available()) {
+    cli_abort("{.pkg mcptools} is required to load mcp-repl tools")
+  }
+
+  isolated_config <- tempfile("deputy-mcp-repl-", fileext = ".json")
+  on.exit(unlink(isolated_config), add = TRUE)
+  file.create(isolated_config)
+  Sys.chmod(isolated_config, mode = "0600")
+  jsonlite::write_json(
+    list(mcpServers = stats::setNames(list(selected), server)),
+    isolated_config,
+    auto_unbox = TRUE,
+    null = "null"
+  )
+
+  tools <- tools_mcp(config = isolated_config)
+  if (length(tools) == 0L) {
+    cli_abort("The sandboxed mcp-repl server returned no tools")
+  }
+  tools
+}
+
 #' Get tools from MCP servers
 #'
 #' @description

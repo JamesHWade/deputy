@@ -262,6 +262,13 @@ table(findings_df$category, findings_df$severity)
 result$cost
 result$duration
 
+# Never substitute zero for an incomplete provider total
+if (!isTRUE(result$cost$complete)) {
+  cli::cli_alert_warning(
+    "Provider omitted {result$cost$missing} cost record{?s}."
+  )
+}
+
 # All tool calls made during the review
 tool_calls <- result$tool_calls()
 cli::cli_alert_info("Total tool calls: {length(tool_calls)}")

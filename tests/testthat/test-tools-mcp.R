@@ -187,3 +187,92 @@ test_that("tools_mcp validates return value is list", {
   expect_true(is.list(result))
   expect_length(result, 0)
 })
+
+test_that("mcp-repl sandbox configuration is explicit and exact", {
+  server <- list(
+    command = "/usr/local/bin/mcp-repl",
+    args = list(
+      "--oversized-output",
+      "files",
+      "--sandbox",
+      "workspace-write",
+      "--interpreter",
+      "r"
+    )
+  )
+
+  expect_identical(
+    validate_mcp_repl_sandbox_server(server, "workspace-write"),
+    "workspace-write"
+  )
+  expect_error(
+    validate_mcp_repl_sandbox_server(server, "read-only"),
+    "configured.*workspace-write"
+  )
+
+  server$args <- list("--interpreter", "r")
+  expect_error(
+    validate_mcp_repl_sandbox_server(server, "workspace-write"),
+    "explicitly set"
+  )
+})
+
+test_that("mcp-repl sandbox configuration rejects unenforced modes", {
+  server <- list(
+    command = "mcp-repl",
+    args = list("--sandbox=danger-full-access")
+  )
+  expect_error(
+    validate_mcp_repl_sandbox_server(server, "workspace-write"),
+    "danger-full-access"
+  )
+
+  server$args <- list("--sandbox", "inherit-codex")
+  expect_error(
+    validate_mcp_repl_sandbox_server(server, "workspace-write"),
+    "per-call sandbox metadata"
+  )
+
+  server$command <- "another-server"
+  server$args <- list("--sandbox", "workspace-write")
+  expect_error(
+    validate_mcp_repl_sandbox_server(server, "workspace-write"),
+    "mcp-repl executable"
+  )
+})
+
+test_that("mcp-repl sandbox parsing honors the final CLI setting", {
+  server <- list(
+    command = "posit-mcp-repl",
+    args = list(
+      "--sandbox",
+      "read-only",
+      "--sandbox=workspace-write"
+    )
+  )
+
+  expect_identical(
+    validate_mcp_repl_sandbox_server(server, "workspace-write"),
+    "workspace-write"
+  )
+})
+
+test_that("tools_mcp_repl fails closed before loading an invalid server", {
+  config_path <- withr::local_tempfile(fileext = ".json")
+  writeLines(
+    paste0(
+      '{"mcpServers":{"r":{"command":"mcp-repl",',
+      '"args":["--sandbox","danger-full-access"]}}}'
+    ),
+    config_path
+  )
+
+  expect_error(
+    tools_mcp_repl(
+      config = config_path,
+      server = "r",
+      sandbox = "workspace-write"
+    ),
+    "danger-full-access"
+  )
+})

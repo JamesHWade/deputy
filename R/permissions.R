@@ -133,7 +133,7 @@ permission_mode_capabilities <- function(mode, working_dir = getwd()) {
       file_read = TRUE,
       file_write = working_dir,
       bash = FALSE,
-      r_code = TRUE,
+      r_code = FALSE,
       web = FALSE,
       install_packages = FALSE,
       permission_prompt_tool_name = NULL
@@ -385,7 +385,8 @@ Permissions <- R6::R6Class(
     #'   absolute directory path). Directory grants are canonicalized once when
     #'   the policy is constructed.
     #' @param bash Allow bash commands
-    #' @param r_code Allow R code execution
+    #' @param r_code Allow R code execution. Defaults to `FALSE`; grant it
+    #'   explicitly for trusted code or use [permissions_full()].
     #' @param web Allow web requests
     #' @param install_packages Allow package installation
     #' @param can_use_tool Custom callback function
@@ -400,7 +401,7 @@ Permissions <- R6::R6Class(
       file_read = TRUE,
       file_write = getwd(),
       bash = FALSE,
-      r_code = TRUE,
+      r_code = FALSE,
       web = FALSE,
       install_packages = FALSE,
       can_use_tool = NULL,
@@ -1214,8 +1215,9 @@ permissions_readonly <- function() {
 #' @description
 #' Creates a permission policy suitable for most use cases.
 #' Allows reads of files accessible to the R process, confines file writes to
-#' the working directory, and permits R code execution. Denies bash commands,
-#' web access, and package installation.
+#' the working directory. Denies arbitrary R code, bash commands, web access,
+#' and package installation. Grant code execution explicitly only when the
+#' model and task are trusted; process separation is not an OS sandbox.
 #'
 #' @param working_dir Existing absolute root directory for file writes (default:
 #'   current directory). This does not restrict otherwise accessible file
@@ -1233,7 +1235,7 @@ permissions_standard <- function(working_dir = getwd()) {
     file_read = TRUE,
     file_write = working_dir,
     bash = FALSE,
-    r_code = TRUE,
+    r_code = FALSE,
     web = FALSE,
     install_packages = FALSE
   )
