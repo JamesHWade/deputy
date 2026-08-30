@@ -18,8 +18,8 @@ tools_preset(name)
   - `"minimal"` - Read-only tools for safe exploration (`read_file`,
     `read_markdown`, `list_files`)
 
-  - `"standard"` - Balanced toolset for R development (`read_file`,
-    `read_markdown`, `write_file`, `list_files`, `run_r_code`)
+  - `"standard"` - File-oriented toolset for ordinary work (`read_file`,
+    `read_markdown`, `write_file`, `list_files`)
 
   - `"dev"` - Full development with shell access (`read_file`,
     `read_markdown`, `write_file`, `list_files`, `run_r_code`,

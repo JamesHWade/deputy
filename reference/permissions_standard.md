@@ -2,8 +2,9 @@
 
 Creates a permission policy suitable for most use cases. Allows reads of
 files accessible to the R process, confines file writes to the working
-directory, and permits R code execution. Denies bash commands, web
-access, and package installation.
+directory. Denies arbitrary R code, bash commands, web access, and
+package installation. Grant code execution explicitly only when the
+model and task are trusted; process separation is not an OS sandbox.
 
 ## Usage
 

@@ -147,12 +147,12 @@ own.</p>
 </tr>
 <tr class="odd">
 <td><code>tool_run_r_code</code></td>
-<td>Execute R code</td>
-<td>open-world</td>
+<td>Execute trusted R code as the current user</td>
+<td>destructive, open-world</td>
 </tr>
 <tr class="even">
 <td><code>tool_run_bash</code></td>
-<td>Execute a bash command</td>
+<td>Execute trusted shell code as the current user</td>
 <td>destructive, open-world</td>
 </tr>
 <tr class="odd">
@@ -193,6 +193,10 @@ system uses to decide whether the agent is allowed to use it. See
 <span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># read_csv, read_file, read_markdown</span></span>
 <span><span class="fu"><a href="../reference/tools_web.html">tools_web</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># universal web_fetch and web_search</span></span>
 <span><span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># everything</span></span></code></pre></div>
+<p>Registration is not authorization: <code><a href="../reference/tools_code.html">tools_code()</a></code> makes
+the two trusted-code tools available to the model, while the Agent’s
+<code>Permissions</code> still decides whether either call may run.
+<code><a href="../reference/permissions_standard.html">permissions_standard()</a></code> denies both.</p>
 <p>Combine bundles by concatenating:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
@@ -208,6 +212,34 @@ system uses to decide whether the agent is allowed to use it. See
 <span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"dev"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"data"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"full"</span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<thead><tr class="header">
+<th>Preset</th>
+<th>Included capabilities</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>minimal</code></td>
+<td>file and document reads</td>
+</tr>
+<tr class="even">
+<td><code>standard</code></td>
+<td>reads plus native file writes; no code execution</td>
+</tr>
+<tr class="odd">
+<td><code>data</code></td>
+<td>data reads plus trusted R execution</td>
+</tr>
+<tr class="even">
+<td><code>dev</code></td>
+<td>native files plus trusted R and shell execution</td>
+</tr>
+<tr class="odd">
+<td><code>full</code></td>
+<td>every built-in tool</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="section level2">
 <h2 id="creating-custom-tools">Creating Custom Tools<a class="anchor" aria-label="anchor" href="#creating-custom-tools"></a>
@@ -283,8 +315,23 @@ universal web tools:</p>
 <code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_web.html">tools_web</a></span><span class="op">(</span><span class="va">chat</span><span class="op">)</span></span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_web.html">tools_web</a></span><span class="op">(</span><span class="va">chat</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>    web <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>    tool_allowlist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"web_search"</span>, <span class="st">"web_fetch"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>Provider-native tools execute outside R, so Deputy authorizes known
+native web search and fetch tools before registering them. The policy
+must grant web access and explicitly allow the tool; static denylists
+are also enforced at registration. A custom <code>can_use_tool</code>
+callback rejects provider-native tools because Deputy cannot supply
+request arguments or run context after provider execution begins. Other
+provider-native tool types are rejected. Use the universal function
+tools when authorization must inspect each request. If
+<code>set_permission_mode()</code> later narrows away web access, Deputy
+removes registered provider-native web tools before the new policy
+becomes active.</p>
 <p>For providers without native support, deputy falls back to
 <code>tool_web_fetch</code> (fetches a URL and extracts text) and
 <code>tool_web_search</code> (searches via DuckDuckGo).</p>
@@ -304,6 +351,30 @@ servers via the <a href="https://github.com/posit-dev/mcptools" class="external-
 <code>mcptools</code> is not installed or no tools are available. MCP
 servers are configured in <code>~/.config/mcptools/config.json</code>;
 see the mcptools documentation for setup.</p>
+<div class="section level3">
+<h3 id="sandboxed-r-with-mcp-repl">Sandboxed R with mcp-repl<a class="anchor" aria-label="anchor" href="#sandboxed-r-with-mcp-repl"></a>
+</h3>
+<p>Use <code><a href="../reference/tools_mcp_repl.html">tools_mcp_repl()</a></code> when model-generated R needs an OS
+sandbox rather than the current user’s authority:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">repl_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tools_mcp_repl.html">tools_mcp_repl</a></span><span class="op">(</span></span>
+<span>  config <span class="op">=</span> <span class="st">"~/.config/mcptools/config.json"</span>,</span>
+<span>  server <span class="op">=</span> <span class="st">"r"</span>,</span>
+<span>  sandbox <span class="op">=</span> <span class="st">"workspace-write"</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="va">repl_tools</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>web <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The helper isolates the named server from the rest of the MCP
+configuration and checks its exact final <code>--sandbox</code>
+argument. Missing policies and modes that do not establish a
+Deputy-verifiable boundary are errors. mcp-repl then owns OS-specific
+confinement, including fail-closed startup on unsupported hosts. See
+<code><a href="../articles/permissions.html">vignette("permissions")</a></code> for the complete trust model.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="human-in-the-loop">Human-in-the-Loop<a class="anchor" aria-label="anchor" href="#human-in-the-loop"></a>
@@ -311,7 +382,7 @@ see the mcptools documentation for setup.</p>
 <p>The <code>tool_ask_user</code> tool lets an agent ask the user a
 question during execution. This is useful for confirmations,
 clarifications, or collecting input:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent_id</span> <span class="op">&lt;-</span> <span class="st">"agent-analysis"</span></span>
 <span><span class="va">session_id</span> <span class="op">&lt;-</span> <span class="st">"session-analysis"</span></span>
 <span></span>

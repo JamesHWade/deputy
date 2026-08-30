@@ -4,14 +4,16 @@ run_r_code - Execute R code in a separate process
 run_bash - Execute bash commands
 
 
-Note: These tools require appropriate permissions. By default,
-permissions_standard() allows R code but not bash."><meta property="og:description" content="Returns a list of tools for code execution:
+Note: These tools execute trusted code and require explicit permissions.
+Process separation is not an OS sandbox; permissions_standard() denies
+both tools."><meta property="og:description" content="Returns a list of tools for code execution:
 run_r_code - Execute R code in a separate process
 run_bash - Execute bash commands
 
 
-Note: These tools require appropriate permissions. By default,
-permissions_standard() allows R code but not bash."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
+Note: These tools execute trusted code and require explicit permissions.
+Process separation is not an OS sandbox; permissions_standard() denies
+both tools."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -68,8 +70,9 @@ permissions_standard() allows R code but not bash."><meta property="og:image" co
     <div class="ref-description section level2">
     <p>Returns a list of tools for code execution:</p><ul><li><p><code>run_r_code</code> - Execute R code in a separate process</p></li>
 <li><p><code>run_bash</code> - Execute bash commands</p></li>
-</ul><p><strong>Note:</strong> These tools require appropriate permissions. By default,
-<code><a href="permissions_standard.html">permissions_standard()</a></code> allows R code but not bash.</p>
+</ul><p><strong>Note:</strong> These tools execute trusted code and require explicit permissions.
+Process separation is not an OS sandbox; <code><a href="permissions_standard.html">permissions_standard()</a></code> denies
+both tools.</p>
     </div>
 
     <div class="section level2">

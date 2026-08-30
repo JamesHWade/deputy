@@ -128,7 +128,8 @@ unset.</p></dd>
 
 <dt id="arg-max-cost-usd">max_cost_usd<a class="anchor" aria-label="anchor" href="#arg-max-cost-usd"></a></dt>
 <dd><p>Maximum provider-reported estimated cost in US dollars.
-<code>NULL</code> leaves the field unset.</p></dd>
+<code>NULL</code> leaves the field unset. If configured, missing provider cost data
+stops the run with <code>"cost_unavailable"</code> rather than undercounting.</p></dd>
 
 
 <dt id="arg-on-exceed">on_exceed<a class="anchor" aria-label="anchor" href="#arg-on-exceed"></a></dt>

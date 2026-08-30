@@ -99,7 +99,8 @@ result <- agent$run_sync(
     "Read DESCRIPTION and list the R/ directory.",
     "Explain the package purpose and identify three good entry-point files.",
     "Cite the paths you used. Do not propose or make edits."
-  )
+  ),
+  run_context = list(stage = "package-review")
 )
 ```
 
@@ -121,7 +122,12 @@ result$tool_results()
 
 Check `stop_reason` before treating the response as complete. A request,
 tool-call, token, or cost limit produces a typed stop reason rather than
-a silently truncated success.
+a silently truncated success. `"tool_loop"` means the model requested
+the same tool with the same arguments and received the same result three
+times consecutively; changing results count as progress. If a cost limit
+is set but the provider omits any cost record, Deputy stops with
+`"cost_unavailable"`; it never presents a known lower bound as the
+total.
 
 ## 4. Grant writes deliberately
 
@@ -212,9 +218,14 @@ increase only the specific limit whose additional work is justified.
 ### Code execution sounds safer than it is
 
 `run_r_code` starts a separate R process, but process separation is not
-an OS sandbox. `run_bash` runs with the current user’s privileges. Use
-containers, virtual machines, or another real isolation boundary for
-untrusted code.
+an OS sandbox. `run_bash` runs with the current user’s privileges. Both
+are denied by
+[`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md).
+For untrusted model-generated R, configure mcp-repl with an explicit OS
+policy and load it through
+[`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md);
+Deputy refuses to load a server whose effective sandbox differs from the
+requested one.
 
 ### A Shiny task reads the wrong directory
 

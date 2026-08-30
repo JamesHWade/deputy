@@ -44,7 +44,8 @@ AgentUsage(
 
 - cost_usd:
 
-  Provider-reported estimated cost in US dollars.
+  Provider-reported estimated cost in US dollars, or `NA_real_` when the
+  provider did not report complete cost information.
 
 ## Value
 

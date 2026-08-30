@@ -2,8 +2,11 @@
 
 This example builds an autonomous agent that performs exploratory data
 analysis on a dataset. The agent decides what to investigate, writes and
-runs R code, and iterates until it has a thorough understanding of the
-data.
+runs R code in an explicitly trusted local subprocess, and iterates
+until it understands the data. For untrusted inputs or prompts, replace
+[`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md)
+with an mcp-repl tool loaded by
+[`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md).
 
 This follows the **Autonomous Agent** pattern: a single agent with
 tools, given a goal and left to iterate through analysis steps on its
@@ -36,6 +39,11 @@ chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 agent <- Agent$new(
   chat = chat,
   tools = c(tools_data(), tools_code()),
+  permissions = Permissions$new(
+    file_read = TRUE,
+    file_write = FALSE,
+    r_code = TRUE
+  ),
   system_prompt = "You are a data scientist. When exploring a dataset:
     1. Start with structure and summary statistics
     2. Check for missing values and data quality issues
@@ -93,6 +101,11 @@ chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 agent <- Agent$new(
   chat = chat,
   tools = c(tools_data(), tools_code()),
+  permissions = Permissions$new(
+    file_read = TRUE,
+    file_write = FALSE,
+    r_code = TRUE
+  ),
   system_prompt = "You are a data scientist. Be thorough but concise."
 )
 
@@ -165,8 +178,10 @@ result <- agent$run_sync(
 ```
 
 The agent can read data and run R code, but cannot write files or run
-bash commands. Deputy stops the run when it observes either configured
-usage limit.
+bash commands. This permission is application policy, not an OS sandbox.
+Deputy stops the run when it observes either configured usage limit, and
+stops with `"cost_unavailable"` if the provider does not report enough
+cost information to enforce the dollar limit.
 
 ## Next Steps
 

@@ -400,7 +400,7 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 <p>All requests pass through Deputy's run kernel. The return value matches
 <code>ellmer::Chat$chat()</code>; inspect <a href="AgentResult.html">AgentResult</a> metadata with <code>$last_run()</code>.</p><div class="section">
 <h4 id="usage-3">Usage<a class="anchor" aria-label="anchor" href="#usage-3"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="va">...</span>, echo <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="va">...</span>, echo <span class="op">=</span> <span class="cn">NULL</span>, run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>...</code></dt>
@@ -408,6 +408,10 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 
       <dt><code>echo</code></dt>
 <dd><p>Accepted for ellmer compatibility.</p></dd>
+
+      <dt><code>run_context</code></dt>
+<dd><p>Canonical JSON-compatible context to add to or narrow
+for this run.</p></dd>
 
 
 </dl><p></p></div>
@@ -422,7 +426,11 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
 <h3 id="agent-chat-async-"><code>Agent$chat_async()</code><a class="anchor" aria-label="anchor" href="#agent-chat-async-"></a></h3>
 <p>Send messages asynchronously using the ellmer Chat interface.</p><div class="section">
 <h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat_async</span><span class="op">(</span><span class="va">...</span>, tool_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"concurrent"</span>, <span class="st">"sequential"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat_async</span><span class="op">(</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  tool_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"concurrent"</span>, <span class="st">"sequential"</span><span class="op">)</span>,</span>
+<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>...</code></dt>
@@ -431,6 +439,10 @@ for this run. Protected constructor identity fields cannot change.</p></dd>
       <dt><code>tool_mode</code></dt>
 <dd><p>Whether ellmer executes tool calls concurrently or
 sequentially.</p></dd>
+
+      <dt><code>run_context</code></dt>
+<dd><p>Canonical JSON-compatible context to add to or narrow
+for this run.</p></dd>
 
 
 </dl><p></p></div>
@@ -445,7 +457,13 @@ sequentially.</p></dd>
 <h3 id="agent-chat-structured-"><code>Agent$chat_structured()</code><a class="anchor" aria-label="anchor" href="#agent-chat-structured-"></a></h3>
 <p>Send a structured request through the governed run kernel.</p><div class="section">
 <h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat_structured</span><span class="op">(</span><span class="va">...</span>, <span class="va">type</span>, echo <span class="op">=</span> <span class="st">"none"</span>, convert <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat_structured</span><span class="op">(</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  <span class="va">type</span>,</span>
+<span>  echo <span class="op">=</span> <span class="st">"none"</span>,</span>
+<span>  convert <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-5">Arguments<a class="anchor" aria-label="anchor" href="#arguments-5"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>...</code></dt>
@@ -460,6 +478,10 @@ sequentially.</p></dd>
       <dt><code>convert</code></dt>
 <dd><p>Whether ellmer converts the structured response.</p></dd>
 
+      <dt><code>run_context</code></dt>
+<dd><p>Canonical JSON-compatible context to add to or narrow
+for this run.</p></dd>
+
 
 </dl><p></p></div>
 </div><p></p><div class="section">
@@ -473,7 +495,13 @@ sequentially.</p></dd>
 <h3 id="agent-chat-structured-async-"><code>Agent$chat_structured_async()</code><a class="anchor" aria-label="anchor" href="#agent-chat-structured-async-"></a></h3>
 <p>Send an asynchronous structured request through Deputy.</p><div class="section">
 <h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat_structured_async</span><span class="op">(</span><span class="va">...</span>, <span class="va">type</span>, echo <span class="op">=</span> <span class="st">"none"</span>, convert <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">chat_structured_async</span><span class="op">(</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  <span class="va">type</span>,</span>
+<span>  echo <span class="op">=</span> <span class="st">"none"</span>,</span>
+<span>  convert <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-6">Arguments<a class="anchor" aria-label="anchor" href="#arguments-6"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>...</code></dt>
@@ -488,6 +516,10 @@ sequentially.</p></dd>
       <dt><code>convert</code></dt>
 <dd><p>Whether ellmer converts the structured response.</p></dd>
 
+      <dt><code>run_context</code></dt>
+<dd><p>Canonical JSON-compatible context to add to or narrow
+for this run.</p></dd>
+
 
 </dl><p></p></div>
 </div><p></p><div class="section">
@@ -501,7 +533,12 @@ sequentially.</p></dd>
 <h3 id="agent-stream-"><code>Agent$stream()</code><a class="anchor" aria-label="anchor" href="#agent-stream-"></a></h3>
 <p>Stream synchronously using the ellmer Chat interface.</p><div class="section">
 <h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">stream</span><span class="op">(</span><span class="va">...</span>, stream <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"text"</span>, <span class="st">"content"</span><span class="op">)</span>, controller <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">stream</span><span class="op">(</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  stream <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"text"</span>, <span class="st">"content"</span><span class="op">)</span>,</span>
+<span>  controller <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-7">Arguments<a class="anchor" aria-label="anchor" href="#arguments-7"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>...</code></dt>
@@ -512,6 +549,10 @@ sequentially.</p></dd>
 
       <dt><code>controller</code></dt>
 <dd><p>Optional ellmer stream controller.</p></dd>
+
+      <dt><code>run_context</code></dt>
+<dd><p>Canonical JSON-compatible context to add to or narrow
+for this run.</p></dd>
 
 
 </dl><p></p></div>
@@ -533,7 +574,8 @@ workspace resolution, context management, and run accounting.</p><div class="sec
 <span>  <span class="va">...</span>,</span>
 <span>  tool_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"concurrent"</span>, <span class="st">"sequential"</span><span class="op">)</span>,</span>
 <span>  stream <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"text"</span>, <span class="st">"content"</span><span class="op">)</span>,</span>
-<span>  controller <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  controller <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-8">Arguments<a class="anchor" aria-label="anchor" href="#arguments-8"></a></h4>
@@ -550,6 +592,10 @@ sequentially.</p></dd>
 
       <dt><code>controller</code></dt>
 <dd><p>Optional ellmer stream controller.</p></dd>
+
+      <dt><code>run_context</code></dt>
+<dd><p>Canonical JSON-compatible context to add to or narrow
+for this run.</p></dd>
 
 
 </dl><p></p></div>
@@ -837,13 +883,19 @@ emitted into model context.</p></dd>
 
 <p></p><hr><a id="method-Agent-register_tool"></a><div class="section">
 <h3 id="agent-register-tool-"><code>Agent$register_tool()</code><a class="anchor" aria-label="anchor" href="#agent-register-tool-"></a></h3>
-<p>Register a tool with the agent.</p><div class="section">
+<p>Register a tool with the agent.</p>
+<p>Function tools are wrapped with Deputy's runtime enforcement. Known
+provider-native web tools are authorized once, before registration,
+because their execution occurs inside the provider rather than R. Native
+tools therefore require static permissions and cannot be registered with
+a custom <code>can_use_tool</code> callback.</p><div class="section">
 <h4 id="usage-25">Usage<a class="anchor" aria-label="anchor" href="#usage-25"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="va">tool</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-19">Arguments<a class="anchor" aria-label="anchor" href="#arguments-19"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>tool</code></dt>
-<dd><p>A tool created with <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code></p></dd>
+<dd><p>A tool created with <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code> or a supported
+provider-native web tool.</p></dd>
 
 
 </dl><p></p></div>
@@ -862,7 +914,8 @@ emitted into model context.</p></dd>
 </div><p></p><div class="section">
 <h4 id="arguments-20">Arguments<a class="anchor" aria-label="anchor" href="#arguments-20"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>tools</code></dt>
-<dd><p>A list of tools created with <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code></p></dd>
+<dd><p>A list of function tools or supported provider-native web
+tools.</p></dd>
 
 
 </dl><p></p></div>
@@ -1006,7 +1059,9 @@ modify behavior (e.g., deny tool calls, log events).</p><div class="section">
 <p>Preserve or narrow the active permission mode for subsequent tool calls.
 Reapplying the current mode is a no-op. Widening or incomparable mode
 changes require a newly configured <code>Agent</code> so custom restrictions remain
-an immutable authority ceiling.</p><div class="section">
+an immutable authority ceiling. When narrowing removes web access,
+registered provider-native web tools are removed before the new policy
+becomes active because Deputy cannot interpose on provider-side calls.</p><div class="section">
 <h4 id="usage-34">Usage<a class="anchor" aria-label="anchor" href="#usage-34"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">set_permission_mode</span><span class="op">(</span><span class="va">mode</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
@@ -1030,7 +1085,9 @@ an immutable authority ceiling.</p><div class="section">
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">cost</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-35">Returns<a class="anchor" aria-label="anchor" href="#returns-35"></a></h4>
-<p>A list with input, output, cached, and total token costs</p>
+<p>A list with input, output, and cached token counts; total
+estimated cost; and <code>complete</code> and <code>missing</code> fields describing provider
+cost coverage. An incomplete total is <code>NA_real_</code>.</p>
 </div>
 
 </div>

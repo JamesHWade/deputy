@@ -65,6 +65,8 @@ Built-in tools and tool bundles
   : Tools for interactive workflows
 - [`tools_mcp()`](https://jameshwade.github.io/deputy/reference/tools_mcp.md)
   : Get tools from MCP servers
+- [`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md)
+  : Load an R REPL with an enforced OS sandbox
 - [`set_ask_user_callback()`](https://jameshwade.github.io/deputy/reference/set_ask_user_callback.md)
   : Set callback for non-interactive user input
 

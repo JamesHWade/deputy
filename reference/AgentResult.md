@@ -16,7 +16,8 @@ occurred during execution.
 
 - `cost`:
 
-  Cost information (list with input, output, cached, total)
+  Cost information with input, output, cached, total, complete, and
+  missing fields. An incomplete total is `NA_real_`.
 
 - `events`:
 
@@ -104,7 +105,8 @@ Create a new AgentResult object.
     AgentResult$new(
       response = NULL,
       turns = list(),
-      cost = list(input = 0, output = 0, cached = 0, total = 0),
+      cost = list(input = 0, output = 0, cached = 0, total = 0, complete = TRUE, missing =
+        0L),
       events = list(),
       duration = NULL,
       stop_reason = "complete",
@@ -132,7 +134,7 @@ Create a new AgentResult object.
 
 - `cost`:
 
-  Cost information
+  Cost information, including provider coverage metadata
 
 - `events`:
 

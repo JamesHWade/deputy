@@ -170,7 +170,8 @@ package inspection is a better first task than an open-ended request to
 <span>    <span class="st">"Read DESCRIPTION and list the R/ directory."</span>,</span>
 <span>    <span class="st">"Explain the package purpose and identify three good entry-point files."</span>,</span>
 <span>    <span class="st">"Cite the paths you used. Do not propose or make edits."</span></span>
-<span>  <span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>stage <span class="op">=</span> <span class="st">"package-review"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p><code>run_sync()</code> blocks until the run stops and returns an
 <code>AgentResult</code>. The result keeps the outcome and the evidence
@@ -186,7 +187,13 @@ needed to understand how it happened:</p>
 <span><span class="va">result</span><span class="op">$</span><span class="fu">tool_results</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>Check <code>stop_reason</code> before treating the response as
 complete. A request, tool-call, token, or cost limit produces a typed
-stop reason rather than a silently truncated success.</p>
+stop reason rather than a silently truncated success.
+<code>"tool_loop"</code> means the model requested the same tool with
+the same arguments and received the same result three times
+consecutively; changing results count as progress. If a cost limit is
+set but the provider omits any cost record, Deputy stops with
+<code>"cost_unavailable"</code>; it never presents a known lower bound
+as the total.</p>
 </div>
 <div class="section level2">
 <h2 id="grant-writes-deliberately">4. Grant writes deliberately<a class="anchor" aria-label="anchor" href="#grant-writes-deliberately"></a>
@@ -272,8 +279,11 @@ specific limit whose additional work is justified.</p>
 </h3>
 <p><code>run_r_code</code> starts a separate R process, but process
 separation is not an OS sandbox. <code>run_bash</code> runs with the
-current user’s privileges. Use containers, virtual machines, or another
-real isolation boundary for untrusted code.</p>
+current user’s privileges. Both are denied by
+<code><a href="../reference/permissions_standard.html">permissions_standard()</a></code>. For untrusted model-generated R,
+configure mcp-repl with an explicit OS policy and load it through
+<code><a href="../reference/tools_mcp_repl.html">tools_mcp_repl()</a></code>; Deputy refuses to load a server whose
+effective sandbox differs from the requested one.</p>
 </div>
 <div class="section level3">
 <h3 id="a-shiny-task-reads-the-wrong-directory">A Shiny task reads the wrong directory<a class="anchor" aria-label="anchor" href="#a-shiny-task-reads-the-wrong-directory"></a>

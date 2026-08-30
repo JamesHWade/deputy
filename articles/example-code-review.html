@@ -331,6 +331,13 @@ analysis:</p>
 <span><span class="va">result</span><span class="op">$</span><span class="va">cost</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">duration</span></span>
 <span></span>
+<span><span class="co"># Never substitute zero for an incomplete provider total</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/Logic.html" class="external-link">isTRUE</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">complete</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_warning</a></span><span class="op">(</span></span>
+<span>    <span class="st">"Provider omitted {result$cost$missing} cost record{?s}."</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span></span>
 <span><span class="co"># All tool calls made during the review</span></span>
 <span><span class="va">tool_calls</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">$</span><span class="fu">tool_calls</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Total tool calls: {length(tool_calls)}"</span><span class="op">)</span></span>

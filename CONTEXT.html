@@ -78,6 +78,8 @@
 <p><strong>Tool</strong>: A function exposed to the model, carrying a description and annotations that declare its effects. <em>Avoid</em>: function, capability, action</p>
 <p><strong>Tool annotation</strong>: A declaration of a tool’s effects — whether it reads only, destroys, reaches outside the workspace, or is safe to retry. Annotations are what permissions reason about; they describe the tool, not the caller. <em>Avoid</em>: tool metadata, hints, flags</p>
 <p><strong>Permission mode</strong>: The policy governing which tools an Agent may call in a run. <em>Avoid</em>: security level, access mode, sandbox mode</p>
+<p><strong>Trusted-code tool</strong>: A tool that executes model-supplied R or shell code with the current user’s authority. A separate process may improve fault isolation, but does not make the code untrusted or confined. <em>Avoid</em>: sandboxed tool, safe execution</p>
+<p><strong>OS sandbox</strong>: A platform-enforced boundary that constrains an already authorized process. Deputy delegates this boundary to mcp-repl and verifies the requested policy; permission modes do not substitute for it. <em>Avoid</em>: permission mode, subprocess isolation</p>
 <p><strong>Hook</strong>: A callback fired at a named point in an Agent’s lifecycle, able to observe a run and, at some points, alter or block it. <em>Avoid</em>: callback, middleware, listener, interceptor</p>
 <p><strong>Hook event</strong>: The named lifecycle point a hook is registered against. <em>Avoid</em>: trigger, lifecycle stage</p>
 <p><strong>Skill</strong>: A bundle of prompt text, tools, and metadata that can be loaded into an Agent to specialize it. <em>Avoid</em>: plugin, extension, module, capability pack</p>

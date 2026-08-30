@@ -51,10 +51,12 @@
   JSON-compatible `run_context`. Results, hooks, saved sessions, and
   delegated agents retain that context, while paired tool events and
   delegated results expose Agent, run, parent, tool-call, and delegation
-  identifiers. Generated correlation identifiers no longer advance R’s
-  global RNG stream.
+  identifiers. The drop-in `chat*()` and `stream*()` methods accept the
+  same per-run context narrowing so product hosts do not need a separate
+  execution bridge. Generated correlation identifiers no longer advance
+  R’s global RNG stream.
 
-- Deputy now has a deliberate 52-symbol public API centered on native
+- Deputy now has a deliberate 53-symbol public API centered on native
   agents, tools, permissions, hooks, skills, delegation, and run usage.
   Sessions use a stable `session_id` for correlation and explicit
   `Agent$save_session()` and `Agent$load_session()` calls for
@@ -124,6 +126,42 @@
   now rejects timed-out or failed `callr` subprocesses with readable
   tool errors instead of failing later while formatting an unbound
   result ([\#27](https://github.com/JamesHWade/deputy/issues/27)).
+
+- `Agent$cost()` now returns `NA` when any provider cost record is
+  unavailable, with `complete` and `missing` fields that distinguish an
+  observed zero from an unknown total. Run cost limits fail closed with
+  the typed stop reason `"cost_unavailable"` instead of enforcing an
+  understated total
+  ([\#29](https://github.com/JamesHWade/deputy/issues/29)).
+
+- Deputy now stops after three consecutive completed tool calls with the
+  same canonical request and result. The `"tool_loop"` stop reason
+  remains stable when surrounding response text differs trivially, while
+  changing results reset the counter for legitimate polling progress
+  ([\#34](https://github.com/JamesHWade/deputy/issues/34)).
+
+- The default
+  [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md)
+  policy and partial direct `Permissions$new()` policies no longer grant
+  arbitrary R execution, and `tools_preset("standard")` no longer
+  registers `run_r_code`. Built-in R and shell tools are explicitly
+  trusted-code tools. New
+  [`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md)
+  verifies an exact `read-only` or `workspace-write` mcp-repl
+  configuration and refuses missing, inherited, external, or
+  unrestricted sandbox modes before loading tools
+  ([\#32](https://github.com/JamesHWade/deputy/issues/32)).
+
+- Provider-native web tools now honor their documented
+  [`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md)
+  contract. Deputy passes through only known native search and fetch
+  tools after an explicit, fail-closed registration-time web permission
+  check; unsupported provider-side tools remain rejected because their
+  execution cannot be intercepted by Deputy. Custom request-time
+  permission callbacks cannot authorize native tools because their
+  arguments and run context are not available for interception.
+  Narrowing away web access atomically removes any registered
+  provider-native web tools before the new policy becomes active.
 
 - [`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md)
   now creates an `ask_user` tool with an instance-scoped human-input

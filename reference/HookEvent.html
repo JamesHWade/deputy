@@ -86,7 +86,8 @@ type has a specific callback signature and context structure.</p>
 <p>Callback signature: <code>function(tool_name, tool_result, tool_error, context)</code></p><ul><li><p>Same arguments as PostToolUse, fired only when <code>tool_error</code> is not NULL</p></li>
 </ul><p><strong>Stop</strong> - When the agent stops</p>
 <p>Callback signature: <code>function(reason, context)</code></p><ul><li><p><code>reason</code>: Why the agent stopped (for example <code>"complete"</code>,
-<code>"request_limit"</code>, <code>"cost_limit"</code>, or <code>"provider_error"</code>)</p></li>
+<code>"request_limit"</code>, <code>"cost_limit"</code>, <code>"cost_unavailable"</code>, <code>"tool_loop"</code>,
+or <code>"provider_error"</code>)</p></li>
 <li><p><code>context</code>: Common correlation fields plus <code>usage</code> and <code>cost</code>; native
 <code>run()</code> also includes <code>total_turns</code></p></li>
 <li><p>Return: NULL (informational only)</p></li>
@@ -129,7 +130,8 @@ event-specific metadata</p></li>
 <li><p>Return: NULL (informational only)</p></li>
 </ul><p><strong>SessionEnd</strong> - When an agent session ends</p>
 <p>Callback signature: <code>function(reason, context)</code></p><ul><li><p><code>reason</code>: Why the agent stopped (for example <code>"complete"</code>,
-<code>"request_limit"</code>, <code>"cost_limit"</code>, or <code>"hook_requested_stop"</code>)</p></li>
+<code>"request_limit"</code>, <code>"cost_unavailable"</code>, <code>"tool_loop"</code>, or
+<code>"hook_requested_stop"</code>)</p></li>
 <li><p><code>context</code>: Common correlation fields plus <code>usage</code> and <code>cost</code>; native
 <code>run()</code> also includes <code>total_turns</code></p></li>
 <li><p>Return: NULL (informational only)</p></li>

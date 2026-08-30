@@ -22,6 +22,8 @@ output.
 
     - `deputy_budget_exceeded` - Cost limit exceeded
 
+    - `deputy_cost_unavailable` - Cost limit could not be measured
+
     - `deputy_request_limit` - Maximum model requests exceeded
 
   - **deputy_provider** - LLM provider failures

@@ -17,8 +17,8 @@ deputy includes the following tools out of the box:
 | `tool_list_files` | List files in a directory | read-only |
 | `tool_glob_files` | Find files by glob pattern | read-only |
 | `tool_grep_files` | Search file contents | read-only |
-| `tool_run_r_code` | Execute R code | open-world |
-| `tool_run_bash` | Execute a bash command | destructive, open-world |
+| `tool_run_r_code` | Execute trusted R code as the current user | destructive, open-world |
+| `tool_run_bash` | Execute trusted shell code as the current user | destructive, open-world |
 | `tool_read_csv` | Read and summarise a CSV | read-only |
 | `tool_web_fetch` | Fetch a web page | read-only, open-world |
 | `tool_web_search` | Search the web | read-only, open-world |
@@ -44,6 +44,13 @@ tools_web()   # universal web_fetch and web_search
 tools_all()   # everything
 ```
 
+Registration is not authorization:
+[`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md)
+makes the two trusted-code tools available to the model, while the
+Agent’s `Permissions` still decides whether either call may run.
+[`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md)
+denies both.
+
 Combine bundles by concatenating:
 
 ``` r
@@ -64,6 +71,14 @@ tools_preset("dev")
 tools_preset("data")
 tools_preset("full")
 ```
+
+| Preset     | Included capabilities                            |
+|------------|--------------------------------------------------|
+| `minimal`  | file and document reads                          |
+| `standard` | reads plus native file writes; no code execution |
+| `data`     | data reads plus trusted R execution              |
+| `dev`      | native files plus trusted R and shell execution  |
+| `full`     | every built-in tool                              |
 
 ## Creating Custom Tools
 
@@ -136,9 +151,25 @@ chat returns Deputy’s universal web tools:
 chat <- ellmer::chat_anthropic()
 agent <- Agent$new(
   chat = chat,
-  tools = tools_web(chat)
+  tools = tools_web(chat),
+  permissions = Permissions$new(
+    web = TRUE,
+    tool_allowlist = c("web_search", "web_fetch")
+  )
 )
 ```
+
+Provider-native tools execute outside R, so Deputy authorizes known
+native web search and fetch tools before registering them. The policy
+must grant web access and explicitly allow the tool; static denylists
+are also enforced at registration. A custom `can_use_tool` callback
+rejects provider-native tools because Deputy cannot supply request
+arguments or run context after provider execution begins. Other
+provider-native tool types are rejected. Use the universal function
+tools when authorization must inspect each request. If
+`set_permission_mode()` later narrows away web access, Deputy removes
+registered provider-native web tools before the new policy becomes
+active.
 
 For providers without native support, deputy falls back to
 `tool_web_fetch` (fetches a URL and extracts text) and `tool_web_search`
@@ -164,6 +195,36 @@ returns an empty list with a warning when `mcptools` is not installed or
 no tools are available. MCP servers are configured in
 `~/.config/mcptools/config.json`; see the mcptools documentation for
 setup.
+
+### Sandboxed R with mcp-repl
+
+Use
+[`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md)
+when model-generated R needs an OS sandbox rather than the current
+user’s authority:
+
+``` r
+
+repl_tools <- tools_mcp_repl(
+  config = "~/.config/mcptools/config.json",
+  server = "r",
+  sandbox = "workspace-write"
+)
+
+agent <- Agent$new(
+  chat = ellmer::chat("openai"),
+  tools = repl_tools,
+  permissions = Permissions$new(web = FALSE)
+)
+```
+
+The helper isolates the named server from the rest of the MCP
+configuration and checks its exact final `--sandbox` argument. Missing
+policies and modes that do not establish a Deputy-verifiable boundary
+are errors. mcp-repl then owns OS-specific confinement, including
+fail-closed startup on unsupported hosts. See
+[`vignette("permissions")`](https://jameshwade.github.io/deputy/articles/permissions.md)
+for the complete trust model.
 
 ## Human-in-the-Loop
 

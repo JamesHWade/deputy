@@ -95,7 +95,7 @@ Create a new Permissions object.
       file_read = TRUE,
       file_write = getwd(),
       bash = FALSE,
-      r_code = TRUE,
+      r_code = FALSE,
       web = FALSE,
       install_packages = FALSE,
       can_use_tool = NULL,
@@ -126,7 +126,9 @@ Create a new Permissions object.
 
 - `r_code`:
 
-  Allow R code execution
+  Allow R code execution. Defaults to `FALSE`; grant it explicitly for
+  trusted code or use
+  [`permissions_full()`](https://jameshwade.github.io/deputy/reference/permissions_full.md).
 
 - `web`:
 

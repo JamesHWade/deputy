@@ -102,8 +102,8 @@ policies.</p>
 <span><span class="co"># Plan: annotated read-only tools plus ask_user</span></span>
 <span><span class="fu"><a href="../reference/permissions_plan.html">permissions_plan</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Standard (default): accessible reads, workspace-scoped writes, R code,</span></span>
-<span><span class="co"># no bash/web</span></span>
+<span><span class="co"># Standard (default): accessible reads and workspace-scoped writes;</span></span>
+<span><span class="co"># no R code, bash, or web</span></span>
 <span><span class="fu"><a href="../reference/permissions_standard.html">permissions_standard</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Full: everything allowed (use with caution!)</span></span>
@@ -131,6 +131,13 @@ directly:</p>
 <span>  web <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  install_packages <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>Setting <code>r_code = TRUE</code> or <code>bash = TRUE</code>
+authorizes Deputy’s built-in trusted-code tools. It does not confine the
+subprocess. Use this only when the model, prompt, inputs, and
+current-user filesystem authority are all within the same trust
+boundary. Direct <code>Permissions$new()</code> policies default
+<code>r_code</code> to <code>FALSE</code>, including partial policies
+such as <code>Permissions$new(web = TRUE)</code>.</p>
 <p>Fields:</p>
 <table class="table">
 <colgroup>
@@ -283,7 +290,12 @@ policy:</p>
 <p>Reapplying the current mode is an exact no-op. For an allowed
 narrowing, Deputy intersects the target mode with the existing
 capabilities. Custom restrictions, tool gates, callbacks, and
-directory-scoped write roots therefore remain authoritative.</p>
+directory-scoped write roots therefore remain authoritative. If the
+target removes web access, Deputy also removes registered
+provider-native web tools before activating the new policy. Ordinary
+function tools stay registered because Deputy can still deny them when
+they are requested; provider-side tools have no equivalent interception
+point.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">set_permission_mode</span><span class="op">(</span><span class="st">"readonly"</span><span class="op">)</span></span></code></pre></div>
 <p>Create a newly configured <code>Agent</code> when broader or
@@ -343,6 +355,10 @@ annotations participate in the configured capability checks.</p>
 <code>tool_annotations</code>
 </li>
 </ul>
+<p>Custom callbacks govern function tools whose requests Deputy can
+intercept. Provider-native tools are rejected when a callback is
+configured; use the universal function tool when authorization depends
+on request arguments or run context.</p>
 <p>It must return <code><a href="../reference/PermissionResultAllow.html">PermissionResultAllow()</a></code> or
 <code>PermissionResultDeny(reason)</code>.</p>
 </div>
@@ -383,7 +399,57 @@ run:</p>
 <p>When a limit is reached, the agent stops and the
 <code>AgentResult$stop_reason</code> identifies the limit, such as
 <code>"request_limit"</code>, <code>"tool_call_limit"</code>, or
-<code>"cost_limit"</code>.</p>
+<code>"cost_limit"</code>. If <code>max_cost_usd</code> is configured
+and the provider omits a cost record, Deputy fails closed with
+<code>"cost_unavailable"</code>. <code>Agent$cost()</code> and
+<code>AgentResult$cost</code> expose <code>complete</code> and
+<code>missing</code>; an incomplete <code>total</code> is
+<code>NA</code>, never an understated sum.</p>
+<p>Deputy also stops a run with <code>"tool_loop"</code> after three
+consecutive requests for the same tool and canonical arguments. Cosmetic
+changes in surrounding model text do not reset that progress signal;
+changing the tool or its arguments does.</p>
+</div>
+<div class="section level2">
+<h2 id="trusted-code-and-os-sandboxes">Trusted Code and OS Sandboxes<a class="anchor" aria-label="anchor" href="#trusted-code-and-os-sandboxes"></a>
+</h2>
+<p>Permissions and sandboxes answer different questions. A permission
+decides whether the model may call a tool. An OS sandbox constrains what
+already authorized code can read, write, execute, or reach over the
+network.</p>
+<p><code>tool_run_r_code</code> and <code>tool_run_bash</code> are
+trusted-code tools. <code>callr</code> gives the R tool a separate
+process and a timeout, but the subprocess retains the current user’s
+filesystem and network authority. Deputy therefore excludes R execution
+from both the standard permission policy and the standard tool
+preset.</p>
+<p>For model-generated R that needs confinement, use mcp-repl as the
+execution backend. Its server entry must name the policy explicitly:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="dt">"mcpServers"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    <span class="dt">"r"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>      <span class="dt">"command"</span><span class="fu">:</span> <span class="st">"/absolute/path/to/mcp-repl"</span><span class="fu">,</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>      <span class="dt">"args"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>        <span class="st">"--sandbox"</span><span class="ot">,</span> <span class="st">"workspace-write"</span><span class="ot">,</span></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>        <span class="st">"--interpreter"</span><span class="ot">,</span> <span class="st">"r"</span></span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>      <span class="ot">]</span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">repl_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tools_mcp_repl.html">tools_mcp_repl</a></span><span class="op">(</span></span>
+<span>  server <span class="op">=</span> <span class="st">"r"</span>,</span>
+<span>  sandbox <span class="op">=</span> <span class="st">"workspace-write"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/tools_mcp_repl.html">tools_mcp_repl()</a></code> checks the exact final
+<code>--sandbox</code> setting before starting the server. It accepts
+only <code>"read-only"</code> and <code>"workspace-write"</code>. It
+rejects implicit defaults, <code>danger-full-access</code>,
+<code>external-sandbox</code>, and <code>inherit-codex</code>; the
+latter needs per-call metadata that mcptools does not provide. mcp-repl
+owns the platform-specific enforcement and fails rather than downgrading
+when it cannot establish the requested OS boundary. See mcp-repl’s <a href="https://github.com/posit-dev/mcp-repl/blob/main/docs/sandbox.md" class="external-link">sandbox
+contract</a> for its filesystem, network, and platform guarantees.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

@@ -6,9 +6,10 @@ Returns a list of tools for code execution:
 
 - `run_bash` - Execute bash commands
 
-**Note:** These tools require appropriate permissions. By default,
+**Note:** These tools execute trusted code and require explicit
+permissions. Process separation is not an OS sandbox;
 [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md)
-allows R code but not bash.
+denies both tools.
 
 ## Usage
 

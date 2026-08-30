@@ -348,11 +348,13 @@ report:</p>
 <span>    <span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
+<span>  <span class="va">costs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">step1</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">total</span>, <span class="va">step2</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">total</span>, <span class="va">step3</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">total</span><span class="op">)</span></span>
+<span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>    metadata <span class="op">=</span> <span class="va">step1</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">parsed</span>,</span>
 <span>    enriched <span class="op">=</span> <span class="va">step2</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">parsed</span>,</span>
 <span>    report <span class="op">=</span> <span class="va">step3</span><span class="op">$</span><span class="va">response</span>,</span>
-<span>    total_cost <span class="op">=</span> <span class="va">step1</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">total</span> <span class="op">+</span> <span class="va">step2</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">total</span> <span class="op">+</span> <span class="va">step3</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">total</span></span>
+<span>    total_cost <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">anyNA</a></span><span class="op">(</span><span class="va">costs</span><span class="op">)</span><span class="op">)</span> <span class="cn">NA_real_</span> <span class="kw">else</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">costs</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>

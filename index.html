@@ -126,7 +126,7 @@
                   Deputy Agent
                      |
         AgentResult + Events + Checkpoints</code></pre>
-<p>The Agent itself implements ellmer’s Chat protocol. Use <code>agent$chat()</code> and <code>agent$stream()</code> in synchronous code, or pass the Agent directly to <code>shinychat::chat_server()</code>. Those paths use the same governed kernel as <code>run_sync()</code> and <code>run_async()</code>; the latter pair return richer <code>AgentResult</code> metadata when the host needs to inspect the run.</p>
+<p>The Agent itself implements ellmer’s Chat protocol. Use <code>agent$chat()</code> and <code>agent$stream()</code> in synchronous code, or pass the Agent directly to <code>shinychat::chat_server()</code>. Those paths use the same governed kernel as <code>run_sync()</code> and <code>run_async()</code>; the latter pair return richer <code>AgentResult</code> metadata when the host needs to inspect the run. Product hosts may attach per-run correlation with the optional <code>run_context</code> argument on every chat, stream, and run method.</p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -192,12 +192,14 @@
 <ul>
 <li>
 <code><a href="reference/permissions_readonly.html">permissions_readonly()</a></code> denies Deputy’s write, shell, R execution, web, and package-install capabilities.</li>
+<li>
+<code><a href="reference/permissions_standard.html">permissions_standard()</a></code> permits accessible reads and workspace-scoped native file writes, but denies arbitrary R and shell execution by default.</li>
 <li>A directory-valued <code>file_write</code> permission confines Deputy’s native file writes to that canonical root. File reads remain limited by the R process, not by an operating-system sandbox.</li>
 <li>
 <code>run_r_code</code> uses a separate R process; that process separation is not an OS security sandbox. <code>run_bash</code> executes with the current user’s privileges.</li>
 <li>File checkpoints cover Deputy’s native write, edit, and multi-edit tools. They are recovery machinery, not a substitute for version control or backups.</li>
 </ul>
-<p>Start read-only, grant the narrowest capability that completes the job, and use a real isolation boundary for untrusted code.</p>
+<p>Start read-only, grant the narrowest capability that completes the job, and use a real isolation boundary for untrusted code. <code><a href="reference/tools_mcp_repl.html">tools_mcp_repl()</a></code> loads an explicitly configured <a href="https://github.com/posit-dev/mcp-repl" class="external-link">mcp-repl</a> R session only after verifying that its <code>read-only</code> or <code>workspace-write</code> OS sandbox matches the requested policy; a missing or weaker policy is an error.</p>
 </div>
 <div class="section level2">
 <h2 id="choose-your-path">Choose your path<a class="anchor" aria-label="anchor" href="#choose-your-path"></a>

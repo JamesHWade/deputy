@@ -130,7 +130,10 @@ available. Set to <code>FALSE</code> to always use universal tools.</p></dd>
 <span class="r-in"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  chat <span class="op">=</span> <span class="va">chat</span>,</span></span>
 <span class="r-in"><span>  tools <span class="op">=</span> <span class="fu">tools_web</span><span class="op">(</span><span class="va">chat</span><span class="op">)</span>,  <span class="co"># Uses Claude's native web tools</span></span></span>
-<span class="r-in"><span>  permissions <span class="op">=</span> <span class="va"><a href="Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>web <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  permissions <span class="op">=</span> <span class="va"><a href="Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span></span>
+<span class="r-in"><span>    web <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>    tool_allowlist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"web_search"</span>, <span class="st">"web_fetch"</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Force universal tools even with Claude</span></span></span>

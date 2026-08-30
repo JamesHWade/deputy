@@ -75,7 +75,8 @@ execution.</p>
 
 
     <dt><code>cost</code></dt>
-<dd><p>Cost information (list with input, output, cached, total)</p></dd>
+<dd><p>Cost information with input, output, cached, total,
+complete, and missing fields. An incomplete total is <code>NA_real_</code>.</p></dd>
 
 
     <dt><code>events</code></dt>
@@ -156,7 +157,8 @@ execution.</p>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va"><a href="../reference/AgentResult.html">AgentResult</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  response <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  turns <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  cost <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>input <span class="op">=</span> <span class="fl">0</span>, output <span class="op">=</span> <span class="fl">0</span>, cached <span class="op">=</span> <span class="fl">0</span>, total <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>,</span>
+<span>  cost <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>input <span class="op">=</span> <span class="fl">0</span>, output <span class="op">=</span> <span class="fl">0</span>, cached <span class="op">=</span> <span class="fl">0</span>, total <span class="op">=</span> <span class="fl">0</span>, complete <span class="op">=</span> <span class="cn">TRUE</span>, missing <span class="op">=</span></span>
+<span>    <span class="fl">0L</span><span class="op">)</span>,</span>
 <span>  events <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  duration <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  stop_reason <span class="op">=</span> <span class="st">"complete"</span>,</span>
@@ -180,7 +182,7 @@ execution.</p>
 <dd><p>List of conversation turns</p></dd>
 
       <dt><code>cost</code></dt>
-<dd><p>Cost information</p></dd>
+<dd><p>Cost information, including provider coverage metadata</p></dd>
 
       <dt><code>events</code></dt>
 <dd><p>List of AgentEvent objects</p></dd>

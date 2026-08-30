@@ -33,7 +33,9 @@ The Agent itself implements ellmer’s Chat protocol. Use `agent$chat()`
 and `agent$stream()` in synchronous code, or pass the Agent directly to
 `shinychat::chat_server()`. Those paths use the same governed kernel as
 `run_sync()` and `run_async()`; the latter pair return richer
-`AgentResult` metadata when the host needs to inspect the run.
+`AgentResult` metadata when the host needs to inspect the run. Product
+hosts may attach per-run correlation with the optional `run_context`
+argument on every chat, stream, and run method.
 
 ## Installation
 
@@ -128,6 +130,9 @@ turn model-generated code into untrusted code you can execute safely:
 - [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md)
   denies Deputy’s write, shell, R execution, web, and package-install
   capabilities.
+- [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md)
+  permits accessible reads and workspace-scoped native file writes, but
+  denies arbitrary R and shell execution by default.
 - A directory-valued `file_write` permission confines Deputy’s native
   file writes to that canonical root. File reads remain limited by the R
   process, not by an operating-system sandbox.
@@ -140,6 +145,11 @@ turn model-generated code into untrusted code you can execute safely:
 
 Start read-only, grant the narrowest capability that completes the job,
 and use a real isolation boundary for untrusted code.
+[`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md)
+loads an explicitly configured
+[mcp-repl](https://github.com/posit-dev/mcp-repl) R session only after
+verifying that its `read-only` or `workspace-write` OS sandbox matches
+the requested policy; a missing or weaker policy is an error.
 
 ## Choose your path
 
@@ -245,6 +255,8 @@ Built-in tools and tool bundles
   : Tools for interactive workflows
 - [`tools_mcp()`](https://jameshwade.github.io/deputy/reference/tools_mcp.md)
   : Get tools from MCP servers
+- [`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md)
+  : Load an R REPL with an enforced OS sandbox
 - [`set_ask_user_callback()`](https://jameshwade.github.io/deputy/reference/set_ask_user_callback.md)
   : Set callback for non-interactive user input
 

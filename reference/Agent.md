@@ -438,7 +438,7 @@ metadata with `$last_run()`.
 
 #### Usage
 
-    Agent$chat(..., echo = NULL)
+    Agent$chat(..., echo = NULL, run_context = list())
 
 #### Arguments
 
@@ -449,6 +449,10 @@ metadata with `$last_run()`.
 - `echo`:
 
   Accepted for ellmer compatibility.
+
+- `run_context`:
+
+  Canonical JSON-compatible context to add to or narrow for this run.
 
 #### Returns
 
@@ -462,7 +466,11 @@ Send messages asynchronously using the ellmer Chat interface.
 
 #### Usage
 
-    Agent$chat_async(..., tool_mode = c("concurrent", "sequential"))
+    Agent$chat_async(
+      ...,
+      tool_mode = c("concurrent", "sequential"),
+      run_context = list()
+    )
 
 #### Arguments
 
@@ -473,6 +481,10 @@ Send messages asynchronously using the ellmer Chat interface.
 - `tool_mode`:
 
   Whether ellmer executes tool calls concurrently or sequentially.
+
+- `run_context`:
+
+  Canonical JSON-compatible context to add to or narrow for this run.
 
 #### Returns
 
@@ -486,7 +498,13 @@ Send a structured request through the governed run kernel.
 
 #### Usage
 
-    Agent$chat_structured(..., type, echo = "none", convert = TRUE)
+    Agent$chat_structured(
+      ...,
+      type,
+      echo = "none",
+      convert = TRUE,
+      run_context = list()
+    )
 
 #### Arguments
 
@@ -505,6 +523,10 @@ Send a structured request through the governed run kernel.
 - `convert`:
 
   Whether ellmer converts the structured response.
+
+- `run_context`:
+
+  Canonical JSON-compatible context to add to or narrow for this run.
 
 #### Returns
 
@@ -518,7 +540,13 @@ Send an asynchronous structured request through Deputy.
 
 #### Usage
 
-    Agent$chat_structured_async(..., type, echo = "none", convert = TRUE)
+    Agent$chat_structured_async(
+      ...,
+      type,
+      echo = "none",
+      convert = TRUE,
+      run_context = list()
+    )
 
 #### Arguments
 
@@ -538,6 +566,10 @@ Send an asynchronous structured request through Deputy.
 
   Whether ellmer converts the structured response.
 
+- `run_context`:
+
+  Canonical JSON-compatible context to add to or narrow for this run.
+
 #### Returns
 
 A promise resolving to structured response data.
@@ -550,7 +582,12 @@ Stream synchronously using the ellmer Chat interface.
 
 #### Usage
 
-    Agent$stream(..., stream = c("text", "content"), controller = NULL)
+    Agent$stream(
+      ...,
+      stream = c("text", "content"),
+      controller = NULL,
+      run_context = list()
+    )
 
 #### Arguments
 
@@ -565,6 +602,10 @@ Stream synchronously using the ellmer Chat interface.
 - `controller`:
 
   Optional ellmer stream controller.
+
+- `run_context`:
+
+  Canonical JSON-compatible context to add to or narrow for this run.
 
 #### Returns
 
@@ -586,7 +627,8 @@ workspace resolution, context management, and run accounting.
       ...,
       tool_mode = c("concurrent", "sequential"),
       stream = c("text", "content"),
-      controller = NULL
+      controller = NULL,
+      run_context = list()
     )
 
 #### Arguments
@@ -607,6 +649,10 @@ workspace resolution, context management, and run accounting.
 - `controller`:
 
   Optional ellmer stream controller.
+
+- `run_context`:
+
+  Canonical JSON-compatible context to add to or narrow for this run.
 
 #### Returns
 
@@ -922,6 +968,12 @@ Invisible self.
 
 Register a tool with the agent.
 
+Function tools are wrapped with Deputy's runtime enforcement. Known
+provider-native web tools are authorized once, before registration,
+because their execution occurs inside the provider rather than R. Native
+tools therefore require static permissions and cannot be registered with
+a custom `can_use_tool` callback.
+
 #### Usage
 
     Agent$register_tool(tool)
@@ -932,6 +984,7 @@ Register a tool with the agent.
 
   A tool created with
   [`ellmer::tool()`](https://ellmer.tidyverse.org/reference/tool.html)
+  or a supported provider-native web tool.
 
 #### Returns
 
@@ -951,8 +1004,7 @@ Register multiple tools with the agent.
 
 - `tools`:
 
-  A list of tools created with
-  [`ellmer::tool()`](https://ellmer.tidyverse.org/reference/tool.html)
+  A list of function tools or supported provider-native web tools.
 
 #### Returns
 
@@ -1107,7 +1159,9 @@ Character permission mode
 Preserve or narrow the active permission mode for subsequent tool calls.
 Reapplying the current mode is a no-op. Widening or incomparable mode
 changes require a newly configured `Agent` so custom restrictions remain
-an immutable authority ceiling.
+an immutable authority ceiling. When narrowing removes web access,
+registered provider-native web tools are removed before the new policy
+becomes active because Deputy cannot interpose on provider-side calls.
 
 #### Usage
 
@@ -1136,7 +1190,9 @@ Get cost information for the conversation.
 
 #### Returns
 
-A list with input, output, cached, and total token costs
+A list with input, output, and cached token counts; total estimated
+cost; and `complete` and `missing` fields describing provider cost
+coverage. An incomplete total is `NA_real_`.
 
 ------------------------------------------------------------------------
 

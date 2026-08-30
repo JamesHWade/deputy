@@ -161,7 +161,7 @@ canonical absolute directory path. Read-only after construction.</p></dd>
 <span>  file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  file_write <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  r_code <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  r_code <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  web <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  install_packages <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  can_use_tool <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -186,7 +186,8 @@ the policy is constructed.</p></dd>
 <dd><p>Allow bash commands</p></dd>
 
       <dt><code>r_code</code></dt>
-<dd><p>Allow R code execution</p></dd>
+<dd><p>Allow R code execution. Defaults to <code>FALSE</code>; grant it
+explicitly for trusted code or use <code><a href="permissions_full.html">permissions_full()</a></code>.</p></dd>
 
       <dt><code>web</code></dt>
 <dd><p>Allow web requests</p></dd>

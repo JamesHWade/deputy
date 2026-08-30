@@ -56,7 +56,8 @@ UsageLimits(
 - max_cost_usd:
 
   Maximum provider-reported estimated cost in US dollars. `NULL` leaves
-  the field unset.
+  the field unset. If configured, missing provider cost data stops the
+  run with `"cost_unavailable"` rather than undercounting.
 
 - on_exceed:
 
