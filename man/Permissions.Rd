@@ -70,7 +70,7 @@ canonical absolute directory path. Read-only after construction.}
   file_read = TRUE,
   file_write = getwd(),
   bash = FALSE,
-  r_code = TRUE,
+  r_code = FALSE,
   web = FALSE,
   install_packages = FALSE,
   can_use_tool = NULL,
@@ -89,7 +89,8 @@ canonical absolute directory path. Read-only after construction.}
 absolute directory path). Directory grants are canonicalized once when
 the policy is constructed.}
       \item{\code{bash}}{Allow bash commands}
-      \item{\code{r_code}}{Allow R code execution}
+      \item{\code{r_code}}{Allow R code execution. Defaults to \code{FALSE}; grant it
+explicitly for trusted code or use \code{\link[=permissions_full]{permissions_full()}}.}
       \item{\code{web}}{Allow web requests}
       \item{\code{install_packages}}{Allow package installation}
       \item{\code{can_use_tool}}{Custom callback function}

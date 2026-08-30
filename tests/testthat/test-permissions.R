@@ -55,6 +55,16 @@ test_that("permission check blocks unrestricted R code by default", {
   expect_match(result$reason, "not allowed")
 })
 
+test_that("partial direct policies block unrestricted R code by default", {
+  perms <- Permissions$new(web = TRUE)
+
+  result <- perms$check("run_r_code", list(code = "1 + 1"), list())
+
+  expect_false(perms$r_code)
+  expect_s3_class(result, "PermissionResultDeny")
+  expect_match(result$reason, "not allowed")
+})
+
 test_that("permission check blocks writes outside working_dir", {
   withr::local_tempdir(pattern = "deputy-test") -> temp_dir
   # Normalize to handle macOS /var -> /private/var symlink

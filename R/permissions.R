@@ -385,7 +385,8 @@ Permissions <- R6::R6Class(
     #'   absolute directory path). Directory grants are canonicalized once when
     #'   the policy is constructed.
     #' @param bash Allow bash commands
-    #' @param r_code Allow R code execution
+    #' @param r_code Allow R code execution. Defaults to `FALSE`; grant it
+    #'   explicitly for trusted code or use [permissions_full()].
     #' @param web Allow web requests
     #' @param install_packages Allow package installation
     #' @param can_use_tool Custom callback function
@@ -400,7 +401,7 @@ Permissions <- R6::R6Class(
       file_read = TRUE,
       file_write = getwd(),
       bash = FALSE,
-      r_code = TRUE,
+      r_code = FALSE,
       web = FALSE,
       install_packages = FALSE,
       can_use_tool = NULL,

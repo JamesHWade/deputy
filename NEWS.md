@@ -113,9 +113,10 @@
   when surrounding response text differs trivially, while changing results
   reset the counter for legitimate polling progress (#34).
 
-* The default `permissions_standard()` policy no longer grants arbitrary R
-  execution, and `tools_preset("standard")` no longer registers
-  `run_r_code`. Built-in R and shell tools are explicitly trusted-code tools.
+* The default `permissions_standard()` policy and partial direct
+  `Permissions$new()` policies no longer grant arbitrary R execution, and
+  `tools_preset("standard")` no longer registers `run_r_code`. Built-in R and
+  shell tools are explicitly trusted-code tools.
   New `tools_mcp_repl()` verifies an exact `read-only` or `workspace-write`
   mcp-repl configuration and refuses missing, inherited, external, or
   unrestricted sandbox modes before loading tools (#32).
