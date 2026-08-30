@@ -167,7 +167,9 @@ Provider-native tools execute outside R, so Deputy authorizes known native web
 search and fetch tools before registering them. The policy must grant web
 access, and any allowlist, denylist, or custom callback is evaluated without
 request arguments. Other provider-native tool types are rejected. Use the
-universal tools when authorization must inspect each request.
+universal tools when authorization must inspect each request. If
+`set_permission_mode()` later narrows away web access, Deputy removes registered
+provider-native web tools before the new policy becomes active.
 
 For providers without native support, deputy falls back to `tool_web_fetch`
 (fetches a URL and extracts text) and `tool_web_search` (searches via

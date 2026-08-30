@@ -1035,7 +1035,9 @@ agent$add_hook(HookMatcher$new(
   Preserve or narrow the active permission mode for subsequent tool calls.
 Reapplying the current mode is a no-op. Widening or incomparable mode
 changes require a newly configured \code{Agent} so custom restrictions remain
-an immutable authority ceiling.
+an immutable authority ceiling. When narrowing removes web access,
+registered provider-native web tools are removed before the new policy
+becomes active because Deputy cannot interpose on provider-side calls.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_permission_mode(mode)}

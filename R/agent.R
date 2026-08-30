@@ -860,7 +860,9 @@ Agent <- R6::R6Class(
     #' Preserve or narrow the active permission mode for subsequent tool calls.
     #' Reapplying the current mode is a no-op. Widening or incomparable mode
     #' changes require a newly configured `Agent` so custom restrictions remain
-    #' an immutable authority ceiling.
+    #' an immutable authority ceiling. When narrowing removes web access,
+    #' registered provider-native web tools are removed before the new policy
+    #' becomes active because Deputy cannot interpose on provider-side calls.
     #'
     #' @param mode Permission mode, see [PermissionMode]
     #' @return Invisible self
@@ -898,7 +900,7 @@ Agent <- R6::R6Class(
         permission_mode_capabilities(mode, self$working_dir)
       )
 
-      private$.permissions <- Permissions$new(
+      narrowed_permissions <- Permissions$new(
         mode = mode,
         file_read = capabilities$file_read,
         file_write = capabilities$file_write,
@@ -911,6 +913,25 @@ Agent <- R6::R6Class(
         tool_denylist = existing$tool_denylist,
         permission_prompt_tool_name = capabilities$permission_prompt_tool_name
       )
+
+      registered_tools <- private$.chat$get_tools()
+      provider_native <- vapply(
+        registered_tools,
+        inherits,
+        logical(1),
+        what = "ellmer::ToolBuiltIn"
+      )
+      removed_provider_tools <- character()
+      if (!isTRUE(narrowed_permissions$web) && any(provider_native)) {
+        removed_provider_tools <- vapply(
+          registered_tools[provider_native],
+          \(tool) tool@name,
+          character(1)
+        )
+        private$.chat$set_tools(registered_tools[!provider_native])
+      }
+
+      private$.permissions <- narrowed_permissions
 
       self$hooks$fire(
         "ConfigChange",
@@ -925,7 +946,8 @@ Agent <- R6::R6Class(
         level = "info",
         code = "permission_mode_changed",
         previous_mode = old_mode,
-        permission_mode = mode
+        permission_mode = mode,
+        removed_provider_tools = removed_provider_tools
       )
 
       invisible(self)

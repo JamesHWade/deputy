@@ -124,7 +124,8 @@
   Deputy passes through only known native search and fetch tools after an
   explicit, fail-closed registration-time web permission check; unsupported
   provider-side tools remain rejected because their execution cannot be
-  intercepted by Deputy.
+  intercepted by Deputy. Narrowing away web access atomically removes any
+  registered provider-native web tools before the new policy becomes active.
 
 * `tools_interactive()` now creates an `ask_user` tool with an instance-scoped
   human-input handler and routing context, allowing concurrent Agents to remain

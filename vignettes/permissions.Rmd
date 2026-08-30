@@ -124,7 +124,10 @@ widen it or replace it with an incomparable policy:
 Reapplying the current mode is an exact no-op. For an allowed narrowing,
 Deputy intersects the target mode with the existing capabilities. Custom
 restrictions, tool gates, callbacks, and directory-scoped write roots therefore
-remain authoritative.
+remain authoritative. If the target removes web access, Deputy also removes
+registered provider-native web tools before activating the new policy. Ordinary
+function tools stay registered because Deputy can still deny them when they are
+requested; provider-side tools have no equivalent interception point.
 
 ```{r, eval = FALSE}
 agent$set_permission_mode("readonly")
