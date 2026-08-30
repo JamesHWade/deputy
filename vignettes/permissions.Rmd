@@ -188,6 +188,11 @@ The callback receives:
 - `tool_input` -- Named list of arguments
 - `context` -- List with `working_dir` and `tool_annotations`
 
+Custom callbacks govern function tools whose requests Deputy can intercept.
+Provider-native tools are rejected when a callback is configured; use the
+universal function tool when authorization depends on request arguments or run
+context.
+
 It must return `PermissionResultAllow()` or `PermissionResultDeny(reason)`.
 
 ## Example: Read-Only Agent

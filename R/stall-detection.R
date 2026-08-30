@@ -28,6 +28,21 @@ tool_request_signature <- function(tool_name, tool_input) {
   )
 }
 
+tool_cycle_signature <- function(request_signature, tool_result, tool_error) {
+  tryCatch(
+    digest::digest(
+      list(
+        request = request_signature,
+        result = canonicalize_tool_input(tool_result),
+        error = canonicalize_tool_input(tool_error)
+      ),
+      algo = "sha256",
+      serialize = TRUE
+    ),
+    error = function(error) NULL
+  )
+}
+
 advance_tool_loop <- function(
   signature,
   last_signature,

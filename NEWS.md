@@ -108,10 +108,10 @@
   an unknown total. Run cost limits fail closed with the typed stop reason
   `"cost_unavailable"` instead of enforcing an understated total (#29).
 
-* Deputy now stops after three consecutive tool requests with the same name
-  and canonical arguments. The `"tool_loop"` stop reason remains stable when
-  surrounding response text differs trivially, replacing brittle whole-response
-  hashing with a deterministic progress signal (#34).
+* Deputy now stops after three consecutive completed tool calls with the same
+  canonical request and result. The `"tool_loop"` stop reason remains stable
+  when surrounding response text differs trivially, while changing results
+  reset the counter for legitimate polling progress (#34).
 
 * The default `permissions_standard()` policy no longer grants arbitrary R
   execution, and `tools_preset("standard")` no longer registers
@@ -124,7 +124,9 @@
   Deputy passes through only known native search and fetch tools after an
   explicit, fail-closed registration-time web permission check; unsupported
   provider-side tools remain rejected because their execution cannot be
-  intercepted by Deputy. Narrowing away web access atomically removes any
+  intercepted by Deputy. Custom request-time permission callbacks cannot
+  authorize native tools because their arguments and run context are not
+  available for interception. Narrowing away web access atomically removes any
   registered provider-native web tools before the new policy becomes active.
 
 * `tools_interactive()` now creates an `ask_user` tool with an instance-scoped

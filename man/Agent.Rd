@@ -833,7 +833,9 @@ emitted into model context.}
 
 Function tools are wrapped with Deputy's runtime enforcement. Known
 provider-native web tools are authorized once, before registration,
-because their execution occurs inside the provider rather than R.
+because their execution occurs inside the provider rather than R. Native
+tools therefore require static permissions and cannot be registered with
+a custom \code{can_use_tool} callback.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$register_tool(tool)}

@@ -585,6 +585,24 @@ test_that("provider-native web tools require explicit registration authority", {
     "not explicitly allowed"
   )
 
+  expect_error(
+    Agent$new(
+      chat = create_mock_chat(),
+      tools = list(native_web),
+      permissions = Permissions$new(
+        web = TRUE,
+        tool_allowlist = "web_search",
+        can_use_tool = function(tool_name, tool_input, context) {
+          if (identical(tool_input$query, "internal.example")) {
+            return(PermissionResultDeny("Internal domains are blocked"))
+          }
+          PermissionResultAllow()
+        }
+      )
+    ),
+    "custom permission callback"
+  )
+
   agent <- Agent$new(
     chat = create_mock_chat(),
     tools = list(native_web),

@@ -714,7 +714,9 @@ Agent <- R6::R6Class(
     #'
     #' Function tools are wrapped with Deputy's runtime enforcement. Known
     #' provider-native web tools are authorized once, before registration,
-    #' because their execution occurs inside the provider rather than R.
+    #' because their execution occurs inside the provider rather than R. Native
+    #' tools therefore require static permissions and cannot be registered with
+    #' a custom `can_use_tool` callback.
     #' @param tool A tool created with `ellmer::tool()` or a supported
     #'   provider-native web tool.
     #' @return Invisible self for chaining
@@ -1761,8 +1763,8 @@ Agent <- R6::R6Class(
     last_run_usage = NULL,
     .last_run_result = NULL,
     last_limit_status = NULL,
-    last_tool_signature = NULL,
-    consecutive_tool_calls = 0L,
+    last_tool_cycle_signature = NULL,
+    consecutive_tool_cycles = 0L,
     .last_compaction = NULL,
     .compaction_summary = NULL,
     .tool_result_reader_registered = FALSE,
@@ -1876,6 +1878,19 @@ Agent <- R6::R6Class(
           cli_abort(c(
             "Provider-native web tool {.val {tool_name}} is not explicitly allowed.",
             "i" = "Add the tool name to {.arg tool_allowlist}."
+          ))
+        }
+        if (!is.null(self$permissions$can_use_tool)) {
+          cli_abort(c(
+            "Provider-native tool {.val {tool_name}} cannot use a custom permission callback.",
+            "x" = paste0(
+              "Provider-side requests cannot be checked against request ",
+              "arguments or run context."
+            ),
+            "i" = paste0(
+              "Remove {.arg can_use_tool} or use Deputy's universal ",
+              "function tool."
+            )
           ))
         }
         permission <- self$permissions$check(
@@ -2373,8 +2388,8 @@ Agent <- R6::R6Class(
         agent$.__enclos_env__$private$pending_delegations <- list()
         agent$.__enclos_env__$private$original_tool_results <- list()
         agent$.__enclos_env__$private$last_limit_status <- NULL
-        agent$.__enclos_env__$private$last_tool_signature <- NULL
-        agent$.__enclos_env__$private$consecutive_tool_calls <- 0L
+        agent$.__enclos_env__$private$last_tool_cycle_signature <- NULL
+        agent$.__enclos_env__$private$consecutive_tool_cycles <- 0L
         agent$.__enclos_env__$private$last_run_usage <- AgentUsage()
         agent$.__enclos_env__$private$current_run_checkpoint_id <- NULL
 
@@ -2726,8 +2741,8 @@ Agent <- R6::R6Class(
 
       private$tool_call_limit <- NULL
       private$tool_call_count <- 0L
-      private$last_tool_signature <- NULL
-      private$consecutive_tool_calls <- 0L
+      private$last_tool_cycle_signature <- NULL
+      private$consecutive_tool_cycles <- 0L
       private$should_stop <- FALSE
       private$stop_reason_from_hook <- NULL
       tryCatch(
@@ -2767,8 +2782,8 @@ Agent <- R6::R6Class(
       private$tool_call_records <- list()
       private$pending_delegations <- list()
       private$original_tool_results <- list()
-      private$last_tool_signature <- NULL
-      private$consecutive_tool_calls <- 0L
+      private$last_tool_cycle_signature <- NULL
+      private$consecutive_tool_cycles <- 0L
       if (!is.null(private$current_run_context)) {
         private$last_run_context <- clone_run_context(
           private$current_run_context
@@ -3442,6 +3457,8 @@ Agent <- R6::R6Class(
       private$current_tool_calls <- private$current_tool_calls + 1L
       record <- private$tool_call_record(extracted, "request")
       extracted$tool_call_id <- record$tool_call_id
+      private$tool_call_records[[record$record_index]]$request_signature <-
+        tool_request_signature(tool_name, tool_input)
       if (!isTRUE(record$start_seen)) {
         private$record_run_event(private$tool_start_event(extracted))
       }
@@ -3475,32 +3492,6 @@ Agent <- R6::R6Class(
           )
           ellmer::tool_reject(message)
         }
-      }
-
-      loop <- advance_tool_loop(
-        signature = tool_request_signature(tool_name, tool_input),
-        last_signature = private$last_tool_signature,
-        consecutive_calls = private$consecutive_tool_calls
-      )
-      private$last_tool_signature <- loop$signature
-      private$consecutive_tool_calls <- loop$consecutive_calls
-      if (isTRUE(loop$stalled)) {
-        message <- paste0(
-          "Tool request `",
-          tool_name,
-          "` was repeated ",
-          loop$consecutive_calls,
-          " times without progress."
-        )
-        private$request_stream_stop("tool_loop")
-        private$notify(
-          message,
-          level = "warning",
-          code = "tool_loop",
-          tool_name = tool_name,
-          repeated = loop$consecutive_calls
-        )
-        ellmer::tool_reject(message)
       }
 
       file_info <- private$file_tool_path_info(tool_name, tool_input)
@@ -3691,6 +3682,47 @@ Agent <- R6::R6Class(
       }
 
       private$record_run_event(private$tool_end_event(extracted))
+
+      record_state <- private$tool_call_records[[record$record_index]]
+      request_signature <- record_state$request_signature
+      cycle_signature <- if (is.null(request_signature)) {
+        NULL
+      } else {
+        tool_cycle_signature(
+          request_signature,
+          hook_tool_result,
+          extracted$tool_error
+        )
+      }
+      if (is.null(cycle_signature)) {
+        private$last_tool_cycle_signature <- NULL
+        private$consecutive_tool_cycles <- 0L
+      } else {
+        loop <- advance_tool_loop(
+          signature = cycle_signature,
+          last_signature = private$last_tool_cycle_signature,
+          consecutive_calls = private$consecutive_tool_cycles
+        )
+        private$last_tool_cycle_signature <- loop$signature
+        private$consecutive_tool_cycles <- loop$consecutive_calls
+        if (isTRUE(loop$stalled) && !isTRUE(private$should_stop)) {
+          message <- paste0(
+            "Tool request `",
+            extracted$tool_name,
+            "` completed with the same result ",
+            loop$consecutive_calls,
+            " times without progress."
+          )
+          private$request_stream_stop("tool_loop")
+          private$notify(
+            message,
+            level = "warning",
+            code = "tool_loop",
+            tool_name = extracted$tool_name,
+            repeated = loop$consecutive_calls
+          )
+        }
+      }
 
       # ellmer may make another provider request after this tool result. Check
       # the complete context again while the run is between provider turns.

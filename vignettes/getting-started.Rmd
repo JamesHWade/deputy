@@ -126,8 +126,9 @@ result$tool_results()
 Check `stop_reason` before treating the response as complete. A request,
 tool-call, token, or cost limit produces a typed stop reason rather than a
 silently truncated success. `"tool_loop"` means the model requested the same
-tool with the same arguments three times consecutively. If a cost limit is set
-but the provider omits any cost record, Deputy stops with
+tool with the same arguments and received the same result three times
+consecutively; changing results count as progress. If a cost limit is set but
+the provider omits any cost record, Deputy stops with
 `"cost_unavailable"`; it never presents a known lower bound as the total.
 
 ## 4. Grant writes deliberately
