@@ -987,6 +987,58 @@ tool_run_r_code <- ellmer::tool(
   )
 )
 
+run_bash_impl <- function(command, timeout = 30) {
+  # Use callr for reliable timeout enforcement if available
+  if (rlang::is_installed("callr")) {
+    tryCatch(
+      {
+        result <- callr::r(
+          function(cmd) {
+            system(cmd, intern = TRUE)
+          },
+          args = list(cmd = command),
+          timeout = timeout
+        )
+        if (length(result) == 0) {
+          "Command executed successfully (no output)"
+        } else {
+          paste(result, collapse = "\n")
+        }
+      },
+      error = function(e) {
+        if (inherits(e, "callr_timeout_error")) {
+          ellmer::tool_reject(sprintf(
+            "Command timed out after %s seconds",
+            format(timeout, trim = TRUE)
+          ))
+        }
+        ellmer::tool_reject(paste(
+          "Command failed:",
+          conditionMessage(e)
+        ))
+      }
+    )
+  } else {
+    # Fallback to system() - timeout may not be reliable
+    tryCatch(
+      {
+        result <- system(command, intern = TRUE, timeout = timeout)
+        if (length(result) == 0) {
+          "Command executed successfully (no output)"
+        } else {
+          paste(result, collapse = "\n")
+        }
+      },
+      error = function(e) {
+        ellmer::tool_reject(paste("Command failed:", e$message))
+      },
+      warning = function(w) {
+        paste("Warning:", w$message)
+      }
+    )
+  }
+}
+
 #' Execute bash commands
 #'
 #' @description
@@ -1009,57 +1061,7 @@ tool_run_r_code <- ellmer::tool(
 #' @export
 tool_run_bash <- ellmer::tool(
   fun = function(command) {
-    # Internal parameter (not exposed to LLM)
-    timeout <- 30
-
-    # Use callr for reliable timeout enforcement if available
-    if (rlang::is_installed("callr")) {
-      tryCatch(
-        {
-          result <- callr::r(
-            function(cmd) {
-              system(cmd, intern = TRUE)
-            },
-            args = list(cmd = command),
-            timeout = timeout
-          )
-          if (length(result) == 0) {
-            "Command executed successfully (no output)"
-          } else {
-            paste(result, collapse = "\n")
-          }
-        },
-        error = function(e) {
-          if (grepl("timeout", e$message, ignore.case = TRUE)) {
-            ellmer::tool_reject(paste(
-              "Command timed out after",
-              timeout,
-              "seconds"
-            ))
-          } else {
-            ellmer::tool_reject(paste("Command failed:", e$message))
-          }
-        }
-      )
-    } else {
-      # Fallback to system() - timeout may not be reliable
-      tryCatch(
-        {
-          result <- system(command, intern = TRUE, timeout = timeout)
-          if (length(result) == 0) {
-            "Command executed successfully (no output)"
-          } else {
-            paste(result, collapse = "\n")
-          }
-        },
-        error = function(e) {
-          ellmer::tool_reject(paste("Command failed:", e$message))
-        },
-        warning = function(w) {
-          paste("Warning:", w$message)
-        }
-      )
-    }
+    run_bash_impl(command)
   },
   name = "run_bash",
   description = "Execute a bash/shell command and return the output. Use with caution - this can execute arbitrary system commands.",
