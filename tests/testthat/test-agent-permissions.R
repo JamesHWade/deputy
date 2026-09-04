@@ -80,6 +80,32 @@ test_that("permission mode changes can only narrow the current policy", {
   )
 })
 
+test_that("narrowing removes native tools that lose provider-side authority", {
+  native_web <- ellmer::openai_tool_web_search()
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(tool_read_file, native_web),
+    permissions = Permissions$new(
+      mode = "standard",
+      file_read = TRUE,
+      file_write = FALSE,
+      bash = FALSE,
+      r_code = FALSE,
+      web = TRUE,
+      install_packages = FALSE,
+      tool_allowlist = c("read_file", "web_search")
+    )
+  )
+
+  expect_setequal(names(agent$get_tools()), c("read_file", "web_search"))
+  expect_invisible(agent$set_permission_mode("standard"))
+  expect_setequal(names(agent$get_tools()), c("read_file", "web_search"))
+
+  expect_invisible(agent$set_permission_mode("readonly"))
+  expect_false(agent$permissions$web)
+  expect_identical(names(agent$get_tools()), "read_file")
+})
+
 test_that("permission mode transitions follow the authority lattice", {
   expected <- list(
     standard = c("standard", "readonly"),

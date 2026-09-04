@@ -26,7 +26,8 @@ before execution.}
 \item{cached_tokens}{Provider-reported cached input tokens. These are
 reported separately and are not added again to \code{total_tokens}.}
 
-\item{cost_usd}{Provider-reported estimated cost in US dollars.}
+\item{cost_usd}{Provider-reported estimated cost in US dollars, or \code{NA_real_}
+when the provider did not report complete cost information.}
 }
 \value{
 An \code{AgentUsage} object.
@@ -35,4 +36,13 @@ An \code{AgentUsage} object.
 \code{AgentUsage()} creates a normalized usage record. \code{AgentResult$usage} and
 run \code{usage}/\code{stop} events are scoped to that run, while \link{Agent}\verb{$usage()}
 describes the complete in-memory conversation at the time it is called.
+}
+\examples{
+AgentUsage(
+  requests = 2,
+  tool_calls = 1,
+  input_tokens = 120,
+  output_tokens = 30,
+  cost_usd = 0.002
+)
 }

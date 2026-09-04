@@ -15,6 +15,10 @@ tool_read_file(path, pages = NULL)
 \item{pages}{Optional PDF page selection. Accepts comma-separated pages and
 ranges (e.g. \code{"1,3-5"}). Only supported for PDF files.}
 }
+\value{
+When called directly, a character string with the file contents, or
+a structured list when selected PDF pages are requested.
+}
 \description{
 A tool that reads the contents of a file and returns it as a string.
 }

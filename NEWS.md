@@ -1,17 +1,38 @@
 # deputy (development version)
 
-* New `Agent$run_async()` runs a task without blocking the R process and
-  returns a promise that resolves to an `AgentResult`. It shares
-  `run_shiny()`'s engine -- ellmer's `stream_async()` with permissions, hooks,
-  and `UsageLimits` enforced through callbacks and terminal accounting -- but
-  collects the final response, run-scoped usage, and stop reason instead of
-  streaming to a UI, accepts a per-run `UsageLimits` override (including
-  `on_exceed = "error"`, which rejects the promise with the structured limit
-  error), and does not impose `run_shiny()`'s absolute-file-path rule. Use it
-  when an Agent is a worker inside a larger async system, such as a sub-agent
-  invoked from a streaming parent chat's tool. Callback-driven runs now also
-  record their run-scoped usage so `AgentResult$usage` and the Agent's last
-  run usage reflect `run_shiny()`/`run_async()` runs.
+* `Agent` is now a governed, drop-in chat: `chat()`, `chat_async()`, `stream()`,
+  `stream_async()`, `run_sync()`, and `run_async()` are adapters over one async
+  run kernel. The public backend escape hatch and separate `run_shiny()` bridge
+  are removed. shinychat can consume `agent$stream_async()` directly, including
+  attachment content, while permissions, hooks, limits, checkpoints, and
+  accounting remain active. `LeadAgent` delegation now uses `run_async()` and
+  no longer blocks the R process.
+
+* New `ContextPolicy()` enables automatic pre-request context compaction and
+  durable offloading of large tool results. Compaction reports whether it used
+  the LLM, a hook, or an explicitly configured text fallback, and includes its
+  own usage. Version 2 saved sessions retain cumulative summaries and portable
+  copies of offloaded results. Chunkable text sidecars keep model retrieval
+  memory-bounded, and explicit relative offload roots remain stable after the
+  policy is created. Native file and code tools execute against the Agent
+  workspace without changing the R process working directory. Replacing turns
+  clears Deputy-owned compacted conversation state while preserving other
+  prompt content. Automatic compaction honors run limits before making its
+  summary request. Prompt-owned routing and compaction boundaries cannot
+  collide with ordinary user headings or summary text, and replacing a prompt
+  resets hook-context de-duplication state.
+  Loading a saved session transactionally replaces the receiver's active
+  offloaded-result set, so results from an earlier conversation cannot leak
+  into later session saves.
+  `LeadAgent` accepts the same policy and propagates it to delegated agents.
+  Prompt updates and sub-agent registration preserve cumulative compaction
+  state, while post-tool hooks inspect the original result before large values
+  are represented to the model by bounded references.
+
+* Concurrent `LeadAgent` delegations reserve their child budgets before launch,
+  so siblings share the lead's remaining usage limits instead of each receiving
+  the full balance. Cloned lead agents also recreate their delegate tool against
+  the clone's own registry, hooks, and run history.
 
 * The `deputy` command now ships as a tested Rapp 0.4 package executable for
   one-off `rx` use and persistent `ir tool install` launchers. Its task and
@@ -22,9 +43,11 @@
   JSON-compatible `run_context`. Results, hooks, saved sessions, and
   delegated agents retain that context, while paired tool events and delegated
   results expose Agent, run, parent, tool-call, and delegation identifiers.
+  The drop-in `chat*()` and `stream*()` methods accept the same per-run context
+  narrowing so product hosts do not need a separate execution bridge.
   Generated correlation identifiers no longer advance R's global RNG stream.
 
-* Deputy now has a deliberate 51-symbol public API centered on native agents,
+* Deputy now has a deliberate 53-symbol public API centered on native agents,
   tools, permissions, hooks, skills, delegation, and run usage. Sessions use a
   stable `session_id` for correlation and explicit `Agent$save_session()` and
   `Agent$load_session()` calls for persistence.
@@ -44,6 +67,11 @@
   immutable authority ceiling. Reapplying the current mode is a no-op; other
   changes may only narrow authority. Delegated agents use the same rule and
   retain lead capability, tool-gate, callback, and write-root restrictions.
+
+* `agent_definition()` now validates and canonicalizes AgentDefinition routing
+  keys and fields. `LeadAgent` rejects duplicate names and keeps its registry
+  private behind a read-only snapshot, so delegation, displayed definitions,
+  and the lead prompt cannot diverge (#79).
 
 * `Agent` now rejects a provider tool request whose name is missing,
   unreadable, or malformed before it reaches usage accounting, permissions,
@@ -81,6 +109,38 @@
   timed-out command was reported to the model as a generic "Command failed"
   with no indication that a timeout was the cause. This brings `run_bash` in
   line with the `run_r_code` timeout handling from #27.
+
+* `Agent$cost()` now returns `NA` when any provider cost record is unavailable,
+  with `complete` and `missing` fields that distinguish an observed zero from
+  an unknown total. Run cost limits fail closed with the typed stop reason
+  `"cost_unavailable"` instead of enforcing an understated total (#29).
+
+* Deputy now stops after three consecutive completed tool calls with the same
+  canonical request and result. The `"tool_loop"` stop reason remains stable
+  when surrounding response text differs trivially, while changing results
+  reset the counter for legitimate polling progress (#34).
+
+* The default `permissions_standard()` policy and partial direct
+  `Permissions$new()` policies no longer grant arbitrary R execution, and
+  `tools_preset("standard")` no longer registers `run_r_code`. Built-in R and
+  shell tools are explicitly trusted-code tools.
+  New `tools_mcp_repl()` verifies an exact `read-only` or `workspace-write`
+  mcp-repl configuration and refuses missing, inherited, external, or
+  unrestricted sandbox modes before loading tools (#32).
+
+* Provider-native web tools now honor their documented `tools_web()` contract.
+  Deputy passes through only known native search and fetch tools after an
+  explicit, fail-closed registration-time web permission check; unsupported
+  provider-side tools remain rejected because their execution cannot be
+  intercepted by Deputy. Custom request-time permission callbacks cannot
+  authorize native tools because their arguments and run context are not
+  available for interception. Narrowing away web access atomically removes any
+  registered provider-native web tools before the new policy becomes active.
+
+* `tools_interactive()` now creates an `ask_user` tool with an instance-scoped
+  human-input handler and routing context, allowing concurrent Agents to remain
+  isolated. Missing handlers signal `deputy_human_input_unavailable`;
+  `set_ask_user_callback()` remains a legacy process-wide fallback (#76).
 
 # deputy 0.0.0.9000
 

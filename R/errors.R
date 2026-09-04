@@ -20,12 +20,15 @@
 #'     - `deputy_tool_execution` - Tool failed during execution
 #'   - **deputy_budget** - Resource limit violations
 #'     - `deputy_budget_exceeded` - Cost limit exceeded
+#'     - `deputy_cost_unavailable` - Cost limit could not be measured
 #'     - `deputy_request_limit` - Maximum model requests exceeded
 #'   - **deputy_provider** - LLM provider failures
 #'   - **deputy_session** - Session management failures
 #'     - `deputy_session_load` - Failed to load session
 #'     - `deputy_session_save` - Failed to save session
 #'   - **deputy_hook** - Hook execution failures
+#'   - **deputy_human_input_unavailable** - No interactive or bound handler
+#'     is available for an `ask_user` request
 #'
 #' @section Usage:
 #'
@@ -206,6 +209,21 @@ abort_budget_exceeded <- function(
     message,
     class = c("budget_exceeded", "budget"),
     current_cost = current_cost,
+    max_cost = max_cost,
+    ...,
+    .envir = .envir
+  )
+}
+
+abort_cost_unavailable <- function(
+  message,
+  max_cost,
+  ...,
+  .envir = parent.frame()
+) {
+  abort_deputy(
+    message,
+    class = c("cost_unavailable", "budget"),
     max_cost = max_cost,
     ...,
     .envir = .envir

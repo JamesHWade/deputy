@@ -12,12 +12,13 @@ A list of tool definitions
 \description{
 Returns a list of tools for code execution:
 \itemize{
-\item \code{run_r_code} - Execute R code (sandboxed by default)
+\item \code{run_r_code} - Execute R code in a separate process
 \item \code{run_bash} - Execute bash commands
 }
 
-\strong{Note:} These tools require appropriate permissions. By default,
-\code{\link[=permissions_standard]{permissions_standard()}} allows R code but not bash.
+\strong{Note:} These tools execute trusted code and require explicit permissions.
+Process separation is not an OS sandbox; \code{\link[=permissions_standard]{permissions_standard()}} denies
+both tools.
 }
 \examples{
 \dontrun{

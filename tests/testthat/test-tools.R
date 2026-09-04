@@ -256,9 +256,14 @@ test_that("tool_list_files handles empty directory", {
 test_that("tool_run_r_code executes code", {
   skip_on_cran()
   skip_if_not_installed("callr")
-  # Note: sandbox parameter is no longer exposed (security fix)
   result <- tool_run_r_code("1 + 1")
   expect_true(grepl("2", result))
+})
+
+test_that("tool_run_r_code describes its process boundary accurately", {
+  expect_match(tool_run_r_code@description, "separate process")
+  expect_match(tool_run_r_code@description, "not an OS security sandbox")
+  expect_false(grepl("sandboxed", tool_run_r_code@description))
 })
 
 test_that("tool_run_r_code captures output", {
@@ -460,7 +465,7 @@ test_that("tool_run_bash handles command not found", {
   expect_true(is.character(result))
 })
 
-test_that("tool_run_r_code requires callr for sandbox", {
+test_that("tool_run_r_code requires callr for process isolation", {
   # Mock is_installed to return FALSE for callr
   local_mocked_bindings(
     is_installed = function(pkg) {
@@ -501,14 +506,14 @@ test_that("tools_preset returns correct tools for minimal", {
 test_that("tools_preset returns correct tools for standard", {
   tools <- tools_preset("standard")
   expect_type(tools, "list")
-  expect_length(tools, 5)
+  expect_length(tools, 4)
 
   tool_names <- vapply(tools, function(t) t@name, character(1))
   expect_true("read_file" %in% tool_names)
   expect_true("read_markdown" %in% tool_names)
   expect_true("write_file" %in% tool_names)
   expect_true("list_files" %in% tool_names)
-  expect_true("run_r_code" %in% tool_names)
+  expect_false("run_r_code" %in% tool_names)
 })
 
 test_that("tools_preset returns correct tools for dev", {
@@ -568,4 +573,58 @@ test_that("tools_preset errors on invalid preset name", {
     tools_preset("invalid"),
     "Unknown tool preset"
   )
+})
+
+test_that("provider-native web tools require explicit registration authority", {
+  native_web <- ellmer::openai_tool_web_search()
+
+  expect_error(
+    Agent$new(
+      chat = create_mock_chat(),
+      tools = list(native_web),
+      permissions = Permissions$new(
+        web = FALSE,
+        tool_allowlist = "web_search"
+      )
+    ),
+    "not authorized"
+  )
+
+  expect_error(
+    Agent$new(
+      chat = create_mock_chat(),
+      tools = list(native_web),
+      permissions = Permissions$new(web = TRUE)
+    ),
+    "not explicitly allowed"
+  )
+
+  expect_error(
+    Agent$new(
+      chat = create_mock_chat(),
+      tools = list(native_web),
+      permissions = Permissions$new(
+        web = TRUE,
+        tool_allowlist = "web_search",
+        can_use_tool = function(tool_name, tool_input, context) {
+          if (identical(tool_input$query, "internal.example")) {
+            return(PermissionResultDeny("Internal domains are blocked"))
+          }
+          PermissionResultAllow()
+        }
+      )
+    ),
+    "custom permission callback"
+  )
+
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(native_web),
+    permissions = Permissions$new(
+      web = TRUE,
+      tool_allowlist = "web_search"
+    )
+  )
+
+  expect_s3_class(agent$get_tools()$web_search, "ellmer::ToolBuiltIn")
 })

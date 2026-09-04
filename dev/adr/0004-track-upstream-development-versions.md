@@ -1,19 +1,37 @@
-# Track the development versions of ellmer and shinychat
+# Track released versions of ellmer and shinychat
 
-deputy develops and tests against the **development** versions of ellmer and shinychat, not their CRAN releases. `DESCRIPTION` should declare development floors and a `Remotes:` field pointing at the upstream repositories, and CI should install from those sources.
+deputy's primary compatibility target is the released dependency set available
+from CRAN. `DESCRIPTION`, contributor setup, and the required CI matrix must be
+installable without `Remotes:` or development-only version floors.
+
+This supersedes the development-only policy originally recorded here. That
+policy was deliberately temporary: it expired when deputy began preparing its
+first CRAN submission and its required upstream versions were available on
+CRAN.
 
 ## Why
 
-deputy is built on ellmer and hosted by shinychat (ADR-0002), and defers conversation persistence to shinychat's store (ADR-0003). That store is development-only — CRAN's shinychat 0.4.0 does not have it. Building against releases would mean deferring every capability by a release cycle, and designing against an API a cycle behind the one the maintainers are actually shaping.
+A CRAN package must be reproducible from released dependencies. Making that
+environment the primary target catches dependency floors, accidental use of
+unreleased APIs, and installation failures before submission. It also gives
+users and contributors one supported setup rather than a GitHub-only graph.
 
-Staying current also changes when problems surface. An upstream change that breaks deputy is found the week it lands, while the maintainer still has it in mind and the fix is a conversation. Found at release time it is deputy's emergency, and the window for influencing the design has closed.
-
-The same currency is what makes upstream contribution possible. The export request in issue #66 is only well timed because deputy is looking at unreleased code.
+Focused compatibility work against upstream development versions remains
+valuable. It is an early-warning signal, but it cannot define the required
+installation path or silently raise deputy's supported floor before an
+upstream release exists.
 
 ## Consequences
 
-- **`Remotes:` must be removed before CRAN submission.** CRAN does not accept it, and every dependency must be a released version. This ADR therefore has an expiry: at submission time deputy must be buildable against CRAN releases of ellmer and shinychat, which means those releases must have landed first. That is a real scheduling dependency on two other packages, and it is accepted deliberately.
-- **CI must install from development sources**, otherwise it tests something nobody runs. See issue #67.
-- **Version floors should name development versions** — `ellmer (>= 0.4.2.9000)`, `shinychat (>= 0.4.0.9000)` — so an install that silently resolved to CRAN fails loudly rather than at first use.
-- **Upstream breaking changes are deputy's to absorb promptly**, not to work around. See ADR-0003 on why insulation is the wrong instinct.
-- **Contributors need the dev versions installed.** This should be stated in the development setup instructions, not discovered through a confusing failure.
+- `DESCRIPTION` does not contain `Remotes:` and names only released minimum
+  versions.
+- Required CI checks release R on Ubuntu, macOS, and Windows against released
+  dependencies.
+- Upstream development versions may be tested in an explicitly experimental
+  job or local compatibility pass, but that signal does not replace the
+  released-dependency matrix.
+- Features that require unreleased upstream APIs wait behind a release or use
+  a documented optional boundary; they do not enter the CRAN package through
+  an undeclared development dependency.
+- Issue #67's development-only dependency target is superseded by this release
+  policy.

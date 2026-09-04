@@ -6,16 +6,46 @@
 # - Each option has: label, description
 # - Returns: answers mapping question text to selected label(s)
 
-# Package-level storage for the user input callback
+# Package-level storage for the legacy user input callback
 .deputy_env <- new.env(parent = emptyenv())
 .deputy_env$ask_user_callback <- NULL
+
+validate_ask_user_callback <- function(callback, arg = "callback") {
+  if (!is.null(callback) && !is.function(callback)) {
+    cli::cli_abort("{.arg {arg}} must be a function or NULL")
+  }
+  callback
+}
+
+validate_ask_user_context <- function(context, arg = "context") {
+  if (is.function(context)) {
+    return(context)
+  }
+  if (!is.list(context)) {
+    cli::cli_abort("{.arg {arg}} must be a named list or a function")
+  }
+  if (
+    length(context) > 0 &&
+      (is.null(names(context)) || !all(nzchar(names(context))))
+  ) {
+    cli::cli_abort("{.arg {arg}} must have non-empty names")
+  }
+  context
+}
+
+resolve_ask_user_context <- function(context) {
+  if (is.function(context)) {
+    context <- context()
+  }
+  validate_ask_user_context(context)
+}
 
 #' Set callback for non-interactive user input
 #'
 #' @description
-#' In non-interactive sessions (scripts, Shiny apps, etc.), set a callback
-#' function that will be called when the agent needs user input via
-#' `ask_user`.
+#' Sets a legacy process-wide callback for non-interactive sessions. This
+#' fallback cannot isolate concurrent Agents or Shiny sessions. New code should
+#' bind a handler to a tool instance with [tools_interactive()].
 #'
 #' @param callback A function that takes `questions` in Deputy's structured
 #'   question format. Each question has `question`, `header`,
@@ -28,13 +58,12 @@
 #'
 #' @examples
 #' \dontrun{
-#' # For a Shiny app:
+#' # Legacy fallback for a single-Agent script:
 #' set_ask_user_callback(function(questions) {
 #'   # Display questions in modal and collect answers
 #'   answers <- list()
 #'   for (q in questions) {
-#'     # Show q$question with q$options
-#'     # Collect user selection
+#'     # Collect one answer for each question.
 #'     answers[[q$question]] <- selected_label
 #'   }
 #'   answers
@@ -43,9 +72,7 @@
 #'
 #' @export
 set_ask_user_callback <- function(callback) {
-  if (!is.null(callback) && !is.function(callback)) {
-    cli::cli_abort("{.arg callback} must be a function or NULL")
-  }
+  callback <- validate_ask_user_callback(callback)
   old <- .deputy_env$ask_user_callback
   .deputy_env$ask_user_callback <- callback
   invisible(old)
@@ -74,7 +101,7 @@ parse_user_response <- function(response, options, multi_select = FALSE) {
     parts <- strsplit(response_trimmed, ",")[[1]]
     indices <- suppressWarnings(as.integer(trimws(parts)))
 
-    if (!any(is.na(indices))) {
+    if (!anyNA(indices)) {
       # All parts are valid numbers
       valid_indices <- indices[indices >= 1 & indices <= length(options)]
       if (length(valid_indices) > 0) {
@@ -101,21 +128,37 @@ parse_user_response <- function(response, options, multi_select = FALSE) {
 #' Ask user questions (internal implementation)
 #'
 #' @param questions List of structured question objects
+#' @param callback Optional instance-scoped handler. It receives `questions`
+#'   and the resolved `context`. When omitted, the legacy process-wide fallback
+#'   is used.
+#' @param context Named routing context or a zero-argument function that returns
+#'   it.
 #' @return Named list mapping question text to selected answers
 #' @keywords internal
-ask_user_impl <- function(questions) {
-  # Check for custom callback first
-  callback <- get_ask_user_callback()
+ask_user_impl <- function(questions, callback = NULL, context = list()) {
   if (!is.null(callback)) {
-    return(callback(questions))
+    return(callback(questions, resolve_ask_user_context(context)))
+  }
+
+  legacy_callback <- get_ask_user_callback()
+  if (!is.null(legacy_callback)) {
+    return(legacy_callback(questions))
   }
 
   # Check if we're in an interactive session
   if (!interactive()) {
-    cli::cli_abort(c(
-      "Cannot ask user: session is not interactive",
-      "i" = "Use {.fn set_ask_user_callback} to provide a callback for non-interactive use"
-    ))
+    abort_deputy(
+      c(
+        "Cannot ask user: no human-input handler is available",
+        "i" = paste(
+          "Use {.fn tools_interactive} with an instance-scoped",
+          "{.arg callback} in non-interactive hosts."
+        )
+      ),
+      class = "human_input_unavailable",
+      questions = questions,
+      context = resolve_ask_user_context(context)
+    )
   }
 
   answers <- list()
@@ -158,6 +201,97 @@ ask_user_impl <- function(questions) {
   }
 
   answers
+}
+
+ask_user_tool_impl <- function(questions, callback = NULL, context = list()) {
+  if (is.character(questions) && length(questions) == 1) {
+    parsed <- tryCatch(
+      jsonlite::fromJSON(questions, simplifyVector = FALSE),
+      error = function(e) {
+        ellmer::tool_reject(paste(
+          "Failed to parse questions JSON:",
+          e$message
+        ))
+      }
+    )
+    if (is.null(parsed)) {
+      ellmer::tool_reject("JSON parsing returned NULL unexpectedly")
+    }
+    questions <- parsed
+  }
+
+  validate_questions(questions)
+
+  tryCatch(
+    {
+      answers <- ask_user_impl(
+        questions,
+        callback = callback,
+        context = context
+      )
+      list(
+        questions = questions,
+        answers = answers
+      )
+    },
+    interrupt = function(e) {
+      rlang::cnd_signal(e)
+    },
+    error = function(e) {
+      if (inherits(e, "deputy_human_input_unavailable")) {
+        rlang::cnd_signal(e)
+      }
+      error_class <- paste(class(e), collapse = ", ")
+      ellmer::tool_reject(paste0(
+        "Failed to get user input: ",
+        e$message,
+        " [",
+        error_class,
+        "]"
+      ))
+    }
+  )
+}
+
+new_ask_user_tool <- function(callback = NULL, context = list()) {
+  callback <- validate_ask_user_callback(callback)
+  context <- validate_ask_user_context(context)
+
+  ellmer::tool(
+    fun = function(questions) {
+      ask_user_tool_impl(
+        questions,
+        callback = callback,
+        context = context
+      )
+    },
+    name = "ask_user",
+    description = paste(
+      "Ask the user clarifying questions when you need more information to proceed.",
+      "Present 1-4 questions with 2-4 options each.",
+      "Format: JSON array of question objects, each with:",
+      "- question (string): The full question text",
+      "- header (string, max 12 chars): Short label",
+      "- options (array of 2-4 objects with 'label' and 'description')",
+      "- multiSelect (boolean, optional): Allow multiple selections",
+      "Example: [{\"question\": \"Which format?\", \"header\": \"Format\",",
+      "\"options\": [{\"label\": \"JSON\", \"description\": \"JavaScript Object Notation\"},",
+      "{\"label\": \"YAML\", \"description\": \"YAML format\"}]}]"
+    ),
+    arguments = list(
+      questions = ellmer::type_string(
+        paste(
+          "JSON array of 1-4 question objects. Each object has: question, header,",
+          "options (array of {label, description}), and optionally multiSelect."
+        )
+      )
+    ),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      destructive_hint = FALSE,
+      open_world_hint = FALSE
+    )
+  )
 }
 
 #' Validate questions structure
@@ -229,6 +363,8 @@ validate_questions <- function(questions) {
 #'   `multiSelect` (logical).
 #'
 #' @format A tool definition created with `ellmer::tool()`.
+#' @return When called directly, a list containing the original `questions`
+#'   and a named `answers` list.
 #'
 #' @details
 #' **Input format:**
@@ -246,9 +382,10 @@ validate_questions <- function(questions) {
 #' - For multi-select, labels are joined with ", "
 #' - Users can also type free-form responses
 #'
-#' In interactive R sessions, the tool uses `readline()` to get input.
-#' For non-interactive use (scripts, Shiny apps), set a callback with
-#' [set_ask_user_callback()].
+#' In interactive R sessions, the tool uses `readline()` to get input. The
+#' exported object uses [set_ask_user_callback()] only as a legacy process-wide
+#' fallback. Non-interactive and concurrent hosts should create an isolated
+#' tool with [tools_interactive()].
 #'
 #' @examples
 #' \dontrun{
@@ -272,108 +409,53 @@ validate_questions <- function(questions) {
 #' # }
 #' }
 #'
-#' @seealso [set_ask_user_callback()] for non-interactive usage
+#' @seealso [tools_interactive()] for instance-scoped non-interactive usage
 #'
 #' @export
-tool_ask_user <- ellmer::tool(
-  fun = function(questions) {
-    # Handle JSON string input (from LLMs that pass stringified JSON)
-    if (is.character(questions) && length(questions) == 1) {
-      parsed <- tryCatch(
-        jsonlite::fromJSON(questions, simplifyVector = FALSE),
-        error = function(e) {
-          ellmer::tool_reject(paste(
-            "Failed to parse questions JSON:",
-            e$message
-          ))
-        }
-      )
-      # Guard against unexpected NULL from parsing
-      if (is.null(parsed)) {
-        ellmer::tool_reject("JSON parsing returned NULL unexpectedly")
-      }
-      questions <- parsed
-    }
-
-    # Validate the questions structure
-    validate_questions(questions)
-
-    # Get user answers with specific error handling
-    tryCatch(
-      {
-        answers <- ask_user_impl(questions)
-
-        # Return in the expected format
-        list(
-          questions = questions,
-          answers = answers
-        )
-      },
-      interrupt = function(e) {
-        # Let user interrupts (Ctrl+C) propagate normally
-        stop(e)
-      },
-      error = function(e) {
-        # Include error class for debugging callback issues
-        error_class <- paste(class(e), collapse = ", ")
-        ellmer::tool_reject(paste0(
-          "Failed to get user input: ",
-          e$message,
-          " [",
-          error_class,
-          "]"
-        ))
-      }
-    )
-  },
-  name = "ask_user",
-  description = paste(
-    "Ask the user clarifying questions when you need more information to proceed.",
-    "Present 1-4 questions with 2-4 options each.",
-    "Format: JSON array of question objects, each with:",
-    "- question (string): The full question text",
-    "- header (string, max 12 chars): Short label",
-    "- options (array of 2-4 objects with 'label' and 'description')",
-    "- multiSelect (boolean, optional): Allow multiple selections",
-    "Example: [{\"question\": \"Which format?\", \"header\": \"Format\",",
-    "\"options\": [{\"label\": \"JSON\", \"description\": \"JavaScript Object Notation\"},",
-    "{\"label\": \"YAML\", \"description\": \"YAML format\"}]}]"
-  ),
-  arguments = list(
-    questions = ellmer::type_string(
-      paste(
-        "JSON array of 1-4 question objects. Each object has: question, header,",
-        "options (array of {label, description}), and optionally multiSelect."
-      )
-    )
-  ),
-  annotations = ellmer::tool_annotations(
-    read_only_hint = TRUE,
-    destructive_hint = FALSE,
-    open_world_hint = FALSE
-  )
-)
+tool_ask_user <- new_ask_user_tool()
 
 #' Tools for interactive workflows
 #'
 #' @description
 #' Returns a list of tools that enable human-in-the-loop interactions.
 #' Currently includes `tool_ask_user` (`ask_user`) for asking
-#' clarifying questions.
+#' clarifying questions. Supply `callback` in non-interactive or concurrent
+#' hosts so each Agent receives its own handler.
+#'
+#' @param callback Optional handler with signature `function(questions,
+#'   context)`. It should return a named list that maps each question text to
+#'   the selected label or labels. When omitted, interactive sessions use
+#'   `readline()` and non-interactive sessions may use the legacy callback from
+#'   [set_ask_user_callback()].
+#' @param context Named list of stable host routing values, such as `agent_id`
+#'   and `session_id`, or a zero-argument function returning that list. A
+#'   function is resolved for each question request.
 #'
 #' @return A list of tool definitions.
 #'
 #' @examples
 #' \dontrun{
+#' agent_id <- "agent-review"
+#' session_id <- "session-review"
 #' agent <- Agent$new(
 #'   chat = ellmer::chat("openai/gpt-4o"),
-#'   tools = c(tools_file(), tools_interactive())
+#'   tools = c(
+#'     tools_file(),
+#'     tools_interactive(
+#'       callback = function(questions, context) {
+#'         collect_answers(questions, route = context$session_id)
+#'       },
+#'       context = list(agent_id = agent_id, session_id = session_id)
+#'     )
+#'   ),
+#'   agent_id = agent_id,
+#'   session_id = session_id
 #' )
 #' }
 #'
 #' @seealso [tool_ask_user], [set_ask_user_callback()]
 #'
 #' @export
-tools_interactive <- function() {
-  list(tool_ask_user)
+tools_interactive <- function(callback = NULL, context = list()) {
+  list(new_ask_user_tool(callback = callback, context = context))
 }

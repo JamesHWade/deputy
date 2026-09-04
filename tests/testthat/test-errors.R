@@ -88,6 +88,21 @@ test_that("abort_budget_exceeded has correct structure", {
   expect_equal(err$max_cost, 0.50)
 })
 
+test_that("abort_cost_unavailable has correct structure", {
+  err <- rlang::catch_cnd(
+    abort_cost_unavailable(
+      "Provider cost is incomplete",
+      max_cost = 0.5,
+      run_id = "run-1"
+    )
+  )
+
+  expect_s3_class(err, "deputy_cost_unavailable")
+  expect_s3_class(err, "deputy_budget")
+  expect_equal(err$max_cost, 0.5)
+  expect_identical(err$run_id, "run-1")
+})
+
 test_that("abort_request_limit has correct structure", {
   err <- tryCatch(
     abort_request_limit(

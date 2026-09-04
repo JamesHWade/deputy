@@ -31,7 +31,8 @@ reported separately and is not counted twice. \code{NULL} leaves the field
 unset.}
 
 \item{max_cost_usd}{Maximum provider-reported estimated cost in US dollars.
-\code{NULL} leaves the field unset.}
+\code{NULL} leaves the field unset. If configured, missing provider cost data
+stops the run with \code{"cost_unavailable"} rather than undercounting.}
 
 \item{on_exceed}{What to do when a limit is exceeded. \code{"stop"} returns an
 \link{AgentResult} with a typed stop reason; \code{"error"} emits the final usage
@@ -52,4 +53,8 @@ stops after an overage is observed and can exceed a threshold by one
 response. A \code{NULL} field leaves that limit unset on this object; when the
 object configures or overrides an \link{Agent}, Deputy may fill unset fields from
 the agent's defaults.
+}
+\examples{
+UsageLimits(max_requests = 5, max_tool_calls = 10)
+UsageLimits(max_cost_usd = 0.25, on_exceed = "error")
 }

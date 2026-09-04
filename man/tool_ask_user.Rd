@@ -15,6 +15,10 @@ Each question should have: \code{question} (string), \code{header} (string, max 
 \code{options} (list of objects with \code{label} and \code{description}), and optionally
 \code{multiSelect} (logical).}
 }
+\value{
+When called directly, a list containing the original \code{questions}
+and a named \code{answers} list.
+}
 \description{
 A tool that allows the agent to ask the user clarifying questions and
 receive their responses. This enables human-in-the-loop workflows where
@@ -44,9 +48,10 @@ the agent can request clarification or choices from the user.
 \item Users can also type free-form responses
 }
 
-In interactive R sessions, the tool uses \code{readline()} to get input.
-For non-interactive use (scripts, Shiny apps), set a callback with
-\code{\link[=set_ask_user_callback]{set_ask_user_callback()}}.
+In interactive R sessions, the tool uses \code{readline()} to get input. The
+exported object uses \code{\link[=set_ask_user_callback]{set_ask_user_callback()}} only as a legacy process-wide
+fallback. Non-interactive and concurrent hosts should create an isolated
+tool with \code{\link[=tools_interactive]{tools_interactive()}}.
 }
 \examples{
 \dontrun{
@@ -72,5 +77,5 @@ agent <- Agent$new(
 
 }
 \seealso{
-\code{\link[=set_ask_user_callback]{set_ask_user_callback()}} for non-interactive usage
+\code{\link[=tools_interactive]{tools_interactive()}} for instance-scoped non-interactive usage
 }

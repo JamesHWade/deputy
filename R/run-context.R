@@ -95,7 +95,7 @@ normalize_run_context_value <- function(
   }
 
   if (type %in% c("integer", "double")) {
-    if (anyNA(x) || any(!is.finite(x))) {
+    if (anyNA(x) || !all(is.finite(x))) {
       run_context_abort(
         paste0(
           "Run context numeric values must be finite and must not be ",
@@ -162,7 +162,7 @@ normalize_run_context_list <- function(x, depth, path, top_level) {
     return(output)
   }
 
-  if (anyNA(keys) || any(!nzchar(keys))) {
+  if (anyNA(keys) || !all(nzchar(keys))) {
     run_context_abort(
       "Run context objects must have complete, non-empty keys.",
       path = path

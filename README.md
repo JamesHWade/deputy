@@ -24,13 +24,13 @@ ellmer gives R a provider-independent chat interface and tools. Deputy
 adds the runtime around that chat when a tool-using conversation becomes
 a real job:
 
-| Start with ellmer       | Add Deputy when you need                          |
-|-------------------------|---------------------------------------------------|
-| Chats and provider APIs | Explicit tool permissions and run limits          |
-| Tool registration       | Hooks, semantic events, and inspectable results   |
-| Streaming model output  | A stable stream for terminals and Shiny hosts     |
-| Conversation state      | Explicit session persistence and file checkpoints |
-| One tool-using chat     | Correlated delegation to specialist Agents        |
+| Start with ellmer | Add Deputy when you need |
+|----|----|
+| Chats and provider APIs | Explicit tool permissions and run limits |
+| Tool registration | Hooks, semantic events, and inspectable results |
+| Streaming model output | A stable stream for terminals and Shiny hosts |
+| Conversation state | Automatic compaction, persistence, and checkpoints |
+| One tool-using chat | Correlated delegation to specialist Agents |
 
 The core object model stays small:
 
@@ -42,19 +42,35 @@ ellmer Chat + Tools + Permissions + Limits
         AgentResult + Events + Checkpoints
 ```
 
+The Agent itself implements ellmer’s Chat protocol. Use `agent$chat()`
+and `agent$stream()` in synchronous code, or pass the Agent directly to
+`shinychat::chat_server()`. Those paths use the same governed kernel as
+`run_sync()` and `run_async()`; the latter pair return richer
+`AgentResult` metadata when the host needs to inspect the run. Product
+hosts may attach per-run correlation with the optional `run_context`
+argument on every chat, stream, and run method.
+
 ## Installation
 
-Deputy currently follows development versions of ellmer:
+Before Deputy’s first CRAN release, install the development version from
+GitHub:
 
 ``` r
 # install.packages("pak")
-pak::pak(c("tidyverse/ellmer", "JamesHWade/deputy"))
+pak::pak("JamesHWade/deputy")
+```
+
+After the release is available from CRAN, install the released package
+with:
+
+``` r
+install.packages("deputy")
 ```
 
 For the optional Shiny host, also install shinychat:
 
 ``` r
-pak::pak("posit-dev/shinychat")
+install.packages("shinychat")
 ```
 
 ## A safe first run
@@ -69,6 +85,7 @@ workspace <- normalizePath(getwd(), winslash = "/")
 first_tools <- tools_preset("minimal")
 first_permissions <- permissions_readonly()
 first_limits <- UsageLimits(max_requests = 6, max_tool_calls = 8)
+first_context <- ContextPolicy(max_tokens = 32000, fallback = "error")
 
 stopifnot(
   length(first_tools) == 3L,
@@ -88,6 +105,7 @@ agent <- Agent$new(
   tools = first_tools,
   permissions = first_permissions,
   usage_limits = first_limits,
+  context_policy = first_context,
   working_dir = workspace
 )
 
@@ -118,6 +136,9 @@ turn model-generated code into untrusted code you can execute safely:
 
 - `permissions_readonly()` denies Deputy’s write, shell, R execution,
   web, and package-install capabilities.
+- `permissions_standard()` permits accessible reads and workspace-scoped
+  native file writes, but denies arbitrary R and shell execution by
+  default.
 - A directory-valued `file_write` permission confines Deputy’s native
   file writes to that canonical root. File reads remain limited by the R
   process, not by an operating-system sandbox.
@@ -129,7 +150,11 @@ turn model-generated code into untrusted code you can execute safely:
   control or backups.
 
 Start read-only, grant the narrowest capability that completes the job,
-and use a real isolation boundary for untrusted code.
+and use a real isolation boundary for untrusted code. `tools_mcp_repl()`
+loads an explicitly configured
+[mcp-repl](https://github.com/posit-dev/mcp-repl) R session only after
+verifying that its `read-only` or `workspace-write` OS sandbox matches
+the requested policy; a missing or weaker policy is an error.
 
 ## Choose your path
 

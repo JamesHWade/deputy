@@ -16,6 +16,10 @@ tool_read_csv(path, n_max = 1000, show_head = 10)
 
 \item{show_head}{Number of rows to show in preview (tool argument)}
 }
+\value{
+When called directly, a character summary of the CSV structure and
+preview rows.
+}
 \description{
 A tool that reads a CSV file and returns a summary of its structure
 along with the first few rows.

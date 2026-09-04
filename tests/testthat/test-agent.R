@@ -29,7 +29,7 @@ test_that("Agent core fields are immutable after construction", {
 
   expect_error(
     agent$chat <- create_mock_chat(),
-    "immutable after construction"
+    "locked binding"
   )
   expect_error(
     agent$permissions <- permissions_readonly(),
@@ -44,7 +44,7 @@ test_that("Agent core fields are immutable after construction", {
     "immutable after construction"
   )
 
-  expect_identical(agent$chat, mock_chat)
+  expect_true(is.function(agent$chat))
   expect_identical(agent$permissions, original_permissions)
   expect_identical(agent$hooks, original_hooks)
   expect_identical(agent$working_dir, original_working_dir)
@@ -120,10 +120,31 @@ test_that("Agent cost returns correct structure", {
 
   cost <- agent$cost()
 
-  expect_true("input" %in% names(cost))
-  expect_true("output" %in% names(cost))
-  expect_true("cached" %in% names(cost))
-  expect_true("total" %in% names(cost))
+  expect_named(
+    cost,
+    c("input", "output", "cached", "total", "complete", "missing")
+  )
+  expect_identical(cost$complete, TRUE)
+  expect_identical(cost$missing, 0L)
+})
+
+test_that("Agent cost reports incomplete provider records", {
+  mock_chat <- create_mock_chat()
+  mock_chat$get_tokens <- function() {
+    data.frame(
+      input = c(10, 20),
+      output = c(2, 4),
+      cached_input = c(0, 5),
+      cost = c(0.01, NA_real_)
+    )
+  }
+  agent <- Agent$new(chat = mock_chat)
+
+  cost <- agent$cost()
+
+  expect_identical(cost$total, NA_real_)
+  expect_identical(cost$complete, FALSE)
+  expect_identical(cost$missing, 1L)
 })
 
 test_that("Agent provider returns correct structure", {
@@ -172,13 +193,15 @@ test_that("Agent save_session creates file", {
 
   # Check session contents
   session <- readRDS(session_file)
-  expect_identical(session$schema_version, 1L)
+  expect_identical(session$schema_version, 2L)
   expect_named(
     session,
     c(
       "schema_version",
       "turns",
       "system_prompt",
+      "compaction_summary",
+      "tool_result_envelopes",
       "run_context",
       "appended_hook_context_hashes",
       "file_checkpoint_state",
@@ -224,6 +247,39 @@ test_that("Agent load_session restores chat state but preserves authority", {
   expect_identical(receiver$working_dir, configured_working_dir)
 })
 
+test_that("Agent sessions preserve cumulative compaction context", {
+  root <- withr::local_tempdir(pattern = "deputy-session-compaction-")
+  source_chat <- create_mock_chat()
+  source_chat$set_turns(list(
+    create_mock_user_turn("Original question"),
+    create_mock_assistant_turn("Original answer"),
+    create_mock_user_turn("Follow-up")
+  ))
+  source <- Agent$new(chat = source_chat)
+  source$compact(keep_last = 1L, summary = "Saved cumulative summary")
+  session_file <- file.path(root, "session.rds")
+  suppressMessages(source$save_session(session_file))
+
+  probe <- new.env(parent = emptyenv())
+  receiver <- Agent$new(
+    chat = create_compaction_mock_chat(
+      responses = list("Merged summary"),
+      probe = probe
+    )
+  )
+  suppressMessages(receiver$load_session(session_file))
+  receiver$.__enclos_env__$private$generate_compaction_summary(list(
+    create_mock_user_turn("New question"),
+    create_mock_assistant_turn("New answer")
+  ))
+
+  expect_match(
+    probe$summary_call$prompt,
+    "Existing summary from earlier compactions:\nSaved cumulative summary",
+    fixed = TRUE
+  )
+})
+
 test_that("Agent load_session validates payload before mutating conversation", {
   root <- withr::local_tempdir(pattern = "deputy-session-atomic-")
   session_file <- file.path(root, "malformed.rds")
@@ -235,13 +291,15 @@ test_that("Agent load_session validates payload before mutating conversation", {
 
   saveRDS(
     list(
-      schema_version = 1L,
+      schema_version = 2L,
       turns = list(create_mock_user_turn("new turn")),
       system_prompt = "new prompt",
+      compaction_summary = NULL,
+      tool_result_envelopes = list(),
       run_context = list(),
       appended_hook_context_hashes = new.env(parent = emptyenv()),
       file_checkpoint_state = NULL,
-      metadata = list()
+      metadata = list(session_id = "malformed-session")
     ),
     session_file
   )
@@ -255,7 +313,7 @@ test_that("Agent load_session validates payload before mutating conversation", {
 
   saveRDS(
     list(
-      schema_version = 0L,
+      schema_version = 1L,
       turns = list(create_mock_user_turn("unsafe session")),
       system_prompt = "unsafe prompt",
       run_context = list(),
@@ -267,6 +325,7 @@ test_that("Agent load_session validates payload before mutating conversation", {
   )
   expect_error(
     suppressMessages(agent$load_session(session_file)),
+    "expected version 2",
     class = "deputy_session_load"
   )
   expect_equal(chat$get_turns(), old_turns)
@@ -313,7 +372,8 @@ test_that("compact does nothing when not enough turns", {
     type = "message"
   )
 
-  expect_identical(result, agent)
+  expect_s3_class(result, "DeputyCompaction")
+  expect_identical(result$method, "none")
 })
 
 test_that("compact accepts custom summary", {
@@ -380,6 +440,33 @@ test_that("generate_fallback_summary creates text summary", {
   expect_true(grepl("Asst msg", fallback))
 })
 
+test_that("deterministic fallback carries prior compaction context forward", {
+  chat <- create_compaction_mock_chat(chat_error = "provider failed")
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  agent <- Agent$new(chat = chat)
+  agent$compact(keep_last = 1L, summary = "Earlier compacted context")
+  chat$set_turns(c(
+    chat$get_turns(),
+    list(
+      create_mock_assistant_turn("A2"),
+      create_mock_user_turn("Q3")
+    )
+  ))
+
+  result <- suppressWarnings(suppressMessages(
+    agent$compact(keep_last = 1L, fallback = "text")
+  ))
+
+  expect_identical(result$method, "text")
+  expect_match(result$summary, "Earlier compacted context", fixed = TRUE)
+  expect_match(result$summary, "User: Q2", fixed = TRUE)
+  expect_match(result$summary, "Assistant: A2", fixed = TRUE)
+})
+
 test_that("compaction summary clone is isolated, callback-free, and silent", {
   request_calls <- 0L
   result_calls <- 0L
@@ -428,7 +515,9 @@ test_that("compaction summary clone is isolated, callback-free, and silent", {
     original_turns
   )
 
-  expect_equal(summary, "A summary.")
+  expect_equal(summary$summary, "A summary.")
+  expect_identical(summary$method, "llm")
+  expect_s3_class(summary$usage, "AgentUsage")
   expect_identical(probe$clone_calls, 1L)
   expect_identical(probe$clone_deep, TRUE)
   expect_length(probe$summary_call$turns, 0L)
@@ -507,17 +596,21 @@ test_that("compaction falls back only after clone or summary runtime failure", {
 
   clone_fallback <- suppressWarnings(suppressMessages(
     clone_failure_agent$.__enclos_env__$private$generate_compaction_summary(
-      turns
+      turns,
+      fallback = "text"
     )
   ))
   runtime_fallback <- suppressWarnings(suppressMessages(
     runtime_failure_agent$.__enclos_env__$private$generate_compaction_summary(
-      turns
+      turns,
+      fallback = "text"
     )
   ))
 
-  expect_match(clone_fallback, "Compacted 2 earlier turns")
-  expect_match(runtime_fallback, "Compacted 2 earlier turns")
+  expect_match(clone_fallback$summary, "Compacted 2 earlier turns")
+  expect_match(runtime_fallback$summary, "Compacted 2 earlier turns")
+  expect_identical(clone_fallback$method, "text")
+  expect_identical(runtime_fallback$method, "text")
 })
 
 # Tool data extraction tests

@@ -59,6 +59,54 @@ test_that("agent_definition accepts custom model", {
   expect_equal(def$model, "anthropic/claude-sonnet-4-20250514")
 })
 
+test_that("agent_definition canonicalizes routing keys", {
+  def <- agent_definition(
+    name = "  Review-Agent_1  ",
+    description = "Reviews code",
+    prompt = "Review the code"
+  )
+
+  expect_identical(def$name, "review-agent_1")
+})
+
+test_that("agent_definition validates scalar and collection fields", {
+  base <- list(
+    name = "reviewer",
+    description = "Reviews code",
+    prompt = "Review the code"
+  )
+  invalid <- list(
+    list(args = list(name = "two words"), field = "name"),
+    list(args = list(name = "1reviewer"), field = "name"),
+    list(args = list(description = ""), field = "description"),
+    list(args = list(prompt = NA_character_), field = "prompt"),
+    list(args = list(model = character()), field = "model"),
+    list(args = list(tools = tool_read_file), field = "tools"),
+    list(args = list(skills = "review"), field = "skills"),
+    list(
+      args = list(disallowed_tools = list("run_bash")),
+      field = "disallowed_tools"
+    ),
+    list(args = list(memory = list("memory")), field = "memory"),
+    list(
+      args = list(mcp_servers = c("github", NA_character_)),
+      field = "mcp_servers"
+    ),
+    list(
+      args = list(initial_prompt = c("one", "two")),
+      field = "initial_prompt"
+    )
+  )
+
+  for (case in invalid) {
+    condition <- rlang::catch_cnd(
+      do.call(agent_definition, utils::modifyList(base, case$args))
+    )
+    expect_s3_class(condition, "error")
+    expect_match(conditionMessage(condition), case$field, fixed = TRUE)
+  }
+})
+
 test_that("agent_definition print works", {
   def <- agent_definition(
     name = "print_test",
@@ -126,6 +174,61 @@ test_that("LeadAgent adds delegate_to_agent tool", {
 
   tools <- mock_chat$get_tools()
   expect_true("delegate_to_agent" %in% names(tools))
+})
+
+test_that("LeadAgent propagates context policy to sub-agents", {
+  directory <- withr::local_tempdir(pattern = "deputy-lead-context-")
+  policy <- ContextPolicy(
+    max_tokens = 8000,
+    compact_to = 0.25,
+    fallback = "text",
+    max_tool_result_bytes = 1024,
+    offload_dir = directory
+  )
+  definition <- agent_definition(
+    name = "helper",
+    description = "A helper agent",
+    prompt = "You help with tasks"
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(definition),
+    context_policy = policy
+  )
+
+  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+
+  expect_identical(lead$context_policy, policy)
+  expect_identical(child$context_policy, policy)
+})
+
+test_that("LeadAgent clones bind delegation to the cloned registry", {
+  original_definition <- agent_definition(
+    name = "original",
+    description = "Original helper",
+    prompt = "You help with original tasks"
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(original_definition)
+  )
+  cloned <- lead$clone()
+  clone_definition <- agent_definition(
+    name = "clone_only",
+    description = "Clone-only helper",
+    prompt = "You help with cloned tasks"
+  )
+
+  cloned$register_sub_agent(clone_definition)
+
+  expect_error(
+    cloned$get_tools()[["delegate_to_agent"]]("missing", "Do something"),
+    "original.*clone_only|clone_only.*original"
+  )
+  expect_error(
+    lead$get_tools()[["delegate_to_agent"]]("missing", "Do something"),
+    "Available agents: original$"
+  )
 })
 
 test_that("LeadAgent validates sub_agents", {
@@ -588,7 +691,7 @@ test_that("sub-agents inherit remaining lead run budgets", {
     max_total_tokens = 700,
     max_cost_usd = 0.30
   )
-  private$current_usage_baseline <- agent_usage_snapshot(lead$chat)
+  private$current_usage_baseline <- lead$usage()
   private$current_external_usage <- AgentUsage(
     requests = 2,
     tool_calls = 1,
@@ -604,6 +707,20 @@ test_that("sub-agents inherit remaining lead run budgets", {
   expect_identical(child$usage_limits$max_tool_calls, 3L)
   expect_equal(child$usage_limits$max_total_tokens, 550)
   expect_equal(child$usage_limits$max_cost_usd, 0.20)
+
+  private$reserve_delegation_usage("delegation-one", child$usage_limits)
+  sibling_limits <- private$derive_subagent_usage_limits(definition)
+  expect_identical(sibling_limits$max_requests, 1L)
+  expect_identical(sibling_limits$max_tool_calls, 0L)
+  expect_identical(sibling_limits$max_total_tokens, 0L)
+  expect_identical(sibling_limits$max_cost_usd, 0)
+  private$release_delegation_usage("delegation-one")
+
+  restored_limits <- private$derive_subagent_usage_limits(definition)
+  expect_identical(restored_limits$max_requests, 3L)
+  expect_identical(restored_limits$max_tool_calls, 3L)
+  expect_identical(restored_limits$max_total_tokens, 550L)
+  expect_equal(restored_limits$max_cost_usd, 0.20)
 
   private$current_stream_controller <- NULL
   private$add_external_usage(AgentUsage(requests = 1))
@@ -765,8 +882,7 @@ test_that("LeadAgent with no sub-agents is valid", {
   expect_equal(length(lead$available_sub_agents()), 0)
 })
 
-test_that("LeadAgent duplicate sub-agent names allowed", {
-  # Not validated - this is a user mistake but doesn't crash
+test_that("LeadAgent rejects duplicate normalized routing keys", {
   mock_chat <- create_mock_chat()
 
   agent1 <- agent_definition(
@@ -775,20 +891,68 @@ test_that("LeadAgent duplicate sub-agent names allowed", {
     prompt = "Prompt 1"
   )
   agent2 <- agent_definition(
-    name = "duplicate",
+    name = "DUPLICATE",
     description = "Second agent with same name",
     prompt = "Prompt 2"
   )
 
-  lead <- LeadAgent$new(
-    chat = mock_chat,
-    sub_agents = list(agent1, agent2)
+  condition <- rlang::catch_cnd(
+    LeadAgent$new(
+      chat = mock_chat,
+      sub_agents = list(agent1, agent2)
+    )
   )
 
-  available <- lead$available_sub_agents()
-  # Both are in the list (though this could cause confusion)
-  expect_equal(length(available), 2)
-  expect_true(all(available == "duplicate"))
+  expect_s3_class(condition, "error")
+  expect_match(conditionMessage(condition), "Duplicate", fixed = TRUE)
+  expect_match(conditionMessage(condition), "duplicate", fixed = TRUE)
+})
+
+test_that("LeadAgent registry is a read-only snapshot", {
+  definition <- agent_definition(
+    name = "helper",
+    description = "Helps with tasks",
+    prompt = "Help"
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(definition)
+  )
+
+  snapshot <- lead$sub_agent_defs
+  snapshot[[1]]$name <- "changed"
+  definition$name <- "also-changed"
+
+  expect_identical(lead$available_sub_agents(), "helper")
+  expect_identical(lead$sub_agent_defs[[1]]$name, "helper")
+
+  condition <- rlang::catch_cnd({
+    lead$sub_agent_defs <- list()
+  })
+  expect_s3_class(condition, "error")
+  expect_match(conditionMessage(condition), "read-only", fixed = TRUE)
+})
+
+test_that("LeadAgent rejects duplicate registration", {
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(agent_definition(
+      name = "helper",
+      description = "Helps",
+      prompt = "Help"
+    ))
+  )
+
+  duplicate <- agent_definition(
+    name = "HELPER",
+    description = "Also helps",
+    prompt = "Help again"
+  )
+  condition <- rlang::catch_cnd(lead$register_sub_agent(duplicate))
+
+  expect_s3_class(condition, "error")
+  expect_match(conditionMessage(condition), "already registered", fixed = TRUE)
+  expect_identical(lead$available_sub_agents(), "helper")
 })
 
 test_that("LeadAgent registers additional tools", {
@@ -902,6 +1066,83 @@ test_that("LeadAgent register_sub_agent updates system prompt", {
   prompt_after <- mock_chat$get_system_prompt()
   expect_true(grepl("new_helper", prompt_after))
   expect_true(grepl("newly added helper", prompt_after))
+})
+
+test_that("register_sub_agent preserves prompt content outside routing", {
+  chat <- create_mock_chat()
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  lead <- LeadAgent$new(
+    chat = chat,
+    sub_agents = list(agent_definition(
+      name = "first",
+      description = "First helper",
+      prompt = "You are the first helper"
+    )),
+    system_prompt = "Base prompt"
+  )
+  lead$compact(keep_last = 1L, summary = "Retained lead summary")
+  lead$.__enclos_env__$private$append_hook_context("Retained hook context")
+
+  lead$register_sub_agent(agent_definition(
+    name = "second",
+    description = "Second helper",
+    prompt = "You are the second helper"
+  ))
+
+  prompt <- lead$get_system_prompt()
+  expect_match(prompt, "Retained lead summary", fixed = TRUE)
+  expect_match(prompt, "Retained hook context", fixed = TRUE)
+  expect_match(prompt, "second", fixed = TRUE)
+  expect_length(
+    gregexpr("# Available Sub-Agents", prompt, fixed = TRUE)[[1L]],
+    1L
+  )
+})
+
+test_that("register_sub_agent ignores user-authored routing headings", {
+  user_section <- paste(
+    "Base prompt",
+    "# Available Sub-Agents",
+    "These headings are user-authored instructions.",
+    "# End Available Sub-Agents",
+    sep = "\n"
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(agent_definition(
+      name = "first",
+      description = "First generated helper",
+      prompt = "Act as the first helper"
+    )),
+    system_prompt = user_section
+  )
+
+  lead$register_sub_agent(agent_definition(
+    name = "second",
+    description = "Second generated helper",
+    prompt = "Act as the second helper"
+  ))
+
+  prompt <- lead$get_system_prompt()
+  expect_match(prompt, "user-authored instructions", fixed = TRUE)
+  expect_match(prompt, "First generated helper", fixed = TRUE)
+  expect_match(prompt, "Second generated helper", fixed = TRUE)
+  expect_length(
+    gregexpr("# Available Sub-Agents", prompt, fixed = TRUE)[[1L]],
+    2L
+  )
+  expect_length(
+    gregexpr(
+      "<!-- deputy-lead-routing:v1:start -->",
+      prompt,
+      fixed = TRUE
+    )[[1L]],
+    1L
+  )
 })
 
 test_that("agent_definition accepts all parameter types", {
@@ -1054,7 +1295,7 @@ test_that("SubagentStop hook fires after successful delegation", {
   tools <- mock_chat$get_tools()
   delegate_tool <- tools[["delegate_to_agent"]]
 
-  result <- delegate_tool("helper", "Do a task")
+  result <- resolve_async_value(delegate_tool("helper", "Do a task"))
 
   # Verify hook was fired with correct arguments
 
@@ -1105,9 +1346,13 @@ test_that("delegation executes sub-agent and returns result", {
   tools <- mock_chat$get_tools()
   delegate_tool <- tools[["delegate_to_agent"]]
 
-  result <- delegate_tool("worker", "Complete the task")
+  result <- resolve_async_value(delegate_tool("worker", "Complete the task"))
 
   expect_equal(result, "Task completed successfully")
+  expect_length(
+    lead$.__enclos_env__$private$delegation_usage_reservations,
+    0L
+  )
 })
 
 test_that("delegation passes permissions to sub-agent", {
@@ -1159,7 +1404,7 @@ test_that("delegation passes permissions to sub-agent", {
   tools <- mock_chat$get_tools()
   delegate_tool <- tools[["delegate_to_agent"]]
 
-  result <- delegate_tool("sub", "Read something")
+  result <- resolve_async_value(delegate_tool("sub", "Read something"))
   expect_equal(result, "Done")
 })
 
@@ -1197,8 +1442,14 @@ test_that("delegation handles sub-agent execution failure", {
 
   # Should throw an error from tool_reject
   expect_error(
-    suppressWarnings(delegate_tool("failer", "Do something")),
+    suppressWarnings(resolve_async_value(
+      delegate_tool("failer", "Do something")
+    )),
     "Sub-agent 'failer' failed"
+  )
+  expect_length(
+    lead$.__enclos_env__$private$delegation_usage_reservations,
+    0L
   )
 })
 
@@ -1249,7 +1500,7 @@ test_that("SubagentStop hook receives working_dir in context", {
 
   tools <- mock_chat$get_tools()
   delegate_tool <- tools[["delegate_to_agent"]]
-  delegate_tool("helper", "Help me")
+  resolve_async_value(delegate_tool("helper", "Help me"))
 
   expect_equal(
     captured_context$working_dir,

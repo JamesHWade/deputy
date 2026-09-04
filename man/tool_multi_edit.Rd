@@ -14,6 +14,20 @@ tool_multi_edit(path, edits)
 
 \item{edits}{List or JSON string of edit operations (tool argument)}
 }
+\value{
+When called directly, a character status message describing the
+edits and total replacement count.
+}
 \description{
 Apply a sequence of exact-match text replacements to a file.
+}
+\examples{
+path <- tempfile(fileext = ".txt")
+writeLines(c("alpha", "beta"), path)
+tool_multi_edit(
+  path,
+  list(list(old_text = "alpha", new_text = "gamma"))
+)
+unlink(path)
+
 }

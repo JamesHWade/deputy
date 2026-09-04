@@ -35,7 +35,8 @@
 #'
 #' Callback signature: `function(reason, context)`
 #' - `reason`: Why the agent stopped (for example `"complete"`,
-#'   `"request_limit"`, `"cost_limit"`, or `"provider_error"`)
+#'   `"request_limit"`, `"cost_limit"`, `"cost_unavailable"`, `"tool_loop"`,
+#'   or `"provider_error"`)
 #' - `context`: Common correlation fields plus `usage` and `cost`; native
 #'   `run()` also includes `total_turns`
 #' - Return: NULL (informational only)
@@ -83,11 +84,18 @@
 #'
 #' **PreCompact** - Before conversation compaction
 #'
-#' Callback signature: `function(turns_to_compact, turns_to_keep, context)`
+#' Hook signature: `function(turns_to_compact, turns_to_keep, context)`
 #' - `turns_to_compact`: List of turns that will be compacted into a summary
 #' - `turns_to_keep`: List of recent turns that will be preserved
 #' - `context`: Common correlation fields plus `total_turns` and `compact_count`
 #' - Return: [HookResultPreCompact()] to allow/cancel or provide custom summary
+#'
+#' **PostCompact** - After conversation compaction
+#'
+#' Hook signature: `function(result, context)`
+#' - `result`: The `DeputyCompaction` outcome, including method and usage
+#' - `context`: Common correlation fields plus `compact_count` and `automatic`
+#' - Return: NULL (informational only)
 #'
 #' **SessionStart** - When an agent session begins
 #'
@@ -100,7 +108,8 @@
 #'
 #' Callback signature: `function(reason, context)`
 #' - `reason`: Why the agent stopped (for example `"complete"`,
-#'   `"request_limit"`, `"cost_limit"`, or `"hook_requested_stop"`)
+#'   `"request_limit"`, `"cost_unavailable"`, `"tool_loop"`, or
+#'   `"hook_requested_stop"`)
 #' - `context`: Common correlation fields plus `usage` and `cost`; native
 #'   `run()` also includes `total_turns`
 #' - Return: NULL (informational only)
@@ -123,6 +132,7 @@
 #' - `total_turns`: (native Stop, PreCompact, native SessionEnd) Conversation turns
 #' - `cost`: (Stop, SessionEnd) List with `input`, `output`, `cached`, and `total`
 #' - `compact_count`: (PreCompact only) Number of turns being compacted
+#' - `automatic`: (PostCompact only) Whether the run kernel triggered compaction
 #' - `level`: (Notification only) Informational severity such as `"info"` or `"warning"`
 #' - `code`: (Notification only) Stable notification code when available
 #' - `permissions`: (SessionStart only) The agent's permissions configuration
@@ -166,6 +176,7 @@ HookEvent <- c(
   "PermissionRequest",
   "ConfigChange",
   "PreCompact",
+  "PostCompact",
 
   "SessionStart",
   "SessionEnd"

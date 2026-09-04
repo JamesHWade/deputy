@@ -6,7 +6,7 @@ test_that("permissions_standard creates valid permissions", {
   expect_s3_class(perms, "Permissions")
   expect_equal(perms$mode, "standard")
   expect_true(perms$file_read)
-  expect_true(perms$r_code)
+  expect_false(perms$r_code)
   expect_false(perms$bash)
 })
 
@@ -44,6 +44,25 @@ test_that("permission check blocks bash by default", {
   result <- perms$check("run_bash", list(command = "ls"), context)
   expect_s3_class(result, "PermissionResultDeny")
   expect_true(grepl("not allowed", result$reason))
+})
+
+test_that("permission check blocks unrestricted R code by default", {
+  perms <- permissions_standard()
+
+  result <- perms$check("run_r_code", list(code = "1 + 1"), list())
+
+  expect_s3_class(result, "PermissionResultDeny")
+  expect_match(result$reason, "not allowed")
+})
+
+test_that("partial direct policies block unrestricted R code by default", {
+  perms <- Permissions$new(web = TRUE)
+
+  result <- perms$check("run_r_code", list(code = "1 + 1"), list())
+
+  expect_false(perms$r_code)
+  expect_s3_class(result, "PermissionResultDeny")
+  expect_match(result$reason, "not allowed")
 })
 
 test_that("permission check blocks writes outside working_dir", {

@@ -95,6 +95,22 @@ create_mock_turn_with_tool_request <- function(
   )
 }
 
+as_mock_async_stream <- function(stream) {
+  coro::async_generator(function() {
+    if (!is.function(stream)) {
+      coro::yield(stream)
+      return()
+    }
+    repeat {
+      chunk <- stream()
+      if (coro::is_exhausted(chunk)) {
+        break
+      }
+      coro::yield(chunk)
+    }
+  })()
+}
+
 # Helper to create a mock Chat object for testing
 # This avoids the need for real API calls
 create_mock_chat <- function(responses = list("Hello!")) {
@@ -107,91 +123,120 @@ create_mock_chat <- function(responses = list("Hello!")) {
   provider <- create_mock_provider()
 
   # Create a simple mock that behaves like ellmer's Chat
-  structure(
-    list(
-      chat = function(prompt = NULL) {
-        response_idx <<- response_idx + 1
-        if (response_idx > length(responses)) {
-          response_idx <<- length(responses)
-        }
-        responses[[response_idx]]
-      },
-      stream = function(prompt = NULL) {
-        response_idx <<- response_idx + 1
-        if (response_idx > length(responses)) {
-          response_idx <<- length(responses)
-        }
-        # Return an iterator that yields strings (agent expects strings, not ContentText)
-        text <- responses[[response_idx]]
-        yielded <- FALSE
-        function() {
-          if (yielded) {
-            return(coro::exhausted())
+  chat <- structure(
+    list2env(
+      list(
+        chat = function(prompt = NULL) {
+          response_idx <<- response_idx + 1
+          if (response_idx > length(responses)) {
+            response_idx <<- length(responses)
           }
-          yielded <<- TRUE
-          text
-        }
-      },
-      get_turns = function() turns,
-      set_turns = function(new_turns) turns <<- new_turns,
-      get_system_prompt = function() system_prompt,
-      set_system_prompt = function(prompt) system_prompt <<- prompt,
-      get_tools = function() tools,
-      set_tools = function(new_tools) tools <<- new_tools,
-      register_tool = function(tool) {
-        tools[[tool@name]] <<- tool
-      },
-      register_tools = function(tool_list) {
-        for (tool in tool_list) {
+          responses[[response_idx]]
+        },
+        stream = function(prompt = NULL) {
+          response_idx <<- response_idx + 1
+          if (response_idx > length(responses)) {
+            response_idx <<- length(responses)
+          }
+          # Return an iterator that yields strings (agent expects strings, not ContentText)
+          text <- responses[[response_idx]]
+          yielded <- FALSE
+          function() {
+            if (yielded) {
+              return(coro::exhausted())
+            }
+            yielded <<- TRUE
+            text
+          }
+        },
+        get_turns = function() turns,
+        set_turns = function(new_turns) turns <<- new_turns,
+        get_system_prompt = function() system_prompt,
+        set_system_prompt = function(prompt) system_prompt <<- prompt,
+        get_tools = function() tools,
+        set_tools = function(new_tools) tools <<- new_tools,
+        register_tool = function(tool) {
           tools[[tool@name]] <<- tool
+        },
+        register_tools = function(tool_list) {
+          for (tool in tool_list) {
+            tools[[tool@name]] <<- tool
+          }
+        },
+        get_tokens = function() {
+          data.frame(
+            input = 100,
+            output = 50,
+            cached_input = 0,
+            cost = 0.001
+          )
+        },
+        get_provider = function() {
+          provider
+        },
+        get_model = function() mock_provider_model(provider),
+        last_turn = function(role = "assistant") {
+          # Return a proper S7 AssistantTurn
+          text <- responses[[min(response_idx, length(responses))]]
+          create_mock_assistant_turn(text = text)
+        },
+        on_tool_request = function(callback) {
+          tool_request_callback <<- callback
+        },
+        on_tool_result = function(callback) {
+          tool_result_callback <<- callback
+        },
+        clone = function(deep = FALSE) {
+          cloned <- create_mock_chat(responses = responses)
+          cloned$set_turns(turns)
+          cloned$set_system_prompt(system_prompt)
+          if (length(tools) > 0) {
+            cloned$register_tools(unname(tools))
+          }
+          cloned
         }
-      },
-      get_tokens = function() {
-        data.frame(
-          input = 100,
-          output = 50,
-          cached_input = 0,
-          cost = 0.001
-        )
-      },
-      get_provider = function() {
-        provider
-      },
-      get_model = function() mock_provider_model(provider),
-      last_turn = function(role = "assistant") {
-        # Return a proper S7 AssistantTurn
-        text <- responses[[min(response_idx, length(responses))]]
-        create_mock_assistant_turn(text = text)
-      },
-      on_tool_request = function(callback) {
-        tool_request_callback <<- callback
-      },
-      on_tool_result = function(callback) {
-        tool_result_callback <<- callback
-      },
-      clone = function(deep = FALSE) {
-        cloned <- create_mock_chat(responses = responses)
-        cloned$set_turns(turns)
-        cloned$set_system_prompt(system_prompt)
-        if (length(tools) > 0) {
-          cloned$register_tools(unname(tools))
-        }
-        cloned
-      }
+      ),
+      parent = emptyenv()
     ),
     class = "Chat"
   )
+  chat$stream_async <- function(
+    prompt = NULL,
+    tool_mode = c("concurrent", "sequential"),
+    stream = c("text", "content"),
+    controller = NULL
+  ) {
+    stream_args <- list(prompt)
+    stream_formals <- names(formals(chat$stream))
+    if ("stream" %in% stream_formals) {
+      stream_args$stream <- match.arg(stream)
+    }
+    if ("controller" %in% stream_formals && !is.null(controller)) {
+      stream_args$controller <- controller
+    }
+    as_mock_async_stream(do.call(chat$stream, stream_args))
+  }
+  chat
 }
 
 create_mock_callback_manager <- function(callbacks = list()) {
   state <- new.env(parent = emptyenv())
-  state$callbacks <- callbacks
+  state$callbacks <- stats::setNames(
+    callbacks,
+    as.character(seq_along(callbacks))
+  )
+  state$next_id <- length(callbacks) + 1L
 
   structure(
     list(
       add = function(callback) {
-        state$callbacks <- c(state$callbacks, list(callback))
-        invisible(NULL)
+        id <- as.character(state$next_id)
+        state$next_id <- state$next_id + 1L
+        state$callbacks[[id]] <- callback
+        invisible(function() {
+          state$callbacks[[id]] <- NULL
+          invisible(NULL)
+        })
       },
       clear = function() {
         state$callbacks <- list()

@@ -12,18 +12,22 @@ tool_run_r_code(code)
 \arguments{
 \item{code}{R code to execute (tool argument)}
 }
+\value{
+When called directly, a character string containing captured output
+and the returned value.
+}
 \description{
-A tool that executes R code and returns the result. By default, runs in
-a separate process for safety (requires the callr package).
+A tool that executes R code and returns the result. It runs in a separate
+process for fault isolation and timeout enforcement (requires callr).
 }
 \details{
 This tool intentionally uses R's code evaluation capabilities to execute
 arbitrary R code provided by the LLM. This is a core feature for agentic
 workflows where the agent needs to perform data analysis or other R tasks.
 
-For safety:
+The execution boundary is explicit:
 \itemize{
-\item By default, code runs in a sandboxed subprocess via callr
+\item Code runs in a separate callr subprocess, not an OS security sandbox
 \item A timeout prevents runaway execution
 \item The Permissions system can disable this tool entirely
 }

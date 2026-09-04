@@ -26,12 +26,15 @@ deputy/
 │   ├── agent.R             # Agent class - main agentic workflow engine
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
+│   ├── run-usage.R         # Run accounting and fail-closed limits
+│   ├── stall-detection.R   # Canonical repeated-tool progress signal
 │   ├── permissions.R       # Permission system and tool annotations
 │   ├── hooks.R             # HookRegistry for lifecycle events
 │   ├── skills.R            # Skill loading system
 │   ├── tools-builtin.R     # Built-in tools (read_file, write_file, etc.)
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
+│   ├── tools-mcp.R         # MCP discovery and sandboxed mcp-repl boundary
 │   ├── errors.R            # Custom error hierarchy
 │   └── utils.R             # Internal utilities
 ├── tests/testthat/         # Unit tests (testthat edition 3)
@@ -62,9 +65,8 @@ The repository includes a SessionStart hook (`.claude/setup-r.sh`) that automati
 # Install dependencies
 Rscript -e "devtools::install_deps(dependencies = TRUE)"
 
-# deputy tracks the DEVELOPMENT versions of ellmer and shinychat, not CRAN.
-# Install them from GitHub or you will be working against an older API.
-Rscript -e "pak::pak(c('tidyverse/ellmer', 'posit-dev/shinychat'))"
+# Install the released dependency set used by CRAN and CI.
+Rscript -e "pak::pak()"
 
 # Load package for development
 Rscript -e "devtools::load_all()"
@@ -126,10 +128,10 @@ deputy stays on `0.0.0.9xxx` until it is ready for CRAN.
 
 ### Upstream dependencies
 
-deputy develops against the **development** versions of ellmer and shinychat,
-not their CRAN releases — see `dev/adr/0004-track-upstream-development-versions.md`.
-Install them from GitHub before working on the package. An upstream break is
-something to absorb promptly and report upstream, not to work around locally.
+deputy's primary compatibility target is the released dependency set available
+from CRAN; see `dev/adr/0004-track-upstream-development-versions.md`. Test
+upstream development versions in focused compatibility work before raising a
+minimum version or adopting an unreleased API.
 
 ## Code Conventions
 
@@ -258,11 +260,26 @@ Permissions configured at construction are an immutable authority ceiling.
 `Agent$set_permission_mode()` may keep or narrow a policy but cannot widen it;
 delegated agents are bounded by the same rule and by their lead's restrictions.
 
+### AgentDefinition Routing
+
+`agent_definition()` canonicalizes names to lowercase routing keys. A
+`LeadAgent` keeps definitions in a private, uniquely keyed registry;
+`sub_agent_defs` is a read-only snapshot, and new definitions must go through
+`register_sub_agent()` so the registry and lead prompt stay synchronized.
+
+### Human Input
+
+Concurrent and hosted Agents bind their own handler with
+`tools_interactive(callback, context)`. The context carries stable routing
+values and may be resolved lazily. `set_ask_user_callback()` is only a legacy
+process-wide fallback for single-Agent scripts; do not use it for Shiny or
+other concurrent hosts.
+
 ### Tool Presets
 
 - `tools_preset("minimal")` - read_file, list_files
-- `tools_preset("standard")` - + write_file, run_r_code
-- `tools_preset("dev")` - + run_bash
+- `tools_preset("standard")` - + write_file; no code execution
+- `tools_preset("dev")` - + trusted run_r_code and run_bash
 - `tools_preset("data")` - read_file, list_files, read_csv, run_r_code
 - `tools_preset("full")` - all built-in tools
 
@@ -296,7 +313,9 @@ delegated agents are bounded by the same rule and by their lead's restrictions.
 - `coro` - Coroutines for streaming
 - `digest` - Hashing
 - `Rapp` (>= 0.4.0) - CLI framework
-- `callr` - Subprocess isolation for the standard CLI tool preset
+- `callr` - Fault isolation and timeouts for explicitly trusted R code
+- `mcp-repl` (optional, through mcptools) - OS-sandboxed model-generated R;
+  `tools_mcp_repl()` verifies an explicit fail-closed policy before loading it
 
 **Development** (in Suggests):
 - `testthat` (>= 3.0.0) - Testing

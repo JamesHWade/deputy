@@ -91,9 +91,8 @@ test_that("format_cost formats correctly", {
   expect_equal(format_cost(0.0123), "$0.0123")
   expect_equal(format_cost(1.5), "$1.5000")
 
-  # NULL/NA handling
-  expect_equal(format_cost(NULL), "$0.00")
-  expect_equal(format_cost(NA), "$0.00")
+  expect_equal(format_cost(NULL), "unknown")
+  expect_equal(format_cost(NA), "unknown")
 })
 
 # Symlink and path security tests

@@ -180,6 +180,41 @@ test_that("sequential runs do not leak per-run context", {
   expect_null(agent$.__enclos_env__$private$event_correlation()$run_id)
 })
 
+test_that("drop-in Chat streams accept per-run product context", {
+  chat <- create_mock_chat("context response")
+  agent <- Agent$new(
+    chat = chat,
+    run_context = list(product = "tempest", session = "research-1")
+  )
+
+  methods <- c(
+    "chat",
+    "chat_async",
+    "chat_structured",
+    "chat_structured_async",
+    "stream",
+    "stream_async"
+  )
+  for (method in methods) {
+    expect_true("run_context" %in% names(formals(agent[[method]])))
+  }
+
+  stream <- agent$stream_async(
+    "Research",
+    run_context = list(stage = "dialogue", completion = "completion-1")
+  )
+  expect_equal(collect_async_stream(stream), list("context response"))
+  expect_identical(
+    agent$last_run()$run_context,
+    list(
+      completion = "completion-1",
+      product = "tempest",
+      session = "research-1",
+      stage = "dialogue"
+    )
+  )
+})
+
 test_that("lazy generators retain their intended run contexts", {
   agent <- Agent$new(
     chat = create_mock_chat(c("first", "second")),
@@ -408,7 +443,7 @@ test_that("manual save and load preserve run context", {
     product = "tempest",
     research_run_id = "research-123"
   )
-  expect_identical(payload$schema_version, 1L)
+  expect_identical(payload$schema_version, 2L)
   expect_identical(payload$run_context, expected)
 
   restored_chat <- create_mock_chat()
@@ -474,7 +509,7 @@ test_that("unsupported session schemas are rejected", {
     suppressMessages(agent$load_session(path)),
     class = "deputy_session_load"
   )
-  expect_length(agent$chat$get_turns(), 0L)
+  expect_length(agent$get_turns(), 0L)
 })
 
 test_that("unsafe restored context is rejected before conversation mutation", {
@@ -501,13 +536,15 @@ test_that("unsafe restored context is rejected before conversation mutation", {
     path <- file.path(root, paste0(case_name, ".rds"))
     saveRDS(
       list(
-        schema_version = 1L,
+        schema_version = 2L,
         turns = unsafe_turns,
         system_prompt = "Unsafe prompt",
+        compaction_summary = NULL,
+        tool_result_envelopes = list(),
         run_context = case$context,
         appended_hook_context_hashes = character(),
         file_checkpoint_state = NULL,
-        metadata = list()
+        metadata = list(session_id = paste0("unsafe-", case_name))
       ),
       path
     )

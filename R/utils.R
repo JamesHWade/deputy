@@ -495,7 +495,7 @@ secure_read_file <- function(path, allowed_dir = NULL) {
 #' @noRd
 format_cost <- function(cost) {
   if (is.null(cost) || is.na(cost)) {
-    return("$0.00")
+    return("unknown")
   }
   sprintf("$%.4f", cost)
 }
@@ -531,24 +531,6 @@ get_tool_annotation <- function(tool, annotation, default = NULL) {
   annotations[[annotation]] %||% default
 }
 
-#' Check if a tool is read-only based on annotations
-#'
-#' @param tool A tool definition
-#' @return Logical indicating if tool is read-only
-#' @noRd
-is_tool_readonly <- function(tool) {
-  get_tool_annotation(tool, "read_only_hint", default = FALSE)
-}
-
-#' Check if a tool is destructive based on annotations
-#'
-#' @param tool A tool definition
-#' @return Logical indicating if tool is destructive
-#' @noRd
-is_tool_destructive <- function(tool) {
-  get_tool_annotation(tool, "destructive_hint", default = FALSE)
-}
-
 #' Truncate a string to a maximum length
 #'
 #' @param x String to truncate
@@ -577,20 +559,6 @@ validate_chat <- function(x, arg_name = "chat") {
     ))
   }
   invisible(x)
-}
-
-#' Safe list access with default
-#'
-#' @param x List to access
-#' @param name Name of element
-#' @param default Default value if not found
-#' @return The element or default
-#' @noRd
-list_get <- function(x, name, default = NULL) {
-  if (is.null(x) || !name %in% names(x)) {
-    return(default)
-  }
-  x[[name]]
 }
 
 #' Parse Markdown frontmatter

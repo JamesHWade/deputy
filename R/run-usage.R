@@ -26,12 +26,16 @@
 #'   reported separately and is not counted twice. `NULL` leaves the field
 #'   unset.
 #' @param max_cost_usd Maximum provider-reported estimated cost in US dollars.
-#'   `NULL` leaves the field unset.
+#'   `NULL` leaves the field unset. If configured, missing provider cost data
+#'   stops the run with `"cost_unavailable"` rather than undercounting.
 #' @param on_exceed What to do when a limit is exceeded. `"stop"` returns an
 #'   [AgentResult] with a typed stop reason; `"error"` emits the final usage
 #'   event and then signals a structured Deputy limit error.
 #'
 #' @return A `UsageLimits` object.
+#' @examples
+#' UsageLimits(max_requests = 5, max_tool_calls = 10)
+#' UsageLimits(max_cost_usd = 0.25, on_exceed = "error")
 #' @export
 UsageLimits <- function(
   max_requests = NULL,
@@ -106,9 +110,18 @@ print.UsageLimits <- function(x, ...) {
 #' @param output_tokens Provider-reported output tokens.
 #' @param cached_tokens Provider-reported cached input tokens. These are
 #'   reported separately and are not added again to `total_tokens`.
-#' @param cost_usd Provider-reported estimated cost in US dollars.
+#' @param cost_usd Provider-reported estimated cost in US dollars, or `NA_real_`
+#'   when the provider did not report complete cost information.
 #'
 #' @return An `AgentUsage` object.
+#' @examples
+#' AgentUsage(
+#'   requests = 2,
+#'   tool_calls = 1,
+#'   input_tokens = 120,
+#'   output_tokens = 30,
+#'   cost_usd = 0.002
+#' )
 #' @export
 AgentUsage <- function(
   requests = 0L,
@@ -130,7 +143,11 @@ AgentUsage <- function(
     cached_tokens,
     "cached_tokens"
   )
-  cost_usd <- validate_agent_usage_value(cost_usd, "cost_usd")
+  cost_usd <- validate_agent_usage_value(
+    cost_usd,
+    "cost_usd",
+    allow_unknown = TRUE
+  )
 
   structure(
     list(
@@ -146,12 +163,88 @@ AgentUsage <- function(
   )
 }
 
-validate_agent_usage_value <- function(value, name, integer = FALSE) {
+validate_agent_usage_value <- function(
+  value,
+  name,
+  integer = FALSE,
+  allow_unknown = FALSE
+) {
+  if (
+    isTRUE(allow_unknown) &&
+      is.numeric(value) &&
+      length(value) == 1L &&
+      is.na(value)
+  ) {
+    return(NA_real_)
+  }
   value <- validate_usage_limit(value, name, integer = integer)
   if (is.null(value)) {
     cli::cli_abort("{.arg {name}} must be a non-negative number")
   }
   value
+}
+
+provider_cost_summary <- function(tokens, expected_records = NULL) {
+  records <- if (is.null(tokens)) 0L else NROW(tokens)
+  expected_records <- expected_records %||% records
+
+  costs <- if (records == 0L) {
+    numeric()
+  } else if (!"cost" %in% names(tokens)) {
+    rep(NA_real_, records)
+  } else {
+    suppressWarnings(as.numeric(tokens[["cost"]]))
+  }
+  if (length(costs) < expected_records) {
+    costs <- c(costs, rep(NA_real_, expected_records - length(costs)))
+  }
+  unavailable <- is.na(costs) | !is.finite(costs)
+  missing <- sum(unavailable)
+  if (missing > 0L) {
+    return(list(
+      total = NA_real_,
+      complete = FALSE,
+      missing = as.integer(missing)
+    ))
+  }
+
+  list(total = sum(costs), complete = TRUE, missing = 0L)
+}
+
+provider_usage_summary <- function(chat) {
+  turns <- tryCatch(chat$get_turns(), error = function(e) list())
+  requests <- sum(vapply(
+    turns,
+    inherits,
+    logical(1),
+    what = "ellmer::AssistantTurn"
+  ))
+  tokens <- tryCatch(chat$get_tokens(), error = function(e) NULL)
+  token_sum <- function(name) {
+    if (is.null(tokens) || !name %in% names(tokens)) {
+      return(0)
+    }
+    sum(as.numeric(tokens[[name]]), na.rm = TRUE)
+  }
+  cost <- provider_cost_summary(tokens, expected_records = requests)
+  cost_records <- if (is.null(tokens) || NROW(tokens) == 0L) {
+    numeric()
+  } else if (!"cost" %in% names(tokens)) {
+    rep(NA_real_, NROW(tokens))
+  } else {
+    suppressWarnings(as.numeric(tokens[["cost"]]))
+  }
+
+  list(
+    requests = requests,
+    input = token_sum("input"),
+    output = token_sum("output"),
+    cached = token_sum("cached_input"),
+    total = cost$total,
+    complete = cost$complete,
+    missing = cost$missing,
+    cost_records = cost_records
+  )
 }
 
 #' @export
@@ -221,35 +314,78 @@ normalize_usage_limits <- function(limits) {
 }
 
 agent_usage_snapshot <- function(chat) {
-  turns <- tryCatch(chat$get_turns(), error = function(e) list())
-  requests <- sum(vapply(
-    turns,
-    inherits,
-    logical(1),
-    what = "ellmer::AssistantTurn"
-  ))
+  summary <- provider_usage_summary(chat)
 
-  tokens <- tryCatch(chat$get_tokens(), error = function(e) NULL)
-  token_sum <- function(name) {
-    if (is.null(tokens) || !name %in% names(tokens)) {
-      return(0)
+  usage <- AgentUsage(
+    requests = summary$requests,
+    input_tokens = summary$input,
+    output_tokens = summary$output,
+    cached_tokens = summary$cached,
+    cost_usd = summary$total
+  )
+  attr(usage, "provider_cost_records") <- summary$cost_records
+  attr(usage, "provider_usage_totals") <- unlist(
+    summary[c("input", "output", "cached")],
+    use.names = TRUE
+  )
+  usage
+}
+
+agent_usage_difference <- function(
+  current,
+  baseline,
+  tool_calls = 0L,
+  requests = NULL
+) {
+  non_negative <- function(value) {
+    if (is.na(value)) {
+      return(NA_real_)
     }
-    sum(as.numeric(tokens[[name]]), na.rm = TRUE)
+    max(0, value)
+  }
+  current_costs <- attr(current, "provider_cost_records", exact = TRUE)
+  baseline_costs <- attr(baseline, "provider_cost_records", exact = TRUE)
+  request_difference <- non_negative(current$requests - baseline$requests)
+  if (!is.null(requests)) {
+    request_difference <- max(request_difference, requests)
+  }
+  cost <- if (!is.null(current_costs) && !is.null(baseline_costs)) {
+    if (length(current_costs) < length(baseline_costs)) {
+      NA_real_
+    } else if (length(current_costs) > length(baseline_costs)) {
+      first <- length(baseline_costs) + 1L
+      added <- current_costs[first:length(current_costs)]
+      provider_cost_summary(
+        data.frame(cost = added),
+        expected_records = request_difference
+      )$total
+    } else {
+      current_totals <- attr(
+        current,
+        "provider_usage_totals",
+        exact = TRUE
+      )
+      baseline_totals <- attr(
+        baseline,
+        "provider_usage_totals",
+        exact = TRUE
+      )
+      provider_changed <- !identical(current_costs, baseline_costs) ||
+        !identical(current_totals, baseline_totals)
+      if (isTRUE(provider_changed)) {
+        non_negative(current$cost_usd - baseline$cost_usd)
+      } else if (request_difference == 0L) {
+        0
+      } else {
+        NA_real_
+      }
+    }
+  } else {
+    non_negative(current$cost_usd - baseline$cost_usd)
   }
 
   AgentUsage(
-    requests = requests,
-    input_tokens = token_sum("input"),
-    output_tokens = token_sum("output"),
-    cached_tokens = token_sum("cached_input"),
-    cost_usd = token_sum("cost")
-  )
-}
-
-agent_usage_difference <- function(current, baseline, tool_calls = 0L) {
-  non_negative <- function(value) max(0, value)
-  AgentUsage(
-    requests = non_negative(current$requests - baseline$requests),
+    requests = request_difference,
     tool_calls = tool_calls,
     input_tokens = non_negative(current$input_tokens - baseline$input_tokens),
     output_tokens = non_negative(
@@ -258,7 +394,7 @@ agent_usage_difference <- function(current, baseline, tool_calls = 0L) {
     cached_tokens = non_negative(
       current$cached_tokens - baseline$cached_tokens
     ),
-    cost_usd = non_negative(current$cost_usd - baseline$cost_usd)
+    cost_usd = cost
   )
 }
 
@@ -324,6 +460,12 @@ usage_limit_status <- function(usage, limits, require_followup = FALSE) {
     if (is.null(limit)) {
       next
     }
+    if (identical(check$field, "max_cost_usd") && is.na(check$actual)) {
+      check$reason <- "cost_unavailable"
+      check$label <- "estimated cost"
+      check$limit <- limit
+      return(check)
+    }
     exceeded <- check$actual > limit ||
       (isTRUE(check$reached) && check$actual >= limit)
     if (isTRUE(exceeded)) {
@@ -334,6 +476,12 @@ usage_limit_status <- function(usage, limits, require_followup = FALSE) {
 }
 
 usage_limit_message <- function(status) {
+  if (identical(status$reason, "cost_unavailable")) {
+    return(paste0(
+      "Run cost limit cannot be enforced because the provider did not ",
+      "report complete cost information."
+    ))
+  }
   paste0(
     "Run limit reached for ",
     status$label,

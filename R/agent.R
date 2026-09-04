@@ -86,6 +86,7 @@ clone_compaction_chat <- function(chat) {
 #'     invalidate later file history. Conversation history is not changed.}
 #' }
 #'
+#' @importFrom later run_now
 #' @export
 #'
 #' @examples
@@ -125,6 +126,8 @@ Agent <- R6::R6Class(
     #'   Defaults to [permissions_standard()].
     #' @param usage_limits [UsageLimits] applied independently to each run.
     #'   Defaults to 25 model requests. Use `UsageLimits()` for no limits.
+    #' @param context_policy A [ContextPolicy] controlling automatic compaction
+    #'   and durable offloading of large tool results.
     #' @param enable_file_checkpointing Whether to journal exact file preimages
     #'   for Deputy's mutating file tools. A checkpoint is created automatically
     #'   at the beginning of every run.
@@ -150,6 +153,7 @@ Agent <- R6::R6Class(
       system_prompt = NULL,
       permissions = NULL,
       usage_limits = UsageLimits(max_requests = 25),
+      context_policy = ContextPolicy(),
       enable_file_checkpointing = FALSE,
       file_checkpoint_max_file_bytes = 50 * 1024^2,
       file_checkpoint_max_journal_bytes = 250 * 1024^2,
@@ -192,6 +196,7 @@ Agent <- R6::R6Class(
       private$.chat <- chat
       private$.permissions <- permissions %||% permissions_standard(working_dir)
       private$.usage_limits <- normalize_usage_limits(usage_limits)
+      private$.context_policy <- normalize_context_policy(context_policy)
       private$.working_dir <- working_dir
       private$.hooks <- HookRegistry$new()
       private$.run_context <- normalize_run_context(run_context)
@@ -221,23 +226,37 @@ Agent <- R6::R6Class(
 
       # Override system prompt if provided
       if (!is.null(system_prompt)) {
-        self$chat$set_system_prompt(system_prompt)
+        private$.chat$set_system_prompt(system_prompt)
       }
 
-      # Register tools
+      # Rebind all tools to this Agent's runtime authority, including tools
+      # configured on the supplied Chat before Agent construction.
+      backend_tools <- private$.chat$get_tools()
+      if (length(backend_tools) > 0) {
+        private$.chat$set_tools(list())
+        self$register_tools(backend_tools)
+      }
       if (length(tools) > 0) {
-        self$chat$register_tools(tools)
+        self$register_tools(tools)
       }
 
       # Wire up ellmer's callbacks for permission/hook enforcement
-      self$chat$on_tool_request(private$on_tool_request)
-      self$chat$on_tool_result(private$on_tool_result)
+      private$.chat$on_tool_request(private$handle_tool_request)
+      private$.chat$on_tool_result(private$handle_tool_result)
+
+      # shinychat uses the ellmer Chat protocol structurally. Agent supplies
+      # that protocol while retaining ownership of the wrapped backend.
+      class(self) <- unique(c(class(self), "Chat"))
+      private$.r6_clone <- self$clone
+      rlang::env_binding_unlock(self, "clone")
+      self$clone <- private$clone_client
+      rlang::env_binding_lock(self, "clone")
 
       invisible(self)
     },
 
     #' @description
-    #' Run an agentic task with streaming output.
+    #' Run an agentic task with semantic streaming events.
     #'
     #' Returns a generator that yields [AgentEvent] objects as the agent works.
     #' The agent will continue until the task is complete, a run limit is
@@ -259,13 +278,9 @@ Agent <- R6::R6Class(
       output_format = NULL,
       run_context = list()
     ) {
-      if (isTRUE(private$run_active)) {
-        cli::cli_abort(
-          "This agent already has an active run",
-          class = c("deputy_run_active", "deputy_error")
-        )
+      if (!is.null(output_format)) {
+        task <- apply_output_format_instructions(task, output_format)
       }
-
       effective_run_context <- merge_run_context(
         private$.run_context,
         run_context
@@ -278,23 +293,16 @@ Agent <- R6::R6Class(
       }
       limits <- normalize_usage_limits(limits)
 
-      # Native file tools resolve relative paths through the process working
-      # directory. Wrap each generator step so provider callbacks and tool
-      # execution consistently observe this Agent's immutable workspace while
-      # leaving the caller's process working directory unchanged between
-      # yields.
-      run_owner <- new.env(parent = emptyenv())
-      run_owner$active_run_id <- NULL
-      run_owner$finished <- FALSE
-      generator <- private$create_run_generator(
-        task,
-        limits,
-        include_partial_messages = include_partial_messages,
-        output_format = output_format,
+      governed_run <- private$start_governed_stream(
+        messages = list(task),
+        limits = limits,
         run_context = effective_run_context,
-        run_owner = run_owner
+        stream = "content"
       )
-      private$wrap_generator_working_dir(generator, run_owner)
+      private$event_generator(
+        governed_run,
+        include_partial_messages = include_partial_messages
+      )
     },
 
     #' @description
@@ -319,9 +327,6 @@ Agent <- R6::R6Class(
       output_format = NULL,
       run_context = list()
     ) {
-      start_time <- Sys.time()
-
-      # Collect all events from the generator
       gen <- self$run(
         task = task,
         usage_limits = usage_limits,
@@ -329,10 +334,6 @@ Agent <- R6::R6Class(
         output_format = output_format,
         run_context = run_context
       )
-      events <- list()
-
-      # Iterate through the generator
-      # Note: coro generators return coro::exhausted() when done, not NULL
       repeat {
         event <- tryCatch(
           gen(),
@@ -350,87 +351,446 @@ Agent <- R6::R6Class(
         if (coro::is_exhausted(event)) {
           break
         }
-
-        events <- c(events, list(event))
-
-        # Also break on stop event to avoid extra generator call
-        if (inherits(event, "AgentEvent") && event$type == "stop") {
-          break
-        }
       }
 
-      # Find the stop event for metadata
-      stop_event <- Find(function(e) e$type == "stop", events)
-
-      duration <- as.numeric(Sys.time() - start_time, units = "secs")
-
-      complete_events <- Filter(
-        function(event) identical(event$type, "text_complete"),
-        events
-      )
-      if (length(complete_events) > 0L) {
-        run_response <- complete_events[[length(complete_events)]]$text
-      } else {
-        text_events <- Filter(
-          function(event) identical(event$type, "text"),
-          events
-        )
-        run_response <- if (length(text_events) > 0L) {
-          paste(
-            vapply(text_events, function(event) event$text, character(1)),
-            collapse = ""
-          )
-        } else {
-          NULL
-        }
+      result <- private$.last_run_result
+      if (is.null(result)) {
+        cli_abort("The governed run ended without an AgentResult")
       }
-
-      structured_output <- NULL
-      if (!is.null(output_format) && !is.null(run_response)) {
-        structured_output <- parse_structured_output(
-          run_response,
+      if (!is.null(output_format) && !is.null(result$response)) {
+        result$structured_output <- parse_structured_output(
+          result$response,
           output_format
         )
       }
+      result
+    },
 
-      AgentResult$new(
-        response = run_response,
-        turns = self$chat$get_turns(),
-        cost = stop_event$cost %||% self$cost(),
-        events = events,
-        duration = duration,
-        stop_reason = stop_event$reason %||% "complete",
-        structured_output = structured_output,
-        session_id = private$.session_id,
-        run_id = stop_event$run_id %||% private$current_run_id,
-        agent_id = stop_event$agent_id %||% self$agent_id,
-        agent_name = stop_event$agent_name %||% self$agent_name,
-        parent_agent_id = stop_event$parent_agent_id,
-        parent_run_id = stop_event$parent_run_id,
-        delegation_id = stop_event$delegation_id,
-        run_context = stop_event$run_context %||% private$.run_context,
-        usage = stop_event$usage %||% private$last_run_usage
+    #' @description
+    #' Send messages synchronously using the ellmer Chat interface.
+    #'
+    #' All requests pass through Deputy's run kernel. The return value matches
+    #' `ellmer::Chat$chat()`; inspect [AgentResult] metadata with `$last_run()`.
+    #' @param ... User content accepted by ellmer.
+    #' @param echo Accepted for ellmer compatibility.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
+    #' @return The final assistant text.
+    chat = function(..., echo = NULL, run_context = list()) {
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
       )
+      governed_run <- private$start_governed_stream(
+        messages = list(...),
+        limits = self$usage_limits,
+        run_context = effective_run_context,
+        stream = "content"
+      )
+      result <- private$resolve_promise(private$collect_governed_stream(
+        governed_run
+      ))
+      private$echo_chat_result(result$response, echo)
+      result$response
+    },
+
+    #' @description
+    #' Send messages asynchronously using the ellmer Chat interface.
+    #' @param ... User content accepted by ellmer.
+    #' @param tool_mode Whether ellmer executes tool calls concurrently or
+    #'   sequentially.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
+    #' @return A promise resolving to the final assistant text.
+    chat_async = function(
+      ...,
+      tool_mode = c("concurrent", "sequential"),
+      run_context = list()
+    ) {
+      tool_mode <- match.arg(tool_mode)
+      messages <- list(...)
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
+      )
+      governed_run <- private$start_governed_stream(
+        messages = messages,
+        limits = self$usage_limits,
+        run_context = effective_run_context,
+        tool_mode = tool_mode,
+        stream = "content"
+      )
+      private$collect_governed_stream(governed_run) |>
+        promises::then(function(result) result$response)
+    },
+
+    #' @description Send a structured request through the governed run kernel.
+    #' @param ... User content accepted by ellmer.
+    #' @param type An ellmer structured-output type.
+    #' @param echo Echo mode forwarded to ellmer.
+    #' @param convert Whether ellmer converts the structured response.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
+    #' @return Structured response data.
+    chat_structured = function(
+      ...,
+      type,
+      echo = "none",
+      convert = TRUE,
+      run_context = list()
+    ) {
+      private$resolve_promise(self$chat_structured_async(
+        ...,
+        type = type,
+        echo = echo,
+        convert = convert,
+        run_context = run_context
+      ))
+    },
+
+    #' @description Send an asynchronous structured request through Deputy.
+    #' @param ... User content accepted by ellmer.
+    #' @param type An ellmer structured-output type.
+    #' @param echo Echo mode forwarded to ellmer.
+    #' @param convert Whether ellmer converts the structured response.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
+    #' @return A promise resolving to structured response data.
+    chat_structured_async = function(
+      ...,
+      type,
+      echo = "none",
+      convert = TRUE,
+      run_context = list()
+    ) {
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
+      )
+      governed_run <- private$start_governed_stream(
+        messages = list(...),
+        limits = self$usage_limits,
+        run_context = effective_run_context,
+        stream = "content",
+        structured = list(type = type, echo = echo, convert = convert)
+      )
+      private$collect_governed_stream(governed_run) |>
+        promises::then(function(...) governed_run$state$structured_output)
+    },
+
+    #' @description
+    #' Stream synchronously using the ellmer Chat interface.
+    #' @param ... User content accepted by ellmer.
+    #' @param stream Yield text or semantic ellmer content.
+    #' @param controller Optional ellmer stream controller.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
+    #' @return A synchronous generator.
+    stream = function(
+      ...,
+      stream = c("text", "content"),
+      controller = NULL,
+      run_context = list()
+    ) {
+      stream <- match.arg(stream)
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
+      )
+      governed_run <- private$start_governed_stream(
+        messages = list(...),
+        limits = self$usage_limits,
+        run_context = effective_run_context,
+        stream = stream,
+        controller = controller
+      )
+      private$sync_stream_generator(governed_run$stream)
+    },
+
+    #' @description
+    #' Stream asynchronously using the ellmer Chat interface.
+    #'
+    #' This is the primary interface for shinychat. It returns the same content
+    #' stream as ellmer while enforcing Deputy permissions, hooks, limits,
+    #' workspace resolution, context management, and run accounting.
+    #' @param ... User content accepted by ellmer, including shinychat's list of
+    #'   attachment-enabled `Content` objects.
+    #' @param tool_mode Whether ellmer executes tool calls concurrently or
+    #'   sequentially.
+    #' @param stream Yield text or semantic ellmer content.
+    #' @param controller Optional ellmer stream controller.
+    #' @param run_context Canonical JSON-compatible context to add to or narrow
+    #'   for this run.
+    #' @return An asynchronous generator suitable for `shinychat::chat_append()`.
+    stream_async = function(
+      ...,
+      tool_mode = c("concurrent", "sequential"),
+      stream = c("text", "content"),
+      controller = NULL,
+      run_context = list()
+    ) {
+      tool_mode <- match.arg(tool_mode)
+      stream <- match.arg(stream)
+      effective_run_context <- merge_run_context(
+        private$.run_context,
+        run_context
+      )
+      private$start_governed_stream(
+        messages = list(...),
+        limits = self$usage_limits,
+        run_context = effective_run_context,
+        tool_mode = tool_mode,
+        stream = stream,
+        controller = controller
+      )$stream
+    },
+
+    #' @description
+    #' Return the most recently completed governed run.
+    #' @return An [AgentResult], or `NULL` before the first run completes.
+    last_run = function() {
+      private$.last_run_result
+    },
+
+    #' @description Return the most recent compaction outcome.
+    #' @return A `DeputyCompaction`, or `NULL` before compaction occurs.
+    last_compaction = function() {
+      private$.last_compaction
+    },
+
+    #' @description Resolve a durable tool-result reference.
+    #' @param reference A `deputy://tool-result/...` URI or reference text
+    #'   emitted into model context.
+    #' @return The complete original R value.
+    resolve_tool_result = function(reference) {
+      read_tool_result_envelope(
+        reference,
+        self$context_policy,
+        private$.session_id
+      )$value
+    },
+
+    #' @description Add a user/assistant turn pair, as in ellmer Chat.
+    #' @param user User turn or content.
+    #' @param assistant Assistant turn or content.
+    #' @param log_tokens Whether ellmer should log token metadata.
+    #' @return Invisible self.
+    add_turn = function(user, assistant, log_tokens = TRUE) {
+      private$.chat$add_turn(user, assistant, log_tokens = log_tokens)
+      invisible(self)
+    },
+
+    #' @description Return conversation turns, as in ellmer Chat.
+    #' @param include_system_prompt Include the system prompt as a turn.
+    #' @return A list of ellmer turns.
+    get_turns = function(include_system_prompt = FALSE) {
+      if (
+        "include_system_prompt" %in% names(formals(private$.chat$get_turns))
+      ) {
+        return(private$.chat$get_turns(
+          include_system_prompt = include_system_prompt
+        ))
+      }
+      private$.chat$get_turns()
+    },
+
+    #' @description Replace conversation turns, as in ellmer Chat.
+    #' @param value A list of ellmer turns.
+    #' @return Invisible self.
+    set_turns = function(value) {
+      private$.chat$set_turns(value)
+      prompt <- private$.chat$get_system_prompt()
+      prompt_without_compaction <- private$system_prompt_without_compaction()
+      if (!identical(prompt, prompt_without_compaction)) {
+        private$.chat$set_system_prompt(prompt_without_compaction)
+      }
+      private$.compaction_summary <- NULL
+      invisible(self)
+    },
+
+    #' @description Return the system prompt, as in ellmer Chat.
+    #' @return The system prompt or `NULL`.
+    get_system_prompt = function() {
+      private$.chat$get_system_prompt()
+    },
+
+    #' @description Replace the system prompt, as in ellmer Chat.
+    #' @param value The new system prompt or `NULL`.
+    #' @return Invisible self.
+    set_system_prompt = function(value) {
+      previous_summary <- private$.compaction_summary
+      private$.chat$set_system_prompt(value)
+      private$appended_hook_context_hashes <- character()
+      parts <- private$compaction_prompt_parts(value)
+      private$.compaction_summary <- if (
+        is.null(previous_summary) ||
+          is.null(parts) ||
+          !identical(parts$summary, previous_summary)
+      ) {
+        NULL
+      } else {
+        parts$summary
+      }
+      invisible(self)
+    },
+
+    #' @description Return registered tools, as in ellmer Chat.
+    #' @return A named list of ellmer tool definitions.
+    get_tools = function() {
+      private$.chat$get_tools()
+    },
+
+    #' @description Replace registered tools, preserving Deputy adaptation.
+    #' @param tools A list of ellmer tool definitions.
+    #' @return Invisible self.
+    set_tools = function(tools) {
+      had_result_reader <- isTRUE(private$.tool_result_reader_registered)
+      tools[["deputy_read_tool_result"]] <- NULL
+      private$.chat$set_tools(list())
+      private$.tool_result_reader_registered <- FALSE
+      self$register_tools(tools)
+      if (had_result_reader) {
+        private$ensure_tool_result_reader()
+      }
+      invisible(self)
+    },
+
+    #' @description Return provider token records, as in ellmer Chat.
+    #' @param include_system_prompt Deprecated ellmer compatibility argument.
+    #' @return A token data frame.
+    get_tokens = function(include_system_prompt = NULL) {
+      if (is.null(include_system_prompt)) {
+        return(private$.chat$get_tokens())
+      }
+      private$.chat$get_tokens(include_system_prompt = include_system_prompt)
+    },
+
+    #' @description Return provider cost records, as in ellmer Chat.
+    #' @param include Return all costs or only the latest request.
+    #' @return Provider cost information.
+    get_cost = function(include = c("all", "last")) {
+      private$.chat$get_cost(include = match.arg(include))
+    },
+
+    #' @description Estimate tokens, as in ellmer Chat.
+    #' @param ... User content accepted by ellmer.
+    #' @param include Count only new content or the complete context.
+    #' @param type Optional provider content type.
+    #' @return Estimated token count.
+    token_count = function(
+      ...,
+      include = c("new", "complete"),
+      type = NULL
+    ) {
+      private$.chat$token_count(
+        ...,
+        include = match.arg(include),
+        type = type
+      )
+    },
+
+    #' @description Return the ellmer provider.
+    #' @return An ellmer provider object.
+    get_provider = function() {
+      private$.chat$get_provider()
+    },
+
+    #' @description Return the configured model name.
+    #' @return Model identifier.
+    get_model = function() {
+      private$.chat$get_model()
+    },
+
+    #' @description Replace the configured model.
+    #' @param model Model identifier.
+    #' @return Invisible self.
+    set_model = function(model) {
+      private$.chat$set_model(model)
+      invisible(self)
     },
 
     #' @description
     #' Register a tool with the agent.
     #'
-    #' @param tool A tool created with `ellmer::tool()`
+    #' Function tools are wrapped with Deputy's runtime enforcement. Known
+    #' provider-native web tools are authorized once, before registration,
+    #' because their execution occurs inside the provider rather than R. Native
+    #' tools therefore require static permissions and cannot be registered with
+    #' a custom `can_use_tool` callback.
+    #' @param tool A tool created with `ellmer::tool()` or a supported
+    #'   provider-native web tool.
     #' @return Invisible self for chaining
     register_tool = function(tool) {
-      self$chat$register_tool(tool)
+      private$.chat$register_tool(private$adapt_tool(tool))
       invisible(self)
     },
 
     #' @description
     #' Register multiple tools with the agent.
     #'
-    #' @param tools A list of tools created with `ellmer::tool()`
+    #' @param tools A list of function tools or supported provider-native web
+    #'   tools.
     #' @return Invisible self for chaining
     register_tools = function(tools) {
-      self$chat$register_tools(tools)
+      wrapped <- lapply(tools, private$adapt_tool)
+      private$.chat$register_tools(wrapped)
       invisible(self)
+    },
+
+    #' @description Register an additional ellmer tool-request observer.
+    #' @param callback A function with one `request` argument.
+    #' @return A function that removes the observer.
+    on_tool_request = function(callback) {
+      remove_backend <- private$.chat$on_tool_request(callback)
+      if (!is.function(remove_backend)) {
+        remove_backend <- function() invisible(NULL)
+      }
+      private$.tool_observer_id <- private$.tool_observer_id + 1L
+      id <- as.character(private$.tool_observer_id)
+      private$.tool_request_observers[[id]] <- callback
+      rlang::new_function(
+        alist(),
+        quote({
+          on.exit({
+            agent_private$.tool_request_observers[[id]] <- NULL
+          })
+          remove_backend()
+          invisible(NULL)
+        }),
+        rlang::env(
+          remove_backend = remove_backend,
+          agent_private = private,
+          id = id
+        )
+      )
+    },
+
+    #' @description Register an additional ellmer tool-result observer.
+    #' @param callback A function with one `result` argument.
+    #' @return A function that removes the observer.
+    on_tool_result = function(callback) {
+      remove_backend <- private$.chat$on_tool_result(callback)
+      if (!is.function(remove_backend)) {
+        remove_backend <- function() invisible(NULL)
+      }
+      private$.tool_observer_id <- private$.tool_observer_id + 1L
+      id <- as.character(private$.tool_observer_id)
+      private$.tool_result_observers[[id]] <- callback
+      rlang::new_function(
+        alist(),
+        quote({
+          on.exit({
+            agent_private$.tool_result_observers[[id]] <- NULL
+          })
+          remove_backend()
+          invisible(NULL)
+        }),
+        rlang::env(
+          remove_backend = remove_backend,
+          agent_private = private,
+          id = id
+        )
+      )
     },
 
     #' @description
@@ -470,7 +830,7 @@ Agent <- R6::R6Class(
     #'
     #' @return A list of Turn objects
     turns = function() {
-      self$chat$get_turns()
+      private$.chat$get_turns()
     },
 
     #' @description
@@ -478,8 +838,8 @@ Agent <- R6::R6Class(
     #'
     #' @param role Role to filter by ("assistant", "user", or "system")
     #' @return A Turn object or NULL
-    last_turn = function(role = "assistant") {
-      self$chat$last_turn(role = role)
+    last_turn = function(role = c("assistant", "user", "system")) {
+      private$.chat$last_turn(role = match.arg(role))
     },
 
     #' @description
@@ -502,7 +862,9 @@ Agent <- R6::R6Class(
     #' Preserve or narrow the active permission mode for subsequent tool calls.
     #' Reapplying the current mode is a no-op. Widening or incomparable mode
     #' changes require a newly configured `Agent` so custom restrictions remain
-    #' an immutable authority ceiling.
+    #' an immutable authority ceiling. When narrowing removes web access,
+    #' registered provider-native web tools are removed before the new policy
+    #' becomes active because Deputy cannot interpose on provider-side calls.
     #'
     #' @param mode Permission mode, see [PermissionMode]
     #' @return Invisible self
@@ -540,7 +902,7 @@ Agent <- R6::R6Class(
         permission_mode_capabilities(mode, self$working_dir)
       )
 
-      private$.permissions <- Permissions$new(
+      narrowed_permissions <- Permissions$new(
         mode = mode,
         file_read = capabilities$file_read,
         file_write = capabilities$file_write,
@@ -553,6 +915,25 @@ Agent <- R6::R6Class(
         tool_denylist = existing$tool_denylist,
         permission_prompt_tool_name = capabilities$permission_prompt_tool_name
       )
+
+      registered_tools <- private$.chat$get_tools()
+      provider_native <- vapply(
+        registered_tools,
+        inherits,
+        logical(1),
+        what = "ellmer::ToolBuiltIn"
+      )
+      removed_provider_tools <- character()
+      if (!isTRUE(narrowed_permissions$web) && any(provider_native)) {
+        removed_provider_tools <- vapply(
+          registered_tools[provider_native],
+          \(tool) tool@name,
+          character(1)
+        )
+        private$.chat$set_tools(registered_tools[!provider_native])
+      }
+
+      private$.permissions <- narrowed_permissions
 
       self$hooks$fire(
         "ConfigChange",
@@ -567,7 +948,8 @@ Agent <- R6::R6Class(
         level = "info",
         code = "permission_mode_changed",
         previous_mode = old_mode,
-        permission_mode = mode
+        permission_mode = mode,
+        removed_provider_tools = removed_provider_tools
       )
 
       invisible(self)
@@ -576,15 +958,12 @@ Agent <- R6::R6Class(
     #' @description
     #' Get cost information for the conversation.
     #'
-    #' @return A list with input, output, cached, and total token costs
+    #' @return A list with input, output, and cached token counts; total
+    #'   estimated cost; and `complete` and `missing` fields describing provider
+    #'   cost coverage. An incomplete total is `NA_real_`.
     cost = function() {
-      tokens <- self$chat$get_tokens()
-      list(
-        input = sum(tokens$input, na.rm = TRUE),
-        output = sum(tokens$output, na.rm = TRUE),
-        cached = sum(tokens$cached_input, na.rm = TRUE),
-        total = sum(tokens$cost, na.rm = TRUE)
-      )
+      summary <- provider_usage_summary(private$.chat)
+      summary[c("input", "output", "cached", "total", "complete", "missing")]
     },
 
     #' @description
@@ -595,7 +974,7 @@ Agent <- R6::R6Class(
     #'
     #' @return An [AgentUsage] object
     usage = function() {
-      agent_usage_snapshot(self$chat)
+      agent_usage_snapshot(private$.chat)
     },
 
     #' @description
@@ -627,10 +1006,10 @@ Agent <- R6::R6Class(
     #'
     #' @return A list with provider name and model
     provider = function() {
-      provider <- self$chat$get_provider()
+      provider <- private$.chat$get_provider()
       list(
         name = provider@name,
-        model = self$chat$get_model()
+        model = private$.chat$get_model()
       )
     },
 
@@ -644,14 +1023,15 @@ Agent <- R6::R6Class(
     #' The session file contains:
     #' - Conversation turns
     #' - System prompt
+    #' - The cumulative compaction summary
+    #' - Portable copies of offloaded tool results
     #' - Effective run context
     #' - File checkpoint state, when enabled
     #' - Metadata (timestamp, version, provider info)
     save_session = function(path) {
-      session <- private$build_session_payload()
-
       tryCatch(
         {
+          session <- private$build_session_payload()
           saveRDS(session, path)
           cli_alert_success("Session saved to {.path {path}}")
           invisible(path)
@@ -679,7 +1059,9 @@ Agent <- R6::R6Class(
     #' Tools, permissions, hooks, and the working directory are runtime policy
     #' and are never restored from a session file. Saved run context is
     #' validated before conversation state changes and merged with constructor
-    #' context; protected identity conflicts fail the load.
+    #' context; protected identity conflicts fail the load. Compaction summaries
+    #' and integrity-checked tool-result envelopes are restored as conversational
+    #' state under the receiving Agent's session identity.
     load_session = function(path) {
       if (isTRUE(private$run_active)) {
         cli::cli_abort(
@@ -788,11 +1170,16 @@ Agent <- R6::R6Class(
     #' the system prompt. This preserves important context while reducing
     #' token usage.
     #'
-    #' @param keep_last Number of recent turns to keep uncompacted (default: 4)
+    #' @param keep_last Number of recent turns to retain. `NULL` chooses a
+    #'   complete conversational boundary using the context policy's token
+    #'   target.
     #' @param summary Optional custom summary to use instead of auto-generating.
     #'   If NULL, the LLM will generate a summary focusing on key decisions,
     #'   findings, files discussed, and task progress.
-    #' @return Invisible self
+    #' @param fallback What to do when LLM summary generation fails.
+    #' @param automatic Whether the run kernel triggered this compaction.
+    #' @param estimated_tokens Optional pre-compaction token estimate.
+    #' @return A `DeputyCompaction` describing the method and usage.
     #'
     #' @details
     #' The compaction process:
@@ -801,28 +1188,63 @@ Agent <- R6::R6Class(
     #' 3. Appends summary to system prompt under "Previous Conversation Summary"
     #' 4. Keeps only the most recent `keep_last` turns
     #'
-    #' If LLM summarization fails (e.g., no API key), falls back to a simple
-    #' text-based summary with truncated turn contents.
-    compact = function(keep_last = 4, summary = NULL) {
-      if (isTRUE(private$run_active)) {
+    #' LLM summary-generation failures are errors by default. A deterministic
+    #' truncated-text summary is used only when `fallback = "text"` is
+    #' explicitly configured. The returned object records that degraded method.
+    compact = function(
+      keep_last = NULL,
+      summary = NULL,
+      fallback = self$context_policy$fallback,
+      automatic = FALSE,
+      estimated_tokens = NULL
+    ) {
+      if (isTRUE(private$run_active) && !isTRUE(automatic)) {
         cli::cli_abort(
           "Cannot compact conversation state while this agent has an active run",
           class = c("deputy_run_active", "deputy_error")
         )
       }
-      turns <- self$chat$get_turns()
+      turns <- private$.chat$get_turns()
+      fallback <- match.arg(fallback, c("error", "text"))
+
+      if (is.null(keep_last)) {
+        max_tokens <- self$context_policy$max_tokens
+        keep_last <- if (is.null(max_tokens)) {
+          min(4L, length(turns))
+        } else {
+          private$compaction_keep_last(
+            messages = list(),
+            target_tokens = floor(
+              max_tokens * self$context_policy$compact_to
+            )
+          )
+        }
+      }
+      keep_last <- validate_usage_limit(keep_last, "keep_last", integer = TRUE)
+      if (is.null(keep_last)) {
+        keep_last <- 0L
+      }
 
       if (length(turns) <= keep_last) {
-        cli_alert_info(
-          "Not enough turns to compact (have {length(turns)}, keep_last = {keep_last})"
+        result <- new_compaction_result(
+          method = "none",
+          automatic = automatic,
+          turns_compacted = 0L,
+          turns_kept = length(turns),
+          estimated_tokens = estimated_tokens
         )
-        return(invisible(self))
+        private$.last_compaction <- result
+        return(result)
       }
 
       # Determine which turns to compact
       compact_count <- length(turns) - keep_last
       turns_to_compact <- turns[1:compact_count]
-      turns_to_keep <- turns[(compact_count + 1):length(turns)]
+      turns_to_keep <- if (keep_last == 0L) {
+        list()
+      } else {
+        tail(turns, keep_last)
+      }
 
       # Fire PreCompact hook
       hook_result <- self$hooks$fire(
@@ -837,43 +1259,72 @@ Agent <- R6::R6Class(
 
       # Check if hook wants to cancel compaction
       if (!is.null(hook_result) && isFALSE(hook_result$continue)) {
-        cli_alert_info("Compaction cancelled by hook")
-        return(invisible(self))
+        result <- new_compaction_result(
+          method = "cancelled",
+          automatic = automatic,
+          turns_compacted = 0L,
+          turns_kept = length(turns),
+          estimated_tokens = estimated_tokens
+        )
+        private$.last_compaction <- result
+        return(result)
       }
 
-      # Generate summary if not provided
+      method <- "custom"
+      summary_usage <- AgentUsage()
       if (is.null(summary)) {
-        # Check if hook provided a custom summary
         if (!is.null(hook_result) && !is.null(hook_result$summary)) {
           summary <- hook_result$summary
+          method <- "hook"
         } else {
-          # Use LLM to generate a meaningful summary
-          summary <- private$generate_compaction_summary(turns_to_compact)
+          generated <- private$generate_compaction_summary(
+            turns_to_compact,
+            fallback = fallback
+          )
+          summary <- generated$summary
+          method <- generated$method
+          summary_usage <- generated$usage
         }
       }
 
-      # Add summary to system prompt and keep only recent turns
-      current_system <- self$chat$get_system_prompt() %||% ""
+      summary <- paste(as.character(summary), collapse = "\n")
+      current_system <- private$system_prompt_without_compaction()
       new_system <- paste0(
         current_system,
-        "\n\n## Previous Conversation Summary\n",
-        summary
+        private$compaction_prompt_block(summary)
       )
 
-      self$chat$set_system_prompt(new_system)
-      self$chat$set_turns(turns_to_keep)
+      private$.chat$set_system_prompt(new_system)
+      private$.chat$set_turns(turns_to_keep)
+      private$.compaction_summary <- summary
 
-      cli_alert_success(
-        "Compacted {compact_count} turns, keeping {length(turns_to_keep)}"
+      result <- new_compaction_result(
+        method = method,
+        automatic = automatic,
+        turns_compacted = compact_count,
+        turns_kept = length(turns_to_keep),
+        estimated_tokens = estimated_tokens,
+        usage = summary_usage,
+        summary = summary
       )
-      invisible(self)
+      private$.last_compaction <- result
+      self$hooks$fire(
+        "PostCompact",
+        result = result,
+        context = private$hook_context(
+          total_turns = length(turns),
+          compact_count = compact_count,
+          automatic = isTRUE(automatic)
+        )
+      )
+      result
     },
 
     #' @description
     #' Print the agent configuration.
     print = function() {
       provider_info <- self$provider()
-      tools <- self$chat$get_tools()
+      tools <- private$.chat$get_tools()
 
       cat("<Agent>\n")
       cat("  agent_id:", self$agent_id, "\n")
@@ -962,7 +1413,7 @@ Agent <- R6::R6Class(
       # Register tools with conflict detection
       if (length(skill$tools) > 0) {
         # Get current tool names to detect conflicts
-        current_tools <- self$chat$get_tools()
+        current_tools <- private$.chat$get_tools()
         current_tool_names <- names(current_tools)
 
         # Get names of tools being registered
@@ -990,12 +1441,12 @@ Agent <- R6::R6Class(
           }
         }
 
-        self$chat$register_tools(skill$tools)
+        self$register_tools(skill$tools)
       }
 
       # Append prompt to system prompt
       if (!is.null(skill$prompt) && nchar(skill$prompt) > 0) {
-        current_prompt <- self$chat$get_system_prompt() %||% ""
+        current_prompt <- private$.chat$get_system_prompt() %||% ""
         new_prompt <- paste(
           current_prompt,
           "",
@@ -1003,7 +1454,7 @@ Agent <- R6::R6Class(
           skill$prompt,
           sep = "\n"
         )
-        self$chat$set_system_prompt(new_prompt)
+        private$.chat$set_system_prompt(new_prompt)
       }
 
       # Store reference to loaded skill
@@ -1046,7 +1497,7 @@ Agent <- R6::R6Class(
         # Register tools with error handling
         tryCatch(
           {
-            self$chat$register_tools(mcp_tools_list)
+            self$register_tools(mcp_tools_list)
           },
           error = function(e) {
             cli::cli_abort(c(
@@ -1147,96 +1598,11 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Run an agentic task for use in Shiny applications with shinychat.
-    #'
-    #' Returns an async content stream suitable for passing to
-    #' `shinychat::chat_append()`. Unlike `run()` and `run_sync()`, the
-    #' multi-turn loop is driven by ellmer's `stream_async()` rather than
-    #' deputy's own generator. Deputy's permissions, hooks, and observable
-    #' [UsageLimits] are still enforced via callbacks and terminal accounting.
-    #' File tools must use absolute paths within `working_dir`; rejected calls
-    #' still count toward tool usage.
-    #'
-    #' @param prompt The user message to send
-    #' @param max_tool_calls Maximum number of tool calls before stopping.
-    #'   Overrides `usage_limits$max_tool_calls`; otherwise falls back to that
-    #'   value or 25. This counts individual tool call requests, not LLM turns
-    #'   (one turn can have multiple parallel calls).
-    #' @param run_context Canonical JSON-compatible context to add to or narrow
-    #'   for this run. Protected constructor identity fields cannot change.
-    #' @return An async content stream suitable for
-    #'   `shinychat::chat_append()`.
-    run_shiny = function(prompt, max_tool_calls = NULL, run_context = list()) {
-      rlang::check_installed("promises", reason = "for run_shiny()")
-
-      if (isTRUE(private$run_active)) {
-        cli::cli_abort(
-          "This agent already has an active run",
-          class = c("deputy_run_active", "deputy_error")
-        )
-      }
-
-      effective_run_context <- merge_run_context(
-        private$.run_context,
-        run_context
-      )
-
-      max_tool_calls <- max_tool_calls %||%
-        self$usage_limits$max_tool_calls %||%
-        25L
-      max_tool_calls <- validate_usage_limit(
-        max_tool_calls,
-        "max_tool_calls",
-        integer = TRUE
-      )
-      shiny_limits <- self$usage_limits
-      shiny_limits$max_tool_calls <- max_tool_calls
-
-      agent <- self
-      stream_state <- private$new_callback_run_state()
-      wrapped_stream <- private$callback_run_stream(
-        prompt,
-        limits = shiny_limits,
-        run_context = effective_run_context,
-        require_absolute_file_paths = TRUE,
-        state = stream_state
-      )
-      reg.finalizer(
-        environment(wrapped_stream),
-        function(environment) {
-          if (
-            !isTRUE(stream_state$finished) &&
-              !is.null(stream_state$active_run_id)
-          ) {
-            stream_state$reason <- "abandoned"
-            try(
-              agent$.__enclos_env__$private$request_stream_stop("abandoned"),
-              silent = TRUE
-            )
-            try(
-              agent$.__enclos_env__$private$finish_callback_run(stream_state),
-              silent = TRUE
-            )
-          }
-        },
-        onexit = TRUE
-      )
-      wrapped_stream
-    },
-
-    #' @description
     #' Run an agentic task asynchronously and resolve to an [AgentResult].
     #'
-    #' Like `run_shiny()`, the multi-turn loop is driven by ellmer's
-    #' `stream_async()`, so the R process is never blocked while the model or
-    #' tools work: other Shiny sessions, `later` callbacks, and promise chains
-    #' keep running. Unlike `run_shiny()`, nothing is streamed to a UI. The
-    #' returned promise resolves once the run stops and carries the final
-    #' response, run-scoped usage, and stop reason. Permissions, hooks, and
-    #' [UsageLimits] are enforced as in `run_shiny()` (callbacks plus terminal
-    #' accounting). File tools may use relative paths resolved against
-    #' `working_dir`, as in `run()`; the absolute-path rule is specific to
-    #' `run_shiny()`.
+    #' Uses the same run kernel as `$stream_async()`, `$stream()`, `$chat()`,
+    #' and `$run_sync()`. It collects the final response and run metadata rather
+    #' than returning the content stream.
     #'
     #' Use this when an Agent is a *worker* inside a larger async system, for
     #' example a delegated sub-agent executed from the tool of a parent chat
@@ -1254,15 +1620,6 @@ Agent <- R6::R6Class(
     #'   rejected if the provider stream fails or a limit configured with
     #'   `on_exceed = "error"` is reached.
     run_async = function(task, usage_limits = NULL, run_context = list()) {
-      rlang::check_installed("promises", reason = "for run_async()")
-
-      if (isTRUE(private$run_active)) {
-        cli::cli_abort(
-          "This agent already has an active run",
-          class = c("deputy_run_active", "deputy_error")
-        )
-      }
-
       effective_run_context <- merge_run_context(
         private$.run_context,
         run_context
@@ -1275,48 +1632,13 @@ Agent <- R6::R6Class(
       }
       limits <- normalize_usage_limits(limits)
 
-      agent <- self
-      start_time <- Sys.time()
-      stream_state <- private$new_callback_run_state()
-      stream <- private$callback_run_stream(
-        task,
+      governed_run <- private$start_governed_stream(
+        messages = list(task),
         limits = limits,
         run_context = effective_run_context,
-        require_absolute_file_paths = FALSE,
-        state = stream_state
+        stream = "content"
       )
-
-      coro::async(function() {
-        # Text emitted before a tool call is working narration, not the
-        # answer. Reset on every tool result so `response` is the text of the
-        # final assistant turn, matching `run_sync()`'s `text_complete`.
-        response_parts <- character()
-        repeat {
-          chunk <- coro::await(stream())
-          if (coro::is_exhausted(chunk)) {
-            break
-          }
-          if (inherits(chunk, "ellmer::ContentToolResult")) {
-            response_parts <- character()
-          } else if (inherits(chunk, "ellmer::ContentText")) {
-            response_parts <- c(response_parts, chunk@text)
-          } else if (is.character(chunk)) {
-            response_parts <- c(response_parts, chunk)
-          }
-        }
-
-        # The stream's exit handler has finalized the run by now: hooks have
-        # fired, run-scoped state is cleared, and `stream_state` carries the
-        # terminal reason, usage, and cost. (Assembled outside the async body
-        # because coro's state-machine parser rejects `x <- if (...)`.)
-        agent$.__enclos_env__$private$callback_run_result(
-          response_parts,
-          limits = limits,
-          state = stream_state,
-          run_context = effective_run_context,
-          start_time = start_time
-        )
-      })()
+      private$collect_governed_stream(governed_run)
     }
   ),
   active = list(
@@ -1348,14 +1670,6 @@ Agent <- R6::R6Class(
       )
     },
 
-    #' @field chat The wrapped ellmer Chat object. Read-only after construction.
-    chat = function(value) {
-      if (missing(value)) {
-        return(private$.chat)
-      }
-      cli_abort("Cannot modify agent: chat is immutable after construction")
-    },
-
     #' @field permissions Permission policy for the agent. Read-only after construction.
     permissions = function(value) {
       if (missing(value)) {
@@ -1373,6 +1687,16 @@ Agent <- R6::R6Class(
       }
       cli_abort(
         "Cannot modify agent: usage_limits are immutable after construction"
+      )
+    },
+
+    #' @field context_policy Automatic context-management policy. Read-only.
+    context_policy = function(value) {
+      if (missing(value)) {
+        return(private$.context_policy)
+      }
+      cli_abort(
+        "Cannot modify agent: context_policy is immutable after construction"
       )
     },
 
@@ -1399,6 +1723,7 @@ Agent <- R6::R6Class(
     .chat = NULL,
     .permissions = NULL,
     .usage_limits = NULL,
+    .context_policy = NULL,
     .working_dir = NULL,
     .hooks = NULL,
     .run_context = list(),
@@ -1419,6 +1744,7 @@ Agent <- R6::R6Class(
     run_active = FALSE,
     current_run_id = NULL,
     current_run_context = NULL,
+    current_run_state = NULL,
     last_run_context = NULL,
     current_usage_limits = NULL,
     current_usage_baseline = NULL,
@@ -1433,10 +1759,79 @@ Agent <- R6::R6Class(
     tool_event_overrides = list(),
     tool_call_records = list(),
     pending_delegations = list(),
+    original_tool_results = list(),
     last_run_usage = NULL,
+    .last_run_result = NULL,
     last_limit_status = NULL,
+    last_tool_cycle_signature = NULL,
+    consecutive_tool_cycles = 0L,
+    .last_compaction = NULL,
+    .compaction_summary = NULL,
+    .tool_result_reader_registered = FALSE,
+    .tool_request_observers = list(),
+    .tool_result_observers = list(),
+    .tool_observer_id = 0L,
+    .r6_clone = NULL,
     current_run_checkpoint_id = NULL,
-    current_run_requires_absolute_file_paths = FALSE,
+
+    clone_client = function(deep = FALSE) {
+      invisible(deep)
+      cloned <- private$.r6_clone(deep = TRUE)
+      cloned$.__enclos_env__$private$rewire_chat_runtime()
+      cloned
+    },
+
+    deep_clone = function(name, value) {
+      if (identical(name, ".chat") && is.function(value$clone)) {
+        return(value$clone(deep = TRUE))
+      }
+      is_r6_object <- is.environment(value) &&
+        !is.null(get0(".__enclos_env__", value, inherits = FALSE))
+      if (is_r6_object) {
+        return(value$clone(deep = TRUE))
+      }
+      value
+    },
+
+    rewire_chat_runtime = function() {
+      chat_private <- tryCatch(
+        private$.chat$.__enclos_env__$private,
+        error = function(e) NULL
+      )
+      for (name in c("callback_on_tool_request", "callback_on_tool_result")) {
+        manager <- chat_private[[name]]
+        if (!is.null(manager) && is.function(manager$clear)) {
+          manager$clear()
+        }
+      }
+
+      tools <- private$.chat$get_tools()
+      had_result_reader <- "deputy_read_tool_result" %in% names(tools)
+      tools[["deputy_read_tool_result"]] <- NULL
+      private$.chat$set_tools(list())
+      if (length(tools) > 0L) {
+        private$.chat$register_tools(
+          lapply(tools, private$prepare_cloned_tool)
+        )
+      }
+      private$.tool_result_reader_registered <- FALSE
+      if (isTRUE(had_result_reader)) {
+        private$ensure_tool_result_reader()
+      }
+      private$.chat$on_tool_request(private$handle_tool_request)
+      private$.chat$on_tool_result(private$handle_tool_result)
+      for (callback in private$.tool_request_observers) {
+        private$.chat$on_tool_request(callback)
+      }
+      for (callback in private$.tool_result_observers) {
+        private$.chat$on_tool_result(callback)
+      }
+      invisible(NULL)
+    },
+
+    prepare_cloned_tool = function(tool) {
+      private$adapt_tool(tool)
+    },
 
     new_file_checkpoint_store = function() {
       FileCheckpointStore$new(
@@ -1446,63 +1841,348 @@ Agent <- R6::R6Class(
       )
     },
 
-    wrap_generator_working_dir = function(generator, run_owner) {
-      workspace <- private$.working_dir
-      agent <- self
-      wrapped <- function() {
-        previous <- getwd()
-        on.exit(setwd(previous), add = TRUE)
-        setwd(workspace)
-        generator()
+    resolve_tool_arguments = function(tool_name, arguments) {
+      resolve_runtime_tool_arguments(
+        tool_name,
+        arguments,
+        private$.working_dir
+      )
+    },
+
+    adapt_tool = function(tool) {
+      if (inherits(tool, "ellmer::ToolBuiltIn")) {
+        tool_name <- tryCatch(tool@name, error = function(error) NULL)
+        tool_id <- normalize_native_tool_id(tool_name %||% "")
+        if (!tool_id %in% c("web_search", "web_fetch")) {
+          cli_abort(c(
+            "Unsupported provider-native tool: {.val {tool_name %||% '<unknown>'}}",
+            "x" = paste0(
+              "Deputy cannot interpose on provider-side execution for this ",
+              "tool."
+            )
+          ))
+        }
+        if (!isTRUE(self$permissions$web)) {
+          cli_abort(c(
+            "Provider-native web tool {.val {tool_name}} is not authorized.",
+            "i" = "Set {.code web = TRUE} and explicitly allow the tool."
+          ))
+        }
+        allowlist <- self$permissions$tool_allowlist %||% character()
+        allowlist_ids <- unique(vapply(
+          allowlist,
+          normalize_native_tool_id,
+          character(1)
+        ))
+        if (!tool_id %in% allowlist_ids) {
+          cli_abort(c(
+            "Provider-native web tool {.val {tool_name}} is not explicitly allowed.",
+            "i" = "Add the tool name to {.arg tool_allowlist}."
+          ))
+        }
+        if (!is.null(self$permissions$can_use_tool)) {
+          cli_abort(c(
+            "Provider-native tool {.val {tool_name}} cannot use a custom permission callback.",
+            "x" = paste0(
+              "Provider-side requests cannot be checked against request ",
+              "arguments or run context."
+            ),
+            "i" = paste0(
+              "Remove {.arg can_use_tool} or use Deputy's universal ",
+              "function tool."
+            )
+          ))
+        }
+        permission <- self$permissions$check(
+          tool_name,
+          list(),
+          list(
+            working_dir = private$.working_dir,
+            tool_annotations = tool@annotations
+          )
+        )
+        if (inherits(permission, "PermissionResultDeny")) {
+          cli_abort(c(
+            "Provider-native tool {.val {tool_name}} was denied at registration.",
+            "x" = permission$reason,
+            "i" = paste0(
+              "Provider-native tools are authorized before a request because ",
+              "they execute inside the provider."
+            )
+          ))
+        }
+        return(tool)
       }
-      class(wrapped) <- class(generator)
+      runtime_wrap_tool(
+        tool,
+        resolve_arguments = private$resolve_tool_arguments,
+        process_result = private$offload_tool_result,
+        begin_execution = private$begin_tool_execution,
+        execute = private$execute_tool
+      )
+    },
+
+    execute_tool = function(tool, arguments) {
+      workspace_runner <- attr(
+        tool,
+        "deputy_workspace_runner",
+        exact = TRUE
+      )
+      if (is.function(workspace_runner)) {
+        return(workspace_runner(arguments, private$.working_dir))
+      }
+      do.call(tool, arguments)
+    },
+
+    offload_tool_result = function(tool_name, value, execution_id = NULL) {
+      if (identical(tool_name, "deputy_read_tool_result")) {
+        return(value)
+      }
+      record <- offload_tool_result(
+        value = value,
+        tool_name = tool_name,
+        policy = private$.context_policy,
+        session_id = private$.session_id,
+        agent_id = private$.agent_id
+      )
+      if (is.null(record)) {
+        return(value)
+      }
+      private$ensure_tool_result_reader()
+      private$notify(
+        paste0("Offloaded large result from ", tool_name, "."),
+        level = "info",
+        code = "tool_result_offloaded",
+        tool_name = tool_name,
+        result_reference = record$uri,
+        result_bytes = record$bytes,
+        result_sha256 = record$sha256
+      )
+      if (is_nonempty_string(execution_id)) {
+        private$original_tool_results[[execution_id]] <- value
+      }
+      tool_result_reference_text(record)
+    },
+
+    ensure_tool_result_reader = function() {
+      if (isTRUE(private$.tool_result_reader_registered)) {
+        return(invisible(NULL))
+      }
+      private$.chat$register_tool(
+        private$adapt_tool(tool_result_reader_tool(
+          private$read_tool_result_chunk
+        ))
+      )
+      private$.tool_result_reader_registered <- TRUE
+      invisible(NULL)
+    },
+
+    read_tool_result_chunk = function(reference, offset, max_chars) {
+      read_tool_result_chunk(
+        reference = reference,
+        offset = offset,
+        max_chars = max_chars,
+        policy = private$.context_policy,
+        session_id = private$.session_id
+      )
+    },
+
+    record_run_event = function(event) {
+      state <- private$current_run_state
+      if (!is.null(state)) {
+        state$events[[length(state$events) + 1L]] <- event
+      }
+      invisible(event)
+    },
+
+    start_async_stream = function(
+      messages,
+      tool_mode,
+      stream,
+      controller,
+      structured = NULL
+    ) {
+      if (!is.null(structured)) {
+        return(do.call(
+          private$.chat$chat_structured_async,
+          c(messages, structured)
+        ))
+      }
+      stream_fun <- private$.chat$stream_async
+      stream_formals <- names(formals(stream_fun))
+      args <- messages
+      if ("tool_mode" %in% stream_formals) {
+        args$tool_mode <- tool_mode
+      }
+      if ("stream" %in% stream_formals) {
+        args$stream <- stream
+      }
+      if (
+        !is.null(controller) &&
+          "controller" %in% stream_formals
+      ) {
+        args$controller <- controller
+      }
+      do.call(stream_fun, args)
+    },
+
+    start_governed_stream = function(
+      messages,
+      limits,
+      run_context,
+      tool_mode = "concurrent",
+      stream = "content",
+      controller = NULL,
+      structured = NULL
+    ) {
+      if (isTRUE(private$run_active)) {
+        cli::cli_abort(
+          "This agent already has an active run",
+          class = c("deputy_run_active", "deputy_error")
+        )
+      }
+      limits <- normalize_usage_limits(limits)
+      state <- private$new_callback_run_state()
+      governed <- private$callback_run_stream(
+        messages = messages,
+        limits = limits,
+        run_context = run_context,
+        tool_mode = tool_mode,
+        stream_mode = stream,
+        controller = controller,
+        structured = structured,
+        state = state
+      )
+      agent <- self
       reg.finalizer(
-        environment(wrapped),
+        environment(governed),
         function(environment) {
-          active_run_id <- run_owner$active_run_id
           if (
-            !isTRUE(run_owner$finished) &&
-              !is.null(active_run_id) &&
-              isTRUE(agent$.__enclos_env__$private$run_active) &&
-              identical(
-                agent$.__enclos_env__$private$current_run_id,
-                active_run_id
-              )
+            !isTRUE(state$finished) &&
+              !is.null(state$active_run_id)
           ) {
-            run_owner$finished <- TRUE
+            state$reason <- "abandoned"
             try(
               agent$.__enclos_env__$private$request_stream_stop("abandoned"),
               silent = TRUE
             )
             try(
-              agent$.__enclos_env__$private$finalize_pending_checkpoints(),
-              silent = TRUE
-            )
-            try(
-              agent$.__enclos_env__$private$finish_active_run(),
+              agent$.__enclos_env__$private$finish_callback_run(state),
               silent = TRUE
             )
           }
         },
         onexit = TRUE
       )
-      wrapped
+      list(stream = governed, state = state, limits = limits)
     },
 
-    start_async_stream = function(prompt) {
-      stream_fun <- self$chat$stream_async
-      stream_formals <- names(formals(stream_fun))
-      args <- list(prompt)
-      if ("stream" %in% stream_formals) {
-        args$stream <- "content"
+    collect_governed_stream = function(governed_run) {
+      stream <- governed_run$stream
+      state <- governed_run$state
+      coro::async(function() {
+        repeat {
+          chunk <- coro::await(stream())
+          if (coro::is_exhausted(chunk)) {
+            break
+          }
+        }
+        result <- state$result
+        if (is.null(result)) {
+          cli_abort("The governed run ended without an AgentResult")
+        }
+        result
+      })()
+    },
+
+    echo_chat_result = function(response, echo) {
+      if (is.null(echo)) {
+        echo <- getOption("ellmer_echo", "none")
       }
-      if (
-        !is.null(private$current_stream_controller) &&
-          "controller" %in% stream_formals
-      ) {
-        args$controller <- private$current_stream_controller
+      if (isTRUE(echo)) {
+        echo <- "output"
+      } else if (isFALSE(echo)) {
+        echo <- "none"
+      } else if (identical(echo, "text")) {
+        echo <- "output"
       }
-      do.call(stream_fun, args)
+      echo <- match.arg(echo, c("none", "output", "all"))
+      if (!identical(echo, "none") && !is.null(response)) {
+        cli::cli_text("{response}")
+      }
+      invisible(NULL)
+    },
+
+    resolve_promise = function(promise) {
+      if (!promises::is.promising(promise)) {
+        return(promise)
+      }
+      value <- NULL
+      error <- NULL
+      done <- FALSE
+      promise |>
+        promises::then(function(result) {
+          value <<- result
+          done <<- TRUE
+        }) |>
+        promises::catch(function(condition) {
+          error <<- condition
+          done <<- TRUE
+        })
+      while (!done) {
+        run_now(0.1)
+      }
+      if (!is.null(error)) {
+        rlang::cnd_signal(error)
+      }
+      value
+    },
+
+    sync_stream_generator = function(async_stream) {
+      agent <- self
+      coro::generator(function() {
+        repeat {
+          chunk <- agent$.__enclos_env__$private$resolve_promise(
+            async_stream()
+          )
+          if (coro::is_exhausted(chunk)) {
+            break
+          }
+          coro::yield(chunk)
+        }
+      })()
+    },
+
+    event_generator = function(
+      governed_run,
+      include_partial_messages
+    ) {
+      agent <- self
+      async_stream <- governed_run$stream
+      state <- governed_run$state
+      coro::generator(function() {
+        next_event <- 1L
+        exhausted <- FALSE
+        repeat {
+          while (next_event <= length(state$events)) {
+            event <- state$events[[next_event]]
+            next_event <- next_event + 1L
+            if (
+              isTRUE(include_partial_messages) ||
+                !identical(event$type, "text")
+            ) {
+              coro::yield(event)
+            }
+          }
+          if (isTRUE(exhausted)) {
+            break
+          }
+          chunk <- agent$.__enclos_env__$private$resolve_promise(
+            async_stream()
+          )
+          exhausted <- coro::is_exhausted(chunk)
+        }
+      })()
     },
 
     file_tool_path_info = function(tool_name, tool_input) {
@@ -1559,7 +2239,7 @@ Agent <- R6::R6Class(
       private$.file_checkpoints$finalize_pending()
     },
 
-    # Shared state for one callback-driven run (`run_shiny()`/`run_async()`).
+    # Shared state for one governed callback-driven run.
     # The stream body and its exit handler communicate through this env so a
     # consumer can read the terminal reason, usage, and cost after the stream
     # is exhausted and run-scoped private fields have been cleared.
@@ -1571,29 +2251,36 @@ Agent <- R6::R6Class(
       state$finished <- FALSE
       state$usage <- NULL
       state$cost <- NULL
+      state$events <- list()
+      state$response_parts <- character()
+      state$structured_output <- NULL
+      state$started_at <- Sys.time()
+      state$run_context <- list()
+      state$limits <- NULL
+      state$result <- NULL
+      state$turns_before <- 0L
       state
     },
 
     # Assemble the `AgentResult` for a finished `run_async()` run. Honors
     # `on_exceed = "error"` by signalling the structured limit error when the
     # run stopped because of the recorded limit.
-    callback_run_result = function(
-      response_parts,
-      limits,
-      state,
-      run_context,
-      start_time
-    ) {
-      response <- if (length(response_parts) > 0L) {
-        paste(response_parts, collapse = "")
-      } else {
+    callback_run_result = function(state) {
+      response <- if (length(state$response_parts) > 0L) {
+        paste(state$response_parts, collapse = "")
+      } else if (
+        identical(state$reason, "complete") &&
+          length(private$.chat$get_turns()) > state$turns_before
+      ) {
         tryCatch(private$get_last_response(), error = function(e) NULL)
+      } else {
+        NULL
       }
 
       limit_status <- private$last_limit_status
       if (
         !is.null(limit_status) &&
-          identical(limits$on_exceed, "error") &&
+          identical(state$limits$on_exceed, "error") &&
           identical(state$reason, limit_status$reason)
       ) {
         private$abort_usage_limit(limit_status)
@@ -1601,12 +2288,12 @@ Agent <- R6::R6Class(
 
       AgentResult$new(
         response = response,
-        turns = self$chat$get_turns(),
+        turns = private$.chat$get_turns(),
         cost = state$cost %||% self$cost(),
-        events = list(),
-        duration = as.numeric(Sys.time() - start_time, units = "secs"),
+        events = state$events,
+        duration = as.numeric(Sys.time() - state$started_at, units = "secs"),
         stop_reason = state$reason %||% "complete",
-        structured_output = NULL,
+        structured_output = state$structured_output,
         session_id = private$.session_id,
         run_id = state$active_run_id,
         agent_id = self$agent_id,
@@ -1614,21 +2301,21 @@ Agent <- R6::R6Class(
         parent_agent_id = private$.parent_agent_id,
         parent_run_id = private$.parent_run_id,
         delegation_id = private$.delegation_id,
-        run_context = run_context,
+        run_context = state$run_context,
         usage = state$usage %||% AgentUsage()
       )
     },
 
-    # The engine behind `run_shiny()` and `run_async()`: a lazily-started
-    # async generator that drives ellmer's `stream_async()` while deputy's
-    # permissions, hooks, and usage limits are enforced through the
-    # `on_tool_request`/`on_tool_result` callbacks. Yields whatever the
-    # provider stream yields (content objects in content mode).
+    # The single run kernel. Every public run interface is an adapter
+    # over this lazily-started governed stream.
     callback_run_stream = function(
-      prompt,
+      messages,
       limits,
       run_context,
-      require_absolute_file_paths,
+      tool_mode,
+      stream_mode,
+      controller,
+      structured,
       state
     ) {
       agent <- self
@@ -1644,6 +2331,16 @@ Agent <- R6::R6Class(
           )
         }
 
+        compaction <- agent$.__enclos_env__$private$maybe_auto_compact(
+          messages,
+          limits = run_limits,
+          usage = AgentUsage()
+        )
+        compaction_usage <- AgentUsage()
+        if (!is.null(compaction)) {
+          compaction_usage <- compaction$usage
+        }
+
         agent$.__enclos_env__$private$run_active <- TRUE
         agent$.__enclos_env__$private$current_run_id <-
           agent$.__enclos_env__$private$new_run_id()
@@ -1651,6 +2348,8 @@ Agent <- R6::R6Class(
           effective_run_context
         active_run_id <- agent$.__enclos_env__$private$current_run_id
         stream_state$active_run_id <- active_run_id
+        stream_state$run_context <- effective_run_context
+        stream_state$limits <- run_limits
         on.exit(
           agent$.__enclos_env__$private$finish_callback_run(stream_state),
           add = TRUE
@@ -1665,34 +2364,71 @@ Agent <- R6::R6Class(
         agent$.__enclos_env__$private$stop_reason_from_hook <- NULL
         agent$.__enclos_env__$private$current_usage_limits <- run_limits
         agent$.__enclos_env__$private$current_usage_baseline <-
-          agent_usage_snapshot(agent$chat)
+          agent_usage_snapshot(agent$.__enclos_env__$private$.chat)
+        stream_state$turns_before <- length(
+          agent$.__enclos_env__$private$.chat$get_turns()
+        )
         agent$.__enclos_env__$private$current_tool_calls <- 0L
         agent$.__enclos_env__$private$current_tool_results <- 0L
         agent$.__enclos_env__$private$current_outer_requests <- 0L
-        agent$.__enclos_env__$private$current_external_usage <- AgentUsage()
-        agent$.__enclos_env__$private$current_stream_controller <- tryCatch(
-          ellmer::stream_controller(),
-          error = function(e) NULL
-        )
-        agent$.__enclos_env__$private$current_stream_content <- TRUE
+        agent$.__enclos_env__$private$current_external_usage <- compaction_usage
+        agent$.__enclos_env__$private$current_stream_controller <-
+          controller %||%
+          tryCatch(
+            ellmer::stream_controller(),
+            error = function(e) NULL
+          )
+        agent$.__enclos_env__$private$current_stream_content <-
+          identical(stream_mode, "content")
+        agent$.__enclos_env__$private$current_run_state <- stream_state
         agent$.__enclos_env__$private$pending_events <- list()
         agent$.__enclos_env__$private$tool_started_at <- list()
         agent$.__enclos_env__$private$tool_event_overrides <- list()
         agent$.__enclos_env__$private$tool_call_records <- list()
         agent$.__enclos_env__$private$pending_delegations <- list()
+        agent$.__enclos_env__$private$original_tool_results <- list()
         agent$.__enclos_env__$private$last_limit_status <- NULL
+        agent$.__enclos_env__$private$last_tool_cycle_signature <- NULL
+        agent$.__enclos_env__$private$consecutive_tool_cycles <- 0L
         agent$.__enclos_env__$private$last_run_usage <- AgentUsage()
         agent$.__enclos_env__$private$current_run_checkpoint_id <- NULL
-        agent$.__enclos_env__$private$current_run_requires_absolute_file_paths <-
-          isTRUE(require_absolute_file_paths)
 
         if (!is.null(agent$.__enclos_env__$private$.file_checkpoints)) {
           checkpoint_id <- agent$.__enclos_env__$private$.file_checkpoints$checkpoint(
             paste0("run ", active_run_id),
-            metadata = list(run_id = active_run_id, task = prompt)
+            metadata = list(
+              run_id = active_run_id,
+              message_count = length(messages)
+            )
           )
           agent$.__enclos_env__$private$current_run_checkpoint_id <-
             checkpoint_id
+        }
+
+        task <- messages
+        if (length(messages) == 1L) {
+          task <- messages[[1L]]
+        }
+        agent$.__enclos_env__$private$record_run_event(
+          agent$.__enclos_env__$private$agent_event(
+            "start",
+            task = task,
+            usage_limits = run_limits,
+            checkpoint_id = agent$.__enclos_env__$private$current_run_checkpoint_id
+          )
+        )
+        if (
+          !is.null(
+            agent$.__enclos_env__$private$current_run_checkpoint_id
+          )
+        ) {
+          agent$.__enclos_env__$private$record_run_event(
+            agent$.__enclos_env__$private$agent_event(
+              "file_checkpoint",
+              checkpoint_id = agent$.__enclos_env__$private$current_run_checkpoint_id,
+              name = paste0("run ", active_run_id)
+            )
+          )
         }
 
         agent$hooks$fire(
@@ -1700,14 +2436,14 @@ Agent <- R6::R6Class(
           context = agent$.__enclos_env__$private$hook_context(
             permissions = agent$permissions,
             provider = agent$provider(),
-            tools_count = length(agent$chat$get_tools()),
+            tools_count = length(agent$.__enclos_env__$private$.chat$get_tools()),
             run_id = active_run_id
           )
         )
         stream_state$session_started <- TRUE
         agent$hooks$fire(
           "UserPromptSubmit",
-          prompt = prompt,
+          prompt = if (length(messages) == 1L) messages[[1L]] else messages,
           context = agent$.__enclos_env__$private$hook_context(
             run_id = active_run_id
           )
@@ -1729,10 +2465,16 @@ Agent <- R6::R6Class(
           })()
         } else {
           stream <- tryCatch(
-            agent$.__enclos_env__$private$start_async_stream(prompt),
+            agent$.__enclos_env__$private$start_async_stream(
+              messages = messages,
+              tool_mode = tool_mode,
+              stream = stream_mode,
+              controller = agent$.__enclos_env__$private$current_stream_controller,
+              structured = structured
+            ),
             error = function(error) {
               stream_state$reason <- "error"
-              stop(error)
+              rlang::cnd_signal(error)
             }
           )
         }
@@ -1778,7 +2520,7 @@ Agent <- R6::R6Class(
               break
             }
             stream_state$reason <- "error"
-            stop(stream_error)
+            rlang::cnd_signal(stream_error)
           }
 
           if (agent$.__enclos_env__$private$should_stop) {
@@ -1792,6 +2534,59 @@ Agent <- R6::R6Class(
             break
           }
 
+          if (!is.null(structured)) {
+            stream_state$structured_output <- chunk
+          }
+
+          if (inherits(chunk, "ellmer::ContentToolRequest")) {
+            extracted <- agent$.__enclos_env__$private$extract_tool_request_data(
+              chunk
+            )
+            agent$.__enclos_env__$private$record_run_event(
+              agent$.__enclos_env__$private$tool_start_event(extracted)
+            )
+          } else if (inherits(chunk, "ellmer::ContentToolResult")) {
+            stream_state$response_parts <- character()
+          } else if (inherits(chunk, "ellmer::ContentText")) {
+            stream_state$response_parts <- c(
+              stream_state$response_parts,
+              chunk@text
+            )
+            agent$.__enclos_env__$private$record_run_event(
+              AgentEvent(
+                "text",
+                run_id = active_run_id,
+                text = chunk@text,
+                is_complete = FALSE
+              )
+            )
+          } else if (is.character(chunk) && length(chunk) == 1L) {
+            stream_state$response_parts <- c(
+              stream_state$response_parts,
+              chunk
+            )
+            agent$.__enclos_env__$private$record_run_event(
+              AgentEvent(
+                "text",
+                run_id = active_run_id,
+                text = chunk,
+                is_complete = FALSE
+              )
+            )
+          } else if (
+            !inherits(chunk, "ellmer::ContentToolRequest") &&
+              !inherits(chunk, "ellmer::ContentToolResult")
+          ) {
+            agent$.__enclos_env__$private$record_run_event(
+              AgentEvent(
+                "content",
+                run_id = active_run_id,
+                content = chunk,
+                content_type = class(chunk)[[1L]] %||% "unknown"
+              )
+            )
+          }
+
           coro::yield(chunk)
           if (!isTRUE(is_generator)) {
             break
@@ -1800,8 +2595,8 @@ Agent <- R6::R6Class(
       })()
     },
 
-    # Terminal accounting for a callback-driven run (`run_shiny()` /
-    # `run_async()`): settles the stop reason, fires Stop/SessionEnd, records
+    # Terminal accounting for a callback-driven run: settles the stop reason,
+    # fires Stop/SessionEnd, records
     # run-scoped usage and cost on `state`, and releases the active run.
     finish_callback_run = function(state) {
       active_run_id <- state$active_run_id
@@ -1817,6 +2612,16 @@ Agent <- R6::R6Class(
       cleanup_error <- NULL
       tryCatch(
         {
+          observed_last_turn <- tryCatch(
+            private$.chat$last_turn(),
+            error = function(e) NULL
+          )
+          if (
+            isTRUE(private$should_stop) && identical(state$reason, "complete")
+          ) {
+            state$reason <- private$stop_reason_from_hook %||%
+              "hook_requested_stop"
+          }
           incomplete_tool_call <-
             private$current_tool_calls > private$current_tool_results
           private$finalize_pending_checkpoints()
@@ -1851,6 +2656,28 @@ Agent <- R6::R6Class(
               )
             }
           }
+          if (
+            is.null(private$last_limit_status) &&
+              !is.null(limits$max_cost_usd) &&
+              is.finite(usage$cost_usd) &&
+              usage$cost_usd >= limits$max_cost_usd * 0.9
+          ) {
+            private$notify(
+              paste0(
+                "Approaching run cost limit: ",
+                format_cost(usage$cost_usd),
+                " / ",
+                format_cost(limits$max_cost_usd)
+              ),
+              level = "warning",
+              code = "cost_limit_warning",
+              usage = usage,
+              max_cost_usd = limits$max_cost_usd
+            )
+            cli::cli_warn(
+              "Approaching run cost limit: {format_cost(usage$cost_usd)} / {format_cost(limits$max_cost_usd)}"
+            )
+          }
           if (isTRUE(state$session_started)) {
             self$hooks$fire(
               "Stop",
@@ -1871,6 +2698,41 @@ Agent <- R6::R6Class(
               )
             )
           }
+
+          if (length(state$response_parts) > 0L) {
+            private$record_run_event(AgentEvent(
+              "text_complete",
+              run_id = active_run_id,
+              text = paste(state$response_parts, collapse = "")
+            ))
+          }
+          current_turn_count <- length(private$.chat$get_turns())
+          if (current_turn_count > state$turns_before) {
+            last_turn <- observed_last_turn
+          } else {
+            last_turn <- NULL
+          }
+          if (!is.null(last_turn)) {
+            private$record_run_event(private$agent_event(
+              "turn",
+              turn = last_turn,
+              turn_number = max(1L, usage$requests)
+            ))
+          }
+          private$record_run_event(private$agent_event(
+            "usage",
+            usage = usage,
+            limits = limits
+          ))
+          private$record_run_event(private$agent_event(
+            "stop",
+            reason = state$reason,
+            cost = state$cost,
+            usage = usage,
+            limit = private$last_limit_status
+          ))
+          state$result <- private$callback_run_result(state)
+          private$.last_run_result <- state$result
         },
         error = function(error) {
           cleanup_error <<- error
@@ -1879,6 +2741,8 @@ Agent <- R6::R6Class(
 
       private$tool_call_limit <- NULL
       private$tool_call_count <- 0L
+      private$last_tool_cycle_signature <- NULL
+      private$consecutive_tool_cycles <- 0L
       private$should_stop <- FALSE
       private$stop_reason_from_hook <- NULL
       tryCatch(
@@ -1911,18 +2775,21 @@ Agent <- R6::R6Class(
       private$current_tool_results <- 0L
       private$current_outer_requests <- 0L
       private$current_external_usage <- NULL
+      private$current_run_state <- NULL
       private$pending_events <- list()
       private$tool_started_at <- list()
       private$tool_event_overrides <- list()
       private$tool_call_records <- list()
       private$pending_delegations <- list()
+      private$original_tool_results <- list()
+      private$last_tool_cycle_signature <- NULL
+      private$consecutive_tool_cycles <- 0L
       if (!is.null(private$current_run_context)) {
         private$last_run_context <- clone_run_context(
           private$current_run_context
         )
       }
       private$current_run_context <- NULL
-      private$current_run_requires_absolute_file_paths <- FALSE
       private$run_active <- FALSE
       if (!is.null(checkpoint_error)) {
         stop(checkpoint_error)
@@ -1936,9 +2803,14 @@ Agent <- R6::R6Class(
 
     build_session_payload = function() {
       list(
-        schema_version = 1L,
-        turns = self$chat$get_turns(),
-        system_prompt = self$chat$get_system_prompt(),
+        schema_version = 2L,
+        turns = private$.chat$get_turns(),
+        system_prompt = private$.chat$get_system_prompt(),
+        compaction_summary = private$.compaction_summary,
+        tool_result_envelopes = collect_tool_result_envelopes(
+          private$.context_policy,
+          private$.session_id
+        ),
         run_context = private$snapshot_run_context(),
         appended_hook_context_hashes = private$appended_hook_context_hashes,
         file_checkpoint_state = if (is.null(private$.file_checkpoints)) {
@@ -1965,10 +2837,28 @@ Agent <- R6::R6Class(
         )
       }
 
+      if (!"schema_version" %in% names(session)) {
+        abort_session_load(
+          c(
+            "Invalid session file - missing required fields",
+            "x" = "Missing: schema_version"
+          ),
+          path = source
+        )
+      }
+
+      if (!identical(session$schema_version, 2L)) {
+        abort_session_load(
+          "Unsupported session schema - expected version 2",
+          path = source
+        )
+      }
+
       required_fields <- c(
-        "schema_version",
         "turns",
         "system_prompt",
+        "compaction_summary",
+        "tool_result_envelopes",
         "run_context",
         "appended_hook_context_hashes",
         "file_checkpoint_state",
@@ -1981,13 +2871,6 @@ Agent <- R6::R6Class(
             "Invalid session file - missing required fields",
             "x" = "Missing: {.val {missing}}"
           ),
-          path = source
-        )
-      }
-
-      if (!identical(session$schema_version, 1L)) {
-        abort_session_load(
-          "Unsupported session schema - expected version 1",
           path = source
         )
       }
@@ -2016,6 +2899,34 @@ Agent <- R6::R6Class(
           path = source
         )
       }
+      if (
+        !is.null(session$compaction_summary) &&
+          (!is.character(session$compaction_summary) ||
+            length(session$compaction_summary) != 1L ||
+            is.na(session$compaction_summary))
+      ) {
+        abort_session_load(
+          "Invalid session file - compaction_summary must be one string or NULL",
+          path = source
+        )
+      }
+
+      restored_tool_results <- tryCatch(
+        validate_tool_result_envelopes(
+          session$tool_result_envelopes,
+          metadata$session_id
+        ),
+        error = function(error) {
+          abort_session_load(
+            c(
+              "Invalid session file - saved tool results failed validation",
+              "x" = error$message
+            ),
+            path = source,
+            parent = error
+          )
+        }
+      )
 
       restored_run_context <- tryCatch(
         {
@@ -2063,16 +2974,39 @@ Agent <- R6::R6Class(
         }
       }
 
-      previous_turns <- self$chat$get_turns()
-      previous_prompt <- self$chat$get_system_prompt()
+      previous_turns <- private$.chat$get_turns()
+      previous_prompt <- private$.chat$get_system_prompt()
+      previous_tools <- private$.chat$get_tools()
+      previous_reader_registered <- private$.tool_result_reader_registered
+      tool_result_replacement <- NULL
       tryCatch(
         {
-          self$chat$set_turns(session$turns)
-          self$chat$set_system_prompt(session$system_prompt)
+          tool_result_replacement <- begin_tool_result_envelope_replacement(
+            restored_tool_results,
+            policy = private$.context_policy,
+            source_session_id = metadata$session_id,
+            target_session_id = private$.session_id
+          )
+          private$.chat$set_turns(session$turns)
+          private$.chat$set_system_prompt(session$system_prompt)
+          if (length(restored_tool_results) > 0L) {
+            private$ensure_tool_result_reader()
+          }
+          commit_tool_result_envelope_replacement(tool_result_replacement)
         },
         error = function(error) {
-          try(self$chat$set_turns(previous_turns), silent = TRUE)
-          try(self$chat$set_system_prompt(previous_prompt), silent = TRUE)
+          try(private$.chat$set_turns(previous_turns), silent = TRUE)
+          try(private$.chat$set_system_prompt(previous_prompt), silent = TRUE)
+          try(private$.chat$set_tools(previous_tools), silent = TRUE)
+          private$.tool_result_reader_registered <- previous_reader_registered
+          if (!is.null(tool_result_replacement)) {
+            try(
+              rollback_tool_result_envelope_replacement(
+                tool_result_replacement
+              ),
+              silent = TRUE
+            )
+          }
           abort_session_load(
             c(
               "Failed to restore session conversation state",
@@ -2096,6 +3030,7 @@ Agent <- R6::R6Class(
       private$.run_context <- restored_run_context
       private$last_run_context <- clone_run_context(restored_run_context)
       private$appended_hook_context_hashes <- restored_hashes
+      private$.compaction_summary <- session$compaction_summary
     },
 
     notify = function(message, level = "info", code = NULL, ...) {
@@ -2273,6 +3208,7 @@ Agent <- R6::R6Class(
             NULL
           },
           delegation_queued = FALSE,
+          execution_started = FALSE,
           start_seen = FALSE,
           request_seen = FALSE,
           result_seen = FALSE,
@@ -2286,6 +3222,40 @@ Agent <- R6::R6Class(
       private$tool_call_records <- records
       record$record_index <- index
       record
+    },
+
+    begin_tool_execution = function(tool_name) {
+      records <- private$tool_call_records
+      matches <- which(vapply(
+        records,
+        function(record) {
+          identical(record$tool_name, tool_name) &&
+            isTRUE(record$request_seen) &&
+            !isTRUE(record$result_seen) &&
+            !isTRUE(record$execution_started)
+        },
+        logical(1)
+      ))
+      if (length(matches) == 0L) {
+        return(NULL)
+      }
+
+      index <- matches[[1L]]
+      records[[index]]$execution_started <- TRUE
+      private$tool_call_records <- records
+      records[[index]]$tool_call_id
+    },
+
+    claim_original_tool_result = function(tool_call_id, fallback) {
+      if (
+        !is_nonempty_string(tool_call_id) ||
+          !tool_call_id %in% names(private$original_tool_results)
+      ) {
+        return(fallback)
+      }
+      value <- private$original_tool_results[[tool_call_id]]
+      private$original_tool_results[[tool_call_id]] <- NULL
+      value
     },
 
     queue_delegation = function(record) {
@@ -2326,45 +3296,19 @@ Agent <- R6::R6Class(
       )
     },
 
-    enqueue_event = function(event) {
-      private$pending_events <- c(private$pending_events, list(event))
-      invisible(event)
-    },
-
-    drain_events = function() {
-      events <- private$pending_events
-      private$pending_events <- list()
-      events
-    },
-
-    fallback_chat = function(prompt) {
-      # Non-streaming chat calls report tool lifecycle through callbacks, so
-      # switch out of content-stream mode before invoking the provider.
-      private$current_stream_content <- FALSE
-      fallback_error <- NULL
-      response <- tryCatch(
-        self$chat$chat(prompt),
-        error = function(error) {
-          fallback_error <<- error
-          NULL
-        }
-      )
-
-      list(
-        response = response,
-        events = private$drain_events(),
-        error = fallback_error
-      )
-    },
-
     current_run_usage = function() {
       baseline <- private$current_usage_baseline %||% AgentUsage()
-      usage <- agent_usage_difference(
-        agent_usage_snapshot(self$chat),
-        baseline,
-        tool_calls = private$current_tool_calls
+      current <- agent_usage_snapshot(private$.chat)
+      requests <- max(
+        current$requests - baseline$requests,
+        private$current_outer_requests
       )
-      usage$requests <- max(usage$requests, private$current_outer_requests)
+      usage <- agent_usage_difference(
+        current,
+        baseline,
+        tool_calls = private$current_tool_calls,
+        requests = requests
+      )
       agent_usage_add(
         usage,
         private$current_external_usage %||% AgentUsage()
@@ -2428,6 +3372,13 @@ Agent <- R6::R6Class(
           run_id = private$current_run_id
         )
       }
+      if (identical(status$reason, "cost_unavailable")) {
+        abort_cost_unavailable(
+          message,
+          max_cost = status$limit,
+          run_id = private$current_run_id
+        )
+      }
       abort_budget_exceeded(
         message,
         current_cost = if (identical(status$reason, "cost_limit")) {
@@ -2444,26 +3395,6 @@ Agent <- R6::R6Class(
         actual = status$actual,
         limit = status$limit,
         run_id = private$current_run_id
-      )
-    },
-
-    start_stream = function(prompt) {
-      stream_fun <- self$chat$stream
-      stream_formals <- names(formals(stream_fun))
-      args <- list(prompt)
-      content_mode <- "stream" %in% stream_formals
-      if (content_mode) {
-        args$stream <- "content"
-      }
-      if (
-        !is.null(private$current_stream_controller) &&
-          "controller" %in% stream_formals
-      ) {
-        args$controller <- private$current_stream_controller
-      }
-      list(
-        generator = do.call(stream_fun, args),
-        content = content_mode
       )
     },
 
@@ -2512,7 +3443,7 @@ Agent <- R6::R6Class(
     },
 
     # Callback for tool requests (permission checking + hooks)
-    on_tool_request = function(request) {
+    handle_tool_request = function(request) {
       # Validate and extract request data safely
       extracted <- private$extract_tool_request_data(request)
       if (!is.null(extracted$tool_identity_error)) {
@@ -2526,8 +3457,10 @@ Agent <- R6::R6Class(
       private$current_tool_calls <- private$current_tool_calls + 1L
       record <- private$tool_call_record(extracted, "request")
       extracted$tool_call_id <- record$tool_call_id
-      if (!isTRUE(private$current_stream_content)) {
-        private$enqueue_event(private$tool_start_event(extracted))
+      private$tool_call_records[[record$record_index]]$request_signature <-
+        tool_request_signature(tool_name, tool_input)
+      if (!isTRUE(record$start_seen)) {
+        private$record_run_event(private$tool_start_event(extracted))
       }
 
       usage <- private$current_run_usage()
@@ -2542,29 +3475,26 @@ Agent <- R6::R6Class(
         ellmer::tool_reject(usage_limit_message(limit_status))
       }
 
-      file_info <- private$file_tool_path_info(tool_name, tool_input)
-      if (
-        isTRUE(private$current_run_requires_absolute_file_paths) &&
-          !is.null(file_info)
-      ) {
-        tool_path <- file_info$path
-        if (is.null(tool_path) || !is_absolute_path(tool_path)) {
-          ellmer::tool_reject(sprintf(
-            paste0(
-              "Relative or missing file paths are not safe in run_shiny(); ",
-              "provide an absolute path within the Agent working_dir: %s"
-            ),
-            self$working_dir
-          ))
-        }
-        if (!is_path_within(tool_path, self$working_dir)) {
-          ellmer::tool_reject(sprintf(
-            "File paths in run_shiny() must stay within: %s",
-            self$working_dir
-          ))
+      # Retain the adapter-specific counter for callers that configure it
+      # directly. The governed run limit above counts all requests.
+      if (!is.null(private$tool_call_limit)) {
+        private$tool_call_count <- private$tool_call_count + 1L
+        if (private$tool_call_count > private$tool_call_limit) {
+          private$request_stream_stop("tool_call_limit")
+          message <- paste0(
+            "Tool call limit reached. Please provide your final answer with ",
+            "the information gathered so far."
+          )
+          private$notify(
+            message,
+            level = "warning",
+            code = "tool_call_limit"
+          )
+          ellmer::tool_reject(message)
         }
       }
 
+      file_info <- private$file_tool_path_info(tool_name, tool_input)
       context <- private$hook_context(
         tool_annotations = tool_annotations,
         tool_call_id = record$tool_call_id,
@@ -2574,8 +3504,16 @@ Agent <- R6::R6Class(
         delegation_id = record$delegation_id
       )
 
-      # Check permissions first
-      perm_result <- self$permissions$check(tool_name, tool_input, context)
+      # Deputy's session-local result reader is not part of the configured tool
+      # surface. Its private marker exempts only the allowlist gate; ordinary
+      # denylist, callback, mode, and capability checks still apply.
+      permission_context <- context
+      permission_context$.deputy_internal_tool <- extracted$internal_tool
+      perm_result <- self$permissions$check(
+        tool_name,
+        tool_input,
+        permission_context
+      )
 
       if (inherits(perm_result, "PermissionResultDeny")) {
         request_result <- self$hooks$fire(
@@ -2636,23 +3574,6 @@ Agent <- R6::R6Class(
         }
       }
 
-      # Enforce callback-based limits (active during run_shiny; NULL during
-      # run/run_sync which have their own turn-level loop controls)
-      if (!is.null(private$tool_call_limit)) {
-        private$tool_call_count <- private$tool_call_count + 1L
-        if (private$tool_call_count > private$tool_call_limit) {
-          private$request_stream_stop("tool_call_limit")
-          private$notify(
-            "Tool call limit reached. Please provide your final answer with the information gathered so far.",
-            level = "warning",
-            code = "tool_call_limit"
-          )
-          ellmer::tool_reject(
-            "Tool call limit reached. Please provide your final answer with the information gathered so far."
-          )
-        }
-      }
-
       if (!is.null(private$.file_checkpoints)) {
         tryCatch(
           private$.file_checkpoints$before_tool(
@@ -2683,7 +3604,7 @@ Agent <- R6::R6Class(
     },
 
     # Callback for tool results (hooks)
-    on_tool_result = function(result) {
+    handle_tool_result = function(result) {
       # Validate and extract tool result data safely
       # ContentToolResult (S7) has: value, error, extra, request
       # request is ContentToolRequest with: id, name, arguments, tool, extra
@@ -2691,6 +3612,10 @@ Agent <- R6::R6Class(
       private$current_tool_results <- private$current_tool_results + 1L
       record <- private$tool_call_record(extracted, "result")
       extracted$tool_call_id <- record$tool_call_id
+      hook_tool_result <- private$claim_original_tool_result(
+        record$tool_call_id,
+        extracted$tool_result
+      )
 
       if (!is.null(private$.file_checkpoints)) {
         tryCatch(
@@ -2725,7 +3650,7 @@ Agent <- R6::R6Class(
       hook_result <- self$hooks$fire(
         "PostToolUse",
         tool_name = extracted$tool_name,
-        tool_result = extracted$tool_result,
+        tool_result = hook_tool_result,
         tool_error = extracted$tool_error,
         context = context
       )
@@ -2750,14 +3675,59 @@ Agent <- R6::R6Class(
         self$hooks$fire(
           "PostToolUseFailure",
           tool_name = extracted$tool_name,
-          tool_result = extracted$tool_result,
+          tool_result = hook_tool_result,
           tool_error = extracted$tool_error,
           context = context
         )
       }
 
-      if (!isTRUE(private$current_stream_content)) {
-        private$enqueue_event(private$tool_end_event(extracted))
+      private$record_run_event(private$tool_end_event(extracted))
+
+      record_state <- private$tool_call_records[[record$record_index]]
+      request_signature <- record_state$request_signature
+      cycle_signature <- if (is.null(request_signature)) {
+        NULL
+      } else {
+        tool_cycle_signature(
+          request_signature,
+          hook_tool_result,
+          extracted$tool_error
+        )
+      }
+      if (is.null(cycle_signature)) {
+        private$last_tool_cycle_signature <- NULL
+        private$consecutive_tool_cycles <- 0L
+      } else {
+        loop <- advance_tool_loop(
+          signature = cycle_signature,
+          last_signature = private$last_tool_cycle_signature,
+          consecutive_calls = private$consecutive_tool_cycles
+        )
+        private$last_tool_cycle_signature <- loop$signature
+        private$consecutive_tool_cycles <- loop$consecutive_calls
+        if (isTRUE(loop$stalled) && !isTRUE(private$should_stop)) {
+          message <- paste0(
+            "Tool request `",
+            extracted$tool_name,
+            "` completed with the same result ",
+            loop$consecutive_calls,
+            " times without progress."
+          )
+          private$request_stream_stop("tool_loop")
+          private$notify(
+            message,
+            level = "warning",
+            code = "tool_loop",
+            tool_name = extracted$tool_name,
+            repeated = loop$consecutive_calls
+          )
+        }
+      }
+
+      # ellmer may make another provider request after this tool result. Check
+      # the complete context again while the run is between provider turns.
+      if (!isTRUE(private$should_stop)) {
+        private$maybe_auto_compact(messages = list())
       }
 
       invisible(NULL)
@@ -2769,6 +3739,7 @@ Agent <- R6::R6Class(
       tool_name <- "unknown"
       tool_input <- list()
       tool_annotations <- NULL
+      internal_tool <- NULL
       provider_tool_call_id <- NULL
       tool_identity_error <- NULL
 
@@ -2779,6 +3750,7 @@ Agent <- R6::R6Class(
           tool_name = tool_name,
           tool_input = tool_input,
           tool_annotations = tool_annotations,
+          internal_tool = internal_tool,
           provider_tool_call_id = provider_tool_call_id,
           tool_identity_error = tool_request_identity_error(request)
         ))
@@ -2795,6 +3767,7 @@ Agent <- R6::R6Class(
           tool_name = tool_name,
           tool_input = tool_input,
           tool_annotations = tool_annotations,
+          internal_tool = internal_tool,
           provider_tool_call_id = provider_tool_call_id,
           tool_identity_error = tool_request_identity_error(request)
         ))
@@ -2835,11 +3808,22 @@ Agent <- R6::R6Class(
           NULL
         }
       )
+      internal_tool <- tryCatch(
+        {
+          if (is.null(request@tool)) {
+            NULL
+          } else {
+            attr(request@tool, "deputy_internal_tool", exact = TRUE)
+          }
+        },
+        error = function(e) NULL
+      )
 
       list(
         tool_name = tool_name,
         tool_input = tool_input,
         tool_annotations = tool_annotations,
+        internal_tool = internal_tool,
         provider_tool_call_id = provider_tool_call_id,
         tool_identity_error = tool_identity_error
       )
@@ -2955,8 +3939,8 @@ Agent <- R6::R6Class(
         chunk_hash
       )
 
-      current_prompt <- self$chat$get_system_prompt() %||% ""
-      self$chat$set_system_prompt(paste(
+      current_prompt <- private$.chat$get_system_prompt() %||% ""
+      private$.chat$set_system_prompt(paste(
         current_prompt,
         "",
         "# Hook Additional Context",
@@ -2968,648 +3952,269 @@ Agent <- R6::R6Class(
     },
 
     # Create a true coro generator for streaming events
-    create_run_generator = function(
-      task,
-      usage_limits,
-      include_partial_messages = TRUE,
-      output_format = NULL,
-      run_context,
-      run_owner
-    ) {
-      agent <- self
 
-      # Note: We use .__enclos_env__$private access inside the generator because
-      # coro's state machine parser doesn't support calling closure functions.
-      # This is a known limitation - see https://github.com/r-lib/coro/issues
-
-      # Create the generator using coro
-      coro::generator(function() {
-        if (isTRUE(agent$.__enclos_env__$private$run_active)) {
-          cli::cli_abort(
-            "This agent already has an active run",
-            class = c("deputy_run_active", "deputy_error")
-          )
-        }
-        agent$.__enclos_env__$private$run_active <- TRUE
-        active_run_id <- NULL
-        on.exit(
-          {
-            if (
-              is.null(active_run_id) ||
-                identical(
-                  agent$.__enclos_env__$private$current_run_id,
-                  active_run_id
-                )
-            ) {
-              run_owner$finished <- TRUE
-              agent$.__enclos_env__$private$finish_active_run()
-            }
-          },
-          add = TRUE
-        )
-
-        agent$.__enclos_env__$private$should_stop <- FALSE
-        agent$.__enclos_env__$private$stop_reason_from_hook <- NULL
-        agent$.__enclos_env__$private$current_run_id <-
-          agent$.__enclos_env__$private$new_run_id()
-        agent$.__enclos_env__$private$current_run_context <- run_context
-        active_run_id <- agent$.__enclos_env__$private$current_run_id
-        run_owner$active_run_id <- active_run_id
-        agent$.__enclos_env__$private$current_usage_limits <- usage_limits
-        agent$.__enclos_env__$private$current_usage_baseline <-
-          agent_usage_snapshot(agent$chat)
-        agent$.__enclos_env__$private$current_tool_calls <- 0L
-        agent$.__enclos_env__$private$current_tool_results <- 0L
-        agent$.__enclos_env__$private$current_outer_requests <- 0L
-        agent$.__enclos_env__$private$current_external_usage <- AgentUsage()
-        agent$.__enclos_env__$private$current_stream_controller <- tryCatch(
-          ellmer::stream_controller(),
-          error = function(e) NULL
-        )
-        agent$.__enclos_env__$private$current_stream_content <- FALSE
-        agent$.__enclos_env__$private$pending_events <- list()
-        agent$.__enclos_env__$private$tool_started_at <- list()
-        agent$.__enclos_env__$private$tool_event_overrides <- list()
-        agent$.__enclos_env__$private$tool_call_records <- list()
-        agent$.__enclos_env__$private$pending_delegations <- list()
-        agent$.__enclos_env__$private$last_limit_status <- NULL
-        agent$.__enclos_env__$private$last_run_usage <- AgentUsage()
-        agent$.__enclos_env__$private$current_run_checkpoint_id <- NULL
-        agent$.__enclos_env__$private$current_run_requires_absolute_file_paths <-
-          FALSE
-
-        # Apply output format instructions
-        if (!is.null(output_format)) {
-          task <- apply_output_format_instructions(task, output_format)
-        }
-
-        if (!is.null(agent$.__enclos_env__$private$.file_checkpoints)) {
-          checkpoint_id <- agent$.__enclos_env__$private$.file_checkpoints$checkpoint(
-            paste0("run ", agent$.__enclos_env__$private$current_run_id),
-            metadata = list(
-              run_id = agent$.__enclos_env__$private$current_run_id,
-              task = task
-            )
-          )
-          agent$.__enclos_env__$private$current_run_checkpoint_id <-
-            checkpoint_id
-        }
-
-        # Yield start event
-        coro::yield(agent$.__enclos_env__$private$agent_event(
-          "start",
-          task = task,
-          usage_limits = usage_limits,
-          checkpoint_id = agent$.__enclos_env__$private$current_run_checkpoint_id
-        ))
-
-        if (!is.null(agent$.__enclos_env__$private$current_run_checkpoint_id)) {
-          coro::yield(agent$.__enclos_env__$private$agent_event(
-            "file_checkpoint",
-            checkpoint_id = agent$.__enclos_env__$private$current_run_checkpoint_id,
-            name = paste0(
-              "run ",
-              agent$.__enclos_env__$private$current_run_id
-            )
-          ))
-        }
-
-        # Fire SessionStart hook (before first turn begins)
-        agent$hooks$fire(
-          "SessionStart",
-          context = agent$.__enclos_env__$private$hook_context(
-            permissions = agent$permissions,
-            provider = agent$provider(),
-            tools_count = length(agent$chat$get_tools()),
-            run_id = agent$.__enclos_env__$private$current_run_id,
-            usage_limits = usage_limits
-          )
-        )
-
-        # Fire UserPromptSubmit hook
-        agent$hooks$fire(
-          "UserPromptSubmit",
-          prompt = task,
-          context = agent$.__enclos_env__$private$hook_context(
-            run_id = agent$.__enclos_env__$private$current_run_id
-          )
-        )
-
-        turn_num <- 0
-        stop_reason <- "complete"
-        last_response_hash <- NULL
-        loop_cap <- usage_limits$max_requests
-
-        if (identical(loop_cap, 0L)) {
-          zero_status <- list(
-            field = "max_requests",
-            actual = 0L,
-            reason = "request_limit",
-            label = "model requests",
-            reached = TRUE,
-            limit = 0L
-          )
-          agent$.__enclos_env__$private$mark_usage_limit(zero_status)
-          stop_reason <- "request_limit"
-        }
-
-        i <- 0L
-        while (is.null(loop_cap) || i < loop_cap) {
-          # Check if hook requested stop
-          if (agent$.__enclos_env__$private$should_stop) {
-            hook_reason <- agent$.__enclos_env__$private$stop_reason_from_hook
-            if (is.null(hook_reason)) {
-              stop_reason <- "hook_requested_stop"
-            } else {
-              stop_reason <- hook_reason
-            }
-            break
-          }
-
-          i <- i + 1L
-          turn_num <- i
-          agent$.__enclos_env__$private$current_outer_requests <- i
-
-          # Determine the prompt for this turn
-          if (i == 1) {
-            prompt <- task
-          } else {
-            prompt <- NULL
-          }
-
-          # Use ellmer's stream() for true streaming text output
-          text_chunks <- character()
-          stream_error <- NULL
-          saw_stream_output <- FALSE
-          tool_calls_before_stream <-
-            agent$.__enclos_env__$private$current_tool_calls
-          tool_results_before_stream <-
-            agent$.__enclos_env__$private$current_tool_results
-          turns_before_stream <- tryCatch(
-            length(agent$chat$get_turns()),
-            error = function(e) 0L
-          )
-
-          # Try streaming first
-          stream <- tryCatch(
-            agent$.__enclos_env__$private$start_stream(prompt),
-            error = function(e) {
-              stream_error <<- e
-              NULL
-            }
-          )
-
-          if (!is.null(stream)) {
-            stream_gen <- stream$generator
-            agent$.__enclos_env__$private$current_stream_content <-
-              isTRUE(stream$content)
-
-            # Stream chunks as they arrive
-            repeat {
-              if (agent$.__enclos_env__$private$should_stop) {
-                break
-              }
-              step <- tryCatch(
-                list(chunk = stream_gen(), error = NULL),
-                error = function(e) list(chunk = NULL, error = e)
-              )
-              if (!is.null(step$error)) {
-                if (agent$.__enclos_env__$private$should_stop) {
-                  break
-                }
-                stream_error <- step$error
-                break
-              }
-              chunk <- step$chunk
-              if (coro::is_exhausted(chunk)) {
-                break
-              }
-              if (
-                agent$.__enclos_env__$private$should_stop &&
-                  !inherits(chunk, "ellmer::ContentToolResult")
-              ) {
-                break
-              }
-              saw_stream_output <- TRUE
-
-              queued <- agent$.__enclos_env__$private$drain_events()
-              for (event in queued) {
-                coro::yield(event)
-              }
-
-              if (inherits(chunk, "ellmer::ContentToolRequest")) {
-                extracted <- agent$.__enclos_env__$private$extract_tool_request_data(
-                  chunk
-                )
-                coro::yield(
-                  agent$.__enclos_env__$private$tool_start_event(extracted)
-                )
-              } else if (inherits(chunk, "ellmer::ContentToolResult")) {
-                extracted <- agent$.__enclos_env__$private$extract_tool_result_data(
-                  chunk
-                )
-                coro::yield(
-                  agent$.__enclos_env__$private$tool_end_event(extracted)
-                )
-              } else if (inherits(chunk, "ellmer::ContentText")) {
-                text <- chunk@text
-                text_chunks <- c(text_chunks, text)
-                if (isTRUE(include_partial_messages)) {
-                  coro::yield(AgentEvent(
-                    "text",
-                    run_id = agent$.__enclos_env__$private$current_run_id,
-                    text = text,
-                    is_complete = FALSE
-                  ))
-                }
-              } else if (is.character(chunk) && length(chunk) == 1) {
-                if (nchar(chunk) > 0) {
-                  text_chunks <- c(text_chunks, chunk)
-                  if (isTRUE(include_partial_messages)) {
-                    coro::yield(AgentEvent(
-                      "text",
-                      run_id = agent$.__enclos_env__$private$current_run_id,
-                      text = chunk,
-                      is_complete = FALSE
-                    ))
-                  }
-                }
-              } else {
-                coro::yield(AgentEvent(
-                  "content",
-                  run_id = agent$.__enclos_env__$private$current_run_id,
-                  content = chunk,
-                  content_type = class(chunk)[[1]] %||% "unknown"
-                ))
-              }
-            }
-
-            queued <- agent$.__enclos_env__$private$drain_events()
-            for (event in queued) {
-              coro::yield(event)
-            }
-          } else {
-            # Fallback to non-streaming if stream() failed
-            if (!agent$.__enclos_env__$private$should_stop) {
-              if (!is.null(stream_error)) {
-                cli::cli_warn(c(
-                  "Streaming failed, falling back to non-streaming",
-                  "x" = stream_error$message
-                ))
-                agent$.__enclos_env__$private$notify(
-                  "Streaming failed, falling back to non-streaming",
-                  level = "warning",
-                  code = "stream_fallback",
-                  error = stream_error$message
-                )
-                # Emit warning event so applications can surface this to users
-                coro::yield(AgentEvent(
-                  "warning",
-                  run_id = agent$.__enclos_env__$private$current_run_id,
-                  message = "Streaming failed, falling back to non-streaming",
-                  details = stream_error$message
-                ))
-              }
-              fallback <- agent$.__enclos_env__$private$fallback_chat(prompt)
-              for (event in fallback$events) {
-                coro::yield(event)
-              }
-              if (
-                !is.null(fallback$error) &&
-                  !agent$.__enclos_env__$private$should_stop
-              ) {
-                stop(fallback$error)
-              }
-              response <- fallback$response
-              if (
-                !agent$.__enclos_env__$private$should_stop &&
-                  !is.null(response) &&
-                  nchar(response) > 0
-              ) {
-                text_chunks <- response
-                if (isTRUE(include_partial_messages)) {
-                  coro::yield(AgentEvent(
-                    "text",
-                    run_id = agent$.__enclos_env__$private$current_run_id,
-                    text = response,
-                    is_complete = TRUE
-                  ))
-                }
-              }
-            }
-          }
-
-          if (
-            !is.null(stream_error) &&
-              !is.null(stream) &&
-              !isTRUE(saw_stream_output) &&
-              !agent$.__enclos_env__$private$should_stop &&
-              identical(
-                agent$.__enclos_env__$private$current_tool_calls,
-                tool_calls_before_stream
-              )
-          ) {
-            cli::cli_warn(c(
-              "Streaming failed, falling back to non-streaming",
-              "x" = stream_error$message
-            ))
-            agent$.__enclos_env__$private$notify(
-              "Streaming failed, falling back to non-streaming",
-              level = "warning",
-              code = "stream_fallback",
-              error = stream_error$message
-            )
-            coro::yield(AgentEvent(
-              "warning",
-              run_id = agent$.__enclos_env__$private$current_run_id,
-              message = "Streaming failed, falling back to non-streaming",
-              details = stream_error$message
-            ))
-            fallback <- agent$.__enclos_env__$private$fallback_chat(prompt)
-            for (event in fallback$events) {
-              coro::yield(event)
-            }
-            if (
-              !is.null(fallback$error) &&
-                !agent$.__enclos_env__$private$should_stop
-            ) {
-              stop(fallback$error)
-            }
-            response <- fallback$response
-            if (
-              !agent$.__enclos_env__$private$should_stop &&
-                !is.null(response) &&
-                nchar(response) > 0
-            ) {
-              text_chunks <- response
-              if (isTRUE(include_partial_messages)) {
-                coro::yield(AgentEvent(
-                  "text",
-                  run_id = agent$.__enclos_env__$private$current_run_id,
-                  text = response,
-                  is_complete = TRUE
-                ))
-              }
-            }
-            stream_error <- NULL
-          }
-
-          if (
-            !is.null(stream_error) &&
-              !is.null(stream) &&
-              (isTRUE(saw_stream_output) ||
-                agent$.__enclos_env__$private$current_tool_calls >
-                  tool_calls_before_stream)
-          ) {
-            if (!agent$.__enclos_env__$private$should_stop) {
-              stop_reason <- "provider_error"
-              coro::yield(AgentEvent(
-                "warning",
-                run_id = agent$.__enclos_env__$private$current_run_id,
-                message = "Streaming stopped after a provider error",
-                details = stream_error$message
-              ))
-            }
-            break
-          }
-
-          # Yield complete text event with full response
-          full_text <- paste(text_chunks, collapse = "")
-          if (length(text_chunks) > 0 && nchar(full_text) > 0) {
-            coro::yield(AgentEvent(
-              "text_complete",
-              run_id = agent$.__enclos_env__$private$current_run_id,
-              text = full_text
-            ))
-          }
-
-          # Stall detection
-          if (nchar(full_text) > 0) {
-            current_hash <- digest::digest(full_text, algo = "md5")
-          } else {
-            current_hash <- ""
-          }
-          if (
-            !is.null(last_response_hash) &&
-              identical(current_hash, last_response_hash) &&
-              nchar(full_text) > 0
-          ) {
-            cli::cli_warn("Agent may be stalled - identical response detected")
-          }
-          last_response_hash <- current_hash
-
-          incomplete_tool_call <-
-            agent$.__enclos_env__$private$current_tool_calls -
-              tool_calls_before_stream >
-              agent$.__enclos_env__$private$current_tool_results -
-                tool_results_before_stream
-          agent$.__enclos_env__$private$finalize_pending_checkpoints()
-          if (isTRUE(incomplete_tool_call)) {
-            stop_reason <- "provider_error"
-            coro::yield(AgentEvent(
-              "warning",
-              run_id = agent$.__enclos_env__$private$current_run_id,
-              message = "Provider stream ended before a tool result arrived",
-              details = "Pending tool calls were finalized for safe recovery."
-            ))
-          }
-
-          # Attribute a turn only when this request produced fresh output or
-          # advanced the conversation. Cancellation before the first chunk
-          # must not re-emit a prior assistant turn as current-run state.
-          turns_after_stream <- tryCatch(
-            length(agent$chat$get_turns()),
-            error = function(e) turns_before_stream
-          )
-          produced_current_turn <-
-            isTRUE(saw_stream_output) ||
-            length(text_chunks) > 0L ||
-            agent$.__enclos_env__$private$current_tool_calls >
-              tool_calls_before_stream ||
-            turns_after_stream > turns_before_stream
-          last_turn <- NULL
-          if (isTRUE(produced_current_turn)) {
-            last_turn <- agent$chat$last_turn()
-            coro::yield(AgentEvent(
-              "turn",
-              run_id = agent$.__enclos_env__$private$current_run_id,
-              turn = last_turn,
-              turn_number = turn_num
-            ))
-          }
-
-          if (isTRUE(incomplete_tool_call)) {
-            break
-          }
-
-          # Check if hook requested stop (after tool execution)
-          if (agent$.__enclos_env__$private$should_stop) {
-            hook_reason <- agent$.__enclos_env__$private$stop_reason_from_hook
-            if (is.null(hook_reason)) {
-              stop_reason <- "hook_requested_stop"
-            } else {
-              stop_reason <- hook_reason
-            }
-            break
-          }
-
-          # Check if we're done (no tool requests in last turn)
-          if (!agent$.__enclos_env__$private$has_tool_requests(last_turn)) {
-            break
-          }
-
-          # Check if we hit max turns
-          if (!is.null(loop_cap) && i >= loop_cap) {
-            request_status <- list(
-              field = "max_requests",
-              actual = i,
-              reason = "request_limit",
-              label = "model requests",
-              reached = TRUE,
-              limit = loop_cap
-            )
-            agent$.__enclos_env__$private$mark_usage_limit(request_status)
-            stop_reason <- "request_limit"
-          }
-        }
-
-        # A provider can fail after the request callback but before returning a
-        # tool result. Resolve those captures before ending the run.
-        agent$.__enclos_env__$private$finalize_pending_checkpoints()
-
-        usage <- agent$.__enclos_env__$private$current_run_usage()
-        agent$.__enclos_env__$private$last_run_usage <- usage
-        limit_status <- agent$.__enclos_env__$private$last_limit_status
-        if (is.null(limit_status)) {
-          limit_status <- usage_limit_status(usage, usage_limits)
-          if (!is.null(limit_status)) {
-            agent$.__enclos_env__$private$mark_usage_limit(limit_status)
-            stop_reason <- limit_status$reason
-          }
-        }
-
-        if (agent$.__enclos_env__$private$should_stop) {
-          stop_reason <- agent$.__enclos_env__$private$stop_reason_from_hook %||%
-            "hook_requested_stop"
-        }
-        external_requests <- (agent$.__enclos_env__$private$current_external_usage %||%
-          AgentUsage())$requests
-        parent_requests <- max(0L, usage$requests - external_requests)
-        turn_num <- max(turn_num, parent_requests)
-
-        if (
-          is.null(limit_status) &&
-            !is.null(usage_limits$max_cost_usd) &&
-            usage$cost_usd >= usage_limits$max_cost_usd * 0.9
-        ) {
-          agent$.__enclos_env__$private$notify(
-            paste0(
-              "Approaching run cost limit: ",
-              format_cost(usage$cost_usd),
-              " / ",
-              format_cost(usage_limits$max_cost_usd)
-            ),
-            level = "warning",
-            code = "cost_limit_warning",
-            usage = usage,
-            max_cost_usd = usage_limits$max_cost_usd
-          )
-          cli::cli_warn(
-            "Approaching run cost limit: {format_cost(usage$cost_usd)} / {format_cost(usage_limits$max_cost_usd)}"
-          )
-        }
-
-        # Fire Stop hook
-        agent$hooks$fire(
-          "Stop",
-          reason = stop_reason,
-          context = agent$.__enclos_env__$private$hook_context(
-            total_turns = turn_num,
-            cost = agent$cost(),
-            usage = usage,
-            run_id = agent$.__enclos_env__$private$current_run_id
-          )
-        )
-
-        # Fire SessionEnd hook (after agent stops for any reason)
-        agent$hooks$fire(
-          "SessionEnd",
-          reason = stop_reason,
-          context = agent$.__enclos_env__$private$hook_context(
-            total_turns = turn_num,
-            cost = agent$cost(),
-            usage = usage,
-            run_id = agent$.__enclos_env__$private$current_run_id
-          )
-        )
-
-        coro::yield(agent$.__enclos_env__$private$agent_event(
-          "usage",
-          usage = usage,
-          limits = usage_limits
-        ))
-
-        if (
-          !is.null(limit_status) && identical(usage_limits$on_exceed, "error")
-        ) {
-          agent$.__enclos_env__$private$abort_usage_limit(limit_status)
-        }
-
-        stop_event <- agent$.__enclos_env__$private$agent_event(
-          "stop",
-          reason = stop_reason,
-          total_turns = turn_num,
-          cost = agent$cost(),
-          usage = usage,
-          limit = limit_status
-        )
-        run_owner$finished <- TRUE
-        agent$.__enclos_env__$private$finish_active_run()
-
-        # Yield stop event after run resources are released.
-        coro::yield(stop_event)
-      })()
-    },
-
-    # Check if a turn has tool requests
-    has_tool_requests = function(turn) {
-      if (is.null(turn)) {
-        return(FALSE)
-      }
-
-      # Check contents for tool requests (with defensive error handling)
-      contents <- tryCatch(
-        turn@contents,
-        error = function(e) {
-          cli_warn(c(
-            "Failed to access turn contents for tool request check",
-            "i" = "Turn class: {.cls {class(turn)}}",
-            "x" = e$message
-          ))
-          list()
-        }
-      )
-
-      for (content in contents) {
-        if (inherits(content, "ellmer::ContentToolRequest")) {
-          return(TRUE)
-        }
-      }
-      FALSE
-    },
-
-    # Get the last response text
     get_last_response = function() {
-      last <- self$chat$last_turn()
+      last <- private$.chat$last_turn()
       if (is.null(last)) {
         return(NULL)
       }
       last@text
     },
 
+    compaction_prompt_parts = function(prompt) {
+      if (
+        !is.character(prompt) ||
+          length(prompt) != 1L ||
+          is.na(prompt)
+      ) {
+        return(NULL)
+      }
+      start_pattern <- paste0(
+        "\\n\\n<!-- deputy-compaction-summary:v1 chars=([0-9]+) ",
+        "sha256=([a-f0-9]{64}) -->\\n",
+        "## Previous Conversation Summary\\n"
+      )
+      start <- regexec(start_pattern, prompt, perl = TRUE)[[1L]]
+      captured <- regmatches(prompt, list(start))[[1L]]
+      if (length(captured) != 3L) {
+        return(NULL)
+      }
+      summary_chars <- suppressWarnings(as.numeric(captured[[2L]]))
+      if (
+        length(summary_chars) != 1L ||
+          is.na(summary_chars) ||
+          !is.finite(summary_chars) ||
+          summary_chars < 0 ||
+          summary_chars != floor(summary_chars)
+      ) {
+        return(NULL)
+      }
+
+      summary_start <- start[[1L]] + attr(start, "match.length")[[1L]]
+      summary_end <- summary_start + summary_chars - 1
+      summary <- if (summary_chars == 0) {
+        ""
+      } else {
+        substr(prompt, summary_start, summary_end)
+      }
+      if (
+        !identical(
+          digest::digest(summary, algo = "sha256", serialize = FALSE),
+          captured[[3L]]
+        )
+      ) {
+        return(NULL)
+      }
+
+      end_marker <- paste0(
+        "\n\n## End Previous Conversation Summary\n",
+        "<!-- deputy-compaction-summary:v1:end -->"
+      )
+      end_start <- summary_start + summary_chars
+      end_end <- end_start + nchar(end_marker, type = "chars") - 1
+      if (!identical(substr(prompt, end_start, end_end), end_marker)) {
+        return(NULL)
+      }
+
+      before <- substr(prompt, 1L, start[[1L]] - 1L)
+      after_start <- end_end + 1
+      after <- if (after_start > nchar(prompt)) {
+        ""
+      } else {
+        substr(prompt, after_start, nchar(prompt))
+      }
+      list(before = before, summary = summary, after = after)
+    },
+
+    compaction_prompt_block = function(summary) {
+      paste0(
+        "\n\n<!-- deputy-compaction-summary:v1 chars=",
+        nchar(summary, type = "chars"),
+        " sha256=",
+        digest::digest(summary, algo = "sha256", serialize = FALSE),
+        " -->\n## Previous Conversation Summary\n",
+        summary,
+        "\n\n## End Previous Conversation Summary\n",
+        "<!-- deputy-compaction-summary:v1:end -->"
+      )
+    },
+
+    system_prompt_without_compaction = function() {
+      prompt <- private$.chat$get_system_prompt() %||% ""
+      if (is.null(private$.compaction_summary)) {
+        return(prompt)
+      }
+      parts <- private$compaction_prompt_parts(prompt)
+      if (
+        is.null(parts) ||
+          !identical(parts$summary, private$.compaction_summary)
+      ) {
+        return(prompt)
+      }
+      paste0(parts$before, parts$after)
+    },
+
+    context_token_count = function(messages, turns = NULL) {
+      chat <- private$.chat
+      if (!is.null(turns)) {
+        chat <- tryCatch(chat$clone(deep = TRUE), error = function(e) NULL)
+        if (is.null(chat) || identical(chat, private$.chat)) {
+          return(NULL)
+        }
+        turns_set <- tryCatch(
+          {
+            chat$set_turns(turns)
+            TRUE
+          },
+          error = function(e) FALSE
+        )
+        if (!isTRUE(turns_set)) {
+          return(NULL)
+        }
+      }
+
+      count <- tryCatch(
+        do.call(
+          chat$token_count,
+          c(messages, list(include = "complete"))
+        ),
+        error = function(e) NULL
+      )
+      if (!is.numeric(count) || length(count) == 0L || anyNA(count)) {
+        return(NULL)
+      }
+      as.numeric(sum(count))
+    },
+
+    is_human_turn = function(turn) {
+      if (!inherits(turn, "ellmer::UserTurn")) {
+        return(FALSE)
+      }
+      contents <- tryCatch(turn@contents, error = function(e) list())
+      !any(vapply(
+        contents,
+        inherits,
+        logical(1),
+        what = "ellmer::ContentToolResult"
+      ))
+    },
+
+    has_tool_request = function(turn) {
+      if (!inherits(turn, "ellmer::AssistantTurn")) {
+        return(FALSE)
+      }
+      contents <- tryCatch(turn@contents, error = function(e) list())
+      any(vapply(
+        contents,
+        inherits,
+        logical(1),
+        what = "ellmer::ContentToolRequest"
+      ))
+    },
+
+    compaction_keep_last = function(messages, target_tokens) {
+      turns <- private$.chat$get_turns()
+      if (length(turns) == 0L) {
+        return(0L)
+      }
+
+      starts <- which(vapply(turns, private$is_human_turn, logical(1)))
+      minimum_keep <- 0L
+      if (
+        isTRUE(private$run_active) &&
+          private$has_tool_request(tail(turns, 1L)[[1L]])
+      ) {
+        recent_human <- tail(starts, 1L)
+        minimum_keep <- if (length(recent_human) == 0L) {
+          1L
+        } else {
+          length(turns) - recent_human + 1L
+        }
+      }
+      candidates <- unique(c(starts, length(turns) + 1L))
+      for (start in candidates) {
+        kept <- if (start > length(turns)) {
+          list()
+        } else {
+          turns[start:length(turns)]
+        }
+        if (length(kept) < minimum_keep) {
+          next
+        }
+        count <- private$context_token_count(messages, turns = kept)
+        if (!is.null(count) && count <= target_tokens) {
+          return(as.integer(length(kept)))
+        }
+      }
+
+      # A conservative fallback for providers that cannot estimate cloned
+      # contexts. Keep a complete recent user/assistant exchange when possible.
+      recent <- tail(starts, 1L)
+      if (length(recent) == 0L) {
+        return(as.integer(minimum_keep))
+      }
+      as.integer(max(minimum_keep, length(turns) - recent + 1L))
+    },
+
+    maybe_auto_compact = function(messages, limits = NULL, usage = NULL) {
+      policy <- private$.context_policy
+      if (is.null(policy$max_tokens)) {
+        return(NULL)
+      }
+      turns <- private$.chat$get_turns()
+      if (length(turns) == 0L) {
+        return(NULL)
+      }
+
+      if (is.null(limits) && isTRUE(private$run_active)) {
+        limits <- private$current_usage_limits
+      }
+      if (!is.null(limits)) {
+        if (is.null(usage)) {
+          usage <- if (isTRUE(private$run_active)) {
+            private$current_run_usage()
+          } else {
+            AgentUsage()
+          }
+        }
+        limit_status <- usage_limit_status(
+          usage,
+          limits,
+          require_followup = TRUE
+        )
+        if (!is.null(limit_status)) {
+          if (isTRUE(private$run_active)) {
+            private$mark_usage_limit(limit_status)
+          }
+          return(NULL)
+        }
+      }
+
+      estimated <- private$context_token_count(messages)
+      if (is.null(estimated) || estimated <= policy$max_tokens) {
+        return(NULL)
+      }
+
+      keep_last <- private$compaction_keep_last(
+        messages = messages,
+        target_tokens = floor(policy$max_tokens * policy$compact_to)
+      )
+      result <- self$compact(
+        keep_last = keep_last,
+        fallback = policy$fallback,
+        automatic = TRUE,
+        estimated_tokens = estimated
+      )
+      if (isTRUE(private$run_active)) {
+        private$add_external_usage(result$usage)
+      }
+      result
+    },
+
     # Generate a summary of turns using the LLM
-    generate_compaction_summary = function(turns) {
-      # Format turns for summarization
+    generate_compaction_summary = function(turns, fallback = "error") {
+      fallback <- match.arg(fallback, c("error", "text"))
+      # Format turns for compaction
       turn_texts <- vapply(
         turns,
         function(turn) {
@@ -3655,9 +4260,19 @@ Agent <- R6::R6Class(
       )
 
       conversation_text <- paste(turn_texts, collapse = "\n\n")
+      prior_summary <- private$.compaction_summary
+      prior_summary_text <- if (is.null(prior_summary)) {
+        ""
+      } else {
+        paste0(
+          "Existing summary from earlier compactions:\n",
+          prior_summary,
+          "\n\n"
+        )
+      }
 
-      # Create summarization prompt
-      summarization_prompt <- paste0(
+      # Create the compaction prompt
+      compaction_prompt <- paste0(
         "Summarize the following conversation excerpt concisely. ",
         "Focus on:\n",
         "1. Key decisions made\n",
@@ -3666,63 +4281,58 @@ Agent <- R6::R6Class(
         "4. Any errors encountered and how they were resolved\n",
         "5. Current state/progress of the task\n\n",
         "Keep the summary under 500 words. Be factual and specific.\n\n",
-        "Conversation to summarize:\n",
+        prior_summary_text,
+        "Conversation excerpt to merge into the summary:\n",
         "---\n",
         conversation_text,
         "\n---\n\n",
         "Summary:"
       )
 
-      # Try to use the LLM for summarization
-      summary <- tryCatch(
-        {
-          # Create a temporary chat for summarization
-          # Use the same provider as the main chat
-          temp_chat <- tryCatch(
-            {
-              clone_compaction_chat(self$chat)
-            },
-            error = function(e) {
-              cli_warn(c(
-                "Could not create summarization chat",
-                "i" = "Falling back to text-based summary",
-                "x" = e$message
-              ))
-              private$notify(
-                "Compaction fell back to text summary because a summarization chat could not be created.",
-                level = "warning",
-                code = "compact_fallback",
-                error = e$message
-              )
-              NULL
-            }
-          )
-
-          if (is.null(temp_chat)) {
-            return(private$generate_fallback_summary(turns))
-          }
-
-          # Generate summary
-          response <- temp_chat$chat(summarization_prompt, echo = "none")
-          response
-        },
-        error = function(e) {
-          cli_warn(c(
-            "LLM summarization failed",
-            "i" = "Falling back to text-based summary",
-            "x" = e$message
-          ))
-          private$notify(
-            "Compaction fell back to text summary because LLM summarization failed.",
-            level = "warning",
-            code = "compact_fallback",
-            error = e$message
-          )
-          private$generate_fallback_summary(turns)
-        }
+      temp_chat <- tryCatch(
+        clone_compaction_chat(private$.chat),
+        error = function(e) e
       )
+      response <- if (inherits(temp_chat, "error")) {
+        temp_chat
+      } else {
+        tryCatch(
+          temp_chat$chat(compaction_prompt, echo = "none"),
+          error = function(e) e
+        )
+      }
 
-      summary
+      if (!inherits(response, "error")) {
+        return(list(
+          summary = response,
+          method = "llm",
+          usage = agent_usage_snapshot(temp_chat)
+        ))
+      }
+
+      if (identical(fallback, "error")) {
+        cli_abort(
+          c(
+            "Conversation compaction failed.",
+            "x" = response$message,
+            "i" = "Set ContextPolicy(fallback = 'text') to permit degraded compaction."
+          ),
+          class = c("deputy_compaction_error", "deputy_error"),
+          parent = response
+        )
+      }
+
+      private$notify(
+        "Compaction used the configured deterministic text fallback.",
+        level = "warning",
+        code = "compact_fallback",
+        error = response$message
+      )
+      list(
+        summary = private$generate_fallback_summary(turns),
+        method = "text",
+        usage = AgentUsage()
+      )
     },
 
     # Fallback summary when LLM is unavailable
@@ -3751,11 +4361,20 @@ Agent <- R6::R6Class(
         character(1)
       )
 
-      paste0(
+      excerpt_summary <- paste0(
         "[Compacted ",
         length(turns),
         " earlier turns - LLM summary unavailable]\n\n",
         paste(summary_parts, collapse = "\n\n")
+      )
+      if (is.null(private$.compaction_summary)) {
+        return(excerpt_summary)
+      }
+      paste0(
+        "[Prior compacted conversation]\n",
+        private$.compaction_summary,
+        "\n\n",
+        excerpt_summary
       )
     },
 
@@ -3766,10 +4385,10 @@ Agent <- R6::R6Class(
     loaded_mcp_tools = character(),
     loaded_mcp_status = list(),
 
-    # Tool call counter for run_shiny() callback-based limits
+    # Tool call counter for callback-based limits
     tool_call_count = 0L,
 
-    # Tool call limit for run_shiny() -- NULL means inactive (run/run_sync path)
+    # Active tool call limit; NULL means unbounded.
     tool_call_limit = NULL
   )
 )

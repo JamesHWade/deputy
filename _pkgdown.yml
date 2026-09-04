@@ -52,6 +52,7 @@ reference:
   - AgentEvent
   - AgentUsage
   - UsageLimits
+  - ContextPolicy
 
 - title: Tools
   desc: Built-in tools and tool bundles
@@ -78,6 +79,7 @@ reference:
   - tools_preset
   - tools_interactive
   - tools_mcp
+  - tools_mcp_repl
   - set_ask_user_callback
 
 - title: Permissions

@@ -47,7 +47,8 @@ Callback signature: \verb{function(tool_name, tool_result, tool_error, context)}
 Callback signature: \verb{function(reason, context)}
 \itemize{
 \item \code{reason}: Why the agent stopped (for example \code{"complete"},
-\code{"request_limit"}, \code{"cost_limit"}, or \code{"provider_error"})
+\code{"request_limit"}, \code{"cost_limit"}, \code{"cost_unavailable"}, \code{"tool_loop"},
+or \code{"provider_error"})
 \item \code{context}: Common correlation fields plus \code{usage} and \code{cost}; native
 \code{run()} also includes \code{total_turns}
 \item Return: NULL (informational only)
@@ -106,12 +107,21 @@ event-specific metadata
 
 \strong{PreCompact} - Before conversation compaction
 
-Callback signature: \verb{function(turns_to_compact, turns_to_keep, context)}
+Hook signature: \verb{function(turns_to_compact, turns_to_keep, context)}
 \itemize{
 \item \code{turns_to_compact}: List of turns that will be compacted into a summary
 \item \code{turns_to_keep}: List of recent turns that will be preserved
 \item \code{context}: Common correlation fields plus \code{total_turns} and \code{compact_count}
 \item Return: \code{\link[=HookResultPreCompact]{HookResultPreCompact()}} to allow/cancel or provide custom summary
+}
+
+\strong{PostCompact} - After conversation compaction
+
+Hook signature: \verb{function(result, context)}
+\itemize{
+\item \code{result}: The \code{DeputyCompaction} outcome, including method and usage
+\item \code{context}: Common correlation fields plus \code{compact_count} and \code{automatic}
+\item Return: NULL (informational only)
 }
 
 \strong{SessionStart} - When an agent session begins
@@ -128,7 +138,8 @@ Callback signature: \verb{function(context)}
 Callback signature: \verb{function(reason, context)}
 \itemize{
 \item \code{reason}: Why the agent stopped (for example \code{"complete"},
-\code{"request_limit"}, \code{"cost_limit"}, or \code{"hook_requested_stop"})
+\code{"request_limit"}, \code{"cost_unavailable"}, \code{"tool_loop"}, or
+\code{"hook_requested_stop"})
 \item \code{context}: Common correlation fields plus \code{usage} and \code{cost}; native
 \code{run()} also includes \code{total_turns}
 \item Return: NULL (informational only)
@@ -155,6 +166,7 @@ The context parameter is always a named list. Common fields:
 \item \code{total_turns}: (native Stop, PreCompact, native SessionEnd) Conversation turns
 \item \code{cost}: (Stop, SessionEnd) List with \code{input}, \code{output}, \code{cached}, and \code{total}
 \item \code{compact_count}: (PreCompact only) Number of turns being compacted
+\item \code{automatic}: (PostCompact only) Whether the run kernel triggered compaction
 \item \code{level}: (Notification only) Informational severity such as \code{"info"} or \code{"warning"}
 \item \code{code}: (Notification only) Stable notification code when available
 \item \code{permissions}: (SessionStart only) The agent's permissions configuration

@@ -14,6 +14,10 @@ tool_web_search(query, num_results = 10)
 
 \item{num_results}{Maximum number of results to return (tool argument)}
 }
+\value{
+When called directly, a character string containing formatted search
+results.
+}
 \description{
 A tool that performs a web search and returns results. Uses DuckDuckGo's
 HTML search results by default.
