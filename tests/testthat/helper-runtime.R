@@ -2,7 +2,8 @@ create_content_stream_chat <- function(
   tool_name = "read_file",
   tool_result = "contents",
   final_text = "done",
-  execute = NULL
+  execute = NULL,
+  use_execution_result = FALSE
 ) {
   state <- new.env(parent = emptyenv())
   state$turns <- list()
@@ -83,7 +84,13 @@ create_content_stream_chat <- function(
             )
             returned_result <- if (is.null(rejected)) {
               if (!is.null(execute)) {
-                execute(request)
+                value <- execute(request)
+                if (use_execution_result) {
+                  result <- ellmer::ContentToolResult(
+                    value = value,
+                    request = request
+                  )
+                }
               }
               state$tool_executed <- TRUE
               result
@@ -138,7 +145,8 @@ create_content_stream_chat <- function(
           tool_name = tool_name,
           tool_result = tool_result,
           final_text = final_text,
-          execute = execute
+          execute = execute,
+          use_execution_result = use_execution_result
         )$chat
       }
     ),

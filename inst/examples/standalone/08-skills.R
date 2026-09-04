@@ -1,5 +1,6 @@
 # Run with Rscript after installing deputy and setting OPENAI_API_KEY.
 library(deputy)
+rlang::check_installed("yaml", reason = "to run this example")
 chat <- ellmer::chat_openai(
   model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-4o-mini")
 )
@@ -24,3 +25,5 @@ agent <- Agent$new(
 agent$load_skill(skill_dir)
 result <- agent$run_sync("Review mean(c(1, NA)).")
 cli::cli_text("{result$response}")
+
+unlink(skill_dir, recursive = TRUE)

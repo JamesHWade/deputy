@@ -1,7 +1,10 @@
 # Standalone Deputy examples
 
 Install the development versions of deputy and its ellmer dependency, set
-`OPENAI_API_KEY`, and run any script independently with `Rscript`. Live runs
+`OPENAI_API_KEY`, and run any script independently with `Rscript`. Install the
+optional packages `jsonlite` (structured output) and `yaml` (skills), for example
+with `install.packages(c("jsonlite", "yaml"))`. Those scripts check these
+dependencies before creating a chat. Live runs
 make billable model requests. Set `DEPUTY_EXAMPLE_MODEL` to choose another
 OpenAI model supported by your account.
 

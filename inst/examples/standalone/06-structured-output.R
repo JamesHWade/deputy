@@ -1,5 +1,6 @@
 # Run with Rscript after installing deputy and setting OPENAI_API_KEY.
 library(deputy)
+rlang::check_installed("jsonlite", reason = "to run this example")
 chat <- ellmer::chat_openai(
   model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-4o-mini")
 )
