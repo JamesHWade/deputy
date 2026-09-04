@@ -71,6 +71,24 @@ test_that("omitted fields, nulls and empty sequences retain constructor defaults
   expect_identical(agent_definition_read(path), expected)
 })
 
+test_that("named character vectors are written as sequences", {
+  skip_if_not_installed("yaml")
+  path <- file.path(withr::local_tempdir(), "agent.yaml")
+  definition <- agent_definition(
+    "reviewer",
+    "Reviews text",
+    "Read carefully",
+    memory = c(note = "fact", another = "more context"),
+    mcp_servers = c(service = "local"),
+    disallowed_tools = c(action = "run_bash")
+  )
+  agent_definition_write(definition, path)
+  restored <- agent_definition_read(path)
+  for (field in c("memory", "mcp_servers", "disallowed_tools")) {
+    expect_identical(restored[[field]], unname(definition[[field]]))
+  }
+})
+
 test_that("discovery is deterministic and rejects duplicate canonical names", {
   skip_if_not_installed("yaml")
   root <- withr::local_tempdir()
@@ -211,10 +229,35 @@ test_that("a failed rename leaves the original definition intact", {
   )
   expect_error(
     agent_definition_write(definition, path, overwrite = TRUE),
-    "Could not rename",
+    "Could not install",
     class = "deputy_agent_definition_file"
   )
   expect_identical(readLines(path), minimal_definition_yaml)
+  expect_identical(
+    list.files(root, all.files = TRUE, no.. = TRUE),
+    "agent.yaml"
+  )
+})
+
+test_that("concurrent creation cannot bypass the no-overwrite policy", {
+  skip_if_not_installed("yaml")
+  root <- withr::local_tempdir()
+  path <- file.path(root, "agent.yaml")
+  definition <- agent_definition("reviewer", "Reviews text", "Read carefully")
+  link_file <- file.link
+  local_mocked_bindings(
+    file.link = function(from, to) {
+      # Another writer publishes after validation, immediately before install.
+      writeLines("Another writer's definition", to)
+      link_file(from, to)
+    },
+    .package = "base"
+  )
+  expect_error(
+    agent_definition_write(definition, path),
+    class = "deputy_agent_definition_file"
+  )
+  expect_identical(readLines(path), "Another writer's definition")
   expect_identical(
     list.files(root, all.files = TRUE, no.. = TRUE),
     "agent.yaml"

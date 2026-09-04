@@ -16,8 +16,13 @@ names remain inert until the existing LeadAgent lifecycle loads them.
 Writers require each selected object to match exactly one registry entry;
 unknown or ambiguous references fail rather than guessing by a tool's name.
 Round-tripping preserves constructor fields, reference identity, and order,
-while normalizing YAML formatting and discarding R list-element names for
-tools and skills (which the runtime does not use).
+while normalizing YAML formatting and discarding names on R lists and character
+sequences (which the runtime does not use).
+
+Writers finish a temporary file in the destination directory before installing
+it. Explicit overwrites use rename; creation without overwrite uses a hard
+link, which fails atomically if another writer has already created the path.
+Unsupported filesystem operations fail without replacing an existing file.
 
 Discovery reads only the chosen directory, in filename order. It rejects the
 whole collection for invalid files or duplicate canonical routing names. It

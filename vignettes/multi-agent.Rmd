@@ -273,12 +273,15 @@ lead$list_subagents()
 Pass the same registries when writing and reading. The writer finds registry
 keys by exact object identity; it refuses unmapped tools/skills and ambiguous
 aliases. Existing files require `overwrite = TRUE`. Comments, YAML formatting,
-and names attached to the R tools/skills lists are not preserved; object
+and names attached to R lists or character sequences are not preserved; object
 order and registry identity are preserved.
 
 The writer completes a temporary file in the destination directory before
-renaming it into place. A failed write or rename leaves an existing
-definition intact.
+installing it. With `overwrite = TRUE`, it renames the completed file into
+place. Otherwise it creates a hard link, which fails atomically if another
+writer has already created the destination. This requires filesystem support
+for hard links. A failed write or installation leaves an existing definition
+intact.
 
 ```{r definition-file-roundtrip, eval = TRUE}
 path <- tempfile(fileext = ".yaml")

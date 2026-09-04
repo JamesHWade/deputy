@@ -37,11 +37,13 @@
 #' tags are rejected. YAML type inference applies: quote strings such as
 #' `"yes"` or `"123"`. Empty sequences are written as `[]` and optional NULL
 #' values as `null`. Writing canonicalizes formatting; it does not preserve
-#' comments or names attached to the R tools/skills lists. Object order and
-#' registry identity are preserved. A single string is accepted as shorthand
+#' comments or names attached to R lists or character sequences. Object order
+#' and registry identity are preserved. A single string is accepted as shorthand
 #' for a one-element sequence. Only regular files of at most 1 MiB are read.
 #' Writes use a temporary file in the destination directory and replace the
 #' destination only after writing succeeds.
+#' With `overwrite = FALSE`, installing the file requires hard-link support
+#' from the filesystem so a concurrently created destination is never replaced.
 #'
 #' A definition describes a subagent. Permission modes and request limits
 #' remain bounded by its LeadAgent. Nested `sub_agents`, host credentials,
@@ -135,7 +137,7 @@ agent_definition_write <- function(
     "memory",
     "mcp_servers"
   )) {
-    if (!is.null(spec[[field]])) spec[[field]] <- as.list(spec[[field]])
+    if (!is.null(spec[[field]])) spec[[field]] <- unname(as.list(spec[[field]]))
   }
   definition_from_spec(spec, tools, skills, path)
   text <- yaml::as.yaml(spec)
@@ -155,18 +157,15 @@ agent_definition_write <- function(
     error = function(e) abort_definition_file("{conditionMessage(e)}", path),
     warning = function(e) abort_definition_file("{conditionMessage(e)}", path)
   )
-  # The destination may have appeared while the temporary file was written.
-  if (file.exists(path) && !overwrite) {
-    abort_definition_file("Destination appeared before writing completed", path)
-  }
-  renamed <- tryCatch(
-    file.rename(temporary, path),
+  # Linking a completed file fails atomically if the destination exists.
+  installed <- tryCatch(
+    if (overwrite) file.rename(temporary, path) else file.link(temporary, path),
     error = function(e) abort_definition_file("{conditionMessage(e)}", path),
     warning = function(e) abort_definition_file("{conditionMessage(e)}", path)
   )
-  if (!renamed) {
+  if (!installed) {
     abort_definition_file(
-      "Could not rename the completed definition file",
+      "Could not install the completed definition file",
       path
     )
   }

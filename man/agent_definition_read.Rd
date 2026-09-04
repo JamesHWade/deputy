@@ -66,11 +66,13 @@ Unknown fields, versions, references, duplicate keys, and YAML evaluation
 tags are rejected. YAML type inference applies: quote strings such as
 \code{"yes"} or \code{"123"}. Empty sequences are written as \verb{[]} and optional NULL
 values as \code{null}. Writing canonicalizes formatting; it does not preserve
-comments or names attached to the R tools/skills lists. Object order and
-registry identity are preserved. A single string is accepted as shorthand
+comments or names attached to R lists or character sequences. Object order
+and registry identity are preserved. A single string is accepted as shorthand
 for a one-element sequence. Only regular files of at most 1 MiB are read.
 Writes use a temporary file in the destination directory and replace the
 destination only after writing succeeds.
+With \code{overwrite = FALSE}, installing the file requires hard-link support
+from the filesystem so a concurrently created destination is never replaced.
 
 A definition describes a subagent. Permission modes and request limits
 remain bounded by its LeadAgent. Nested \code{sub_agents}, host credentials,
