@@ -155,11 +155,81 @@ result <- lead$run_sync(
 cat(result$response)
 ```
 
-Direct synchronous delegation participates in the lead run's usage limits. Each
+Direct delegation participates in the lead run's usage limits. Each
 child inherits the lead's remaining `UsageLimits`, and its usage is aggregated
-into `result$usage` and enforced by the lead after delegation. This accounting
-does not yet cover parallel or background children, transitive child trees, or
-cross-run global limits.
+into `result$usage` and enforced by the lead after delegation. Concurrent direct
+children reserve allocations before launch. Background children, transitive
+child trees, and cross-run global limits remain outside this contract.
+
+## Stateless fan-out
+
+For independent perspectives on supplied text, the host can select responders
+directly. Each definition gets a fresh conversation with its own prompt and
+at most one model request. The lead makes no model request for orchestration.
+Definitions with tools, skills, or MCP servers are rejected before dispatch.
+
+```{r, eval = FALSE}
+lead <- LeadAgent$new(
+  ellmer::chat_openai(),
+  sub_agents = list(
+    agent_definition("benefits", "Find benefits", "Explain the strongest benefits."),
+    agent_definition("risks", "Find risks", "Explain the strongest risks.")
+  )
+)
+batch <- lead$parallel_delegate(
+  c(benefits = "Review a four-day working week.",
+    risks = "Review a four-day working week."),
+  max_active = 2,
+  usage_limits = UsageLimits(max_requests = 2),
+  run_context = list(workflow = "decision-review")
+)
+batch$status
+batch$results$benefits$response
+batch$run$usage
+lead$list_subagents()
+```
+
+Names are normalized and must select each registered definition at most once.
+The result preserves input order and has five fields:
+
+| Field | Meaning |
+| --- | --- |
+| `mode` | `"stateless"`; other modes are currently rejected |
+| `results` | Named list of child `AgentResult` objects, or `NULL` |
+| `errors` | Named list of captured conditions, or `NULL` |
+| `status` | Named vector: `completed`, `failed`, `stopped`, or `not_started` |
+| `run` | Aggregate `AgentResult` with usage, events, and batch stop reason |
+
+A failed responder does not discard successful siblings. Check `status` before
+synthesis; a stopped child may have partial text. Child records include unique
+agent, session, run, and delegation identifiers linked to the batch run, and
+fire the usual `SubagentStart` and `SubagentStop` hooks. `$last_run()` retains
+the aggregate on normal return. The lead's conversation is unchanged; the
+host explicitly supplies selected responses to any later synthesis run.
+
+### Limits and cancellation
+
+`max_active` bounds simultaneous responders. Work runs in waves: the next wave
+starts after all current responders settle. Each wave reserves request slots
+before dispatch and divides the remaining token and cost ceilings among its
+responders. A definition can narrow its request allowance to zero. Failed
+dispatch attempts count as requests; missing cost information stops queued
+work when a cost ceiling is configured.
+
+Request limits prevent excess dispatches. Token and cost ceilings use observed
+usage, so a wave can exceed them by up to one response per active responder.
+Unused allocations are released after settlement. All observed child usage is
+included in the aggregate, including failed or interrupted runs. The default
+`on_exceed = "stop"` returns partial outcomes. `on_exceed = "error"` raises the
+usual typed limit condition after cleanup; completed child records remain
+inspectable through `$list_subagents()` and `$get_subagent_results()`.
+
+For Shiny or another asynchronous host, use `$parallel_delegate_async()` and
+consume its promise. `$interrupt()` prevents queued work from starting and
+asks active responders to stop at the next supported provider boundary. The
+batch settles after its active responders drain. The lead rejects overlapping
+runs until cleanup finishes. Tool-using background workers and persistent
+agent scheduling are separate future work.
 
 ## Monitoring with SubagentStop Hooks
 

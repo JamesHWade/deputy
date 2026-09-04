@@ -141,7 +141,7 @@ create_content_stream_chat <- function(
       },
       on_tool_request = function(callback) state$on_tool_request <- callback,
       on_tool_result = function(callback) state$on_tool_result <- callback,
-      clone = function() {
+      clone = function(deep = FALSE) {
         create_content_stream_chat(
           tool_name = tool_name,
           tool_result = tool_result,

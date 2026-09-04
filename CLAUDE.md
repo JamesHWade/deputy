@@ -25,6 +25,8 @@ deputy/
 ├── R/                      # Source code (R6 classes and functions)
 │   ├── agent.R             # Agent class - main agentic workflow engine
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
+│   ├── parallel-delegate.R # Bounded stateless responder batches
+│   ├── agent-run-state.R   # Shared model-run and batch initialization
 │   ├── agent-definition-files.R # Portable YAML AgentDefinitions
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
 │   ├── run-usage.R         # Run accounting and fail-closed limits
@@ -256,6 +258,17 @@ test_that("descriptive test name", {
 6. **HookRegistry** fires PreToolUse/PostToolUse events
 7. Tool executes and returns result
 8. Loop continues until LLM stops or limits reached
+
+Hosts may call `LeadAgent$parallel_delegate()` or its async counterpart with a
+named task vector selecting registered definitions. Tier-1 responders have no
+tools, skills, or MCP servers and make at most one request each. A batch uses
+the same lifecycle, accounting, and result assembly as ordinary runs, retains
+partial outcomes, and leaves the lead conversation intact. It owns the lead's
+active-run slot. See `dev/adr/0008-stateless-fanout.md` for wave allocations,
+observed-limit semantics, and the boundary with future background agents.
+
+Tests use httpuv (Suggests) in a separate local R process for a real ellmer
+streaming fixture; no external API or credentials are required.
 
 ### Permission Modes
 

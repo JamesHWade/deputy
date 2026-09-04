@@ -14,6 +14,15 @@ native_file_tool_names <- c(
 
 deputy_tool_result_reader_marker <- new.env(parent = emptyenv())
 
+clear_chat_tool_callbacks <- function(chat) {
+  private <- tryCatch(chat$.__enclos_env__$private, error = function(e) NULL)
+  for (name in c("callback_on_tool_request", "callback_on_tool_result")) {
+    manager <- private[[name]]
+    if (!is.null(manager) && is.function(manager$clear)) manager$clear()
+  }
+  invisible(chat)
+}
+
 runtime_wrap_tool <- function(
   tool,
   resolve_arguments,

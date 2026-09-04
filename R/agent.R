@@ -1861,16 +1861,7 @@ Agent <- R6::R6Class(
     },
 
     rewire_chat_runtime = function() {
-      chat_private <- tryCatch(
-        private$.chat$.__enclos_env__$private,
-        error = function(e) NULL
-      )
-      for (name in c("callback_on_tool_request", "callback_on_tool_result")) {
-        manager <- chat_private[[name]]
-        if (!is.null(manager) && is.function(manager$clear)) {
-          manager$clear()
-        }
-      }
+      clear_chat_tool_callbacks(private$.chat)
 
       tools <- private$.chat$get_tools()
       had_result_reader <- "deputy_read_tool_result" %in% names(tools)
@@ -2084,6 +2075,8 @@ Agent <- R6::R6Class(
       controller,
       structured = NULL
     ) {
+      # Count the dispatch even when a provider fails before recording a turn.
+      private$current_outer_requests <- private$current_outer_requests + 1L
       if (!is.null(structured)) {
         return(do.call(
           private$.chat$chat_structured_async,
@@ -2389,123 +2382,21 @@ Agent <- R6::R6Class(
           compaction_usage <- compaction$usage
         }
 
-        agent$.__enclos_env__$private$run_active <- TRUE
-        agent$.__enclos_env__$private$current_run_id <-
-          agent$.__enclos_env__$private$new_run_id()
-        agent$.__enclos_env__$private$current_run_context <-
-          effective_run_context
-        active_run_id <- agent$.__enclos_env__$private$current_run_id
-        stream_state$active_run_id <- active_run_id
-        stream_state$run_context <- effective_run_context
-        stream_state$limits <- run_limits
         on.exit(
           agent$.__enclos_env__$private$finish_callback_run(stream_state),
           add = TRUE
         )
-
-        # Initialize lazily on first consumption. Merely constructing and
-        # abandoning a stream must not reserve this Agent forever.
-        agent$.__enclos_env__$private$tool_call_count <- 0L
-        agent$.__enclos_env__$private$tool_call_limit <-
-          run_limits$max_tool_calls
-        agent$.__enclos_env__$private$should_stop <- FALSE
-        agent$.__enclos_env__$private$stop_reason_from_hook <- NULL
-        agent$.__enclos_env__$private$current_usage_limits <- run_limits
-        agent$.__enclos_env__$private$current_usage_baseline <-
-          agent_usage_snapshot(agent$.__enclos_env__$private$.chat)
-        stream_state$turns_before <- length(
-          agent$.__enclos_env__$private$.chat$get_turns()
+        initialize_agent_run(
+          agent,
+          stream_state,
+          messages,
+          run_limits,
+          effective_run_context,
+          controller,
+          stream_mode,
+          compaction_usage
         )
-        agent$.__enclos_env__$private$current_tool_calls <- 0L
-        agent$.__enclos_env__$private$current_tool_results <- 0L
-        agent$.__enclos_env__$private$current_outer_requests <- 0L
-        agent$.__enclos_env__$private$current_external_usage <- compaction_usage
-        agent$.__enclos_env__$private$current_stream_controller <-
-          controller %||%
-          tryCatch(
-            ellmer::stream_controller(),
-            error = function(e) NULL
-          )
-        agent$.__enclos_env__$private$current_stream_content <-
-          identical(stream_mode, "content")
-        agent$.__enclos_env__$private$current_run_state <- stream_state
-        agent$.__enclos_env__$private$pending_events <- list()
-        agent$.__enclos_env__$private$tool_started_at <- list()
-        agent$.__enclos_env__$private$tool_event_overrides <- list()
-        agent$.__enclos_env__$private$tool_call_records <- list()
-        agent$.__enclos_env__$private$pending_delegations <- list()
-        agent$.__enclos_env__$private$original_tool_results <- list()
-        agent$.__enclos_env__$private$last_limit_status <- NULL
-        agent$.__enclos_env__$private$last_tool_cycle_signature <- NULL
-        agent$.__enclos_env__$private$consecutive_tool_cycles <- 0L
-        agent$.__enclos_env__$private$last_run_usage <- AgentUsage()
-        agent$.__enclos_env__$private$current_run_checkpoint_id <- NULL
-
-        if (!is.null(agent$.__enclos_env__$private$.file_checkpoints)) {
-          checkpoint_id <- agent$.__enclos_env__$private$.file_checkpoints$checkpoint(
-            paste0("run ", active_run_id),
-            metadata = list(
-              run_id = active_run_id,
-              message_count = length(messages)
-            )
-          )
-          agent$.__enclos_env__$private$current_run_checkpoint_id <-
-            checkpoint_id
-        }
-
-        task <- messages
-        if (length(messages) == 1L) {
-          task <- messages[[1L]]
-        }
-        agent$.__enclos_env__$private$record_run_event(
-          agent$.__enclos_env__$private$agent_event(
-            "start",
-            task = task,
-            usage_limits = run_limits,
-            checkpoint_id = agent$.__enclos_env__$private$current_run_checkpoint_id
-          )
-        )
-        if (
-          !is.null(
-            agent$.__enclos_env__$private$current_run_checkpoint_id
-          )
-        ) {
-          agent$.__enclos_env__$private$record_run_event(
-            agent$.__enclos_env__$private$agent_event(
-              "file_checkpoint",
-              checkpoint_id = agent$.__enclos_env__$private$current_run_checkpoint_id,
-              name = paste0("run ", active_run_id)
-            )
-          )
-        }
-
-        agent$hooks$fire(
-          "SessionStart",
-          context = agent$.__enclos_env__$private$hook_context(
-            permissions = agent$permissions,
-            provider = agent$provider(),
-            tools_count = length(agent$.__enclos_env__$private$.chat$get_tools()),
-            run_id = active_run_id
-          )
-        )
-        stream_state$session_started <- TRUE
-        agent$hooks$fire(
-          "UserPromptSubmit",
-          prompt = if (length(messages) == 1L) messages[[1L]] else messages,
-          context = agent$.__enclos_env__$private$hook_context(
-            run_id = active_run_id
-          )
-        )
-
-        initial_limit_status <- usage_limit_status(
-          agent$.__enclos_env__$private$current_run_usage(),
-          agent$.__enclos_env__$private$current_usage_limits,
-          require_followup = TRUE
-        )
-        if (!is.null(initial_limit_status)) {
-          agent$.__enclos_env__$private$mark_usage_limit(initial_limit_status)
-          stream_state$reason <- initial_limit_status$reason
-        }
+        active_run_id <- stream_state$active_run_id
 
         if (agent$.__enclos_env__$private$should_stop) {
           stream <- coro::async_generator(function() {

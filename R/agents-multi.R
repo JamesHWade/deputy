@@ -360,6 +360,75 @@ LeadAgent <- R6::R6Class(
     },
 
     #' @description
+    #' Run independent, stateless responders concurrently.
+    #'
+    #' Each selected AgentDefinition gets a fresh conversation and at most one
+    #' model request. Definitions with tools, skills, or MCP servers are
+    #' rejected. This is tier-1 fan-out, not background tool-using agents.
+    #' Results preserve input order, including failures and unstarted tasks.
+    #' @param tasks A named character vector of tasks. Names select unique
+    #'   registered AgentDefinitions.
+    #' @param max_active Maximum simultaneous responders.
+    #' @param mode Execution contract. Currently only `"stateless"` is supported.
+    #' @param usage_limits Optional batch-wide [UsageLimits]. Unset fields
+    #'   inherit the lead's defaults. Requests are reserved before dispatch;
+    #'   token and cost ceilings are divided across each concurrent wave and
+    #'   checked after responses, with possible overage by one response per
+    #'   active responder.
+    #' @param run_context Additional immutable context for the batch.
+    #' @return A list with `mode`, named `results` ([AgentResult] or `NULL`),
+    #'   named `errors`, named `status`, and an aggregate `run` ([AgentResult]).
+    #'   `$last_run()` retains the aggregate run. The lead's conversation is
+    #'   unchanged. Failed responders do not discard successful siblings.
+    parallel_delegate = function(
+      tasks,
+      max_active = 2L,
+      mode = "stateless",
+      usage_limits = NULL,
+      run_context = list()
+    ) {
+      promise <- self$parallel_delegate_async(
+        tasks,
+        max_active,
+        mode,
+        usage_limits,
+        run_context
+      )
+      tryCatch(
+        private$resolve_promise(promise),
+        interrupt = function(condition) {
+          self$interrupt()
+          try(private$resolve_promise(promise), silent = TRUE)
+          stop(condition)
+        }
+      )
+    },
+
+    #' @description
+    #' Run stateless fan-out without blocking the R event loop.
+    #' @param tasks,max_active,mode,usage_limits,run_context See
+    #'   `$parallel_delegate()`.
+    #' @return A promise resolving to the same batch result as
+    #'   `$parallel_delegate()`. `$interrupt()` cancels queued work and asks
+    #'   active responders to stop at their next supported provider boundary.
+    parallel_delegate_async = function(
+      tasks,
+      max_active = 2L,
+      mode = "stateless",
+      usage_limits = NULL,
+      run_context = list()
+    ) {
+      lead_parallel_delegate(
+        self,
+        tasks,
+        max_active,
+        mode,
+        usage_limits,
+        run_context
+      )
+    },
+
+    #' @description
     #' List delegated sub-agent runs, including failures.
     #'
     #' @return Data frame with one row per sub-agent run
@@ -751,7 +820,12 @@ LeadAgent <- R6::R6Class(
     },
 
     # Create a sub-agent from a definition
-    create_sub_agent = function(def, correlation = NULL, usage_limits = NULL) {
+    create_sub_agent = function(
+      def,
+      correlation = NULL,
+      usage_limits = NULL,
+      stateless = FALSE
+    ) {
       correlation <- correlation %||% private$claim_delegation()
 
       # Get the model to use
@@ -760,7 +834,11 @@ LeadAgent <- R6::R6Class(
         # then clear conversation history so the sub-agent starts fresh.
         sub_chat <- tryCatch(
           {
-            cloned <- private$.chat$clone()
+            cloned <- private$.chat$clone(deep = TRUE)
+            if (identical(cloned, private$.chat)) {
+              cli_abort("Chat cloning must return an independent instance")
+            }
+            clear_chat_tool_callbacks(cloned)
             cloned$set_turns(list())
             # The child definition chooses its tools. Inherited provider
             # configuration must not import the parent's executable registry.
@@ -817,7 +895,11 @@ LeadAgent <- R6::R6Class(
         permissions = sub_permissions,
         usage_limits = usage_limits %||%
           private$derive_subagent_usage_limits(def),
-        context_policy = self$context_policy,
+        context_policy = if (stateless) {
+          ContextPolicy(max_tokens = NULL, max_tool_result_bytes = NULL)
+        } else {
+          self$context_policy
+        },
         working_dir = self$working_dir,
         session_id = new_deputy_id("session_"),
         run_context = child_run_context,
@@ -832,7 +914,7 @@ LeadAgent <- R6::R6Class(
       # A checkpoint describes workspace state, not one agent's private
       # execution history. Delegated agents therefore write to the exact same
       # journal as the lead so a lead-level rewind includes child mutations.
-      if (!is.null(private$.file_checkpoints)) {
+      if (!stateless && !is.null(private$.file_checkpoints)) {
         sub_agent$.__enclos_env__$private$.file_checkpoints <-
           private$.file_checkpoints
       }
