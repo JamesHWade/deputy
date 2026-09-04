@@ -65,6 +65,7 @@ create_delegation_child_chat <- function() {
       get_system_prompt = function() state$system_prompt,
       set_system_prompt = function(prompt) state$system_prompt <- prompt,
       get_tools = function() state$tools,
+      set_tools = function(tools) state$tools <- tools,
       register_tool = function(tool) state$tools[[tool@name]] <- tool,
       register_tools = function(tools) {
         for (tool in tools) {
@@ -194,6 +195,7 @@ create_delegation_parent_chat <- function(child_chat) {
       get_system_prompt = function() state$system_prompt,
       set_system_prompt = function(prompt) state$system_prompt <- prompt,
       get_tools = function() state$tools,
+      set_tools = function(tools) state$tools <- tools,
       register_tool = function(tool) state$tools[[tool@name]] <- tool,
       register_tools = function(tools) {
         for (tool in tools) {
@@ -289,7 +291,10 @@ test_that("delegated runs retain end-to-end correlation", {
     name = "inspect_evidence",
     description = "Inspect one deterministic evidence fixture.",
     arguments = list(claim = ellmer::type_string("Claim identifier")),
-    annotations = ellmer::tool_annotations(read_only_hint = TRUE)
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
   )
   definition <- agent_definition(
     name = "evidence_reviewer",

@@ -36,7 +36,7 @@ Indicates the tool may cause destructive/irreversible changes.
 Tools with \code{destructive_hint = TRUE} require explicit permission.
 Examples: \code{tool_write_file}, \code{tool_delete_file}, \code{tool_run_bash}
 
-\strong{open_world_hint} (logical, default: FALSE)
+\strong{open_world_hint} (logical, default: TRUE)
 
 Indicates the tool may interact with external systems.
 Used for network calls, package installation, etc.
@@ -45,7 +45,15 @@ Examples: \code{tool_web_search}, \code{tool_install_package}
 \strong{idempotent_hint} (logical, default: FALSE)
 
 Indicates repeated calls produce the same result.
-Safe to retry on failure.
+This annotation alone does not authorize automatic retries.
+
+Missing annotations remain absent on the tool. For custom tools, permission
+checks assume modification, possible destruction, external access, and no
+idempotence unless stated otherwise. If \code{read_only_hint = TRUE}, an omitted
+destructive annotation is ignored; an explicit TRUE still denies read-only
+use. Native tools continue to require their named capabilities. A custom
+permission callback can explicitly authorize a tool in standard mode;
+full mode bypasses annotation checks but still honors tool gating.
 }
 
 \section{Creating Tools with Annotations}{
@@ -59,7 +67,8 @@ tool_search <- ellmer::tool(
   arguments = list(pattern = ellmer::type_string("Search pattern")),
   annotations = ellmer::tool_annotations(
     read_only_hint = TRUE,
-    destructive_hint = FALSE
+    destructive_hint = FALSE,
+    open_world_hint = FALSE
   )
 )
 

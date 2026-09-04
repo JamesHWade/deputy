@@ -248,7 +248,7 @@ test_that("readonly fails closed for unknown unannotated tools", {
   )
 
   expect_s3_class(result, "PermissionResultDeny")
-  expect_match(result$reason, "explicit tool allowlist")
+  expect_match(result$reason, "destructive")
 })
 
 test_that("readonly still enforces capability fields before annotations", {
@@ -357,7 +357,9 @@ test_that("readonly annotations do not grant authority to unknown tools", {
 
   read_only_context <- c(
     context,
-    list(tool_annotations = list(read_only_hint = TRUE))
+    list(
+      tool_annotations = list(read_only_hint = TRUE, open_world_hint = FALSE)
+    )
   )
   result <- perms$check("unknown_tool", list(), read_only_context)
   expect_s3_class(result, "PermissionResultDeny")
@@ -394,7 +396,9 @@ test_that("standard mode uses annotations for unknown tools", {
   # Unknown read-only tool should be allowed
   read_only_context <- c(
     context,
-    list(tool_annotations = list(read_only_hint = TRUE))
+    list(
+      tool_annotations = list(read_only_hint = TRUE, open_world_hint = FALSE)
+    )
   )
   result <- perms$check("custom_read_tool", list(), read_only_context)
   expect_s3_class(result, "PermissionResultAllow")

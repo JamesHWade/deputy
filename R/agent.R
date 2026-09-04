@@ -232,13 +232,13 @@ Agent <- R6::R6Class(
       # Rebind all tools to this Agent's runtime authority, including tools
       # configured on the supplied Chat before Agent construction.
       backend_tools <- private$.chat$get_tools()
-      if (length(backend_tools) > 0) {
-        private$.chat$set_tools(list())
-        self$register_tools(backend_tools)
-      }
-      if (length(tools) > 0) {
-        self$register_tools(tools)
-      }
+      backend_tools <- validate_tool_batch(
+        backend_tools,
+        preserve_reader = TRUE
+      )
+      tools <- validate_tool_batch(tools, existing = backend_tools)
+      wrapped <- lapply(c(backend_tools, tools), private$adapt_tool)
+      private$.chat$set_tools(wrapped)
 
       # Wire up ellmer's callbacks for permission/hook enforcement
       private$.chat$on_tool_request(private$handle_tool_request)
@@ -645,13 +645,13 @@ Agent <- R6::R6Class(
     #' @return Invisible self.
     set_tools = function(tools) {
       had_result_reader <- isTRUE(private$.tool_result_reader_registered)
-      tools[["deputy_read_tool_result"]] <- NULL
-      private$.chat$set_tools(list())
-      private$.tool_result_reader_registered <- FALSE
-      self$register_tools(tools)
+      tools <- validate_tool_batch(tools, preserve_reader = TRUE)
+      wrapped <- lapply(tools, private$adapt_tool)
       if (had_result_reader) {
-        private$ensure_tool_result_reader()
+        wrapped[["deputy_read_tool_result"]] <-
+          private$.chat$get_tools()[["deputy_read_tool_result"]]
       }
+      private$.chat$set_tools(wrapped)
       invisible(self)
     },
 
@@ -717,12 +717,16 @@ Agent <- R6::R6Class(
     #' because their execution occurs inside the provider rather than R. Native
     #' tools therefore require static permissions and cannot be registered with
     #' a custom `can_use_tool` callback.
+    #' Existing names require explicit replacement. Every tool in a batch is
+    #' validated and adapted before the registry changes. List element names
+    #' do not rename tools; each tool's own name is authoritative.
     #' @param tool A tool created with `ellmer::tool()` or a supported
     #'   provider-native web tool.
+    #' @param replace Replace tools already registered under the same name?
+    #'   Defaults to FALSE. Duplicate names within a batch always fail.
     #' @return Invisible self for chaining
-    register_tool = function(tool) {
-      private$.chat$register_tool(private$adapt_tool(tool))
-      invisible(self)
+    register_tool = function(tool, replace = FALSE) {
+      self$register_tools(list(tool), replace = replace)
     },
 
     #' @description
@@ -730,10 +734,15 @@ Agent <- R6::R6Class(
     #'
     #' @param tools A list of function tools or supported provider-native web
     #'   tools.
+    #' @param replace Replace tools already registered under the same name?
+    #'   Defaults to FALSE. Duplicate names within a batch always fail.
     #' @return Invisible self for chaining
-    register_tools = function(tools) {
+    register_tools = function(tools, replace = FALSE) {
+      existing <- private$.chat$get_tools()
+      tools <- validate_tool_batch(tools, existing, replace = replace)
       wrapped <- lapply(tools, private$adapt_tool)
-      private$.chat$register_tools(wrapped)
+      existing[names(wrapped)] <- wrapped
+      private$.chat$set_tools(existing)
       invisible(self)
     },
 
@@ -1441,7 +1450,7 @@ Agent <- R6::R6Class(
           }
         }
 
-        self$register_tools(skill$tools)
+        self$register_tools(skill$tools, replace = allow_conflicts)
       }
 
       # Append prompt to system prompt
@@ -1808,12 +1817,8 @@ Agent <- R6::R6Class(
       tools <- private$.chat$get_tools()
       had_result_reader <- "deputy_read_tool_result" %in% names(tools)
       tools[["deputy_read_tool_result"]] <- NULL
-      private$.chat$set_tools(list())
-      if (length(tools) > 0L) {
-        private$.chat$register_tools(
-          lapply(tools, private$prepare_cloned_tool)
-        )
-      }
+      tools <- validate_tool_batch(tools)
+      private$.chat$set_tools(lapply(tools, private$prepare_cloned_tool))
       private$.tool_result_reader_registered <- FALSE
       if (isTRUE(had_result_reader)) {
         private$ensure_tool_result_reader()
@@ -3794,11 +3799,13 @@ Agent <- R6::R6Class(
         object = request
       )
 
-      # Tool annotations
+      # Resolve annotations from the registered executable. Providers may omit
+      # the tool object or attach a stale copy to the request.
+      registered_tool <- private$.chat$get_tools()[[tool_name]]
       tool_annotations <- tryCatch(
         {
-          if (!is.null(request@tool)) {
-            request@tool@annotations
+          if (!is.null(registered_tool)) {
+            registered_tool@annotations
           } else {
             NULL
           }
@@ -3810,10 +3817,10 @@ Agent <- R6::R6Class(
       )
       internal_tool <- tryCatch(
         {
-          if (is.null(request@tool)) {
+          if (is.null(registered_tool)) {
             NULL
           } else {
-            attr(request@tool, "deputy_internal_tool", exact = TRUE)
+            attr(registered_tool, "deputy_internal_tool", exact = TRUE)
           }
         },
         error = function(e) NULL

@@ -29,7 +29,7 @@
 #' Tools with `destructive_hint = TRUE` require explicit permission.
 #' Examples: `tool_write_file`, `tool_delete_file`, `tool_run_bash`
 #'
-#' **open_world_hint** (logical, default: FALSE)
+#' **open_world_hint** (logical, default: TRUE)
 #'
 #' Indicates the tool may interact with external systems.
 #' Used for network calls, package installation, etc.
@@ -38,7 +38,15 @@
 #' **idempotent_hint** (logical, default: FALSE)
 #'
 #' Indicates repeated calls produce the same result.
-#' Safe to retry on failure.
+#' This annotation alone does not authorize automatic retries.
+#'
+#' Missing annotations remain absent on the tool. For custom tools, permission
+#' checks assume modification, possible destruction, external access, and no
+#' idempotence unless stated otherwise. If `read_only_hint = TRUE`, an omitted
+#' destructive annotation is ignored; an explicit TRUE still denies read-only
+#' use. Native tools continue to require their named capabilities. A custom
+#' permission callback can explicitly authorize a tool in standard mode;
+#' full mode bypasses annotation checks but still honors tool gating.
 #'
 #' @section Creating Tools with Annotations:
 #'
@@ -51,7 +59,8 @@
 #'   arguments = list(pattern = ellmer::type_string("Search pattern")),
 #'   annotations = ellmer::tool_annotations(
 #'     read_only_hint = TRUE,
-#'     destructive_hint = FALSE
+#'     destructive_hint = FALSE,
+#'     open_world_hint = FALSE
 #'   )
 #' )
 #'
@@ -508,6 +517,13 @@ Permissions <- R6::R6Class(
 
       # Extract tool annotations from context if available
       annotations <- context$tool_annotations
+      if (
+        !normalize_native_tool_id(tool_name) %in%
+          permission_native_capability_tool_ids &&
+          !isTRUE(allowlist_exempt)
+      ) {
+        annotations <- effective_tool_annotations(annotations)
+      }
 
       if (self$mode == "readonly") {
         tool_id <- normalize_native_tool_id(tool_name)
@@ -1091,8 +1107,8 @@ Permissions <- R6::R6Class(
         return(PermissionResultAllow())
       }
 
-      # For unknown tools, use annotations if available
-      annotations <- context$tool_annotations
+      # Unknown tools use conservative defaults for every missing annotation.
+      annotations <- effective_tool_annotations(context$tool_annotations)
       if (!is.null(annotations)) {
         # Destructive tools need explicit permission
         if (isTRUE(annotations$destructive_hint)) {
@@ -1116,7 +1132,7 @@ Permissions <- R6::R6Class(
         }
       }
 
-      # Default: allow unknown tools without destructive annotations
+      # The tool passed the effective annotation capability checks.
       PermissionResultAllow()
     },
 
@@ -1142,7 +1158,7 @@ Permissions <- R6::R6Class(
       }
 
       # Plan mode is intentionally conservative: no annotation means deny.
-      if (is.null(annotations)) {
+      if (length(annotations) == 0L) {
         return(PermissionResultDeny(
           reason = paste0(
             "Plan mode only allows annotated read-only tools. ",
@@ -1150,6 +1166,10 @@ Permissions <- R6::R6Class(
             " has no annotations."
           )
         ))
+      }
+
+      if (!is_permission_native_capability_tool(tool_name)) {
+        annotations <- effective_tool_annotations(annotations)
       }
 
       if (isTRUE(annotations$destructive_hint)) {

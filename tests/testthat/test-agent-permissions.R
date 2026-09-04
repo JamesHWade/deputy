@@ -388,7 +388,7 @@ test_that("Agent respects bash permission", {
 
   # Bash allowed
   agent_bash <- Agent$new(
-    chat = mock_chat,
+    chat = create_mock_chat(),
     tools = list(tool_run_bash),
     permissions = Permissions$new(bash = TRUE)
   )
@@ -418,7 +418,7 @@ test_that("Agent respects r_code permission", {
 
   # R code allowed
   agent_r <- Agent$new(
-    chat = mock_chat,
+    chat = create_mock_chat(),
     tools = list(tool_run_r_code),
     permissions = Permissions$new(r_code = TRUE)
   )

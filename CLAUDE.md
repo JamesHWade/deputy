@@ -36,6 +36,7 @@ deputy/
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
 │   ├── tools-mcp.R         # MCP discovery and sandboxed mcp-repl boundary
+│   ├── tool-registration.R # Batch validation and annotation defaults
 │   ├── errors.R            # Custom error hierarchy
 │   └── utils.R             # Internal utilities
 ├── tests/testthat/         # Unit tests (testthat edition 3)
@@ -293,6 +294,13 @@ other concurrent hosts.
 - `tools_preset("dev")` - + trusted run_r_code and run_bash
 - `tools_preset("data")` - read_file, list_files, read_csv, run_r_code
 - `tools_preset("full")` - all built-in tools
+
+Registration uses ellmer tool definitions for local functions, package exports,
+and service tools. Names must be unique; `register_tool(..., replace = TRUE)`
+and `register_tools(..., replace = TRUE)` explicitly replace existing names.
+The complete batch is validated before changing the Chat's tools, including
+constructor and `set_tools()` paths. Missing custom-tool annotations remain
+absent on the source but use conservative permission defaults (ADR-0007).
 
 ### Hook Events
 

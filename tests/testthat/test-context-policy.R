@@ -154,6 +154,7 @@ test_that("the run kernel rechecks context between provider tool turns", {
   }
   agent <- Agent$new(
     chat = chat,
+    permissions = permissions_full(),
     context_policy = ContextPolicy(
       max_tokens = 50,
       compact_to = 0.5,
@@ -227,7 +228,11 @@ test_that("large tool results become durable integrity-checked references", {
     fun = function() value,
     name = "large_result",
     description = "Return a large test value.",
-    arguments = list()
+    arguments = list(),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
   )
   agent <- Agent$new(
     chat = create_mock_chat(),
@@ -333,7 +338,11 @@ test_that("post-tool hooks inspect original offloaded results", {
     fun = function() value,
     name = "large_result",
     description = "Return a large test value.",
-    arguments = list()
+    arguments = list(),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
   )
   captured <- NULL
   agent <- Agent$new(
@@ -413,7 +422,11 @@ test_that("the internal result reader remains available behind an allowlist", {
     fun = function() value,
     name = "large_result",
     description = "Return a large test value.",
-    arguments = list()
+    arguments = list(),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
   )
   other_tool <- ellmer::tool(
     fun = function() "other",

@@ -1,5 +1,12 @@
 # deputy (development version)
 
+* Tool registration validates complete batches before changing the registry.
+  Duplicate names now fail unless the host explicitly uses `replace = TRUE`;
+  duplicate names within a batch always fail. Constructor tools, skills,
+  and `set_tools()` share validation. Missing custom-tool annotations remain
+  visible and use conservative permission defaults, including possible
+  external access (#49).
+
 * `agent_definition_read()`, `agent_definition_write()`, and
   `agent_definitions()` add portable YAML definitions, explicit tool/skill
   registries, and discovery from `.deputy/agents/` (#41).
