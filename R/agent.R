@@ -2267,40 +2267,6 @@ Agent <- R6::R6Class(
       })()
     },
 
-    file_tool_path_info = function(tool_name, tool_input) {
-      if (is.null(tool_name) || length(tool_name) == 0L) {
-        return(NULL)
-      }
-      tool_id <- normalize_native_tool_id(tool_name[[1L]])
-      native_file_tools <- c(
-        "read_file",
-        "read_markdown",
-        "read_csv",
-        "write_file",
-        "edit_file",
-        "multi_edit",
-        "list_files",
-        "glob_files",
-        "grep_files"
-      )
-      if (!tool_id %in% native_file_tools) {
-        return(NULL)
-      }
-
-      default_path <- switch(
-        tool_id,
-        list_files = ".",
-        glob_files = ".",
-        grep_files = ".",
-        NULL
-      )
-      tool_input <- tool_input %||% list()
-      list(
-        tool_id = tool_id,
-        path = tool_input$path %||% default_path
-      )
-    },
-
     request_stream_stop = function(reason) {
       private$should_stop <- TRUE
       private$stop_reason_from_hook <- reason
@@ -3576,11 +3542,6 @@ Agent <- R6::R6Class(
         }
       }
 
-      file_info <- if (identical(extracted$tool_metadata$source$type, "mcp")) {
-        NULL
-      } else {
-        private$file_tool_path_info(tool_name, tool_input)
-      }
       context <- private$hook_context(
         tool_annotations = tool_annotations,
         tool_metadata = extracted$tool_metadata,
@@ -3661,8 +3622,11 @@ Agent <- R6::R6Class(
         }
       }
 
-      if (!is.null(private$.file_checkpoints)) {
-        tryCatch(
+      if (
+        !is.null(private$.file_checkpoints) &&
+          !is_mcp_tool_context(context)
+      ) {
+        captured <- tryCatch(
           private$.file_checkpoints$before_tool(
             tool_name,
             tool_input,
@@ -3679,6 +3643,10 @@ Agent <- R6::R6Class(
             ellmer::tool_reject(conditionMessage(e))
           }
         )
+        private$tool_call_records[[
+          record$record_index
+        ]]$file_checkpoint_captured <-
+          isTRUE(captured)
       }
 
       # Queue delegated-run correlation only after every gate has allowed the
@@ -3704,7 +3672,12 @@ Agent <- R6::R6Class(
         extracted$tool_result
       )
 
-      if (!is.null(private$.file_checkpoints)) {
+      # Finalize only captures started by this request. Remote tools never
+      # enter the local journal, even when their names resemble file tools.
+      if (
+        !is.null(private$.file_checkpoints) &&
+          isTRUE(record$file_checkpoint_captured)
+      ) {
         tryCatch(
           private$.file_checkpoints$after_tool(
             extracted$provider_tool_call_id %||% record$tool_call_id,
@@ -3723,6 +3696,10 @@ Agent <- R6::R6Class(
             stop(e)
           }
         )
+        private$tool_call_records[[
+          record$record_index
+        ]]$file_checkpoint_captured <-
+          FALSE
       }
 
       context <- private$hook_context(

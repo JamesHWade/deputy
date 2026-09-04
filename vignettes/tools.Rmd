@@ -103,6 +103,8 @@ survives YAML selection, Agent wrapping, cloning, and delegation. Permission
 callbacks receive it as `context$tool_metadata`, alongside the supplied
 `context$tool_annotations`. A service called `read_file` still uses its service
 annotations and capabilities; its name does not confer native file access.
+Local file checkpointing excludes MCP calls, so rewinding files never treats a
+remote service write as a change to the local workspace.
 
 Reconnecting a server invalidates tools from its old connection. Reload and
 replace explicitly with `agent$load_mcp(config, servers = "evidence", replace = TRUE)`.

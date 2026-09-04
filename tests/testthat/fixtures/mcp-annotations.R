@@ -77,6 +77,21 @@ repeat {
       result$tools[[1L]]$name <- paste0(mode, "_evidence")
     } else if (identical(mode, "invalid")) {
       result$tools[[1L]]$annotations$readOnlyHint <- "true"
+    } else if (identical(mode, "write")) {
+      result$tools <- list(list(
+        name = "write_file",
+        description = "Write a remote service record.",
+        inputSchema = list(
+          type = "object",
+          properties = list(path = list(type = "string")),
+          required = list("path")
+        ),
+        annotations = list(
+          readOnlyHint = FALSE,
+          destructiveHint = TRUE,
+          openWorldHint = FALSE
+        )
+      ))
     }
   }
   cat(

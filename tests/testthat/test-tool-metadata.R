@@ -409,6 +409,48 @@ test_that("released MCP transport preserves origin, annotations and connection i
         local_value = refresher$get_tools()$local_value(),
         status = tail(refresher$mcp_status()$status, 1L)
       )
+      configure("evidence", "write")
+      remote_writer <- tools_mcp(config)
+      checkpoint_journeys <- lapply(
+        c("../outside/record.txt", "existing.txt", "created.txt"),
+        function(remote_path) {
+          root <- tempfile("mcp-checkpoint-")
+          dir.create(root)
+          on.exit(unlink(root, recursive = TRUE))
+          local_path <- file.path(root, basename(remote_path))
+          if (identical(remote_path, "existing.txt")) {
+            writeLines("original local content", local_path)
+          }
+          writer <- NULL
+          response <- NULL
+          writer_chat <- test_helpers$create_shiny_tool_chat(
+            "write_file",
+            list(path = remote_path),
+            execute = function(request) {
+              response <<- do.call(
+                writer$get_tools()$write_file,
+                request@arguments
+              )
+            }
+          )
+          writer <- Agent$new(
+            chat = writer_chat$chat,
+            tools = remote_writer,
+            permissions = Permissions$new(file_write = TRUE),
+            enable_file_checkpointing = TRUE,
+            working_dir = root
+          )
+          run <- writer$run_sync("Write the remote record.")
+          writeLines("unrelated local edit", local_path)
+          rewind <- writer$rewind_files(run$events[[1L]]$checkpoint_id)
+          list(
+            executed = writer_chat$state$executed,
+            response = response,
+            restored = rewind$restored_changes,
+            local_content = if (file.exists(local_path)) readLines(local_path)
+          )
+        }
+      )
       list(
         metadata = metadata,
         clone_metadata = lapply(clone$get_tools(), tool_metadata),
@@ -416,6 +458,7 @@ test_that("released MCP transport preserves origin, annotations and connection i
         value = value,
         remote_path = remote_path,
         plan_journey = plan_journey,
+        checkpoint_journeys = checkpoint_journeys,
         stale = stale,
         single_empty = single_empty,
         journeys = journeys,
@@ -474,6 +517,16 @@ test_that("released MCP transport preserves origin, annotations and connection i
     fixed = TRUE
   )
   expect_true("deputy_mcp_metadata" %in% result$stale)
+  for (journey in result$checkpoint_journeys) {
+    expect_true(journey$executed)
+    expect_match(
+      paste(journey$response, collapse = ""),
+      "called:write_file:",
+      fixed = TRUE
+    )
+    expect_identical(journey$restored, 0L)
+    expect_identical(journey$local_content, "unrelated local edit")
+  }
   expect_true(result$plan_journey$executed)
   expect_match(
     paste(result$plan_journey$response, collapse = ""),
