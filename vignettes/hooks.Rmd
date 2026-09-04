@@ -233,3 +233,80 @@ recent hook errors with:
 ```{r, eval = FALSE}
 agent$hooks$last_errors()
 ```
+
+## Approval before a tool call
+
+The installed recipe defines `approval_gate()` and `approval_after_install()`:
+
+```{r approval-recipe-load, eval = TRUE}
+source(system.file("examples", "approval-gates.R", package = "deputy"))
+```
+
+`approval_gate()` calls the `ask_user` tool from `tools_interactive()` directly
+inside a `PreToolUse` callback. The handler belongs to this hook instance; it
+does not use the process-wide callback. The question includes the exact tool
+name and arguments. Only the exact answer `"Approve"` permits execution;
+missing answers, cancellation, and handler errors cannot approve a call.
+
+Here is an executable dry run with a host that declines the request:
+
+```{r approval-simple-demo, eval = TRUE}
+decline <- function(questions, context) {
+  setNames(list("Deny"), questions[[1]]$question)
+}
+gate <- approval_gate(callback = decline)
+gate$callback(
+  "write_file", list(path = "report.txt", content = "Draft"),
+  context = list(run_id = "example-run")
+)$permission
+```
+
+Attach a fresh hook to an Agent whose permissions already allow the relevant
+operation. Hooks can narrow permissions; approval cannot widen that ceiling.
+In an interactive R terminal, omit `callback` to use the normal user prompt.
+In a hosted application, supply your own synchronous human-input handler.
+This recipe is not a durable pause/resume mechanism.
+
+```{r, eval = FALSE}
+agent$add_hook(approval_gate(callback = my_approval_handler))
+```
+
+## Approval after an earlier installation
+
+Hook context supplies `run_id`, not a mutable history of earlier calls.
+`approval_after_install()` accumulates successful installation receipts in its
+own environment, keyed by that run ID. Its `PreToolUse` callback reads that
+state before `push_changes`; `Stop` removes it. Create a fresh set per Agent.
+The callbacks use `timeout = 0` so they share caller-process state.
+
+This recipe assumes dedicated `install_dependency` and `push_changes` tools.
+The install tool must return `list(installed = TRUE)` only after success.
+A failed install does not arm the gate. Matching arbitrary shell text would
+not reliably identify these operations.
+
+```{r approval-stateful-demo, eval = TRUE}
+hooks <- approval_after_install(callback = decline)
+run <- list(run_id = "installation-run")
+hooks[[1]]$callback(
+  "install_dependency", list(installed = TRUE), NULL, run
+)
+hooks[[2]]$callback("push_changes", list(remote = "origin"), run)$permission
+# A different run has no installation receipt.
+hooks[[2]]$callback(
+  "push_changes", list(remote = "origin"), list(run_id = "another-run")
+)$permission
+hooks[[3]]$callback("end_turn", run)
+```
+
+Attach all three hooks together:
+
+```{r, eval = FALSE}
+for (hook in approval_after_install(callback = my_approval_handler)) {
+  agent$add_hook(hook)
+}
+```
+
+The example returns `"allow"` before an installation because it demonstrates
+that particular sequence policy. Use the unconditional gate if every push
+needs approval. Neither recipe grants permission or performs an installation
+or a push by itself.

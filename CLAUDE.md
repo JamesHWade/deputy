@@ -39,7 +39,7 @@ deputy/
 │   └── utils.R             # Internal utilities
 ├── tests/testthat/         # Unit tests (testthat edition 3)
 ├── inst/skills/            # Built-in skills with YAML metadata
-├── inst/examples/          # Example apps (e.g., shiny-chat)
+├── inst/examples/          # Runnable recipes and example apps (e.g., shiny-chat)
 ├── exec/deputy.R           # Terminal CLI using Rapp
 ├── vignettes/              # User documentation (R Markdown)
 ├── man/                    # Auto-generated roxygen2 docs
