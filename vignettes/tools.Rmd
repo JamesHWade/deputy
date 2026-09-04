@@ -84,6 +84,31 @@ Readonly mode additionally requires an explicit allowlist entry for custom
 tools. Annotations do not grant authority or verify a service's trustworthiness.
 See `PermissionMode` for callback and mode behavior.
 
+Inspect the supplied fields and defaults without executing the tool:
+
+```{r tool-metadata, eval=TRUE}
+tool_metadata(agent$get_tools()$uppercase)
+```
+
+For service tools, `tools_mcp(config, servers = "evidence")` selects an exact
+configured server name before connecting. The qualified mcptools 1.0.2 bridge
+retains annotations from the server and records `source$type = "mcp"`, its
+server name, and tool name. It reports missing metadata rather than inventing
+safe effects. Other mcptools versions fail explicitly pending qualification.
+The caller must trust the configured service; metadata does not establish trust.
+
+Pass these objects to `Agent$new(tools = ...)`, `register_tools()`, or an
+explicit tool registry used by `agent_definition_read()`. The same metadata
+survives YAML selection, Agent wrapping, cloning, and delegation. Permission
+callbacks receive it as `context$tool_metadata`, alongside the supplied
+`context$tool_annotations`. A service called `read_file` still uses its service
+annotations and capabilities; its name does not confer native file access.
+
+Reconnecting a server invalidates tools from its old connection. Reload and
+replace explicitly with `agent$load_mcp(config, servers = "evidence", replace = TRUE)`.
+A load failure warns and returns no tools; malformed metadata never silently
+becomes an unannotated executable.
+
 Bundles group related tools together:
 
 ```{r, eval = FALSE}

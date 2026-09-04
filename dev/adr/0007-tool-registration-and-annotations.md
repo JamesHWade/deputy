@@ -25,3 +25,34 @@ describe behavior and do not establish trust or grant authority. Native
 capability checks, deny/allow lists, callbacks, and parent permission ceilings
 still apply. Full mode and explicit standard-mode callbacks remain host
 authorization mechanisms.
+
+## MCP descriptor compatibility
+
+CRAN mcptools 1.0.2 owns transport, authentication, schema conversion, pagination,
+and invocation. Its public `mcp_tools()` converter omits server annotations and
+origin; ellmer 0.5.0 exposes no replacement MCP client. Until mcptools exposes
+descriptors publicly, Deputy reads its existing connection registry through a
+bridge qualified for exactly 1.0.2. The bridge checks descriptor cardinality,
+the tool closure's exact server/name, and transport identity. It neither
+patches the namespace nor makes a second discovery connection. Unsupported
+versions and malformed metadata fail explicitly. The existing `tools_mcp()`
+failure contract warns and returns an empty list.
+Issue #99 tracks replacing this bridge with a public upstream interface.
+
+Server selection uses exact config names before connecting. Only selected
+origins are returned even if mcptools retains other connections globally.
+Annotations are translated from MCP camelCase to ellmer snake_case while
+retaining FALSE values and extensions. `tool_metadata()` exposes supplied
+fields separately from missing fields and effective defaults. Deputy runtime
+wrappers retain the source object, including its origin and metadata, and
+permission callbacks receive this metadata from the registered executable.
+MCP names cannot acquire local-file or approval-prompt privileges; remote
+arguments are not rewritten relative to the Agent's workspace.
+
+mcptools resolves calls through mutable server names. A retained tool therefore
+checks that its original transport is still current before invocation.
+Reconnection invalidates old handles rather than letting old annotations
+authorize a new executable. The host reloads and explicitly replaces those
+tools. Tools in YAML registries remain live host objects, and child Agents
+inherit provider configuration with an empty registry before applying their
+definition's tools and the parent's permission ceiling.

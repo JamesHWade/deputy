@@ -79,6 +79,7 @@ reference:
   - tools_preset
   - tools_interactive
   - tools_mcp
+  - tool_metadata
   - tools_mcp_repl
   - set_ask_user_callback
 

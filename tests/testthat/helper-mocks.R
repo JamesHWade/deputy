@@ -19,6 +19,9 @@ create_mock_provider <- function(
     credentials = NULL
   )
   accepted <- names(formals(ellmer::Provider))
+  if (utils::packageVersion("ellmer") >= "0.5.0") {
+    accepted <- setdiff(accepted, c("model", "params", "extra_args"))
+  }
   provider <- do.call(ellmer::Provider, args[names(args) %in% accepted])
   attr(provider, "mock_model") <- model
   provider

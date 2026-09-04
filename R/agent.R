@@ -1497,8 +1497,12 @@ Agent <- R6::R6Class(
     #'   the mcptools default location (`~/.config/mcptools/config.json`).
     #' @param servers Optional character vector of server names to load from.
     #'   If NULL, loads from all configured servers.
+    #' @param replace Explicitly replace existing tools with matching names.
     #' @return Invisible self for chaining
-    load_mcp = function(config = NULL, servers = NULL) {
+    load_mcp = function(config = NULL, servers = NULL, replace = FALSE) {
+      if (!rlang::is_bool(replace)) {
+        tool_registration_error("{.arg replace} must be TRUE or FALSE.")
+      }
       mcp_tools_list <- tools_mcp(config = config, servers = servers)
       loaded_at <- Sys.time()
 
@@ -1506,7 +1510,7 @@ Agent <- R6::R6Class(
         # Register tools with error handling
         tryCatch(
           {
-            self$register_tools(mcp_tools_list)
+            self$register_tools(mcp_tools_list, replace = replace)
           },
           error = function(e) {
             cli::cli_abort(c(
@@ -1920,7 +1924,13 @@ Agent <- R6::R6Class(
       }
       runtime_wrap_tool(
         tool,
-        resolve_arguments = private$resolve_tool_arguments,
+        resolve_arguments = if (
+          identical(tool_metadata(tool)$source$type, "mcp")
+        ) {
+          function(tool_name, arguments) arguments
+        } else {
+          private$resolve_tool_arguments
+        },
         process_result = private$offload_tool_result,
         begin_execution = private$begin_tool_execution,
         execute = private$execute_tool
@@ -3499,9 +3509,14 @@ Agent <- R6::R6Class(
         }
       }
 
-      file_info <- private$file_tool_path_info(tool_name, tool_input)
+      file_info <- if (identical(extracted$tool_metadata$source$type, "mcp")) {
+        NULL
+      } else {
+        private$file_tool_path_info(tool_name, tool_input)
+      }
       context <- private$hook_context(
         tool_annotations = tool_annotations,
+        tool_metadata = extracted$tool_metadata,
         tool_call_id = record$tool_call_id,
         permission_mode = self$permissions$mode,
         usage = usage,
@@ -3802,6 +3817,11 @@ Agent <- R6::R6Class(
       # Resolve annotations from the registered executable. Providers may omit
       # the tool object or attach a stale copy to the request.
       registered_tool <- private$.chat$get_tools()[[tool_name]]
+      metadata <- if (is.null(registered_tool)) {
+        NULL
+      } else {
+        tool_metadata(registered_tool)
+      }
       tool_annotations <- tryCatch(
         {
           if (!is.null(registered_tool)) {
@@ -3830,6 +3850,7 @@ Agent <- R6::R6Class(
         tool_name = tool_name,
         tool_input = tool_input,
         tool_annotations = tool_annotations,
+        tool_metadata = metadata,
         internal_tool = internal_tool,
         provider_tool_call_id = provider_tool_call_id,
         tool_identity_error = tool_identity_error

@@ -46,10 +46,9 @@ runtime_wrap_tool <- function(
     execute = execute,
     tool_name = source_tool@name
   )
-  wrapper <- rlang::new_function(
-    formals(source_tool),
+  invoke <- rlang::new_function(
+    alist(arguments = ),
     quote({
-      arguments <- as.list(environment(), all.names = TRUE)
       arguments <- resolve_arguments(
         tool_name,
         arguments
@@ -64,6 +63,13 @@ runtime_wrap_tool <- function(
       process_result(tool_name, value, execution_id)
     }),
     wrapper_env
+  )
+  wrapper <- rlang::new_function(
+    formals(source_tool),
+    rlang::expr((!!invoke)(base::as.list(
+      base::environment(),
+      all.names = TRUE
+    )))
   )
 
   wrapped <- ellmer::tool(

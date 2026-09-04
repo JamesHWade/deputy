@@ -37,6 +37,8 @@ deputy/
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
 │   ├── tools-mcp.R         # MCP discovery and sandboxed mcp-repl boundary
 │   ├── tool-registration.R # Batch validation and annotation defaults
+│   ├── tool-metadata.R     # Origin and annotation coverage inspection
+│   ├── mcp-metadata.R      # Qualified mcptools descriptor bridge
 │   ├── errors.R            # Custom error hierarchy
 │   └── utils.R             # Internal utilities
 ├── tests/testthat/         # Unit tests (testthat edition 3)
@@ -301,6 +303,13 @@ and `register_tools(..., replace = TRUE)` explicitly replace existing names.
 The complete batch is validated before changing the Chat's tools, including
 constructor and `set_tools()` paths. Missing custom-tool annotations remain
 absent on the source but use conservative permission defaults (ADR-0007).
+`tool_metadata()` exposes origin and missing annotations after wrapping or
+delegation. MCP uses mcptools 1.0.2 for transport/schema/invocation and a narrow
+read-only descriptor bridge because that release drops annotations. Exact
+server selection happens before connection. Reconnecting invalidates old
+tool handles. MCP names never acquire native file or approval-tool privileges.
+Inherited child Chats retain provider configuration but clear parent tools;
+the AgentDefinition supplies the child's executable registry.
 
 ### Hook Events
 

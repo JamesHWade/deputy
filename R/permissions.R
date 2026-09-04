@@ -506,7 +506,10 @@ Permissions <- R6::R6Class(
 
       # Allow the configured prompt tool so gated workflows can request
       # explicit human approval, provided it passed explicit tool gating.
-      if (private$is_permission_prompt_tool(tool_name)) {
+      if (
+        !is_mcp_tool_context(context) &&
+          private$is_permission_prompt_tool(tool_name)
+      ) {
         return(PermissionResultAllow())
       }
 
@@ -518,8 +521,9 @@ Permissions <- R6::R6Class(
       # Extract tool annotations from context if available
       annotations <- context$tool_annotations
       if (
-        !normalize_native_tool_id(tool_name) %in%
-          permission_native_capability_tool_ids &&
+        (is_mcp_tool_context(context) ||
+          !normalize_native_tool_id(tool_name) %in%
+            permission_native_capability_tool_ids) &&
           !isTRUE(allowlist_exempt)
       ) {
         annotations <- effective_tool_annotations(annotations)
@@ -557,7 +561,10 @@ Permissions <- R6::R6Class(
           ))
         }
 
-        if (is_permission_file_read_tool(tool_name)) {
+        if (
+          !is_mcp_tool_context(context) &&
+            is_permission_file_read_tool(tool_name)
+        ) {
           if (!isTRUE(self$file_read)) {
             return(PermissionResultDeny(
               reason = "File reading is not allowed"
@@ -566,7 +573,10 @@ Permissions <- R6::R6Class(
           return(private$apply_callback_veto(tool_name, tool_input, context))
         }
 
-        if (tool_id %in% c("web_search", "web_fetch")) {
+        if (
+          !is_mcp_tool_context(context) &&
+            tool_id %in% c("web_search", "web_fetch")
+        ) {
           if (!isTRUE(self$web)) {
             return(PermissionResultDeny(
               reason = "Web access is not allowed in readonly mode"
@@ -977,6 +987,9 @@ Permissions <- R6::R6Class(
     # Tool-specific permission checks
     check_tool_specific = function(tool_name, tool_input, context) {
       tool_id <- normalize_native_tool_id(tool_name)
+      if (is_mcp_tool_context(context)) {
+        return(private$check_annotation_capabilities(context))
+      }
 
       # File read tools
       if (is_permission_file_read_tool(tool_name)) {
@@ -1107,29 +1120,26 @@ Permissions <- R6::R6Class(
         return(PermissionResultAllow())
       }
 
-      # Unknown tools use conservative defaults for every missing annotation.
+      private$check_annotation_capabilities(context)
+    },
+
+    check_annotation_capabilities = function(context) {
+      # Unknown and MCP tools use conservative defaults for missing annotations.
       annotations <- effective_tool_annotations(context$tool_annotations)
-      if (!is.null(annotations)) {
-        # Destructive tools need explicit permission
-        if (isTRUE(annotations$destructive_hint)) {
-          # If file_write is disabled, deny destructive tools
-          if (isFALSE(self$file_write) && !self$bash) {
-            return(PermissionResultDeny(
-              reason = "Tool is marked as destructive and write operations are disabled"
-            ))
-          }
-        }
-        # Open-world tools need the corresponding capability even when they
-        # also describe themselves as read-only.
-        if (isTRUE(annotations$open_world_hint) && !self$web) {
-          return(PermissionResultDeny(
-            reason = "Tool can access external resources but web access is disabled"
-          ))
-        }
-        # Read-only tools are generally safe
-        if (isTRUE(annotations$read_only_hint)) {
-          return(PermissionResultAllow())
-        }
+      if (
+        isTRUE(annotations$destructive_hint) &&
+          isFALSE(self$file_write) &&
+          !self$bash
+      ) {
+        return(PermissionResultDeny(
+          reason = "Tool is marked as destructive and write operations are disabled"
+        ))
+      }
+      # External access needs its capability even for read-only tools.
+      if (isTRUE(annotations$open_world_hint) && !self$web) {
+        return(PermissionResultDeny(
+          reason = "Tool can access external resources but web access is disabled"
+        ))
       }
 
       # The tool passed the effective annotation capability checks.
@@ -1168,7 +1178,10 @@ Permissions <- R6::R6Class(
         ))
       }
 
-      if (!is_permission_native_capability_tool(tool_name)) {
+      if (
+        is_mcp_tool_context(context) ||
+          !is_permission_native_capability_tool(tool_name)
+      ) {
         annotations <- effective_tool_annotations(annotations)
       }
 
