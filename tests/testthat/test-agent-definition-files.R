@@ -27,7 +27,7 @@ test_that("every AgentDefinition field round-trips through YAML", {
   definition <- agent_definition(
     "Reviewer",
     "Reviews text",
-    "Read carefully.\nReport gaps.",
+    "Read the r\u00e9sum\u00e9 carefully.\nReport gaps.",
     tools = unname(tool_registry),
     model = "inherit",
     skills = unname(skill_registry),
@@ -52,6 +52,7 @@ test_that("every AgentDefinition field round-trips through YAML", {
     skills = skill_registry
   )
   expect_identical(restored, definition)
+  expect_false(as.raw(13) %in% readBin(path, "raw", n = file.size(path)))
   expect_identical(restored$tools[[1]]@annotations, tool_read_file@annotations)
   expect_identical(restored$skills[[1]], skill)
 })
@@ -193,11 +194,16 @@ test_that("partial writes leave the original definition intact", {
   root <- withr::local_tempdir()
   path <- write_definition_fixture(minimal_definition_yaml, root)
   definition <- agent_definition_read(path)
-  write_lines <- writeLines
+  write_bytes <- writeBin
   signal_failure <- rlang::abort
   local_mocked_bindings(
-    writeLines = function(text, con, ...) {
-      write_lines("partial replacement", con, ...)
+    writeBin = function(object, con, ...) {
+      if (
+        !is.character(con) || !startsWith(basename(con), ".deputy-definition-")
+      ) {
+        return(write_bytes(object, con, ...))
+      }
+      write_bytes(charToRaw("partial replacement"), con, ...)
       signal_failure("Simulated disk full")
     },
     .package = "base"

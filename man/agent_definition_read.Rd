@@ -69,6 +69,7 @@ values as \code{null}. Writing canonicalizes formatting; it does not preserve
 comments or names attached to R lists or character sequences. Object order
 and registry identity are preserved. A single string is accepted as shorthand
 for a one-element sequence. Only regular files of at most 1 MiB are read.
+Files are written as UTF-8 with LF line endings on every platform.
 Writes use a temporary file in the destination directory and replace the
 destination only after writing succeeds.
 With \code{overwrite = FALSE}, installing the file requires hard-link support

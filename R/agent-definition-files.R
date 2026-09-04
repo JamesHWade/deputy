@@ -40,6 +40,7 @@
 #' comments or names attached to R lists or character sequences. Object order
 #' and registry identity are preserved. A single string is accepted as shorthand
 #' for a one-element sequence. Only regular files of at most 1 MiB are read.
+#' Files are written as UTF-8 with LF line endings on every platform.
 #' Writes use a temporary file in the destination directory and replace the
 #' destination only after writing succeeds.
 #' With `overwrite = FALSE`, installing the file requires hard-link support
@@ -140,8 +141,8 @@ agent_definition_write <- function(
     if (!is.null(spec[[field]])) spec[[field]] <- unname(as.list(spec[[field]]))
   }
   definition_from_spec(spec, tools, skills, path)
-  text <- yaml::as.yaml(spec)
-  if (nchar(text, type = "bytes") > 1024^2) {
+  bytes <- charToRaw(enc2utf8(yaml::as.yaml(spec)))
+  if (length(bytes) > 1024^2) {
     abort_definition_file("AgentDefinition YAML exceeds 1 MiB", path)
   }
   if (file.exists(path) && !overwrite) {
@@ -153,7 +154,7 @@ agent_definition_write <- function(
   temporary <- tempfile(".deputy-definition-", tmpdir = dirname(path))
   on.exit(unlink(temporary), add = TRUE)
   tryCatch(
-    writeLines(text, temporary, sep = "", useBytes = TRUE),
+    writeBin(bytes, temporary),
     error = function(e) abort_definition_file("{conditionMessage(e)}", path),
     warning = function(e) abort_definition_file("{conditionMessage(e)}", path)
   )
