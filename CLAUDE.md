@@ -81,6 +81,9 @@ Rscript -e "devtools::load_all()"
 The scripts in `inst/examples/standalone/` are executed by
 `tests/testthat/test-standalone-examples.R` using deterministic provider responses.
 Keep examples independent and use the public Agent APIs.
+`09-debate.R` composes stateless fan-out with the bundled prompt-only
+`inst/skills/debate/` skill and a separately budgeted moderator. It requires
+both heads to complete before synthesis; skill loading alone starts no work.
 
 ## Common Commands
 
