@@ -77,6 +77,52 @@ test_that("MCP annotation mapping preserves false values and extensions", {
   )
 })
 
+test_that("MCP names do not acquire native capability restrictions", {
+  names <- c("read_file", "read_csv", "write_file", "run_bash")
+  context <- list(
+    tool_metadata = list(source = list(type = "mcp")),
+    tool_annotations = list(read_only_hint = TRUE, open_world_hint = FALSE)
+  )
+  for (mode in c("standard", "readonly", "plan")) {
+    permissions <- Permissions$new(
+      mode = mode,
+      file_read = FALSE,
+      file_write = FALSE,
+      tool_allowlist = names
+    )
+    for (name in names) {
+      expect_s3_class(
+        permissions$check(name, list(), context),
+        "PermissionResultAllow"
+      )
+      native <- context
+      native$tool_metadata <- NULL
+      expect_s3_class(
+        permissions$check(name, list(), native),
+        "PermissionResultDeny"
+      )
+      external <- context
+      external$tool_annotations$open_world_hint <- TRUE
+      expect_s3_class(
+        permissions$check(name, list(), external),
+        "PermissionResultDeny"
+      )
+      destructive <- context
+      destructive$tool_annotations$destructive_hint <- TRUE
+      expect_s3_class(
+        permissions$check(name, list(), destructive),
+        "PermissionResultDeny"
+      )
+      unannotated <- context
+      unannotated$tool_annotations <- NULL
+      expect_s3_class(
+        permissions$check(name, list(), unannotated),
+        "PermissionResultDeny"
+      )
+    }
+  }
+})
+
 test_that("tool arguments cannot shadow runtime adapter bindings", {
   tool <- ellmer::tool(
     function(original, execute, process_result, tool_name) {
@@ -161,6 +207,33 @@ test_that("released MCP transport preserves origin, annotations and connection i
         original = "literal"
       )
       remote_path <- clone$get_tools()$read_file(path = "remote/relative.txt")
+      plan_agent <- NULL
+      plan_response <- NULL
+      plan_chat <- test_helpers$create_shiny_tool_chat(
+        "read_file",
+        list(path = "remote/plan.txt"),
+        execute = function(request) {
+          plan_response <<- do.call(
+            plan_agent$get_tools()$read_file,
+            request@arguments
+          )
+        }
+      )
+      plan_agent <- Agent$new(
+        chat = plan_chat$chat,
+        tools = tools,
+        permissions = Permissions$new(
+          mode = "plan",
+          file_read = FALSE,
+          file_write = FALSE,
+          web = TRUE
+        )
+      )
+      plan_agent$run_sync("Read the service record.")
+      plan_journey <- list(
+        executed = plan_chat$state$executed,
+        response = plan_response
+      )
       # YAML -> explicit registry -> LeadAgent -> child permission -> MCP call.
       definition_path <- tempfile(fileext = ".yaml")
       on.exit(unlink(definition_path), add = TRUE)
@@ -342,6 +415,7 @@ test_that("released MCP transport preserves origin, annotations and connection i
         decisions = decisions,
         value = value,
         remote_path = remote_path,
+        plan_journey = plan_journey,
         stale = stale,
         single_empty = single_empty,
         journeys = journeys,
@@ -400,6 +474,12 @@ test_that("released MCP transport preserves origin, annotations and connection i
     fixed = TRUE
   )
   expect_true("deputy_mcp_metadata" %in% result$stale)
+  expect_true(result$plan_journey$executed)
+  expect_match(
+    paste(result$plan_journey$response, collapse = ""),
+    "called:read_file:remote/plan.txt",
+    fixed = TRUE
+  )
   expect_identical(result$single_empty, list(count = 0L, status = "empty"))
   expect_identical(
     vapply(result$journeys, function(x) x$executed, logical(1)),

@@ -537,9 +537,9 @@ Permissions <- R6::R6Class(
         ) ||
           isTRUE(allowlist_exempt)
 
-        # Known mutating tools remain denied even if annotations are absent or
-        # incorrectly mark a tool as read-only.
-        if (private$is_write_tool(tool_name)) {
+        # Native mutating tools remain denied even if their annotations are
+        # incorrect. MCP tools are classified by metadata, not remote names.
+        if (!is_mcp_tool_context(context) && private$is_write_tool(tool_name)) {
           return(PermissionResultDeny(
             reason = "Permission denied: readonly mode active"
           ))
@@ -1149,7 +1149,7 @@ Permissions <- R6::R6Class(
     check_plan_mode = function(tool_name, tool_input, context) {
       annotations <- context$tool_annotations
 
-      if (private$is_write_tool(tool_name)) {
+      if (!is_mcp_tool_context(context) && private$is_write_tool(tool_name)) {
         return(PermissionResultDeny(
           reason = paste0(
             "Plan mode does not allow write or execute tools: ",
@@ -1159,7 +1159,8 @@ Permissions <- R6::R6Class(
       }
 
       if (
-        is_permission_file_read_tool(tool_name) &&
+        !is_mcp_tool_context(context) &&
+          is_permission_file_read_tool(tool_name) &&
           !isTRUE(self$file_read)
       ) {
         return(PermissionResultDeny(
