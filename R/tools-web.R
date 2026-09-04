@@ -36,11 +36,7 @@
 #' @export
 tool_web_fetch <- ellmer::tool(
   fun = function(url) {
-    if (!rlang::is_installed("httr2")) {
-      return(ellmer::tool_reject(
-        "Cannot fetch web content: package 'httr2' is required. Install with install.packages('httr2')"
-      ))
-    }
+    rlang::check_installed("httr2", reason = "to fetch web content")
 
     tryCatch(
       {
@@ -133,11 +129,7 @@ tool_web_fetch <- ellmer::tool(
 #' @export
 tool_web_search <- ellmer::tool(
   fun = function(query, num_results = 10) {
-    if (!rlang::is_installed("httr2")) {
-      return(ellmer::tool_reject(
-        "Cannot perform web search: package 'httr2' is required. Install with install.packages('httr2')"
-      ))
-    }
+    rlang::check_installed("httr2", reason = "to search the web")
 
     tryCatch(
       {

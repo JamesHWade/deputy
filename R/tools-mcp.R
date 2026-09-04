@@ -152,9 +152,7 @@ tools_mcp_repl <- function(
   ) {
     cli_abort("{.arg server} must be one non-empty string")
   }
-  if (!rlang::is_installed("jsonlite")) {
-    cli_abort("{.pkg jsonlite} is required to validate MCP configuration")
-  }
+  rlang::check_installed("jsonlite", reason = "to validate MCP configuration")
 
   config <- path.expand(
     config %||%

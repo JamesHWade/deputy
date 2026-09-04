@@ -88,9 +88,7 @@ extract_json_from_text <- function(text) {
     return(list(parsed = NULL, error = "Invalid response text"))
   }
 
-  if (!rlang::is_installed("jsonlite")) {
-    return(list(parsed = NULL, error = "jsonlite package is required"))
-  }
+  rlang::check_installed("jsonlite", reason = "to parse structured output")
 
   parsed <- tryCatch(
     jsonlite::fromJSON(text, simplifyVector = FALSE),
