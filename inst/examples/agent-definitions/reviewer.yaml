@@ -1,0 +1,15 @@
+version: 1
+name: reviewer
+description: Reviews local text for gaps
+prompt: |
+  Read the supplied text using read_file.
+  Report unsupported claims and missing evidence concisely.
+tools: [read_file]
+model: inherit
+skills: []
+disallowed_tools: [write_file, run_bash]
+memory: []
+mcp_servers: []
+initial_prompt: Keep the review grounded in the supplied text.
+max_requests: 2
+permission_mode: readonly

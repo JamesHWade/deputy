@@ -25,6 +25,7 @@ deputy/
 ├── R/                      # Source code (R6 classes and functions)
 │   ├── agent.R             # Agent class - main agentic workflow engine
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
+│   ├── agent-definition-files.R # Portable YAML AgentDefinitions
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
 │   ├── run-usage.R         # Run accounting and fail-closed limits
 │   ├── stall-detection.R   # Canonical repeated-tool progress signal
@@ -270,6 +271,12 @@ delegated agents are bounded by the same rule and by their lead's restrictions.
 `LeadAgent` keeps definitions in a private, uniquely keyed registry;
 `sub_agent_defs` is a read-only snapshot, and new definitions must go through
 `register_sub_agent()` so the registry and lead prompt stay synchronized.
+
+`agent_definition_read()`, `agent_definition_write()`, and `agent_definitions()`
+provide versioned Deputy YAML files, conventionally in `.deputy/agents/`.
+Tools and skills resolve through explicit host registries; file loading never
+sources R code, loads skills, or connects services. See ADR-0006 and the
+Multi-Agent vignette for the format and authoring examples.
 
 ### Human Input
 
