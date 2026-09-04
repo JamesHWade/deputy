@@ -29,9 +29,12 @@ approval_gate <- function(
         multiSelect = FALSE
       )))
       approved <- identical(response$answers[[question]], "Approve")
+      if (approved) {
+        return(NULL)
+      }
       HookResultPreToolUse(
-        permission = if (approved) "allow" else "deny",
-        reason = if (!approved) "The user did not approve this call"
+        permission = "deny",
+        reason = "The user did not approve this call"
       )
     }
   )
@@ -48,10 +51,14 @@ approval_after_install <- function(callback = NULL) {
       pattern = "^install_dependency$",
       timeout = 0,
       callback = function(tool_name, tool_result, tool_error, context) {
-        if (is.null(tool_error) && identical(tool_result$installed, TRUE)) {
+        if (
+          is.null(tool_error) &&
+            is.list(tool_result) &&
+            identical(tool_result$installed, TRUE)
+        ) {
           installed_runs[[context$run_id]] <- TRUE
         }
-        HookResultPostToolUse()
+        NULL
       }
     ),
     HookMatcher$new(
@@ -62,7 +69,7 @@ approval_after_install <- function(callback = NULL) {
         if (isTRUE(installed_runs[[context$run_id]])) {
           return(gate$callback(tool_name, tool_input, context))
         }
-        HookResultPreToolUse(permission = "allow")
+        NULL
       }
     ),
     HookMatcher$new(

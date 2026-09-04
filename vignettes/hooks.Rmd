@@ -261,6 +261,12 @@ gate$callback(
 )$permission
 ```
 
+Register approval hooks **before all other matching hooks**, including audit
+and Stop hooks. The registry returns the first non-NULL result, so an earlier
+allow or audit result can bypass a later hook. These recipes return NULL after
+approval, for unarmed gates, and after recording receipts so later hooks still
+run and can deny the call.
+
 Attach a fresh hook to an Agent whose permissions already allow the relevant
 operation. Hooks can narrow permissions; approval cannot widen that ceiling.
 In an interactive R terminal, omit `callback` to use the normal user prompt.
@@ -294,7 +300,7 @@ hooks[[2]]$callback("push_changes", list(remote = "origin"), run)$permission
 # A different run has no installation receipt.
 hooks[[2]]$callback(
   "push_changes", list(remote = "origin"), list(run_id = "another-run")
-)$permission
+)
 hooks[[3]]$callback("end_turn", run)
 ```
 
@@ -306,7 +312,7 @@ for (hook in approval_after_install(callback = my_approval_handler)) {
 }
 ```
 
-The example returns `"allow"` before an installation because it demonstrates
+The example returns `NULL` before an installation because it demonstrates
 that particular sequence policy. Use the unconditional gate if every push
 needs approval. Neither recipe grants permission or performs an installation
 or a push by itself.
