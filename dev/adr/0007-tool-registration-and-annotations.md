@@ -59,5 +59,10 @@ definition's tools and the parent's permission ceiling.
 
 Explicit refresh replaces the complete tool set of each selected server,
 removing obsolete names even for a successful empty discovery. The internal
-load result distinguishes success from failure before registry replacement;
-failed discovery records an error and preserves the previous registry.
+load result distinguishes success from failure before registry replacement.
+mcptools closes an old transport before replacement discovery and validation,
+so failed refreshes cannot promise a working old connection. On every exit,
+including discovery/registration errors and interrupts, the Agent removes
+handles whose connection guards report invalidation, preserves working tools,
+and updates its loaded-tool names. Failed discovery or registration records
+an error. Failure before reconnecting leaves valid old tools intact.

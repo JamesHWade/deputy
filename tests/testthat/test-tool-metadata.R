@@ -305,11 +305,37 @@ test_that("released MCP transport preserves origin, annotations and connection i
       )
       configure("evidence")
       refresher$load_mcp(config, replace = TRUE)
-      before_failure <- refresher$get_tools()
       configure("evidence", "invalid")
       suppressWarnings(refresher$load_mcp(config, replace = TRUE))
-      failure_preserved <- identical(refresher$get_tools(), before_failure)
+      after_failure <- list(
+        names = names(refresher$get_tools()),
+        loaded = refresher$mcp_tools(),
+        other_value = refresher$get_tools()$other_evidence(
+          claim = "still-working"
+        )
+      )
       failure_status <- tail(refresher$mcp_status(), 1L)
+      configure("evidence")
+      refresher$load_mcp(config, replace = TRUE)
+      before_preconnect_failure <- refresher$get_tools()
+      suppressWarnings(refresher$load_mcp(
+        paste0(config, "-missing"),
+        replace = TRUE
+      ))
+      preconnect_preserved <- identical(
+        before_preconnect_failure,
+        refresher$get_tools()
+      )
+      registration_failure <- tryCatch(
+        refresher$load_mcp(config),
+        error = conditionMessage
+      )
+      after_registration_failure <- list(
+        names = names(refresher$get_tools()),
+        loaded = refresher$mcp_tools(),
+        local_value = refresher$get_tools()$local_value(),
+        status = tail(refresher$mcp_status()$status, 1L)
+      )
       list(
         metadata = metadata,
         clone_metadata = lapply(clone$get_tools(), tool_metadata),
@@ -322,8 +348,11 @@ test_that("released MCP transport preserves origin, annotations and connection i
         conflict = conflict,
         renamed = renamed,
         emptied = emptied,
-        failure_preserved = failure_preserved,
+        after_failure = after_failure,
         failure_status = failure_status,
+        preconnect_preserved = preconnect_preserved,
+        registration_failure = registration_failure,
+        after_registration_failure = after_registration_failure,
         second_sources = lapply(second, function(tool) {
           tool_metadata(tool)$source
         })
@@ -409,7 +438,27 @@ test_that("released MCP transport preserves origin, annotations and connection i
     "untouched",
     fixed = TRUE
   )
-  expect_true(result$failure_preserved)
+  expect_identical(
+    result$after_failure$names,
+    c("other_evidence", "local_value")
+  )
+  expect_identical(result$after_failure$loaded, character())
+  expect_match(
+    paste(result$after_failure$other_value, collapse = ""),
+    "still-working",
+    fixed = TRUE
+  )
+  expect_true(result$preconnect_preserved)
+  expect_match(result$registration_failure, "already registered", fixed = TRUE)
+  expect_identical(
+    result$after_registration_failure,
+    list(
+      names = c("other_evidence", "local_value"),
+      loaded = character(),
+      local_value = "local",
+      status = "failed"
+    )
+  )
   expect_identical(result$failure_status$status, "failed")
   expect_match(
     result$failure_status$error,

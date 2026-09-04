@@ -92,10 +92,15 @@ mcp_tool_with_metadata <- function(tool, state, servers) {
   # mcptools resolves calls by server name. A reconnect can change the actual
   # executable behind that name; an old tool must not authorize a new server
   # using stale annotations, even if its name and schema still match.
+  is_current <- rlang::new_function(
+    alist(),
+    quote(identical(state$mcp_servers[[server_name]]$transport, transport)),
+    rlang::env(state = state, server_name = server_name, transport = transport)
+  )
   invoke <- rlang::new_function(
     alist(arguments = ),
     quote({
-      if (!identical(state$mcp_servers[[server_name]]$transport, transport)) {
+      if (!is_current()) {
         abort_deputy(
           "MCP server {.val {server_name}} was reconnected; load and register its tools again.",
           class = "mcp_metadata"
@@ -105,9 +110,8 @@ mcp_tool_with_metadata <- function(tool, state, servers) {
     }),
     rlang::env(
       original = tool,
-      state = state,
       server_name = server_name,
-      transport = transport
+      is_current = is_current
     )
   )
   guarded <- rlang::new_function(
@@ -130,7 +134,17 @@ mcp_tool_with_metadata <- function(tool, state, servers) {
     server = server_name,
     tool = tool_name
   )
+  attr(result, "deputy_mcp_connection_current") <- is_current
   result
+}
+
+mcp_tool_is_current <- function(tool) {
+  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  check <- attr(source, "deputy_mcp_connection_current", exact = TRUE)
+  if (is.null(check)) {
+    return(TRUE)
+  }
+  isTRUE(check())
 }
 
 load_mcp_tools_with_metadata <- function(config, servers) {

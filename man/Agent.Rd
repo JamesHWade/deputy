@@ -1390,8 +1390,8 @@ the mcptools default location (\verb{~/.config/mcptools/config.json}).}
       \item{\code{servers}}{Optional character vector of server names to load from.
 If NULL, loads from all configured servers.}
       \item{\code{replace}}{Refresh the selected servers' complete tool sets, removing
-obsolete tools, and explicitly replace other matching names. Failed
-discovery leaves the registry unchanged.}
+obsolete tools, and explicitly replace other matching names. On failure,
+tools whose connections were invalidated are removed; working tools remain.}
     }
     \if{html}{\out{</div>}}
   }

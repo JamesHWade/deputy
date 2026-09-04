@@ -108,9 +108,11 @@ Reconnecting a server invalidates tools from its old connection. Reload and
 replace explicitly with `agent$load_mcp(config, servers = "evidence", replace = TRUE)`.
 This refresh removes obsolete tools from the selected servers, including when
 discovery succeeds with an empty tool set. Unrelated tools remain registered.
-A load failure warns, records a failed attempt in `mcp_status()`, and leaves
-the registry unchanged; malformed metadata never silently becomes an
-unannotated executable.
+A load failure records a failed attempt in `mcp_status()`. Tools that still
+have working connections remain registered. If mcptools already closed an
+old connection, its invalidated handles are removed even when discovery or
+registration fails. Malformed metadata never silently becomes an unannotated
+executable.
 
 Bundles group related tools together:
 

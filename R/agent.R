@@ -1498,20 +1498,24 @@ Agent <- R6::R6Class(
     #' @param servers Optional character vector of server names to load from.
     #'   If NULL, loads from all configured servers.
     #' @param replace Refresh the selected servers' complete tool sets, removing
-    #'   obsolete tools, and explicitly replace other matching names. Failed
-    #'   discovery leaves the registry unchanged.
+    #'   obsolete tools, and explicitly replace other matching names. On failure,
+    #'   tools whose connections were invalidated are removed; working tools remain.
     #' @return Invisible self for chaining
     load_mcp = function(config = NULL, servers = NULL, replace = FALSE) {
       if (!rlang::is_bool(replace)) {
         tool_registration_error("{.arg replace} must be TRUE or FALSE.")
       }
+      # mcptools closes old transports before replacement discovery/validation.
+      # Clean up on errors and interrupts as well as normal returns, including
+      # failures while publishing a successfully discovered batch.
+      on.exit(private$discard_stale_mcp_tools(), add = TRUE)
       loaded <- load_mcp_tools_result(config, servers)
       mcp_tools_list <- loaded$tools
       loaded_at <- Sys.time()
 
       if (isTRUE(loaded$success)) {
         # Prepare the whole refreshed registry before publishing it. Successful
-        # discovery can contain zero tools; failure must not clear the registry.
+        # discovery can contain zero tools; working unrelated tools are retained.
         existing <- private$.chat$get_tools()
         removed <- character()
         tryCatch(
@@ -1540,6 +1544,17 @@ Agent <- R6::R6Class(
             }
           },
           error = function(e) {
+            private$loaded_mcp_status <- c(
+              private$loaded_mcp_status,
+              list(list(
+                status = "failed",
+                config = config,
+                servers = loaded$servers,
+                tools = character(),
+                loaded_at = loaded_at,
+                error = conditionMessage(e)
+              ))
+            )
             cli::cli_abort(c(
               "Failed to register MCP tools",
               "x" = e$message,
@@ -1879,6 +1894,19 @@ Agent <- R6::R6Class(
 
     prepare_cloned_tool = function(tool) {
       private$adapt_tool(tool)
+    },
+
+    discard_stale_mcp_tools = function() {
+      tools <- private$.chat$get_tools()
+      current <- vapply(tools, mcp_tool_is_current, logical(1))
+      if (all(current)) {
+        return(invisible(NULL))
+      }
+      removed <- names(tools)[!current]
+      # These are already adapted tools; only remove invalidated handles.
+      private$.chat$set_tools(tools[current])
+      private$loaded_mcp_tools <- setdiff(private$loaded_mcp_tools, removed)
+      invisible(NULL)
     },
 
     new_file_checkpoint_store = function() {
