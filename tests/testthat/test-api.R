@@ -38,6 +38,7 @@ test_that("public API is deliberate", {
     "tool_edit_file",
     "tool_multi_edit",
     "tool_list_files",
+    "tool_metadata",
     "tool_glob_files",
     "tool_grep_files",
     "tool_run_r_code",

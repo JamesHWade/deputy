@@ -1497,18 +1497,64 @@ Agent <- R6::R6Class(
     #'   the mcptools default location (`~/.config/mcptools/config.json`).
     #' @param servers Optional character vector of server names to load from.
     #'   If NULL, loads from all configured servers.
+    #' @param replace Refresh the selected servers' complete tool sets, removing
+    #'   obsolete tools, and explicitly replace other matching names. On failure,
+    #'   tools whose connections were invalidated are removed; working tools remain.
     #' @return Invisible self for chaining
-    load_mcp = function(config = NULL, servers = NULL) {
-      mcp_tools_list <- tools_mcp(config = config, servers = servers)
+    load_mcp = function(config = NULL, servers = NULL, replace = FALSE) {
+      if (!rlang::is_bool(replace)) {
+        tool_registration_error("{.arg replace} must be TRUE or FALSE.")
+      }
+      # mcptools closes old transports before replacement discovery/validation.
+      # Clean up on errors and interrupts as well as normal returns, including
+      # failures while publishing a successfully discovered batch.
+      on.exit(private$discard_stale_mcp_tools(), add = TRUE)
+      loaded <- load_mcp_tools_result(config, servers)
+      mcp_tools_list <- loaded$tools
       loaded_at <- Sys.time()
 
-      if (length(mcp_tools_list) > 0) {
-        # Register tools with error handling
+      if (isTRUE(loaded$success)) {
+        # Prepare the whole refreshed registry before publishing it. Successful
+        # discovery can contain zero tools; working unrelated tools are retained.
+        existing <- private$.chat$get_tools()
+        removed <- character()
         tryCatch(
           {
-            self$register_tools(mcp_tools_list)
+            if (replace) {
+              from_selected_server <- vapply(
+                existing,
+                function(tool) {
+                  source <- tool_metadata(tool)$source
+                  identical(source$type, "mcp") &&
+                    source$server %in% loaded$servers
+                },
+                logical(1)
+              )
+              removed <- names(existing)[from_selected_server]
+              retained <- existing[!from_selected_server]
+              incoming <- validate_tool_batch(
+                mcp_tools_list,
+                retained,
+                replace = TRUE
+              )
+              retained[names(incoming)] <- incoming
+              self$set_tools(retained)
+            } else {
+              self$register_tools(mcp_tools_list)
+            }
           },
           error = function(e) {
+            private$loaded_mcp_status <- c(
+              private$loaded_mcp_status,
+              list(list(
+                status = "failed",
+                config = config,
+                servers = loaded$servers,
+                tools = character(),
+                loaded_at = loaded_at,
+                error = conditionMessage(e)
+              ))
+            )
             cli::cli_abort(c(
               "Failed to register MCP tools",
               "x" = e$message,
@@ -1516,7 +1562,10 @@ Agent <- R6::R6Class(
             ))
           }
         )
+        private$loaded_mcp_tools <- setdiff(private$loaded_mcp_tools, removed)
+      }
 
+      if (length(mcp_tools_list) > 0) {
         # Track loaded MCP tools with warnings for extraction failures
         tool_names <- vapply(
           seq_along(mcp_tools_list),
@@ -1535,7 +1584,10 @@ Agent <- R6::R6Class(
           },
           character(1)
         )
-        private$loaded_mcp_tools <- c(private$loaded_mcp_tools, tool_names)
+        private$loaded_mcp_tools <- unique(c(
+          private$loaded_mcp_tools,
+          tool_names
+        ))
         private$loaded_mcp_status <- c(
           private$loaded_mcp_status,
           list(list(
@@ -1551,12 +1603,18 @@ Agent <- R6::R6Class(
         private$loaded_mcp_status <- c(
           private$loaded_mcp_status,
           list(list(
-            status = if (mcp_available()) "empty" else "unavailable",
+            status = if (!mcp_available()) {
+              "unavailable"
+            } else if (loaded$success) {
+              "empty"
+            } else {
+              "failed"
+            },
             config = config,
             servers = servers %||% character(),
             tools = character(),
             loaded_at = loaded_at,
-            error = NULL
+            error = loaded$error
           ))
         )
       }
@@ -1838,6 +1896,19 @@ Agent <- R6::R6Class(
       private$adapt_tool(tool)
     },
 
+    discard_stale_mcp_tools = function() {
+      tools <- private$.chat$get_tools()
+      current <- vapply(tools, mcp_tool_is_current, logical(1))
+      if (all(current)) {
+        return(invisible(NULL))
+      }
+      removed <- names(tools)[!current]
+      # These are already adapted tools; only remove invalidated handles.
+      private$.chat$set_tools(tools[current])
+      private$loaded_mcp_tools <- setdiff(private$loaded_mcp_tools, removed)
+      invisible(NULL)
+    },
+
     new_file_checkpoint_store = function() {
       FileCheckpointStore$new(
         private$.working_dir,
@@ -1920,7 +1991,13 @@ Agent <- R6::R6Class(
       }
       runtime_wrap_tool(
         tool,
-        resolve_arguments = private$resolve_tool_arguments,
+        resolve_arguments = if (
+          identical(tool_metadata(tool)$source$type, "mcp")
+        ) {
+          function(tool_name, arguments) arguments
+        } else {
+          private$resolve_tool_arguments
+        },
         process_result = private$offload_tool_result,
         begin_execution = private$begin_tool_execution,
         execute = private$execute_tool
@@ -2188,40 +2265,6 @@ Agent <- R6::R6Class(
           exhausted <- coro::is_exhausted(chunk)
         }
       })()
-    },
-
-    file_tool_path_info = function(tool_name, tool_input) {
-      if (is.null(tool_name) || length(tool_name) == 0L) {
-        return(NULL)
-      }
-      tool_id <- normalize_native_tool_id(tool_name[[1L]])
-      native_file_tools <- c(
-        "read_file",
-        "read_markdown",
-        "read_csv",
-        "write_file",
-        "edit_file",
-        "multi_edit",
-        "list_files",
-        "glob_files",
-        "grep_files"
-      )
-      if (!tool_id %in% native_file_tools) {
-        return(NULL)
-      }
-
-      default_path <- switch(
-        tool_id,
-        list_files = ".",
-        glob_files = ".",
-        grep_files = ".",
-        NULL
-      )
-      tool_input <- tool_input %||% list()
-      list(
-        tool_id = tool_id,
-        path = tool_input$path %||% default_path
-      )
     },
 
     request_stream_stop = function(reason) {
@@ -3499,9 +3542,9 @@ Agent <- R6::R6Class(
         }
       }
 
-      file_info <- private$file_tool_path_info(tool_name, tool_input)
       context <- private$hook_context(
         tool_annotations = tool_annotations,
+        tool_metadata = extracted$tool_metadata,
         tool_call_id = record$tool_call_id,
         permission_mode = self$permissions$mode,
         usage = usage,
@@ -3579,8 +3622,11 @@ Agent <- R6::R6Class(
         }
       }
 
-      if (!is.null(private$.file_checkpoints)) {
-        tryCatch(
+      if (
+        !is.null(private$.file_checkpoints) &&
+          !is_mcp_tool_context(context)
+      ) {
+        captured <- tryCatch(
           private$.file_checkpoints$before_tool(
             tool_name,
             tool_input,
@@ -3597,6 +3643,10 @@ Agent <- R6::R6Class(
             ellmer::tool_reject(conditionMessage(e))
           }
         )
+        private$tool_call_records[[
+          record$record_index
+        ]]$file_checkpoint_captured <-
+          isTRUE(captured)
       }
 
       # Queue delegated-run correlation only after every gate has allowed the
@@ -3622,7 +3672,12 @@ Agent <- R6::R6Class(
         extracted$tool_result
       )
 
-      if (!is.null(private$.file_checkpoints)) {
+      # Finalize only captures started by this request. Remote tools never
+      # enter the local journal, even when their names resemble file tools.
+      if (
+        !is.null(private$.file_checkpoints) &&
+          isTRUE(record$file_checkpoint_captured)
+      ) {
         tryCatch(
           private$.file_checkpoints$after_tool(
             extracted$provider_tool_call_id %||% record$tool_call_id,
@@ -3641,6 +3696,10 @@ Agent <- R6::R6Class(
             stop(e)
           }
         )
+        private$tool_call_records[[
+          record$record_index
+        ]]$file_checkpoint_captured <-
+          FALSE
       }
 
       context <- private$hook_context(
@@ -3802,6 +3861,11 @@ Agent <- R6::R6Class(
       # Resolve annotations from the registered executable. Providers may omit
       # the tool object or attach a stale copy to the request.
       registered_tool <- private$.chat$get_tools()[[tool_name]]
+      metadata <- if (is.null(registered_tool)) {
+        NULL
+      } else {
+        tool_metadata(registered_tool)
+      }
       tool_annotations <- tryCatch(
         {
           if (!is.null(registered_tool)) {
@@ -3830,6 +3894,7 @@ Agent <- R6::R6Class(
         tool_name = tool_name,
         tool_input = tool_input,
         tool_annotations = tool_annotations,
+        tool_metadata = metadata,
         internal_tool = internal_tool,
         provider_tool_call_id = provider_tool_call_id,
         tool_identity_error = tool_identity_error

@@ -1379,7 +1379,7 @@ Requires the mcptools package. Issues a warning if not installed or if
 tool fetching fails.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$load_mcp(config = NULL, servers = NULL)}
+    \preformatted{Agent$load_mcp(config = NULL, servers = NULL, replace = FALSE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -1389,6 +1389,9 @@ tool fetching fails.
 the mcptools default location (\verb{~/.config/mcptools/config.json}).}
       \item{\code{servers}}{Optional character vector of server names to load from.
 If NULL, loads from all configured servers.}
+      \item{\code{replace}}{Refresh the selected servers' complete tool sets, removing
+obsolete tools, and explicitly replace other matching names. On failure,
+tools whose connections were invalidated are removed; working tools remain.}
     }
     \if{html}{\out{</div>}}
   }

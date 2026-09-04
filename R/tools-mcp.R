@@ -215,9 +215,14 @@ tools_mcp_repl <- function(
 #'   mcptools default location (`~/.config/mcptools/config.json`).
 #' @param servers Optional character vector of server names to load tools from.
 #'   If NULL (default), loads tools from all configured servers. Filtering is
-#'   based on pattern matching against tool names.
+#'   performed on exact configuration names before connecting servers.
 #'
 #' @return A list of tool definitions compatible with `Agent$register_tools()`.
+#'   [tool_metadata()] reports exact MCP origin, supplied annotations, and gaps.
+#'   The metadata bridge is qualified for mcptools 1.0.2; other versions fail
+#'   explicitly rather than silently losing annotations. Reconnecting a server
+#'   invalidates tools loaded from its previous connection. Reload and explicitly
+#'   replace those tools on the Agent. Load failures warn and return an empty list.
 #'   Returns an empty list if mcptools is not installed or no tools are available.
 #'
 #' @details
@@ -257,6 +262,16 @@ tools_mcp_repl <- function(
 #' mcp_tools <- tools_mcp(servers = c("github", "slack"))
 #' }
 tools_mcp <- function(config = NULL, servers = NULL) {
+  load_mcp_tools_result(config, servers)$tools
+}
+
+load_mcp_tools_result <- function(config, servers) {
+  failed <- list(
+    tools = list(),
+    servers = character(),
+    success = FALSE,
+    error = "mcptools is not installed"
+  )
   # Check if mcptools is available
   if (!mcp_available()) {
     cli::cli_warn(c(
@@ -264,26 +279,12 @@ tools_mcp <- function(config = NULL, servers = NULL) {
       "i" = "Install with: {.code install.packages('mcptools')}",
       "i" = "Returning empty tool list"
     ))
-    return(list())
+    return(failed)
   }
 
   # Fetch MCP tools
-  tools <- tryCatch(
-    {
-      result <- if (is.null(config)) {
-        mcptools::mcp_tools()
-      } else {
-        mcptools::mcp_tools(config = config)
-      }
-
-      # Validate result is a list
-      if (!is.list(result)) {
-        cli::cli_warn("mcptools::mcp_tools() returned non-list value")
-        return(list())
-      }
-
-      result
-    },
+  result <- tryCatch(
+    load_mcp_tools_with_metadata(config, servers),
     error = function(e) {
       error_class <- paste(class(e), collapse = ", ")
       # Escape braces in error message to prevent cli glue interpretation
@@ -294,33 +295,11 @@ tools_mcp <- function(config = NULL, servers = NULL) {
         "i" = paste0("Error type: ", error_class),
         "i" = "Check your MCP configuration and server status"
       ))
-      list()
+      failed$error <- conditionMessage(e)
+      failed
     }
   )
-
-  # Filter by server names if specified
-  # Note: Filtering is based on tool name pattern matching since mcptools
-  # tools may not expose server origin metadata consistently
-  if (!is.null(servers) && length(servers) > 0 && length(tools) > 0) {
-    tools <- Filter(
-      function(tool) {
-        # Get tool name for filtering
-        tool_name <- tryCatch(
-          tool@name %||% "unknown",
-          error = function(e) "unknown"
-        )
-        # Check if tool name matches any requested server pattern
-        any(vapply(
-          servers,
-          function(s) {
-            grepl(s, tool_name, ignore.case = TRUE)
-          },
-          logical(1)
-        ))
-      },
-      tools
-    )
-  }
+  tools <- result$tools
 
   if (length(tools) == 0) {
     cli::cli_alert_info("No MCP tools available")
@@ -347,7 +326,7 @@ tools_mcp <- function(config = NULL, servers = NULL) {
     )
   }
 
-  tools
+  result
 }
 
 #' List available MCP servers
