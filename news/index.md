@@ -2,6 +2,11 @@
 
 ## deputy (development version)
 
+- Required packages now report standard installation guidance with the
+  feature that needs them; skill YAML frontmatter no longer silently
+  loses metadata when yaml is unavailable
+  ([\#57](https://github.com/JamesHWade/deputy/issues/57)).
+
 - `Agent` is now a governed, drop-in chat: `chat()`, `chat_async()`,
   `stream()`, `stream_async()`, `run_sync()`, and `run_async()` are
   adapters over one async run kernel. The public backend escape hatch

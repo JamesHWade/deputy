@@ -341,6 +341,88 @@ run continues. You can inspect recent hook errors with:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="va">hooks</span><span class="op">$</span><span class="fu">last_errors</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
+<div class="section level2">
+<h2 id="approval-before-a-tool-call">Approval before a tool call<a class="anchor" aria-label="anchor" href="#approval-before-a-tool-call"></a>
+</h2>
+<p>The installed recipe defines <code>approval_gate()</code> and
+<code>approval_after_install()</code>:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples"</span>, <span class="st">"approval-gates.R"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><code>approval_gate()</code> calls the <code>ask_user</code> tool
+from <code><a href="../reference/tools_interactive.html">tools_interactive()</a></code> directly inside a
+<code>PreToolUse</code> callback. The handler belongs to this hook
+instance; it does not use the process-wide callback. The question
+includes the exact tool name and arguments. Only the exact answer
+<code>"Approve"</code> permits execution; missing answers, cancellation,
+and handler errors cannot approve a call.</p>
+<p>Here is an executable dry run with a host that declines the
+request:</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">decline</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">questions</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/stats/setNames.html" class="external-link">setNames</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"Deny"</span><span class="op">)</span>, <span class="va">questions</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">question</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span><span class="va">gate</span> <span class="op">&lt;-</span> <span class="fu">approval_gate</span><span class="op">(</span>callback <span class="op">=</span> <span class="va">decline</span><span class="op">)</span></span>
+<span><span class="va">gate</span><span class="op">$</span><span class="fu">callback</span><span class="op">(</span></span>
+<span>  <span class="st">"write_file"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>path <span class="op">=</span> <span class="st">"report.txt"</span>, content <span class="op">=</span> <span class="st">"Draft"</span><span class="op">)</span>,</span>
+<span>  context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>run_id <span class="op">=</span> <span class="st">"example-run"</span><span class="op">)</span></span>
+<span><span class="op">)</span><span class="op">$</span><span class="va">permission</span></span>
+<span><span class="co">#&gt; [1] "deny"</span></span></code></pre></div>
+<p>Register approval hooks <strong>before all other matching
+hooks</strong>, including audit and Stop hooks. The registry returns the
+first non-NULL result, so an earlier allow or audit result can bypass a
+later hook. These recipes return NULL after approval, for unarmed gates,
+and after recording receipts so later hooks still run and can deny the
+call.</p>
+<p>Attach a fresh hook to an Agent whose permissions already allow the
+relevant operation. Hooks can narrow permissions; approval cannot widen
+that ceiling. In an interactive R terminal, omit <code>callback</code>
+to use the normal user prompt. In a hosted application, supply your own
+synchronous human-input handler. This recipe is not a durable
+pause/resume mechanism.</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu">approval_gate</span><span class="op">(</span>callback <span class="op">=</span> <span class="va">my_approval_handler</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="approval-after-an-earlier-installation">Approval after an earlier installation<a class="anchor" aria-label="anchor" href="#approval-after-an-earlier-installation"></a>
+</h2>
+<p>Hook context supplies <code>run_id</code>, not a mutable history of
+earlier calls. <code>approval_after_install()</code> accumulates
+successful installation receipts in its own environment, keyed by that
+run ID. Its <code>PreToolUse</code> callback reads that state before
+<code>push_changes</code>; <code>Stop</code> removes it. Create a fresh
+set per Agent. The callbacks use <code>timeout = 0</code> so they share
+caller-process state.</p>
+<p>This recipe assumes dedicated <code>install_dependency</code> and
+<code>push_changes</code> tools. The install tool must return
+<code>list(installed = TRUE)</code> only after success. A failed install
+does not arm the gate. Matching arbitrary shell text would not reliably
+identify these operations.</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">hooks</span> <span class="op">&lt;-</span> <span class="fu">approval_after_install</span><span class="op">(</span>callback <span class="op">=</span> <span class="va">decline</span><span class="op">)</span></span>
+<span><span class="va">run</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>run_id <span class="op">=</span> <span class="st">"installation-run"</span><span class="op">)</span></span>
+<span><span class="va">hooks</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">callback</span><span class="op">(</span></span>
+<span>  <span class="st">"install_dependency"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>installed <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="cn">NULL</span>, <span class="va">run</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt; NULL</span></span>
+<span><span class="va">hooks</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">callback</span><span class="op">(</span><span class="st">"push_changes"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>remote <span class="op">=</span> <span class="st">"origin"</span><span class="op">)</span>, <span class="va">run</span><span class="op">)</span><span class="op">$</span><span class="va">permission</span></span>
+<span><span class="co">#&gt; [1] "deny"</span></span>
+<span><span class="co"># A different run has no installation receipt.</span></span>
+<span><span class="va">hooks</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">callback</span><span class="op">(</span></span>
+<span>  <span class="st">"push_changes"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>remote <span class="op">=</span> <span class="st">"origin"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>run_id <span class="op">=</span> <span class="st">"another-run"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt; NULL</span></span>
+<span><span class="va">hooks</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">callback</span><span class="op">(</span><span class="st">"end_turn"</span>, <span class="va">run</span><span class="op">)</span></span>
+<span><span class="co">#&gt; NULL</span></span></code></pre></div>
+<p>Attach all three hooks together:</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw">for</span> <span class="op">(</span><span class="va">hook</span> <span class="kw">in</span> <span class="fu">approval_after_install</span><span class="op">(</span>callback <span class="op">=</span> <span class="va">my_approval_handler</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va">hook</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p>The example returns <code>NULL</code> before an installation because
+it demonstrates that particular sequence policy. Use the unconditional
+gate if every push needs approval. Neither recipe grants permission or
+performs an installation or a push by itself.</p>
+</div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>

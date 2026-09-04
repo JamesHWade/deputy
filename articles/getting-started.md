@@ -248,3 +248,23 @@ directory-valued write grant from that same path.
 The durable pattern is the same in every host: make the workspace,
 tools, permissions, and limits explicit; run one bounded job; then
 inspect the typed result before granting more authority.
+
+## Standalone scripts
+
+The package includes eight independent scripts for basic runs, tools,
+permissions, hooks, delegation, structured output, session resume, and
+skills. They are executed in CI with deterministic provider responses.
+To run one against OpenAI, set `OPENAI_API_KEY` and source the installed
+file:
+
+``` r
+
+source(system.file("examples", "standalone", "01-basic.R", package = "deputy"))
+```
+
+Find the other scripts and their setup guide with:
+
+``` r
+
+list.files(system.file("examples", "standalone", package = "deputy"))
+```
