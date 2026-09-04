@@ -586,19 +586,17 @@ parse_markdown_frontmatter <- function(path) {
   meta_lines <- lines[2:(end_idx - 1)]
   body_lines <- lines[(end_idx + 1):length(lines)]
 
-  meta <- list()
-  if (rlang::is_installed("yaml")) {
-    meta <- tryCatch(
-      yaml::read_yaml(text = paste(meta_lines, collapse = "\n")),
-      error = function(e) {
-        cli::cli_warn(c(
-          "Failed to parse YAML frontmatter in {.path {path}}",
-          "x" = e$message
-        ))
-        list()
-      }
-    )
-  }
+  rlang::check_installed("yaml", reason = "to parse skill YAML frontmatter")
+  meta <- tryCatch(
+    yaml::read_yaml(text = paste(meta_lines, collapse = "\n")),
+    error = function(e) {
+      cli::cli_warn(c(
+        "Failed to parse YAML frontmatter in {.path {path}}",
+        "x" = e$message
+      ))
+      list()
+    }
+  )
 
   list(
     meta = meta %||% list(),

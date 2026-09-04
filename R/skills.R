@@ -294,12 +294,7 @@ skill_load <- function(path, check_requirements = TRUE) {
 
   # Parse SKILL.yaml when present
   if (file.exists(yaml_path)) {
-    if (!rlang::is_installed("yaml")) {
-      cli_abort(c(
-        "Package {.pkg yaml} is required to load SKILL.yaml",
-        "i" = "Install with: {.code install.packages('yaml')}"
-      ))
-    }
+    rlang::check_installed("yaml", reason = "to load SKILL.yaml")
     meta <- yaml::read_yaml(yaml_path)
     if (is.null(meta$name)) {
       cli_abort("SKILL.yaml must contain a 'name' field")
@@ -548,7 +543,7 @@ skills_list <- function(path = "skills") {
             ))
           }
         )
-      } else if (file.exists(md_path)) {
+      } else if (file.exists(md_path) && rlang::is_installed("yaml")) {
         parsed <- parse_markdown_frontmatter(md_path)
         name <- parsed$meta$name %||% basename(dir)
       }
@@ -566,9 +561,11 @@ skills_list <- function(path = "skills") {
 
   # Include standalone markdown skills in the root
   for (md_path in md_files) {
-    parsed <- parse_markdown_frontmatter(md_path)
-    name <- parsed$meta$name %||%
-      tools::file_path_sans_ext(basename(md_path))
+    name <- tools::file_path_sans_ext(basename(md_path))
+    if (rlang::is_installed("yaml")) {
+      parsed <- parse_markdown_frontmatter(md_path)
+      name <- parsed$meta$name %||% name
+    }
     skills <- rbind(
       skills,
       data.frame(

@@ -78,17 +78,13 @@ read_pdf_text_pages <- function(path) {
     return(text)
   }
 
-  cli_abort(c(
-    "Reading PDF content requires {.pkg pdftools}.",
-    "i" = "Alternatively, install {.pkg reticulate} with the Python module {.pkg pypdf}."
-  ))
+  rlang::check_installed("pdftools", reason = "to read PDF content")
+  pdftools::pdf_text(path)
 }
 
 # Convert a local file to markdown using Python MarkItDown via reticulate
 convert_to_markdown_markitdown <- function(path) {
-  if (!rlang::is_installed("reticulate")) {
-    cli_abort("{.pkg reticulate} is required for MarkItDown conversion.")
-  }
+  rlang::check_installed("reticulate", reason = "for MarkItDown conversion")
 
   available <- tryCatch(
     reticulate::py_module_available("markitdown"),
@@ -176,9 +172,7 @@ parse_multi_edits <- function(edits) {
   parsed <- edits
 
   if (is.character(edits) && length(edits) == 1) {
-    if (!rlang::is_installed("jsonlite")) {
-      cli_abort("Parsing JSON edits requires {.pkg jsonlite}.")
-    }
+    rlang::check_installed("jsonlite", reason = "to parse JSON edits")
 
     parsed <- tryCatch(
       jsonlite::fromJSON(edits, simplifyVector = FALSE),
@@ -333,7 +327,7 @@ tool_read_file <- ellmer::tool(
         )
       },
       error = function(e) {
-        ellmer::tool_reject(paste("Error reading file:", e$message))
+        ellmer::tool_reject(paste("Error reading file:", conditionMessage(e)))
       }
     )
   },
@@ -388,7 +382,7 @@ tool_read_markdown <- ellmer::tool(
       error = function(e) {
         ellmer::tool_reject(paste(
           "Error converting file to markdown:",
-          e$message
+          conditionMessage(e)
         ))
       }
     )
@@ -596,7 +590,7 @@ tool_multi_edit <- ellmer::tool(
         )
       },
       error = function(e) {
-        ellmer::tool_reject(paste("Error applying edits:", e$message))
+        ellmer::tool_reject(paste("Error applying edits:", conditionMessage(e)))
       }
     )
   },
@@ -926,14 +920,7 @@ tool_grep_files <- ellmer::tool(
 )
 
 run_r_code_impl <- function(code, timeout = 30, working_dir = getwd()) {
-  if (!rlang::is_installed("callr")) {
-    ellmer::tool_reject(
-      paste(
-        "Cannot execute R code: package 'callr' is required for",
-        "subprocess execution. Install with install.packages('callr')"
-      )
-    )
-  }
+  rlang::check_installed("callr", reason = "to execute R code in a subprocess")
 
   result <- tryCatch(
     callr::r(

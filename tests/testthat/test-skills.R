@@ -585,3 +585,21 @@ test_that("Conflicting tool is actually replaced with allow_conflicts = TRUE", {
   )
   expect_equal(desc, "Replacement")
 })
+
+
+test_that("skill discovery preserves basename fallbacks without yaml", {
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "directory-skill"))
+  writeLines(
+    c("---", "name: metadata-name", "---", "Prompt"),
+    file.path(root, "directory-skill", "SKILL.md")
+  )
+  writeLines(
+    c("---", "name: other-name", "---", "Prompt"),
+    file.path(root, "standalone.md")
+  )
+  local_mocked_bindings(is_installed = function(pkg) FALSE, .package = "rlang")
+  listed <- skills_list(root)
+  expect_setequal(listed$name, c("directory-skill", "standalone"))
+  expect_equal(nrow(listed), 2L)
+})

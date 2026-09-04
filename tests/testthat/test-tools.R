@@ -131,9 +131,11 @@ test_that("tool_read_markdown rejects missing files", {
 })
 
 test_that("tool_read_markdown rejects when reticulate is unavailable", {
+  check_installed <- rlang::check_installed
+  local_mocked_bindings(is_interactive = function() FALSE, .package = "rlang")
   local_mocked_bindings(
-    is_installed = function(pkg) {
-      if (pkg == "reticulate") FALSE else TRUE
+    check_installed = function(pkg, reason) {
+      check_installed(pkg, reason = reason, version = "9999")
     },
     .package = "rlang"
   )
@@ -466,20 +468,16 @@ test_that("tool_run_bash handles command not found", {
 })
 
 test_that("tool_run_r_code requires callr for process isolation", {
-  # Mock is_installed to return FALSE for callr
+  check_installed <- rlang::check_installed
+  local_mocked_bindings(is_interactive = function() FALSE, .package = "rlang")
   local_mocked_bindings(
-    is_installed = function(pkg) {
-      if (pkg == "callr") FALSE else TRUE
+    check_installed = function(pkg, reason) {
+      check_installed(pkg, reason = reason, version = "9999")
     },
     .package = "rlang"
   )
 
-  # Should reject because callr is "not installed"
-  # tool_reject throws an error with class ellmer_tool_reject
-  expect_error(
-    tool_run_r_code("1 + 1"),
-    class = "ellmer_tool_reject"
-  )
+  expect_snapshot(error = TRUE, tool_run_r_code("1 + 1"))
 })
 
 # Tool preset tests
