@@ -1,5 +1,9 @@
 # deputy (development version)
 
+* `agent_definition_read()`, `agent_definition_write()`, and
+  `agent_definitions()` add portable YAML definitions, explicit tool/skill
+  registries, and discovery from `.deputy/agents/` (#41).
+
 * Required packages now report standard installation guidance with the feature
   that needs them; skill YAML frontmatter no longer silently loses metadata when
   yaml is unavailable (#57).

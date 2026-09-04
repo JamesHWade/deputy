@@ -121,6 +121,7 @@ reference:
   contents:
   - LeadAgent
   - agent_definition
+  - agent_definition_read
 
 - title: Errors
   desc: Identify structured Deputy conditions
