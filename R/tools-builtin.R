@@ -1061,15 +1061,16 @@ run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
         }
       },
       error = function(e) {
-        if (grepl("timeout", e$message, ignore.case = TRUE)) {
-          ellmer::tool_reject(paste(
-            "Command timed out after",
-            timeout,
-            "seconds"
+        if (inherits(e, "callr_timeout_error")) {
+          ellmer::tool_reject(sprintf(
+            "Command timed out after %s seconds",
+            format(timeout, trim = TRUE)
           ))
-        } else {
-          ellmer::tool_reject(paste("Command failed:", e$message))
         }
+        ellmer::tool_reject(paste(
+          "Command failed:",
+          conditionMessage(e)
+        ))
       }
     )
   } else {

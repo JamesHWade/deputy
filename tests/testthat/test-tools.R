@@ -440,6 +440,20 @@ test_that("tool_run_r_code rejects subprocess timeouts readably", {
   expect_snapshot(error)
 })
 
+test_that("tool_run_bash rejects subprocess timeouts readably", {
+  skip_if_not_installed("callr")
+  skip_on_os("windows")
+
+  error <- tryCatch(
+    run_bash_impl("sleep 10", timeout = 0.05),
+    ellmer_tool_reject = identity
+  )
+
+  expect_s3_class(error, "ellmer_tool_reject")
+  expect_match(conditionMessage(error), "timed out after")
+  expect_snapshot(error)
+})
+
 test_that("tool_run_bash handles command not found", {
   result <- tryCatch(
     tool_run_bash("nonexistent_command_xyz123"),
