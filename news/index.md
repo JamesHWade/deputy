@@ -127,6 +127,15 @@
   tool errors instead of failing later while formatting an unbound
   result ([\#27](https://github.com/JamesHWade/deputy/issues/27)).
 
+- [`tool_run_bash()`](https://jameshwade.github.io/deputy/reference/tool_run_bash.md)
+  now detects a subprocess timeout from the condition class instead of
+  matching the word “timeout” in the error message. `callr` reports a
+  timeout as “callr timed out”, which never contains the matched word,
+  so a timed-out command was reported to the model as a generic “Command
+  failed” with no indication that a timeout was the cause. This brings
+  `run_bash` in line with the `run_r_code` timeout handling from
+  [\#27](https://github.com/JamesHWade/deputy/issues/27).
+
 - `Agent$cost()` now returns `NA` when any provider cost record is
   unavailable, with `complete` and `missing` fields that distinguish an
   observed zero from an unknown total. Run cost limits fail closed with
