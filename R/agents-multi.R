@@ -762,6 +762,9 @@ LeadAgent <- R6::R6Class(
           {
             cloned <- private$.chat$clone()
             cloned$set_turns(list())
+            # The child definition chooses its tools. Inherited provider
+            # configuration must not import the parent's executable registry.
+            cloned$set_tools(list())
             cloned
           },
           error = function(e) {

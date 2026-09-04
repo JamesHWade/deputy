@@ -208,3 +208,24 @@ test_that("permission annotations come from the registered executable", {
     expect_no_error(agent$.__enclos_env__$private$handle_tool_request(request))
   }
 })
+
+test_that("child definitions can share parent tools without inheriting the registry", {
+  shared <- registration_tool("shared")
+  definition <- agent_definition(
+    "reviewer",
+    "Reviews values",
+    "Inspect a value.",
+    tools = list(shared)
+  )
+  lead <- LeadAgent$new(
+    chat = registration_chat(),
+    sub_agents = list(definition),
+    tools = list(shared, registration_tool("parent_only"))
+  )
+  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+  expect_named(child$get_tools(), "shared")
+  expect_identical(child$get_tools()$shared(), "original")
+  expect_true(all(
+    c("shared", "parent_only", "delegate_to_agent") %in% names(lead$get_tools())
+  ))
+})
