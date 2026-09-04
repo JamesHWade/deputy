@@ -199,7 +199,7 @@ test_that("web permission is checked correctly", {
 
   # Web allowed
   agent_web <- Agent$new(
-    chat = mock_chat,
+    chat = create_mock_chat(),
     tools = list(tool_web_fetch),
     permissions = Permissions$new(web = TRUE)
   )
@@ -231,7 +231,7 @@ test_that("web_search permission is checked correctly", {
 
   # Web allowed
   agent_web <- Agent$new(
-    chat = mock_chat,
+    chat = create_mock_chat(),
     tools = list(tool_web_search),
     permissions = Permissions$new(web = TRUE)
   )

@@ -743,7 +743,9 @@ LeadAgent <- R6::R6Class(
         ),
         annotations = ellmer::tool_annotations(
           read_only_hint = FALSE,
-          destructive_hint = FALSE
+          destructive_hint = FALSE,
+          open_world_hint = FALSE,
+          idempotent_hint = FALSE
         )
       )
     },

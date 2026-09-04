@@ -836,9 +836,12 @@ provider-native web tools are authorized once, before registration,
 because their execution occurs inside the provider rather than R. Native
 tools therefore require static permissions and cannot be registered with
 a custom \code{can_use_tool} callback.
+Existing names require explicit replacement. Every tool in a batch is
+validated and adapted before the registry changes. List element names
+do not rename tools; each tool's own name is authoritative.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$register_tool(tool)}
+    \preformatted{Agent$register_tool(tool, replace = FALSE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -846,6 +849,8 @@ a custom \code{can_use_tool} callback.
     \describe{
       \item{\code{tool}}{A tool created with \code{ellmer::tool()} or a supported
 provider-native web tool.}
+      \item{\code{replace}}{Replace tools already registered under the same name?
+Defaults to FALSE. Duplicate names within a batch always fail.}
     }
     \if{html}{\out{</div>}}
   }
@@ -861,7 +866,7 @@ provider-native web tool.}
   Register multiple tools with the agent.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$register_tools(tools)}
+    \preformatted{Agent$register_tools(tools, replace = FALSE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -869,6 +874,8 @@ provider-native web tool.}
     \describe{
       \item{\code{tools}}{A list of function tools or supported provider-native web
 tools.}
+      \item{\code{replace}}{Replace tools already registered under the same name?
+Defaults to FALSE. Duplicate names within a batch always fail.}
     }
     \if{html}{\out{</div>}}
   }

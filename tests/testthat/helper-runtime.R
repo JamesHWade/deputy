@@ -116,6 +116,7 @@ create_content_stream_chat <- function(
       get_system_prompt = function() state$system_prompt,
       set_system_prompt = function(prompt) state$system_prompt <- prompt,
       get_tools = function() state$tools,
+      set_tools = function(tools) state$tools <- tools,
       register_tool = function(tool) state$tools[[tool@name]] <- tool,
       register_tools = function(tools) {
         for (registered_tool in tools) {
