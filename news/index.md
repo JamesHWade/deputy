@@ -2,6 +2,25 @@
 
 ## deputy (development version)
 
+- [`tool_metadata()`](https://jameshwade.github.io/deputy/reference/tool_metadata.md)
+  reports tool origin, supplied annotations, missing fields, and
+  effective defaults through registration, cloning, and delegation. MCP
+  loading preserves server annotations using a qualified mcptools 1.0.2
+  bridge, selects exact server names before connecting, and rejects
+  stale tool handles after reconnection. MCP tool names do not grant
+  native-tool privileges or rewrite remote paths. Delegated Agents take
+  their tool registry from their definition rather than inheriting the
+  parent’s tools
+  ([\#50](https://github.com/JamesHWade/deputy/issues/50)).
+
+- Tool registration validates complete batches before changing the
+  registry. Duplicate names now fail unless the host explicitly uses
+  `replace = TRUE`; duplicate names within a batch always fail.
+  Constructor tools, skills, and `set_tools()` share validation. Missing
+  custom-tool annotations remain visible and use conservative permission
+  defaults, including possible external access
+  ([\#49](https://github.com/JamesHWade/deputy/issues/49)).
+
 - [`agent_definition_read()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md),
   [`agent_definition_write()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md),
   and

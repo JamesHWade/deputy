@@ -972,11 +972,14 @@ Function tools are wrapped with Deputy's runtime enforcement. Known
 provider-native web tools are authorized once, before registration,
 because their execution occurs inside the provider rather than R. Native
 tools therefore require static permissions and cannot be registered with
-a custom `can_use_tool` callback.
+a custom `can_use_tool` callback. Existing names require explicit
+replacement. Every tool in a batch is validated and adapted before the
+registry changes. List element names do not rename tools; each tool's
+own name is authoritative.
 
 #### Usage
 
-    Agent$register_tool(tool)
+    Agent$register_tool(tool, replace = FALSE)
 
 #### Arguments
 
@@ -985,6 +988,11 @@ a custom `can_use_tool` callback.
   A tool created with
   [`ellmer::tool()`](https://ellmer.tidyverse.org/reference/tool.html)
   or a supported provider-native web tool.
+
+- `replace`:
+
+  Replace tools already registered under the same name? Defaults to
+  FALSE. Duplicate names within a batch always fail.
 
 #### Returns
 
@@ -998,13 +1006,18 @@ Register multiple tools with the agent.
 
 #### Usage
 
-    Agent$register_tools(tools)
+    Agent$register_tools(tools, replace = FALSE)
 
 #### Arguments
 
 - `tools`:
 
   A list of function tools or supported provider-native web tools.
+
+- `replace`:
+
+  Replace tools already registered under the same name? Defaults to
+  FALSE. Duplicate names within a batch always fail.
 
 #### Returns
 
@@ -1507,7 +1520,7 @@ tool fetching fails.
 
 #### Usage
 
-    Agent$load_mcp(config = NULL, servers = NULL)
+    Agent$load_mcp(config = NULL, servers = NULL, replace = FALSE)
 
 #### Arguments
 
@@ -1520,6 +1533,12 @@ tool fetching fails.
 
   Optional character vector of server names to load from. If NULL, loads
   from all configured servers.
+
+- `replace`:
+
+  Refresh the selected servers' complete tool sets, removing obsolete
+  tools, and explicitly replace other matching names. On failure, tools
+  whose connections were invalidated are removed; working tools remain.
 
 #### Returns
 

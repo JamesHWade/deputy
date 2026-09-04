@@ -86,12 +86,17 @@ mcptools default location (<code>~/.config/mcptools/config.json</code>).</p></dd
 <dt id="arg-servers">servers<a class="anchor" aria-label="anchor" href="#arg-servers"></a></dt>
 <dd><p>Optional character vector of server names to load tools from.
 If NULL (default), loads tools from all configured servers. Filtering is
-based on pattern matching against tool names.</p></dd>
+performed on exact configuration names before connecting servers.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A list of tool definitions compatible with <code>Agent$register_tools()</code>.
+<code><a href="tool_metadata.html">tool_metadata()</a></code> reports exact MCP origin, supplied annotations, and gaps.
+The metadata bridge is qualified for mcptools 1.0.2; other versions fail
+explicitly rather than silently losing annotations. Reconnecting a server
+invalidates tools loaded from its previous connection. Reload and explicitly
+replace those tools on the Agent. Load failures warn and return an empty list.
 Returns an empty list if mcptools is not installed or no tools are available.</p>
     </div>
     <div class="section level2">

@@ -888,14 +888,21 @@ emitted into model context.</p></dd>
 provider-native web tools are authorized once, before registration,
 because their execution occurs inside the provider rather than R. Native
 tools therefore require static permissions and cannot be registered with
-a custom <code>can_use_tool</code> callback.</p><div class="section">
+a custom <code>can_use_tool</code> callback.
+Existing names require explicit replacement. Every tool in a batch is
+validated and adapted before the registry changes. List element names
+do not rename tools; each tool's own name is authoritative.</p><div class="section">
 <h4 id="usage-25">Usage<a class="anchor" aria-label="anchor" href="#usage-25"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="va">tool</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="va">tool</span>, replace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-19">Arguments<a class="anchor" aria-label="anchor" href="#arguments-19"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>tool</code></dt>
 <dd><p>A tool created with <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code> or a supported
 provider-native web tool.</p></dd>
+
+      <dt><code>replace</code></dt>
+<dd><p>Replace tools already registered under the same name?
+Defaults to FALSE. Duplicate names within a batch always fail.</p></dd>
 
 
 </dl><p></p></div>
@@ -910,12 +917,16 @@ provider-native web tool.</p></dd>
 <h3 id="agent-register-tools-"><code>Agent$register_tools()</code><a class="anchor" aria-label="anchor" href="#agent-register-tools-"></a></h3>
 <p>Register multiple tools with the agent.</p><div class="section">
 <h4 id="usage-26">Usage<a class="anchor" aria-label="anchor" href="#usage-26"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">register_tools</span><span class="op">(</span><span class="va">tools</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">register_tools</span><span class="op">(</span><span class="va">tools</span>, replace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-20">Arguments<a class="anchor" aria-label="anchor" href="#arguments-20"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>tools</code></dt>
 <dd><p>A list of function tools or supported provider-native web
 tools.</p></dd>
+
+      <dt><code>replace</code></dt>
+<dd><p>Replace tools already registered under the same name?
+Defaults to FALSE. Duplicate names within a batch always fail.</p></dd>
 
 
 </dl><p></p></div>
@@ -1353,7 +1364,7 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 <p>Requires the mcptools package. Issues a warning if not installed or if
 tool fetching fails.</p><div class="section">
 <h4 id="usage-48">Usage<a class="anchor" aria-label="anchor" href="#usage-48"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_mcp</span><span class="op">(</span>config <span class="op">=</span> <span class="cn">NULL</span>, servers <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_mcp</span><span class="op">(</span>config <span class="op">=</span> <span class="cn">NULL</span>, servers <span class="op">=</span> <span class="cn">NULL</span>, replace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-33">Arguments<a class="anchor" aria-label="anchor" href="#arguments-33"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>config</code></dt>
@@ -1363,6 +1374,11 @@ the mcptools default location (<code>~/.config/mcptools/config.json</code>).</p>
       <dt><code>servers</code></dt>
 <dd><p>Optional character vector of server names to load from.
 If NULL, loads from all configured servers.</p></dd>
+
+      <dt><code>replace</code></dt>
+<dd><p>Refresh the selected servers' complete tool sets, removing
+obsolete tools, and explicitly replace other matching names. On failure,
+tools whose connections were invalidated are removed; working tools remain.</p></dd>
 
 
 </dl><p></p></div>

@@ -31,6 +31,127 @@ for details.
 
 ## Tool Bundles
 
+Use [`ellmer::tool()`](https://ellmer.tidyverse.org/reference/tool.html)
+for local functions, package exports, and service call wrappers, then
+register those objects through the same Agent API. Registration does not
+load packages or infer a function’s effects. Describe them explicitly:
+
+``` r
+
+library(deputy)
+uppercase <- ellmer::tool(
+  base::toupper,
+  name = "uppercase",
+  description = "Uppercase local text.",
+  arguments = list(x = ellmer::type_string()),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = TRUE, destructive_hint = FALSE,
+    open_world_hint = FALSE, idempotent_hint = TRUE
+  )
+)
+# Constructing this Chat does not make a model request.
+chat <- ellmer::chat_openai(credentials = function() "example", model = "gpt-4o-mini")
+agent <- Agent$new(chat = chat, tools = list(uppercase))
+agent$get_tools()$uppercase("hello")
+#> [1] "HELLO"
+agent$register_tool(uppercase, replace = TRUE)
+```
+
+Existing names are errors unless `replace = TRUE` is explicit. Repeated
+names inside one batch always fail, including with replacement enabled.
+List names do not rename a tool. `set_tools()` replaces the whole user
+registry. Both methods and construction validate and adapt the complete
+batch before changing the backend registry; a malformed later tool
+leaves earlier tools untouched. Skills use
+`load_skill(..., allow_conflicts = TRUE)` for explicit replacement.
+
+Missing annotations stay absent on the source object. For custom tools,
+permissions assume possible modification, destruction, and external
+access, and no idempotence. An explicit read-only annotation makes an
+omitted destructive annotation irrelevant. A local read tool therefore
+needs at least `read_only_hint = TRUE` and `open_world_hint = FALSE`
+under standard permissions. Readonly mode additionally requires an
+explicit allowlist entry for custom tools. Annotations do not grant
+authority or verify a service’s trustworthiness. See `PermissionMode`
+for callback and mode behavior.
+
+Inspect the supplied fields and defaults without executing the tool:
+
+``` r
+
+tool_metadata(agent$get_tools()$uppercase)
+#> $name
+#> [1] "uppercase"
+#> 
+#> $source
+#> $source$type
+#> [1] "package"
+#> 
+#> $source$package
+#> [1] "base"
+#> 
+#> 
+#> $annotations
+#> $annotations$read_only_hint
+#> [1] TRUE
+#> 
+#> $annotations$open_world_hint
+#> [1] FALSE
+#> 
+#> $annotations$idempotent_hint
+#> [1] TRUE
+#> 
+#> $annotations$destructive_hint
+#> [1] FALSE
+#> 
+#> 
+#> $missing_annotations
+#> character(0)
+#> 
+#> $effective_annotations
+#> $effective_annotations$read_only_hint
+#> [1] TRUE
+#> 
+#> $effective_annotations$destructive_hint
+#> [1] FALSE
+#> 
+#> $effective_annotations$idempotent_hint
+#> [1] TRUE
+#> 
+#> $effective_annotations$open_world_hint
+#> [1] FALSE
+```
+
+For service tools, `tools_mcp(config, servers = "evidence")` selects an
+exact configured server name before connecting. The qualified mcptools
+1.0.2 bridge retains annotations from the server and records
+`source$type = "mcp"`, its server name, and tool name. It reports
+missing metadata rather than inventing safe effects. Other mcptools
+versions fail explicitly pending qualification. The caller must trust
+the configured service; metadata does not establish trust.
+
+Pass these objects to `Agent$new(tools = ...)`, `register_tools()`, or
+an explicit tool registry used by
+[`agent_definition_read()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md).
+The same metadata survives YAML selection, Agent wrapping, cloning, and
+delegation. Permission callbacks receive it as `context$tool_metadata`,
+alongside the supplied `context$tool_annotations`. A service called
+`read_file` still uses its service annotations and capabilities; its
+name does not confer native file access. Local file checkpointing
+excludes MCP calls, so rewinding files never treats a remote service
+write as a change to the local workspace.
+
+Reconnecting a server invalidates tools from its old connection. Reload
+and replace explicitly with
+`agent$load_mcp(config, servers = "evidence", replace = TRUE)`. This
+refresh removes obsolete tools from the selected servers, including when
+discovery succeeds with an empty tool set. Unrelated tools remain
+registered. A load failure records a failed attempt in `mcp_status()`.
+Tools that still have working connections remain registered. If mcptools
+already closed an old connection, its invalidated handles are removed
+even when discovery or registration fails. Malformed metadata never
+silently becomes an unannotated executable.
+
 Bundles group related tools together:
 
 ``` r

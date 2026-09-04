@@ -23,14 +23,20 @@ tools_mcp(config = NULL, servers = NULL)
 - servers:
 
   Optional character vector of server names to load tools from. If NULL
-  (default), loads tools from all configured servers. Filtering is based
-  on pattern matching against tool names.
+  (default), loads tools from all configured servers. Filtering is
+  performed on exact configuration names before connecting servers.
 
 ## Value
 
 A list of tool definitions compatible with `Agent$register_tools()`.
-Returns an empty list if mcptools is not installed or no tools are
-available.
+[`tool_metadata()`](https://jameshwade.github.io/deputy/reference/tool_metadata.md)
+reports exact MCP origin, supplied annotations, and gaps. The metadata
+bridge is qualified for mcptools 1.0.2; other versions fail explicitly
+rather than silently losing annotations. Reconnecting a server
+invalidates tools loaded from its previous connection. Reload and
+explicitly replace those tools on the Agent. Load failures warn and
+return an empty list. Returns an empty list if mcptools is not installed
+or no tools are available.
 
 ## Details
 

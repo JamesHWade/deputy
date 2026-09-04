@@ -97,13 +97,20 @@ open-world capability checks. Examples: <code>tool_read_file</code>, <code>tool_
 <p>Indicates the tool may cause destructive/irreversible changes.
 Tools with <code>destructive_hint = TRUE</code> require explicit permission.
 Examples: <code>tool_write_file</code>, <code>tool_delete_file</code>, <code>tool_run_bash</code></p>
-<p><strong>open_world_hint</strong> (logical, default: FALSE)</p>
+<p><strong>open_world_hint</strong> (logical, default: TRUE)</p>
 <p>Indicates the tool may interact with external systems.
 Used for network calls, package installation, etc.
 Examples: <code>tool_web_search</code>, <code>tool_install_package</code></p>
 <p><strong>idempotent_hint</strong> (logical, default: FALSE)</p>
 <p>Indicates repeated calls produce the same result.
-Safe to retry on failure.</p>
+This annotation alone does not authorize automatic retries.</p>
+<p>Missing annotations remain absent on the tool. For custom tools, permission
+checks assume modification, possible destruction, external access, and no
+idempotence unless stated otherwise. If <code>read_only_hint = TRUE</code>, an omitted
+destructive annotation is ignored; an explicit TRUE still denies read-only
+use. Native tools continue to require their named capabilities. A custom
+permission callback can explicitly authorize a tool in standard mode;
+full mode bypasses annotation checks but still honors tool gating.</p>
     </div>
     <div class="section level2">
     <h2 id="creating-tools-with-annotations">Creating Tools with Annotations<a class="anchor" aria-label="anchor" href="#creating-tools-with-annotations"></a></h2>
@@ -118,7 +125,8 @@ Safe to retry on failure.</p>
 <span>  arguments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>pattern <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="st">"Search pattern"</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  annotations <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool_annotations.html" class="external-link">tool_annotations</a></span><span class="op">(</span></span>
 <span>    read_only_hint <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>    destructive_hint <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>    destructive_hint <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    open_world_hint <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>

@@ -38,7 +38,7 @@ Indicates the tool may cause destructive/irreversible changes. Tools
 with `destructive_hint = TRUE` require explicit permission. Examples:
 `tool_write_file`, `tool_delete_file`, `tool_run_bash`
 
-**open_world_hint** (logical, default: FALSE)
+**open_world_hint** (logical, default: TRUE)
 
 Indicates the tool may interact with external systems. Used for network
 calls, package installation, etc. Examples: `tool_web_search`,
@@ -46,8 +46,17 @@ calls, package installation, etc. Examples: `tool_web_search`,
 
 **idempotent_hint** (logical, default: FALSE)
 
-Indicates repeated calls produce the same result. Safe to retry on
-failure.
+Indicates repeated calls produce the same result. This annotation alone
+does not authorize automatic retries.
+
+Missing annotations remain absent on the tool. For custom tools,
+permission checks assume modification, possible destruction, external
+access, and no idempotence unless stated otherwise. If
+`read_only_hint = TRUE`, an omitted destructive annotation is ignored;
+an explicit TRUE still denies read-only use. Native tools continue to
+require their named capabilities. A custom permission callback can
+explicitly authorize a tool in standard mode; full mode bypasses
+annotation checks but still honors tool gating.
 
 ## Creating Tools with Annotations
 
@@ -59,7 +68,8 @@ failure.
       arguments = list(pattern = ellmer::type_string("Search pattern")),
       annotations = ellmer::tool_annotations(
         read_only_hint = TRUE,
-        destructive_hint = FALSE
+        destructive_hint = FALSE,
+        open_world_hint = FALSE
       )
     )
 
