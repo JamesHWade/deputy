@@ -516,3 +516,11 @@ GitHub Actions workflows in `.github/workflows/`:
 - `pkgdown.yaml` - Documentation site
 - `format-suggest.yaml` - Code formatting suggestions
 - `claude.yml` / `claude-code-review.yml` - Claude integration
+
+The automatic Claude review workflow runs only for PR branches in this
+repository. Fork PRs receive an explicit skip explanation in the workflow
+summary and require maintainer review; their ordinary CI still runs. The fork
+notice has no token permissions, checkout, or secrets. Keep this workflow on
+`pull_request`; do not use a privileged fork checkout to bypass authentication
+restrictions. This policy applies to automatic review, not the separate
+mention-triggered Claude workflow.
