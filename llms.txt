@@ -323,6 +323,10 @@ Coordinate multiple specialized agents
   : LeadAgent R6 Class
 - [`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
   : Create an Agent Definition
+- [`agent_definition_read()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md)
+  [`agent_definition_write()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md)
+  [`agent_definitions()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md)
+  : Read, write, and discover AgentDefinition files
 
 ## Errors
 

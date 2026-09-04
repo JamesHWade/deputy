@@ -2,6 +2,14 @@
 
 ## deputy (development version)
 
+- [`agent_definition_read()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md),
+  [`agent_definition_write()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md),
+  and
+  [`agent_definitions()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md)
+  add portable YAML definitions, explicit tool/skill registries, and
+  discovery from `.deputy/agents/`
+  ([\#41](https://github.com/JamesHWade/deputy/issues/41)).
+
 - Required packages now report standard installation guidance with the
   feature that needs them; skill YAML frontmatter no longer silently
   loses metadata when yaml is unavailable

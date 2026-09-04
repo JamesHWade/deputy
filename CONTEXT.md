@@ -13,7 +13,7 @@ executes tool calls, and enforces permissions. Always the R6 object,
 never a spec or a role. *Avoid*: assistant, bot, LLM
 
 **AgentDefinition**: A declarative specification of an agent — name,
-prompt, tools, model, skills — loaded from a markdown file or
+prompt, tools, model, skills — loaded from a Deputy definition file or
 constructed in code. A definition is not runnable on its own; it
 describes an Agent that a LeadAgent can instantiate. *Avoid*: agent
 config, agent spec, custom agent

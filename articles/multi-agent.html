@@ -319,6 +319,179 @@ results:</p>
 <span></span>
 <span><span class="va">lead</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va">hook_monitor</span><span class="op">)</span></span></code></pre></div>
 </div>
+<div class="section level2">
+<h2 id="portable-definitions">Portable definitions<a class="anchor" aria-label="anchor" href="#portable-definitions"></a>
+</h2>
+<p>AgentDefinitions can live as <code>.yaml</code> or <code>.yml</code>
+files in <code>.deputy/agents/</code>. A file contains data, while the
+host chooses the actual tools and skills it can reference. Reading files
+does not run R code, load a Skill, contact an MCP server, or create an
+Agent.</p>
+<p>Here is a complete version 1 definition:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">version</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> reviewer</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="fu">description</span><span class="kw">:</span><span class="at"> Reviews local text for gaps</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="fu">prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  Read the supplied text using read_file.</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  Report unsupported claims and missing evidence concisely.</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="fu">tools</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">read_file</span><span class="kw">]</span></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="fu">model</span><span class="kw">:</span><span class="at"> inherit</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="fu">skills</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="fu">disallowed_tools</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">write_file</span><span class="kw">,</span><span class="at"> run_bash</span><span class="kw">]</span></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="fu">mcp_servers</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="fu">initial_prompt</span><span class="kw">:</span><span class="at"> Keep the review grounded in the supplied text.</span></span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="fu">max_requests</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="fu">permission_mode</span><span class="kw">:</span><span class="at"> readonly</span></span></code></pre></div>
+<p>Only <code>version</code>, <code>name</code>,
+<code>description</code>, and <code>prompt</code> are required. All
+other fields use <code><a href="../reference/agent_definition.html">agent_definition()</a></code> defaults when omitted.
+The format covers the entire constructor surface:</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>Field</th>
+<th>Type and meaning</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>version</code></td>
+<td>Required numeric format version, currently <code>1</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>name</code></td>
+<td>Required routing name; canonicalized to lowercase</td>
+</tr>
+<tr class="odd">
+<td><code>description</code></td>
+<td>Required nonempty description shown to the lead</td>
+</tr>
+<tr class="even">
+<td><code>prompt</code></td>
+<td>Required nonempty prompt; <code>|</code> preserves multiline
+text</td>
+</tr>
+<tr class="odd">
+<td><code>tools</code></td>
+<td>Tool registry keys; defaults to <code>[]</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>model</code></td>
+<td>Model string, default <code>inherit</code>
+</td>
+</tr>
+<tr class="odd">
+<td><code>skills</code></td>
+<td>Skill registry keys; defaults to <code>[]</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>disallowed_tools</code></td>
+<td>Tool names denied to the subagent, or <code>null</code>
+</td>
+</tr>
+<tr class="odd">
+<td><code>memory</code></td>
+<td>Sequence of memory strings, or <code>null</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>mcp_servers</code></td>
+<td>MCP server names for the existing delegation lifecycle, or
+<code>null</code>
+</td>
+</tr>
+<tr class="odd">
+<td><code>initial_prompt</code></td>
+<td>Initial task prefix, or <code>null</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>max_requests</code></td>
+<td>Non-negative integer request limit, or <code>null</code>
+</td>
+</tr>
+<tr class="odd">
+<td><code>permission_mode</code></td>
+<td>
+<code>standard</code>, <code>readonly</code>, <code>plan</code>,
+<code>full</code>, or <code>null</code>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The lead still controls the authority ceiling. A file cannot give a
+subagent more permission than its lead, nor supply credentials, host
+settings, or nested subagents. Tool and skill references are exact,
+case-sensitive keys like <code>read_file</code> or
+<code>concise_review</code>; they do not name R expressions, package
+exports, or filesystem paths. A host can map a key to an approved Skill
+path. Loading that Skill happens when the subagent is instantiated.</p>
+<p>Unknown fields, unsupported versions, missing references, duplicate
+keys, and <code>!expr</code> tags are errors. Quote YAML strings like
+<code>"yes"</code> and <code>"123"</code> to prevent YAML’s automatic
+type conversion. Use <code>[]</code> for empty sequences and
+<code>null</code> for absent optional fields. Single strings are also
+accepted for one-element sequences. Files are limited to 1 MiB.</p>
+<div class="section level3">
+<h3 id="read-and-delegate">Read and delegate<a class="anchor" aria-label="anchor" href="#read-and-delegate"></a>
+</h3>
+<p>The package ships the YAML above as a working example. This chunk
+reads it without model credentials:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
+<span><span class="va">tool_registry</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>read_file <span class="op">=</span> <span class="va">tool_read_file</span><span class="op">)</span></span>
+<span><span class="va">definition_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples"</span>, <span class="st">"agent-definitions"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span></span>
+<span><span class="va">definitions</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition_read.html">agent_definitions</a></span><span class="op">(</span><span class="va">definition_dir</span>, tools <span class="op">=</span> <span class="va">tool_registry</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">definitions</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "reviewer"</span></span>
+<span><span class="va">definitions</span><span class="op">$</span><span class="va">reviewer</span><span class="op">$</span><span class="va">max_requests</span></span>
+<span><span class="co">#&gt; [1] 2</span></span></code></pre></div>
+<p>For a project, use
+<code>agent_definitions(tools = tool_registry)</code> to discover
+<code>.deputy/agents/</code>. Discovery is nonrecursive and ordered by
+filename. A missing or empty directory returns an empty list. Duplicate
+canonical names and invalid files stop discovery rather than silently
+dropping a definition.</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  sub_agents <span class="op">=</span> <span class="va">definitions</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"standard"</span>, file_write <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Delegate a review of input.txt to reviewer."</span><span class="op">)</span></span>
+<span><span class="va">lead</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="write-and-round-trip">Write and round-trip<a class="anchor" aria-label="anchor" href="#write-and-round-trip"></a>
+</h3>
+<p>Pass the same registries when writing and reading. The writer finds
+registry keys by exact object identity; it refuses unmapped tools/skills
+and ambiguous aliases. Existing files require
+<code>overwrite = TRUE</code>. Comments, YAML formatting, and names
+attached to R lists or character sequences are not preserved; object
+order and registry identity are preserved.</p>
+<p>The writer completes a temporary file in the destination directory
+before installing it. With <code>overwrite = TRUE</code>, it renames the
+completed file into place. Otherwise it creates a hard link, which fails
+atomically if another writer has already created the destination. This
+requires filesystem support for hard links. A failed write or
+installation leaves an existing definition intact.</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".yaml"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/agent_definition_read.html">agent_definition_write</a></span><span class="op">(</span><span class="va">definitions</span><span class="op">$</span><span class="va">reviewer</span>, <span class="va">path</span>, tools <span class="op">=</span> <span class="va">tool_registry</span><span class="op">)</span></span>
+<span><span class="va">restored</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition_read.html">agent_definition_read</a></span><span class="op">(</span><span class="va">path</span>, tools <span class="op">=</span> <span class="va">tool_registry</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">restored</span>, <span class="va">definitions</span><span class="op">$</span><span class="va">reviewer</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span></code></pre></div>
+</div>
+</div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>

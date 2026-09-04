@@ -173,3 +173,126 @@ hook_monitor <- HookMatcher$new(
 
 lead$add_hook(hook_monitor)
 ```
+
+## Portable definitions
+
+AgentDefinitions can live as `.yaml` or `.yml` files in
+`.deputy/agents/`. A file contains data, while the host chooses the
+actual tools and skills it can reference. Reading files does not run R
+code, load a Skill, contact an MCP server, or create an Agent.
+
+Here is a complete version 1 definition:
+
+``` yaml
+version: 1
+name: reviewer
+description: Reviews local text for gaps
+prompt: |
+  Read the supplied text using read_file.
+  Report unsupported claims and missing evidence concisely.
+tools: [read_file]
+model: inherit
+skills: []
+disallowed_tools: [write_file, run_bash]
+memory: []
+mcp_servers: []
+initial_prompt: Keep the review grounded in the supplied text.
+max_requests: 2
+permission_mode: readonly
+```
+
+Only `version`, `name`, `description`, and `prompt` are required. All
+other fields use
+[`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
+defaults when omitted. The format covers the entire constructor surface:
+
+| Field | Type and meaning |
+|----|----|
+| `version` | Required numeric format version, currently `1` |
+| `name` | Required routing name; canonicalized to lowercase |
+| `description` | Required nonempty description shown to the lead |
+| `prompt` | Required nonempty prompt; `|` preserves multiline text |
+| `tools` | Tool registry keys; defaults to `[]` |
+| `model` | Model string, default `inherit` |
+| `skills` | Skill registry keys; defaults to `[]` |
+| `disallowed_tools` | Tool names denied to the subagent, or `null` |
+| `memory` | Sequence of memory strings, or `null` |
+| `mcp_servers` | MCP server names for the existing delegation lifecycle, or `null` |
+| `initial_prompt` | Initial task prefix, or `null` |
+| `max_requests` | Non-negative integer request limit, or `null` |
+| `permission_mode` | `standard`, `readonly`, `plan`, `full`, or `null` |
+
+The lead still controls the authority ceiling. A file cannot give a
+subagent more permission than its lead, nor supply credentials, host
+settings, or nested subagents. Tool and skill references are exact,
+case-sensitive keys like `read_file` or `concise_review`; they do not
+name R expressions, package exports, or filesystem paths. A host can map
+a key to an approved Skill path. Loading that Skill happens when the
+subagent is instantiated.
+
+Unknown fields, unsupported versions, missing references, duplicate
+keys, and `!expr` tags are errors. Quote YAML strings like `"yes"` and
+`"123"` to prevent YAML’s automatic type conversion. Use `[]` for empty
+sequences and `null` for absent optional fields. Single strings are also
+accepted for one-element sequences. Files are limited to 1 MiB.
+
+### Read and delegate
+
+The package ships the YAML above as a working example. This chunk reads
+it without model credentials:
+
+``` r
+
+library(deputy)
+tool_registry <- list(read_file = tool_read_file)
+definition_dir <- system.file("examples", "agent-definitions", package = "deputy")
+definitions <- agent_definitions(definition_dir, tools = tool_registry)
+names(definitions)
+#> [1] "reviewer"
+definitions$reviewer$max_requests
+#> [1] 2
+```
+
+For a project, use `agent_definitions(tools = tool_registry)` to
+discover `.deputy/agents/`. Discovery is nonrecursive and ordered by
+filename. A missing or empty directory returns an empty list. Duplicate
+canonical names and invalid files stop discovery rather than silently
+dropping a definition.
+
+``` r
+
+lead <- LeadAgent$new(
+  chat = ellmer::chat_openai(),
+  sub_agents = definitions,
+  permissions = Permissions$new(mode = "standard", file_write = FALSE),
+  usage_limits = UsageLimits(max_requests = 6)
+)
+result <- lead$run_sync("Delegate a review of input.txt to reviewer.")
+lead$list_subagents()
+```
+
+### Write and round-trip
+
+Pass the same registries when writing and reading. The writer finds
+registry keys by exact object identity; it refuses unmapped tools/skills
+and ambiguous aliases. Existing files require `overwrite = TRUE`.
+Comments, YAML formatting, and names attached to R lists or character
+sequences are not preserved; object order and registry identity are
+preserved.
+
+The writer completes a temporary file in the destination directory
+before installing it. With `overwrite = TRUE`, it renames the completed
+file into place. Otherwise it creates a hard link, which fails
+atomically if another writer has already created the destination. This
+requires filesystem support for hard links. A failed write or
+installation leaves an existing definition intact.
+
+``` r
+
+path <- tempfile(fileext = ".yaml")
+agent_definition_write(definitions$reviewer, path, tools = tool_registry)
+restored <- agent_definition_read(path, tools = tool_registry)
+identical(restored, definitions$reviewer)
+#> [1] TRUE
+unlink(path)
+```

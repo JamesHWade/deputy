@@ -60,7 +60,7 @@
 <div class="section level3">
 <h3 id="agents">Agents<a class="anchor" aria-label="anchor" href="#agents"></a></h3>
 <p><strong>Agent</strong>: The runtime object that drives a conversation with an LLM, executes tool calls, and enforces permissions. Always the R6 object, never a spec or a role. <em>Avoid</em>: assistant, bot, LLM</p>
-<p><strong>AgentDefinition</strong>: A declarative specification of an agent — name, prompt, tools, model, skills — loaded from a markdown file or constructed in code. A definition is not runnable on its own; it describes an Agent that a LeadAgent can instantiate. <em>Avoid</em>: agent config, agent spec, custom agent</p>
+<p><strong>AgentDefinition</strong>: A declarative specification of an agent — name, prompt, tools, model, skills — loaded from a Deputy definition file or constructed in code. A definition is not runnable on its own; it describes an Agent that a LeadAgent can instantiate. <em>Avoid</em>: agent config, agent spec, custom agent</p>
 <p><strong>LeadAgent</strong>: An Agent that can delegate work to subagents. The only kind of Agent that acts on an AgentDefinition. <em>Avoid</em>: orchestrator, supervisor, parent agent</p>
 <p><strong>Subagent</strong>: An Agent instantiated by a LeadAgent to carry out one delegated task, with its own conversation and its own permissions. Subordinate for the duration of the delegation only. <em>Avoid</em>: child agent, worker, sub-agent (hyphenated)</p>
 <p><strong>Delegation</strong>: The act of a LeadAgent handing a task to a subagent and receiving its result. <em>Avoid</em>: dispatch, handoff, spawning</p>
