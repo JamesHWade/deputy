@@ -262,6 +262,16 @@ tools_mcp_repl <- function(
 #' mcp_tools <- tools_mcp(servers = c("github", "slack"))
 #' }
 tools_mcp <- function(config = NULL, servers = NULL) {
+  load_mcp_tools_result(config, servers)$tools
+}
+
+load_mcp_tools_result <- function(config, servers) {
+  failed <- list(
+    tools = list(),
+    servers = character(),
+    success = FALSE,
+    error = "mcptools is not installed"
+  )
   # Check if mcptools is available
   if (!mcp_available()) {
     cli::cli_warn(c(
@@ -269,22 +279,12 @@ tools_mcp <- function(config = NULL, servers = NULL) {
       "i" = "Install with: {.code install.packages('mcptools')}",
       "i" = "Returning empty tool list"
     ))
-    return(list())
+    return(failed)
   }
 
   # Fetch MCP tools
-  tools <- tryCatch(
-    {
-      result <- load_mcp_tools_with_metadata(config, servers)
-
-      # Validate result is a list
-      if (!is.list(result)) {
-        cli::cli_warn("mcptools::mcp_tools() returned non-list value")
-        return(list())
-      }
-
-      result
-    },
+  result <- tryCatch(
+    load_mcp_tools_with_metadata(config, servers),
     error = function(e) {
       error_class <- paste(class(e), collapse = ", ")
       # Escape braces in error message to prevent cli glue interpretation
@@ -295,9 +295,11 @@ tools_mcp <- function(config = NULL, servers = NULL) {
         "i" = paste0("Error type: ", error_class),
         "i" = "Check your MCP configuration and server status"
       ))
-      list()
+      failed$error <- conditionMessage(e)
+      failed
     }
   )
+  tools <- result$tools
 
   if (length(tools) == 0) {
     cli::cli_alert_info("No MCP tools available")
@@ -324,7 +326,7 @@ tools_mcp <- function(config = NULL, servers = NULL) {
     )
   }
 
-  tools
+  result
 }
 
 #' List available MCP servers

@@ -106,8 +106,11 @@ annotations and capabilities; its name does not confer native file access.
 
 Reconnecting a server invalidates tools from its old connection. Reload and
 replace explicitly with `agent$load_mcp(config, servers = "evidence", replace = TRUE)`.
-A load failure warns and returns no tools; malformed metadata never silently
-becomes an unannotated executable.
+This refresh removes obsolete tools from the selected servers, including when
+discovery succeeds with an empty tool set. Unrelated tools remain registered.
+A load failure warns, records a failed attempt in `mcp_status()`, and leaves
+the registry unchanged; malformed metadata never silently becomes an
+unannotated executable.
 
 Bundles group related tools together:
 

@@ -27,6 +27,20 @@ test_that("tool metadata retains supplied values and explicit gaps", {
   expect_identical(tool_metadata(agent$clone()$get_tools()$value), metadata)
 })
 
+test_that("absent MCP metadata is safe in permission contexts", {
+  for (context in list(
+    list(),
+    list(tool_metadata = NULL),
+    list(tool_metadata = list(source = NULL))
+  )) {
+    expect_false(is_mcp_tool_context(context))
+    expect_s3_class(
+      permissions_standard()$check("read_file", list(), context),
+      "PermissionResultAllow"
+    )
+  }
+})
+
 test_that("MCP annotation mapping preserves false values and extensions", {
   annotations <- mcp_ellmer_annotations(
     list(
@@ -86,6 +100,11 @@ test_that("tool arguments cannot shadow runtime adapter bindings", {
 
 test_that("released MCP transport preserves origin, annotations and connection identity", {
   skip_if_not_installed("mcptools", "1.0.2")
+  skip_if(
+    as.character(utils::packageVersion("mcptools")) != "1.0.2",
+    "The MCP descriptor bridge is qualified for exactly mcptools 1.0.2"
+  )
+  skip_if_not_installed("yaml")
   fixture <- normalizePath(test_path("fixtures", "mcp-annotations.R"))
   # Isolate mcptools' process-global connection registry from other tests.
   result <- callr::r(
@@ -207,6 +226,22 @@ test_that("released MCP transport preserves origin, annotations and connection i
         old_tool(claim = "claim-2"),
         deputy_mcp_metadata = function(e) class(e)
       )
+      only_server <- Agent$new(
+        chat = test_helpers$create_mock_chat(),
+        tools = reloaded
+      )
+      empty_server <- server
+      empty_server$args <- list(fixture, "empty")
+      jsonlite::write_json(
+        list(mcpServers = list(evidence = empty_server)),
+        config,
+        auto_unbox = TRUE
+      )
+      only_server$load_mcp(config, replace = TRUE)
+      single_empty <- list(
+        count = length(only_server$get_tools()),
+        status = tail(only_server$mcp_status()$status, 1L)
+      )
       # Loading a second configuration must not return the previous connection's tools.
       jsonlite::write_json(
         list(mcpServers = list(second = server)),
@@ -232,6 +267,49 @@ test_that("released MCP transport preserves origin, annotations and connection i
         },
         warning = function(e) TRUE
       )
+      configure <- function(name, mode = character()) {
+        selected <- server
+        selected$args <- c(list(fixture), as.list(mode))
+        jsonlite::write_json(
+          list(mcpServers = stats::setNames(list(selected), name)),
+          config,
+          auto_unbox = TRUE
+        )
+      }
+      configure("other", "other")
+      other <- tools_mcp(config)
+      local <- ellmer::tool(
+        function() "local",
+        name = "local_value",
+        description = "Local value."
+      )
+      refresher <- Agent$new(
+        chat = test_helpers$create_mock_chat(),
+        tools = c(other, list(local))
+      )
+      configure("evidence")
+      refresher$load_mcp(config)
+      configure("evidence", "renamed")
+      refresher$load_mcp(config, replace = TRUE)
+      renamed <- list(
+        names = names(refresher$get_tools()),
+        loaded = refresher$mcp_tools(),
+        value = refresher$get_tools()$renamed_evidence(claim = "new")
+      )
+      configure("evidence", "empty")
+      refresher$load_mcp(config, replace = TRUE)
+      emptied <- list(
+        names = names(refresher$get_tools()),
+        loaded = refresher$mcp_tools(),
+        other_value = refresher$get_tools()$other_evidence(claim = "untouched")
+      )
+      configure("evidence")
+      refresher$load_mcp(config, replace = TRUE)
+      before_failure <- refresher$get_tools()
+      configure("evidence", "invalid")
+      suppressWarnings(refresher$load_mcp(config, replace = TRUE))
+      failure_preserved <- identical(refresher$get_tools(), before_failure)
+      failure_status <- tail(refresher$mcp_status(), 1L)
       list(
         metadata = metadata,
         clone_metadata = lapply(clone$get_tools(), tool_metadata),
@@ -239,8 +317,13 @@ test_that("released MCP transport preserves origin, annotations and connection i
         value = value,
         remote_path = remote_path,
         stale = stale,
+        single_empty = single_empty,
         journeys = journeys,
         conflict = conflict,
+        renamed = renamed,
+        emptied = emptied,
+        failure_preserved = failure_preserved,
+        failure_status = failure_status,
         second_sources = lapply(second, function(tool) {
           tool_metadata(tool)$source
         })
@@ -288,6 +371,7 @@ test_that("released MCP transport preserves origin, annotations and connection i
     fixed = TRUE
   )
   expect_true("deputy_mcp_metadata" %in% result$stale)
+  expect_identical(result$single_empty, list(count = 0L, status = "empty"))
   expect_identical(
     vapply(result$journeys, function(x) x$executed, logical(1)),
     c(TRUE, FALSE, FALSE)
@@ -308,6 +392,29 @@ test_that("released MCP transport preserves origin, annotations and connection i
     fixed = TRUE
   )
   expect_true(result$conflict)
+  expect_identical(
+    result$renamed$names,
+    c("other_evidence", "local_value", "renamed_evidence")
+  )
+  expect_identical(result$renamed$loaded, "renamed_evidence")
+  expect_match(
+    paste(result$renamed$value, collapse = ""),
+    "called:renamed_evidence:new",
+    fixed = TRUE
+  )
+  expect_identical(result$emptied$names, c("other_evidence", "local_value"))
+  expect_identical(result$emptied$loaded, character())
+  expect_match(
+    paste(result$emptied$other_value, collapse = ""),
+    "untouched",
+    fixed = TRUE
+  )
+  expect_true(result$failure_preserved)
+  expect_identical(result$failure_status$status, "failed")
+  expect_match(
+    result$failure_status$error,
+    "must be TRUE or[[:space:]]+FALSE"
+  )
   expect_true(all(vapply(
     result$second_sources,
     function(source) identical(source$server, "second"),

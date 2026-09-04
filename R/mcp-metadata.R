@@ -167,7 +167,7 @@ load_mcp_tools_with_metadata <- function(config, servers) {
     )
   }
   if (length(servers) == 0L) {
-    return(list())
+    return(list(tools = list(), servers = character(), success = TRUE))
   }
   state <- mcp_metadata_state()
   # Filter before connecting: an excluded server must never be started.
@@ -182,6 +182,10 @@ load_mcp_tools_with_metadata <- function(config, servers) {
     null = "null"
   )
   tools <- mcptools::mcp_tools(config = selected_config)
+  # The released converter's unlist() returns NULL when every server is empty.
+  if (is.null(tools)) {
+    tools <- list()
+  }
   if (!is.list(tools)) {
     abort_deputy(
       "mcptools returned a non-list tool collection.",
@@ -195,5 +199,9 @@ load_mcp_tools_with_metadata <- function(config, servers) {
     servers = servers
   )
   tools <- Filter(Negate(is.null), tools)
-  validate_tool_batch(tools)
+  list(
+    tools = validate_tool_batch(tools),
+    servers = unique(servers),
+    success = TRUE
+  )
 }

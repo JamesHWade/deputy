@@ -1,5 +1,6 @@
 # A deterministic MCP producer. Used through the released mcptools transport.
 input <- file("stdin", open = "r")
+mode <- commandArgs(trailingOnly = TRUE)
 repeat {
   line <- readLines(input, n = 1L, warn = FALSE)
   if (length(line) == 0L) {
@@ -68,6 +69,16 @@ repeat {
     ),
     list()
   )
+  if (identical(message$method, "tools/list")) {
+    if (identical(mode, "empty")) {
+      result$tools <- list()
+    } else if (length(mode) == 1L && mode %in% c("renamed", "other")) {
+      result$tools <- result$tools[1L]
+      result$tools[[1L]]$name <- paste0(mode, "_evidence")
+    } else if (identical(mode, "invalid")) {
+      result$tools[[1L]]$annotations$readOnlyHint <- "true"
+    }
+  }
   cat(
     jsonlite::toJSON(
       list(jsonrpc = "2.0", id = message$id, result = result),

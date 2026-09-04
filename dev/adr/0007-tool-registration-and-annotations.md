@@ -56,3 +56,8 @@ authorize a new executable. The host reloads and explicitly replaces those
 tools. Tools in YAML registries remain live host objects, and child Agents
 inherit provider configuration with an empty registry before applying their
 definition's tools and the parent's permission ceiling.
+
+Explicit refresh replaces the complete tool set of each selected server,
+removing obsolete names even for a successful empty discovery. The internal
+load result distinguishes success from failure before registry replacement;
+failed discovery records an error and preserves the previous registry.
