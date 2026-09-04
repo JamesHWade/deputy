@@ -69,6 +69,8 @@ values as \code{null}. Writing canonicalizes formatting; it does not preserve
 comments or names attached to the R tools/skills lists. Object order and
 registry identity are preserved. A single string is accepted as shorthand
 for a one-element sequence. Only regular files of at most 1 MiB are read.
+Writes use a temporary file in the destination directory and replace the
+destination only after writing succeeds.
 
 A definition describes a subagent. Permission modes and request limits
 remain bounded by its LeadAgent. Nested \code{sub_agents}, host credentials,

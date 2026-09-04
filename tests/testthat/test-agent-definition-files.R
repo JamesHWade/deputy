@@ -170,6 +170,76 @@ test_that("writing requires explicit unambiguous registries and protects existin
   expect_identical(readLines(path), "original")
 })
 
+test_that("partial writes leave the original definition intact", {
+  skip_if_not_installed("yaml")
+  root <- withr::local_tempdir()
+  path <- write_definition_fixture(minimal_definition_yaml, root)
+  definition <- agent_definition_read(path)
+  write_lines <- writeLines
+  signal_failure <- rlang::abort
+  local_mocked_bindings(
+    writeLines = function(text, con, ...) {
+      write_lines("partial replacement", con, ...)
+      signal_failure("Simulated disk full")
+    },
+    .package = "base"
+  )
+  for (signal in list(rlang::abort, rlang::warn)) {
+    signal_failure <- signal
+    expect_error(
+      agent_definition_write(definition, path, overwrite = TRUE),
+      "Simulated disk full",
+      class = "deputy_agent_definition_file"
+    )
+    expect_identical(readLines(path), minimal_definition_yaml)
+    expect_identical(
+      list.files(root, all.files = TRUE, no.. = TRUE),
+      "agent.yaml"
+    )
+  }
+})
+
+test_that("a failed rename leaves the original definition intact", {
+  skip_if_not_installed("yaml")
+  root <- withr::local_tempdir()
+  path <- write_definition_fixture(minimal_definition_yaml, root)
+  definition <- agent_definition_read(path)
+  definition$prompt <- "A replacement prompt"
+  local_mocked_bindings(
+    file.rename = function(from, to) FALSE,
+    .package = "base"
+  )
+  expect_error(
+    agent_definition_write(definition, path, overwrite = TRUE),
+    "Could not rename",
+    class = "deputy_agent_definition_file"
+  )
+  expect_identical(readLines(path), minimal_definition_yaml)
+  expect_identical(
+    list.files(root, all.files = TRUE, no.. = TRUE),
+    "agent.yaml"
+  )
+})
+
+test_that("the size boundary includes every byte written", {
+  skip_if_not_installed("yaml")
+  root <- withr::local_tempdir()
+  path <- file.path(root, "agent.yaml")
+  definition <- agent_definition("reviewer", "Reviews text", "x")
+  agent_definition_write(definition, path)
+  definition$prompt <- strrep("x", 1024^2 - file.size(path) + 1L)
+  agent_definition_write(definition, path, overwrite = TRUE)
+  expect_equal(file.size(path), 1024^2)
+  expect_identical(agent_definition_read(path), definition)
+  definition$prompt <- paste0(definition$prompt, "x")
+  expect_error(
+    agent_definition_write(definition, path, overwrite = TRUE),
+    "exceeds 1 MiB",
+    class = "deputy_agent_definition_file"
+  )
+  expect_equal(file.size(path), 1024^2)
+})
+
 test_that("a loaded definition delegates with its tools, limits and permissions", {
   skip_if_not_installed("yaml")
   registry <- list(read = tool_read_file)

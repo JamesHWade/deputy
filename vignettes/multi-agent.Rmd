@@ -180,7 +180,7 @@ lead$add_hook(hook_monitor)
 
 ## Portable definitions
 
-AgentDefinitions can live in `.deputy/agents/*.yaml` or `*.yml`. A file
+AgentDefinitions can live as `.yaml` or `.yml` files in `.deputy/agents/`. A file
 contains data, while the host chooses the actual tools and skills it can
 reference. Reading files does not run R code, load a Skill, contact an MCP
 server, or create an Agent.
@@ -275,6 +275,10 @@ keys by exact object identity; it refuses unmapped tools/skills and ambiguous
 aliases. Existing files require `overwrite = TRUE`. Comments, YAML formatting,
 and names attached to the R tools/skills lists are not preserved; object
 order and registry identity are preserved.
+
+The writer completes a temporary file in the destination directory before
+renaming it into place. A failed write or rename leaves an existing
+definition intact.
 
 ```{r definition-file-roundtrip, eval = TRUE}
 path <- tempfile(fileext = ".yaml")

@@ -40,6 +40,8 @@
 #' comments or names attached to the R tools/skills lists. Object order and
 #' registry identity are preserved. A single string is accepted as shorthand
 #' for a one-element sequence. Only regular files of at most 1 MiB are read.
+#' Writes use a temporary file in the destination directory and replace the
+#' destination only after writing succeeds.
 #'
 #' A definition describes a subagent. Permission modes and request limits
 #' remain bounded by its LeadAgent. Nested `sub_agents`, host credentials,
@@ -146,9 +148,28 @@ agent_definition_write <- function(
       path
     )
   }
-  tryCatch(writeLines(text, path, useBytes = TRUE), error = function(e) {
-    abort_definition_file("{conditionMessage(e)}", path)
-  })
+  temporary <- tempfile(".deputy-definition-", tmpdir = dirname(path))
+  on.exit(unlink(temporary), add = TRUE)
+  tryCatch(
+    writeLines(text, temporary, sep = "", useBytes = TRUE),
+    error = function(e) abort_definition_file("{conditionMessage(e)}", path),
+    warning = function(e) abort_definition_file("{conditionMessage(e)}", path)
+  )
+  # The destination may have appeared while the temporary file was written.
+  if (file.exists(path) && !overwrite) {
+    abort_definition_file("Destination appeared before writing completed", path)
+  }
+  renamed <- tryCatch(
+    file.rename(temporary, path),
+    error = function(e) abort_definition_file("{conditionMessage(e)}", path),
+    warning = function(e) abort_definition_file("{conditionMessage(e)}", path)
+  )
+  if (!renamed) {
+    abort_definition_file(
+      "Could not rename the completed definition file",
+      path
+    )
+  }
   invisible(path)
 }
 
