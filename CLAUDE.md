@@ -39,7 +39,7 @@ deputy/
 │   └── utils.R             # Internal utilities
 ├── tests/testthat/         # Unit tests (testthat edition 3)
 ├── inst/skills/            # Built-in skills with YAML metadata
-├── inst/examples/          # Runnable recipes and example apps (e.g., shiny-chat)
+├── inst/examples/          # Runnable recipes, standalone scripts, and Shiny app
 ├── exec/deputy.R           # Terminal CLI using Rapp
 ├── vignettes/              # User documentation (R Markdown)
 ├── man/                    # Auto-generated roxygen2 docs
@@ -71,6 +71,10 @@ Rscript -e "pak::pak()"
 # Load package for development
 Rscript -e "devtools::load_all()"
 ```
+
+The scripts in `inst/examples/standalone/` are executed by
+`tests/testthat/test-standalone-examples.R` using deterministic provider responses.
+Keep examples independent and use the public Agent APIs.
 
 ## Common Commands
 

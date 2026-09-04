@@ -79,6 +79,10 @@ jobs:
           extra-packages: any::rcmdcheck
           needs: check
 
+      - name: Run standalone examples with deterministic provider responses
+        run: testthat::test_local(filter = "standalone-examples", stop_on_failure = TRUE)
+        shell: Rscript {0}
+
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
