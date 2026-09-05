@@ -90,6 +90,18 @@ Keep examples independent and use the public Agent APIs.
 `inst/skills/debate/` skill and a separately budgeted moderator. It requires
 both heads to complete before synthesis; skill loading alone starts no work.
 
+`inst/examples/history-recovery/` is an external paired evaluation with
+caller-owned synthetic history. It compares identical compacted contexts with
+and without bounded source retrieval. Run deterministic producer tests with
+`devtools::test(filter = "history-recovery-example|compaction-evidence")`.
+The directory's README documents explicit paid-run opt-in and observed budgets.
+Its `original` and `changed-constraint` scenarios cover retained and superseded
+host eligibility rules with the same paired-continuation protocol.
+Live results are required before drawing model-quality conclusions (#112).
+History recovery proceeds with caller-owned records under ADR-0003.
+`dev/shinychat-history-consumer.md` tracks the optional shinychat adapter for #66;
+only that adapter waits for an agreed, released R API.
+
 ## Common Commands
 
 ### Testing
@@ -285,6 +297,17 @@ fallback Chats never select the task provider or inherit executable tools and
 callbacks. Installing a compacted window preserves prior usage and completed
 tool effects. Manual `compact()` remains synchronous. Evaluation cases and the
 future history-retrieval comparison are described in `dev/compaction-evaluation.md`.
+Compaction projects ellmer Content objects to public evidence before offloading,
+and bounds potential rendered expansion as well as serialized size. Generated
+summaries preserve up to eight direct recovery references; larger sets use one
+durable catalog, flattened across compactions and retained by session save/load.
+Public error diagnostics and tool-request arguments use the same bounds.
+Superseded internal catalogs are reclaimed after accepted replacement unless a
+live Agent in the current R process sharing the session directory still references
+them; saved sessions keep their snapshots and source artifacts remain.
+Aborted compactions remove their provisional evidence artifacts, preserving
+artifacts claimed by another compaction or returned to a tool caller.
+Caller-supplied summaries retain control over their content.
 
 ### Permission Modes
 
@@ -370,6 +393,7 @@ the AgentDefinition supplies the child's executable registry.
 - `rlang` - Language utilities
 - `coro` - Coroutines for streaming
 - `digest` - Hashing
+- `jsonlite` - Runtime JSON serialization, including atomic tool evidence
 - `Rapp` (>= 0.4.0) - CLI framework
 - `callr` - Fault isolation and timeouts for explicitly trusted R code
 - `mcp-repl` (optional, through mcptools) - OS-sandboxed model-generated R;

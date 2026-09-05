@@ -49,6 +49,29 @@ devtools::test(filter = "compaction-run|context-policy|chat-fallback")
 
 ## Next comparison
 
+The runnable producer is now in
+[`inst/examples/history-recovery/`](../inst/examples/history-recovery/README.md).
+It supplies three synthetic checkpoints through real tool rounds, requires
+repeated automatic compaction, and compares identical prepared contexts with
+and without scoped retrieval. `test-history-recovery-example.R` exercises its
+paired runner and failure paths with released ellmer wire fixtures. The new
+tool-evidence regression also verifies that the summary request contains tool
+results without their private display metadata.
+
+Deterministic scores establish the experiment's wiring, not model quality.
+#112 remains open for authorized live repeated trials and an evidence-based
+decision. The initial catalogue is repetitive synthetic padding; supplement it
+with diverse or consented trajectories, actual completed effects and changed
+constraints before making a production claim. The live runner requires explicit
+opt-in, preserves recoverable partial results, and documents observed-cost
+limitations. No recursive implementation is justified by the fixture tests.
+
+The optional `changed-constraint` scenario now supplies a later host amendment
+and retains it by source ID and revision. Its deterministic producer checks
+paired contexts, retrieval of the amendment, and rejection of the superseded
+eligibility answer. Actual completed effects and more diverse trajectories
+remain follow-up work; the export receipt in both scenarios is synthetic.
+
 Evaluate these strategies on the same host-owned trajectories and probes:
 
 1. Current cumulative summary plus recent context.
@@ -70,8 +93,9 @@ accuracy and latency distributions, not one successful answer. Luna is a
 candidate helper model to measure, not an assumed quality-equivalent substitute.
 
 Do not add a second conversation database to run this comparison. Use an
-explicit caller-owned history fixture first. Production persistence follows
-ADR-0003 and the public shinychat history contract tracked in #66. Removed
+explicit caller-owned history fixture first. Continue implementation against
+host-supplied history under ADR-0003; the optional shinychat adapter tracked in
+#66 can follow when its public R contract is released. Removed
 turns remain unrecoverable through the current Deputy session snapshot unless
 the host retained them independently. Schema changes can target the current
 pre-CRAN format directly.
