@@ -1,8 +1,12 @@
 # Model dispatch governance. ellmer owns provider IO and transport retries.
 
-normalize_fallback_chats <- function(chats, primary) {
+normalize_fallback_chats <- function(
+  chats,
+  primary,
+  argument = "fallback_chats"
+) {
   if (!is.list(chats)) {
-    abort_deputy("{.arg fallback_chats} must be a list of Chats")
+    abort_deputy("{.arg {argument}} must be a list of Chats")
   }
   for (chat in chats) {
     validate_chat(chat)
@@ -29,7 +33,16 @@ install_request_callbacks <- function(agent) {
     return(invisible(NULL))
   }
   callbacks <- list(
-    on_request_start = function(turns) begin_model_request(agent),
+    on_request_start = function(turns) {
+      coro::async(function() {
+        # All tool results have settled; ellmer has not dispatched this round.
+        if (private$current_run_state$task_requests > 0L) {
+          pending <- utils::tail(turns, 1L)[[1L]]
+          coro::await(private$maybe_auto_compact(messages = pending@contents))
+        }
+        begin_model_request(agent)
+      })()
+    },
     on_request_end = function(turn) end_model_request(agent, turn)
   )
   attr(chat, "deputy_request_callbacks") <- lapply(
@@ -105,6 +118,7 @@ begin_model_request <- function(agent) {
   }
   private$current_outer_requests <- private$current_outer_requests + 1L
   state$request_number <- state$request_number + 1L
+  state$task_requests <- state$task_requests + 1L
   state$request_turns_before <- length(private$.chat$get_turns())
   state$model_failure <- NULL
   private$record_run_event(private$agent_event(

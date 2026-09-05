@@ -16,8 +16,9 @@ UsageLimits(
 }
 \arguments{
 \item{max_requests}{Maximum governed model dispatches, including failed
-calls, structured extraction, and corrections. Retries inside ellmer's
-HTTP transport are not separately observable. \code{NULL} leaves the field unset.}
+calls, automatic compaction, structured extraction, and corrections. Retries
+inside ellmer's HTTP transport are not separately observable. \code{NULL} leaves
+the field unset.}
 
 \item{max_tool_calls}{Maximum requested tool calls. Rejected calls count
 toward usage. \code{NULL} leaves the field unset.}

@@ -29,6 +29,7 @@ deputy/
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
+│   ├── compaction-run.R    # Governed asynchronous summary attempts and recovery
 │   ├── agent-definition-files.R # Portable YAML AgentDefinitions
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
 │   ├── run-usage.R         # Run accounting and fail-closed limits
@@ -276,6 +277,14 @@ observed-limit semantics, and the boundary with future background agents.
 
 Tests use httpuv (Suggests) in a separate local R process for a real ellmer
 streaming fixture; no external API or credentials are required.
+
+Automatic compaction runs after SessionStart/UserPromptSubmit and between tool
+rounds at ellmer's request-start boundary. Its isolated summary streams share
+the run's budget and cancellation controller. ContextPolicy's explicit summary
+fallback Chats never select the task provider or inherit executable tools and
+callbacks. Installing a compacted window preserves prior usage and completed
+tool effects. Manual `compact()` remains synchronous. Evaluation cases and the
+future history-retrieval comparison are described in `dev/compaction-evaluation.md`.
 
 ### Permission Modes
 

@@ -306,16 +306,6 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           )
         }
 
-        compaction <- agent$.__enclos_env__$private$maybe_auto_compact(
-          messages,
-          limits = run_limits,
-          usage = AgentUsage()
-        )
-        compaction_usage <- AgentUsage()
-        if (!is.null(compaction)) {
-          compaction_usage <- compaction$usage
-        }
-
         on.exit(
           agent$.__enclos_env__$private$finish_callback_run(stream_state),
           add = TRUE
@@ -328,13 +318,24 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             run_limits,
             effective_run_context,
             controller,
-            stream_mode,
-            compaction_usage
+            stream_mode
           ),
           error = function(error) {
             stream_state$reason <- "error"
             record_run_failure(agent, "initialization", error)
             rlang::cnd_signal(error)
+          }
+        )
+        tryCatch(
+          coro::await(agent$.__enclos_env__$private$maybe_auto_compact(
+            messages
+          )),
+          error = function(error) {
+            if (!agent$.__enclos_env__$private$should_stop) {
+              stream_state$reason <- "error"
+              record_run_failure(agent, "compaction", error)
+              rlang::cnd_signal(error)
+            }
           }
         )
         active_run_id <- stream_state$active_run_id
@@ -402,10 +403,13 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             stream_state$reason <- "error"
             # Structured requests record dispatch errors before applying
             # validation; a rejected value is a separate run outcome.
-            if (is.null(structured)) {
+            if (is.null(structured) && is.null(stream_state$failure_phase)) {
               record_model_failure(agent, stream_error)
             }
-            if (try_chat_fallback(agent, stream_error)) {
+            if (
+              is.null(stream_state$failure_phase) &&
+                try_chat_fallback(agent, stream_error)
+            ) {
               stream <- tryCatch(
                 agent$.__enclos_env__$private$start_async_stream(
                   messages,
@@ -428,7 +432,8 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             stream_state$reason <- "error"
             record_run_failure(
               agent,
-              if (is.null(structured)) "stream" else "structured_output",
+              stream_state$failure_phase %||%
+                if (is.null(structured)) "stream" else "structured_output",
               stream_error
             )
             rlang::cnd_signal(stream_error)

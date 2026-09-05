@@ -7,11 +7,19 @@ clone_compaction_chat <- function(chat) {
 
   callback_names <- c(
     "callback_on_tool_request",
-    "callback_on_tool_result"
+    "callback_on_tool_result",
+    "callback_on_request_start",
+    "callback_on_request_end"
   )
   live_private <- chat$.__enclos_env__$private
   summary_private <- summary_chat$.__enclos_env__$private
 
+  callback_names <- Filter(
+    function(name) {
+      !is.null(summary_private[[name]]) || startsWith(name, "callback_on_tool")
+    },
+    callback_names
+  )
   for (callback_name in callback_names) {
     live_manager <- live_private[[callback_name]]
     summary_manager <- summary_private[[callback_name]]
@@ -236,64 +244,175 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       as.integer(max(minimum_keep, length(turns) - recent + 1L))
     },
 
-    maybe_auto_compact = function(messages, limits = NULL, usage = NULL) {
-      policy <- private$.context_policy
-      if (is.null(policy$max_tokens)) {
-        return(NULL)
-      }
+    maybe_auto_compact = function(messages) {
+      governed_compaction(self, messages)
+    },
+
+    prepare_compaction = function(
+      keep_last,
+      summary,
+      fallback,
+      automatic,
+      estimated_tokens
+    ) {
       turns <- private$.chat$get_turns()
-      if (length(turns) == 0L) {
-        return(NULL)
+      fallback <- match.arg(fallback, c("error", "text"))
+
+      if (is.null(keep_last)) {
+        max_tokens <- self$context_policy$max_tokens
+        keep_last <- if (is.null(max_tokens)) {
+          min(4L, length(turns))
+        } else {
+          private$compaction_keep_last(
+            messages = list(),
+            target_tokens = floor(
+              max_tokens * self$context_policy$compact_to
+            )
+          )
+        }
+      }
+      keep_last <- validate_usage_limit(keep_last, "keep_last", integer = TRUE)
+      if (is.null(keep_last)) {
+        keep_last <- 0L
       }
 
-      if (is.null(limits) && isTRUE(private$run_active)) {
-        limits <- private$current_usage_limits
-      }
-      if (!is.null(limits)) {
-        if (is.null(usage)) {
-          usage <- if (isTRUE(private$run_active)) {
-            private$current_run_usage()
-          } else {
-            AgentUsage()
-          }
-        }
-        limit_status <- usage_limit_status(
-          usage,
-          limits,
-          require_followup = TRUE
+      if (length(turns) <= keep_last) {
+        result <- new_compaction_result(
+          method = "none",
+          automatic = automatic,
+          turns_compacted = 0L,
+          turns_kept = length(turns),
+          estimated_tokens = estimated_tokens
         )
-        if (!is.null(limit_status)) {
-          if (isTRUE(private$run_active)) {
-            private$mark_usage_limit(limit_status)
-          }
-          return(NULL)
+        private$.last_compaction <- result
+        return(list(result = result))
+      }
+
+      # Determine which turns to compact
+      compact_count <- length(turns) - keep_last
+      turns_to_compact <- turns[1:compact_count]
+      turns_to_keep <- if (keep_last == 0L) {
+        list()
+      } else {
+        tail(turns, keep_last)
+      }
+
+      # Fire PreCompact hook
+      hook_result <- private$fire_hook(
+        "PreCompact",
+        turns_to_compact = turns_to_compact,
+        turns_to_keep = turns_to_keep,
+        context = private$hook_context(
+          total_turns = length(turns),
+          compact_count = compact_count
+        )
+      )
+
+      # Check if hook wants to cancel compaction
+      if (!is.null(hook_result) && isFALSE(hook_result$continue)) {
+        result <- new_compaction_result(
+          method = "cancelled",
+          automatic = automatic,
+          turns_compacted = 0L,
+          turns_kept = length(turns),
+          estimated_tokens = estimated_tokens
+        )
+        private$.last_compaction <- result
+        return(list(result = result))
+      }
+
+      list(
+        turns = turns,
+        turns_to_compact = turns_to_compact,
+        turns_to_keep = turns_to_keep,
+        summary = summary %||% hook_result$summary,
+        method = if (!is.null(summary)) "custom" else "hook",
+        automatic = automatic,
+        estimated_tokens = estimated_tokens
+      )
+    },
+
+    install_compaction = function(
+      plan,
+      summary,
+      method,
+      summary_usage,
+      attempts = list()
+    ) {
+      summary <- paste(as.character(summary), collapse = "\n")
+      current_system <- private$system_prompt_without_compaction()
+      new_system <- paste0(
+        current_system,
+        private$compaction_prompt_block(summary)
+      )
+
+      usage <- if (isTRUE(private$run_active)) private$current_run_usage()
+      old_prompt <- private$.chat$get_system_prompt()
+      tryCatch(
+        {
+          private$.chat$set_system_prompt(new_system)
+          private$.chat$set_turns(plan$turns_to_keep)
+        },
+        error = function(error) {
+          private$.chat$set_system_prompt(old_prompt)
+          private$.chat$set_turns(plan$turns)
+          rlang::cnd_signal(error)
+        }
+      )
+      private$.compaction_summary <- summary
+      if (!is.null(usage)) {
+        # Preserve run usage when old provider turns leave the active window.
+        # Tool counts remain in their existing authoritative runtime fields.
+        usage$tool_calls <- usage$tool_calls - private$current_tool_calls
+        private$current_external_usage <- usage
+        private$current_outer_requests <- 0L
+        private$current_usage_baseline <- agent_usage_snapshot(private$.chat)
+        state <- private$current_run_state
+        state$turns_before <- max(
+          0L,
+          state$turns_before - length(plan$turns_to_compact)
+        )
+        if (!isTRUE(state$response_seen) && private$current_tool_calls == 0L) {
+          state$dispatch_turns <- private$.chat$get_turns()
+          state$request_turns_before <- length(state$dispatch_turns)
         }
       }
 
-      estimated <- private$context_token_count(messages)
-      if (is.null(estimated) || estimated <= policy$max_tokens) {
-        return(NULL)
-      }
-
-      keep_last <- private$compaction_keep_last(
-        messages = messages,
-        target_tokens = floor(policy$max_tokens * policy$compact_to)
+      result <- new_compaction_result(
+        method = method,
+        automatic = plan$automatic,
+        turns_compacted = length(plan$turns_to_compact),
+        turns_kept = length(plan$turns_to_keep),
+        estimated_tokens = plan$estimated_tokens,
+        usage = summary_usage,
+        attempts = attempts,
+        run_id = private$current_run_id,
+        summary = summary
       )
-      result <- self$compact(
-        keep_last = keep_last,
-        fallback = policy$fallback,
-        automatic = TRUE,
-        estimated_tokens = estimated
+      private$.last_compaction <- result
+      private$record_run_event(private$agent_event(
+        "compaction",
+        method = method,
+        automatic = plan$automatic,
+        turns_compacted = length(plan$turns_to_compact),
+        turns_kept = length(plan$turns_to_keep),
+        usage = summary_usage,
+        attempts = attempts
+      ))
+      private$fire_hook(
+        "PostCompact",
+        result = result,
+        context = private$hook_context(
+          total_turns = length(plan$turns),
+          compact_count = length(plan$turns_to_compact),
+          automatic = isTRUE(plan$automatic)
+        )
       )
-      if (isTRUE(private$run_active)) {
-        private$add_external_usage(result$usage)
-      }
       result
     },
 
     # Generate a summary of turns using the LLM
-    generate_compaction_summary = function(turns, fallback = "error") {
-      fallback <- match.arg(fallback, c("error", "text"))
+    compaction_summary_prompt = function(turns) {
       # Format turns for compaction
       turn_texts <- vapply(
         turns,
@@ -352,7 +471,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       }
 
       # Create the compaction prompt
-      compaction_prompt <- paste0(
+      paste0(
         "Summarize the following conversation excerpt concisely. ",
         "Focus on:\n",
         "1. Key decisions made\n",
@@ -368,7 +487,11 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         "\n---\n\n",
         "Summary:"
       )
+    },
 
+    generate_compaction_summary = function(turns, fallback = "error") {
+      fallback <- match.arg(fallback, c("error", "text"))
+      compaction_prompt <- private$compaction_summary_prompt(turns)
       temp_chat <- tryCatch(
         clone_compaction_chat(private$.chat),
         error = function(e) e

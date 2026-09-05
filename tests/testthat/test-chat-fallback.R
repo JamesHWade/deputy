@@ -285,7 +285,7 @@ test_that("request-end callback errors are run failures regardless of callback o
   }
 })
 
-test_that("pre-run compaction retains its explicit summary failure policy", {
+test_that("automatic compaction uses its own summary failure policy", {
   withr::local_options(ellmer_max_tries = 1)
   source <- local_runtime_server(list(runtime_failure()))
   backup <- local_runtime_server(list(runtime_reply("unexpected")))
@@ -311,7 +311,9 @@ test_that("pre-run compaction retains its explicit summary failure policy", {
   expect_length(backup$requests(), 0L)
   expect_identical(agent$get_turns(), turns)
   expect_identical(agent$get_model(), "primary")
-  expect_null(agent$last_run())
+  expect_identical(agent$last_run()$stop_reason, "error")
+  expect_identical(agent$last_run()$usage$requests, 1L)
+  expect_identical(runtime_events(agent, "run_error")[[1L]]$phase, "compaction")
 })
 
 test_that("HTTP failures in application callbacks do not become model failures", {

@@ -1,5 +1,13 @@
 # deputy (development version)
 
+* `ContextPolicy()` governs automatic compaction under the active run's identity,
+  shared usage limits, and cancellation controller. Explicit
+  `summary_fallback_chats` recover transient summary failures independently of
+  task fallback. Summary attempts remain inspectable, accepted summaries survive
+  task fallback, and interrupted or failed compaction preserves the active
+  context. Between-round compaction preserves completed tool effects and usage
+  (#111).
+
 * Split runtime, permission, checkpoint, and built-in tool support into cohesive
   modules, with tests grouped by behavior. Public class interfaces and session
   formats are unchanged by the mechanical extraction.
