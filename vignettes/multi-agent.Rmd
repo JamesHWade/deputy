@@ -260,7 +260,7 @@ hook_monitor <- HookMatcher$new(
   event = "SubagentStop",
   callback = function(agent_name, task, result, context) {
     cli::cli_alert_info("Sub-agent {agent_name} finished")
-    cli::cli_alert("Requests: {result$usage$requests}")
+    cli::cli_alert("Status: {context$status}")
     NULL
   }
 )
