@@ -562,6 +562,50 @@ test_that("host edits during an asynchronous summary reject stale replacement", 
   }
 })
 
+test_that("host history replacement preserves accrued task and summary usage", {
+  reply <- runtime_reply("Stale summary")
+  attr(reply, "fixture_delay") <- 0.2
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "export_findings"),
+    reply
+  ))
+  chat <- runtime_compaction_chat(server, name = "OpenAI")
+  chat$token_count <- function(...) if (length(server$requests())) 1000 else 10
+  tool <- ellmer::tool(
+    function() "export-0042",
+    name = "export_findings",
+    description = "Export"
+  )
+  agent <- Agent$new(
+    chat,
+    tools = list(tool),
+    permissions = permissions_full(),
+    context_policy = ContextPolicy(max_tokens = 50)
+  )
+  replacement <- list(ellmer::UserTurn("Host reset"))
+  deadline <- Sys.time() + 5
+  edit_host <- function() {
+    if (length(server$requests()) >= 2L) {
+      agent$set_turns(replacement)
+    } else if (Sys.time() < deadline) {
+      later::later(edit_host, 0.01)
+    }
+  }
+  timer <- later::later(edit_host, 0.01)
+  withr::defer(timer())
+  error <- tryCatch(agent$run_sync("Export"), error = identity)
+
+  expect_s3_class(error, "deputy_compaction_conflict")
+  expect_identical(agent$get_turns(), replacement)
+  expect_identical(agent$last_run()$usage$requests, 2L)
+  expect_identical(agent$last_run()$usage$tool_calls, 1L)
+  expect_equal(agent$last_run()$usage$total_tokens, 30)
+  expect_gt(agent$last_run()$usage$cost_usd, 0)
+  expect_length(runtime_events(agent, "request_end"), 2L)
+  expect_length(runtime_events(agent, "tool_end"), 1L)
+  expect_length(server$requests(), 2L)
+})
+
 test_that("text recovery preserves failed dispatch accounting without exposing a summary", {
   withr::local_options(ellmer_max_tries = 1)
   server <- local_runtime_server(list(

@@ -85,7 +85,7 @@ retain_pending_tool_results <- function(agent, request_turns) {
   }
   chat <- agent$.__enclos_env__$private$.chat
   current <- chat$get_turns()
-  previous <- head(request_turns, -1L)
+  previous <- utils::head(request_turns, -1L)
   # Compaction preserves the pending round. If a host deliberately replaced
   # that conversation while we awaited, do not append orphaned tool results.
   if (

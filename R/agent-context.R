@@ -379,12 +379,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       )
       private$.compaction_summary <- summary
       if (!is.null(usage)) {
-        # Preserve run usage when old provider turns leave the active window.
-        # Tool counts remain in their existing authoritative runtime fields.
-        usage$tool_calls <- usage$tool_calls - private$current_tool_calls
-        private$current_external_usage <- usage
-        private$current_outer_requests <- 0L
-        private$current_usage_baseline <- agent_usage_snapshot(private$.chat)
+        preserve_run_usage(self, usage)
         state <- private$current_run_state
         state$turns_before <- max(
           0L,

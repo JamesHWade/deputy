@@ -29,7 +29,7 @@ context_count_after_unpaired_result <- function(chat, messages) {
       }
       last <- tail(completed, 1L)
       users <- which(vapply(
-        head(turns, last - 1L),
+        utils::head(turns, last - 1L),
         inherits,
         logical(1),
         what = "ellmer::UserTurn"

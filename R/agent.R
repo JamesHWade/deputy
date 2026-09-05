@@ -605,11 +605,14 @@ Agent <- R6::R6Class(
       private$.chat$get_turns()
     },
 
-    #' @description Replace conversation turns, as in ellmer Chat.
+    #' @description Replace conversation turns, as in ellmer Chat. During a
+    #'   run, already accrued usage remains charged after history replacement.
     #' @param value A list of ellmer turns.
     #' @return Invisible self.
     set_turns = function(value) {
+      usage <- if (isTRUE(private$run_active)) private$current_run_usage()
       private$.chat$set_turns(value)
+      preserve_run_usage(self, usage)
       prompt <- private$.chat$get_system_prompt()
       prompt_without_compaction <- private$system_prompt_without_compaction()
       if (!identical(prompt, prompt_without_compaction)) {

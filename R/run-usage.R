@@ -442,6 +442,21 @@ agent_usage_add <- function(left, right) {
   )
 }
 
+# Call after replacing conversation turns, using usage captured before the
+# replacement. Run evidence survives mutable context; tool counts retain their
+# separate authoritative runtime counter.
+preserve_run_usage <- function(agent, usage) {
+  if (is.null(usage)) {
+    return(invisible(NULL))
+  }
+  private <- agent$.__enclos_env__$private
+  usage$tool_calls <- usage$tool_calls - private$current_tool_calls
+  private$current_external_usage <- usage
+  private$current_outer_requests <- 0L
+  private$current_usage_baseline <- agent_usage_snapshot(private$.chat)
+  invisible(NULL)
+}
+
 usage_limit_status <- function(usage, limits, require_followup = FALSE) {
   checks <- list(
     list(

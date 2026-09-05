@@ -656,7 +656,8 @@ emitted into model context.}
 \if{html}{\out{<a id="method-Agent-set_turns"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-set_turns}{}}}
 \subsection{\code{Agent$set_turns()}}{
-  Replace conversation turns, as in ellmer Chat.
+  Replace conversation turns, as in ellmer Chat. During a
+run, already accrued usage remains charged after history replacement.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_turns(value)}
