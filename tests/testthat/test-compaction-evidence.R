@@ -38,6 +38,43 @@ test_that("compaction includes tool evidence without private display metadata", 
   expect_no_match(prompt, "HOST-ONLY-SECRET", fixed = TRUE)
 })
 
+test_that("degraded text compaction retains bounded tool evidence", {
+  withr::local_options(ellmer_max_tries = 1)
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "source_read"),
+    runtime_reply("Source inspected."),
+    runtime_failure(401L)
+  ))
+  source <- ellmer::tool(
+    function() {
+      ellmer::ContentToolResult(
+        value = list(ellmer::ContentText(
+          "Document assay-C-r3: denominator 84, page 17."
+        )),
+        extra = list(private = "HOST-ONLY-SECRET")
+      )
+    },
+    name = "source_read",
+    description = "Read source evidence.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  agent <- Agent$new(runtime_chat(server), tools = list(source))
+  agent$run_sync("Inspect the source.")
+  result <- agent$compact(keep_last = 0L, fallback = "text")
+  expect_identical(result$method, "text")
+  expect_match(result$summary, "denominator 84, page 17", fixed = TRUE)
+  expect_no_match(result$summary, "HOST-ONLY-SECRET", fixed = TRUE)
+  expect_match(
+    agent$get_system_prompt(),
+    "denominator 84, page 17",
+    fixed = TRUE
+  )
+  expect_length(server$requests(), 3L)
+})
+
 test_that("compaction preserves documented non-string ellmer tool payloads", {
   for (value in list(
     ellmer::ContentText("Evidence: denominator 84, page 17."),

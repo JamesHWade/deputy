@@ -236,16 +236,25 @@ history_prepare <- function(
   requested <- integer()
   stages <- sort(unique(records$stage))
   expected_stage <- integer()
+  invalid_request <- FALSE
   agent <- deputy::Agent$new(
     chat,
     tools = list(ellmer::tool(
       function(stage) {
-        requested <<- c(requested, stage)
-        if (!identical(as.integer(stage), expected_stage)) {
+        valid <- is.numeric(stage) &&
+          length(stage) == 1L &&
+          !is.na(stage) &&
+          is.finite(stage) &&
+          length(expected_stage) == 1L &&
+          stage == expected_stage
+        if (!valid) {
+          invalid_request <<- TRUE
           ellmer::tool_reject(
             "This checkpoint is not authorized for the current preparation run."
           )
         }
+        stage <- as.integer(stage)
+        requested <<- c(requested, stage)
         if (anyDuplicated(requested)) {
           ellmer::tool_reject(
             "Each checkpoint may be loaded only once per trial."
@@ -307,6 +316,7 @@ history_prepare <- function(
   for (i in seq_along(prompts)) {
     expected_stage <- if (i <= length(stages)) stages[[i]] else integer()
     before <- length(requested)
+    invalid_request <- FALSE
     outcome <- budget$run(
       agent,
       prompts[[i]],
@@ -326,7 +336,7 @@ history_prepare <- function(
       )
     }
     current <- utils::tail(requested, length(requested) - before)
-    if (!identical(as.integer(current), expected_stage)) {
+    if (invalid_request || !identical(current, expected_stage)) {
       cli::cli_abort(
         "Preparation did not load exactly its assigned checkpoint; do not score this trial.",
         class = "history_evaluation_wrong_checkpoint"

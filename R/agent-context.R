@@ -453,6 +453,19 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       paste(format(content, show = "header"), text, sep = "\n")
     },
 
+    compaction_turn_text = function(turn) {
+      # `turn@text` intentionally omits tool content. Model and degraded text
+      # summaries use the same public evidence projection.
+      cli::ansi_strip(paste(
+        vapply(
+          turn@contents,
+          private$compaction_content_text,
+          character(1)
+        ),
+        collapse = "\n"
+      ))
+    },
+
     # Generate a summary of turns using the LLM
     compaction_summary_prompt = function(turns) {
       # Format turns for compaction
@@ -471,15 +484,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
             ))
             "Unknown"
           }
-          # `turn@text` intentionally omits tool content.
-          text <- cli::ansi_strip(paste(
-            vapply(
-              turn@contents,
-              private$compaction_content_text,
-              character(1)
-            ),
-            collapse = "\n"
-          ))
+          text <- private$compaction_turn_text(turn)
           paste0(role, ": ", text)
         },
         character(1)
@@ -582,7 +587,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
             ))
             "Unknown"
           }
-          text <- turn@text %||% "[no text]"
+          text <- private$compaction_turn_text(turn)
           if (nchar(text) > 200) {
             text <- paste0(substr(text, 1, 197), "...")
           }

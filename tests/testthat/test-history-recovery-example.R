@@ -371,3 +371,30 @@ test_that("a preparation run cannot consume future checkpoints", {
     fixed = TRUE
   )
 })
+
+test_that("fractional checkpoint arguments cannot masquerade as loaded sources", {
+  example <- history_example()
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "load_checkpoint", arguments = list(stage = 1.5)),
+    runtime_reply("Checkpoint acknowledged.")
+  ))
+  warnings <- character()
+  evaluation <- withCallingHandlers(
+    example$history_evaluate(
+      function(model) runtime_chat(server),
+      example$history_fixture(1L)
+    ),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_length(warnings, 1L)
+  expect_identical(
+    evaluation$failure$class,
+    "history_evaluation_wrong_checkpoint"
+  )
+  expect_length(evaluation$trials, 0L)
+  expect_length(evaluation$runs, 1L)
+  expect_length(server$requests(), 2L)
+})
