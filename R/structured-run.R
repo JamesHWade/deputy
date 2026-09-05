@@ -12,17 +12,17 @@ structured_run_spec <- function(
       !is.null(validate) ||
         !identical(max_corrections, 0L) && !identical(max_corrections, 0)
     ) {
-      cli_abort(
+      abort_deputy(
         "{.arg validate} and {.arg max_corrections} require {.arg type}"
       )
     }
     return(NULL)
   }
   if (!inherits(type, "ellmer::Type")) {
-    cli_abort("{.arg type} must be an ellmer type")
+    abort_deputy("{.arg type} must be an ellmer type")
   }
   if (!is.null(validate) && !is.function(validate)) {
-    cli_abort("{.arg validate} must be a function or NULL")
+    abort_deputy("{.arg validate} must be a function or NULL")
   }
   if (
     !is.numeric(max_corrections) ||
@@ -32,7 +32,7 @@ structured_run_spec <- function(
       max_corrections < 0 ||
       max_corrections != floor(max_corrections)
   ) {
-    cli_abort("{.arg max_corrections} must be a finite non-negative integer")
+    abort_deputy("{.arg max_corrections} must be a finite non-negative integer")
   }
   list(
     type = type,
@@ -75,9 +75,9 @@ governed_structured_request <- function(agent, messages, spec) {
       }
       if (
         !is.null(condition) &&
-          (is.null(turn) || fallback_transport_error(condition))
+          !structured_parse_failure(turn, condition)
       ) {
-        record_model_failure(agent, condition)
+        record_model_failure(agent, condition, structured = TRUE)
         rlang::cnd_signal(condition)
       }
       end_model_request(agent, turn)
@@ -132,4 +132,31 @@ governed_structured_request <- function(agent, messages, spec) {
       ))
     }
   })()
+}
+
+# ellmer owns parsing. Reproduce only its public ContentJson parse failure;
+# an arbitrary rejection after a recorded turn is not validation feedback.
+# Unclassified conversion or application errors remain terminal.
+structured_parse_failure <- function(turn, condition) {
+  if (!inherits(turn, "ellmer::AssistantTurn")) {
+    return(FALSE)
+  }
+  json <- Filter(function(x) inherits(x, "ellmer::ContentJson"), turn@contents)
+  if (!length(json)) {
+    return(FALSE)
+  }
+  # A failed S7 getter can leave its recursion guard on the original object.
+  # Use its public class constructor for a fresh value, preserving the turn.
+  constructor <- S7::S7_class(json[[1]])
+  fresh <- constructor(data = json[[1]]@data, string = json[[1]]@string)
+  failure <- tryCatch(
+    {
+      S7::prop(fresh, "parsed")
+      NULL
+    },
+    error = identity
+  )
+  inherits(failure, "error") &&
+    identical(class(failure), class(condition)) &&
+    identical(conditionMessage(failure), conditionMessage(condition))
 }

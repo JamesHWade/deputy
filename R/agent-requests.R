@@ -2,15 +2,17 @@
 
 normalize_fallback_chats <- function(chats, primary) {
   if (!is.list(chats)) {
-    cli_abort("{.arg fallback_chats} must be a list of Chats")
+    abort_deputy("{.arg fallback_chats} must be a list of Chats")
   }
   for (chat in chats) {
     validate_chat(chat)
     if (inherits(chat, "Agent") || identical(chat, primary)) {
-      cli_abort("Fallback templates must be independent ellmer Chats")
+      abort_deputy("Fallback templates must be independent ellmer Chats")
     }
     if (length(chat$get_turns()) || length(chat$get_tools())) {
-      cli_abort("Fallback templates must have no conversation turns or tools")
+      abort_deputy(
+        "Fallback templates must have no conversation turns or tools"
+      )
     }
   }
   # The caller can keep and change their templates without changing our policy.
@@ -76,7 +78,7 @@ clone_governed_chat <- function(chat) {
     chat$clone()
   }
   if (identical(cloned, chat)) {
-    cli_abort("Chat cloning must return an independent instance")
+    abort_deputy("Chat cloning must return an independent instance")
   }
   cloned
 }
@@ -103,6 +105,8 @@ begin_model_request <- function(agent) {
   }
   private$current_outer_requests <- private$current_outer_requests + 1L
   state$request_number <- state$request_number + 1L
+  state$request_turns_before <- length(private$.chat$get_turns())
+  state$model_failure <- NULL
   private$record_run_event(private$agent_event(
     "request_start",
     request_number = state$request_number,
@@ -130,13 +134,31 @@ end_model_request <- function(agent, turn) {
   invisible(NULL)
 }
 
-record_model_failure <- function(agent, condition) {
-  # A stream rejection can come from application callbacks or conversion.
-  # Only httr2's public HTTP/transport conditions establish request failure.
+record_model_failure <- function(agent, condition, structured = FALSE) {
+  # Callback code can make HTTP requests too. In ordinary streams ellmer
+  # records an AssistantPartialTurn after start callbacks and before IO, then
+  # finalizes it before end callbacks. Require that public dispatch evidence.
+  private <- agent$.__enclos_env__$private
+  state <- private$current_run_state
+  state$model_failure <- NULL
   if (!inherits(condition, c("httr2_failure", "httr2_http"))) {
     return(invisible(FALSE))
   }
-  private <- agent$.__enclos_env__$private
+  if (isTRUE(private$current_stream_controller$cancelled)) {
+    return(invisible(FALSE))
+  }
+  turns <- private$.chat$get_turns()
+  turn <- if (length(turns) > state$request_turns_before) {
+    utils::tail(turns, 1L)[[1]]
+  }
+  partial <- inherits(turn, "ellmer::AssistantPartialTurn")
+  # Structured value requests bypass request callbacks in ellmer 0.5.0 and
+  # append their turn only after a response. A completed turn rules out IO
+  # failure here too; preserve any subsequent application error as run_error.
+  if ((!structured && !partial) || (structured && !is.null(turn) && !partial)) {
+    return(invisible(FALSE))
+  }
+  state$model_failure <- condition
   private$record_run_event(private$agent_event(
     "request_error",
     request_number = private$current_run_state$request_number,
@@ -167,6 +189,7 @@ try_chat_fallback <- function(agent, condition) {
     isTRUE(private$should_stop) ||
       isTRUE(state$response_seen) ||
       private$current_tool_calls > 0L ||
+      !identical(state$model_failure, condition) ||
       !fallback_transport_error(condition) ||
       state$fallback_index >= length(private$.fallback_chats)
   ) {

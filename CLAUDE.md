@@ -354,7 +354,8 @@ the AgentDefinition supplies the child's executable registry.
 ## Dependencies
 
 **Core** (in Imports):
-- `ellmer` (>= 0.3.0) - LLM abstraction layer
+- `ellmer` (>= 0.5.0) - LLM abstraction layer
+- `S7` - Public type and content property access
 - `R6` - Object-oriented programming
 - `cli` - CLI formatting
 - `rlang` - Language utilities

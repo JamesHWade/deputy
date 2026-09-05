@@ -84,9 +84,13 @@ data <- agent$chat_structured(
 )
 ```
 
-An exhausted correction policy signals `deputy_structured_output_invalid`.
-An exception or `NA` from the validator is terminal. Provider failures are not
-application corrections. Incomplete responses rejected by ellmer before a turn
+Corrections cover failed application validation and JSON parsing failures
+confirmed through ellmer's recorded `ContentJson`. Unclassified conversion
+errors and application callback errors are terminal, preserving their original
+conditions. An exhausted correction policy signals
+`deputy_structured_output_invalid`. An exception or `NA` from the validator is
+terminal. Provider failures are not application corrections.
+Incomplete responses rejected by ellmer before a turn
 can be recorded are terminal; the caller must change the token/context policy.
 Cancellation is cooperative: an in-flight structured request can finish, but no
 correction starts after cancellation. With `on_exceed = "stop"`, a budget stop

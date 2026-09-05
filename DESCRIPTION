@@ -52,6 +52,7 @@ Imports:
     R6,
     Rapp (>= 0.4.0),
     rlang,
+    S7,
     utils
 Config/roxygen2/version: 8.1.0
 Collate:

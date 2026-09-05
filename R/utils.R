@@ -552,7 +552,7 @@ truncate_string <- function(x, max_length = 100, suffix = "...") {
 #' @noRd
 validate_chat <- function(x, arg_name = "chat") {
   if (!inherits(x, "Chat")) {
-    cli_abort(c(
+    abort_deputy(c(
       "Invalid {.arg {arg_name}} argument",
       "x" = "Expected an ellmer Chat object",
       "i" = "Create one with {.fn ellmer::chat} or provider-specific functions like {.fn ellmer::chat_openai}"

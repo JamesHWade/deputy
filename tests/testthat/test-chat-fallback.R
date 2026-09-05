@@ -313,3 +313,79 @@ test_that("pre-run compaction retains its explicit summary failure policy", {
   expect_identical(agent$get_model(), "primary")
   expect_null(agent$last_run())
 })
+
+test_that("HTTP failures in application callbacks do not become model failures", {
+  for (phase in c("start", "end")) {
+    for (order in c("before", "after")) {
+      server <- local_runtime_server(list(runtime_reply("response received")))
+      service <- local_runtime_server(list(runtime_failure()))
+      backup <- local_runtime_server(list(runtime_reply("unexpected")))
+      chat <- runtime_chat(server, "primary")
+      callback <- function(turns = NULL, turn = NULL) {
+        httr2::request(service$url) |>
+          httr2::req_body_json(list(operation = "application callback")) |>
+          httr2::req_perform()
+      }
+      register <- chat[[paste0("on_request_", phase)]]
+      if (order == "before") {
+        register(callback)
+      }
+      agent <- Agent$new(chat, fallback_chats = list(runtime_chat(backup)))
+      if (order == "after") {
+        agent$add_hook(HookMatcher$new(
+          "SessionStart",
+          function(...) {
+            register(callback)
+            NULL
+          },
+          timeout = 0
+        ))
+      }
+      expect_error(agent$run_sync("task"), class = "httr2_http_503")
+      expect_length(service$requests(), 1L)
+      expect_length(server$requests(), if (phase == "start") 0L else 1L)
+      expect_length(backup$requests(), 0L)
+      expect_length(runtime_events(agent, "request_error"), 0L)
+      expect_length(runtime_events(agent, "fallback"), 0L)
+      expect_s3_class(
+        runtime_events(agent, "run_error")[[1]]$condition,
+        "httr2_http_503"
+      )
+      expect_identical(agent$get_model(), "primary")
+      expect_identical(agent$last_run()$stop_reason, "error")
+    }
+  }
+})
+
+test_that("fallback argument errors support Deputy class handlers", {
+  chat <- create_mock_chat()
+  expect_error(Agent$new(chat, fallback_chats = TRUE), class = "deputy_error")
+  expect_error(
+    Agent$new(chat, fallback_chats = list(TRUE)),
+    class = "deputy_error"
+  )
+  expect_error(
+    Agent$new(chat, fallback_chats = list(chat)),
+    class = "deputy_error"
+  )
+})
+
+test_that("a real connection failure retains dispatch evidence for fallback", {
+  withr::local_options(ellmer_max_tries = 1)
+  backup <- local_runtime_server(list(runtime_reply("recovered")))
+  unavailable <- list(
+    url = paste0("http://127.0.0.1:", httpuv::randomPort(), "/v1")
+  )
+  agent <- Agent$new(
+    runtime_chat(unavailable, "primary"),
+    fallback_chats = list(runtime_chat(backup, "backup"))
+  )
+  expect_identical(trimws(agent$run_sync("task")$response), "recovered")
+  expect_length(runtime_events(agent, "request_error"), 1L)
+  expect_s3_class(
+    runtime_events(agent, "request_error")[[1]]$condition,
+    "httr2_failure"
+  )
+  expect_length(runtime_events(agent, "fallback"), 1L)
+  expect_identical(agent$last_run()$usage$requests, 2L)
+})

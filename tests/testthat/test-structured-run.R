@@ -349,3 +349,64 @@ test_that("recovered structured dispatch errors do not become run failures", {
   expect_identical(agent$last_run()$usage$requests, 2L)
   expect_identical(agent$last_run()$stop_reason, "complete")
 })
+
+test_that("post-response structured application errors are terminal", {
+  for (mode in c("direct", "extraction")) {
+    responses <- list(runtime_reply('{"count":1}', stream = FALSE))
+    if (mode == "extraction") {
+      responses <- c(list(runtime_reply("task complete")), responses)
+    }
+    server <- local_runtime_server(responses)
+    backup <- local_runtime_server(list(runtime_reply("unexpected")))
+    chat <- runtime_chat(server)
+    original <- chat$chat_structured_async
+    # ellmer 0.5.0 bypasses request callbacks for structured values. Compose
+    # a post-response application callback with its real public producer.
+    failure <- rlang::error_cnd(
+      "fixture_callback_error",
+      message = "callback failed"
+    )
+    rlang::env_binding_unlock(chat, "chat_structured_async")
+    chat$chat_structured_async <- function(...) {
+      promises::then(original(...), function(value) rlang::cnd_signal(failure))
+    }
+    agent <- Agent$new(chat, fallback_chats = list(runtime_chat(backup)))
+    run <- if (mode == "direct") agent$chat_structured else agent$run_sync
+    caught <- expect_error(
+      run(
+        "task",
+        type = ellmer::type_object(count = ellmer::type_integer()),
+        max_corrections = 3
+      ),
+      class = "fixture_callback_error"
+    )
+    expect_length(server$requests(), length(responses))
+    expect_length(backup$requests(), 0L)
+    expect_length(runtime_events(agent, "structured_attempt"), 0L)
+    expect_length(runtime_events(agent, "request_error"), 0L)
+    expect_identical(runtime_events(agent, "run_error")[[1]]$condition, caught)
+    expect_identical(agent$last_run()$stop_reason, "error")
+    expect_null(agent$last_run()$structured_output)
+  }
+})
+
+test_that("structured argument errors support Deputy class handlers", {
+  agent <- Agent$new(create_mock_chat())
+  expect_error(
+    agent$run_sync("task", validate = identity),
+    class = "deputy_error"
+  )
+  expect_error(
+    agent$chat_structured("task", type = TRUE),
+    class = "deputy_error"
+  )
+  type <- ellmer::type_object(count = ellmer::type_integer())
+  expect_error(
+    agent$chat_structured("task", type = type, validate = TRUE),
+    class = "deputy_error"
+  )
+  expect_error(
+    agent$chat_structured("task", type = type, max_corrections = Inf),
+    class = "deputy_error"
+  )
+})

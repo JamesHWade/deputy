@@ -55,8 +55,11 @@ selected provider and do not implicitly gain additional destinations.
 
 `request_start`, `request_end`, `request_error`, and `fallback` events retain
 model selection and original conditions with run IDs. These local events may
-contain provider error details. `request_error` is reserved for recognized
-httr2 HTTP/transport conditions. Application callback and validation failures
+contain provider error details. `request_error` requires a recognized httr2
+HTTP/transport condition and evidence that the Chat reached model dispatch.
+Streaming requests use ellmer's recorded partial turn to distinguish dispatch
+from request callbacks. Ambiguous failures do not select another provider.
+Application callback and validation failures
 retain any observed `request_end` and a separate `run_error` with the original
 condition. Failed dispatches count toward
 `max_requests`.

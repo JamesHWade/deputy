@@ -53,6 +53,8 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           class = c("deputy_run_active", "deputy_error")
         )
       }
+      force(structured)
+      force(extraction)
       limits <- normalize_usage_limits(limits)
       state <- private$new_callback_run_state()
       governed <- private$callback_run_stream(
