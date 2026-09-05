@@ -355,6 +355,7 @@ test_that("aborted compaction removes only provisional evidence files", {
       runtime_reply(tool = "source_read"),
       runtime_reply("Source inspected."),
       failure,
+      runtime_reply("Fresh context."),
       runtime_reply("Evidence summarized.", stream = FALSE)
     ))
     value <- strrep("recoverable evidence ", 500L)
@@ -386,6 +387,7 @@ test_that("aborted compaction removes only provisional evidence files", {
       log_tokens = FALSE
     )
     before <- agent$get_turns()
+    tools_before <- names(agent$get_tools())
     # An unrelated envelope already owned by this session must survive rollback.
     existing <- offload_tool_result(
       "Previously accepted evidence",
@@ -424,6 +426,7 @@ test_that("aborted compaction removes only provisional evidence files", {
       }
     }
     expect_identical(agent$get_turns(), before)
+    expect_identical(names(agent$get_tools()), tools_before)
     expect_identical(sort(list.files(dirname(existing$path))), files_before)
     snapshot <- tempfile(fileext = ".rds")
     withr::defer(unlink(snapshot))
@@ -447,11 +450,18 @@ test_that("aborted compaction removes only provisional evidence files", {
       agent$resolve_tool_result(existing$uri),
       "Previously accepted evidence"
     )
+    fresh <- agent$clone()
+    fresh$set_turns(list())
+    fresh$set_tools(list())
+    expect_length(fresh$get_tools(), 0L)
+    fresh$run_sync("Start fresh.")
+    expect_null(tail(server$requests(), 1L)[[1L]]$body$tools)
     # The unchanged original turns can subsequently produce a durable summary.
     result <- agent$compact(keep_last = 0L)
     reference <- compaction_tool_result_references(result$summary)
     expect_length(reference, 1L)
     expect_identical(agent$resolve_tool_result(reference), value)
+    expect_true("deputy_read_tool_result" %in% names(agent$get_tools()))
   }
   for (mode in c("manual", "automatic", "cancel")) {
     check_case(mode)

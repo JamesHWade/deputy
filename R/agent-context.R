@@ -624,6 +624,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       }
       summary <- paste(as.character(summary), collapse = "\n")
       catalogs <- character()
+      needs_reader <- FALSE
       if (method %in% c("llm", "text")) {
         # The summary provider may omit every reference. Preserve the handles
         # from both newly compacted evidence and the prior accepted summary.
@@ -644,7 +645,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           )
           catalogs <- handles$catalogs
           private$track_compaction_artifact(handles$record)
-          private$ensure_tool_result_reader()
+          needs_reader <- TRUE
           summary <- trimws(gsub(
             compaction_tool_result_reference_pattern,
             "",
@@ -684,14 +685,21 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
 
       usage <- if (isTRUE(private$run_active)) private$current_run_usage()
       old_prompt <- private$.chat$get_system_prompt()
+      old_tools <- if (needs_reader) private$.chat$get_tools()
+      had_reader <- private$.tool_result_reader_registered
       tryCatch(
         {
           private$.chat$set_system_prompt(new_system)
           private$.chat$set_turns(plan$turns_to_keep)
+          if (needs_reader) private$ensure_tool_result_reader()
         },
         error = function(error) {
           private$.chat$set_system_prompt(old_prompt)
           private$.chat$set_turns(plan$turns)
+          if (needs_reader) {
+            private$.chat$set_tools(old_tools)
+            private$.tool_result_reader_registered <- had_reader
+          }
           retire_catalogs(old_prompt, plan$turns)
           rlang::cnd_signal(error)
         }
@@ -805,7 +813,6 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       )
       if (!is.null(record)) {
         private$track_compaction_artifact(record)
-        private$ensure_tool_result_reader()
         return(paste(
           header,
           tool_result_reference_text(record),
