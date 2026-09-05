@@ -67,20 +67,20 @@ history_budget <- function(
   max_requests = 100L,
   cancelled = function() FALSE
 ) {
-  if (
-    !is.null(max_cost_usd) &&
-      (length(max_cost_usd) != 1L ||
-        is.na(max_cost_usd) ||
-        !is.finite(max_cost_usd) ||
-        max_cost_usd <= 0)
-  ) {
+  limits <- deputy::UsageLimits(
+    max_requests = max_requests,
+    max_cost_usd = max_cost_usd
+  )
+  max_requests <- limits$max_requests
+  max_cost_usd <- limits$max_cost_usd
+  if (is.null(max_requests) || max_requests == 0L) {
+    cli::cli_abort(
+      "The evaluation request limit must be a positive whole number."
+    )
+  }
+  if (!is.null(max_cost_usd) && max_cost_usd == 0) {
     cli::cli_abort("The evaluation cost limit must be positive and finite.")
   }
-  stopifnot(
-    length(max_requests) == 1L,
-    is.finite(max_requests),
-    max_requests > 0L
-  )
   state <- new.env(parent = emptyenv())
   state$requests <- 0L
   state$cost <- 0

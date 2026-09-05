@@ -398,3 +398,26 @@ test_that("fractional checkpoint arguments cannot masquerade as loaded sources",
   expect_length(evaluation$runs, 1L)
   expect_length(server$requests(), 2L)
 })
+
+test_that("invalid experiment limits fail before creating a model client", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  calls <- 0L
+  factory <- function(model) {
+    calls <<- calls + 1L
+    rlang::abort("The provider factory must not be called for invalid limits.")
+  }
+  for (limit in list(1.5, "2", NA_real_, Inf, TRUE, NULL, 0L)) {
+    expect_condition(
+      example$history_evaluate(factory, fixture, max_requests = limit),
+      class = "rlang_error"
+    )
+  }
+  for (limit in list("2", NA_real_, Inf, TRUE, 0)) {
+    expect_condition(
+      example$history_evaluate(factory, fixture, max_cost_usd = limit),
+      class = "rlang_error"
+    )
+  }
+  expect_identical(calls, 0L)
+})
