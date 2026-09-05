@@ -36,7 +36,9 @@ install.packages("deputy")
 
 You also need credentials for one
 [ellmer provider](https://ellmer.tidyverse.org/reference/index.html). The
-examples use OpenAI, but the Deputy API is provider-independent.
+examples use OpenAI's `gpt-5.6-luna` with `OPENAI_API_KEY`, but the Deputy API is
+provider-independent. To use a larger GPT-5.6 model, select `gpt-5.6-terra` or
+`gpt-5.6-sol` explicitly when creating the Chat. The `gpt-5.6` alias selects Sol.
 
 ## 1. Define the workspace and limits
 
@@ -77,7 +79,7 @@ This chunk makes a provider request, so it is displayed but not run while the
 vignette is built.
 
 ```{r first-agent, eval = FALSE}
-chat <- ellmer::chat("openai")
+chat <- ellmer::chat("openai/gpt-5.6-luna")
 
 agent <- Agent$new(
   chat = chat,

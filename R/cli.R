@@ -147,11 +147,7 @@ cli_create_chat <- function(provider, model) {
     } else {
       ellmer::chat_anthropic(model = model)
     },
-    openai = if (is.null(model)) {
-      ellmer::chat_openai()
-    } else {
-      ellmer::chat_openai(model = model)
-    },
+    openai = ellmer::chat_openai(model = model %||% "gpt-5.6-luna"),
     google = if (is.null(model)) {
       ellmer::chat_google_gemini()
     } else {
@@ -616,7 +612,7 @@ deputy_cli_main <- function(config) {
     }
   )
   if (debug_enabled) {
-    model <- config$model %||% "<default>"
+    model <- chat$get_model()
     debug_log(
       "Chat initialized for provider=",
       config$provider,

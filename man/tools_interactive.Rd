@@ -30,7 +30,7 @@ hosts so each Agent receives its own handler.
 agent_id <- "agent-review"
 session_id <- "session-review"
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = c(
     tools_file(),
     tools_interactive(

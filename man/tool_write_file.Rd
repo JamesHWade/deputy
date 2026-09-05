@@ -26,7 +26,7 @@ A tool that writes content to a file, creating it if it doesn't exist.
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = list(tool_write_file)
 )
 }

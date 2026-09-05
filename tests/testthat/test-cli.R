@@ -121,6 +121,32 @@ test_that("Rapp parses CLI options before entering the package runtime", {
   expect_equal(captured$task, "one complete task")
 })
 
+test_that("CLI model defaults and overrides reach the real ellmer Chat", {
+  withr::local_envvar(OPENAI_API_KEY = "example")
+  chat <- NULL
+  local_mocked_bindings(
+    deputy_cli_main = function(config) {
+      config <- cli_normalize_config(config)
+      chat <<- cli_create_chat(config$provider, config$model)
+      invisible(NULL)
+    },
+    .package = "deputy"
+  )
+
+  Rapp::run(cli_test_app(), "inspect files")
+  expect_identical(chat$get_model(), "gpt-5.6-luna")
+
+  Rapp::run(cli_test_app(), c("--provider", "openai", "inspect files"))
+  expect_identical(chat$get_model(), "gpt-5.6-luna")
+
+  for (model in c("gpt-5.6-terra", "gpt-5.6-sol", "gpt-4o-mini")) {
+    Rapp::run(cli_test_app(), c("--model", model, "inspect files"))
+    expect_identical(chat$get_model(), model)
+    agent <- Agent$new(chat, tools = list())
+    expect_identical(agent$get_model(), model)
+  }
+})
+
 test_that("Rapp discovers and installs the package executable", {
   destination <- withr::local_tempdir()
 
@@ -160,6 +186,25 @@ test_that("Google uses the current ellmer constructor and its default model", {
     list(provider = "google")
   )
   expect_equal(seen_model, "gemini-test")
+})
+
+test_that("Anthropic retains its provider default and explicit model override", {
+  seen_model <- NULL
+  local_mocked_bindings(
+    chat_anthropic = function(model) {
+      seen_model <<- if (missing(model)) "<provider-default>" else model
+      list(provider = "anthropic")
+    },
+    .package = "ellmer"
+  )
+
+  expect_equal(cli_create_chat("anthropic", NULL), list(provider = "anthropic"))
+  expect_equal(seen_model, "<provider-default>")
+  expect_equal(
+    cli_create_chat("anthropic", "claude-test"),
+    list(provider = "anthropic")
+  )
+  expect_equal(seen_model, "claude-test")
 })
 
 test_that("CLI builds permissions and usage limits separately", {

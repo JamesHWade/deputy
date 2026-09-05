@@ -2,7 +2,7 @@
 # Two independent one-request perspectives, then one synthesis request.
 library(deputy)
 rlang::check_installed("yaml", reason = "to load the debate skill")
-model <- Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-4o-mini")
+model <- Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-5.6-luna")
 question <- Sys.getenv(
   "DEPUTY_DEBATE_TOPIC",
   "Should a small R package adopt a mandatory code review for every change?"

@@ -391,7 +391,7 @@ validate_questions <- function(questions) {
 #' \dontrun{
 #' # Add to agent's tools
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = c(tools_file(), tool_ask_user)
 #' )
 #'
@@ -438,7 +438,7 @@ tool_ask_user <- new_ask_user_tool()
 #' agent_id <- "agent-review"
 #' session_id <- "session-review"
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = c(
 #'     tools_file(),
 #'     tools_interactive(

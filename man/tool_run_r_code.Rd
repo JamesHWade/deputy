@@ -35,7 +35,7 @@ The execution boundary is explicit:
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = list(tool_run_r_code)
 )
 }

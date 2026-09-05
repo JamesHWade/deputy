@@ -35,7 +35,7 @@ delegation.
 
 # Create an agent with file tools
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = tools_preset("standard")
 )
 

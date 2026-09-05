@@ -270,7 +270,7 @@ glob_relative_paths <- function(path = ".", pattern = "*", recursive = TRUE) {
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = list(tool_read_file)
 #' )
 #' }
@@ -414,7 +414,7 @@ tool_read_markdown <- ellmer::tool(
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = list(tool_write_file)
 #' )
 #' }
@@ -626,7 +626,7 @@ tool_multi_edit <- ellmer::tool(
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = list(tool_list_files)
 #' )
 #' }
@@ -998,7 +998,7 @@ run_r_code_impl <- function(code, timeout = 30, working_dir = getwd()) {
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = list(tool_run_r_code)
 #' )
 #' }
@@ -1097,7 +1097,7 @@ run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = list(tool_run_bash),
 #'   permissions = permissions_full()  # Required for bash
 #' )
@@ -1142,7 +1142,7 @@ attr(tool_run_bash, "deputy_workspace_runner") <-
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = list(tool_read_csv)
 #' )
 #' }

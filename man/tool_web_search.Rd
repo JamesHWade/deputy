@@ -30,7 +30,7 @@ consider using a dedicated search API.
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = list(tool_web_search),
   permissions = Permissions$new(web = TRUE)
 )

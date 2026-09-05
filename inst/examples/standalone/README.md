@@ -5,8 +5,13 @@ Install deputy and its released ellmer dependency, set
 optional packages `jsonlite` (structured output) and `yaml` (skills), for example
 with `install.packages(c("jsonlite", "yaml"))`. Those scripts check these
 dependencies before creating a chat. Live runs
-make billable model requests. Set `DEPUTY_EXAMPLE_MODEL` to choose another
-OpenAI model supported by your account.
+make billable model requests using `gpt-5.6-luna` by default. Set
+`DEPUTY_EXAMPLE_MODEL` to choose another OpenAI model supported by your account,
+such as `gpt-5.6-terra` or `gpt-5.6-sol`. The `gpt-5.6` alias selects Sol.
+
+```bash
+DEPUTY_EXAMPLE_MODEL=gpt-5.6-terra Rscript inst/examples/standalone/01-basic.R
+```
 
 ```r
 example <- system.file("examples", "standalone", "01-basic.R", package = "deputy")

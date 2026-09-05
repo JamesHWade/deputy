@@ -34,7 +34,7 @@ The tool respects a 30-second timeout and follows redirects.
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = list(tool_web_fetch),
   permissions = Permissions$new(web = TRUE)
 )
