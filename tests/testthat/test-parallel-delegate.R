@@ -55,6 +55,13 @@ test_that("stateless responders overlap with isolated conversations and ordered 
     unique(vapply(hooks, `[[`, character(1), "run_id")),
     batch$run$run_id
   )
+  for (context in hooks) {
+    expect_identical(context$parent_agent_id, lead$agent_id)
+    expect_identical(context$parent_run_id, batch$run$run_id)
+    child <- runs[runs$delegation_id == context$delegation_id, ]
+    expect_identical(context$child_agent_id, child$agent_id)
+    expect_identical(context$parent_run_id, child$parent_run_id)
+  }
   expect_length(lead$.__enclos_env__$private$delegation_usage_reservations, 0L)
 })
 
