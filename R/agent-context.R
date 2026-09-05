@@ -433,22 +433,43 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       ) {
         return(paste(format(content), collapse = "\n"))
       }
-      # ellmer's result formatter expects scalar text, while its public result
-      # class also permits atomic vectors and Content objects. Format those
-      # payloads through their public interfaces; never include display `extra`.
+      # Keep ordinary structured results intact. Project Content objects through
+      # their public formatter, including inside named/nested payloads, without
+      # including tool-result display `extra`.
       value <- content@value
-      if (inherits(value, "ellmer::Content")) {
-        value <- list(value)
+      project_content <- function(value) {
+        if (inherits(value, "ellmer::Content")) {
+          return(private$compaction_content_text(value))
+        }
+        if (is.atomic(value) && !is.null(names(value))) {
+          value <- as.list(value)
+        }
+        if (is.list(value)) {
+          value[] <- lapply(value, project_content)
+        }
+        value
       }
-      text <- if (is.list(value)) {
+      text <- if (inherits(value, "ellmer::Content")) {
+        private$compaction_content_text(value)
+      } else if (
+        is.list(value) &&
+          is.null(names(value)) &&
+          length(value) > 0L &&
+          all(vapply(value, inherits, logical(1), what = "ellmer::Content"))
+      ) {
         paste(
           vapply(value, private$compaction_content_text, character(1)),
           collapse = "\n"
         )
-      } else if (is.character(value)) {
+      } else if (is.character(value) && is.null(names(value))) {
         paste(value, collapse = "\n")
       } else {
-        as.character(jsonlite::toJSON(value, auto_unbox = TRUE, null = "null"))
+        as.character(jsonlite::toJSON(
+          project_content(value),
+          auto_unbox = TRUE,
+          digits = NA,
+          null = "null"
+        ))
       }
       paste(format(content, show = "header"), text, sep = "\n")
     },

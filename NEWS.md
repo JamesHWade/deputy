@@ -1,8 +1,9 @@
 # deputy (development version)
 
 * Compaction summaries now include tool evidence through ellmer's public content
-  formatter, while excluding tool-result display metadata. Previously a source
-  returned by a tool could disappear from the summary input.
+  formatter, preserving field names and relationships in structured results
+  while excluding tool-result display metadata. Previously a source returned by
+  a tool could disappear from the summary input.
 * A caller-owned history-recovery experiment compares identical prepared context
   with and without bounded, scoped source retrieval, including a scenario where
   a later host instruction supersedes an earlier eligibility rule. It records
