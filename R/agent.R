@@ -114,6 +114,8 @@ Agent <- R6::R6Class(
     #'   response. Templates are cloned; their connection/model settings are
     #'   preserved and their history, system prompt, and tools are replaced by
     #'   the Agent's. The selected Chat remains active for subsequent runs.
+    #'   Applies to governed task and structured requests. Pre-run automatic
+    #'   compaction retains the separate [ContextPolicy] summary-failure policy.
     #' @return A new `Agent` object
     initialize = function(
       chat,

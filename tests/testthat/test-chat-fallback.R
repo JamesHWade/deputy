@@ -284,3 +284,32 @@ test_that("request-end callback errors are run failures regardless of callback o
     expect_length(backup$requests(), 0L)
   }
 })
+
+test_that("pre-run compaction retains its explicit summary failure policy", {
+  withr::local_options(ellmer_max_tries = 1)
+  source <- local_runtime_server(list(runtime_failure()))
+  backup <- local_runtime_server(list(runtime_reply("unexpected")))
+  chat <- runtime_chat(source, "primary")
+  # Fix only the estimate so this boundary does not depend on a provider
+  # tokenizer. Summary generation still uses the real ellmer HTTP transport.
+  rlang::env_binding_unlock(chat, "token_count")
+  chat$token_count <- function(...) 1000
+  turns <- list(
+    create_mock_user_turn("Earlier question"),
+    create_mock_assistant_turn("Earlier answer"),
+    create_mock_user_turn("Recent question"),
+    create_mock_assistant_turn("Recent answer")
+  )
+  chat$set_turns(turns)
+  agent <- Agent$new(
+    chat,
+    fallback_chats = list(runtime_chat(backup, "backup")),
+    context_policy = ContextPolicy(max_tokens = 1)
+  )
+  expect_error(agent$run_sync("continue"), class = "deputy_compaction_error")
+  expect_length(source$requests(), 1L)
+  expect_length(backup$requests(), 0L)
+  expect_identical(agent$get_turns(), turns)
+  expect_identical(agent$get_model(), "primary")
+  expect_null(agent$last_run())
+})

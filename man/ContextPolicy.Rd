@@ -20,7 +20,9 @@ compaction. Use \code{NULL} to disable automatic compaction.}
 should occupy after compaction.}
 
 \item{fallback}{What to do when LLM summary generation fails. \code{"error"} fails
-closed; \code{"text"} uses a deterministic truncated-text summary.}
+closed; \code{"text"} uses a deterministic truncated-text summary. Summary
+generation uses an isolated clone of the active Chat and does not select
+from the Agent's task \code{fallback_chats}.}
 
 \item{max_tool_result_bytes}{Serialized size above which a tool result is
 stored outside the model context. Use \code{NULL} to disable result offloading.}

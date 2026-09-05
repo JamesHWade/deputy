@@ -44,6 +44,12 @@ streamed response or completed tool effect locks the run to its current Chat;
 Deputy preserves the partial result and signals the failure. It never restarts
 a completed tool loop. The selected Chat remains active; subsequent runs can
 advance to later configured templates, without revisiting earlier ones.
+Automatic compaction runs before task dispatch and retains its separate
+`ContextPolicy(fallback = "error" | "text")` policy. Its isolated summary request
+does not select from `fallback_chats`: a summary failure stops preparation by
+default, or uses the explicitly configured deterministic text summary. Governed
+compaction recovery is tracked in [#111](https://github.com/JamesHWade/deputy/issues/111).
+
 LeadAgent's fallback policy applies to the lead. Child definitions inherit the
 selected provider and do not implicitly gain additional destinations.
 
