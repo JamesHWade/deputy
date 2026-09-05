@@ -36,7 +36,9 @@ result <- agent$run_sync("Summarize the supplied evidence.")
 ```
 
 Fallback is eligible for a connection failure or HTTP 408, 429, 500, 502, 503,
-or 504 before any response content or requested tool. Authentication errors,
+or 504 before any response content or requested tool. Upstream serializers
+check content/tool compatibility with the selected provider; Deputy does not
+drop content or rewrite provider-specific tools to make a fallback succeed. Authentication errors,
 application callbacks, and validation failures are terminal. A partially
 streamed response or completed tool effect locks the run to its current Chat;
 Deputy preserves the partial result and signals the failure. It never restarts

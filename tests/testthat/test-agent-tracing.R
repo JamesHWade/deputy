@@ -13,7 +13,11 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
         }
       )
       otelsdk::with_otel_record({
-        pkgload::load_all(path, quiet = TRUE)
+        if (file.exists(file.path(path, "R", "agent.R"))) {
+          pkgload::load_all(path, quiet = TRUE)
+        } else {
+          library(deputy, lib.loc = dirname(path))
+        }
         chat <- ellmer::chat_openai_compatible(
           base_url = url,
           credentials = function() "fixture",
@@ -57,7 +61,7 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
       })
     },
     args = list(
-      path = pkgload::pkg_path(),
+      path = getNamespaceInfo(asNamespace("deputy"), "path"),
       url = url,
       mode = mode,
       capture = capture

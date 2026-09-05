@@ -26,6 +26,7 @@ local_runtime_server <- function(responses, .local_envir = parent.frame()) {
       )
       on.exit(server$stop(), add = TRUE)
       saveRDS(port, file.path(directory, "port.rds"))
+      file.create(file.path(directory, "ready"))
       repeat {
         httpuv::service(50)
       }
@@ -34,7 +35,7 @@ local_runtime_server <- function(responses, .local_envir = parent.frame()) {
   )
   withr::defer(process$kill(), envir = .local_envir)
   deadline <- Sys.time() + 10
-  while (!file.exists(file.path(directory, "port.rds"))) {
+  while (!file.exists(file.path(directory, "ready"))) {
     if (!process$is_alive() || Sys.time() > deadline) {
       cli::cli_abort("Runtime fixture did not start")
     }
