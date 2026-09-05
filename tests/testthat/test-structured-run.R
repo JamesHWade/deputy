@@ -258,3 +258,36 @@ test_that("a failed extraction retains its original condition after completed ta
   )
   expect_length(server$requests(), 2L)
 })
+
+test_that("an incomplete tool call prevents post-task extraction", {
+  mock <- create_content_stream_chat()
+  request <- ellmer::ContentToolRequest(
+    id = "unfinished-tool",
+    name = "read_file",
+    arguments = list(path = "input.txt"),
+    tool = mock$tool
+  )
+  mock$chat$stream_async <- function(...) {
+    coro::async_generator(function() {
+      mock$state$on_tool_request(request)
+      coro::yield(request)
+      # The producer ends without delivering this tool's result.
+    })()
+  }
+  extractions <- 0L
+  mock$chat$chat_structured_async <- function(...) {
+    extractions <<- extractions + 1L
+    promises::promise_resolve(list(status = "unexpected"))
+  }
+  agent <- Agent$new(mock$chat, tools = list(mock$tool))
+  result <- agent$run_sync(
+    "read the input",
+    type = ellmer::type_object(status = ellmer::type_string())
+  )
+  expect_identical(result$stop_reason, "provider_error")
+  expect_null(result$structured_output)
+  expect_identical(extractions, 0L)
+  expect_identical(result$usage$requests, 1L)
+  expect_length(runtime_events(agent, "structured_attempt"), 0L)
+  expect_identical(agent$last_run()$stop_reason, "provider_error")
+})

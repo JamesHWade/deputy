@@ -500,7 +500,10 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           }
         }
         if (
-          !is.null(extraction) && !agent$.__enclos_env__$private$should_stop
+          !is.null(extraction) &&
+            !agent$.__enclos_env__$private$should_stop &&
+            agent$.__enclos_env__$private$current_tool_calls <=
+              agent$.__enclos_env__$private$current_tool_results
         ) {
           extracted_output <- tryCatch(
             coro::await(governed_structured_request(

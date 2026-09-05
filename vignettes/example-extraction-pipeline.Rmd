@@ -110,7 +110,6 @@ step1 <- extractor$run_sync(
 
 # Validate the output before proceeding
 stopifnot(step1$is_success())
-stopifnot(step1$is_success())
 
 pkg_metadata <- step1$structured_output
 pkg_metadata$name

@@ -12,7 +12,9 @@ agent <- Agent$new(
 result <- agent$run_sync(
   'Return a JSON object with status equal to "ok".',
   type = ellmer::type_object(status = ellmer::type_string()),
-  validate = function(x) identical(x$status, "ok"),
+  validate = function(x) {
+    if (identical(x$status, "ok")) TRUE else "status must equal ok"
+  },
   max_corrections = 1L
 )
 stopifnot(result$is_success())
