@@ -26,7 +26,9 @@ generation uses an isolated clone of the active Chat and does not select
 from the Agent's task \code{fallback_chats}.}
 
 \item{max_tool_result_bytes}{Serialized size above which a tool result is
-stored outside the model context. Use \code{NULL} to disable result offloading.}
+stored outside the model context. Use \code{NULL} to disable result offloading.
+Compaction applies this limit to explicit \code{ellmer::ContentToolResult}
+payloads too, retaining a preview and recoverable reference.}
 
 \item{offload_dir}{Directory for durable result envelopes. Relative paths
 are anchored to the current working directory when the policy is created.

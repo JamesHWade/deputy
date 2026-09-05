@@ -18,6 +18,8 @@
 #'   from the Agent's task `fallback_chats`.
 #' @param max_tool_result_bytes Serialized size above which a tool result is
 #'   stored outside the model context. Use `NULL` to disable result offloading.
+#'   Compaction applies this limit to explicit `ellmer::ContentToolResult`
+#'   payloads too, retaining a preview and recoverable reference.
 #' @param offload_dir Directory for durable result envelopes. Relative paths
 #'   are anchored to the current working directory when the policy is created.
 #'   `NULL` uses the Deputy user cache, partitioned by Agent session.

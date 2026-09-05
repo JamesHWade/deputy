@@ -437,6 +437,28 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       # their public formatter, including inside named/nested payloads, without
       # including tool-result display `extra`.
       value <- content@value
+      # Results supplied as ContentToolResult, including restored turns, can
+      # bypass runtime offloading. Bound them before paste/JSON allocates the
+      # summary evidence, while keeping the source value recoverable.
+      record <- offload_tool_result(
+        value = value,
+        tool_name = if (is.null(content@request)) {
+          "compaction_evidence"
+        } else {
+          content@request@name
+        },
+        policy = private$.context_policy,
+        session_id = private$.session_id,
+        agent_id = private$.agent_id
+      )
+      if (!is.null(record)) {
+        private$ensure_tool_result_reader()
+        return(paste(
+          format(content, show = "header"),
+          tool_result_reference_text(record),
+          sep = "\n"
+        ))
+      }
       project_content <- function(value) {
         if (inherits(value, "ellmer::Content")) {
           return(private$compaction_content_text(value))
@@ -610,7 +632,20 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           }
           text <- private$compaction_turn_text(turn)
           if (nchar(text) > 200) {
-            text <- paste0(substr(text, 1, 197), "...")
+            references <- unique(regmatches(
+              text,
+              gregexpr(
+                paste0(
+                  "deputy://tool-result/result_[a-f0-9]{64}",
+                  "\\?text_sha256=[a-f0-9]{64}"
+                ),
+                text
+              )
+            )[[1L]])
+            text <- paste(
+              c(paste0(substr(text, 1, 197), "..."), references),
+              collapse = "\n"
+            )
           }
           paste0(role, ": ", text)
         },

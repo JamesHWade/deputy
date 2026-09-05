@@ -214,3 +214,78 @@ test_that("structured tool evidence keeps field names and relationships", {
     }
   }
 })
+
+test_that("compaction offloads oversized explicit tool results before formatting", {
+  withr::local_options(ellmer_max_tries = 1)
+  large_text <- paste0(strrep("evidence ", 20000L), "SOURCE-END")
+  for (value in list(large_text, list(source = large_text, page = 17L))) {
+    for (fallback in c(FALSE, TRUE)) {
+      directory <- withr::local_tempdir()
+      server <- local_runtime_server(list(
+        runtime_reply(tool = "source_read"),
+        runtime_reply("Source inspected."),
+        if (fallback) {
+          runtime_failure(401L)
+        } else {
+          runtime_reply("Evidence summarized.", stream = FALSE)
+        }
+      ))
+      source <- ellmer::tool(
+        function() {
+          ellmer::ContentToolResult(
+            value = value,
+            extra = list(private = "HOST-ONLY-SECRET")
+          )
+        },
+        name = "source_read",
+        description = "Read source evidence.",
+        annotations = ellmer::tool_annotations(
+          read_only_hint = TRUE,
+          open_world_hint = FALSE
+        )
+      )
+      agent <- Agent$new(
+        runtime_chat(server),
+        tools = list(source),
+        context_policy = ContextPolicy(offload_dir = directory)
+      )
+      agent$run_sync("Read the source.")
+      source_turns <- agent$get_turns()
+      result <- agent$compact(keep_last = 0L, fallback = "text")
+      prompt <- paste(
+        unlist(lapply(
+          tail(server$requests(), 1L)[[1L]]$body$messages,
+          `[[`,
+          "content"
+        )),
+        collapse = "\n"
+      )
+      expect_lt(nchar(prompt), 10000L)
+      expect_match(prompt, "Tool result offloaded by Deputy", fixed = TRUE)
+      expect_no_match(prompt, "SOURCE-END", fixed = TRUE)
+      expect_no_match(prompt, "HOST-ONLY-SECRET", fixed = TRUE)
+      reference <- regmatches(
+        prompt,
+        regexpr(
+          "deputy://tool-result/result_[a-f0-9]+\\?text_sha256=[a-f0-9]+",
+          prompt
+        )
+      )
+      expect_identical(agent$resolve_tool_result(reference), value)
+      expect_identical(source_turns[[3L]]@contents[[1L]]@value, value)
+      expect_match(
+        agent$get_tools()[["deputy_read_tool_result"]](
+          reference,
+          max_chars = 64L
+        ),
+        "evidence",
+        fixed = TRUE
+      )
+      expect_identical(result$method, if (fallback) "text" else "llm")
+      if (fallback) {
+        expect_match(result$summary, reference, fixed = TRUE)
+        expect_lt(nchar(result$summary), 10000L)
+      }
+    }
+  }
+})
