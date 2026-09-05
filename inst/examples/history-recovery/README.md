@@ -33,6 +33,8 @@ produce at least two automatic compactions. A repeated or out-of-order checkpoin
 invalidates preparation and is not scored. Both continuations start from identical
 prepared turns and system prompt; their order alternates across trials. The helper
 model performs preparation and summarization; the task model is held fixed.
+The authorized fixture must contain exactly stages 1, 2 and 3; missing, extra or
+alternate stages are rejected before creating a model client or dispatching work.
 
 The history continuation adds two tools from `history.R`:
 

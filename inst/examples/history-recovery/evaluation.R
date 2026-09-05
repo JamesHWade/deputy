@@ -235,6 +235,13 @@ history_prepare <- function(
   records <- history_scope_records(fixture$records, fixture$scope)
   requested <- integer()
   stages <- sort(unique(records$stage))
+  if (!is.numeric(stages) || !setequal(stages, 1:3)) {
+    cli::cli_abort(
+      "Authorized history must contain exactly checkpoints 1, 2 and 3.",
+      class = "history_evaluation_wrong_stages"
+    )
+  }
+  stages <- 1:3
   expected_stage <- integer()
   invalid_request <- FALSE
   agent <- deputy::Agent$new(

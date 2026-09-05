@@ -85,6 +85,43 @@ test_that("history validates authorized snapshots and rejects old revisions afte
   )
 })
 
+test_that("preparation requires all three authorized checkpoints before creating a chat", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  missing <- fixture$records[fixture$records$stage != 3L, ]
+  alternate <- fixture$records
+  alternate$stage <- alternate$stage + 1L
+  hidden <- fixture$records
+  hidden$owner_id[hidden$stage == 3L] <- "reader-b"
+  extra <- fixture$records
+  extra$stage[[1L]] <- 4L
+  calls <- 0L
+  factory <- function(model) {
+    calls <<- calls + 1L
+    rlang::abort(
+      "The model factory must not be called for invalid checkpoints."
+    )
+  }
+  for (records in list(missing, alternate, hidden, extra)) {
+    fixture$records <- records
+    evaluation <- example$history_evaluate(
+      factory,
+      fixture,
+      trials = 1L,
+      helper_models = "fixture",
+      task_model = "fixture"
+    )
+    expect_identical(
+      evaluation$failure$class,
+      "history_evaluation_wrong_stages"
+    )
+    expect_identical(evaluation$usage$requests, 0L)
+    expect_length(evaluation$runs, 0L)
+    expect_length(evaluation$inputs, 0L)
+  }
+  expect_identical(calls, 0L)
+})
+
 test_that("history chunks preserve UTF-8 and enforce whole-payload budgets", {
   example <- history_example()
   fixture <- example$history_fixture(1L)
@@ -142,6 +179,9 @@ for (scenario in c("original", "changed-constraint")) {
   test_that(paste("paired continuations preserve the", scenario, "protocol"), {
     example <- history_example()
     fixture <- example$history_fixture(1L, scenario = scenario)
+    if (scenario == "changed-constraint") {
+      fixture$records$stage <- as.numeric(fixture$records$stage)
+    }
     answer <- c(fixture$expected, list(source_ids = fixture$required_sources))
     source_id <- if (scenario == "original") {
       "assay-C-r3"
