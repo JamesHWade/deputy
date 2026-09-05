@@ -77,6 +77,7 @@ governed_structured_request <- function(agent, messages, spec) {
         !is.null(condition) &&
           (is.null(turn) || fallback_transport_error(condition))
       ) {
+        record_model_failure(agent, condition)
         rlang::cnd_signal(condition)
       }
       end_model_request(agent, turn)

@@ -127,6 +127,11 @@ test_that("unavailable validators and cancellation do not initiate correction", 
     class = "deputy_validation_unavailable"
   )
   expect_length(server$requests(), 1L)
+  expect_length(runtime_events(agent, "request_error"), 0L)
+  expect_s3_class(
+    runtime_events(agent, "run_error")[[1]]$condition,
+    "deputy_validation_unavailable"
+  )
   agent$chat_structured(
     "extract",
     type = type,
@@ -159,6 +164,7 @@ test_that("invalid JSON has bounded evidence and terminal provider errors are no
     class = "httr2_http_401"
   )
   expect_length(server2$requests(), 1L)
+  expect_length(runtime_events(agent2, "request_error"), 1L)
 })
 
 test_that("structured streams reuse ellmer native support", {
@@ -252,6 +258,7 @@ test_that("a failed extraction retains its original condition after completed ta
   expect_identical(trimws(agent$last_run()$response), "work complete")
   expect_identical(agent$last_run()$stop_reason, "error")
   expect_identical(agent$last_run()$usage$requests, 2L)
+  expect_length(runtime_events(agent, "request_error"), 1L)
   expect_s3_class(
     runtime_events(agent, "request_error")[[1]]$condition,
     "httr2_http_401"
@@ -290,4 +297,55 @@ test_that("an incomplete tool call prevents post-task extraction", {
   expect_identical(result$usage$requests, 1L)
   expect_length(runtime_events(agent, "structured_attempt"), 0L)
   expect_identical(agent$last_run()$stop_reason, "provider_error")
+})
+
+test_that("application validation failures retain successful request evidence", {
+  for (mode in c("direct", "extraction")) {
+    responses <- list(runtime_reply('{"count":0}', stream = FALSE))
+    if (mode == "extraction") {
+      responses <- c(list(runtime_reply("task complete")), responses)
+    }
+    server <- local_runtime_server(responses)
+    agent <- Agent$new(runtime_chat(server))
+    run <- if (mode == "direct") agent$chat_structured else agent$run_sync
+    expect_error(
+      run(
+        "task",
+        type = ellmer::type_object(count = ellmer::type_integer()),
+        validate = function(x) FALSE
+      ),
+      class = "deputy_structured_output_invalid"
+    )
+    expect_length(runtime_events(agent, "request_end"), length(responses))
+    expect_length(runtime_events(agent, "request_error"), 0L)
+    expect_false(runtime_events(agent, "structured_attempt")[[1]]$valid)
+    expect_s3_class(
+      runtime_events(agent, "run_error")[[1]]$condition,
+      "deputy_structured_output_invalid"
+    )
+    expect_identical(agent$last_run()$stop_reason, "error")
+  }
+})
+
+test_that("recovered structured dispatch errors do not become run failures", {
+  server <- local_runtime_server(list(
+    runtime_failure(),
+    runtime_reply('{"count":1}', stream = FALSE)
+  ))
+  agent <- Agent$new(
+    runtime_chat(server, "primary"),
+    fallback_chats = list(runtime_chat(server, "backup"))
+  )
+  expect_identical(
+    agent$chat_structured(
+      "extract",
+      type = ellmer::type_object(count = ellmer::type_integer())
+    ),
+    list(count = 1L)
+  )
+  expect_length(runtime_events(agent, "request_error"), 1L)
+  expect_length(runtime_events(agent, "request_end"), 1L)
+  expect_length(runtime_events(agent, "run_error"), 0L)
+  expect_identical(agent$last_run()$usage$requests, 2L)
+  expect_identical(agent$last_run()$stop_reason, "complete")
 })

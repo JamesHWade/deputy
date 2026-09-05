@@ -1,4 +1,13 @@
-# Shared initialization for model runs and host-driven delegation batches.
+# Shared lifecycle for model runs and host-driven delegation batches.
+record_run_failure <- function(agent, phase, condition) {
+  private <- agent$.__enclos_env__$private
+  private$record_run_event(private$agent_event(
+    "run_error",
+    phase = phase,
+    condition = condition
+  ))
+}
+
 initialize_agent_run <- function(
   agent,
   state,

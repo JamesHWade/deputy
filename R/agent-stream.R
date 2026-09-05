@@ -331,13 +331,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           ),
           error = function(error) {
             stream_state$reason <- "error"
-            agent$.__enclos_env__$private$record_run_event(
-              agent$.__enclos_env__$private$agent_event(
-                "run_error",
-                phase = "initialization",
-                condition = error
-              )
-            )
+            record_run_failure(agent, "initialization", error)
             rlang::cnd_signal(error)
           }
         )
@@ -404,7 +398,11 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
               break
             }
             stream_state$reason <- "error"
-            record_model_failure(agent, stream_error)
+            # Structured requests record dispatch errors before applying
+            # validation; a rejected value is a separate run outcome.
+            if (is.null(structured)) {
+              record_model_failure(agent, stream_error)
+            }
             if (try_chat_fallback(agent, stream_error)) {
               stream <- tryCatch(
                 agent$.__enclos_env__$private$start_async_stream(
@@ -426,6 +424,9 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
               break
             }
             stream_state$reason <- "error"
+            if (!is.null(structured)) {
+              record_run_failure(agent, "structured_output", stream_error)
+            }
             rlang::cnd_signal(stream_error)
           }
 
@@ -515,7 +516,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             )),
             error = function(error) {
               if (!agent$.__enclos_env__$private$should_stop) {
-                record_model_failure(agent, error)
+                record_run_failure(agent, "extraction", error)
                 stream_state$reason <- "error"
                 rlang::cnd_signal(error)
               }
