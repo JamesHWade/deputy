@@ -228,7 +228,9 @@ test_that("compaction offloads oversized explicit tool results before formatting
           runtime_failure(401L)
         } else {
           runtime_reply("Evidence summarized.", stream = FALSE)
-        }
+        },
+        runtime_reply("Continuing from the summary."),
+        runtime_reply("Summary refreshed.", stream = FALSE)
       ))
       source <- ellmer::tool(
         function() {
@@ -282,10 +284,19 @@ test_that("compaction offloads oversized explicit tool results before formatting
         fixed = TRUE
       )
       expect_identical(result$method, if (fallback) "text" else "llm")
-      if (fallback) {
-        expect_match(result$summary, reference, fixed = TRUE)
-        expect_lt(nchar(result$summary), 10000L)
-      }
+      expect_match(result$summary, reference, fixed = TRUE)
+      expect_lt(nchar(result$summary), 10000L)
+      agent$run_sync("Continue using the source evidence.")
+      continuation <- jsonlite::toJSON(tail(server$requests(), 1L)[[1L]]$body)
+      expect_match(continuation, reference, fixed = TRUE)
+      expect_match(continuation, "deputy_read_tool_result", fixed = TRUE)
+
+      # A later summary can omit references again after the original source
+      # turns are gone. The prior accepted reference must still survive.
+      refreshed <- agent$compact(keep_last = 0L)
+      expect_match(refreshed$summary, reference, fixed = TRUE)
+      expect_match(agent$get_system_prompt(), reference, fixed = TRUE)
+      expect_identical(agent$resolve_tool_result(reference), value)
     }
   }
 })

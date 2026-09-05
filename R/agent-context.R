@@ -1,3 +1,16 @@
+compaction_tool_result_references <- function(text) {
+  unique(unlist(
+    regmatches(
+      text,
+      gregexpr(
+        "deputy://tool-result/result_[a-f0-9]{64}\\?text_sha256=[a-f0-9]{64}",
+        text
+      )
+    ),
+    use.names = FALSE
+  ))
+}
+
 clone_compaction_chat <- function(chat) {
   summary_chat <- clone_governed_chat(chat)
   if (identical(summary_chat, chat)) {
@@ -360,6 +373,30 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         )
       }
       summary <- paste(as.character(summary), collapse = "\n")
+      if (identical(method, "llm")) {
+        # The summary provider may omit every reference. Preserve the handles
+        # from both newly compacted evidence and the prior accepted summary.
+        references <- compaction_tool_result_references(c(
+          plan$previous_summary,
+          vapply(
+            plan$turns_to_compact,
+            private$compaction_turn_text,
+            character(1)
+          )
+        ))
+        missing_references <- setdiff(
+          references,
+          compaction_tool_result_references(summary)
+        )
+        if (length(missing_references)) {
+          summary <- paste(
+            summary,
+            "Recoverable tool results:",
+            paste(missing_references, collapse = "\n"),
+            sep = "\n\n"
+          )
+        }
+      }
       current_system <- private$system_prompt_without_compaction()
       new_system <- paste0(
         current_system,
@@ -632,16 +669,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           }
           text <- private$compaction_turn_text(turn)
           if (nchar(text) > 200) {
-            references <- unique(regmatches(
-              text,
-              gregexpr(
-                paste0(
-                  "deputy://tool-result/result_[a-f0-9]{64}",
-                  "\\?text_sha256=[a-f0-9]{64}"
-                ),
-                text
-              )
-            )[[1L]])
+            references <- compaction_tool_result_references(text)
             text <- paste(
               c(paste0(substr(text, 1, 197), "..."), references),
               collapse = "\n"

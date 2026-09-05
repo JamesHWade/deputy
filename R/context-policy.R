@@ -20,6 +20,7 @@
 #'   stored outside the model context. Use `NULL` to disable result offloading.
 #'   Compaction applies this limit to explicit `ellmer::ContentToolResult`
 #'   payloads too, retaining a preview and recoverable reference.
+#'   Model-generated summaries preserve references across later compactions.
 #' @param offload_dir Directory for durable result envelopes. Relative paths
 #'   are anchored to the current working directory when the policy is created.
 #'   `NULL` uses the Deputy user cache, partitioned by Agent session.
