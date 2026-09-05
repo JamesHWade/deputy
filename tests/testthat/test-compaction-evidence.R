@@ -344,7 +344,7 @@ test_that("compaction offloads oversized explicit tool results before formatting
 test_that("compaction keeps growing recovery sets behind a bounded catalog", {
   withr::local_options(ellmer_max_tries = 1)
   server <- local_runtime_server(c(
-    rep(list(runtime_reply("Evidence summarized.", stream = FALSE)), 3L),
+    rep(list(runtime_reply("Evidence summarized.", stream = FALSE)), 4L),
     list(runtime_failure(401L))
   ))
   policy <- ContextPolicy(
@@ -362,11 +362,19 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
       open_world_hint = FALSE
     )
   )
+  chat <- runtime_chat(server)
   agent <- Agent$new(
-    runtime_chat(server),
+    chat,
     tools = list(source),
     context_policy = policy
   )
+  snapshot_file <- tempfile(fileext = ".rds")
+  early_session <- tempfile(fileext = ".rds")
+  withr::defer(unlink(c(snapshot_file, early_session)))
+  snapshot <- function() {
+    agent$save_session(snapshot_file)
+    readRDS(snapshot_file)
+  }
   references <- character()
   previous_catalogs <- character()
   for (batch in seq_len(3L)) {
@@ -382,7 +390,60 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
       ellmer::AssistantTurn(paste(results, collapse = "\n")),
       log_tokens = FALSE
     )
-    compacted <- agent$compact(keep_last = 0L)
+    keep_last <- if (batch == 2L) 2L else 0L
+    if (batch == 2L) {
+      agent$add_turn(
+        ellmer::UserTurn(paste(
+          "Keep this catalog available:",
+          previous_catalogs[[1L]]
+        )),
+        ellmer::AssistantTurn("It remains available."),
+        log_tokens = FALSE
+      )
+      before <- snapshot()
+      private <- agent$.__enclos_env__$private
+      plan <- private$prepare_compaction(keep_last, NULL, "error", FALSE, NULL)
+      generated <- private$generate_compaction_summary(
+        plan$turns_to_compact,
+        "error"
+      )
+      original_set_turns <- chat$set_turns
+      replace_set_turns <- function(method) {
+        unlockBinding("set_turns", chat)
+        chat$set_turns <- method
+        lockBinding("set_turns", chat)
+      }
+      reject <- TRUE
+      replace_set_turns(function(turns) {
+        if (reject) {
+          reject <<- FALSE
+          cli::cli_abort("Injected installation failure")
+        }
+        original_set_turns(turns)
+      })
+      expect_error(
+        private$install_compaction(
+          plan,
+          generated$summary,
+          generated$method,
+          generated$usage
+        ),
+        "Injected installation failure"
+      )
+      replace_set_turns(original_set_turns)
+      after <- snapshot()
+      expect_identical(agent$get_system_prompt(), before$system_prompt)
+      expect_identical(agent$get_turns(), before$turns)
+      expect_identical(
+        names(after$tool_result_envelopes),
+        names(before$tool_result_envelopes)
+      )
+      expect_identical(
+        unclass(agent$resolve_tool_result(previous_catalogs[[1L]])),
+        head(references, 10L)
+      )
+    }
+    compacted <- agent$compact(keep_last = keep_last)
     handles <- compaction_tool_result_references(compacted$summary)
     expect_length(handles, 1L)
     expect_lt(nchar(compacted$summary), 600L)
@@ -396,7 +457,42 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
       fixed = TRUE
     )
     previous_catalogs <- c(previous_catalogs, handles)
+    saved <- snapshot()
+    expected_catalogs <- if (batch == 2L) 2L else 1L
+    expect_length(saved$tool_result_envelopes, batch * 10L + expected_catalogs)
+    expect_equal(
+      sum(vapply(
+        saved$tool_result_envelopes,
+        function(envelope) {
+          inherits(envelope$value, "deputy_compaction_catalog")
+        },
+        logical(1)
+      )),
+      expected_catalogs
+    )
+    if (batch == 1L) expect_true(file.copy(snapshot_file, early_session))
   }
+  for (reference in head(previous_catalogs, -1L)) {
+    expect_error(agent$resolve_tool_result(reference), "not found")
+    paths <- file.path(
+      policy$offload_dir,
+      saved$metadata$session_id,
+      paste0(
+        parse_tool_result_reference(reference),
+        c(".rds", ".txt", ".meta.rds")
+      )
+    )
+    expect_false(any(file.exists(paths)))
+  }
+  earlier <- Agent$new(
+    runtime_chat(server),
+    context_policy = ContextPolicy(offload_dir = withr::local_tempdir())
+  )
+  earlier$load_session(early_session)
+  expect_identical(
+    unclass(earlier$resolve_tool_result(previous_catalogs[[1L]])),
+    head(references, 10L)
+  )
   agent$add_turn(
     ellmer::UserTurn("Continue."),
     ellmer::AssistantTurn("Continuing."),
@@ -442,4 +538,77 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
     compaction_tool_result_references(after_restore$summary),
     handles
   )
+})
+
+test_that("compaction bounds public error diagnostics", {
+  withr::local_options(ellmer_max_tries = 1)
+  diagnostic <- paste0(strrep("diagnostic ", 20000L), "DIAGNOSTIC-END")
+  check_error <- function(error, fallback) {
+    server <- local_runtime_server(list(
+      runtime_reply(tool = "source_read"),
+      runtime_reply("The source request failed."),
+      if (fallback) {
+        runtime_failure(401L)
+      } else {
+        runtime_reply("Failure summarized.", stream = FALSE)
+      }
+    ))
+    source <- ellmer::tool(
+      function() {
+        ellmer::ContentToolResult(
+          error = error,
+          extra = list(private = "HOST-ONLY-SECRET")
+        )
+      },
+      name = "source_read",
+      description = "Read source evidence.",
+      annotations = ellmer::tool_annotations(
+        read_only_hint = TRUE,
+        open_world_hint = FALSE
+      )
+    )
+    agent <- Agent$new(
+      runtime_chat(server),
+      tools = list(source),
+      context_policy = ContextPolicy(offload_dir = withr::local_tempdir())
+    )
+    expect_warning(
+      agent$run_sync("Read the source."),
+      "Failed to evaluate 1 tool call"
+    )
+    result <- agent$compact(keep_last = 0L, fallback = "text")
+    prompt <- paste(
+      unlist(lapply(
+        tail(server$requests(), 1L)[[1L]]$body$messages,
+        `[[`,
+        "content"
+      )),
+      collapse = "\n"
+    )
+    expect_lt(nchar(prompt), 10000L)
+    expect_match(prompt, "Error:", fixed = TRUE)
+    expect_no_match(prompt, "DIAGNOSTIC-END", fixed = TRUE)
+    expect_no_match(prompt, "HOST-ONLY-SECRET", fixed = TRUE)
+    reference <- compaction_tool_result_references(prompt)
+    expect_length(reference, 1L)
+    expect_identical(
+      agent$resolve_tool_result(reference),
+      list(error = diagnostic)
+    )
+    expect_match(result$summary, reference, fixed = TRUE)
+    expect_identical(result$method, if (fallback) "text" else "llm")
+    expect_match(
+      agent$get_tools()[["deputy_read_tool_result"]](
+        reference,
+        max_chars = 64L
+      ),
+      "diagnostic",
+      fixed = TRUE
+    )
+  }
+  for (error in list(diagnostic, simpleError(diagnostic))) {
+    for (fallback in c(FALSE, TRUE)) {
+      check_error(error, fallback)
+    }
+  }
 })

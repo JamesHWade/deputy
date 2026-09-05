@@ -574,6 +574,8 @@ Agent <- R6::R6Class(
     #'   emitted into model context.
     #' @return The complete stored R value. Content evidence offloaded during
     #'   compaction uses its public text representation.
+    #'   Compaction may retire superseded internal catalog URIs after installing
+    #'   their replacement; saved sessions retain their catalog snapshots.
     resolve_tool_result = function(reference) {
       read_tool_result_envelope(
         reference,

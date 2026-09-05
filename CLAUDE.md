@@ -301,6 +301,9 @@ Compaction projects ellmer Content objects to public evidence before offloading,
 and bounds potential rendered expansion as well as serialized size. Generated
 summaries preserve up to eight direct recovery references; larger sets use one
 durable catalog, flattened across compactions and retained by session save/load.
+Public error diagnostics use the same bounds. Superseded internal catalogs are
+reclaimed after accepted replacement unless retained conversation state still
+references them; saved sessions keep their snapshots and source artifacts remain.
 Caller-supplied summaries retain control over their content.
 
 ### Permission Modes

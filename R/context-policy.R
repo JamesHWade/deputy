@@ -20,12 +20,15 @@
 #'   stored outside the model context. Use `NULL` to disable result offloading.
 #'   Compaction applies this limit to the public evidence in explicit
 #'   `ellmer::ContentToolResult` payloads too, retaining a preview and recoverable
-#'   reference. Content objects use their public text rather than class metadata.
+#'   reference. Content objects and error conditions use their public text.
 #'   A conservative rendered-size bound also covers compact sequences and shared
 #'   strings before JSON expansion. Generated summaries retain up to eight direct
 #'   recovery references; larger sets use one durable, chunk-readable catalog.
 #'   Catalogs preserve earlier entries across compactions and session restores,
 #'   including existing references when new result offloading is disabled.
+#'   Superseded internal catalogs are reclaimed after replacement, except those
+#'   referenced by retained turns or the installed prompt. Earlier saved sessions
+#'   keep their own catalog snapshots. Original result artifacts are retained.
 #' @param offload_dir Directory for durable result envelopes. Relative paths
 #'   are anchored to the current working directory when the policy is created.
 #'   `NULL` uses the Deputy user cache, partitioned by Agent session.

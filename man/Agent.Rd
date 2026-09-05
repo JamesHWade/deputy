@@ -604,6 +604,8 @@ emitted into model context.}
   \subsection{Returns}{
     The complete stored R value. Content evidence offloaded during
 compaction uses its public text representation.
+Compaction may retire superseded internal catalog URIs after installing
+their replacement; saved sessions retain their catalog snapshots.
   }
 }
 

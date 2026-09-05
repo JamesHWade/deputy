@@ -78,6 +78,7 @@ compaction_reference_handles <- function(
   session_id,
   agent_id
 ) {
+  catalog_ids <- character()
   references <- unique(unlist(
     lapply(references, function(reference) {
       envelope <- tryCatch(
@@ -89,6 +90,7 @@ compaction_reference_handles <- function(
           identical(envelope$tool_name, "deputy_compaction_catalog") &&
           inherits(envelope$value, "deputy_compaction_catalog")
       ) {
+        catalog_ids <<- c(catalog_ids, envelope$id)
         unclass(envelope$value)
       } else {
         reference
@@ -97,7 +99,10 @@ compaction_reference_handles <- function(
     use.names = FALSE
   ))
   if (length(references) <= 8L) {
-    return(paste(references, collapse = "\n"))
+    return(list(
+      text = paste(references, collapse = "\n"),
+      catalogs = catalog_ids
+    ))
   }
   record <- offload_tool_result(
     structure(references, class = "deputy_compaction_catalog"),
@@ -107,11 +112,63 @@ compaction_reference_handles <- function(
     agent_id = agent_id,
     force = TRUE
   )
-  paste(
-    paste0("Catalog of ", length(references), " tool results: ", record$uri),
-    "Call deputy_read_tool_result on this catalog for individual references.",
-    sep = "\n"
+  list(
+    text = paste(
+      paste0("Catalog of ", length(references), " tool results: ", record$uri),
+      "Call deputy_read_tool_result on this catalog for individual references.",
+      sep = "\n"
+    ),
+    catalogs = unique(c(catalog_ids, record$id))
   )
+}
+
+compaction_embedded_references <- function(value) {
+  if (is.character(value) || is.factor(value)) {
+    return(compaction_tool_result_references(as.character(value)))
+  }
+  if (inherits(value, "ellmer::Content")) {
+    value <- S7::props(value)
+  }
+  if (is.list(value)) {
+    return(unique(unlist(
+      lapply(value, compaction_embedded_references),
+      use.names = FALSE
+    )))
+  }
+  character()
+}
+
+retire_compaction_catalogs <- function(
+  catalogs,
+  references,
+  policy,
+  session_id
+) {
+  retained <- vapply(references, parse_tool_result_reference, character(1))
+  directory <- tool_result_offload_dir(policy, session_id)
+  for (id in setdiff(catalogs, retained)) {
+    envelope <- tryCatch(
+      read_tool_result_envelope(
+        paste0("deputy://tool-result/", id),
+        policy,
+        session_id
+      ),
+      error = function(error) NULL
+    )
+    # Never reclaim ordinary result artifacts, including on a metadata mismatch.
+    if (
+      is.null(envelope) ||
+        !identical(envelope$tool_name, "deputy_compaction_catalog") ||
+        !inherits(envelope$value, "deputy_compaction_catalog")
+    ) {
+      next
+    }
+    paths <- file.path(directory, paste0(id, c(".rds", ".txt", ".meta.rds")))
+    if (unlink(paths) != 0L) {
+      cli_warn("Could not remove a superseded compaction catalog.")
+    }
+  }
+  invisible(NULL)
 }
 
 clone_compaction_chat <- function(chat) {
@@ -476,6 +533,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         )
       }
       summary <- paste(as.character(summary), collapse = "\n")
+      catalogs <- character()
       if (method %in% c("llm", "text")) {
         # The summary provider may omit every reference. Preserve the handles
         # from both newly compacted evidence and the prior accepted summary.
@@ -494,6 +552,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
             private$.session_id,
             private$.agent_id
           )
+          catalogs <- handles$catalogs
           private$ensure_tool_result_reader()
           summary <- trimws(gsub(
             compaction_tool_result_reference_pattern,
@@ -503,7 +562,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           summary <- paste(
             summary,
             "Recoverable tool results:",
-            handles,
+            handles$text,
             sep = "\n\n"
           )
         }
@@ -513,6 +572,23 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         current_system,
         private$compaction_prompt_block(summary)
       )
+      retire_catalogs <- function(prompt, turns) {
+        if (!length(catalogs)) {
+          return(invisible(NULL))
+        }
+        references <- unique(c(
+          compaction_tool_result_references(prompt),
+          compaction_embedded_references(lapply(turns, function(turn) {
+            turn@contents
+          }))
+        ))
+        retire_compaction_catalogs(
+          catalogs,
+          references,
+          private$.context_policy,
+          private$.session_id
+        )
+      }
 
       usage <- if (isTRUE(private$run_active)) private$current_run_usage()
       old_prompt <- private$.chat$get_system_prompt()
@@ -524,10 +600,12 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         error = function(error) {
           private$.chat$set_system_prompt(old_prompt)
           private$.chat$set_turns(plan$turns)
+          retire_catalogs(old_prompt, plan$turns)
           rlang::cnd_signal(error)
         }
       )
       private$.compaction_summary <- summary
+      retire_catalogs(new_system, plan$turns_to_keep)
       if (!is.null(usage)) {
         preserve_run_usage(self, usage)
         state <- private$current_run_state
@@ -575,10 +653,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
     },
 
     compaction_content_text = function(content) {
-      if (
-        !inherits(content, "ellmer::ContentToolResult") ||
-          !is.null(content@error)
-      ) {
+      if (!inherits(content, "ellmer::ContentToolResult")) {
         return(paste(format(content), collapse = "\n"))
       }
       # Keep ordinary structured results intact. Project Content objects through
@@ -598,7 +673,23 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       }
       # Serialize public evidence, not S7 class environments: those can be
       # large and their bytes need not survive a save/load round trip.
-      value <- project_content(content@value)
+      is_error <- !is.null(content@error)
+      diagnostic <- if (is_error) {
+        if (inherits(content@error, "condition")) {
+          conditionMessage(content@error)
+        } else {
+          content@error
+        }
+      }
+      value <- if (is_error) {
+        list(error = diagnostic)
+      } else {
+        project_content(content@value)
+      }
+      header <- format(content, show = "header")
+      if (is_error) {
+        header <- paste(header, "Error:")
+      }
       # Results supplied as ContentToolResult, including restored turns, can
       # bypass runtime offloading. Bound them before paste/JSON allocates the
       # summary evidence, while keeping public evidence recoverable.
@@ -620,10 +711,13 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       if (!is.null(record)) {
         private$ensure_tool_result_reader()
         return(paste(
-          format(content, show = "header"),
+          header,
           tool_result_reference_text(record),
           sep = "\n"
         ))
+      }
+      if (is_error) {
+        return(paste(header, paste(diagnostic, collapse = "\n")))
       }
       text <- if (
         is.list(content@value) &&
