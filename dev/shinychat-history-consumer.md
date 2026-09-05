@@ -77,3 +77,5 @@ which public abstraction it prefers. Record that outcome in Deputy #66. Link
 the supported R release for #62 and the hosted part of #43 if accepted; revisit
 ADR-0003 explicitly if declined. Do not copy the store or use private APIs while
 the discussion is pending.
+
+Upstream proposal: [posit-dev/shinychat#391](https://github.com/posit-dev/shinychat/issues/391), opened 2026-09-05. The design outcome and public R release remain pending; Deputy #66 stays open.
