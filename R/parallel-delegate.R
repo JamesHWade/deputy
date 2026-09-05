@@ -104,6 +104,8 @@ parallel_responder <- function(
           task = task,
           context = private$hook_context(
             agent_definition = definition,
+            parent_agent_id = correlation$parent_agent_id,
+            parent_run_id = correlation$parent_run_id,
             child_agent_id = child$agent_id,
             child_agent_name = child$agent_name,
             child_run_context = child$run_context,
@@ -154,6 +156,8 @@ parallel_responder <- function(
         context = private$hook_context(
           status = status,
           error = if (!is.null(error)) conditionMessage(error),
+          parent_agent_id = correlation$parent_agent_id,
+          parent_run_id = correlation$parent_run_id,
           child_agent_id = child$agent_id,
           child_agent_name = child$agent_name,
           child_run_id = child_run_id,
