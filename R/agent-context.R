@@ -123,12 +123,32 @@ compaction_reference_handles <- function(
   )
 }
 
-new_compaction_catalog_registry <- function(owner) {
-  registry <- new.env(parent = emptyenv())
-  registry$owners <- list(rlang::new_weakref(owner))
-  registry$catalogs <- character()
-  registry$provisional <- list()
-  registry$transactions <- list()
+compaction_catalog_registries <- new.env(parent = emptyenv())
+
+new_compaction_catalog_registry <- function(owner, policy, session_id) {
+  directory <- tool_result_offload_dir(policy, session_id)
+  key <- file.path(
+    normalizePath(dirname(directory), winslash = "/", mustWork = FALSE),
+    basename(directory)
+  )
+  # Keep only weak registry references globally: neither finished sessions nor
+  # discarded Agents should be retained by this process-local ownership index.
+  for (name in ls(compaction_catalog_registries, all.names = TRUE)) {
+    if (is.null(rlang::wref_key(compaction_catalog_registries[[name]]))) {
+      rm(list = name, envir = compaction_catalog_registries)
+    }
+  }
+  existing <- compaction_catalog_registries[[key]]
+  registry <- if (!is.null(existing)) rlang::wref_key(existing)
+  if (is.null(registry)) {
+    registry <- new.env(parent = emptyenv())
+    registry$owners <- list()
+    registry$catalogs <- character()
+    registry$provisional <- list()
+    registry$transactions <- list()
+    compaction_catalog_registries[[key]] <- rlang::new_weakref(registry)
+  }
+  register_compaction_catalog_owner(registry, owner)
   registry
 }
 
@@ -164,8 +184,8 @@ retire_compaction_catalogs <- function(
   owners <- lapply(registry$owners, rlang::wref_key)
   alive <- !vapply(owners, is.null, logical(1))
   registry$owners <- registry$owners[alive]
-  # Clones share this artifact store. Weak references let cleanup check live
-  # sibling contexts without keeping discarded clients alive indefinitely.
+  # Agents sharing session storage may have independent live contexts. Weak
+  # references check those contexts without retaining discarded clients.
   for (owner in owners[alive]) {
     references <- c(
       references,
@@ -755,7 +775,36 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       result
     },
 
+    compaction_evidence_record = function(value, tool_name) {
+      record <- offload_tool_result(
+        value = value,
+        tool_name = tool_name,
+        policy = private$.context_policy,
+        session_id = private$.session_id,
+        agent_id = private$.agent_id,
+        force = compaction_evidence_exceeds_limit(
+          value,
+          private$.context_policy$max_tool_result_bytes
+        )
+      )
+      private$track_compaction_artifact(record)
+      record
+    },
+
     compaction_content_text = function(content) {
+      if (inherits(content, "ellmer::ContentToolRequest")) {
+        record <- private$compaction_evidence_record(
+          list(arguments = content@arguments),
+          paste0(content@name, " arguments")
+        )
+        if (!is.null(record)) {
+          return(paste(
+            paste0("Tool request: ", content@name, " (", content@id, ")"),
+            tool_result_reference_text(record),
+            sep = "\n"
+          ))
+        }
+      }
       if (!inherits(content, "ellmer::ContentToolResult")) {
         return(paste(format(content), collapse = "\n"))
       }
@@ -796,23 +845,15 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       # Results supplied as ContentToolResult, including restored turns, can
       # bypass runtime offloading. Bound them before paste/JSON allocates the
       # summary evidence, while keeping public evidence recoverable.
-      record <- offload_tool_result(
+      record <- private$compaction_evidence_record(
         value = value,
         tool_name = if (is.null(content@request)) {
           "compaction_evidence"
         } else {
           content@request@name
-        },
-        policy = private$.context_policy,
-        session_id = private$.session_id,
-        agent_id = private$.agent_id,
-        force = compaction_evidence_exceeds_limit(
-          value,
-          private$.context_policy$max_tool_result_bytes
-        )
+        }
       )
       if (!is.null(record)) {
-        private$track_compaction_artifact(record)
         return(paste(
           header,
           tool_result_reference_text(record),

@@ -301,9 +301,10 @@ Compaction projects ellmer Content objects to public evidence before offloading,
 and bounds potential rendered expansion as well as serialized size. Generated
 summaries preserve up to eight direct recovery references; larger sets use one
 durable catalog, flattened across compactions and retained by session save/load.
-Public error diagnostics use the same bounds. Superseded internal catalogs are
-reclaimed after accepted replacement unless a live Agent or clone still
-references them; saved sessions keep their snapshots and source artifacts remain.
+Public error diagnostics and tool-request arguments use the same bounds.
+Superseded internal catalogs are reclaimed after accepted replacement unless a
+live Agent in the current R process sharing the session directory still references
+them; saved sessions keep their snapshots and source artifacts remain.
 Aborted compactions remove their provisional evidence artifacts, preserving
 artifacts claimed by another compaction or returned to a tool caller.
 Caller-supplied summaries retain control over their content.

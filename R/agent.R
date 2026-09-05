@@ -224,7 +224,9 @@ Agent <- R6::R6Class(
       self$clone <- private$clone_client
       rlang::env_binding_lock(self, "clone")
       private$.compaction_catalog_registry <- new_compaction_catalog_registry(
-        self
+        self,
+        private$.context_policy,
+        private$.session_id
       )
 
       invisible(self)

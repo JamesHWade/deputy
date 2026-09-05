@@ -341,6 +341,95 @@ test_that("compaction offloads oversized explicit tool results before formatting
     }
   }
 })
+test_that("compaction bounds real tool-request arguments without losing their payload", {
+  withr::local_options(ellmer_max_tries = 1)
+  check_case <- function(mode) {
+    arguments <- list(
+      path = "report.txt",
+      text = paste0(strrep("payload ", 30000L), "ARGUMENT-END")
+    )
+    server <- local_runtime_server(list(
+      runtime_reply(tool = "write_file", arguments = arguments),
+      runtime_reply("File written."),
+      if (mode == "llm") {
+        runtime_reply("Write completed.", stream = FALSE)
+      } else {
+        runtime_failure(401L)
+      }
+    ))
+    directory <- withr::local_tempdir()
+    writes <- 0L
+    writer <- ellmer::tool(
+      function(path, text) {
+        writes <<- writes + 1L
+        writeLines(text, path)
+        "saved"
+      },
+      name = "write_file",
+      description = "Write a local report.",
+      arguments = list(
+        path = ellmer::type_string(),
+        text = ellmer::type_string()
+      )
+    )
+    policy <- ContextPolicy(
+      max_tokens = NULL,
+      offload_dir = withr::local_tempdir()
+    )
+    agent <- Agent$new(
+      runtime_chat(server),
+      tools = list(writer),
+      permissions = permissions_full(),
+      working_dir = directory,
+      context_policy = policy
+    )
+    agent$run_sync("Write the report.")
+    before <- agent$get_turns()
+    if (mode == "error") {
+      expect_error(
+        agent$compact(keep_last = 0L),
+        class = "deputy_compaction_error"
+      )
+      expect_identical(agent$get_turns(), before)
+      expect_false("deputy_read_tool_result" %in% names(agent$get_tools()))
+      expect_length(
+        list.files(tool_result_offload_dir(policy, agent$session_id())),
+        0L
+      )
+    } else {
+      result <- agent$compact(keep_last = 0L, fallback = "text")
+      expect_identical(result$method, mode)
+      reference <- compaction_tool_result_references(result$summary)
+      expect_length(reference, 1L)
+      expect_identical(
+        agent$resolve_tool_result(reference),
+        list(arguments = arguments)
+      )
+      expect_match(
+        agent$get_tools()[["deputy_read_tool_result"]](
+          reference,
+          max_chars = 512L
+        ),
+        "report.txt",
+        fixed = TRUE
+      )
+    }
+    prompt <- jsonlite::toJSON(tail(server$requests(), 1L)[[1L]]$body)
+    expect_lt(nchar(prompt), 10000L)
+    expect_match(prompt, "write_file", fixed = TRUE)
+    expect_no_match(prompt, "ARGUMENT-END", fixed = TRUE)
+    expect_identical(writes, 1L)
+    expect_identical(
+      readLines(file.path(directory, arguments$path)),
+      arguments$text
+    )
+    expect_identical(before[[2L]]@contents[[1L]]@arguments, arguments)
+  }
+  for (mode in c("llm", "text", "error")) {
+    check_case(mode)
+  }
+})
+
 test_that("aborted compaction removes only provisional evidence files", {
   withr::local_options(ellmer_max_tries = 1)
   check_case <- function(mode) {
@@ -558,7 +647,7 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
   withr::local_options(ellmer_max_tries = 1)
   server <- local_runtime_server(c(
     rep(list(runtime_reply("Evidence summarized.", stream = FALSE)), 4L),
-    list(runtime_failure(401L))
+    rep(list(runtime_failure(401L)), 2L)
   ))
   policy <- ContextPolicy(
     max_tokens = NULL,
@@ -686,6 +775,12 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
     if (batch == 1L) {
       expect_true(file.copy(snapshot_file, early_session))
       sibling <- agent$clone()
+      shared <- Agent$new(
+        runtime_chat(server),
+        context_policy = policy,
+        session_id = agent$session_id()
+      )
+      shared$load_session(early_session)
     }
   }
   expect_identical(
@@ -704,6 +799,7 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
   invisible(gc())
   earlier <- Agent$new(
     runtime_chat(server),
+    session_id = agent$session_id(),
     context_policy = ContextPolicy(offload_dir = withr::local_tempdir())
   )
   earlier$load_session(early_session)
@@ -719,6 +815,28 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
   degraded <- agent$compact(keep_last = 0L, fallback = "text")
   expect_identical(degraded$method, "text")
   expect_identical(compaction_tool_result_references(degraded$summary), handles)
+  saved <- snapshot()
+  expect_length(saved$tool_result_envelopes, 32L)
+  expect_identical(
+    unclass(shared$resolve_tool_result(previous_catalogs[[1L]])),
+    head(references, 10L)
+  )
+  expect_match(
+    shared$get_tools()[["deputy_read_tool_result"]](
+      previous_catalogs[[1L]],
+      max_chars = 512L
+    ),
+    references[[1L]],
+    fixed = TRUE
+  )
+  shared <- NULL
+  invisible(gc())
+  agent$add_turn(
+    ellmer::UserTurn("Refresh the summary."),
+    ellmer::AssistantTurn("Sources remain recoverable."),
+    log_tokens = FALSE
+  )
+  agent$compact(keep_last = 0L, fallback = "text")
   saved <- snapshot()
   expect_length(saved$tool_result_envelopes, 31L)
   for (reference in head(previous_catalogs, -1L)) {
