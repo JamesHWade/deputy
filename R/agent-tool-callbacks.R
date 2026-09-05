@@ -96,16 +96,12 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         }
       }
 
-      private$record_run_event(private$agent_event(
-        "permission",
-        tool_call_id = record$tool_call_id,
-        decision = if (inherits(perm_result, "PermissionResultDeny")) {
-          "deny"
-        } else {
-          "allow"
-        }
-      ))
       if (inherits(perm_result, "PermissionResultDeny")) {
+        private$record_run_event(private$agent_event(
+          "permission",
+          tool_call_id = record$tool_call_id,
+          decision = "deny"
+        ))
         if (isTRUE(perm_result$interrupt)) {
           private$request_stream_stop("permission_denied")
         }
@@ -174,6 +170,14 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         ]]$file_checkpoint_captured <-
           isTRUE(captured)
       }
+
+      # Emit authorization only after Deputy's policy and hook gates have
+      # accepted the request. An intermediate allow can still be denied.
+      private$record_run_event(private$agent_event(
+        "permission",
+        tool_call_id = record$tool_call_id,
+        decision = "allow"
+      ))
 
       # Queue delegated-run correlation only after every gate has allowed the
       # request. A denied request never invokes the tool closure and therefore

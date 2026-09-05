@@ -40,7 +40,7 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
             name = "effect",
             description = "effect"
           )
-          permissions <- if (mode == "deny") {
+          permissions <- if (mode %in% c("deny", "override", "override_deny")) {
             Permissions$new(mode = "readonly", tool_denylist = "effect")
           } else {
             permissions_full()
@@ -50,6 +50,25 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
             tools = list(tool),
             permissions = permissions
           )
+        }
+        if (mode %in% c("override", "override_deny")) {
+          agent$add_hook(HookMatcher$new(
+            "PermissionRequest",
+            function(...) PermissionResultAllow(),
+            timeout = 0
+          ))
+        }
+        if (mode %in% c("hook_deny", "override_deny")) {
+          agent$add_hook(HookMatcher$new(
+            "PreToolUse",
+            function(...) {
+              HookResultPreToolUse(
+                permission = "deny",
+                reason = "private hook denial"
+              )
+            },
+            timeout = 0
+          ))
         }
         result <- suppressWarnings(agent$run_sync("private user prompt"))
         list(
@@ -179,4 +198,33 @@ test_that("async delegated runs retain both trace parentage and run correlation"
     Filter(function(x) startsWith(x$name, "chat "), record$traces),
     3L
   )
+})
+
+test_that("permission events contain only the final Deputy decision", {
+  for (mode in c("hook_deny", "override", "override_deny")) {
+    server <- local_runtime_server(list(
+      runtime_reply(tool = "effect"),
+      runtime_reply()
+    ))
+    record <- record_runtime_trace(server$url, mode)
+    decision <- if (mode == "override") "allow" else "deny"
+    events <- Filter(function(x) x$type == "permission", record$value$events)
+    expect_length(events, 1L)
+    expect_identical(events[[1]]$decision, decision)
+    traced <- Filter(
+      function(x) x$name == "deputy.permission",
+      record$traces[["deputy.run"]]$events
+    )
+    expect_length(traced, 1L)
+    expect_identical(traced[[1]]$attributes$decision, decision)
+    expect_identical(
+      traced[[1]]$attributes$tool_call_id,
+      events[[1]]$tool_call_id
+    )
+    executed <- Filter(
+      function(x) startsWith(x$name, "execute_tool "),
+      record$traces
+    )
+    expect_length(executed, as.integer(decision == "allow"))
+  }
 })
