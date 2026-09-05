@@ -49,9 +49,10 @@ selected provider and do not implicitly gain additional destinations.
 
 `request_start`, `request_end`, `request_error`, and `fallback` events retain
 model selection and original conditions with run IDs. These local events may
-contain provider error details. Application validation failures retain the
-successful `request_end` and a separate `run_error`, with the original condition,
-rather than reporting a provider request failure. Failed dispatches count toward
+contain provider error details. `request_error` is reserved for recognized
+httr2 HTTP/transport conditions. Application callback and validation failures
+retain any observed `request_end` and a separate `run_error` with the original
+condition. Failed dispatches count toward
 `max_requests`.
 Reported token totals include only observed usage; unknown cost is `NA`, and a
 cost cap prevents further requests when that cost cannot be enforced.

@@ -148,6 +148,11 @@ test_that("cancellation and application callback errors never trigger fallback",
   broken$on_request_start(function(turns) cli::cli_abort("application failure"))
   agent <- Agent$new(broken, fallback_chats = list(runtime_chat(backup)))
   expect_error(agent$run_sync("task"), "application failure")
+  expect_length(runtime_events(agent, "request_error"), 0L)
+  expect_match(
+    conditionMessage(runtime_events(agent, "run_error")[[1]]$condition),
+    "application failure"
+  )
   expect_length(backup$requests(), 0L)
 })
 
@@ -233,5 +238,49 @@ test_that("synchronous fallback configuration failures cannot report completion"
   expect_error(agent$run_sync("task"), "invalid backup configuration")
   expect_identical(agent$last_run()$stop_reason, "error")
   expect_false(agent$.__enclos_env__$private$run_active)
-  expect_length(runtime_events(agent, "request_error"), 2L)
+  expect_length(runtime_events(agent, "request_error"), 1L)
+  expect_match(
+    conditionMessage(runtime_events(agent, "run_error")[[1]]$condition),
+    "invalid backup configuration"
+  )
+})
+
+test_that("request-end callback errors are run failures regardless of callback order", {
+  for (order in c("before", "after")) {
+    server <- local_runtime_server(list(runtime_reply("response received")))
+    backup <- local_runtime_server(list(runtime_reply("unexpected")))
+    chat <- runtime_chat(server)
+    callback <- function(turn) {
+      rlang::abort(
+        "application callback failed",
+        class = "fixture_callback_error"
+      )
+    }
+    if (order == "before") {
+      chat$on_request_end(callback)
+    }
+    agent <- Agent$new(chat, fallback_chats = list(runtime_chat(backup)))
+    if (order == "after") {
+      agent$add_hook(HookMatcher$new(
+        "SessionStart",
+        function(...) {
+          chat$on_request_end(callback)
+          NULL
+        },
+        timeout = 0
+      ))
+    }
+    expect_error(agent$run_sync("task"), class = "fixture_callback_error")
+    expect_length(runtime_events(agent, "request_error"), 0L)
+    # ellmer owns callback delivery order; verify the request actually ran
+    # without requiring Deputy's end observer to precede the failing callback.
+    expect_length(server$requests(), 1L)
+    expect_s3_class(
+      runtime_events(agent, "run_error")[[1]]$condition,
+      "fixture_callback_error"
+    )
+    expect_identical(agent$last_run()$usage$requests, 1L)
+    expect_identical(agent$last_run()$stop_reason, "error")
+    expect_length(backup$requests(), 0L)
+  }
 })

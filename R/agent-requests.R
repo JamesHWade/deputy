@@ -131,6 +131,11 @@ end_model_request <- function(agent, turn) {
 }
 
 record_model_failure <- function(agent, condition) {
+  # A stream rejection can come from application callbacks or conversion.
+  # Only httr2's public HTTP/transport conditions establish request failure.
+  if (!inherits(condition, c("httr2_failure", "httr2_http"))) {
+    return(invisible(FALSE))
+  }
   private <- agent$.__enclos_env__$private
   private$record_run_event(private$agent_event(
     "request_error",
@@ -139,6 +144,7 @@ record_model_failure <- function(agent, condition) {
     model = agent$get_model(),
     condition = condition
   ))
+  invisible(TRUE)
 }
 
 # Only transport failures known to be transient qualify. Authentication,

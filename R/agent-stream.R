@@ -424,9 +424,11 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
               break
             }
             stream_state$reason <- "error"
-            if (!is.null(structured)) {
-              record_run_failure(agent, "structured_output", stream_error)
-            }
+            record_run_failure(
+              agent,
+              if (is.null(structured)) "stream" else "structured_output",
+              stream_error
+            )
             rlang::cnd_signal(stream_error)
           }
 

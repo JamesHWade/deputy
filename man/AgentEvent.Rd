@@ -34,10 +34,11 @@ updates on agent progress.
 \code{content_type}
 \item \code{"request_start"}, \code{"request_end"}, \code{"request_error"} - Governed model
 dispatch evidence with provider, model, request number, and original
-conditions on errors. These are not individual HTTP retry attempts.
-\item \code{"run_error"} - Initialization or structured-output failure, with its phase
-and original condition. Application validation does not turn a successful
-provider response into a \code{"request_error"}.
+HTTP/transport conditions on errors. These are not individual HTTP retry
+attempts. Unclassified application errors are retained as \code{"run_error"}.
+\item \code{"run_error"} - Terminal initialization, streaming, or structured-output
+failure, with its phase and original condition. Application callbacks and
+validation do not turn a successful response into a \code{"request_error"}.
 \item \code{"fallback"} - Explicit Chat selection, prior condition, and usage.
 \item \code{"structured_attempt"} - Structured value, available turn, validation
 outcome, feedback, and condition. May contain sensitive application data.
