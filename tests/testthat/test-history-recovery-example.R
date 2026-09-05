@@ -337,3 +337,37 @@ test_that("repeated checkpoint requests invalidate preparation without replaying
   expect_match(last$content, "only once", fixed = TRUE)
   expect_no_match(last$content, "denominator 80", fixed = TRUE)
 })
+
+test_that("a preparation run cannot consume future checkpoints", {
+  example <- history_example()
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "load_checkpoint", arguments = list(stage = 1L)),
+    runtime_reply(tool = "load_checkpoint", arguments = list(stage = 2L)),
+    runtime_reply(tool = "load_checkpoint", arguments = list(stage = 3L)),
+    runtime_reply("All checkpoints acknowledged.")
+  ))
+  warnings <- character()
+  evaluation <- withCallingHandlers(
+    example$history_evaluate(
+      function(model) runtime_chat(server),
+      example$history_fixture(1L)
+    ),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_length(warnings, 1L)
+  expect_identical(
+    evaluation$failure$class,
+    "history_evaluation_wrong_checkpoint"
+  )
+  expect_length(evaluation$trials, 0L)
+  expect_length(evaluation$runs, 1L)
+  expect_length(server$requests(), 4L)
+  expect_no_match(
+    jsonlite::toJSON(server$requests()),
+    "denominator 84",
+    fixed = TRUE
+  )
+})
