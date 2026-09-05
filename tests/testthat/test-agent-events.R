@@ -520,3 +520,21 @@ test_that("malformed tool identity is rejected before permission checks", {
   expect_false(checked$value)
   expect_identical(agent$.__enclos_env__$private$current_tool_calls, 0L)
 })
+
+test_that("failed run initialization retains an error outcome before any dispatch", {
+  server <- local_runtime_server(list(runtime_reply()))
+  agent <- Agent$new(
+    runtime_chat(server),
+    enable_file_checkpointing = TRUE,
+    file_checkpoint_max_journal_bytes = 1
+  )
+  expect_error(agent$run_sync("task"), class = "deputy_file_checkpoint_error")
+  expect_identical(agent$last_run()$stop_reason, "error")
+  expect_identical(agent$last_run()$usage$requests, 0L)
+  expect_length(server$requests(), 0L)
+  expect_false(agent$.__enclos_env__$private$run_active)
+  expect_s3_class(
+    runtime_events(agent, "run_error")[[1]]$condition,
+    "deputy_file_checkpoint_error"
+  )
+})

@@ -318,15 +318,28 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           agent$.__enclos_env__$private$finish_callback_run(stream_state),
           add = TRUE
         )
-        initialize_agent_run(
-          agent,
-          stream_state,
-          messages,
-          run_limits,
-          effective_run_context,
-          controller,
-          stream_mode,
-          compaction_usage
+        tryCatch(
+          initialize_agent_run(
+            agent,
+            stream_state,
+            messages,
+            run_limits,
+            effective_run_context,
+            controller,
+            stream_mode,
+            compaction_usage
+          ),
+          error = function(error) {
+            stream_state$reason <- "error"
+            agent$.__enclos_env__$private$record_run_event(
+              agent$.__enclos_env__$private$agent_event(
+                "run_error",
+                phase = "initialization",
+                condition = error
+              )
+            )
+            rlang::cnd_signal(error)
+          }
         )
         active_run_id <- stream_state$active_run_id
 
@@ -390,16 +403,21 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
                 "interrupted"
               break
             }
+            stream_state$reason <- "error"
             record_model_failure(agent, stream_error)
             if (try_chat_fallback(agent, stream_error)) {
-              stream <- agent$.__enclos_env__$private$start_async_stream(
-                messages,
-                tool_mode,
-                stream_mode,
-                agent$.__enclos_env__$private$current_stream_controller,
-                structured,
-                stream_type
+              stream <- tryCatch(
+                agent$.__enclos_env__$private$start_async_stream(
+                  messages,
+                  tool_mode,
+                  stream_mode,
+                  agent$.__enclos_env__$private$current_stream_controller,
+                  structured,
+                  stream_type
+                ),
+                error = function(error) promises::promise_reject(error)
               )
+              stream_state$reason <- "complete"
               is_generator <- inherits(stream, "coro_generator_instance")
               next
             }
@@ -494,6 +512,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             )),
             error = function(error) {
               if (!agent$.__enclos_env__$private$should_stop) {
+                record_model_failure(agent, error)
                 stream_state$reason <- "error"
                 rlang::cnd_signal(error)
               }

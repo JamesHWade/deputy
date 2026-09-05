@@ -220,3 +220,18 @@ test_that("observer removers follow the selected Chat and templates keep their c
   expect_identical(observer_calls, 1L)
   expect_identical(template_calls, 2L)
 })
+
+test_that("synchronous fallback configuration failures cannot report completion", {
+  withr::local_options(ellmer_max_tries = 1)
+  server <- local_runtime_server(list(runtime_failure()))
+  backup <- runtime_chat(server)
+  rlang::env_binding_unlock(backup, "stream_async")
+  backup$stream_async <- function(...) {
+    cli::cli_abort("invalid backup configuration")
+  }
+  agent <- Agent$new(runtime_chat(server), fallback_chats = list(backup))
+  expect_error(agent$run_sync("task"), "invalid backup configuration")
+  expect_identical(agent$last_run()$stop_reason, "error")
+  expect_false(agent$.__enclos_env__$private$run_active)
+  expect_length(runtime_events(agent, "request_error"), 2L)
+})

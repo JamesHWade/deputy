@@ -234,3 +234,27 @@ test_that("truncated structured responses are terminal and budget errors retain 
   expect_identical(limited$last_run()$stop_reason, "request_limit")
   expect_identical(limited$last_run()$usage$requests, 0L)
 })
+
+test_that("a failed extraction retains its original condition after completed task work", {
+  server <- local_runtime_server(list(
+    runtime_reply("work complete"),
+    runtime_failure(401L)
+  ))
+  agent <- Agent$new(runtime_chat(server))
+  expect_error(
+    agent$run_sync(
+      "task",
+      type = ellmer::type_object(count = ellmer::type_integer()),
+      max_corrections = 5
+    ),
+    class = "httr2_http_401"
+  )
+  expect_identical(trimws(agent$last_run()$response), "work complete")
+  expect_identical(agent$last_run()$stop_reason, "error")
+  expect_identical(agent$last_run()$usage$requests, 2L)
+  expect_s3_class(
+    runtime_events(agent, "request_error")[[1]]$condition,
+    "httr2_http_401"
+  )
+  expect_length(server$requests(), 2L)
+})

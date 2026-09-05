@@ -25,6 +25,7 @@
 #' * `"request_start"`, `"request_end"`, `"request_error"` - Governed model
 #'   dispatch evidence with provider, model, request number, and original
 #'   conditions on errors. These are not individual HTTP retry attempts.
+#' * `"run_error"` - Initialization failure before model dispatch.
 #' * `"fallback"` - Explicit Chat selection, prior condition, and usage.
 #' * `"structured_attempt"` - Structured value, available turn, validation
 #'   outcome, feedback, and condition. May contain sensitive application data.
