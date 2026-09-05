@@ -71,6 +71,9 @@ create_parallel_chat <- function(state = new.env(parent = emptyenv())) {
         stop("deterministic responder failure")
       }
       text <- paste(key, prompt)
+      if (is.function(state$responder)) {
+        text <- state$responder(key, prompt)
+      }
       chat$set_turns(list(
         ellmer::UserTurn(list(ellmer::ContentText(prompt))),
         ellmer::AssistantTurn(

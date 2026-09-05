@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* The standalone `09-debate.R` example runs opposing stateless responders,
+  formats their arguments side by side, and synthesizes completed results
+  using a reusable, tool-free `debate` skill. Failed perspectives remain
+  inspectable and prevent synthesis (#40).
+
 * `LeadAgent$parallel_delegate()` and `$parallel_delegate_async()` run fresh,
   tool-free responders in bounded concurrent waves. Batches preserve named
   partial results, record child runs, reserve request budgets, and support host

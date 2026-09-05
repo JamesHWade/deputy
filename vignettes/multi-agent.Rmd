@@ -231,6 +231,26 @@ batch settles after its active responders drain. The lead rejects overlapping
 runs until cleanup finishes. Tool-using background workers and persistent
 agent scheduling are separate future work.
 
+## Opposing perspectives and synthesis
+
+For a complete opposing-perspective workflow, run the installed standalone
+example after configuring your OpenAI credentials:
+
+```{r, eval = FALSE}
+source(system.file("examples", "standalone", "09-debate.R", package = "deputy"))
+```
+
+It prints a Markdown comparison, requires both heads to complete, and then
+uses a separate one-request moderator. Its bundled prompt can also be reused
+with any Agent:
+
+```{r, eval = FALSE}
+agent$load_skill(system.file("skills", "debate", package = "deputy"))
+```
+
+Loading this prompt does not start independent responders. The host supplies
+arguments or orchestrates fan-out explicitly.
+
 ## Monitoring with SubagentStop Hooks
 
 Use a `SubagentStop` hook to log or inspect sub-agent results:
@@ -240,7 +260,7 @@ hook_monitor <- HookMatcher$new(
   event = "SubagentStop",
   callback = function(agent_name, task, result, context) {
     cli::cli_alert_info("Sub-agent {agent_name} finished")
-    cli::cli_alert("Requests: {result$usage$requests}")
+    cli::cli_alert("Status: {context$status}")
     NULL
   }
 )

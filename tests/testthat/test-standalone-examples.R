@@ -128,3 +128,100 @@ test_that("delegation example runs its registered reviewer during the lead run",
   expect_identical(runs$agent_name, "reviewer")
   expect_identical(runs$status, "completed")
 })
+
+test_that("debate example compares independent heads and synthesizes both arguments", {
+  skip_if_not_installed("yaml")
+  withr::local_envvar(DEPUTY_DEBATE_TOPIC = "Should reviews be mandatory?")
+  state <- new.env(parent = emptyenv())
+  state$responder <- function(system_prompt, task) {
+    if (grepl("AGAINST", system_prompt, fixed = TRUE)) {
+      "Review queues can delay fixes.\nMeasure the cost | benefit."
+    } else {
+      "Independent review catches mistakes <early>."
+    }
+  }
+  moderator_chat <- create_mock_chat("Pilot reviews and measure outcomes.")
+  stream <- moderator_chat$stream
+  submitted <- NULL
+  moderator_chat$stream <- function(prompt) {
+    submitted <<- prompt
+    stream(prompt)
+  }
+  index <- 0L
+  example <- run_standalone_example("09-debate.R", function() {
+    index <<- index + 1L
+    if (index == 1L) create_parallel_chat(state) else moderator_chat
+  })
+  expect_identical(index, 2L)
+  expect_identical(state$peak, 2L)
+  expect_identical(
+    example$batch$status,
+    c(support = "completed", challenge = "completed")
+  )
+  expect_match(example$comparison, "mistakes &lt;early&gt;", fixed = TRUE)
+  expect_match(
+    example$comparison,
+    "<br>Measure the cost &#124; benefit.",
+    fixed = TRUE
+  )
+  expect_match(submitted, "Should reviews be mandatory?", fixed = TRUE)
+  expect_match(
+    submitted,
+    "Independent review catches mistakes <early>.",
+    fixed = TRUE
+  )
+  expect_match(submitted, "Review queues can delay fixes.", fixed = TRUE)
+  expect_identical(
+    example$synthesis$response,
+    "Pilot reviews and measure outcomes."
+  )
+  expect_identical(example$requests_used, 3L)
+  expect_length(example$moderator$get_tools(), 0L)
+  expect_identical(names(example$moderator$skills()), "debate")
+  expect_match(
+    example$moderator$get_system_prompt(),
+    "Do not invent sources",
+    fixed = TRUE
+  )
+})
+
+test_that("debate example retains partial comparison and skips synthesis on failure", {
+  skip_if_not_installed("yaml")
+  state <- new.env(parent = emptyenv())
+  state$responder <- function(system_prompt, task) {
+    if (grepl("AGAINST", system_prompt, fixed = TRUE)) {
+      cli::cli_abort("fixture challenger unavailable")
+    }
+    "Independent review catches mistakes."
+  }
+  index <- 0L
+  env <- new.env(parent = as.environment("package:deputy"))
+  expect_error(
+    run_standalone_example(
+      "09-debate.R",
+      function() {
+        index <<- index + 1L
+        create_parallel_chat(state)
+      },
+      env
+    ),
+    "Debate incomplete"
+  )
+  expect_identical(index, 1L)
+  expect_identical(
+    env$batch$status,
+    c(support = "completed", challenge = "failed")
+  )
+  expect_match(
+    env$comparison,
+    "Independent review catches mistakes.",
+    fixed = TRUE
+  )
+  expect_match(env$comparison, "[failed]", fixed = TRUE)
+  expect_match(
+    conditionMessage(env$batch$errors$challenge),
+    "fixture challenger unavailable",
+    fixed = TRUE
+  )
+  expect_false(exists("synthesis", envir = env, inherits = FALSE))
+})
