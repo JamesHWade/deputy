@@ -1,5 +1,13 @@
 # deputy (development version)
 
+* Compaction summaries now include tool evidence through ellmer's public content
+  formatter, while excluding tool-result display metadata. Previously a source
+  returned by a tool could disappear from the summary input.
+* A caller-owned history-recovery experiment compares identical prepared context
+  with and without bounded, scoped source retrieval. It records paired outcomes,
+  provenance, usage, latency and effect counts without adding a persistence API
+  or recursive-analysis runtime (#112).
+
 * `ContextPolicy()` governs automatic compaction under the active run's identity,
   shared usage limits, and cancellation controller. Explicit
   `summary_fallback_chats` recover transient summary failures independently of

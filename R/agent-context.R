@@ -444,31 +444,11 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
             ))
             "Unknown"
           }
-          text <- turn@text %||% "[no text]"
-
-          # Include tool information if present
-          tool_info <- ""
-          if (inherits(turn, "ellmer::AssistantTurn")) {
-            contents <- turn@contents %||% list()
-            tool_requests <- Filter(
-              function(c) inherits(c, "ellmer::ContentToolRequest"),
-              contents
-            )
-            if (length(tool_requests) > 0) {
-              tool_names <- vapply(
-                tool_requests,
-                function(tool) tool@name %||% "unknown",
-                character(1)
-              )
-              tool_info <- paste0(
-                " [Tools: ",
-                paste(tool_names, collapse = ", "),
-                "]"
-              )
-            }
-          }
-
-          paste0(role, tool_info, ": ", text)
+          # `turn@text` intentionally omits tool content. ellmer's public
+          # formatter includes requests/results but excludes result `extra`,
+          # which is private display metadata rather than model-visible evidence.
+          text <- cli::ansi_strip(format(turn))
+          paste0(role, ": ", text)
         },
         character(1)
       )

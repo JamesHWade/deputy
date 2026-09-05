@@ -49,6 +49,23 @@ devtools::test(filter = "compaction-run|context-policy|chat-fallback")
 
 ## Next comparison
 
+The runnable producer is now in
+[`inst/examples/history-recovery/`](../inst/examples/history-recovery/README.md).
+It supplies three synthetic checkpoints through real tool rounds, requires
+repeated automatic compaction, and compares identical prepared contexts with
+and without scoped retrieval. `test-history-recovery-example.R` exercises its
+paired runner and failure paths with released ellmer wire fixtures. The new
+tool-evidence regression also verifies that the summary request contains tool
+results without their private display metadata.
+
+Deterministic scores establish the experiment's wiring, not model quality.
+#112 remains open for authorized live repeated trials and an evidence-based
+decision. The initial catalogue is repetitive synthetic padding; supplement it
+with diverse or consented trajectories, actual completed effects and changed
+constraints before making a production claim. The live runner requires explicit
+opt-in, preserves recoverable partial results, and documents observed-cost
+limitations. No recursive implementation is justified by the fixture tests.
+
 Evaluate these strategies on the same host-owned trajectories and probes:
 
 1. Current cumulative summary plus recent context.
