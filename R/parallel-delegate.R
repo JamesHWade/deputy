@@ -111,13 +111,14 @@ parallel_responder <- function(
           )
         )
         if (isTRUE(private$should_stop)) {
-          return(list(result = NULL, error = NULL, status = "not_started"))
+          NULL
+        } else {
+          task_to_run <- task
+          if (!is.null(definition$initial_prompt)) {
+            task_to_run <- paste(definition$initial_prompt, task, sep = "\n\n")
+          }
+          coro::await(child$run_async(task_to_run, usage_limits = limits))
         }
-        task_to_run <- task
-        if (!is.null(definition$initial_prompt)) {
-          task_to_run <- paste(definition$initial_prompt, task, sep = "\n\n")
-        }
-        coro::await(child$run_async(task_to_run, usage_limits = limits))
       },
       error = function(condition) {
         error <<- condition
@@ -133,6 +134,8 @@ parallel_responder <- function(
     )
     if (!is.null(error)) {
       status <- "failed"
+    } else if (is.null(result)) {
+      status <- "not_started"
     } else if (identical(result$stop_reason, "complete")) {
       status <- "completed"
     } else if (result$stop_reason %in% c("error", "provider_error")) {
