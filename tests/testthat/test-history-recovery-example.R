@@ -137,8 +137,18 @@ test_that("paired continuations use real compaction, retrieval and structured ou
   server <- local_runtime_server(wire)
   factory <- function(model) {
     chat <- runtime_chat(server, name = "OpenAI")
+    counter <- function(..., include = "complete") {
+      previous <- sum(nchar(vapply(self$get_turns(), format, character(1))))
+      incoming <- sum(nchar(vapply(
+        list(...),
+        function(x) paste(format(x), collapse = ""),
+        character(1)
+      )))
+      (previous + incoming) / 4
+    }
+    environment(counter) <- environment(chat$token_count)
     rlang::env_binding_unlock(chat, "token_count")
-    chat$token_count <- function(...) 1000
+    chat$token_count <- counter
     chat
   }
   evaluation <- example$history_evaluate(
@@ -147,7 +157,7 @@ test_that("paired continuations use real compaction, retrieval and structured ou
     trials = 2L,
     helper_models = "fixture",
     task_model = "fixture",
-    max_tokens = 50L
+    max_tokens = 500L
   )
   expect_null(evaluation$failure)
   expect_length(evaluation$trials, 4L)
@@ -157,7 +167,7 @@ test_that("paired continuations use real compaction, retrieval and structured ou
   )
   for (rows in split(evaluation$trials, rep(1:2, each = 2L))) {
     expect_identical(rows[[1L]]$summary_id, rows[[2L]]$summary_id)
-    expect_gte(rows[[1L]]$transitions, 2L)
+    expect_equal(rows[[1L]]$transitions, 3L)
     expect_identical(
       vapply(rows, function(row) row$score$all_correct, logical(1)),
       c(TRUE, TRUE)
@@ -169,6 +179,22 @@ test_that("paired continuations use real compaction, retrieval and structured ou
   }
   history <- Filter(function(row) row$strategy == "history", evaluation$trials)
   expect_identical(history[[1L]]$history_audit[[1L]]$item_ids, "assay-C-r3")
+  compactions <- unlist(
+    lapply(evaluation$runs, function(run) {
+      Filter(function(event) event$type == "compaction", run$events)
+    }),
+    recursive = FALSE
+  )
+  expect_length(compactions, 6L)
+  expect_identical(
+    vapply(compactions, function(event) length(event$attempts), integer(1)),
+    rep(1L, 6L)
+  )
+  expect_match(
+    paste(example$history_report(evaluation), collapse = "\n"),
+    "fixture/2",
+    fixed = TRUE
+  )
   prompts <- jsonlite::toJSON(server$requests())
   expect_match(prompts, "denominator 84", fixed = TRUE)
   expect_no_match(prompts, "PRIVATE-", fixed = TRUE)
@@ -256,4 +282,27 @@ test_that("experiment interruption retains evidence and prevents later dispatch"
   expect_identical(unknown$usage$cost_usd, NA_real_)
   expect_length(unknown$runs, 1L)
   expect_length(server$requests(), 2L)
+})
+
+
+test_that("live opt-in is explicit and outer errors persist no condition message", {
+  example <- history_example()
+  withr::local_envvar(DEPUTY_HISTORY_LIVE = NA_character_)
+  path <- system.file(
+    "examples",
+    "history-recovery",
+    "run.R",
+    package = "deputy"
+  )
+  expect_condition(sys.source(path, envir = new.env()), class = "rlang_error")
+  evaluation <- example$history_evaluate(
+    function(model) rlang::abort("CREDENTIAL-BEARING-ERROR"),
+    example$history_fixture(1L)
+  )
+  expect_identical(evaluation$failure, list(class = "rlang_error"))
+  expect_no_match(
+    jsonlite::toJSON(evaluation),
+    "CREDENTIAL-BEARING-ERROR",
+    fixed = TRUE
+  )
 })

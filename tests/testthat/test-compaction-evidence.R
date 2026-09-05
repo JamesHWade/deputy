@@ -37,3 +37,43 @@ test_that("compaction includes tool evidence without private display metadata", 
   expect_match(prompt, "source_read", fixed = TRUE)
   expect_no_match(prompt, "HOST-ONLY-SECRET", fixed = TRUE)
 })
+
+test_that("compaction preserves documented non-string ellmer tool payloads", {
+  for (value in list(
+    ellmer::ContentText("Evidence: denominator 84, page 17."),
+    list(
+      ellmer::ContentText("Evidence: denominator 84"),
+      ellmer::ContentText("page 17.")
+    ),
+    c(84L, 17L)
+  )) {
+    server <- local_runtime_server(list(
+      runtime_reply(tool = "source_read"),
+      runtime_reply("Source inspected."),
+      runtime_reply("C uses denominator 84, page 17.", stream = FALSE)
+    ))
+    source <- ellmer::tool(
+      function() {
+        ellmer::ContentToolResult(
+          value = value,
+          extra = list(private = "HOST-ONLY-SECRET")
+        )
+      },
+      name = "source_read",
+      description = "Read source evidence.",
+      annotations = ellmer::tool_annotations(
+        read_only_hint = TRUE,
+        open_world_hint = FALSE
+      )
+    )
+    agent <- Agent$new(runtime_chat(server), tools = list(source))
+    agent$run_sync("Read the source.")
+    source_turns <- agent$get_turns()
+    agent$compact(keep_last = 0L)
+    prompt <- jsonlite::toJSON(tail(server$requests(), 1L)[[1L]]$body)
+    expect_match(prompt, "84", fixed = TRUE)
+    expect_match(prompt, "17", fixed = TRUE)
+    expect_no_match(prompt, "HOST-ONLY-SECRET", fixed = TRUE)
+    expect_identical(source_turns[[3L]]@contents[[1L]]@value, value)
+  }
+})

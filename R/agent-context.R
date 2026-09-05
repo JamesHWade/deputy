@@ -426,6 +426,33 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       result
     },
 
+    compaction_content_text = function(content) {
+      if (
+        !inherits(content, "ellmer::ContentToolResult") ||
+          !is.null(content@error)
+      ) {
+        return(paste(format(content), collapse = "\n"))
+      }
+      # ellmer's result formatter expects scalar text, while its public result
+      # class also permits atomic vectors and Content objects. Format those
+      # payloads through their public interfaces; never include display `extra`.
+      value <- content@value
+      if (inherits(value, "ellmer::Content")) {
+        value <- list(value)
+      }
+      text <- if (is.list(value)) {
+        paste(
+          vapply(value, private$compaction_content_text, character(1)),
+          collapse = "\n"
+        )
+      } else if (is.character(value)) {
+        paste(value, collapse = "\n")
+      } else {
+        as.character(jsonlite::toJSON(value, auto_unbox = TRUE, null = "null"))
+      }
+      paste(format(content, show = "header"), text, sep = "\n")
+    },
+
     # Generate a summary of turns using the LLM
     compaction_summary_prompt = function(turns) {
       # Format turns for compaction
@@ -444,10 +471,15 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
             ))
             "Unknown"
           }
-          # `turn@text` intentionally omits tool content. ellmer's public
-          # formatter includes requests/results but excludes result `extra`,
-          # which is private display metadata rather than model-visible evidence.
-          text <- cli::ansi_strip(format(turn))
+          # `turn@text` intentionally omits tool content.
+          text <- cli::ansi_strip(paste(
+            vapply(
+              turn@contents,
+              private$compaction_content_text,
+              character(1)
+            ),
+            collapse = "\n"
+          ))
           paste0(role, ": ", text)
         },
         character(1)

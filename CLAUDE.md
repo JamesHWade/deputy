@@ -90,6 +90,15 @@ Keep examples independent and use the public Agent APIs.
 `inst/skills/debate/` skill and a separately budgeted moderator. It requires
 both heads to complete before synthesis; skill loading alone starts no work.
 
+`inst/examples/history-recovery/` is an external paired evaluation with
+caller-owned synthetic history. It compares identical compacted contexts with
+and without bounded source retrieval. Run deterministic producer tests with
+`devtools::test(filter = "history-recovery-example|compaction-evidence")`.
+The directory's README documents explicit paid-run opt-in and observed budgets.
+Live results are required before drawing model-quality conclusions (#112).
+`dev/shinychat-history-consumer.md` proposes the public history boundary for #66;
+production integration waits for an agreed, released R API.
+
 ## Common Commands
 
 ### Testing

@@ -86,6 +86,17 @@ history_budget <- function(
   state$cost <- 0
   state$records <- list()
   state$inputs <- list()
+  clean_attempts <- function(attempts) {
+    lapply(attempts, function(attempt) {
+      attempt$condition_class <- if (is.null(attempt$condition)) {
+        NULL
+      } else {
+        class(attempt$condition)
+      }
+      attempt$condition <- NULL
+      attempt
+    })
+  }
   run <- function(agent, prompt, label, type = NULL, max_run_requests = 8L) {
     if (isTRUE(cancelled())) {
       cli::cli_abort(
@@ -163,6 +174,11 @@ history_budget <- function(
           model = event$model,
           tool_name = event$tool_name,
           tool_call_id = event$tool_call_id,
+          method = event$method,
+          turns_compacted = event$turns_compacted,
+          turns_kept = event$turns_kept,
+          usage = event$usage,
+          attempts = clean_attempts(event$attempts),
           condition_class = if (is.null(event$condition)) {
             NULL
           } else {
@@ -176,15 +192,7 @@ history_budget <- function(
       compaction <- NULL
     }
     if (!is.null(compaction)) {
-      compaction$attempts <- lapply(compaction$attempts, function(attempt) {
-        attempt$condition_class <- if (is.null(attempt$condition)) {
-          NULL
-        } else {
-          class(attempt$condition)
-        }
-        attempt$condition <- NULL
-        attempt
-      })
+      compaction$attempts <- clean_attempts(compaction$attempts)
     }
     state$records[[length(state$records) + 1L]] <- list(
       label = label,
@@ -279,6 +287,14 @@ history_prepare <- function(
     )
   )
   compactions <- list()
+  agent$add_hook(deputy::HookMatcher$new(
+    event = "PostCompact",
+    timeout = 0,
+    callback = function(context, result, ...) {
+      compactions[[length(compactions) + 1L]] <<- result$summary
+      NULL
+    }
+  ))
   for (i in seq_along(prompts)) {
     outcome <- budget$run(
       agent,
@@ -291,14 +307,6 @@ history_prepare <- function(
         "Context preparation stopped; do not score an unfinished trial.",
         class = "history_evaluation_incomplete"
       )
-    }
-    compact <- agent$last_compaction()
-    if (
-      !is.null(compact) &&
-        identical(compact$run_id, outcome$result$run_id) &&
-        compact$method %in% c("llm", "text", "hook", "custom")
-    ) {
-      compactions[[length(compactions) + 1L]] <- compact$summary
     }
   }
   if (!setequal(loaded, unique(records$stage))) {
@@ -492,8 +500,7 @@ history_evaluate <- function(
     },
     error = function(error) {
       failure <<- list(
-        class = class(error)[[1L]],
-        message = conditionMessage(error)
+        class = class(error)[[1L]]
       )
     }
   )

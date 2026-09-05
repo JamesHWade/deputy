@@ -42,7 +42,7 @@ devtools::test(filter = "history-recovery-example|compaction-evidence")
 ```
 
 Tests use real ellmer producers against a local HTTP server, with canned answers
-and a fixed context estimate to force transitions. They cover paired preparation,
+and a character-count estimator that shrinks after compaction to force transitions. They cover paired preparation,
 structured scoring, real retrieval, scope isolation, stale/missing references,
 UTF-8 and payload limits, denied exports, cancellation and exhausted/unknown-cost
 budgets. Canned answer scores test the wiring, **not model recall quality**.
