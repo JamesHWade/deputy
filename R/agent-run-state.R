@@ -58,6 +58,8 @@ initialize_agent_run <- function(
   state$response_seen <- FALSE
   state$fallback_index <- private$.fallback_position
   state$request_number <- 0L
+  state$task_requests <- 0L
+  state$failure_phase <- NULL
   state$request_turns_before <- state$turns_before
   state$model_failure <- NULL
   state$dispatch_turns <- private$.chat$get_turns()

@@ -9,7 +9,8 @@ ContextPolicy(
   compact_to = 0.5,
   fallback = c("error", "text"),
   max_tool_result_bytes = 64 * 1024,
-  offload_dir = NULL
+  offload_dir = NULL,
+  summary_fallback_chats = list()
 )
 }
 \arguments{
@@ -30,6 +31,14 @@ stored outside the model context. Use \code{NULL} to disable result offloading.}
 \item{offload_dir}{Directory for durable result envelopes. Relative paths
 are anchored to the current working directory when the policy is created.
 \code{NULL} uses the Deputy user cache, partitioned by Agent session.}
+
+\item{summary_fallback_chats}{Ordered, explicitly configured ellmer Chats
+authorized to receive summary prompts during automatic compaction. Each
+template must have no turns or tools. Transient transport failures may
+advance to the next template after ellmer's retries. These destinations
+are separate from the Agent's task \code{fallback_chats}; choosing a summary
+destination does not change the task Chat. Manual \verb{$compact()} uses only
+its active Chat and \code{fallback} policy. Templates are cloned at construction.}
 }
 \value{
 A \code{ContextPolicy} object.
@@ -39,4 +48,20 @@ Defines when an \link{Agent} compacts its conversation and when large tool
 results are replaced with durable references. The default policy compacts
 before a request would exceed 32,000 estimated tokens and offloads tool
 results larger than 64 KiB.
+}
+\details{
+Automatic compaction is an asynchronous run phase. \code{SessionStart} and
+\code{UserPromptSubmit} precede \code{PreCompact}; \code{PostCompact} follows an accepted
+replacement. \code{Stop} and \code{SessionEnd} include summary failures and usage.
+Between tool rounds, context is checked at ellmer's next request boundary
+after all tool results settle. Summary dispatches, including failures, share
+the run's request/token/cost budget. Unknown costs remain unknown.
+
+Summary Chats have no tools, history, system prompt, or inherited callbacks.
+Cancellation or unrecoverable failure leaves the active context unchanged.
+An accepted summary remains installed when the budget prevents task dispatch.
+\verb{$last_compaction()} includes \code{run_id} and summary \code{attempts} with destination,
+usage, and original condition. Summaries are internal context, not task output.
+This policy does not archive removed turns or restore runtime permissions
+from a summary.
 }

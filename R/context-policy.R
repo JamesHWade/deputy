@@ -21,6 +21,28 @@
 #' @param offload_dir Directory for durable result envelopes. Relative paths
 #'   are anchored to the current working directory when the policy is created.
 #'   `NULL` uses the Deputy user cache, partitioned by Agent session.
+#' @param summary_fallback_chats Ordered, explicitly configured ellmer Chats
+#'   authorized to receive summary prompts during automatic compaction. Each
+#'   template must have no turns or tools. Transient transport failures may
+#'   advance to the next template after ellmer's retries. These destinations
+#'   are separate from the Agent's task `fallback_chats`; choosing a summary
+#'   destination does not change the task Chat. Manual `$compact()` uses only
+#'   its active Chat and `fallback` policy. Templates are cloned at construction.
+#' @details
+#' Automatic compaction is an asynchronous run phase. `SessionStart` and
+#' `UserPromptSubmit` precede `PreCompact`; `PostCompact` follows an accepted
+#' replacement. `Stop` and `SessionEnd` include summary failures and usage.
+#' Between tool rounds, context is checked at ellmer's next request boundary
+#' after all tool results settle. Summary dispatches, including failures, share
+#' the run's request/token/cost budget. Unknown costs remain unknown.
+#'
+#' Summary Chats have no tools, history, system prompt, or inherited callbacks.
+#' Cancellation or unrecoverable failure leaves the active context unchanged.
+#' An accepted summary remains installed when the budget prevents task dispatch.
+#' `$last_compaction()` includes `run_id` and summary `attempts` with destination,
+#' usage, and original condition. Summaries are internal context, not task output.
+#' This policy does not archive removed turns or restore runtime permissions
+#' from a summary.
 #' @return A `ContextPolicy` object.
 #' @export
 ContextPolicy <- function(
@@ -28,9 +50,15 @@ ContextPolicy <- function(
   compact_to = 0.5,
   fallback = c("error", "text"),
   max_tool_result_bytes = 64 * 1024,
-  offload_dir = NULL
+  offload_dir = NULL,
+  summary_fallback_chats = list()
 ) {
   fallback <- match.arg(fallback)
+  summary_fallback_chats <- normalize_fallback_chats(
+    summary_fallback_chats,
+    primary = NULL,
+    argument = "summary_fallback_chats"
+  )
   max_tokens <- context_policy_whole_number(max_tokens, "max_tokens")
   max_tool_result_bytes <- context_policy_whole_number(
     max_tool_result_bytes,
@@ -73,7 +101,8 @@ ContextPolicy <- function(
       compact_to = as.numeric(compact_to),
       fallback = fallback,
       max_tool_result_bytes = max_tool_result_bytes,
-      offload_dir = offload_dir
+      offload_dir = offload_dir,
+      summary_fallback_chats = summary_fallback_chats
     ),
     class = c("ContextPolicy", "list")
   )
@@ -119,7 +148,7 @@ normalize_context_policy <- function(policy) {
   if (!inherits(policy, "ContextPolicy")) {
     cli_abort("{.arg context_policy} must be a ContextPolicy object")
   }
-  policy
+  do.call(ContextPolicy, unclass(policy))
 }
 
 #' @export
@@ -128,6 +157,7 @@ print.ContextPolicy <- function(x, ...) {
   cli::cli_text("  compact at: {x$max_tokens %||% 'disabled'} tokens")
   cli::cli_text("  compact to: {format(x$compact_to * 100)}%")
   cli::cli_text("  fallback: {x$fallback}")
+  cli::cli_text("  summary fallback Chats: {length(x$summary_fallback_chats)}")
   cli::cli_text(
     "  offload above: {x$max_tool_result_bytes %||% 'disabled'} bytes"
   )
@@ -141,7 +171,9 @@ new_compaction_result <- function(
   turns_kept,
   estimated_tokens,
   usage = AgentUsage(),
-  summary = NULL
+  summary = NULL,
+  attempts = list(),
+  run_id = NULL
 ) {
   structure(
     list(
@@ -152,6 +184,8 @@ new_compaction_result <- function(
       estimated_tokens = estimated_tokens,
       usage = usage,
       summary = summary,
+      attempts = attempts,
+      run_id = run_id,
       compacted_at = Sys.time()
     ),
     class = c("DeputyCompaction", "list")

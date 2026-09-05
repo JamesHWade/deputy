@@ -1,8 +1,12 @@
 # Model dispatch governance. ellmer owns provider IO and transport retries.
 
-normalize_fallback_chats <- function(chats, primary) {
+normalize_fallback_chats <- function(
+  chats,
+  primary,
+  argument = "fallback_chats"
+) {
   if (!is.list(chats)) {
-    abort_deputy("{.arg fallback_chats} must be a list of Chats")
+    abort_deputy("{.arg {argument}} must be a list of Chats")
   }
   for (chat in chats) {
     validate_chat(chat)
@@ -29,7 +33,27 @@ install_request_callbacks <- function(agent) {
     return(invisible(NULL))
   }
   callbacks <- list(
-    on_request_start = function(turns) begin_model_request(agent),
+    on_request_start = function(turns) {
+      coro::async(function() {
+        tryCatch(
+          {
+            # All tool results have settled; ellmer has not stored or dispatched
+            # the pending user turn yet. Count its contents without appending it.
+            if (private$current_run_state$task_requests > 0L) {
+              pending <- utils::tail(turns, 1L)[[1L]]
+              coro::await(private$maybe_auto_compact(
+                messages = pending@contents
+              ))
+            }
+            begin_model_request(agent)
+          },
+          error = function(error) {
+            retain_pending_tool_results(agent, turns)
+            rlang::cnd_signal(error)
+          }
+        )
+      })()
+    },
     on_request_end = function(turn) end_model_request(agent, turn)
   )
   attr(chat, "deputy_request_callbacks") <- lapply(
@@ -43,6 +67,34 @@ install_request_callbacks <- function(agent) {
     }
   )
   chat$conversation_id <- private$.session_id
+  invisible(NULL)
+}
+
+retain_pending_tool_results <- function(agent, request_turns) {
+  pending <- utils::tail(request_turns, 1L)[[1L]]
+  if (
+    !inherits(pending, "ellmer::UserTurn") ||
+      !any(vapply(
+        pending@contents,
+        inherits,
+        logical(1),
+        what = "ellmer::ContentToolResult"
+      ))
+  ) {
+    return(invisible(NULL))
+  }
+  chat <- agent$.__enclos_env__$private$.chat
+  current <- chat$get_turns()
+  previous <- utils::head(request_turns, -1L)
+  # Compaction preserves the pending round. If a host deliberately replaced
+  # that conversation while we awaited, do not append orphaned tool results.
+  if (
+    length(current) &&
+      length(previous) &&
+      identical(tail(current, 1L), tail(previous, 1L))
+  ) {
+    chat$set_turns(c(current, list(pending)))
+  }
   invisible(NULL)
 }
 
@@ -105,6 +157,7 @@ begin_model_request <- function(agent) {
   }
   private$current_outer_requests <- private$current_outer_requests + 1L
   state$request_number <- state$request_number + 1L
+  state$task_requests <- state$task_requests + 1L
   state$request_turns_before <- length(private$.chat$get_turns())
   state$model_failure <- NULL
   private$record_run_event(private$agent_event(

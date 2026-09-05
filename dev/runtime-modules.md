@@ -11,6 +11,7 @@ formats remain unchanged by the moves.
 | Shared governed stream, adapters and finalization | `R/agent-stream.R` |
 | Session payload construction and restoration | `R/agent-session.R` |
 | Context estimation and compaction | `R/agent-context.R` |
+| Governed asynchronous compaction requests and recovery | `R/compaction-run.R` |
 | Permission/hook callbacks and upstream tool content extraction | `R/agent-tool-callbacks.R` |
 | Tool call records and delegation correlation | `R/agent-tool-records.R` |
 | Public ellmer request callbacks and explicit Chat selection | `R/agent-requests.R` |

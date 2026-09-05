@@ -605,11 +605,14 @@ Agent <- R6::R6Class(
       private$.chat$get_turns()
     },
 
-    #' @description Replace conversation turns, as in ellmer Chat.
+    #' @description Replace conversation turns, as in ellmer Chat. During a
+    #'   run, already accrued usage remains charged after history replacement.
     #' @param value A list of ellmer turns.
     #' @return Invisible self.
     set_turns = function(value) {
+      usage <- if (isTRUE(private$run_active)) private$current_run_usage()
       private$.chat$set_turns(value)
+      preserve_run_usage(self, usage)
       prompt <- private$.chat$get_system_prompt()
       prompt_without_compaction <- private$system_prompt_without_compaction()
       if (!identical(prompt, prompt_without_compaction)) {
@@ -1188,127 +1191,27 @@ Agent <- R6::R6Class(
           class = c("deputy_run_active", "deputy_error")
         )
       }
-      turns <- private$.chat$get_turns()
-      fallback <- match.arg(fallback, c("error", "text"))
-
-      if (is.null(keep_last)) {
-        max_tokens <- self$context_policy$max_tokens
-        keep_last <- if (is.null(max_tokens)) {
-          min(4L, length(turns))
-        } else {
-          private$compaction_keep_last(
-            messages = list(),
-            target_tokens = floor(
-              max_tokens * self$context_policy$compact_to
-            )
-          )
-        }
+      plan <- private$prepare_compaction(
+        keep_last,
+        summary,
+        fallback,
+        automatic,
+        estimated_tokens
+      )
+      if (!is.null(plan$result)) {
+        return(plan$result)
       }
-      keep_last <- validate_usage_limit(keep_last, "keep_last", integer = TRUE)
-      if (is.null(keep_last)) {
-        keep_last <- 0L
-      }
-
-      if (length(turns) <= keep_last) {
-        result <- new_compaction_result(
-          method = "none",
-          automatic = automatic,
-          turns_compacted = 0L,
-          turns_kept = length(turns),
-          estimated_tokens = estimated_tokens
-        )
-        private$.last_compaction <- result
-        return(result)
-      }
-
-      # Determine which turns to compact
-      compact_count <- length(turns) - keep_last
-      turns_to_compact <- turns[1:compact_count]
-      turns_to_keep <- if (keep_last == 0L) {
-        list()
+      generated <- if (is.null(plan$summary)) {
+        private$generate_compaction_summary(plan$turns_to_compact, fallback)
       } else {
-        tail(turns, keep_last)
+        list(summary = plan$summary, method = plan$method, usage = AgentUsage())
       }
-
-      # Fire PreCompact hook
-      hook_result <- private$fire_hook(
-        "PreCompact",
-        turns_to_compact = turns_to_compact,
-        turns_to_keep = turns_to_keep,
-        context = private$hook_context(
-          total_turns = length(turns),
-          compact_count = compact_count
-        )
+      private$install_compaction(
+        plan,
+        generated$summary,
+        generated$method,
+        generated$usage
       )
-
-      # Check if hook wants to cancel compaction
-      if (!is.null(hook_result) && isFALSE(hook_result$continue)) {
-        result <- new_compaction_result(
-          method = "cancelled",
-          automatic = automatic,
-          turns_compacted = 0L,
-          turns_kept = length(turns),
-          estimated_tokens = estimated_tokens
-        )
-        private$.last_compaction <- result
-        return(result)
-      }
-
-      method <- "custom"
-      summary_usage <- AgentUsage()
-      if (is.null(summary)) {
-        if (!is.null(hook_result) && !is.null(hook_result$summary)) {
-          summary <- hook_result$summary
-          method <- "hook"
-        } else {
-          generated <- private$generate_compaction_summary(
-            turns_to_compact,
-            fallback = fallback
-          )
-          summary <- generated$summary
-          method <- generated$method
-          summary_usage <- generated$usage
-        }
-      }
-
-      summary <- paste(as.character(summary), collapse = "\n")
-      current_system <- private$system_prompt_without_compaction()
-      new_system <- paste0(
-        current_system,
-        private$compaction_prompt_block(summary)
-      )
-
-      private$.chat$set_system_prompt(new_system)
-      private$.chat$set_turns(turns_to_keep)
-      private$.compaction_summary <- summary
-
-      result <- new_compaction_result(
-        method = method,
-        automatic = automatic,
-        turns_compacted = compact_count,
-        turns_kept = length(turns_to_keep),
-        estimated_tokens = estimated_tokens,
-        usage = summary_usage,
-        summary = summary
-      )
-      private$.last_compaction <- result
-      private$record_run_event(private$agent_event(
-        "compaction",
-        method = method,
-        automatic = automatic,
-        turns_compacted = compact_count,
-        turns_kept = length(turns_to_keep)
-      ))
-      private$fire_hook(
-        "PostCompact",
-        result = result,
-        context = private$hook_context(
-          total_turns = length(turns),
-          compact_count = compact_count,
-          automatic = isTRUE(automatic)
-        )
-      )
-      result
     },
 
     #' @description
@@ -1758,7 +1661,7 @@ Agent <- R6::R6Class(
     #' @field context_policy Automatic context-management policy. Read-only.
     context_policy = function(value) {
       if (missing(value)) {
-        return(private$.context_policy)
+        return(normalize_context_policy(private$.context_policy))
       }
       cli_abort(
         "Cannot modify agent: context_policy is immutable after construction"

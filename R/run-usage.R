@@ -16,8 +16,9 @@
 #' the agent's defaults.
 #'
 #' @param max_requests Maximum governed model dispatches, including failed
-#'   calls, structured extraction, and corrections. Retries inside ellmer's
-#'   HTTP transport are not separately observable. `NULL` leaves the field unset.
+#'   calls, automatic compaction, structured extraction, and corrections. Retries
+#'   inside ellmer's HTTP transport are not separately observable. `NULL` leaves
+#'   the field unset.
 #' @param max_tool_calls Maximum requested tool calls. Rejected calls count
 #'   toward usage. `NULL` leaves the field unset.
 #' @param max_input_tokens Maximum provider-reported input tokens. `NULL` leaves
@@ -221,7 +222,13 @@ provider_usage_summary <- function(chat) {
     logical(1),
     what = "ellmer::AssistantTurn"
   ))
-  tokens <- tryCatch(chat$get_tokens(), error = function(e) NULL)
+  tokens <- tryCatch(chat$get_tokens(), error = function(e) {
+    # ellmer 0.5.0's token table assumes paired user/assistant turns. A
+    # retained, undispatched tool-result turn breaks its input-preview column.
+    # These public producer properties retain the actual usage without adding
+    # a fictitious assistant response or changing provider serialization.
+    assistant_turn_tokens(turns)
+  })
   token_sum <- function(name) {
     if (is.null(tokens) || !name %in% names(tokens)) {
       return(0)
@@ -246,6 +253,33 @@ provider_usage_summary <- function(chat) {
     complete = cost$complete,
     missing = cost$missing,
     cost_records = cost_records
+  )
+}
+
+assistant_turn_tokens <- function(turns) {
+  # Released ellmer's S7 AssistantTurn contract requires three numeric token
+  # slots and one numeric cost, including for AssistantPartialTurn. Missing
+  # reports use NA, which preserves unknown cost through provider_cost_summary.
+  assistants <- Filter(
+    function(turn) inherits(turn, "ellmer::AssistantTurn"),
+    turns
+  )
+  token <- function(name) {
+    vapply(
+      assistants,
+      function(turn) {
+        tokens <- turn@tokens
+        position <- match(name, c("input", "output", "cached_input"))
+        as.numeric(tokens[[position]])
+      },
+      numeric(1)
+    )
+  }
+  data.frame(
+    input = token("input"),
+    output = token("output"),
+    cached_input = token("cached_input"),
+    cost = vapply(assistants, function(turn) as.numeric(turn@cost), numeric(1))
   )
 }
 
@@ -409,6 +443,21 @@ agent_usage_add <- function(left, right) {
     cached_tokens = left$cached_tokens + right$cached_tokens,
     cost_usd = left$cost_usd + right$cost_usd
   )
+}
+
+# Call after replacing conversation turns, using usage captured before the
+# replacement. Run evidence survives mutable context; tool counts retain their
+# separate authoritative runtime counter.
+preserve_run_usage <- function(agent, usage) {
+  if (is.null(usage)) {
+    return(invisible(NULL))
+  }
+  private <- agent$.__enclos_env__$private
+  usage$tool_calls <- usage$tool_calls - private$current_tool_calls
+  private$current_external_usage <- usage
+  private$current_outer_requests <- 0L
+  private$current_usage_baseline <- agent_usage_snapshot(private$.chat)
+  invisible(NULL)
 }
 
 usage_limit_status <- function(usage, limits, require_followup = FALSE) {

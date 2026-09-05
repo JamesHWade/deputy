@@ -318,12 +318,6 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         }
       }
 
-      # ellmer may make another provider request after this tool result. Check
-      # the complete context again while the run is between provider turns.
-      if (!isTRUE(private$should_stop)) {
-        private$maybe_auto_compact(messages = list())
-      }
-
       invisible(NULL)
     },
 

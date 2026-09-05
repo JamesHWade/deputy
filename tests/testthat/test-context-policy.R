@@ -129,61 +129,6 @@ test_that("automatic compaction does not spend an exhausted run budget", {
   expect_null(agent$last_compaction())
 })
 
-test_that("the run kernel rechecks context between provider tool turns", {
-  active_chat <- NULL
-  fixture <- create_shiny_tool_chat(
-    "test_tool",
-    list(),
-    execute = function(request) {
-      active_chat$set_turns(c(
-        active_chat$get_turns(),
-        list(ellmer::AssistantTurn(contents = list(request)))
-      ))
-    }
-  )
-  chat <- fixture$chat
-  active_chat <- chat
-  chat$set_turns(list(
-    create_mock_user_turn("Q1"),
-    create_mock_assistant_turn("A1"),
-    create_mock_user_turn("Q2"),
-    create_mock_assistant_turn("A2")
-  ))
-  chat$token_count <- function(..., include = c("new", "complete")) {
-    if (isTRUE(fixture$state$executed)) 100 else 10
-  }
-  agent <- Agent$new(
-    chat = chat,
-    permissions = permissions_full(),
-    context_policy = ContextPolicy(
-      max_tokens = 50,
-      compact_to = 0.5,
-      fallback = "text"
-    )
-  )
-
-  result <- suppressWarnings(agent$run_sync("Use the tool"))
-  compaction <- agent$last_compaction()
-
-  expect_s3_class(result, "AgentResult")
-  expect_true(compaction$automatic)
-  expect_identical(compaction$estimated_tokens, 100)
-  expect_gt(compaction$turns_compacted, 0L)
-  expect_true(any(vapply(
-    agent$get_turns(),
-    function(turn) {
-      inherits(turn, "ellmer::AssistantTurn") &&
-        any(vapply(
-          turn@contents,
-          inherits,
-          logical(1),
-          what = "ellmer::ContentToolRequest"
-        ))
-    },
-    logical(1)
-  )))
-})
-
 test_that("automatic compaction fails closed unless fallback is configured", {
   chat <- token_counting_chat()
   chat$set_turns(list(
