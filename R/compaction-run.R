@@ -159,13 +159,13 @@ compaction_summary_requests <- function(agent, turns) {
       return(NULL)
     }
     if (identical(private$.context_policy$fallback, "error")) {
-      cli_abort(
+      abort_deputy(
         c(
           "Conversation compaction failed.",
           "x" = conditionMessage(attempt$condition),
           "i" = "Set ContextPolicy(fallback = 'text') to permit degraded compaction."
         ),
-        class = c("deputy_compaction_error", "deputy_error"),
+        class = "compaction_error",
         parent = attempt$condition
       )
     }
@@ -205,9 +205,9 @@ compaction_summary_attempt <- function(
         chat$conversation_id <- private$.session_id
         chat$on_request_start(function(turns) {
           if (!compaction_can_continue(agent)) {
-            cli_abort(
+            abort_deputy(
               "The governed run has stopped",
-              class = c("deputy_run_stopped", "deputy_error")
+              class = "run_stopped"
             )
           }
           dispatched <<- dispatched + 1L

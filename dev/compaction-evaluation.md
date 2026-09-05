@@ -29,6 +29,17 @@ explicit recovery destinations, shared request/token/cost accounting, lifecycle
 correlation, cancellation, and preservation of tool results and completed effects.
 The between-round cases execute a counted export tool and require exactly one
 effect. Wire fixtures establish runtime behavior, not model recall accuracy.
+Stopped boundaries are also saved, loaded into a fresh Agent, and resumed;
+the provider receives each settled tool result once, with run-scoped usage.
+
+Released ellmer 0.5.0's `get_tokens()` preview table assumes paired user and
+completed assistant turns. A retained, undispatched tool-result turn violates
+that assumption ([upstream issue](https://github.com/tidyverse/ellmer/issues/1131)).
+Deputy reads public assistant token/cost properties if that
+table fails. For context estimation, it supplies the last completed pair and
+subsequent content to ellmer's public estimator on a clone. This leaves the
+canonical history and provider encoding intact, including after resume. Remove
+these narrow accommodations when the released producer supports this history.
 
 Run these tests without credentials or external model requests:
 

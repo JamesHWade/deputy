@@ -336,6 +336,232 @@ test_that("between-round summary failure is a compaction error and cannot replay
   expect_null(agent$last_compaction())
 })
 
+test_that("stopped compaction retains settled results through save, load, and resume", {
+  withr::local_options(ellmer_max_tries = 1)
+  for (outcome in c("failure", "cancel", "budget")) {
+    summary <- if (outcome == "failure") {
+      runtime_failure()
+    } else {
+      runtime_reply("Export completed.")
+    }
+    if (outcome == "cancel") {
+      attr(summary, "fixture_delay") <- 0.5
+    }
+    server <- local_runtime_server(list(
+      runtime_reply(tool = "export_findings"),
+      summary,
+      runtime_reply("Continued without repeating the export.")
+    ))
+    chat <- runtime_compaction_chat(server, name = "OpenAI")
+    chat$token_count <- function(...) {
+      if (
+        any(vapply(
+          list(...),
+          inherits,
+          logical(1),
+          what = "ellmer::ContentToolResult"
+        ))
+      ) {
+        1000
+      } else {
+        10
+      }
+    }
+    effects <- 0L
+    tool <- ellmer::tool(
+      function() {
+        effects <<- effects + 1L
+        "export-0042"
+      },
+      name = "export_findings",
+      description = "Export the findings"
+    )
+    agent <- Agent$new(
+      chat,
+      tools = list(tool),
+      permissions = permissions_full(),
+      context_policy = ContextPolicy(max_tokens = 50),
+      usage_limits = UsageLimits(
+        max_requests = if (outcome == "budget") 2 else 25
+      )
+    )
+    if (outcome == "cancel") {
+      deadline <- Sys.time() + 5
+      cancel_summary <- function() {
+        if (length(server$requests()) >= 2L) {
+          agent$interrupt()
+        } else if (Sys.time() < deadline) {
+          later::later(cancel_summary, 0.01)
+        }
+      }
+      cancel_timer <- later::later(cancel_summary, 0.01)
+    }
+    error <- tryCatch(
+      agent$run_sync("Perform the approved export"),
+      error = identity
+    )
+    if (outcome == "cancel") {
+      cancel_timer()
+    }
+    if (outcome == "failure") {
+      expect_s3_class(error, "deputy_compaction_error")
+    }
+    result <- agent$last_run()
+    expect_identical(
+      result$stop_reason,
+      switch(
+        outcome,
+        failure = "error",
+        cancel = "interrupted",
+        budget = "request_limit"
+      )
+    )
+    expect_identical(result$usage$requests, 2L)
+    expect_identical(result$usage$tool_calls, 1L)
+    expect_equal(result$usage$total_tokens, if (outcome == "budget") 30 else 15)
+    if (outcome == "budget") {
+      expect_gt(result$usage$cost_usd, 0)
+    } else {
+      expect_identical(result$usage$cost_usd, NA_real_)
+    }
+    turns <- agent$get_turns()
+    expect_s3_class(tail(turns, 1L)[[1]], "ellmer::UserTurn")
+    results <- Filter(
+      function(content) inherits(content, "ellmer::ContentToolResult"),
+      unlist(lapply(turns, function(turn) turn@contents), recursive = FALSE)
+    )
+    expect_length(results, 1L)
+    expect_identical(effects, 1L)
+    expect_length(server$requests(), 2L)
+    # No assistant was synthesized at the stopped dispatch boundary.
+    expect_s3_class(tail(turns, 2L)[[1]], "ellmer::AssistantTurn")
+    expect_equal(tail(turns, 2L)[[1]]@tokens[["input"]], 10)
+
+    path <- withr::local_tempfile(fileext = ".rds")
+    suppressWarnings(suppressMessages(agent$save_session(path)))
+    restored <- Agent$new(
+      runtime_chat(server, name = "OpenAI"),
+      tools = list(tool),
+      permissions = permissions_full()
+    )
+    suppressMessages(restored$load_session(path))
+    expect_length(restored$get_turns(), length(turns))
+    restored_result <- tail(restored$get_turns(), 1L)[[1]]@contents[[1]]
+    expect_s3_class(restored_result, "ellmer::ContentToolResult")
+    expect_equal(restored_result@value, results[[1]]@value)
+    expect_identical(restored_result@request@id, results[[1]]@request@id)
+    counts <- local_runtime_server(rep(
+      list(list(
+        status = 200L,
+        headers = list("Content-Type" = "application/json"),
+        body = '{"input_tokens":7}'
+      )),
+      2L
+    ))
+    estimator <- Agent$new(ellmer::chat_openai(
+      base_url = counts$url,
+      model = "gpt-4o-mini",
+      credentials = function() "fixture"
+    ))
+    estimator$set_turns(restored$get_turns())
+    estimate_before <- estimator$.__enclos_env__$private$context_token_count(list(
+      "Continue"
+    ))
+    expect_equal(estimate_before, 22)
+    expect_match(
+      jsonlite::toJSON(counts$requests()[[1]]$body),
+      "export-0042",
+      fixed = TRUE
+    )
+    resumed <- restored$run_sync("Continue using the completed export")
+    expect_identical(
+      trimws(resumed$response),
+      "Continued without repeating the export."
+    )
+    expect_identical(resumed$usage$requests, 1L)
+    expect_identical(resumed$usage$tool_calls, 0L)
+    expect_equal(resumed$usage$total_tokens, 15)
+    expect_gt(resumed$usage$cost_usd, 0)
+    expect_identical(effects, 1L)
+    messages <- server$requests()[[3]]$body$messages
+    wire_results <- Filter(
+      function(message) identical(message$role, "tool"),
+      messages
+    )
+    expect_length(wire_results, 1L)
+    expect_identical(wire_results[[1]]$tool_call_id, "call_fixture")
+    expect_match(
+      jsonlite::toJSON(wire_results[[1]]$content),
+      "export-0042",
+      fixed = TRUE
+    )
+    estimator$set_turns(restored$get_turns())
+    estimate_after <- estimator$.__enclos_env__$private$context_token_count(list(
+      "Continue"
+    ))
+    expect_equal(estimate_after, 22)
+    expect_identical(
+      vapply(counts$requests(), `[[`, character(1), "path"),
+      rep("/v1/responses/input_tokens", 2L)
+    )
+    expect_equal(
+      provider_usage_summary(restored$.__enclos_env__$private$.chat)$input,
+      sum(
+        vapply(
+          Filter(
+            function(turn) inherits(turn, "ellmer::AssistantTurn"),
+            restored$get_turns()
+          ),
+          function(turn) turn@tokens[[1L]],
+          numeric(1)
+        ),
+        na.rm = TRUE
+      )
+    )
+  }
+})
+
+test_that("host edits during an asynchronous summary reject stale replacement", {
+  for (edit in c("turns", "system_prompt")) {
+    reply <- runtime_reply("Stale summary")
+    attr(reply, "fixture_delay") <- 0.2
+    server <- local_runtime_server(list(reply))
+    agent <- Agent$new(
+      runtime_compaction_chat(server),
+      context_policy = ContextPolicy(max_tokens = 50)
+    )
+    replacement <- list(ellmer::UserTurn("Host replacement"))
+    changed <- FALSE
+    deadline <- Sys.time() + 5
+    edit_host <- function() {
+      if (length(server$requests())) {
+        if (edit == "turns") {
+          agent$set_turns(replacement)
+        } else {
+          agent$set_system_prompt("New host policy")
+        }
+        changed <<- TRUE
+      } else if (Sys.time() < deadline) {
+        later::later(edit_host, 0.01)
+      }
+    }
+    timer <- later::later(edit_host, 0.01)
+    error <- tryCatch(agent$run_sync("Continue"), error = identity)
+    timer()
+    expect_true(changed)
+    expect_s3_class(error, "deputy_compaction_conflict")
+    if (edit == "turns") {
+      expect_identical(agent$get_turns(), replacement)
+    } else {
+      expect_identical(agent$get_system_prompt(), "New host policy")
+    }
+    expect_null(agent$last_compaction())
+    expect_identical(agent$last_run()$usage$requests, 1L)
+    expect_identical(agent$last_run()$stop_reason, "error")
+    expect_length(server$requests(), 1L)
+  }
+})
+
 test_that("text recovery preserves failed dispatch accounting without exposing a summary", {
   withr::local_options(ellmer_max_tries = 1)
   server <- local_runtime_server(list(

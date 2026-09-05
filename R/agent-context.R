@@ -168,6 +168,9 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         ),
         error = function(e) NULL
       )
+      if (is.null(count)) {
+        count <- context_count_after_unpaired_result(chat, messages)
+      }
       if (!is.numeric(count) || length(count) == 0L || anyNA(count)) {
         return(NULL)
       }
@@ -322,6 +325,9 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       }
 
       list(
+        chat = private$.chat,
+        system_prompt = private$.chat$get_system_prompt(),
+        previous_summary = private$.compaction_summary,
         turns = turns,
         turns_to_compact = turns_to_compact,
         turns_to_keep = turns_to_keep,
@@ -339,6 +345,18 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       summary_usage,
       attempts = list()
     ) {
+      if (
+        isTRUE(plan$automatic) &&
+          (!identical(private$.chat, plan$chat) ||
+            !identical(private$.chat$get_turns(), plan$turns) ||
+            !identical(private$.chat$get_system_prompt(), plan$system_prompt) ||
+            !identical(private$.compaction_summary, plan$previous_summary))
+      ) {
+        abort_deputy(
+          "Conversation changed while compaction was preparing its replacement.",
+          class = c("compaction_conflict", "compaction_error")
+        )
+      }
       summary <- paste(as.character(summary), collapse = "\n")
       current_system <- private$system_prompt_without_compaction()
       new_system <- paste0(

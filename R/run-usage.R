@@ -222,7 +222,13 @@ provider_usage_summary <- function(chat) {
     logical(1),
     what = "ellmer::AssistantTurn"
   ))
-  tokens <- tryCatch(chat$get_tokens(), error = function(e) NULL)
+  tokens <- tryCatch(chat$get_tokens(), error = function(e) {
+    # ellmer 0.5.0's token table assumes paired user/assistant turns. A
+    # retained, undispatched tool-result turn breaks its input-preview column.
+    # These public producer properties retain the actual usage without adding
+    # a fictitious assistant response or changing provider serialization.
+    assistant_turn_tokens(turns)
+  })
   token_sum <- function(name) {
     if (is.null(tokens) || !name %in% names(tokens)) {
       return(0)
@@ -247,6 +253,30 @@ provider_usage_summary <- function(chat) {
     complete = cost$complete,
     missing = cost$missing,
     cost_records = cost_records
+  )
+}
+
+assistant_turn_tokens <- function(turns) {
+  assistants <- Filter(
+    function(turn) inherits(turn, "ellmer::AssistantTurn"),
+    turns
+  )
+  token <- function(name) {
+    vapply(
+      assistants,
+      function(turn) {
+        tokens <- turn@tokens
+        position <- match(name, c("input", "output", "cached_input"))
+        as.numeric(tokens[[position]])
+      },
+      numeric(1)
+    )
+  }
+  data.frame(
+    input = token("input"),
+    output = token("output"),
+    cached_input = token("cached_input"),
+    cost = vapply(assistants, function(turn) as.numeric(turn@cost), numeric(1))
   )
 }
 

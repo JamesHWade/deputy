@@ -50,6 +50,12 @@ summary. Summary failures still produce an inspectable `last_run()` with termina
 hooks and usage. Between tool rounds, compaction runs at the next model-request
 boundary, after all tool results settle.
 
+If summary failure, cancellation, or a limit stops that boundary, settled tool
+results remain in the conversation and survive save/load. Resuming sends those
+results once, without repeating the tool or inventing an assistant response.
+Host changes to the turns or system prompt while a summary is in flight reject
+the stale replacement and preserve the host's edits.
+
 Use a separate policy to authorize summary recovery destinations:
 
 ```{r, eval=FALSE}

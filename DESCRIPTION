@@ -70,6 +70,7 @@ Collate:
     'agents-multi.R'
     'cli.R'
     'compaction-run.R'
+    'context-estimation.R'
     'context-policy.R'
     'deputy-package.R'
     'errors.R'
