@@ -839,6 +839,7 @@ test_that("compaction hooks can cancel, replace, or fail without losing the run"
     expect_length(runtime_events(agent, "stop"), 1L)
     if (action == "cancel") {
       expect_identical(agent$last_compaction()$method, "cancelled")
+      expect_identical(agent$last_compaction()$run_id, result$run_id)
       expect_identical(agent$get_turns()[seq_along(before)], before)
       expect_identical(result$stop_reason, "complete")
     } else if (action == "replace") {
@@ -862,4 +863,25 @@ test_that("compaction hooks can cancel, replace, or fail without losing the run"
       expect_identical(result$stop_reason, "interrupted")
     }
   }
+})
+
+test_that("compaction IDs distinguish automatic no-ops from manual work after a run", {
+  server <- local_runtime_server(list(runtime_reply("Task complete")))
+  chat <- runtime_compaction_chat(server)
+  chat$set_turns(list(
+    ellmer::UserTurn("Previous task"),
+    ellmer::AssistantTurn("Previous response")
+  ))
+  agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
+
+  result <- agent$run_sync("Continue")
+  expect_identical(agent$last_compaction()$method, "none")
+  expect_identical(agent$last_compaction()$run_id, result$run_id)
+  expect_length(server$requests(), 1L)
+
+  manual <- agent$compact(keep_last = 0, summary = "Manual continuation")
+  expect_identical(manual$method, "custom")
+  expect_null(manual$run_id)
+  expect_identical(agent$last_run()$run_id, result$run_id)
+  expect_null(agent$compact()$run_id)
 })

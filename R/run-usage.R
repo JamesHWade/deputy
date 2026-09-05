@@ -257,6 +257,9 @@ provider_usage_summary <- function(chat) {
 }
 
 assistant_turn_tokens <- function(turns) {
+  # Released ellmer's S7 AssistantTurn contract requires three numeric token
+  # slots and one numeric cost, including for AssistantPartialTurn. Missing
+  # reports use NA, which preserves unknown cost through provider_cost_summary.
   assistants <- Filter(
     function(turn) inherits(turn, "ellmer::AssistantTurn"),
     turns

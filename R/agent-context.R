@@ -285,6 +285,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           automatic = automatic,
           turns_compacted = 0L,
           turns_kept = length(turns),
+          run_id = private$active_run_id(),
           estimated_tokens = estimated_tokens
         )
         private$.last_compaction <- result
@@ -318,6 +319,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           automatic = automatic,
           turns_compacted = 0L,
           turns_kept = length(turns),
+          run_id = private$active_run_id(),
           estimated_tokens = estimated_tokens
         )
         private$.last_compaction <- result
@@ -399,7 +401,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         estimated_tokens = plan$estimated_tokens,
         usage = summary_usage,
         attempts = attempts,
-        run_id = private$current_run_id,
+        run_id = private$active_run_id(),
         summary = summary
       )
       private$.last_compaction <- result

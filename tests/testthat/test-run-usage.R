@@ -158,6 +158,39 @@ test_that("run cost ignores incomplete records from earlier turns", {
   )
 })
 
+test_that("real partial turns keep usage evidence available for unpaired histories", {
+  chat <- ellmer::chat_openai_compatible(
+    base_url = "http://127.0.0.1:1",
+    model = "fixture",
+    credentials = function() "unused"
+  )
+  completed <- ellmer::AssistantTurn("Done", tokens = c(10, 5, 2), cost = 0.01)
+  partial <- ellmer::AssistantPartialTurn()
+  chat$set_turns(list(
+    ellmer::UserTurn("First"),
+    completed,
+    ellmer::UserTurn("Interrupted request"),
+    partial
+  ))
+
+  usage <- agent_usage_snapshot(chat)
+  expect_identical(usage$requests, 2L)
+  expect_equal(usage$input_tokens, 10)
+  expect_equal(usage$output_tokens, 5)
+  expect_equal(usage$cached_tokens, 2)
+  expect_identical(usage$cost_usd, NA_real_)
+  expect_identical(
+    usage_limit_status(usage, UsageLimits(max_cost_usd = 1))$reason,
+    "cost_unavailable"
+  )
+  # The producer represents missing reports with NA rather than NULL/short
+  # properties; invalid shapes are rejected before Deputy receives the turn.
+  expect_identical(partial@tokens, rep(NA_real_, 3L))
+  expect_identical(partial@cost, NA_real_)
+  expect_error(ellmer::AssistantTurn(tokens = numeric()), "length three")
+  expect_error(ellmer::AssistantTurn(cost = NULL))
+})
+
 test_that("usage limit status distinguishes reached request limits", {
   limits <- UsageLimits(max_requests = 2, max_tool_calls = 3)
   usage <- AgentUsage(requests = 2, tool_calls = 3)
