@@ -58,9 +58,10 @@ ellmer configures httr2 with `ellmer_max_tries` (default 3 total attempts) and
 startup if needed. Deputy does not change process-wide options during runs or
 add another retry loop. HTTP retries belong to the upstream transport: our
 real streaming fixture verifies three HTTP attempts are still one governed
-model dispatch. The structured async transport in the tested httr2 1.3.0 stack
-performs one attempt despite the retry configuration; callers must not assume
-every transport has identical retry behavior. Deputy does not estimate hidden
+model dispatch. The structured async path uses httr2 1.3.0's
+[`req_perform_promise()`](https://httr2.r-lib.org/reference/req_perform_promise.html),
+which explicitly does not perform retries. Our fixture confirms one HTTP
+attempt for this path; callers must not assume identical retry behavior. Deputy does not estimate hidden
 HTTP attempts from model-request callbacks or promise immediate cancellation
 during an upstream backoff or in-flight structured request.
 
