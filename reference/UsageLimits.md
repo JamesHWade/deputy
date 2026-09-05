@@ -32,9 +32,10 @@ UsageLimits(
 
 - max_requests:
 
-  Maximum governed model dispatches, including failed calls, structured
-  extraction, and corrections. Retries inside ellmer's HTTP transport
-  are not separately observable. `NULL` leaves the field unset.
+  Maximum governed model dispatches, including failed calls, automatic
+  compaction, structured extraction, and corrections. Retries inside
+  ellmer's HTTP transport are not separately observable. `NULL` leaves
+  the field unset.
 
 - max_tool_calls:
 

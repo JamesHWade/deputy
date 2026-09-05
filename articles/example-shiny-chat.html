@@ -207,12 +207,15 @@ working directory. Custom hosts can pass <code>run_context</code> to any
 chat, stream, or run method to correlate a request with product-owned
 session and stage identities.</p>
 <p><code><a href="../reference/ContextPolicy.html">ContextPolicy()</a></code> checks the estimated complete context
-before a run and again between provider tool turns, compacting whenever
-it crosses the token threshold. The default fails closed if LLM summary
-generation fails. Set <code>fallback = "text"</code> only when a
-deterministic degraded summary is acceptable.
-<code>agent$last_compaction()</code> reports which method was used and
-the compaction usage.</p>
+after run initialization and again at model-request boundaries between
+tool rounds, compacting whenever it crosses the token threshold. Summary
+streaming is asynchronous and shares the run’s cancellation controller
+and usage limits. The default fails closed if LLM summary generation
+fails. Set <code>fallback = "text"</code> only when a deterministic
+degraded summary is acceptable. <code>summary_fallback_chats</code>
+explicitly configures separate summary recovery destinations.
+<code>agent$last_compaction()</code> reports the method, run ID, attempt
+conditions, and compaction usage.</p>
 <p>Large tool results are stored as integrity-checked envelopes and
 replaced in model context with a preview and
 <code>deputy://tool-result/...</code> reference. The Agent registers

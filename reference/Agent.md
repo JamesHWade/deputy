@@ -837,7 +837,8 @@ A list of ellmer turns.
 
 ### `Agent$set_turns()`
 
-Replace conversation turns, as in ellmer Chat.
+Replace conversation turns, as in ellmer Chat. During a run, already
+accrued usage remains charged after history replacement.
 
 #### Usage
 

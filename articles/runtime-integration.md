@@ -35,12 +35,57 @@ completed tool effect locks the run to its current Chat; Deputy
 preserves the partial result and signals the failure. It never restarts
 a completed tool loop. The selected Chat remains active; subsequent runs
 can advance to later configured templates, without revisiting earlier
-ones. Automatic compaction runs before task dispatch and retains its
-separate `ContextPolicy(fallback = "error" | "text")` policy. Its
-isolated summary request does not select from `fallback_chats`: a
-summary failure stops preparation by default, or uses the explicitly
-configured deterministic text summary. Governed compaction recovery is
-tracked in [\#111](https://github.com/JamesHWade/deputy/issues/111).
+ones. Automatic compaction belongs to the active run. `SessionStart` and
+`UserPromptSubmit` precede `PreCompact`, and `PostCompact` follows an
+accepted summary. Summary failures still produce an inspectable
+`last_run()` with terminal hooks and usage. Between tool rounds,
+compaction runs at the next model-request boundary, after all tool
+results settle.
+
+If summary failure, cancellation, or a limit stops that boundary,
+settled tool results remain in the conversation and survive save/load.
+Resuming sends those results once, without repeating the tool or
+inventing an assistant response. Host changes to the turns or system
+prompt while a summary is in flight reject the stale replacement and
+preserve the host’s edits.
+
+Use a separate policy to authorize summary recovery destinations:
+
+``` r
+
+policy <- ContextPolicy(
+  summary_fallback_chats = list(ellmer::chat("openai/gpt-5.6-luna"))
+)
+agent <- Agent$new(
+  ellmer::chat("openai/gpt-5.6-terra"),
+  context_policy = policy,
+  fallback_chats = list(ellmer::chat("openai/gpt-5.6-sol"))
+)
+```
+
+The primary summary uses an isolated clone of the active Chat. Only a
+transient model transport failure can advance to
+`summary_fallback_chats`, after ellmer’s own retries. Summary Chats have
+no tools, inherited callbacks, or unrelated history. Selecting one does
+not change the task provider. Internal summaries are never streamed as
+task output, and a successful summary does not prevent a later task
+fallback before task output or effects occur.
+
+Every summary dispatch shares the run’s request/token/cost budget,
+including failed dispatches. Unknown cost stays unknown and stops a
+cost-limited run. `ContextPolicy(fallback = "text")` permits
+deterministic degraded recovery when summary generation fails and the
+run can still continue; it is opt-in and emits a `Notification` with
+code `compact_fallback`. Cancellation leaves the active context
+unchanged. A completed summary stays installed if its usage exhausts the
+budget before task execution.
+
+`agent$last_compaction()` reports the method, run ID, usage, and
+destination attempts. Request and fallback events use
+`phase = "compaction"` for summary work. Manual `agent$compact()` keeps
+its synchronous, active-Chat-only contract. Removed turns are not
+archived by this policy; host-owned history retrieval remains a separate
+integration.
 
 LeadAgent’s fallback policy applies to the lead. Child definitions
 inherit the selected provider and do not implicitly gain additional

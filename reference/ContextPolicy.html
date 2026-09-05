@@ -74,7 +74,8 @@ results larger than 64 KiB.</p>
 <span>  compact_to <span class="op">=</span> <span class="fl">0.5</span>,</span>
 <span>  fallback <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"error"</span>, <span class="st">"text"</span><span class="op">)</span>,</span>
 <span>  max_tool_result_bytes <span class="op">=</span> <span class="fl">64</span> <span class="op">*</span> <span class="fl">1024</span>,</span>
-<span>  offload_dir <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  offload_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  summary_fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -109,10 +110,36 @@ stored outside the model context. Use <code>NULL</code> to disable result offloa
 are anchored to the current working directory when the policy is created.
 <code>NULL</code> uses the Deputy user cache, partitioned by Agent session.</p></dd>
 
+
+<dt id="arg-summary-fallback-chats">summary_fallback_chats<a class="anchor" aria-label="anchor" href="#arg-summary-fallback-chats"></a></dt>
+<dd><p>Ordered, explicitly configured ellmer Chats
+authorized to receive summary prompts during automatic compaction. Each
+template must have no turns or tools. Transient transport failures may
+advance to the next template after ellmer's retries. These destinations
+are separate from the Agent's task <code>fallback_chats</code>; choosing a summary
+destination does not change the task Chat. Manual <code>$compact()</code> uses only
+its active Chat and <code>fallback</code> policy. Templates are cloned at construction.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <code>ContextPolicy</code> object.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>Automatic compaction is an asynchronous run phase. <code>SessionStart</code> and
+<code>UserPromptSubmit</code> precede <code>PreCompact</code>; <code>PostCompact</code> follows an accepted
+replacement. <code>Stop</code> and <code>SessionEnd</code> include summary failures and usage.
+Between tool rounds, context is checked at ellmer's next request boundary
+after all tool results settle. Summary dispatches, including failures, share
+the run's request/token/cost budget. Unknown costs remain unknown.</p>
+<p>Summary Chats have no tools, history, system prompt, or inherited callbacks.
+Cancellation or unrecoverable failure leaves the active context unchanged.
+An accepted summary remains installed when the budget prevents task dispatch.
+<code>$last_compaction()</code> includes <code>run_id</code> and summary <code>attempts</code> with destination,
+usage, and original condition. Summaries are internal context, not task output.
+This policy does not archive removed turns or restore runtime permissions
+from a summary.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

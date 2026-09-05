@@ -118,12 +118,51 @@ completed tool effect locks the run to its current Chat; Deputy
 preserves the partial result and signals the failure. It never restarts
 a completed tool loop. The selected Chat remains active; subsequent runs
 can advance to later configured templates, without revisiting earlier
-ones. Automatic compaction runs before task dispatch and retains its
-separate <code>ContextPolicy(fallback = "error" | "text")</code> policy.
-Its isolated summary request does not select from
-<code>fallback_chats</code>: a summary failure stops preparation by
-default, or uses the explicitly configured deterministic text summary.
-Governed compaction recovery is tracked in <a href="https://github.com/JamesHWade/deputy/issues/111" class="external-link">#111</a>.</p>
+ones. Automatic compaction belongs to the active run.
+<code>SessionStart</code> and <code>UserPromptSubmit</code> precede
+<code>PreCompact</code>, and <code>PostCompact</code> follows an
+accepted summary. Summary failures still produce an inspectable
+<code>last_run()</code> with terminal hooks and usage. Between tool
+rounds, compaction runs at the next model-request boundary, after all
+tool results settle.</p>
+<p>If summary failure, cancellation, or a limit stops that boundary,
+settled tool results remain in the conversation and survive save/load.
+Resuming sends those results once, without repeating the tool or
+inventing an assistant response. Host changes to the turns or system
+prompt while a summary is in flight reject the stale replacement and
+preserve the host’s edits.</p>
+<p>Use a separate policy to authorize summary recovery destinations:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ContextPolicy.html">ContextPolicy</a></span><span class="op">(</span></span>
+<span>  summary_fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-terra"</span><span class="op">)</span>,</span>
+<span>  context_policy <span class="op">=</span> <span class="va">policy</span>,</span>
+<span>  fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-sol"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The primary summary uses an isolated clone of the active Chat. Only a
+transient model transport failure can advance to
+<code>summary_fallback_chats</code>, after ellmer’s own retries. Summary
+Chats have no tools, inherited callbacks, or unrelated history.
+Selecting one does not change the task provider. Internal summaries are
+never streamed as task output, and a successful summary does not prevent
+a later task fallback before task output or effects occur.</p>
+<p>Every summary dispatch shares the run’s request/token/cost budget,
+including failed dispatches. Unknown cost stays unknown and stops a
+cost-limited run. <code>ContextPolicy(fallback = "text")</code> permits
+deterministic degraded recovery when summary generation fails and the
+run can still continue; it is opt-in and emits a
+<code>Notification</code> with code <code>compact_fallback</code>.
+Cancellation leaves the active context unchanged. A completed summary
+stays installed if its usage exhausts the budget before task
+execution.</p>
+<p><code>agent$last_compaction()</code> reports the method, run ID,
+usage, and destination attempts. Request and fallback events use
+<code>phase = "compaction"</code> for summary work. Manual
+<code>agent$compact()</code> keeps its synchronous, active-Chat-only
+contract. Removed turns are not archived by this policy; host-owned
+history retrieval remains a separate integration.</p>
 <p>LeadAgent’s fallback policy applies to the lead. Child definitions
 inherit the selected provider and do not implicitly gain additional
 destinations.</p>
@@ -163,7 +202,7 @@ parent span and governance events, using <code>deputy.run.id</code>,
 <code>deputy.agent.id</code>, parent/delegation IDs, and ellmer’s
 <code>gen_ai.conversation.id</code> mapped to the Deputy session ID.
 Async delegated runs retain their trace parent and run correlation.</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># In a fresh R session, this records locally without configuring an exporter.</span></span>
 <span><span class="va">record</span> <span class="op">&lt;-</span> <span class="fu">otelsdk</span><span class="fu">::</span><span class="fu"><a href="https://otelsdk.r-lib.org/reference/with_otel_record.html" class="external-link">with_otel_record</a></span><span class="op">(</span><span class="op">{</span></span>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
@@ -195,7 +234,7 @@ tokens, cost, duration, and error class.
 <code>run_context$evaluation$case_id</code> links local evidence to the
 case. The same run ID appears on the trace, without enabling message
 capture.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples"</span>, <span class="st">"standalone"</span>, <span class="st">"10-evaluation.R"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">evaluation</span></span></code></pre></div>
 <p>Replace that dataset and scoring rule in your external runner. Deputy

@@ -83,12 +83,15 @@ never changes the process working directory. Custom hosts can pass
 with product-owned session and stage identities.
 
 [`ContextPolicy()`](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
-checks the estimated complete context before a run and again between
-provider tool turns, compacting whenever it crosses the token threshold.
-The default fails closed if LLM summary generation fails. Set
-`fallback = "text"` only when a deterministic degraded summary is
-acceptable. `agent$last_compaction()` reports which method was used and
-the compaction usage.
+checks the estimated complete context after run initialization and again
+at model-request boundaries between tool rounds, compacting whenever it
+crosses the token threshold. Summary streaming is asynchronous and
+shares the run’s cancellation controller and usage limits. The default
+fails closed if LLM summary generation fails. Set `fallback = "text"`
+only when a deterministic degraded summary is acceptable.
+`summary_fallback_chats` explicitly configures separate summary recovery
+destinations. `agent$last_compaction()` reports the method, run ID,
+attempt conditions, and compaction usage.
 
 Large tool results are stored as integrity-checked envelopes and
 replaced in model context with a preview and `deputy://tool-result/...`
