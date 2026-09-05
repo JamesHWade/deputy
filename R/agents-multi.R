@@ -834,11 +834,16 @@ LeadAgent <- R6::R6Class(
         # then clear conversation history so the sub-agent starts fresh.
         sub_chat <- tryCatch(
           {
-            cloned <- private$.chat$clone(deep = TRUE)
+            clone_args <- names(formals(private$.chat$clone))
+            cloned <- if (any(c("deep", "...") %in% clone_args)) {
+              private$.chat$clone(deep = TRUE)
+            } else {
+              private$.chat$clone()
+            }
             if (identical(cloned, private$.chat)) {
               cli_abort("Chat cloning must return an independent instance")
             }
-            clear_chat_tool_callbacks(cloned)
+            clear_chat_tool_callbacks(cloned, source = private$.chat)
             cloned$set_turns(list())
             # The child definition chooses its tools. Inherited provider
             # configuration must not import the parent's executable registry.

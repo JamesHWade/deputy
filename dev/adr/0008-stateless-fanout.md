@@ -28,6 +28,9 @@ cloned; copied tool callback managers are cleared before the child Agent
 binds its own runtime callbacks. The definition supplies the complete child
 tool registry. All children are prepared before the first provider dispatch,
 so invalid configuration cannot lose already-paid sibling responses.
+Custom Chats whose clone method lacks a `deep` argument may supply their own
+independent clone. Shared tool callback managers are rejected before clearing
+callbacks, so compatibility cannot erase the parent's governance callbacks.
 
 ## Scheduling and accounting
 

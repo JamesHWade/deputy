@@ -229,6 +229,66 @@ test_that("interrupting a batch drains active responders and releases the lead",
   expect_identical(again$status, c(a = "completed"))
 })
 
+test_that("no-argument custom clones work when their callbacks are isolated", {
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  chat <- lead$.__enclos_env__$private$.chat
+  clone <- chat$clone
+  chat$clone <- function() clone()
+  lead$.__enclos_env__$private$.chat <- chat
+  batch <- lead$parallel_delegate(c(a = "first", b = "second"))
+  expect_identical(batch$status, c(a = "completed", b = "completed"))
+
+  manager <- new.env(parent = emptyenv())
+  cleared <- FALSE
+  manager$clear <- function() cleared <<- TRUE
+  chat$.__enclos_env__ <- list(
+    private = list(callback_on_tool_request = manager)
+  )
+  chat$clone <- function() {
+    child <- clone()
+    child$.__enclos_env__ <- chat$.__enclos_env__
+    child
+  }
+  lead$.__enclos_env__$private$.chat <- chat
+  expect_error(
+    lead$parallel_delegate(c(a = "again")),
+    "must isolate tool callback managers"
+  )
+  expect_false(cleared)
+  expect_length(state$started, 2L)
+})
+
+test_that("cancellation from SubagentStart balances hooks without dispatching", {
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  stopped <- list()
+  lead$add_hook(HookMatcher$new(
+    event = "SubagentStart",
+    timeout = 0,
+    callback = function(...) {
+      lead$interrupt("cancelled_before_dispatch")
+      NULL
+    }
+  ))
+  lead$add_hook(HookMatcher$new(
+    event = "SubagentStop",
+    timeout = 0,
+    callback = function(agent_name, context, ...) {
+      stopped[[agent_name]] <<- context$status
+      NULL
+    }
+  ))
+  batch <- lead$parallel_delegate(c(a = "first", b = "second"))
+  expect_identical(batch$status, c(a = "not_started", b = "not_started"))
+  expect_identical(stopped, list(a = "not_started"))
+  expect_length(state$started, 0L)
+  expect_identical(batch$run$usage$requests, 0L)
+  expect_identical(batch$run$stop_reason, "cancelled_before_dispatch")
+  expect_identical(lead$list_subagents()$status, "not_started")
+  expect_length(lead$.__enclos_env__$private$delegation_usage_reservations, 0L)
+})
+
 test_that("released ellmer Chats preserve transport and isolate runtime callbacks", {
   server <- local_parallel_server()
   chat <- ellmer::chat_openai_compatible(
