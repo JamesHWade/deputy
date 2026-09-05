@@ -507,6 +507,11 @@ history_evaluate <- function(
   cancelled = function() FALSE
 ) {
   history_validate_configuration(trials, helper_models, task_model)
+  if (is.null(deputy::ContextPolicy(max_tokens = max_tokens)$max_tokens)) {
+    cli::cli_abort(
+      "max_tokens must enable automatic compaction for this experiment."
+    )
+  }
   budget <- history_budget(max_cost_usd, max_requests, cancelled)
   rows <- list()
   failure <- NULL

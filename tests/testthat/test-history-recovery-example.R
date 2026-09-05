@@ -419,6 +419,12 @@ test_that("invalid experiment limits fail before creating a model client", {
       class = "rlang_error"
     )
   }
+  for (limit in list(NULL, 1.5, "2", NA_real_, Inf, TRUE, 0L, 2^31)) {
+    expect_error(
+      example$history_evaluate(factory, fixture, max_tokens = limit),
+      "max_tokens"
+    )
+  }
   expect_identical(calls, 0L)
 })
 
