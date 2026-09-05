@@ -1,14 +1,16 @@
-# Headless history consumer proposal for shinychat
+# Optional headless history adapter for shinychat
 
 Deputy needs to retain original conversation evidence outside an Agent's compacted
 context, then restore a selected conversation branch for a later governed run.
-We would like shinychat to continue owning the conversation format and branch
-semantics. Deputy would own permissions, run limits and execution state.
+For hosts using shinychat, shinychat would own its conversation format and branch
+semantics. Deputy owns permissions, run limits and execution state; the host
+supplies authorized history as described in ADR-0003.
 
 The concrete consumer is the [caller-owned recovery experiment](../inst/examples/history-recovery/README.md):
 an evidence-review Agent reads source items, compacts repeatedly, and later recovers
-an earlier correction through bounded search/read tools. Production integration
-is blocked on a public, released contract; the experiment uses in-memory fixtures.
+an earlier correction through bounded search/read tools. Continue this work with
+caller-owned records. Only the shinychat adapter waits for a public, released
+contract; Deputy implementation and evaluation do not depend on that outcome.
 
 ## What already works
 
@@ -72,10 +74,10 @@ context to managed submissions, which is useful but does not provide this worker
 history boundary. The R development version is `0.4.0.9000`; the `r/v0.4.0` release
 does not contain the store API. Python release tags do not change the R gate.
 
-Ask upstream whether this worker use case fits shinychat's intended boundary and
-which public abstraction it prefers. Record that outcome in Deputy #66. Link
-the supported R release for #62 and the hosted part of #43 if accepted; revisit
-ADR-0003 explicitly if declined. Do not copy the store or use private APIs while
-the discussion is pending.
+Await feedback on the existing upstream proposal and record the outcome in
+Deputy #66. If accepted, link the supported R release when implementing the
+adapter. Work on #62 and the hosted part of #43 should use the host-owned boundary
+in ADR-0003 and assess their own requirements independently. Do not copy the
+shinychat store or use private APIs while the discussion is pending.
 
 Upstream proposal: [posit-dev/shinychat#391](https://github.com/posit-dev/shinychat/issues/391), opened 2026-09-05. The design outcome and public R release remain pending; Deputy #66 stays open.

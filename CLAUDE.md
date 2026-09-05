@@ -96,8 +96,9 @@ and without bounded source retrieval. Run deterministic producer tests with
 `devtools::test(filter = "history-recovery-example|compaction-evidence")`.
 The directory's README documents explicit paid-run opt-in and observed budgets.
 Live results are required before drawing model-quality conclusions (#112).
-`dev/shinychat-history-consumer.md` proposes the public history boundary for #66;
-production integration waits for an agreed, released R API.
+History recovery proceeds with caller-owned records under ADR-0003.
+`dev/shinychat-history-consumer.md` tracks the optional shinychat adapter for #66;
+only that adapter waits for an agreed, released R API.
 
 ## Common Commands
 

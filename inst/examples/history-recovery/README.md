@@ -4,6 +4,11 @@ Compare cumulative summary plus recent context with **the same prepared context*
 plus read-only search and reads of caller-owned source records. This is an
 external example, not a new Deputy API, conversation database, or RLM runtime.
 
+This implementation uses caller-owned records and released ellmer APIs. It can
+be developed and evaluated independently of the optional shinychat history
+adapter tracked in #66. A future adapter must preserve the scope, revision and
+read-budget checks exercised here.
+
 `fixture.R` supplies an entirely synthetic evidence review with three checkpoints,
 early eligibility constraints, a superseded denominator, unresolved methods, a
 historical export receipt, and quoted malicious instructions. Ninety synthetic

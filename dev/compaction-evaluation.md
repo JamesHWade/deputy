@@ -87,8 +87,9 @@ accuracy and latency distributions, not one successful answer. Luna is a
 candidate helper model to measure, not an assumed quality-equivalent substitute.
 
 Do not add a second conversation database to run this comparison. Use an
-explicit caller-owned history fixture first. Production persistence follows
-ADR-0003 and the public shinychat history contract tracked in #66. Removed
+explicit caller-owned history fixture first. Continue implementation against
+host-supplied history under ADR-0003; the optional shinychat adapter tracked in
+#66 can follow when its public R contract is released. Removed
 turns remain unrecoverable through the current Deputy session snapshot unless
 the host retained them independently. Schema changes can target the current
 pre-CRAN format directly.
