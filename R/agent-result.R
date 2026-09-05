@@ -22,6 +22,17 @@
 #' * `"warning"` - Warning condition occurred. Contains: `message`, `details`
 #' * `"content"` - Non-text provider content. Contains: `content`,
 #'   `content_type`
+#' * `"request_start"`, `"request_end"`, `"request_error"` - Governed model
+#'   dispatch evidence with provider, model, request number, and original
+#'   HTTP/transport conditions on errors. These are not individual HTTP retry
+#'   attempts. Unclassified application errors are retained as `"run_error"`.
+#' * `"run_error"` - Terminal initialization, streaming, or structured-output
+#'   failure, with its phase and original condition. Application callbacks and
+#'   validation do not turn a successful response into a `"request_error"`.
+#' * `"fallback"` - Explicit Chat selection, prior condition, and usage.
+#' * `"structured_attempt"` - Structured value, available turn, validation
+#'   outcome, feedback, and condition. May contain sensitive application data.
+#' * `"permission"`, `"hook"`, `"compaction"` - Governance decisions and lifecycle.
 #' * `"file_checkpoint"` - Automatic run-boundary checkpoint. Contains:
 #'   `checkpoint_id`, `name`
 #' * `"usage"` - Run usage snapshot. Contains: `usage`, `limits`
@@ -137,7 +148,7 @@ AgentResult <- R6::R6Class(
     #' @field stop_reason Reason the agent stopped
     stop_reason = NULL,
 
-    #' @field structured_output Parsed/validated structured output (if requested)
+    #' @field structured_output Data converted by ellmer using the requested type (if any)
     structured_output = NULL,
 
     #' @field session_id Stable session identifier for run correlation
@@ -299,17 +310,9 @@ AgentResult <- R6::R6Class(
         cat("  tokens:", self$usage$total_tokens, "\n")
       }
       if (!is.null(self$structured_output)) {
-        status <- "unknown"
-        if (isTRUE(self$structured_output$valid)) {
-          status <- "valid"
-        } else if (identical(self$structured_output$valid, FALSE)) {
-          status <- "invalid"
-        }
-        if (isTRUE(self$structured_output$schema_validation_skipped)) {
-          cat("  structured_output:", status, "(validation skipped)\n")
-        } else {
-          cat("  structured_output:", status, "\n")
-        }
+        cli::cli_text(
+          "  structured_output: <{class(self$structured_output)[[1L]]}>"
+        )
       }
 
       invisible(self)

@@ -32,6 +32,17 @@ updates on agent progress.
 \item \code{"warning"} - Warning condition occurred. Contains: \code{message}, \code{details}
 \item \code{"content"} - Non-text provider content. Contains: \code{content},
 \code{content_type}
+\item \code{"request_start"}, \code{"request_end"}, \code{"request_error"} - Governed model
+dispatch evidence with provider, model, request number, and original
+HTTP/transport conditions on errors. These are not individual HTTP retry
+attempts. Unclassified application errors are retained as \code{"run_error"}.
+\item \code{"run_error"} - Terminal initialization, streaming, or structured-output
+failure, with its phase and original condition. Application callbacks and
+validation do not turn a successful response into a \code{"request_error"}.
+\item \code{"fallback"} - Explicit Chat selection, prior condition, and usage.
+\item \code{"structured_attempt"} - Structured value, available turn, validation
+outcome, feedback, and condition. May contain sensitive application data.
+\item \code{"permission"}, \code{"hook"}, \code{"compaction"} - Governance decisions and lifecycle.
 \item \code{"file_checkpoint"} - Automatic run-boundary checkpoint. Contains:
 \code{checkpoint_id}, \code{name}
 \item \code{"usage"} - Run usage snapshot. Contains: \code{usage}, \code{limits}

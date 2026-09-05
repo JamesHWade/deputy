@@ -33,14 +33,6 @@
 ---
 
     Code
-      parse_structured_output("{}", list(type = "json_object"))
-    Condition
-      Error in `rlang::check_installed()`:
-      ! The package "jsonlite" (>= 9999) is required to parse structured output
-
----
-
-    Code
       skill_load(skill_dir)
     Condition
       Error in `rlang::check_installed()`:

@@ -265,6 +265,9 @@ LeadAgent <- R6::R6Class(
     #'   runs and delegated agents.
     #' @param agent_id Optional stable identifier for this LeadAgent instance.
     #' @param agent_name Optional human-readable LeadAgent name.
+    #' @param fallback_chats Ordered configured fallback Chats for the lead.
+    #'   Child definitions inherit the selected provider, without an implicit
+    #'   fallback policy of their own. See [Agent].
     #' @return A new `LeadAgent` object
     initialize = function(
       chat,
@@ -281,7 +284,8 @@ LeadAgent <- R6::R6Class(
       session_id = NULL,
       run_context = list(),
       agent_id = NULL,
-      agent_name = NULL
+      agent_name = NULL,
+      fallback_chats = list()
     ) {
       private$.sub_agent_defs <- normalize_agent_definitions(sub_agents)
 
@@ -312,7 +316,8 @@ LeadAgent <- R6::R6Class(
         session_id = session_id,
         run_context = run_context,
         agent_id = agent_id,
-        agent_name = agent_name
+        agent_name = agent_name,
+        fallback_chats = fallback_chats
       )
     },
 
@@ -653,7 +658,7 @@ LeadAgent <- R6::R6Class(
           cli::cli_alert_info("Delegating to {.val {agent_name}}: {task}")
           started_at <- Sys.time()
 
-          lead_agent$hooks$fire(
+          private$fire_hook(
             "SubagentStart",
             agent_name = agent_name,
             task = task,
@@ -736,7 +741,7 @@ LeadAgent <- R6::R6Class(
               settle_usage(sub_result$usage)
               result <- sub_result$response
 
-              lead_agent$hooks$fire(
+              private$fire_hook(
                 "SubagentStop",
                 agent_name = agent_name,
                 task = task,
@@ -775,7 +780,7 @@ LeadAgent <- R6::R6Class(
                 agent_result = NULL
               )
               child_run_id <- sub_agent$.__enclos_env__$private$current_run_id
-              lead_agent$hooks$fire(
+              private$fire_hook(
                 "SubagentStop",
                 agent_name = agent_name,
                 task = task,
@@ -834,12 +839,7 @@ LeadAgent <- R6::R6Class(
         # then clear conversation history so the sub-agent starts fresh.
         sub_chat <- tryCatch(
           {
-            clone_args <- names(formals(private$.chat$clone))
-            cloned <- if (any(c("deep", "...") %in% clone_args)) {
-              private$.chat$clone(deep = TRUE)
-            } else {
-              private$.chat$clone()
-            }
+            cloned <- clone_governed_chat(private$.chat)
             if (identical(cloned, private$.chat)) {
               cli_abort("Chat cloning must return an independent instance")
             }

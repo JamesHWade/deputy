@@ -1,5 +1,26 @@
 # deputy (development version)
 
+* Split runtime, permission, checkpoint, and built-in tool support into cohesive
+  modules, with tests grouped by behavior. Public class interfaces and session
+  formats are unchanged by the mechanical extraction.
+
+* Use released ellmer >= 0.5.0 for public request callbacks, model objects,
+  conversation trace IDs, and native structured streaming.
+* Structured output now uses ellmer types throughout. `run()`, `run_sync()`,
+  and `run_async()` can complete tool work and then extract structured data
+  under one budget. Optional application validation has bounded corrections
+  and attempt evidence. The pre-CRAN `output_format` argument, JSON parser,
+  validation wrapper, and jsonvalidate dependency have been removed.
+* Agents and LeadAgents accept ordered, explicitly configured fallback Chats
+  for transient failures before any response or tool request. Partial output
+  and completed effects prevent replay. Failed dispatches remain accounted for,
+  missing costs stay unknown, and observer removal follows the selected Chat.
+* Optional OpenTelemetry integration adds Deputy run/governance evidence around
+  ellmer spans, including async parent-child correlation. Content is omitted
+  from Deputy traces; upstream message capture remains an explicit opt-in.
+  A runnable external evaluation example joins fixed cases to run IDs.
+* Limit errors retain the completed `last_run()` result for inspection.
+
 * The CLI now defaults to OpenAI with `gpt-5.6-luna`. OpenAI examples also
   select Luna explicitly, with documented Terra and Sol overrides. Explicit
   model choices, other providers' defaults, and caller-supplied Chats are

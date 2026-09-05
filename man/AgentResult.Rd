@@ -24,7 +24,7 @@ complete, and missing fields. An incomplete total is \code{NA_real_}.}
 
     \item{\code{stop_reason}}{Reason the agent stopped}
 
-    \item{\code{structured_output}}{Parsed/validated structured output (if requested)}
+    \item{\code{structured_output}}{Data converted by ellmer using the requested type (if any)}
 
     \item{\code{session_id}}{Stable session identifier for run correlation}
 

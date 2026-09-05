@@ -15,7 +15,9 @@
 #' object configures or overrides an [Agent], Deputy may fill unset fields from
 #' the agent's defaults.
 #'
-#' @param max_requests Maximum model requests. `NULL` leaves the field unset.
+#' @param max_requests Maximum governed model dispatches, including failed
+#'   calls, structured extraction, and corrections. Retries inside ellmer's
+#'   HTTP transport are not separately observable. `NULL` leaves the field unset.
 #' @param max_tool_calls Maximum requested tool calls. Rejected calls count
 #'   toward usage. `NULL` leaves the field unset.
 #' @param max_input_tokens Maximum provider-reported input tokens. `NULL` leaves

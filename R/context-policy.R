@@ -13,7 +13,9 @@
 #' @param compact_to Fraction of `max_tokens` that the retained recent context
 #'   should occupy after compaction.
 #' @param fallback What to do when LLM summary generation fails. `"error"` fails
-#'   closed; `"text"` uses a deterministic truncated-text summary.
+#'   closed; `"text"` uses a deterministic truncated-text summary. Summary
+#'   generation uses an isolated clone of the active Chat and does not select
+#'   from the Agent's task `fallback_chats`.
 #' @param max_tool_result_bytes Serialized size above which a tool result is
 #'   stored outside the model context. Use `NULL` to disable result offloading.
 #' @param offload_dir Directory for durable result envelopes. Relative paths

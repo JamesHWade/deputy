@@ -16,7 +16,6 @@ These paths use `rlang::check_installed()` with a feature-specific reason:
 | `tool_web_fetch`, `tool_web_search` | httr2 | Execute the HTTP request |
 | `skill_load()` with SKILL.yaml | yaml | Read skill metadata |
 | `parse_markdown_frontmatter()` with frontmatter | yaml | Avoid silently discarding metadata |
-| `extract_json_from_text()` | jsonlite | Parse structured output |
 | `read_pdf_text_pages()` after backend selection fails | pdftools | Offer the preferred backend, then retry reading after interactive installation |
 
 ## Branches retained
@@ -30,7 +29,6 @@ These paths use `rlang::check_installed()` with a feature-specific reason:
 | `Skill$check_requirements()` | declared packages | Return an availability report rather than interrupt it |
 | `skills_list()` | yaml | Directory basename when optional YAML name lookup is unavailable |
 | `format_schema_json()` | jsonlite | Text representation for display |
-| `validate_output_schema()` | jsonvalidate | Explicit unknown validity and `schema_validation_skipped`, rather than claiming validity |
 | `extract_web_content()` | rvest, xml2 | Basic HTML extraction |
 | `parse_duckduckgo_results()` | rvest, xml2 | Regex search-result extraction |
 | `has_pandoc()` | rmarkdown | Report unavailable converter so caller can choose another path |

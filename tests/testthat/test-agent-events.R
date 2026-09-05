@@ -11,6 +11,7 @@ test_that("content streams expose tool lifecycle before and after execution", {
 
   generator <- agent$run("Read input.txt")
   start <- generator()
+  expect_identical(generator()$type, "request_start")
   tool_start <- generator()
 
   expect_identical(start$type, "start")
@@ -18,6 +19,7 @@ test_that("content streams expose tool lifecycle before and after execution", {
   expect_identical(tool_start$tool_call_id, "tool-use-1")
   expect_false(mock$state$tool_executed)
 
+  expect_identical(generator()$type, "permission")
   tool_end <- generator()
   expect_true(mock$state$tool_executed)
   expect_identical(tool_end$type, "tool_end")
@@ -147,6 +149,7 @@ test_that("interrupt stops native streams that ignore their controller", {
   generator <- agent$run("stream")
 
   expect_identical(generator()$type, "start")
+  expect_identical(generator()$type, "request_start")
   first <- generator()
   expect_identical(first$type, "text")
   expect_identical(first$text, "one")
@@ -441,7 +444,7 @@ test_that("run_sync never returns a prior turn after an early stop", {
   result <- agent$run_sync(
     "Do not call the provider",
     usage_limits = UsageLimits(max_requests = 0),
-    output_format = list(type = "json_object")
+    type = ellmer::type_object(status = ellmer::type_string())
   )
 
   expect_null(result$response)
@@ -516,4 +519,22 @@ test_that("malformed tool identity is rejected before permission checks", {
 
   expect_false(checked$value)
   expect_identical(agent$.__enclos_env__$private$current_tool_calls, 0L)
+})
+
+test_that("failed run initialization retains an error outcome before any dispatch", {
+  server <- local_runtime_server(list(runtime_reply()))
+  agent <- Agent$new(
+    runtime_chat(server),
+    enable_file_checkpointing = TRUE,
+    file_checkpoint_max_journal_bytes = 1
+  )
+  expect_error(agent$run_sync("task"), class = "deputy_file_checkpoint_error")
+  expect_identical(agent$last_run()$stop_reason, "error")
+  expect_identical(agent$last_run()$usage$requests, 0L)
+  expect_length(server$requests(), 0L)
+  expect_false(agent$.__enclos_env__$private$run_active)
+  expect_s3_class(
+    runtime_events(agent, "run_error")[[1]]$condition,
+    "deputy_file_checkpoint_error"
+  )
 })

@@ -23,9 +23,10 @@ Suggests:
     httr2,
     httpuv,
     jsonlite,
-    jsonvalidate,
     knitr,
     mcptools (>= 1.0.2),
+    otel (>= 0.2.0),
+    otelsdk (>= 0.2.0),
     pdftools,
     pkgload,
     readr,
@@ -45,10 +46,56 @@ Imports:
     cli,
     coro,
     digest,
-    ellmer (>= 0.4.2),
+    ellmer (>= 0.5.0),
     later,
-    promises,
+    promises (>= 1.5.0),
     R6,
     Rapp (>= 0.4.0),
-    rlang
+    rlang,
+    S7,
+    utils
 Config/roxygen2/version: 8.1.0
+Collate:
+    'agent-context.R'
+    'agent-definition-files.R'
+    'agent-requests.R'
+    'agent-result.R'
+    'agent-run-state.R'
+    'agent-session.R'
+    'agent-stream.R'
+    'agent-tool-callbacks.R'
+    'agent-tool-records.R'
+    'agent-tracing.R'
+    'agent.R'
+    'agents-multi.R'
+    'cli.R'
+    'context-policy.R'
+    'deputy-package.R'
+    'errors.R'
+    'file-checkpoint-paths.R'
+    'file-checkpoint-validation.R'
+    'file-checkpoints.R'
+    'hook-validation.R'
+    'hooks.R'
+    'ids.R'
+    'mcp-metadata.R'
+    'parallel-delegate.R'
+    'permission-policy.R'
+    'permissions.R'
+    'run-context.R'
+    'run-usage.R'
+    'skills.R'
+    'stall-detection.R'
+    'structured-run.R'
+    'tool-metadata.R'
+    'tool-registration.R'
+    'tool-request-validation.R'
+    'tool-runtime.R'
+    'tools-bundles.R'
+    'tools-documents.R'
+    'tools-execution.R'
+    'tools-files.R'
+    'tools-interactive.R'
+    'tools-mcp.R'
+    'tools-web.R'
+    'utils.R'
