@@ -15,7 +15,8 @@ fixture receipt, not a write executed during preparation.
 `evaluation.R` loads each checkpoint through an actual ellmer tool round under a
 Deputy read-only allowlist. Large-result offloading is disabled for this experiment
 so the source text reaches the model. Preparation must load all checkpoints and
-produce at least two automatic compactions. Both continuations start from identical
+produce at least two automatic compactions. A repeated or out-of-order checkpoint
+invalidates preparation and is not scored. Both continuations start from identical
 prepared turns and system prompt; their order alternates across trials. The helper
 model performs preparation and summarization; the task model is held fixed.
 

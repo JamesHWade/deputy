@@ -242,6 +242,11 @@ history_prepare <- function(
           ellmer::tool_reject("Unknown checkpoint.")
         }
         loaded <<- c(loaded, stage)
+        if (anyDuplicated(loaded)) {
+          ellmer::tool_reject(
+            "Each checkpoint may be loaded only once per trial."
+          )
+        }
         history_stage_prompt(records, stage)
       },
       name = "load_checkpoint",
@@ -308,8 +313,14 @@ history_prepare <- function(
         class = "history_evaluation_incomplete"
       )
     }
+    if (anyDuplicated(loaded)) {
+      cli::cli_abort(
+        "Preparation repeated a checkpoint; do not score this trial.",
+        class = "history_evaluation_repeated_checkpoint"
+      )
+    }
   }
-  if (!setequal(loaded, unique(records$stage))) {
+  if (!identical(as.integer(loaded), sort(unique(records$stage)))) {
     cli::cli_abort(
       "Preparation did not load every checkpoint; do not score this trial."
     )

@@ -379,6 +379,7 @@ the AgentDefinition supplies the child's executable registry.
 - `rlang` - Language utilities
 - `coro` - Coroutines for streaming
 - `digest` - Hashing
+- `jsonlite` - Runtime JSON serialization, including atomic tool evidence
 - `Rapp` (>= 0.4.0) - CLI framework
 - `callr` - Fault isolation and timeouts for explicitly trusted R code
 - `mcp-repl` (optional, through mcptools) - OS-sandboxed model-generated R;
