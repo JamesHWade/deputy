@@ -129,7 +129,7 @@ normalize_agent_definitions <- function(definitions, arg = "sub_agents") {
 #'
 #' # Use with a lead agent
 #' lead <- LeadAgent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   sub_agents = list(code_reviewer)
 #' )
 #' }

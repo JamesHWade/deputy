@@ -14,7 +14,7 @@
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = tools_file()
 #' )
 #' }
@@ -46,7 +46,7 @@ tools_file <- function() {
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = tools_code()
 #' )
 #' }
@@ -72,7 +72,7 @@ tools_code <- function() {
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = tools_data()
 #' )
 #' }
@@ -220,7 +220,7 @@ get_provider_name <- function(chat) {
 #' \dontrun{
 #' # Allow all tools with full permissions
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = tools_all(),
 #'   permissions = permissions_full()
 #' )
@@ -271,20 +271,20 @@ ToolPresets <- c("minimal", "standard", "dev", "data", "full")
 #' \dontrun{
 #' # Minimal preset for read-only operations
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = tools_preset("minimal"),
 #'   permissions = permissions_readonly()
 #' )
 #'
 #' # Standard preset for typical development
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = tools_preset("standard")
 #' )
 #'
 #' # Data analysis preset
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-4o"),
+#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = tools_preset("data")
 #' )
 #' }

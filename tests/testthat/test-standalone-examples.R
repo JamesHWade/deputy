@@ -3,23 +3,30 @@ run_standalone_example <- function(
   chat,
   env = new.env(parent = as.environment("package:deputy"))
 ) {
+  models <- character()
   local_mocked_bindings(
-    chat_openai = function(...) if (is.function(chat)) chat() else chat,
+    chat_openai = function(model, ...) {
+      models <<- c(models, model)
+      if (is.function(chat)) chat() else chat
+    },
     .package = "ellmer"
   )
   path <- system.file("examples", "standalone", name, package = "deputy")
   sys.source(path, envir = env)
+  attr(env, "models") <- models
   env
 }
 
 test_that("basic, structured, session and skill scripts execute independently", {
   skip_if_not_installed("jsonlite")
   skip_if_not_installed("yaml")
+  withr::local_envvar(DEPUTY_EXAMPLE_MODEL = NA_character_)
   basic <- run_standalone_example(
     "01-basic.R",
     create_mock_chat("An R vector.")
   )
   expect_identical(basic$result$response, "An R vector.")
+  expect_identical(attr(basic, "models"), "gpt-5.6-luna")
   structured <- run_standalone_example(
     "06-structured-output.R",
     create_mock_chat('{"status":"ok"}')
@@ -54,6 +61,7 @@ test_that("basic, structured, session and skill scripts execute independently", 
   })
   expect_equal(receiver_chat$get_turns(), source_chat$get_turns())
   expect_identical(index, 2L)
+  expect_identical(attr(session, "models"), rep("gpt-5.6-luna", 2L))
   expect_identical(session$resumed$run_context$project, "session-example")
   expect_identical(session$result$response, "Cedar")
   expect_false(file.exists(session$session_file))
@@ -131,7 +139,10 @@ test_that("delegation example runs its registered reviewer during the lead run",
 
 test_that("debate example compares independent heads and synthesizes both arguments", {
   skip_if_not_installed("yaml")
-  withr::local_envvar(DEPUTY_DEBATE_TOPIC = "Should reviews be mandatory?")
+  withr::local_envvar(
+    DEPUTY_DEBATE_TOPIC = "Should reviews be mandatory?",
+    DEPUTY_EXAMPLE_MODEL = "gpt-5.6-terra"
+  )
   state <- new.env(parent = emptyenv())
   state$responder <- function(system_prompt, task) {
     if (grepl("AGAINST", system_prompt, fixed = TRUE)) {
@@ -153,6 +164,7 @@ test_that("debate example compares independent heads and synthesizes both argume
     if (index == 1L) create_parallel_chat(state) else moderator_chat
   })
   expect_identical(index, 2L)
+  expect_identical(attr(example, "models"), rep("gpt-5.6-terra", 2L))
   expect_identical(state$peak, 2L)
   expect_identical(
     example$batch$status,

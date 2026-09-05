@@ -5,9 +5,9 @@
 
 #| description: "LLM provider to use (anthropic, openai, google, ollama)"
 #| short: 'p'
-provider <- "anthropic"
+provider <- "openai"
 
-#| description: "Model to use (provider-specific)"
+#| description: "Model to use (OpenAI default: gpt-5.6-luna; otherwise provider-specific)"
 #| short: 'm'
 model <- NA_character_
 

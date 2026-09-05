@@ -46,7 +46,7 @@ deputy/
 ├── tests/testthat/         # Unit tests (testthat edition 3)
 ├── inst/skills/            # Built-in skills with YAML metadata
 ├── inst/examples/          # Runnable recipes, standalone scripts, and Shiny app
-├── exec/deputy.R           # Terminal CLI using Rapp
+├── exec/deputy.R           # Terminal CLI using Rapp (OpenAI / gpt-5.6-luna default)
 ├── vignettes/              # User documentation (R Markdown)
 ├── man/                    # Auto-generated roxygen2 docs
 ├── dev/agents/             # Agent skill configuration (issue tracker, labels, domain)

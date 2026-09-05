@@ -94,11 +94,12 @@ stopifnot(
 )
 ```
 
-Then choose any provider supported by ellmer and run a task. The model
+The examples use `gpt-5.6-luna`, the inexpensive GPT-5.6 model. Choose
+any provider supported by ellmer when creating your own Chat. The model
 call is not executed while building the documentation:
 
 ``` r
-chat <- ellmer::chat("openai")
+chat <- ellmer::chat("openai/gpt-5.6-luna")
 
 agent <- Agent$new(
   chat = chat,
@@ -113,6 +114,14 @@ result <- agent$run_sync(
   "Explain what this R package does. Support the answer with file paths."
 )
 ```
+
+Set `OPENAI_API_KEY` for these examples. To use a larger GPT-5.6 model,
+replace `gpt-5.6-luna` with `gpt-5.6-terra` (balanced) or `gpt-5.6-sol`
+(flagship). Use the explicit tier name: `gpt-5.6` is an alias for Sol.
+See OpenAI’s [model
+guide](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6)
+for the tier tradeoffs. Deputy preserves the model and parameters of the
+Chat you supply, including when it creates inherited child Chats.
 
 `run_sync()` returns an `AgentResult`, not just text:
 
@@ -180,8 +189,14 @@ rx --from github::JamesHWade/deputy deputy \
   --provider openai "Summarize the R files in this project"
 
 ir tool install github::JamesHWade/deputy
-deputy --provider openai --tools minimal
+deputy --tools minimal
+deputy --model gpt-5.6-terra --tools minimal
 ```
+
+The CLI defaults to OpenAI with `gpt-5.6-luna`. Use `--model` to select
+another model or `--provider` to select another provider, such as
+`--provider anthropic`. Other providers retain their own model defaults
+when `--model` is omitted.
 
 ## Status
 

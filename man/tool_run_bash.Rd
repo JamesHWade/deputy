@@ -23,7 +23,7 @@ A tool that executes bash/shell commands and returns the output.
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = list(tool_run_bash),
   permissions = permissions_full()  # Required for bash
 )

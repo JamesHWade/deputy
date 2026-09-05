@@ -17,7 +17,7 @@ to allow all operations.
 \dontrun{
 # Allow all tools with full permissions
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = tools_all(),
   permissions = permissions_full()
 )
