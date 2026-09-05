@@ -2,6 +2,20 @@
 
 ## deputy (development version)
 
+- The standalone `09-debate.R` example runs opposing stateless
+  responders, formats their arguments side by side, and synthesizes
+  completed results using a reusable, tool-free `debate` skill. Failed
+  perspectives remain inspectable and prevent synthesis
+  ([\#40](https://github.com/JamesHWade/deputy/issues/40)).
+
+- `LeadAgent$parallel_delegate()` and `$parallel_delegate_async()` run
+  fresh, tool-free responders in bounded concurrent waves. Batches
+  preserve named partial results, record child runs, reserve request
+  budgets, and support host cancellation. Failed provider dispatches
+  count toward request limits. Child Chats isolate runtime callbacks as
+  well as history and tools
+  ([\#39](https://github.com/JamesHWade/deputy/issues/39)).
+
 - [`tool_metadata()`](https://jameshwade.github.io/deputy/reference/tool_metadata.md)
   reports tool origin, supplied annotations, missing fields, and
   effective defaults through registration, cloning, and delegation. MCP

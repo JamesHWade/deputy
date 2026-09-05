@@ -84,6 +84,8 @@ sub-agents based on registered AgentDefinitions.</p>
 <p></p><ul><li><p><a href="#method-LeadAgent-initialize"><code>LeadAgent$new()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-register_sub_agent"><code>LeadAgent$register_sub_agent()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-available_sub_agents"><code>LeadAgent$available_sub_agents()</code></a></p></li>
+<li><p><a href="#method-LeadAgent-parallel_delegate"><code>LeadAgent$parallel_delegate()</code></a></p></li>
+<li><p><a href="#method-LeadAgent-parallel_delegate_async"><code>LeadAgent$parallel_delegate_async()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-list_subagents"><code>LeadAgent$list_subagents()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-get_subagent_results"><code>LeadAgent$get_subagent_results()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-get_subagent_messages"><code>LeadAgent$get_subagent_messages()</code></a></p></li>
@@ -256,13 +258,90 @@ runs and delegated agents.</p></dd>
 
 </div>
 
+<p></p><hr><a id="method-LeadAgent-parallel_delegate"></a><div class="section">
+<h3 id="leadagent-parallel-delegate-"><code>LeadAgent$parallel_delegate()</code><a class="anchor" aria-label="anchor" href="#leadagent-parallel-delegate-"></a></h3>
+<p>Run independent, stateless responders concurrently.</p>
+<p>Each selected AgentDefinition gets a fresh conversation and at most one
+model request. Definitions with tools, skills, or MCP servers are
+rejected. This is tier-1 fan-out, not background tool-using agents.
+Results preserve input order, including failures and unstarted tasks.</p><div class="section">
+<h4 id="usage-3">Usage<a class="anchor" aria-label="anchor" href="#usage-3"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">parallel_delegate</span><span class="op">(</span></span>
+<span>  <span class="va">tasks</span>,</span>
+<span>  max_active <span class="op">=</span> <span class="fl">2L</span>,</span>
+<span>  mode <span class="op">=</span> <span class="st">"stateless"</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-2">Arguments<a class="anchor" aria-label="anchor" href="#arguments-2"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>tasks</code></dt>
+<dd><p>A named character vector of tasks. Names select unique
+registered AgentDefinitions.</p></dd>
+
+      <dt><code>max_active</code></dt>
+<dd><p>Maximum simultaneous responders.</p></dd>
+
+      <dt><code>mode</code></dt>
+<dd><p>Execution contract. Currently only <code>"stateless"</code> is supported.</p></dd>
+
+      <dt><code>usage_limits</code></dt>
+<dd><p>Optional batch-wide <a href="UsageLimits.html">UsageLimits</a>. Unset fields
+inherit the lead's defaults. Requests are reserved before dispatch;
+token and cost ceilings are divided across each concurrent wave and
+checked after responses, with possible overage by one response per
+active responder.</p></dd>
+
+      <dt><code>run_context</code></dt>
+<dd><p>Additional immutable context for the batch.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<p>A list with <code>mode</code>, named <code>results</code> (<a href="AgentResult.html">AgentResult</a> or <code>NULL</code>),
+named <code>errors</code>, named <code>status</code>, and an aggregate <code>run</code> (<a href="AgentResult.html">AgentResult</a>).
+<code>$last_run()</code> retains the aggregate run. The lead's conversation is
+unchanged. Failed responders do not discard successful siblings.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-LeadAgent-parallel_delegate_async"></a><div class="section">
+<h3 id="leadagent-parallel-delegate-async-"><code>LeadAgent$parallel_delegate_async()</code><a class="anchor" aria-label="anchor" href="#leadagent-parallel-delegate-async-"></a></h3>
+<p>Run stateless fan-out without blocking the R event loop.</p><div class="section">
+<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">parallel_delegate_async</span><span class="op">(</span></span>
+<span>  <span class="va">tasks</span>,</span>
+<span>  max_active <span class="op">=</span> <span class="fl">2L</span>,</span>
+<span>  mode <span class="op">=</span> <span class="st">"stateless"</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>tasks, max_active, mode, usage_limits, run_context</code></dt>
+<dd><p>See
+<code>$parallel_delegate()</code>.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
+<p>A promise resolving to the same batch result as
+<code>$parallel_delegate()</code>. <code>$interrupt()</code> cancels queued work and asks
+active responders to stop at their next supported provider boundary.</p>
+</div>
+
+</div>
+
 <p></p><hr><a id="method-LeadAgent-list_subagents"></a><div class="section">
 <h3 id="leadagent-list-subagents-"><code>LeadAgent$list_subagents()</code><a class="anchor" aria-label="anchor" href="#leadagent-list-subagents-"></a></h3>
 <p>List delegated sub-agent runs, including failures.</p><div class="section">
-<h4 id="usage-3">Usage<a class="anchor" aria-label="anchor" href="#usage-3"></a></h4>
+<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
 <p>Data frame with one row per sub-agent run</p>
 </div>
 
@@ -271,10 +350,10 @@ runs and delegated agents.</p></dd>
 <p></p><hr><a id="method-LeadAgent-get_subagent_results"></a><div class="section">
 <h3 id="leadagent-get-subagent-results-"><code>LeadAgent$get_subagent_results()</code><a class="anchor" aria-label="anchor" href="#leadagent-get-subagent-results-"></a></h3>
 <p>Get retained results from delegated sub-agent runs.</p><div class="section">
-<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">get_subagent_results</span><span class="op">(</span>agent_name <span class="op">=</span> <span class="cn">NULL</span>, delegation_id <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-2">Arguments<a class="anchor" aria-label="anchor" href="#arguments-2"></a></h4>
+<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>agent_name</code></dt>
 <dd><p>Optional sub-agent name filter</p></dd>
 
@@ -284,7 +363,7 @@ runs and delegated agents.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
+<h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
 <p>List of <a href="AgentResult.html">AgentResult</a> objects or <code>NULL</code> entries for failed runs</p>
 </div>
 
@@ -293,10 +372,10 @@ runs and delegated agents.</p></dd>
 <p></p><hr><a id="method-LeadAgent-get_subagent_messages"></a><div class="section">
 <h3 id="leadagent-get-subagent-messages-"><code>LeadAgent$get_subagent_messages()</code><a class="anchor" aria-label="anchor" href="#leadagent-get-subagent-messages-"></a></h3>
 <p>Get stored turn history for delegated sub-agent runs.</p><div class="section">
-<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
+<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">get_subagent_messages</span><span class="op">(</span>agent_name <span class="op">=</span> <span class="cn">NULL</span>, session_id <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
+<h4 id="arguments-5">Arguments<a class="anchor" aria-label="anchor" href="#arguments-5"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>agent_name</code></dt>
 <dd><p>Optional sub-agent name filter</p></dd>
 
@@ -306,7 +385,7 @@ runs and delegated agents.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
+<h4 id="returns-7">Returns<a class="anchor" aria-label="anchor" href="#returns-7"></a></h4>
 <p>List of turn histories</p>
 </div>
 
@@ -315,7 +394,7 @@ runs and delegated agents.</p></dd>
 <p></p><hr><a id="method-LeadAgent-print"></a><div class="section">
 <h3 id="leadagent-print-"><code>LeadAgent$print()</code><a class="anchor" aria-label="anchor" href="#leadagent-print-"></a></h3>
 <p>Print the lead agent.</p><div class="section">
-<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
+<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -324,10 +403,10 @@ runs and delegated agents.</p></dd>
 <p></p><hr><a id="method-LeadAgent-clone"></a><div class="section">
 <h3 id="leadagent-clone-"><code>LeadAgent$clone()</code><a class="anchor" aria-label="anchor" href="#leadagent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
+<h4 id="usage-9">Usage<a class="anchor" aria-label="anchor" href="#usage-9"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
+<h4 id="arguments-6">Arguments<a class="anchor" aria-label="anchor" href="#arguments-6"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

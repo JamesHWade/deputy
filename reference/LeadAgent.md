@@ -25,6 +25,10 @@ it to spawn sub-agents based on registered AgentDefinitions.
 
 - [`LeadAgent$available_sub_agents()`](#method-LeadAgent-available_sub_agents)
 
+- [`LeadAgent$parallel_delegate()`](#method-LeadAgent-parallel_delegate)
+
+- [`LeadAgent$parallel_delegate_async()`](#method-LeadAgent-parallel_delegate_async)
+
 - [`LeadAgent$list_subagents()`](#method-LeadAgent-list_subagents)
 
 - [`LeadAgent$get_subagent_results()`](#method-LeadAgent-get_subagent_results)
@@ -226,6 +230,92 @@ Get available sub-agent names.
 #### Returns
 
 Character vector of sub-agent names
+
+------------------------------------------------------------------------
+
+### `LeadAgent$parallel_delegate()`
+
+Run independent, stateless responders concurrently.
+
+Each selected AgentDefinition gets a fresh conversation and at most one
+model request. Definitions with tools, skills, or MCP servers are
+rejected. This is tier-1 fan-out, not background tool-using agents.
+Results preserve input order, including failures and unstarted tasks.
+
+#### Usage
+
+    LeadAgent$parallel_delegate(
+      tasks,
+      max_active = 2L,
+      mode = "stateless",
+      usage_limits = NULL,
+      run_context = list()
+    )
+
+#### Arguments
+
+- `tasks`:
+
+  A named character vector of tasks. Names select unique registered
+  AgentDefinitions.
+
+- `max_active`:
+
+  Maximum simultaneous responders.
+
+- `mode`:
+
+  Execution contract. Currently only `"stateless"` is supported.
+
+- `usage_limits`:
+
+  Optional batch-wide
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md).
+  Unset fields inherit the lead's defaults. Requests are reserved before
+  dispatch; token and cost ceilings are divided across each concurrent
+  wave and checked after responses, with possible overage by one
+  response per active responder.
+
+- `run_context`:
+
+  Additional immutable context for the batch.
+
+#### Returns
+
+A list with `mode`, named `results`
+([AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
+or `NULL`), named `errors`, named `status`, and an aggregate `run`
+([AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)).
+`$last_run()` retains the aggregate run. The lead's conversation is
+unchanged. Failed responders do not discard successful siblings.
+
+------------------------------------------------------------------------
+
+### `LeadAgent$parallel_delegate_async()`
+
+Run stateless fan-out without blocking the R event loop.
+
+#### Usage
+
+    LeadAgent$parallel_delegate_async(
+      tasks,
+      max_active = 2L,
+      mode = "stateless",
+      usage_limits = NULL,
+      run_context = list()
+    )
+
+#### Arguments
+
+- `tasks, max_active, mode, usage_limits, run_context`:
+
+  See `$parallel_delegate()`.
+
+#### Returns
+
+A promise resolving to the same batch result as `$parallel_delegate()`.
+`$interrupt()` cancels queued work and asks active responders to stop at
+their next supported provider boundary.
 
 ------------------------------------------------------------------------
 
