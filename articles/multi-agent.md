@@ -168,7 +168,7 @@ servers are rejected before dispatch.
 ``` r
 
 lead <- LeadAgent$new(
-  ellmer::chat_openai(),
+  ellmer::chat_openai(model = "gpt-5.6-luna"),
   sub_agents = list(
     agent_definition("benefits", "Find benefits", "Explain the strongest benefits."),
     agent_definition("risks", "Find risks", "Explain the strongest risks.")
@@ -360,7 +360,7 @@ dropping a definition.
 ``` r
 
 lead <- LeadAgent$new(
-  chat = ellmer::chat_openai(),
+  chat = ellmer::chat_openai(model = "gpt-5.6-luna"),
   sub_agents = definitions,
   permissions = Permissions$new(mode = "standard", file_write = FALSE),
   usage_limits = UsageLimits(max_requests = 6)

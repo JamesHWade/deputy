@@ -55,7 +55,7 @@ repl_tools <- tools_mcp_repl(
   sandbox = "workspace-write"
 )
 agent <- Agent$new(
-  chat = ellmer::chat("openai"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = repl_tools,
   permissions = Permissions$new(web = FALSE)
 )

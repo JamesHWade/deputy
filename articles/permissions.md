@@ -224,7 +224,7 @@ on the agent or an individual run:
 ``` r
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = tools_file(),
   permissions = permissions_standard(),
   usage_limits = UsageLimits(

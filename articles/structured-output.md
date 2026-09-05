@@ -13,7 +13,7 @@ The simplest form asks the LLM to return a JSON object:
 
 library(deputy)
 
-chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
 agent <- Agent$new(chat = chat)
 
 result <- agent$run_sync(
@@ -56,7 +56,7 @@ schema <- list(
   required = c("packages")
 )
 
-chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
 agent <- Agent$new(chat = chat)
 
 result <- agent$run_sync(
@@ -124,7 +124,7 @@ schema <- list(
   required = c("language", "purpose", "first_release_year")
 )
 
-chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
 agent <- Agent$new(chat = chat)
 
 result <- agent$run_sync(

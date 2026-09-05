@@ -30,7 +30,7 @@ ui <- bslib::page_fluid(
 
 server <- function(input, output, session) {
   chat <- ellmer::chat_openai(
-    model = "gpt-4o-mini",
+    model = "gpt-5.6-luna",
     system_prompt = "You are a concise data assistant."
   )
 

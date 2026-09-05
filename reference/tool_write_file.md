@@ -36,7 +36,7 @@ When called directly, a character status message describing the write.
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = list(tool_write_file)
 )
 } # }

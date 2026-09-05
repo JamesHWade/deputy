@@ -91,7 +91,7 @@ tool that lets it assign tasks to any registered sub-agent:
 
 ``` r
 
-chat <- ellmer::chat_openai()
+chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
 
 lead <- LeadAgent$new(
   chat = chat,
@@ -192,7 +192,7 @@ review_schema <- list(
   required = c("summary", "total_findings", "findings")
 )
 
-chat <- ellmer::chat_openai()
+chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
 
 lead <- LeadAgent$new(
   chat = chat,

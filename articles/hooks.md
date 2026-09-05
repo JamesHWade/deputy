@@ -83,7 +83,7 @@ logs every tool call using cli:
 
 library(deputy)
 
-chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
 agent <- Agent$new(
   chat = chat,
   tools = tools_file(),
@@ -173,7 +173,7 @@ hook_audit <- HookMatcher$new(
   }
 )
 
-chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
 agent <- Agent$new(
   chat = chat,
   tools = tools_file(),

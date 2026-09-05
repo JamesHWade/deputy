@@ -2,6 +2,12 @@
 
 ## deputy (development version)
 
+- The CLI now defaults to OpenAI with `gpt-5.6-luna`. OpenAI examples
+  also select Luna explicitly, with documented Terra and Sol overrides.
+  Explicit model choices, other providers’ defaults, and caller-supplied
+  Chats are preserved
+  ([\#106](https://github.com/JamesHWade/deputy/issues/106)).
+
 - The standalone `09-debate.R` example runs opposing stateless
   responders, formats their arguments side by side, and synthesizes
   completed results using a reusable, tool-free `debate` skill. Failed

@@ -50,7 +50,7 @@ uppercase <- ellmer::tool(
   )
 )
 # Constructing this Chat does not make a model request.
-chat <- ellmer::chat_openai(credentials = function() "example", model = "gpt-4o-mini")
+chat <- ellmer::chat_openai(credentials = function() "example", model = "gpt-5.6-luna")
 agent <- Agent$new(chat = chat, tools = list(uppercase))
 agent$get_tools()$uppercase("hello")
 #> [1] "HELLO"
@@ -177,7 +177,7 @@ Combine bundles by concatenating:
 ``` r
 
 tools <- c(tools_file(), tools_code())
-agent <- Agent$new(chat = ellmer::chat_openai(), tools = tools)
+agent <- Agent$new(chat = ellmer::chat_openai(model = "gpt-5.6-luna"), tools = tools)
 ```
 
 ## Tool Presets
@@ -254,7 +254,7 @@ tool_dice <- ellmer::tool(
   )
 )
 
-chat <- ellmer::chat_openai(model = "gpt-4o-mini")
+chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
 agent <- Agent$new(chat = chat, tools = list(tool_dice))
 result <- agent$run_sync("Roll 2d20 for me")
 cat(result$response)
@@ -333,7 +333,7 @@ repl_tools <- tools_mcp_repl(
 )
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = repl_tools,
   permissions = Permissions$new(web = FALSE)
 )
@@ -359,7 +359,7 @@ agent_id <- "agent-analysis"
 session_id <- "session-analysis"
 
 agent <- Agent$new(
-  chat = ellmer::chat_openai(),
+  chat = ellmer::chat_openai(model = "gpt-5.6-luna"),
   tools = c(
     tools_file(),
     tools_interactive(

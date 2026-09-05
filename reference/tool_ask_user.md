@@ -76,7 +76,7 @@ for instance-scoped non-interactive usage
 if (FALSE) { # \dontrun{
 # Add to agent's tools
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-4o"),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = c(tools_file(), tool_ask_user)
 )
 
