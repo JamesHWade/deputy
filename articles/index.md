@@ -23,7 +23,9 @@
 - [Multi-Agent
   Orchestration](https://jameshwade.github.io/deputy/articles/multi-agent.md):
 - [Structured
-  Output](https://jameshwade.github.io/deputy/articles/structured-output.md):
+  output](https://jameshwade.github.io/deputy/articles/structured-output.md):
+- [Runtime integration and
+  evaluation](https://jameshwade.github.io/deputy/articles/runtime-integration.md):
 
 ### Recipes
 

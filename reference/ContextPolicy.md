@@ -33,7 +33,9 @@ ContextPolicy(
 - fallback:
 
   What to do when LLM summary generation fails. `"error"` fails closed;
-  `"text"` uses a deterministic truncated-text summary.
+  `"text"` uses a deterministic truncated-text summary. Summary
+  generation uses an isolated clone of the active Chat and does not
+  select from the Agent's task `fallback_chats`.
 
 - max_tool_result_bytes:
 

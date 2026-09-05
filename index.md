@@ -29,6 +29,14 @@ ellmer Chat + Tools + Permissions + Limits
         AgentResult + Events + Checkpoints
 ```
 
+Deputy requires released ellmer 0.5.0 or later. Structured output uses
+ellmer types, with bounded application corrections under the same run
+budget. Explicit fallback Chats and OpenTelemetry governance compose
+with ellmer’s provider transport and tracing. See [runtime
+integration](https://jameshwade.github.io/deputy/articles/runtime-integration.md)
+and [structured
+output](https://jameshwade.github.io/deputy/articles/structured-output.md).
+
 The Agent itself implements ellmer’s Chat protocol. Use `agent$chat()`
 and `agent$stream()` in synchronous code, or pass the Agent directly to
 `shinychat::chat_server()`. Those paths use the same governed kernel as

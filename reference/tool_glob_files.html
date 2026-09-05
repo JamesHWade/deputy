@@ -32,6 +32,7 @@
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -49,7 +50,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Find files using a glob pattern</h1>
-      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/tools-builtin.R" class="external-link"><code>R/tools-builtin.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/tools-files.R" class="external-link"><code>R/tools-files.R</code></a></small>
       <div class="d-none name"><code>tool_glob_files.Rd</code></div>
     </div>
 
@@ -94,7 +95,7 @@ glob pattern.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">directory</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines</a></span><span class="op">(</span><span class="st">"example"</span>, <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">directory</span>, <span class="st">"example.txt"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">tool_glob_files</span><span class="op">(</span><span class="st">"*.txt"</span>, <span class="va">directory</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Base path: /tmp/RtmpyoW1OV/file1ab8bdadf98\nMatches: 1\n\nexample.txt"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Base path: /tmp/RtmpQ9IcZ2/file1a4512739a0\nMatches: 1\n\nexample.txt"</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">directory</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

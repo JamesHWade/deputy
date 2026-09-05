@@ -34,6 +34,7 @@ updates on agent progress."><meta property="og:image" content="https://jameshwad
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -96,6 +97,17 @@ updates on agent progress.</p>
 <li><p><code>"warning"</code> - Warning condition occurred. Contains: <code>message</code>, <code>details</code></p></li>
 <li><p><code>"content"</code> - Non-text provider content. Contains: <code>content</code>,
 <code>content_type</code></p></li>
+<li><p><code>"request_start"</code>, <code>"request_end"</code>, <code>"request_error"</code> - Governed model
+dispatch evidence with provider, model, request number, and original
+HTTP/transport conditions on errors. These are not individual HTTP retry
+attempts. Unclassified application errors are retained as <code>"run_error"</code>.</p></li>
+<li><p><code>"run_error"</code> - Terminal initialization, streaming, or structured-output
+failure, with its phase and original condition. Application callbacks and
+validation do not turn a successful response into a <code>"request_error"</code>.</p></li>
+<li><p><code>"fallback"</code> - Explicit Chat selection, prior condition, and usage.</p></li>
+<li><p><code>"structured_attempt"</code> - Structured value, available turn, validation
+outcome, feedback, and condition. May contain sensitive application data.</p></li>
+<li><p><code>"permission"</code>, <code>"hook"</code>, <code>"compaction"</code> - Governance decisions and lifecycle.</p></li>
 <li><p><code>"file_checkpoint"</code> - Automatic run-boundary checkpoint. Contains:
 <code>checkpoint_id</code>, <code>name</code></p></li>
 <li><p><code>"usage"</code> - Run usage snapshot. Contains: <code>usage</code>, <code>limits</code></p></li>
@@ -111,14 +123,14 @@ applicable.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Create a start event</span></span></span>
 <span class="r-in"><span><span class="fu">AgentEvent</span><span class="op">(</span><span class="st">"start"</span>, task <span class="op">=</span> <span class="st">"Analyze data.csv"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;AgentEvent: start &gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   timestamp: 2026-09-05 01:05:34 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   timestamp: 2026-09-05 09:59:34 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   task: Analyze data.csv</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Create a text event</span></span></span>
 <span class="r-in"><span><span class="fu">AgentEvent</span><span class="op">(</span><span class="st">"text"</span>, text <span class="op">=</span> <span class="st">"Hello"</span>, is_complete <span class="op">=</span> <span class="cn">FALSE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;AgentEvent: text &gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   timestamp: 2026-09-05 01:05:34 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   timestamp: 2026-09-05 09:59:34 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   text: Hello</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   is_complete: FALSE</span>
 <span class="r-in"><span></span></span>

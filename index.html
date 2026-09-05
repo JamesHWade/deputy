@@ -55,6 +55,7 @@
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
     <li><a class="dropdown-item" href="articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="articles/structured-output.html">Structured Output</a></li>
+    <li><a class="dropdown-item" href="articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
     <li><a class="dropdown-item" href="articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -126,6 +127,7 @@
                   Deputy Agent
                      |
         AgentResult + Events + Checkpoints</code></pre>
+<p>Deputy requires released ellmer 0.5.0 or later. Structured output uses ellmer types, with bounded application corrections under the same run budget. Explicit fallback Chats and OpenTelemetry governance compose with ellmer’s provider transport and tracing. See <a href="articles/runtime-integration.html">runtime integration</a> and <a href="articles/structured-output.html">structured output</a>.</p>
 <p>The Agent itself implements ellmer’s Chat protocol. Use <code>agent$chat()</code> and <code>agent$stream()</code> in synchronous code, or pass the Agent directly to <code>shinychat::chat_server()</code>. Those paths use the same governed kernel as <code>run_sync()</code> and <code>run_async()</code>; the latter pair return richer <code>AgentResult</code> metadata when the host needs to inspect the run. Product hosts may attach per-run correlation with the optional <code>run_context</code> argument on every chat, stream, and run method.</p>
 </div>
 <div class="section level2">

@@ -52,6 +52,7 @@
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -119,8 +120,8 @@ metadata</li>
 <li>
 <strong>Report</strong> – Produce a human-readable summary</li>
 </ol>
-<p>Each step uses <code>output_format</code> to constrain the LLM to a
-JSON schema.</p>
+<p>Each step supplies an ellmer <code>type</code> to extract a
+structured result after its tool work.</p>
 </div>
 <div class="section level2">
 <h2 id="step-1-extract-package-metadata">Step 1: Extract Package Metadata<a class="anchor" aria-label="anchor" href="#step-1-extract-package-metadata"></a>
@@ -181,15 +182,13 @@ then extracts structured information:</p>
 <span><span class="va">step1</span> <span class="op">&lt;-</span> <span class="va">extractor</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
 <span>  <span class="st">"Extract metadata from this R package. Read DESCRIPTION and scan</span></span>
 <span><span class="st">   the R/ directory for exported functions."</span>,</span>
-<span>  output_format <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"json_schema"</span>, schema <span class="op">=</span> <span class="va">extract_schema</span><span class="op">)</span></span>
+<span>  type <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_from_schema</a></span><span class="op">(</span><span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="va">extract_schema</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Validate the output before proceeding</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="va">step1</span><span class="op">$</span><span class="fu">is_success</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Logic.html" class="external-link">isTRUE</a></span><span class="op">(</span><span class="va">step1</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">valid</span><span class="op">)</span> <span class="op">||</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">step1</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">valid</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">pkg_metadata</span> <span class="op">&lt;-</span> <span class="va">step1</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">parsed</span></span>
+<span><span class="va">pkg_metadata</span> <span class="op">&lt;-</span> <span class="va">step1</span><span class="op">$</span><span class="va">structured_output</span></span>
 <span><span class="va">pkg_metadata</span><span class="op">$</span><span class="va">name</span></span>
 <span><span class="va">pkg_metadata</span><span class="op">$</span><span class="va">version</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">pkg_metadata</span><span class="op">$</span><span class="va">exported_functions</span><span class="op">)</span></span></code></pre></div>
@@ -255,11 +254,11 @@ summaries:</p>
 <span>    <span class="st">"Package metadata:"</span>,</span>
 <span>    <span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="va">pkg_metadata</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span>, pretty <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span>  <span class="op">)</span>,</span>
-<span>  output_format <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"json_schema"</span>, schema <span class="op">=</span> <span class="va">enrich_schema</span><span class="op">)</span></span>
+<span>  type <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_from_schema</a></span><span class="op">(</span><span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="va">enrich_schema</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="va">step2</span><span class="op">$</span><span class="fu">is_success</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">enriched</span> <span class="op">&lt;-</span> <span class="va">step2</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">parsed</span></span>
+<span><span class="va">enriched</span> <span class="op">&lt;-</span> <span class="va">step2</span><span class="op">$</span><span class="va">structured_output</span></span>
 <span><span class="va">enriched</span><span class="op">$</span><span class="va">category_tags</span></span>
 <span><span class="va">enriched</span><span class="op">$</span><span class="va">complexity</span></span></code></pre></div>
 </div>
@@ -307,7 +306,7 @@ report:</p>
 <span></span>
 <span>  <span class="va">step1</span> <span class="op">&lt;-</span> <span class="va">extractor</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
 <span>    <span class="st">"Extract metadata from this R package."</span>,</span>
-<span>    output_format <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"json_schema"</span>, schema <span class="op">=</span> <span class="va">extract_schema</span><span class="op">)</span></span>
+<span>    type <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_from_schema</a></span><span class="op">(</span><span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="va">extract_schema</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
 <span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="va">step1</span><span class="op">$</span><span class="fu">is_success</span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
@@ -327,10 +326,10 @@ report:</p>
 <span></span>
 <span>  <span class="va">step2</span> <span class="op">&lt;-</span> <span class="va">enricher</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Enrich this metadata:"</span>, <span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span></span>
-<span>      <span class="va">step1</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">parsed</span>,</span>
+<span>      <span class="va">step1</span><span class="op">$</span><span class="va">structured_output</span>,</span>
 <span>      auto_unbox <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span>    <span class="op">)</span><span class="op">)</span>,</span>
-<span>    output_format <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"json_schema"</span>, schema <span class="op">=</span> <span class="va">enrich_schema</span><span class="op">)</span></span>
+<span>    type <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_from_schema</a></span><span class="op">(</span><span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="va">enrich_schema</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
 <span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="va">step2</span><span class="op">$</span><span class="fu">is_success</span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
@@ -343,7 +342,7 @@ report:</p>
 <span></span>
 <span>  <span class="va">step3</span> <span class="op">&lt;-</span> <span class="va">reporter</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Write a package summary:"</span>, <span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span></span>
-<span>      <span class="va">step2</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">parsed</span>,</span>
+<span>      <span class="va">step2</span><span class="op">$</span><span class="va">structured_output</span>,</span>
 <span>      auto_unbox <span class="op">=</span> <span class="cn">TRUE</span>, pretty <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span>    <span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
@@ -351,8 +350,8 @@ report:</p>
 <span>  <span class="va">costs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">step1</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">total</span>, <span class="va">step2</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">total</span>, <span class="va">step3</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">total</span><span class="op">)</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    metadata <span class="op">=</span> <span class="va">step1</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">parsed</span>,</span>
-<span>    enriched <span class="op">=</span> <span class="va">step2</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">parsed</span>,</span>
+<span>    metadata <span class="op">=</span> <span class="va">step1</span><span class="op">$</span><span class="va">structured_output</span>,</span>
+<span>    enriched <span class="op">=</span> <span class="va">step2</span><span class="op">$</span><span class="va">structured_output</span>,</span>
 <span>    report <span class="op">=</span> <span class="va">step3</span><span class="op">$</span><span class="va">response</span>,</span>
 <span>    total_cost <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">anyNA</a></span><span class="op">(</span><span class="va">costs</span><span class="op">)</span><span class="op">)</span> <span class="cn">NA_real_</span> <span class="kw">else</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">costs</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
@@ -365,28 +364,22 @@ report:</p>
 <div class="section level2">
 <h2 id="error-handling-between-steps">Error Handling Between Steps<a class="anchor" aria-label="anchor" href="#error-handling-between-steps"></a>
 </h2>
-<p>Each step validates its output before passing it to the next. Check
-both <code>is_success()</code> (the agent completed normally) and
-<code>structured_output$valid</code> (the JSON matches the schema):</p>
+<p>Check <code>is_success()</code> before passing a result to the next
+step. Use <code>validate</code> for application rules; invalid output or
+an unavailable validator signals an error, and bounded corrections are
+opt-in:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">step</span> <span class="op">&lt;-</span> <span class="va">extractor</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
 <span>  <span class="st">"Extract metadata."</span>,</span>
-<span>  output_format <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"json_schema"</span>, schema <span class="op">=</span> <span class="va">extract_schema</span><span class="op">)</span></span>
+<span>  type <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_from_schema</a></span><span class="op">(</span><span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="va">extract_schema</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="va">step</span><span class="op">$</span><span class="fu">is_success</span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli_abort</a></span><span class="op">(</span><span class="st">"Agent stopped early: {step$stop_reason}"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">step</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">valid</span>, <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli_abort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>    <span class="st">"Output doesn't match schema"</span>,</span>
-<span>    <span class="st">"x"</span> <span class="op">=</span> <span class="va">step</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">errors</span></span>
-<span>  <span class="op">)</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
 <span><span class="co"># Safe to use the parsed output</span></span>
-<span><span class="va">parsed</span> <span class="op">&lt;-</span> <span class="va">step</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">parsed</span></span></code></pre></div>
+<span><span class="va">parsed</span> <span class="op">&lt;-</span> <span class="va">step</span><span class="op">$</span><span class="va">structured_output</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="next-steps">Next Steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>

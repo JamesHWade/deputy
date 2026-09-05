@@ -36,6 +36,7 @@ sub-agents based on registered AgentDefinitions."><meta property="og:image" cont
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -102,6 +103,7 @@ sub-agents based on registered AgentDefinitions.</p>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href="Agent.html#method-cost"><code>Agent$cost()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_cost"><a href="Agent.html#method-get_cost"><code>Agent$get_cost()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_model"><a href="Agent.html#method-get_model"><code>Agent$get_model()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_model_object"><a href="Agent.html#method-get_model_object"><code>Agent$get_model_object()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_permission_mode"><a href="Agent.html#method-get_permission_mode"><code>Agent$get_permission_mode()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_provider"><a href="Agent.html#method-get_provider"><code>Agent$get_provider()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_system_prompt"><a href="Agent.html#method-get_system_prompt"><code>Agent$get_system_prompt()</code></a></span></li>
@@ -160,7 +162,8 @@ sub-agents based on registered AgentDefinitions.</p>
 <span>  session_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  agent_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  agent_name <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  agent_name <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h4>
@@ -217,6 +220,11 @@ runs and delegated agents.</p></dd>
 
       <dt><code>agent_name</code></dt>
 <dd><p>Optional human-readable LeadAgent name.</p></dd>
+
+      <dt><code>fallback_chats</code></dt>
+<dd><p>Ordered configured fallback Chats for the lead.
+Child definitions inherit the selected provider, without an implicit
+fallback policy of their own. See <a href="Agent.html">Agent</a>.</p></dd>
 
 
 </dl><p></p></div>

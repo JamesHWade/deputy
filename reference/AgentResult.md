@@ -33,7 +33,7 @@ occurred during execution.
 
 - `structured_output`:
 
-  Parsed/validated structured output (if requested)
+  Data converted by ellmer using the requested type (if any)
 
 - `session_id`:
 

@@ -205,7 +205,7 @@ lead <- LeadAgent$new(
 
 result <- lead$run_sync(
   "Review the R/ directory and return structured findings.",
-  output_format = list(type = "json_schema", schema = review_schema)
+  type = ellmer::type_from_schema(jsonlite::toJSON(review_schema, auto_unbox = TRUE))
 )
 ```
 
@@ -216,7 +216,7 @@ programmatically:
 
 ``` r
 
-review <- result$structured_output$parsed
+review <- result$structured_output
 
 # Summary
 cli::cli_h1("Code Review: {review$summary}")

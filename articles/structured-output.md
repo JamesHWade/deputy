@@ -1,136 +1,109 @@
-# Structured Output
+# Structured output
 
-Sometimes you need the agent to return data in a specific format rather
-than free-form text. deputy supports **structured output** via the
-`output_format` parameter, which tells the LLM to return valid JSON
-matching a schema.
+Deputy uses ellmer’s types, provider schema transport, JSON extraction,
+and R conversion. A structured result is the value ellmer returns,
+available directly in `AgentResult$structured_output`. There is no
+separate Deputy schema format.
 
-## JSON Object Format
+## Extract directly
 
-The simplest form asks the LLM to return a JSON object:
-
-``` r
-
-library(deputy)
-
-chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
-agent <- Agent$new(chat = chat)
-
-result <- agent$run_sync(
-  "List three popular R packages for data manipulation.
-   Return a JSON object with a 'packages' array where each
-   element has 'name' and 'description' fields.",
-  output_format = list(type = "json_object")
-)
-
-parsed <- result$structured_output$parsed
-str(parsed)
-```
-
-## JSON Schema Format
-
-For stricter control, provide a JSON Schema. The LLM will be constrained
-to produce output matching the schema:
+Use `chat_structured()` when the conversation already contains the
+information to extract. It makes a governed structured request and
+suppresses ordinary tools, as ellmer does. `chat_structured_async()`
+returns a promise with the same value.
 
 ``` r
 
-schema <- list(
-  type = "object",
-  properties = list(
-    packages = list(
-      type = "array",
-      items = list(
-        type = "object",
-        properties = list(
-          name = list(type = "string"),
-          description = list(type = "string"),
-          category = list(
-            type = "string",
-            enum = c("data", "visualization", "modeling", "infrastructure")
-          )
-        ),
-        required = c("name", "description", "category")
-      )
-    )
-  ),
-  required = c("packages")
+agent <- Agent$new(ellmer::chat("openai/gpt-5.6-luna"))
+review_type <- ellmer::type_object(
+  status = ellmer::type_enum(c("ok", "needs_review")),
+  findings = ellmer::type_array(ellmer::type_string())
 )
-
-chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
-agent <- Agent$new(chat = chat)
-
-result <- agent$run_sync(
-  "List three popular R packages and categorise them.",
-  output_format = list(type = "json_schema", schema = schema)
-)
-
-parsed <- result$structured_output$parsed
-str(parsed)
+data <- agent$chat_structured("The review found no problems.", type = review_type)
+agent$last_run()$usage
 ```
 
-## Accessing Structured Output
-
-The `structured_output` field on `AgentResult` contains:
-
-| Field     | Description                                          |
-|-----------|------------------------------------------------------|
-| `$parsed` | Parsed R list from the JSON response                 |
-| `$raw`    | Raw JSON string                                      |
-| `$valid`  | `TRUE`, `FALSE`, or `NA` (if validation was skipped) |
-| `$errors` | Validation error messages (if any)                   |
-| `$format` | The `output_format` spec that was used               |
+Existing JSON Schema can enter through
+`ellmer::type_from_schema(text = ...)`. Schema support and conversion
+remain ellmer’s contract.
 
 ``` r
 
-result$structured_output$valid
-#> [1] TRUE
-
-result$structured_output$parsed$packages[[1]]$name
-#> [1] "dplyr"
+status_type <- ellmer::type_from_schema(
+  '{"type":"object","properties":{"status":{"type":"string"}},"required":["status"],"additionalProperties":false}'
+)
 ```
 
-## Schema Validation
+## Complete a task, then extract
 
-When you provide a JSON Schema and the
-[jsonvalidate](https://docs.ropensci.org/jsonvalidate/) package is
-installed, deputy automatically validates the output:
+`run_sync(type = ...)`, `run_async(type = ...)`, and the semantic
+`run(type = ...)` stream first complete an ordinary tool-using task,
+then ask ellmer to extract from that conversation. Both phases share one
+run ID, hook lifecycle, permission policy, and request/token/cost
+budget. The extraction never repeats tool work. The `response` is the
+task’s text; `structured_output` is the extracted value. Even a task
+without tools uses these two explicit phases; use `chat_structured()`
+for direct extraction in one request.
 
 ``` r
 
-# If validation fails:
-result$structured_output$valid
-#> [1] FALSE
-
-result$structured_output$errors
-#> [1] "data/packages/0: must have required property 'category'"
+agent <- Agent$new(
+  ellmer::chat("openai/gpt-5.6-luna"),
+  tools = tools_file(),
+  permissions = permissions_readonly(),
+  usage_limits = UsageLimits(max_requests = 8)
+)
+result <- agent$run_sync("Review the README", type = status_type)
+stopifnot(result$is_success())
+result$structured_output
 ```
 
-Without jsonvalidate installed, `$valid` will be `NA` and `$errors` will
-be empty. The parsed output is still available.
+## Bounded application validation
 
-## Extraction Example
-
-Structured output is especially useful for data extraction tasks:
+A `validate` function receives ellmer’s converted value and returns
+`TRUE`, `FALSE`, or non-empty text explaining a failed application rule.
+Set `max_corrections` to a finite non-negative integer to permit more
+structured requests. The default is zero. Corrections have no tools and
+consume the remaining run budget. They retain failed values, available
+turns, feedback, and conditions in `structured_attempt` events. These
+local events can contain user data; Deputy’s tracing adapter omits that
+content.
 
 ``` r
 
-schema <- list(
-  type = "object",
-  properties = list(
-    language = list(type = "string"),
-    purpose = list(type = "string"),
-    first_release_year = list(type = "integer")
-  ),
-  required = c("language", "purpose", "first_release_year")
+data <- agent$chat_structured(
+  "Extract the review status.",
+  type = status_type,
+  validate = function(x) {
+    if (identical(x$status, "ok")) TRUE else "status must equal ok"
+  },
+  max_corrections = 1L
 )
-
-chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
-agent <- Agent$new(chat = chat)
-
-result <- agent$run_sync(
-  "Extract structured information about the R programming language.",
-  output_format = list(type = "json_schema", schema = schema)
-)
-
-result$structured_output$parsed
 ```
+
+Corrections cover failed application validation and JSON parsing
+failures confirmed through ellmer’s recorded `ContentJson`. Unclassified
+conversion errors and application callback errors are terminal,
+preserving their original conditions. An exhausted correction policy
+signals `deputy_structured_output_invalid`. An exception or `NA` from
+the validator is terminal. Provider failures are not application
+corrections. Incomplete responses rejected by ellmer before a turn can
+be recorded are terminal; the caller must change the token/context
+policy. Cancellation is cooperative: an in-flight structured request can
+finish, but no correction starts after cancellation. With
+`on_exceed = "stop"`, a budget stop returns a result with a stop reason
+and no successful structured value; with `on_exceed = "error"`, it
+signals the typed limit condition. Inspect `last_run()` for
+completed-run evidence even after an error.
+
+## Native structured streaming
+
+`stream(type = ...)` and `stream_async(type = ...)` forward to ellmer’s
+native structured streaming API. Chunks contain raw JSON text/content;
+the completed upstream assistant turn stores `ContentJson`. These
+methods do not add an application correction loop. Providers requiring
+ellmer’s schema-tool fallback must use `chat_structured()` instead.
+
+The former `output_format` argument and its `parsed`/`valid` wrapper
+were removed before Deputy’s first CRAN release. Update callers to
+ellmer types and consume `structured_output` directly.

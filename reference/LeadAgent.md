@@ -52,6 +52,7 @@ Inherited methods
 - [`Agent$cost()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-cost)
 - [`Agent$get_cost()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_cost)
 - [`Agent$get_model()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_model)
+- [`Agent$get_model_object()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_model_object)
 - [`Agent$get_permission_mode()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_permission_mode)
 - [`Agent$get_provider()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_provider)
 - [`Agent$get_system_prompt()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_system_prompt)
@@ -115,7 +116,8 @@ Create a new LeadAgent.
       session_id = NULL,
       run_context = list(),
       agent_id = NULL,
-      agent_name = NULL
+      agent_name = NULL,
+      fallback_chats = list()
     )
 
 #### Arguments
@@ -190,6 +192,13 @@ Create a new LeadAgent.
 - `agent_name`:
 
   Optional human-readable LeadAgent name.
+
+- `fallback_chats`:
+
+  Ordered configured fallback Chats for the lead. Child definitions
+  inherit the selected provider, without an implicit fallback policy of
+  their own. See
+  [Agent](https://jameshwade.github.io/deputy/reference/Agent.md).
 
 #### Returns
 

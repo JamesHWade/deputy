@@ -148,6 +148,8 @@ for writes made through its native file tools.
 
 - [`Agent$get_model()`](#method-Agent-get_model)
 
+- [`Agent$get_model_object()`](#method-Agent-get_model_object)
+
 - [`Agent$set_model()`](#method-Agent-set_model)
 
 - [`Agent$register_tool()`](#method-Agent-register_tool)
@@ -228,7 +230,8 @@ Create a new Agent.
       session_id = NULL,
       run_context = list(),
       agent_id = NULL,
-      agent_name = NULL
+      agent_name = NULL,
+      fallback_chats = list()
     )
 
 #### Arguments
@@ -314,6 +317,18 @@ Create a new Agent.
 
   Optional human-readable Agent name.
 
+- `fallback_chats`:
+
+  Ordered configured ellmer Chats, explicitly allowed to receive this
+  conversation after a transient failure before any response. Templates
+  are cloned; their connection/model settings are preserved and their
+  history, system prompt, and tools are replaced by the Agent's. The
+  selected Chat remains active for subsequent runs. Applies to governed
+  task and structured requests. Pre-run automatic compaction retains the
+  separate
+  [ContextPolicy](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
+  summary-failure policy.
+
 #### Returns
 
 A new `Agent` object
@@ -335,8 +350,10 @@ complete, a run limit is reached, or it is interrupted.
       task,
       usage_limits = NULL,
       include_partial_messages = TRUE,
-      output_format = NULL,
-      run_context = list()
+      run_context = list(),
+      type = NULL,
+      validate = NULL,
+      max_corrections = 0L
     )
 
 #### Arguments
@@ -356,15 +373,25 @@ complete, a run limit is reached, or it is interrupted.
   If TRUE (default), yield partial text chunks as they stream. If FALSE,
   only yield `text_complete`.
 
-- `output_format`:
-
-  Optional output format spec (e.g. JSON schema) to guide and validate
-  structured responses.
-
 - `run_context`:
 
   Canonical JSON-compatible context to add to or narrow for this run.
   Protected constructor identity fields cannot change.
+
+- `type`:
+
+  Optional ellmer type. Complete the task with tools, then extract from
+  the conversation within the same run budget.
+
+- `validate`:
+
+  Optional synchronous function receiving ellmer's value. Return TRUE,
+  FALSE, or non-empty correction feedback. Errors and NA are terminal.
+
+- `max_corrections`:
+
+  Maximum additional structured requests after invalid output. Defaults
+  to zero; all attempts share the run budget.
 
 #### Returns
 
@@ -388,8 +415,10 @@ an
       task,
       usage_limits = NULL,
       include_partial_messages = TRUE,
-      output_format = NULL,
-      run_context = list()
+      run_context = list(),
+      type = NULL,
+      validate = NULL,
+      max_corrections = 0L
     )
 
 #### Arguments
@@ -409,15 +438,25 @@ an
   If TRUE (default), keep partial text events. If FALSE, suppress
   partials.
 
-- `output_format`:
-
-  Optional output format spec (e.g. JSON schema) to guide and validate
-  structured responses.
-
 - `run_context`:
 
   Canonical JSON-compatible context to add to or narrow for this run.
   Protected constructor identity fields cannot change.
+
+- `type`:
+
+  Optional ellmer type. Complete the task with tools, then extract from
+  the conversation within the same run budget.
+
+- `validate`:
+
+  Optional synchronous function receiving ellmer's value. Return TRUE,
+  FALSE, or non-empty correction feedback. Errors and NA are terminal.
+
+- `max_corrections`:
+
+  Maximum additional structured requests after invalid output. Defaults
+  to zero; all attempts share the run budget.
 
 #### Returns
 
@@ -503,7 +542,9 @@ Send a structured request through the governed run kernel.
       type,
       echo = "none",
       convert = TRUE,
-      run_context = list()
+      run_context = list(),
+      validate = NULL,
+      max_corrections = 0L
     )
 
 #### Arguments
@@ -527,6 +568,16 @@ Send a structured request through the governed run kernel.
 - `run_context`:
 
   Canonical JSON-compatible context to add to or narrow for this run.
+
+- `validate`:
+
+  Optional synchronous function receiving ellmer's value. Return TRUE,
+  FALSE, or non-empty correction feedback. Errors and NA are terminal.
+
+- `max_corrections`:
+
+  Maximum additional structured requests after invalid output. Defaults
+  to zero; all attempts share the run budget.
 
 #### Returns
 
@@ -545,7 +596,9 @@ Send an asynchronous structured request through Deputy.
       type,
       echo = "none",
       convert = TRUE,
-      run_context = list()
+      run_context = list(),
+      validate = NULL,
+      max_corrections = 0L
     )
 
 #### Arguments
@@ -570,6 +623,16 @@ Send an asynchronous structured request through Deputy.
 
   Canonical JSON-compatible context to add to or narrow for this run.
 
+- `validate`:
+
+  Optional synchronous function receiving ellmer's value. Return TRUE,
+  FALSE, or non-empty correction feedback. Errors and NA are terminal.
+
+- `max_corrections`:
+
+  Maximum additional structured requests after invalid output. Defaults
+  to zero; all attempts share the run budget.
+
 #### Returns
 
 A promise resolving to structured response data.
@@ -586,7 +649,8 @@ Stream synchronously using the ellmer Chat interface.
       ...,
       stream = c("text", "content"),
       controller = NULL,
-      run_context = list()
+      run_context = list(),
+      type = NULL
     )
 
 #### Arguments
@@ -606,6 +670,11 @@ Stream synchronously using the ellmer Chat interface.
 - `run_context`:
 
   Canonical JSON-compatible context to add to or narrow for this run.
+
+- `type`:
+
+  Optional ellmer type for native structured streaming. Providers
+  requiring schema-tool fallback must use `chat_structured()`.
 
 #### Returns
 
@@ -628,7 +697,8 @@ workspace resolution, context management, and run accounting.
       tool_mode = c("concurrent", "sequential"),
       stream = c("text", "content"),
       controller = NULL,
-      run_context = list()
+      run_context = list(),
+      type = NULL
     )
 
 #### Arguments
@@ -653,6 +723,11 @@ workspace resolution, context management, and run accounting.
 - `run_context`:
 
   Canonical JSON-compatible context to add to or narrow for this run.
+
+- `type`:
+
+  Optional ellmer type for native structured streaming. Providers
+  requiring schema-tool fallback must use `chat_structured()`.
 
 #### Returns
 
@@ -941,6 +1016,20 @@ Return the configured model name.
 #### Returns
 
 Model identifier.
+
+------------------------------------------------------------------------
+
+### `Agent$get_model_object()`
+
+Return ellmer's configured model object.
+
+#### Usage
+
+    Agent$get_model_object()
+
+#### Returns
+
+An ellmer model object, including parameters and extra arguments.
 
 ------------------------------------------------------------------------
 
@@ -1585,12 +1674,19 @@ rather than returning the content stream.
 
 Use this when an Agent is a *worker* inside a larger async system, for
 example a delegated sub-agent executed from the tool of a parent chat
-that is itself streaming. `output_format` is not supported here;
-structured output still requires `run()` or `run_sync()`.
+that is itself streaming. Supply `type` to extract structured output
+after the tool-using task within the same run budget.
 
 #### Usage
 
-    Agent$run_async(task, usage_limits = NULL, run_context = list())
+    Agent$run_async(
+      task,
+      usage_limits = NULL,
+      run_context = list(),
+      type = NULL,
+      validate = NULL,
+      max_corrections = 0L
+    )
 
 #### Arguments
 
@@ -1611,6 +1707,21 @@ structured output still requires `run()` or `run_sync()`.
 
   Canonical JSON-compatible context to add to or narrow for this run.
   Protected constructor identity fields cannot change.
+
+- `type`:
+
+  Optional ellmer type. Complete the task with tools, then extract from
+  the conversation within the same run budget.
+
+- `validate`:
+
+  Optional synchronous function receiving ellmer's value. Return TRUE,
+  FALSE, or non-empty correction feedback. Errors and NA are terminal.
+
+- `max_corrections`:
+
+  Maximum additional structured requests after invalid output. Defaults
+  to zero; all attempts share the run budget.
 
 #### Returns
 

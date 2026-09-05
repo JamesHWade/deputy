@@ -45,6 +45,26 @@ An `AgentEvent` object
 - `"content"` - Non-text provider content. Contains: `content`,
   `content_type`
 
+- `"request_start"`, `"request_end"`, `"request_error"` - Governed model
+  dispatch evidence with provider, model, request number, and original
+  HTTP/transport conditions on errors. These are not individual HTTP
+  retry attempts. Unclassified application errors are retained as
+  `"run_error"`.
+
+- `"run_error"` - Terminal initialization, streaming, or
+  structured-output failure, with its phase and original condition.
+  Application callbacks and validation do not turn a successful response
+  into a `"request_error"`.
+
+- `"fallback"` - Explicit Chat selection, prior condition, and usage.
+
+- `"structured_attempt"` - Structured value, available turn, validation
+  outcome, feedback, and condition. May contain sensitive application
+  data.
+
+- `"permission"`, `"hook"`, `"compaction"` - Governance decisions and
+  lifecycle.
+
 - `"file_checkpoint"` - Automatic run-boundary checkpoint. Contains:
   `checkpoint_id`, `name`
 
@@ -63,14 +83,14 @@ applicable.
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-09-05 01:05:34 
+#>   timestamp: 2026-09-05 09:59:34 
 #>   task: Analyze data.csv
 
 # Create a text event
 AgentEvent("text", text = "Hello", is_complete = FALSE
 )
 #> <AgentEvent: text >
-#>   timestamp: 2026-09-05 01:05:34 
+#>   timestamp: 2026-09-05 09:59:34 
 #>   text: Hello
 #>   is_complete: FALSE
 ```

@@ -52,6 +52,7 @@
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
     <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
@@ -281,7 +282,7 @@ capture individual findings:</p>
 <span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
 <span>  <span class="st">"Review the R/ directory and return structured findings."</span>,</span>
-<span>  output_format <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"json_schema"</span>, schema <span class="op">=</span> <span class="va">review_schema</span><span class="op">)</span></span>
+<span>  type <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_from_schema</a></span><span class="op">(</span><span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="va">review_schema</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
@@ -290,7 +291,7 @@ capture individual findings:</p>
 <p>With structured output, you can filter, sort, and summarise findings
 programmatically:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">review</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">$</span><span class="va">structured_output</span><span class="op">$</span><span class="va">parsed</span></span>
+<code class="sourceCode R"><span><span class="va">review</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">$</span><span class="va">structured_output</span></span>
 <span></span>
 <span><span class="co"># Summary</span></span>
 <span><span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_h1.html" class="external-link">cli_h1</a></span><span class="op">(</span><span class="st">"Code Review: {review$summary}"</span><span class="op">)</span></span>
