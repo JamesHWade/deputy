@@ -66,6 +66,12 @@ constraints before making a production claim. The live runner requires explicit
 opt-in, preserves recoverable partial results, and documents observed-cost
 limitations. No recursive implementation is justified by the fixture tests.
 
+The optional `changed-constraint` scenario now supplies a later host amendment
+and retains it by source ID and revision. Its deterministic producer checks
+paired contexts, retrieval of the amendment, and rejection of the superseded
+eligibility answer. Actual completed effects and more diverse trajectories
+remain follow-up work; the export receipt in both scenarios is synthetic.
+
 Evaluate these strategies on the same host-owned trajectories and probes:
 
 1. Current cumulative summary plus recent context.

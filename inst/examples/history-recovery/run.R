@@ -23,6 +23,9 @@ helpers <- trimws(strsplit(
 task_model <- trimws(Sys.getenv("DEPUTY_HISTORY_TASK_MODEL", "gpt-5.6-luna"))
 trials <- suppressWarnings(as.numeric(Sys.getenv("DEPUTY_HISTORY_TRIALS", "3")))
 history_validate_configuration(trials, helpers, task_model)
+fixture <- history_fixture(
+  scenario = Sys.getenv("DEPUTY_HISTORY_SCENARIO", "original")
+)
 output <- Sys.getenv("DEPUTY_HISTORY_OUTPUT", "history-recovery-results")
 if (dir.exists(output)) {
   cli::cli_abort(
@@ -41,6 +44,7 @@ chat_factory <- function(model) {
 }
 evaluation <- history_evaluate(
   chat_factory,
+  fixture = fixture,
   trials = trials,
   helper_models = helpers,
   task_model = task_model,

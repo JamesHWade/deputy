@@ -15,7 +15,7 @@ history_answer_type <- function() {
 
 history_probe_prompt <- function() {
   paste(
-    "Reconcile reports A-F using the original eligibility rule, the latest correction",
+    "Reconcile reports A-F using the current host eligibility rule, the latest correction",
     "to C, unresolved methods, and the completed export. Is B eligible? Give the",
     "current C denominator, document ID and page, which reports remain pending,",
     "the completed export ID, and whether another export is permitted now.",
@@ -35,7 +35,7 @@ history_score <- function(answer, fixture) {
       ))
   }
   checks <- c(
-    early_constraint = equal("b_eligible"),
+    current_constraint = equal("b_eligible"),
     denominator = equal("c_denominator"),
     corrected_source = equal("c_source"),
     source_page = equal("c_page"),
@@ -295,9 +295,15 @@ history_prepare <- function(
   ))
   prompts <- c(
     lapply(stages, function(stage) {
-      sprintf(
-        "Call load_checkpoint(%d) once to inspect the source items, then give one short acknowledgement.",
-        stage
+      paste(
+        c(
+          fixture$stage_instructions[[as.character(stage)]],
+          sprintf(
+            "Call load_checkpoint(%d) once to inspect the source items, then give one short acknowledgement.",
+            stage
+          )
+        ),
+        collapse = "\n"
       )
     }),
     list(
@@ -593,6 +599,8 @@ history_report <- function(evaluation) {
     "# Bounded history recovery pilot",
     "",
     "Synthetic evidence-review trajectories; this pilot does not establish production performance.",
+    "",
+    paste("Case:", evaluation$case_id),
     "",
     sprintf(
       "Recorded %d scored continuations and %d governed requests. Cost: %s USD.",

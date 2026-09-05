@@ -95,6 +95,8 @@ caller-owned synthetic history. It compares identical compacted contexts with
 and without bounded source retrieval. Run deterministic producer tests with
 `devtools::test(filter = "history-recovery-example|compaction-evidence")`.
 The directory's README documents explicit paid-run opt-in and observed budgets.
+Its `original` and `changed-constraint` scenarios cover retained and superseded
+host eligibility rules with the same paired-continuation protocol.
 Live results are required before drawing model-quality conclusions (#112).
 History recovery proceeds with caller-owned records under ADR-0003.
 `dev/shinychat-history-consumer.md` tracks the optional shinychat adapter for #66;

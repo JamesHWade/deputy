@@ -89,122 +89,165 @@ test_that("history chunks preserve UTF-8 and enforce whole-payload budgets", {
   }
 })
 
-test_that("paired continuations use real compaction, retrieval and structured output", {
-  example <- history_example()
-  fixture <- example$history_fixture(1L)
-  answer <- c(fixture$expected, list(source_ids = fixture$required_sources))
-  wire <- local({
-    reply <- runtime_reply
-    function(request, count) {
-      last <- tail(request$messages, 1L)[[1L]]
-      content <- jsonlite::toJSON(last$content, auto_unbox = TRUE)
-      if (grepl("Summarize the following", content, fixed = TRUE)) {
-        return(reply(
-          "Adults only. C corrected. D and F pending. Export completed."
-        ))
+for (scenario in c("original", "changed-constraint")) {
+  test_that(paste("paired continuations preserve the", scenario, "protocol"), {
+    example <- history_example()
+    fixture <- example$history_fixture(1L, scenario = scenario)
+    answer <- c(fixture$expected, list(source_ids = fixture$required_sources))
+    source_id <- if (scenario == "original") {
+      "assay-C-r3"
+    } else {
+      "protocol-all-ages-randomized"
+    }
+    wire <- local({
+      reply <- runtime_reply
+      function(request, count) {
+        last <- tail(request$messages, 1L)[[1L]]
+        content <- jsonlite::toJSON(last$content, auto_unbox = TRUE)
+        if (grepl("Summarize the following", content, fixed = TRUE)) {
+          return(reply(
+            "Adults only. C corrected. D and F pending. Export completed."
+          ))
+        }
+        if (!is.null(request$response_format)) {
+          return(reply(
+            as.character(jsonlite::toJSON(answer, auto_unbox = TRUE)),
+            stream = FALSE
+          ))
+        }
+        if (identical(last$role, "tool")) {
+          return(reply("Source inspected."))
+        }
+        if (grepl("Call load_checkpoint", content, fixed = TRUE)) {
+          stage <- as.integer(sub(
+            ".*load_checkpoint\\(([0-9]+)\\).*",
+            "\\1",
+            content
+          ))
+          return(reply(
+            tool = "load_checkpoint",
+            arguments = list(stage = stage)
+          ))
+        }
+        tools <- vapply(
+          request$tools,
+          function(tool) tool$`function`$name,
+          character(1)
+        )
+        if ("history_read" %in% tools) {
+          return(reply(
+            tool = "history_read",
+            arguments = list(item_id = source_id)
+          ))
+        }
+        reply("Ready.")
       }
-      if (!is.null(request$response_format)) {
-        return(reply(
-          as.character(jsonlite::toJSON(answer, auto_unbox = TRUE)),
-          stream = FALSE
-        ))
+    })
+    server <- local_runtime_server(wire)
+    factory <- function(model) {
+      chat <- runtime_chat(server, name = "OpenAI")
+      counter <- function(..., include = "complete") {
+        previous <- sum(nchar(vapply(self$get_turns(), format, character(1))))
+        incoming <- sum(nchar(vapply(
+          list(...),
+          function(x) paste(format(x), collapse = ""),
+          character(1)
+        )))
+        (previous + incoming) / 4
       }
-      if (identical(last$role, "tool")) {
-        return(reply("Source inspected."))
-      }
-      if (grepl("Call load_checkpoint", content, fixed = TRUE)) {
-        stage <- as.integer(sub(
-          ".*load_checkpoint\\(([0-9]+)\\).*",
-          "\\1",
-          content
-        ))
-        return(reply(tool = "load_checkpoint", arguments = list(stage = stage)))
-      }
-      tools <- vapply(
-        request$tools,
-        function(tool) tool$`function`$name,
-        character(1)
+      environment(counter) <- environment(chat$token_count)
+      rlang::env_binding_unlock(chat, "token_count")
+      chat$token_count <- counter
+      chat
+    }
+    evaluation <- example$history_evaluate(
+      factory,
+      fixture,
+      trials = 2L,
+      helper_models = "fixture",
+      task_model = "fixture",
+      max_tokens = 500L
+    )
+    expect_null(evaluation$failure)
+    expect_length(evaluation$trials, 4L)
+    expect_identical(
+      vapply(evaluation$trials, `[[`, character(1), "strategy"),
+      c("summary", "history", "history", "summary")
+    )
+    for (rows in split(evaluation$trials, rep(1:2, each = 2L))) {
+      expect_identical(rows[[1L]]$summary_id, rows[[2L]]$summary_id)
+      expect_equal(rows[[1L]]$transitions, 3L)
+      expect_identical(
+        vapply(rows, function(row) row$score$all_correct, logical(1)),
+        c(TRUE, TRUE)
       )
-      if ("history_read" %in% tools) {
-        return(reply(
-          tool = "history_read",
-          arguments = list(item_id = "assay-C-r3")
-        ))
-      }
-      reply("Ready.")
+      expect_identical(
+        vapply(rows, `[[`, integer(1), "repeated_effects"),
+        c(0L, 0L)
+      )
     }
+    history <- Filter(
+      function(row) row$strategy == "history",
+      evaluation$trials
+    )
+    expect_identical(history[[1L]]$history_audit[[1L]]$item_ids, source_id)
+    compactions <- unlist(
+      lapply(evaluation$runs, function(run) {
+        Filter(function(event) event$type == "compaction", run$events)
+      }),
+      recursive = FALSE
+    )
+    expect_length(compactions, 6L)
+    expect_identical(
+      vapply(compactions, function(event) length(event$attempts), integer(1)),
+      rep(1L, 6L)
+    )
+    expect_match(
+      paste(example$history_report(evaluation), collapse = "\n"),
+      "fixture/2",
+      fixed = TRUE
+    )
+    expect_match(
+      paste(example$history_report(evaluation), collapse = "\n"),
+      fixture$case_id,
+      fixed = TRUE
+    )
+    prompts <- jsonlite::toJSON(server$requests())
+    expect_match(prompts, "denominator 84", fixed = TRUE)
+    expect_no_match(prompts, "PRIVATE-", fixed = TRUE)
+    if (scenario == "changed-constraint") {
+      submitted <- unlist(lapply(evaluation$inputs, `[[`, "prompt"))
+      expect_match(
+        submitted[grepl("Call load_checkpoint(3)", submitted, fixed = TRUE)][[
+          1L
+        ]],
+        "Host protocol amendment",
+        fixed = TRUE
+      )
+      amendment <- jsonlite::fromJSON(
+        example$history_access(fixture$records, fixture$scope)$read(source_id)
+      )$items
+      expect_match(
+        amendment$text,
+        "supersedes the adult-only restriction",
+        fixed = TRUE
+      )
+      stale_answer <- answer
+      stale_answer$b_eligible <- FALSE
+      expect_identical(
+        example$history_score(stale_answer, fixture)$checks$current_constraint,
+        FALSE
+      )
+      expect_identical(evaluation$case_id, "assay-review-changed-constraint-v1")
+    }
+    expect_gt(evaluation$usage$requests, 16L)
+    expect_gt(evaluation$usage$cost_usd, 0)
+    expect_type(
+      jsonlite::toJSON(evaluation, auto_unbox = TRUE, null = "null"),
+      "character"
+    )
   })
-  server <- local_runtime_server(wire)
-  factory <- function(model) {
-    chat <- runtime_chat(server, name = "OpenAI")
-    counter <- function(..., include = "complete") {
-      previous <- sum(nchar(vapply(self$get_turns(), format, character(1))))
-      incoming <- sum(nchar(vapply(
-        list(...),
-        function(x) paste(format(x), collapse = ""),
-        character(1)
-      )))
-      (previous + incoming) / 4
-    }
-    environment(counter) <- environment(chat$token_count)
-    rlang::env_binding_unlock(chat, "token_count")
-    chat$token_count <- counter
-    chat
-  }
-  evaluation <- example$history_evaluate(
-    factory,
-    fixture,
-    trials = 2L,
-    helper_models = "fixture",
-    task_model = "fixture",
-    max_tokens = 500L
-  )
-  expect_null(evaluation$failure)
-  expect_length(evaluation$trials, 4L)
-  expect_identical(
-    vapply(evaluation$trials, `[[`, character(1), "strategy"),
-    c("summary", "history", "history", "summary")
-  )
-  for (rows in split(evaluation$trials, rep(1:2, each = 2L))) {
-    expect_identical(rows[[1L]]$summary_id, rows[[2L]]$summary_id)
-    expect_equal(rows[[1L]]$transitions, 3L)
-    expect_identical(
-      vapply(rows, function(row) row$score$all_correct, logical(1)),
-      c(TRUE, TRUE)
-    )
-    expect_identical(
-      vapply(rows, `[[`, integer(1), "repeated_effects"),
-      c(0L, 0L)
-    )
-  }
-  history <- Filter(function(row) row$strategy == "history", evaluation$trials)
-  expect_identical(history[[1L]]$history_audit[[1L]]$item_ids, "assay-C-r3")
-  compactions <- unlist(
-    lapply(evaluation$runs, function(run) {
-      Filter(function(event) event$type == "compaction", run$events)
-    }),
-    recursive = FALSE
-  )
-  expect_length(compactions, 6L)
-  expect_identical(
-    vapply(compactions, function(event) length(event$attempts), integer(1)),
-    rep(1L, 6L)
-  )
-  expect_match(
-    paste(example$history_report(evaluation), collapse = "\n"),
-    "fixture/2",
-    fixed = TRUE
-  )
-  prompts <- jsonlite::toJSON(server$requests())
-  expect_match(prompts, "denominator 84", fixed = TRUE)
-  expect_no_match(prompts, "PRIVATE-", fixed = TRUE)
-  expect_gt(evaluation$usage$requests, 16L)
-  expect_gt(evaluation$usage$cost_usd, 0)
-  expect_type(
-    jsonlite::toJSON(evaluation, auto_unbox = TRUE, null = "null"),
-    "character"
-  )
-})
+}
 
 test_that("missing history and injected export requests preserve host authority", {
   example <- history_example()
@@ -465,13 +508,21 @@ test_that("invalid live configuration leaves the requested output path available
     DEPUTY_HISTORY_MAX_COST_USD = "1",
     DEPUTY_HISTORY_OUTPUT = output,
     DEPUTY_HISTORY_HELPERS = "gpt-5.6-luna",
-    DEPUTY_HISTORY_TASK_MODEL = "gpt-5.6-luna"
+    DEPUTY_HISTORY_TASK_MODEL = "gpt-5.6-luna",
+    DEPUTY_HISTORY_SCENARIO = "original"
   )
   path <- system.file(
     "examples",
     "history-recovery",
     "run.R",
     package = "deputy"
+  )
+  withr::with_envvar(
+    c(DEPUTY_HISTORY_TRIALS = "1", DEPUTY_HISTORY_SCENARIO = "unknown"),
+    {
+      expect_snapshot(error = TRUE, sys.source(path, envir = new.env()))
+      expect_identical(dir.exists(output), FALSE)
+    }
   )
   for (trials in c("bad", "", "0", "-1", "1.5", "Inf")) {
     withr::with_envvar(c(DEPUTY_HISTORY_TRIALS = trials), {
