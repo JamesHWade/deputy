@@ -1,6 +1,5 @@
 # Run with Rscript after installing deputy and setting OPENAI_API_KEY.
 library(deputy)
-rlang::check_installed("jsonlite", reason = "to run this example")
 chat <- ellmer::chat_openai(
   model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-5.6-luna")
 )
@@ -12,8 +11,9 @@ agent <- Agent$new(
 )
 result <- agent$run_sync(
   'Return a JSON object with status equal to "ok".',
-  output_format = list(type = "json_object")
+  type = ellmer::type_object(status = ellmer::type_string()),
+  validate = function(x) identical(x$status, "ok"),
+  max_corrections = 1L
 )
-# json_object parses JSON; it does not validate a JSON Schema.
-stopifnot(isTRUE(result$structured_output$valid))
-print(result$structured_output$parsed)
+stopifnot(result$is_success())
+print(result$structured_output)

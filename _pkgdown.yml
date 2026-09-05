@@ -33,6 +33,8 @@ navbar:
         href: articles/multi-agent.html
       - text: Structured Output
         href: articles/structured-output.html
+      - text: Runtime Integration and Evaluation
+        href: articles/runtime-integration.html
       - text: "---"
       - text: "Recipes"
       - text: Data Analysis Agent
@@ -147,6 +149,7 @@ articles:
   contents:
   - multi-agent
   - structured-output
+  - runtime-integration
 - title: Recipes
   contents:
   - example-data-analysis

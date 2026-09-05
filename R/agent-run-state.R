@@ -46,6 +46,12 @@ initialize_agent_run <- function(
   private$current_stream_content <-
     identical(stream_mode, "content")
   private$current_run_state <- state
+  state$response_seen <- FALSE
+  state$fallback_index <- private$.fallback_position
+  state$request_number <- 0L
+  state$dispatch_turns <- private$.chat$get_turns()
+  state$trace_span <- start_run_trace(agent, state)
+  install_request_callbacks(agent)
   private$pending_events <- list()
   private$tool_started_at <- list()
   private$tool_event_overrides <- list()
@@ -96,7 +102,7 @@ initialize_agent_run <- function(
     )
   }
 
-  agent$hooks$fire(
+  private$fire_hook(
     "SessionStart",
     context = private$hook_context(
       permissions = agent$permissions,
@@ -106,7 +112,7 @@ initialize_agent_run <- function(
     )
   )
   state$session_started <- TRUE
-  agent$hooks$fire(
+  private$fire_hook(
     "UserPromptSubmit",
     prompt = if (length(messages) == 1L) messages[[1L]] else messages,
     context = private$hook_context(

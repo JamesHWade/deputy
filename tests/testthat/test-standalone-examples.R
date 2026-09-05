@@ -27,11 +27,15 @@ test_that("basic, structured, session and skill scripts execute independently", 
   )
   expect_identical(basic$result$response, "An R vector.")
   expect_identical(attr(basic, "models"), "gpt-5.6-luna")
+  server <- local_runtime_server(list(
+    runtime_reply("status is ok"),
+    runtime_reply('{"status":"ok"}', stream = FALSE)
+  ))
   structured <- run_standalone_example(
     "06-structured-output.R",
-    create_mock_chat('{"status":"ok"}')
+    runtime_chat(server)
   )
-  expect_identical(structured$result$structured_output$parsed$status, "ok")
+  expect_identical(structured$result$structured_output$status, "ok")
   source_chat <- create_mock_chat("I will remember Cedar.")
   source_stream <- source_chat$stream
   source_chat$stream <- function(prompt) {
@@ -236,4 +240,18 @@ test_that("debate example retains partial comparison and skips synthesis on fail
     fixed = TRUE
   )
   expect_false(exists("synthesis", envir = env, inherits = FALSE))
+})
+
+test_that("external evaluation example joins fixed cases to governed run identities", {
+  responses <- c("4", "Paris")
+  index <- 0L
+  example <- run_standalone_example("10-evaluation.R", function() {
+    index <<- index + 1L
+    create_mock_chat(responses[[index]])
+  })
+  expect_identical(example$evaluation$case_id, c("addition", "capital"))
+  expect_true(all(example$evaluation$passed))
+  expect_true(all(example$evaluation$stop_reason == "complete"))
+  expect_length(unique(example$evaluation$run_id), 2L)
+  expect_identical(example$evaluation$requests, c(1L, 1L))
 })

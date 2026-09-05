@@ -1,0 +1,112 @@
+---
+title: "Runtime integration and evaluation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Runtime integration and evaluation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = FALSE)
+library(deputy)
+```
+
+Deputy owns permissions, budgets, hooks, run identity, checkpoints, context
+policy, and delegation. ellmer owns provider requests, schema transport, tool
+execution, model parameters, and provider tracing. The integration requires
+released ellmer 0.5.0 or later.
+
+## Explicit fallback Chats
+
+The caller chooses every destination by supplying configured `fallback_chats`.
+Deputy clones these templates, preserves their credentials, base URL, model
+parameters, and request callbacks, and installs the Agent's conversation,
+system prompt, governed tools, and observers. Templates must have no history
+or tools. Fallback neither discovers a provider nor silently selects a model.
+
+```{r fallback}
+agent <- Agent$new(
+  ellmer::chat("openai/gpt-5.6-luna"),
+  fallback_chats = list(ellmer::chat("openai/gpt-5.6-terra")),
+  permissions = permissions_readonly(),
+  usage_limits = UsageLimits(max_requests = 5)
+)
+result <- agent$run_sync("Summarize the supplied evidence.")
+```
+
+Fallback is eligible for a connection failure or HTTP 408, 429, 500, 502, 503,
+or 504 before any response content or requested tool. Authentication errors,
+application callbacks, and validation failures are terminal. A partially
+streamed response or completed tool effect locks the run to its current Chat;
+Deputy preserves the partial result and signals the failure. It never restarts
+a completed tool loop. The selected Chat remains active; subsequent runs can
+advance to later configured templates, without revisiting earlier ones.
+LeadAgent's fallback policy applies to the lead. Child definitions inherit the
+selected provider and do not implicitly gain additional destinations.
+
+`request_start`, `request_end`, `request_error`, and `fallback` events retain
+model selection and original conditions with run IDs. These local events may
+contain provider error details. Failed dispatches count toward `max_requests`.
+Reported token totals include only observed usage; unknown cost is `NA`, and a
+cost cap prevents further requests when that cost cannot be enforced.
+
+ellmer configures httr2 with `ellmer_max_tries` (default 3 total attempts) and
+`ellmer_timeout_s` (default 300 seconds). Configure these once at application
+startup if needed. Deputy does not change process-wide options during runs or
+add another retry loop. HTTP retries belong to the upstream transport: our
+real streaming fixture verifies three HTTP attempts are still one governed
+model dispatch. The structured async transport in the tested httr2 1.3.0 stack
+performs one attempt despite the retry configuration; callers must not assume
+every transport has identical retry behavior. Deputy does not estimate hidden
+HTTP attempts from model-request callbacks or promise immediate cancellation
+during an upstream backoff or in-flight structured request.
+
+## Tracing governance
+
+Configure an `otel` provider before loading ellmer and Deputy. Existing ellmer
+spans describe invocation, model calls, HTTP work, and actual tool execution.
+Deputy adds a `deputy.run` parent span and governance events, using
+`deputy.run.id`, `deputy.agent.id`, parent/delegation IDs, and ellmer's
+`gen_ai.conversation.id` mapped to the Deputy session ID. Async delegated runs
+retain their trace parent and run correlation.
+
+```{r tracing}
+# In a fresh R session, this records locally without configuring an exporter.
+record <- otelsdk::with_otel_record({
+  library(deputy)
+  agent <- Agent$new(ellmer::chat("openai/gpt-5.6-luna"))
+  agent$run_sync("Summarize this supplied text.")
+})
+record$value$run_id
+record$traces
+```
+
+A policy denial records a permission event and does not pretend a tool ran.
+Deputy's trace adapter exports a small allowlist of identifiers and decisions;
+it omits prompts, tool inputs/results, validation feedback, conditions, paths,
+and product run context. Custom stop text is represented as `custom`. This
+allowlist stays in place even when upstream content capture is enabled.
+
+ellmer's message capture is separately opt-in via
+`OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true`, set before loading
+ellmer. Deputy does not override it or create a second exporter. The caller's
+upstream tracer may record endpoint URLs and tool descriptions; configure those
+without secrets and apply the exporter's own privacy policy as appropriate.
+
+## An external evaluation runner
+
+The runnable `10-evaluation.R` example executes a fixed two-row dataset, applies
+an application-owned exact-answer rule, and reports case/run/session IDs,
+completion status, requests, reported tokens, cost, duration, and error class.
+`run_context$evaluation$case_id` links local evidence to the case. The same run
+ID appears on the trace, without enabling message capture.
+
+```{r evaluation}
+source(system.file("examples", "standalone", "10-evaluation.R", package = "deputy"))
+evaluation
+```
+
+Replace that dataset and scoring rule in your external runner. Deputy provides
+`AgentResult`, usage, stop reasons, events, and correlated traces; it does not
+own a dataset format, scoring framework, exporter, or experiment database.

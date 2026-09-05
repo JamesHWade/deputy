@@ -42,7 +42,7 @@ Our pipeline has three steps:
 2. **Enrich** -- Categorise and annotate the extracted metadata
 3. **Report** -- Produce a human-readable summary
 
-Each step uses `output_format` to constrain the LLM to a JSON schema.
+Each step supplies an ellmer `type` to extract a structured result after its tool work.
 
 ## Step 1: Extract Package Metadata
 
@@ -105,15 +105,14 @@ extractor <- Agent$new(
 step1 <- extractor$run_sync(
   "Extract metadata from this R package. Read DESCRIPTION and scan
    the R/ directory for exported functions.",
-  output_format = list(type = "json_schema", schema = extract_schema)
+  type = ellmer::type_from_schema(jsonlite::toJSON(extract_schema, auto_unbox = TRUE))
 )
 
 # Validate the output before proceeding
 stopifnot(step1$is_success())
-stopifnot(isTRUE(step1$structured_output$valid) ||
-  is.na(step1$structured_output$valid))
+stopifnot(step1$is_success())
 
-pkg_metadata <- step1$structured_output$parsed
+pkg_metadata <- step1$structured_output
 pkg_metadata$name
 pkg_metadata$version
 length(pkg_metadata$exported_functions)
@@ -182,11 +181,11 @@ step2 <- enricher$run_sync(
     "Package metadata:",
     jsonlite::toJSON(pkg_metadata, auto_unbox = TRUE, pretty = TRUE)
   ),
-  output_format = list(type = "json_schema", schema = enrich_schema)
+  type = ellmer::type_from_schema(jsonlite::toJSON(enrich_schema, auto_unbox = TRUE))
 )
 
 stopifnot(step2$is_success())
-enriched <- step2$structured_output$parsed
+enriched <- step2$structured_output
 enriched$category_tags
 enriched$complexity
 ```
@@ -235,7 +234,7 @@ extraction_pipeline <- function(package_dir = ".") {
 
   step1 <- extractor$run_sync(
     "Extract metadata from this R package.",
-    output_format = list(type = "json_schema", schema = extract_schema)
+    type = ellmer::type_from_schema(jsonlite::toJSON(extract_schema, auto_unbox = TRUE))
   )
 
   if (!step1$is_success()) {
@@ -255,10 +254,10 @@ extraction_pipeline <- function(package_dir = ".") {
 
   step2 <- enricher$run_sync(
     paste("Enrich this metadata:", jsonlite::toJSON(
-      step1$structured_output$parsed,
+      step1$structured_output,
       auto_unbox = TRUE
     )),
-    output_format = list(type = "json_schema", schema = enrich_schema)
+    type = ellmer::type_from_schema(jsonlite::toJSON(enrich_schema, auto_unbox = TRUE))
   )
 
   if (!step2$is_success()) {
@@ -271,7 +270,7 @@ extraction_pipeline <- function(package_dir = ".") {
 
   step3 <- reporter$run_sync(
     paste("Write a package summary:", jsonlite::toJSON(
-      step2$structured_output$parsed,
+      step2$structured_output,
       auto_unbox = TRUE, pretty = TRUE
     ))
   )
@@ -279,8 +278,8 @@ extraction_pipeline <- function(package_dir = ".") {
   costs <- c(step1$cost$total, step2$cost$total, step3$cost$total)
 
   list(
-    metadata = step1$structured_output$parsed,
-    enriched = step2$structured_output$parsed,
+    metadata = step1$structured_output,
+    enriched = step2$structured_output,
     report = step3$response,
     total_cost = if (anyNA(costs)) NA_real_ else sum(costs)
   )
@@ -293,29 +292,22 @@ cat(result$report)
 
 ## Error Handling Between Steps
 
-Each step validates its output before passing it to the next. Check both
-`is_success()` (the agent completed normally) and `structured_output$valid`
-(the JSON matches the schema):
+Check `is_success()` before passing a result to the next step. Use `validate`
+for application rules; invalid output or an unavailable validator signals an
+error, and bounded corrections are opt-in:
 
 ```{r error-handling}
 step <- extractor$run_sync(
   "Extract metadata.",
-  output_format = list(type = "json_schema", schema = extract_schema)
+  type = ellmer::type_from_schema(jsonlite::toJSON(extract_schema, auto_unbox = TRUE))
 )
 
 if (!step$is_success()) {
   cli::cli_abort("Agent stopped early: {step$stop_reason}")
 }
 
-if (identical(step$structured_output$valid, FALSE)) {
-  cli::cli_abort(c(
-    "Output doesn't match schema",
-    "x" = step$structured_output$errors
-  ))
-}
-
 # Safe to use the parsed output
-parsed <- step$structured_output$parsed
+parsed <- step$structured_output
 ```
 
 ## Next Steps
