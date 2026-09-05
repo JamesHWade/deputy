@@ -341,6 +341,209 @@ test_that("compaction offloads oversized explicit tool results before formatting
     }
   }
 })
+test_that("aborted compaction removes only provisional evidence files", {
+  withr::local_options(ellmer_max_tries = 1)
+  check_case <- function(mode) {
+    failure <- if (mode == "cancel") {
+      reply <- runtime_reply("A summary that will be cancelled.")
+      attr(reply, "fixture_delay") <- 0.5
+      reply
+    } else {
+      runtime_failure(401L)
+    }
+    server <- local_runtime_server(list(
+      runtime_reply(tool = "source_read"),
+      runtime_reply("Source inspected."),
+      failure,
+      runtime_reply("Evidence summarized.", stream = FALSE)
+    ))
+    value <- strrep("recoverable evidence ", 500L)
+    source <- ellmer::tool(
+      function() ellmer::ContentToolResult(value = value),
+      name = "source_read",
+      description = "Read source evidence.",
+      annotations = ellmer::tool_annotations(
+        read_only_hint = TRUE,
+        open_world_hint = FALSE
+      )
+    )
+    chat <- runtime_chat(server)
+    rlang::env_binding_unlock(chat, "token_count")
+    chat$token_count <- function(...) 10
+    agent <- Agent$new(
+      chat,
+      tools = list(source),
+      context_policy = ContextPolicy(
+        max_tokens = 50L,
+        max_tool_result_bytes = 512L,
+        offload_dir = withr::local_tempdir()
+      )
+    )
+    agent$run_sync("Read the source.")
+    agent$add_turn(
+      ellmer::UserTurn("Plan the next step."),
+      ellmer::AssistantTurn("Use the source evidence."),
+      log_tokens = FALSE
+    )
+    before <- agent$get_turns()
+    # An unrelated envelope already owned by this session must survive rollback.
+    existing <- offload_tool_result(
+      "Previously accepted evidence",
+      "accepted_source",
+      agent$context_policy,
+      agent$session_id(),
+      agent$agent_id,
+      force = TRUE
+    )
+    files_before <- sort(list.files(dirname(existing$path)))
+    if (mode == "manual") {
+      expect_error(
+        agent$compact(keep_last = 0L),
+        class = "deputy_compaction_error"
+      )
+    } else {
+      chat$token_count <- function(...) 1000
+      if (mode == "cancel") {
+        deadline <- Sys.time() + 5
+        cancel <- function() {
+          if (length(server$requests()) >= 3L) {
+            agent$interrupt()
+          } else if (Sys.time() < deadline) {
+            later::later(cancel, 0.01)
+          }
+        }
+        timer <- later::later(cancel, 0.01)
+        agent$run_sync("Continue.")
+        timer()
+        expect_identical(agent$last_run()$stop_reason, "interrupted")
+      } else {
+        expect_error(
+          agent$run_sync("Continue."),
+          class = "deputy_compaction_error"
+        )
+      }
+    }
+    expect_identical(agent$get_turns(), before)
+    expect_identical(sort(list.files(dirname(existing$path))), files_before)
+    snapshot <- tempfile(fileext = ".rds")
+    withr::defer(unlink(snapshot))
+    withCallingHandlers(
+      agent$save_session(snapshot),
+      warning = function(warning) {
+        # load_all() exposes a transient package environment in explicit Content.
+        if (
+          grepl(
+            "'package:deputy' may not be available",
+            conditionMessage(warning),
+            fixed = TRUE
+          )
+        ) {
+          invokeRestart("muffleWarning")
+        }
+      }
+    )
+    expect_named(readRDS(snapshot)$tool_result_envelopes, existing$id)
+    expect_identical(
+      agent$resolve_tool_result(existing$uri),
+      "Previously accepted evidence"
+    )
+    # The unchanged original turns can subsequently produce a durable summary.
+    result <- agent$compact(keep_last = 0L)
+    reference <- compaction_tool_result_references(result$summary)
+    expect_length(reference, 1L)
+    expect_identical(agent$resolve_tool_result(reference), value)
+  }
+  for (mode in c("manual", "automatic", "cancel")) {
+    check_case(mode)
+  }
+})
+
+test_that("provisional evidence respects concurrent clone and tool ownership", {
+  check_case <- function(claim) {
+    server <- local_runtime_server(list(runtime_reply(
+      "Summary.",
+      stream = FALSE
+    )))
+    value <- strrep("shared evidence ", 100L)
+    source <- ellmer::tool(
+      function() value,
+      name = "source_read",
+      description = "Read shared evidence.",
+      annotations = ellmer::tool_annotations(
+        read_only_hint = TRUE,
+        open_world_hint = FALSE
+      )
+    )
+    agent <- Agent$new(
+      runtime_chat(server),
+      tools = list(source),
+      context_policy = ContextPolicy(
+        max_tokens = NULL,
+        max_tool_result_bytes = 512L,
+        offload_dir = withr::local_tempdir()
+      )
+    )
+    request <- ellmer::ContentToolRequest(
+      name = "source_read",
+      arguments = list(),
+      id = "source"
+    )
+    agent$add_turn(
+      ellmer::UserTurn("Read evidence."),
+      ellmer::AssistantTurn(contents = list(request)),
+      log_tokens = FALSE
+    )
+    agent$add_turn(
+      ellmer::UserTurn(
+        contents = list(ellmer::ContentToolResult(
+          value = value,
+          request = request
+        ))
+      ),
+      ellmer::AssistantTurn("Evidence read."),
+      log_tokens = FALSE
+    )
+    sibling <- agent$clone()
+    private <- agent$.__enclos_env__$private
+    # Pause the first transaction after its real evidence projection, then let
+    # a sibling use the same content-addressed artifact before the first aborts.
+    transaction <- private$begin_compaction_artifacts()
+    reference <- compaction_tool_result_references(private$compaction_summary_prompt(agent$get_turns()))
+    expect_length(reference, 1L)
+    if (claim == "abort") {
+      other <- sibling$.__enclos_env__$private
+      pending <- other$begin_compaction_artifacts()
+      expect_match(
+        other$compaction_summary_prompt(sibling$get_turns()),
+        reference,
+        fixed = TRUE
+      )
+    } else if (claim == "install") {
+      installed <- sibling$compact(keep_last = 0L)
+      expect_match(
+        installed$summary,
+        reference,
+        fixed = TRUE
+      )
+    } else {
+      expect_match(
+        sibling$get_tools()[["source_read"]](),
+        reference,
+        fixed = TRUE
+      )
+    }
+    private$finish_compaction_artifacts(transaction)
+    expect_identical(sibling$resolve_tool_result(reference), value)
+    if (claim == "abort") {
+      other$finish_compaction_artifacts(pending)
+      expect_error(sibling$resolve_tool_result(reference), "not found")
+    }
+  }
+  for (claim in c("abort", "install", "tool")) {
+    check_case(claim)
+  }
+})
+
 test_that("compaction keeps growing recovery sets behind a bounded catalog", {
   withr::local_options(ellmer_max_tries = 1)
   server <- local_runtime_server(c(
@@ -458,7 +661,7 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
     )
     previous_catalogs <- c(previous_catalogs, handles)
     saved <- snapshot()
-    expected_catalogs <- if (batch == 2L) 2L else 1L
+    expected_catalogs <- if (batch > 1L) 2L else 1L
     expect_length(saved$tool_result_envelopes, batch * 10L + expected_catalogs)
     expect_equal(
       sum(vapply(
@@ -470,20 +673,25 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
       )),
       expected_catalogs
     )
-    if (batch == 1L) expect_true(file.copy(snapshot_file, early_session))
+    if (batch == 1L) {
+      expect_true(file.copy(snapshot_file, early_session))
+      sibling <- agent$clone()
+    }
   }
-  for (reference in head(previous_catalogs, -1L)) {
-    expect_error(agent$resolve_tool_result(reference), "not found")
-    paths <- file.path(
-      policy$offload_dir,
-      saved$metadata$session_id,
-      paste0(
-        parse_tool_result_reference(reference),
-        c(".rds", ".txt", ".meta.rds")
-      )
-    )
-    expect_false(any(file.exists(paths)))
-  }
+  expect_identical(
+    unclass(sibling$resolve_tool_result(previous_catalogs[[1L]])),
+    head(references, 10L)
+  )
+  expect_match(
+    sibling$get_tools()[["deputy_read_tool_result"]](
+      previous_catalogs[[1L]],
+      max_chars = 512L
+    ),
+    references[[1L]],
+    fixed = TRUE
+  )
+  sibling <- NULL
+  invisible(gc())
   earlier <- Agent$new(
     runtime_chat(server),
     context_policy = ContextPolicy(offload_dir = withr::local_tempdir())
@@ -501,6 +709,20 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
   degraded <- agent$compact(keep_last = 0L, fallback = "text")
   expect_identical(degraded$method, "text")
   expect_identical(compaction_tool_result_references(degraded$summary), handles)
+  saved <- snapshot()
+  expect_length(saved$tool_result_envelopes, 31L)
+  for (reference in head(previous_catalogs, -1L)) {
+    expect_error(agent$resolve_tool_result(reference), "not found")
+    paths <- file.path(
+      policy$offload_dir,
+      saved$metadata$session_id,
+      paste0(
+        parse_tool_result_reference(reference),
+        c(".rds", ".txt", ".meta.rds")
+      )
+    )
+    expect_false(any(file.exists(paths)))
+  }
   for (index in c(1L, length(references))) {
     expect_identical(
       agent$resolve_tool_result(references[[index]]),

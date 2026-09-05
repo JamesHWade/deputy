@@ -352,7 +352,8 @@ offload_tool_result <- function(
   }
 
   path <- file.path(directory, paste0(result_id, ".rds"))
-  if (!file.exists(path)) {
+  created <- !file.exists(path)
+  if (created) {
     text_temporary <- tempfile(
       "result-text-",
       tmpdir = directory,
@@ -398,6 +399,7 @@ offload_tool_result <- function(
 
   list(
     id = result_id,
+    created = created,
     uri = paste0(
       "deputy://tool-result/",
       result_id,

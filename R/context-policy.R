@@ -27,8 +27,10 @@
 #'   Catalogs preserve earlier entries across compactions and session restores,
 #'   including existing references when new result offloading is disabled.
 #'   Superseded internal catalogs are reclaimed after replacement, except those
-#'   referenced by retained turns or the installed prompt. Earlier saved sessions
-#'   keep their own catalog snapshots. Original result artifacts are retained.
+#'   referenced by retained turns or the installed prompt of a live Agent or clone.
+#'   Earlier saved sessions keep their own catalog snapshots. Original result
+#'   artifacts are retained. New evidence artifacts from aborted compactions
+#'   are removed unless another compaction or tool caller has claimed them.
 #' @param offload_dir Directory for durable result envelopes. Relative paths
 #'   are anchored to the current working directory when the policy is created.
 #'   `NULL` uses the Deputy user cache, partitioned by Agent session.

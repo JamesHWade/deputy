@@ -223,6 +223,9 @@ Agent <- R6::R6Class(
       rlang::env_binding_unlock(self, "clone")
       self$clone <- private$clone_client
       rlang::env_binding_lock(self, "clone")
+      private$.compaction_catalog_registry <- new_compaction_catalog_registry(
+        self
+      )
 
       invisible(self)
     },
@@ -1204,6 +1207,8 @@ Agent <- R6::R6Class(
       if (!is.null(plan$result)) {
         return(plan$result)
       }
+      artifacts <- private$begin_compaction_artifacts()
+      on.exit(private$finish_compaction_artifacts(artifacts), add = TRUE)
       generated <- if (is.null(plan$summary)) {
         private$generate_compaction_summary(plan$turns_to_compact, fallback)
       } else {
@@ -1741,6 +1746,8 @@ Agent <- R6::R6Class(
       consecutive_tool_cycles = 0L,
       .last_compaction = NULL,
       .compaction_summary = NULL,
+      .compaction_catalog_registry = NULL,
+      .compaction_artifacts = NULL,
       .tool_result_reader_registered = FALSE,
       .tool_request_observers = list(),
       .tool_result_observers = list(),
@@ -1753,6 +1760,11 @@ Agent <- R6::R6Class(
         invisible(deep)
         cloned <- private$.r6_clone(deep = TRUE)
         cloned$.__enclos_env__$private$rewire_chat_runtime()
+        cloned$.__enclos_env__$private$.compaction_artifacts <- NULL
+        register_compaction_catalog_owner(
+          private$.compaction_catalog_registry,
+          cloned
+        )
         cloned
       },
 
@@ -1924,6 +1936,9 @@ Agent <- R6::R6Class(
         if (is.null(record)) {
           return(value)
         }
+        # Returning a result to the caller claims it independently of any
+        # concurrent compaction that first created these content-addressed bytes.
+        private$.compaction_catalog_registry$provisional[[record$id]] <- NULL
         private$ensure_tool_result_reader()
         private$notify(
           paste0("Offloaded large result from ", tool_name, "."),

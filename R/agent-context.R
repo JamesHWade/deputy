@@ -118,8 +118,23 @@ compaction_reference_handles <- function(
       "Call deputy_read_tool_result on this catalog for individual references.",
       sep = "\n"
     ),
-    catalogs = unique(c(catalog_ids, record$id))
+    catalogs = unique(c(catalog_ids, record$id)),
+    record = record
   )
+}
+
+new_compaction_catalog_registry <- function(owner) {
+  registry <- new.env(parent = emptyenv())
+  registry$owners <- list(rlang::new_weakref(owner))
+  registry$catalogs <- character()
+  registry$provisional <- list()
+  registry$transactions <- list()
+  registry
+}
+
+register_compaction_catalog_owner <- function(registry, owner) {
+  registry$owners <- c(registry$owners, list(rlang::new_weakref(owner)))
+  invisible(NULL)
 }
 
 compaction_embedded_references <- function(value) {
@@ -142,11 +157,27 @@ retire_compaction_catalogs <- function(
   catalogs,
   references,
   policy,
-  session_id
+  session_id,
+  registry
 ) {
+  registry$catalogs <- unique(c(registry$catalogs, catalogs))
+  owners <- lapply(registry$owners, rlang::wref_key)
+  alive <- !vapply(owners, is.null, logical(1))
+  registry$owners <- registry$owners[alive]
+  # Clones share this artifact store. Weak references let cleanup check live
+  # sibling contexts without keeping discarded clients alive indefinitely.
+  for (owner in owners[alive]) {
+    references <- c(
+      references,
+      compaction_tool_result_references(owner$get_system_prompt()),
+      compaction_embedded_references(lapply(owner$get_turns(), function(turn) {
+        turn@contents
+      }))
+    )
+  }
   retained <- vapply(references, parse_tool_result_reference, character(1))
   directory <- tool_result_offload_dir(policy, session_id)
-  for (id in setdiff(catalogs, retained)) {
+  for (id in setdiff(registry$catalogs, retained)) {
     envelope <- tryCatch(
       read_tool_result_envelope(
         paste0("deputy://tool-result/", id),
@@ -166,6 +197,8 @@ retire_compaction_catalogs <- function(
     paths <- file.path(directory, paste0(id, c(".rds", ".txt", ".meta.rds")))
     if (unlink(paths) != 0L) {
       cli_warn("Could not remove a superseded compaction catalog.")
+    } else {
+      registry$catalogs <- setdiff(registry$catalogs, id)
     }
   }
   invisible(NULL)
@@ -222,6 +255,63 @@ clone_compaction_chat <- function(chat) {
 # R6 binds these methods to the same self/private environments as the facade.
 deputy_agent_context_methods <- function(self = NULL, private = NULL) {
   list(
+    begin_compaction_artifacts = function() {
+      transaction <- new.env(parent = emptyenv())
+      transaction$ids <- character()
+      transaction$installed <- FALSE
+      private$.compaction_artifacts <- transaction
+      registry <- private$.compaction_catalog_registry
+      registry$transactions <- c(registry$transactions, list(transaction))
+      transaction
+    },
+
+    track_compaction_artifact = function(record) {
+      transaction <- private$.compaction_artifacts
+      if (!is.null(transaction) && !is.null(record)) {
+        transaction$ids <- unique(c(transaction$ids, record$id))
+        if (isTRUE(record$created)) {
+          private$.compaction_catalog_registry$provisional[[
+            record$id
+          ]] <- record
+        }
+      }
+      invisible(NULL)
+    },
+
+    finish_compaction_artifacts = function(transaction) {
+      if (identical(private$.compaction_artifacts, transaction)) {
+        private$.compaction_artifacts <- NULL
+      }
+      registry <- private$.compaction_catalog_registry
+      registry$transactions <- Filter(
+        function(other) {
+          !identical(other, transaction)
+        },
+        registry$transactions
+      )
+      if (isTRUE(transaction$installed)) {
+        registry$provisional[transaction$ids] <- NULL
+      }
+      pending <- unlist(lapply(registry$transactions, function(other) {
+        other$ids
+      }))
+      # A sibling transaction may still be using the same content-addressed
+      # artifact. Its eventual install or abort decides that artifact's fate.
+      for (id in setdiff(names(registry$provisional), pending)) {
+        record <- registry$provisional[[id]]
+        paths <- file.path(
+          dirname(record$path),
+          paste0(record$id, c(".rds", ".txt", ".meta.rds"))
+        )
+        if (unlink(paths) != 0L) {
+          cli_warn("Could not remove an aborted compaction artifact.")
+        } else {
+          registry$provisional[[id]] <- NULL
+        }
+      }
+      invisible(NULL)
+    },
+
     compaction_prompt_parts = function(prompt) {
       if (
         !is.character(prompt) ||
@@ -553,6 +643,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
             private$.agent_id
           )
           catalogs <- handles$catalogs
+          private$track_compaction_artifact(handles$record)
           private$ensure_tool_result_reader()
           summary <- trimws(gsub(
             compaction_tool_result_reference_pattern,
@@ -586,7 +677,8 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           catalogs,
           references,
           private$.context_policy,
-          private$.session_id
+          private$.session_id,
+          private$.compaction_catalog_registry
         )
       }
 
@@ -605,6 +697,9 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         }
       )
       private$.compaction_summary <- summary
+      if (!is.null(private$.compaction_artifacts)) {
+        private$.compaction_artifacts$installed <- TRUE
+      }
       retire_catalogs(new_system, plan$turns_to_keep)
       if (!is.null(usage)) {
         preserve_run_usage(self, usage)
@@ -709,6 +804,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         )
       )
       if (!is.null(record)) {
+        private$track_compaction_artifact(record)
         private$ensure_tool_result_reader()
         return(paste(
           header,
