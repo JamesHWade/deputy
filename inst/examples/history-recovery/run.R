@@ -15,13 +15,14 @@ if (is.na(cost) || !is.finite(cost) || cost <= 0) {
     "Set a positive DEPUTY_HISTORY_MAX_COST_USD observed spending limit."
   )
 }
-helpers <- strsplit(
+helpers <- trimws(strsplit(
   Sys.getenv("DEPUTY_HISTORY_HELPERS", "gpt-5.6-luna"),
   ",",
   fixed = TRUE
-)[[1L]]
-task_model <- Sys.getenv("DEPUTY_HISTORY_TASK_MODEL", "gpt-5.6-luna")
-trials <- as.integer(Sys.getenv("DEPUTY_HISTORY_TRIALS", "3"))
+)[[1L]])
+task_model <- trimws(Sys.getenv("DEPUTY_HISTORY_TASK_MODEL", "gpt-5.6-luna"))
+trials <- suppressWarnings(as.numeric(Sys.getenv("DEPUTY_HISTORY_TRIALS", "3")))
+history_validate_configuration(trials, helpers, task_model)
 output <- Sys.getenv("DEPUTY_HISTORY_OUTPUT", "history-recovery-results")
 if (dir.exists(output)) {
   cli::cli_abort(
@@ -41,7 +42,7 @@ chat_factory <- function(model) {
 evaluation <- history_evaluate(
   chat_factory,
   trials = trials,
-  helper_models = trimws(helpers),
+  helper_models = helpers,
   task_model = task_model,
   max_cost_usd = cost
 )

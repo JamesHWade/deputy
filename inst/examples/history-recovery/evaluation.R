@@ -467,6 +467,34 @@ history_continue <- function(
   )
 }
 
+history_validate_configuration <- function(trials, helper_models, task_model) {
+  if (
+    !is.numeric(trials) ||
+      length(trials) != 1L ||
+      is.na(trials) ||
+      !is.finite(trials) ||
+      trials < 1L ||
+      trials != floor(trials)
+  ) {
+    cli::cli_abort("trials must be a positive whole number.")
+  }
+  valid_models <- function(models) {
+    is.character(models) &&
+      length(models) > 0L &&
+      !anyNA(models) &&
+      all(nzchar(trimws(models)))
+  }
+  if (!valid_models(helper_models) || anyDuplicated(trimws(helper_models))) {
+    cli::cli_abort(
+      "helper_models must contain distinct, non-empty model names."
+    )
+  }
+  if (!valid_models(task_model) || length(task_model) != 1L) {
+    cli::cli_abort("task_model must be one non-empty model name.")
+  }
+  invisible(NULL)
+}
+
 history_evaluate <- function(
   chat_factory,
   fixture = history_fixture(),
@@ -478,16 +506,7 @@ history_evaluate <- function(
   max_tokens = 6000L,
   cancelled = function() FALSE
 ) {
-  if (
-    !is.numeric(trials) ||
-      length(trials) != 1L ||
-      is.na(trials) ||
-      !is.finite(trials) ||
-      trials < 1L ||
-      trials != floor(trials)
-  ) {
-    cli::cli_abort("trials must be a positive whole number.")
-  }
+  history_validate_configuration(trials, helper_models, task_model)
   budget <- history_budget(max_cost_usd, max_requests, cancelled)
   rows <- list()
   failure <- NULL

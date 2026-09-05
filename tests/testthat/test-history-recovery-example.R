@@ -421,3 +421,63 @@ test_that("invalid experiment limits fail before creating a model client", {
   }
   expect_identical(calls, 0L)
 })
+
+test_that("invalid model selections cannot produce a zero-work evaluation", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  calls <- 0L
+  factory <- function(model) {
+    calls <<- calls + 1L
+    rlang::abort("The provider factory must not be called for invalid models.")
+  }
+  for (models in list(
+    character(),
+    "",
+    " ",
+    NA_character_,
+    1,
+    c("luna", "luna")
+  )) {
+    expect_error(
+      example$history_evaluate(factory, fixture, helper_models = models),
+      "helper_models"
+    )
+  }
+  for (model in list(character(), "", NA_character_, c("luna", "terra"))) {
+    expect_error(
+      example$history_evaluate(factory, fixture, task_model = model),
+      "task_model"
+    )
+  }
+  expect_identical(calls, 0L)
+})
+
+test_that("invalid live configuration leaves the requested output path available", {
+  output <- file.path(withr::local_tempdir(), "pilot")
+  withr::local_envvar(
+    DEPUTY_HISTORY_LIVE = "yes",
+    DEPUTY_HISTORY_MAX_COST_USD = "1",
+    DEPUTY_HISTORY_OUTPUT = output,
+    DEPUTY_HISTORY_HELPERS = "gpt-5.6-luna",
+    DEPUTY_HISTORY_TASK_MODEL = "gpt-5.6-luna"
+  )
+  path <- system.file(
+    "examples",
+    "history-recovery",
+    "run.R",
+    package = "deputy"
+  )
+  for (trials in c("bad", "", "0", "-1", "1.5", "Inf")) {
+    withr::with_envvar(c(DEPUTY_HISTORY_TRIALS = trials), {
+      expect_error(sys.source(path, envir = new.env()), "trials")
+      expect_false(dir.exists(output))
+    })
+  }
+  withr::with_envvar(
+    c(DEPUTY_HISTORY_TRIALS = "1", DEPUTY_HISTORY_HELPERS = ""),
+    {
+      expect_error(sys.source(path, envir = new.env()), "helper_models")
+      expect_false(dir.exists(output))
+    }
+  )
+})
