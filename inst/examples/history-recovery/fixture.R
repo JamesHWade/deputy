@@ -216,7 +216,9 @@ history_scope_records <- function(records, scope) {
   }
   records <- records[keep, , drop = FALSE]
   if (
-    anyDuplicated(records$item_id) ||
+    !is.character(records$text) ||
+      !is.character(records$revision) ||
+      anyDuplicated(records$item_id) ||
       anyNA(records) ||
       any(!nzchar(records$item_id)) ||
       any(nchar(records$item_id) > 128L) ||
@@ -224,6 +226,18 @@ history_scope_records <- function(records, scope) {
   ) {
     cli::cli_abort(
       "Authorized history must have unique IDs and SHA-256 revisions."
+    )
+  }
+  revisions <- vapply(
+    records$text,
+    digest::digest,
+    character(1),
+    algo = "sha256",
+    serialize = FALSE
+  )
+  if (any(records$revision != revisions)) {
+    cli::cli_abort(
+      "Authorized history revisions must match the SHA-256 of their text."
     )
   }
   records

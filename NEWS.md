@@ -5,8 +5,9 @@
   while excluding tool-result display metadata. Previously a source returned by
   a tool could disappear from the summary input.
 * A caller-owned history-recovery experiment compares identical prepared context
-  with and without bounded, scoped source retrieval, including a scenario where
-  a later host instruction supersedes an earlier eligibility rule. It records
+  with and without bounded, scoped source retrieval. It verifies source revisions
+  against their text and includes a scenario where a later host instruction
+  supersedes an earlier eligibility rule. It records
   paired outcomes, provenance, usage, latency and effect counts without adding a
   persistence API or recursive-analysis runtime (#112).
 

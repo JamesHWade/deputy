@@ -43,6 +43,9 @@ The history continuation adds two tools from `history.R`:
 
 The host binds owner, conversation, Agent and branch before searching. The model
 cannot change that scope. Missing and unauthorized IDs return the same result.
+The adapter verifies each authorized record's revision against the SHA-256 of
+its text when binding the snapshot. Changed text requires a new matching
+revision; a refreshed adapter rejects reads expecting the previous revision.
 Defaults allow six calls, 4,096 bytes per response and 16,384 bytes overall,
 including JSON framing and provenance. Rejections contain no source payload and
 do not consume the source-byte allowance. Both strategies register an export spy;

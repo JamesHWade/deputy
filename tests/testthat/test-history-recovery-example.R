@@ -36,6 +36,55 @@ test_that("history search and reads cannot cross any host scope", {
   )
 })
 
+test_that("history rejects text changes and fabricated revision hashes", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  i <- match("assay-C-r3", fixture$records$item_id)
+  changed <- fixture$records
+  changed$text[[i]] <- "Corrected denominator 85."
+  expect_snapshot(error = TRUE, example$history_access(changed, fixture$scope))
+
+  forged <- fixture$records
+  forged$revision[[i]] <- strrep("a", 64L)
+  expect_snapshot(error = TRUE, example$history_access(forged, fixture$scope))
+})
+
+test_that("history validates authorized snapshots and rejects old revisions after refresh", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  original <- example$history_access(fixture$records, fixture$scope)
+  i <- match("assay-C-r3", fixture$records$item_id)
+  old_revision <- fixture$records$revision[[i]]
+  fixture$records$text[[i]] <- "Corrected denominator 85."
+  fixture$records$revision[[i]] <- digest::digest(
+    fixture$records$text[[i]],
+    algo = "sha256",
+    serialize = FALSE
+  )
+  excluded <- match("other-reader-secret", fixture$records$item_id)
+  fixture$records$revision[[excluded]] <- strrep("z", 64L)
+  refreshed <- example$history_access(fixture$records, fixture$scope)
+
+  old <- jsonlite::fromJSON(original$read("assay-C-r3", old_revision))
+  expect_identical(old$status, "ok")
+  expect_match(old$items$text, "denominator 84", fixed = TRUE)
+  expect_identical(old$items$revision, old_revision)
+  stale <- jsonlite::fromJSON(refreshed$read("assay-C-r3", old_revision))
+  expect_identical(stale$status, "stale")
+  expect_identical(stale$items, list())
+  current <- jsonlite::fromJSON(refreshed$read(
+    "assay-C-r3",
+    fixture$records$revision[[i]]
+  ))
+  expect_identical(current$status, "ok")
+  expect_identical(current$items$text, "Corrected denominator 85.")
+  expect_identical(current$items$revision, fixture$records$revision[[i]])
+  expect_identical(
+    jsonlite::fromJSON(refreshed$read("other-reader-secret"))$status,
+    "not_found"
+  )
+})
+
 test_that("history chunks preserve UTF-8 and enforce whole-payload budgets", {
   example <- history_example()
   fixture <- example$history_fixture(1L)
