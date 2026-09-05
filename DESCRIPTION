@@ -21,6 +21,7 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Suggests:
     httr2,
+    httpuv,
     jsonlite,
     jsonvalidate,
     knitr,

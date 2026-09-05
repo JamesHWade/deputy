@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* `LeadAgent$parallel_delegate()` and `$parallel_delegate_async()` run fresh,
+  tool-free responders in bounded concurrent waves. Batches preserve named
+  partial results, record child runs, reserve request budgets, and support host
+  cancellation. Failed provider dispatches count toward request limits. Child
+  Chats isolate runtime callbacks as well as history and tools (#39).
+
 * `tool_metadata()` reports tool origin, supplied annotations, missing fields,
   and effective defaults through registration, cloning, and delegation. MCP
   loading preserves server annotations using a qualified mcptools 1.0.2 bridge,

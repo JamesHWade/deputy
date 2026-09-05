@@ -1243,7 +1243,7 @@ test_that("SubagentStop hook fires after successful delegation", {
   mock_chat <- create_mock_chat()
 
   # Add clone method to mock_chat for model inheritance
-  mock_chat$clone <- function() {
+  mock_chat$clone <- function(deep = FALSE) {
     sub_mock <- create_mock_chat(responses = list("Sub-agent result"))
     # Override stream to return strings
     sub_mock$stream <- function(prompt = NULL) {
@@ -1312,7 +1312,7 @@ test_that("delegation executes sub-agent and returns result", {
   mock_chat <- create_mock_chat()
 
   # Add clone method for model inheritance
-  mock_chat$clone <- function() {
+  mock_chat$clone <- function(deep = FALSE) {
     sub_mock <- create_mock_chat(
       responses = list("Task completed successfully")
     )
@@ -1364,7 +1364,7 @@ test_that("delegation passes permissions to sub-agent", {
   # Track what permissions were used
   sub_agent_created_with_perms <- NULL
 
-  mock_chat$clone <- function() {
+  mock_chat$clone <- function(deep = FALSE) {
     sub_mock <- create_mock_chat(responses = list("Done"))
     sub_mock$stream <- function(prompt = NULL) {
       yielded <- FALSE
@@ -1415,7 +1415,7 @@ test_that("delegation handles sub-agent execution failure", {
   mock_chat <- create_mock_chat()
 
   # Clone that produces a chat which will fail on both stream AND chat
-  mock_chat$clone <- function() {
+  mock_chat$clone <- function(deep = FALSE) {
     sub_mock <- create_mock_chat()
     sub_mock$stream <- function(prompt = NULL) {
       stop("Simulated stream failure")
@@ -1456,7 +1456,7 @@ test_that("delegation handles sub-agent execution failure", {
 test_that("SubagentStop hook receives working_dir in context", {
   mock_chat <- create_mock_chat()
 
-  mock_chat$clone <- function() {
+  mock_chat$clone <- function(deep = FALSE) {
     sub_mock <- create_mock_chat(responses = list("Result"))
     sub_mock$stream <- function(prompt = NULL) {
       yielded <- FALSE

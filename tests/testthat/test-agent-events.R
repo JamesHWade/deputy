@@ -85,17 +85,42 @@ test_that("interrupt cooperatively stops an active run", {
   expect_false(agent$interrupt())
 })
 
-test_that("interrupt before a provider call reports zero requests", {
-  agent <- Agent$new(chat = create_mock_chat("unused"))
+test_that("interrupt counts an already-dispatched request without an assistant turn", {
+  chat <- create_mock_chat("unused")
+  stream_async <- chat$stream_async
+  dispatched <- 0L
+  chat$stream_async <- function(...) {
+    dispatched <<- dispatched + 1L
+    stream_async(...)
+  }
+  agent <- Agent$new(chat = chat)
   generator <- agent$run("cancel")
   expect_identical(generator()$type, "start")
+  expect_identical(dispatched, 1L)
   agent$.__enclos_env__$private$current_stream_controller <- NULL
   expect_true(agent$interrupt("cancelled"))
 
   events <- collect_agent_events(generator)
   stop <- Filter(function(event) event$type == "stop", events)[[1L]]
   expect_identical(stop$reason, "cancelled")
-  expect_identical(stop$usage$requests, 0L)
+  expect_identical(stop$usage$requests, 1L)
+})
+
+test_that("cancellation during run initialization makes no provider request", {
+  chat <- create_mock_chat("unused")
+  chat$stream_async <- function(...) cli::cli_abort("unexpected dispatch")
+  agent <- Agent$new(chat = chat)
+  agent$add_hook(HookMatcher$new(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(...) {
+      agent$interrupt("cancelled")
+      NULL
+    }
+  ))
+  result <- agent$run_sync("cancel")
+  expect_identical(result$stop_reason, "cancelled")
+  expect_identical(result$usage$requests, 0L)
 })
 
 test_that("interrupt stops native streams that ignore their controller", {

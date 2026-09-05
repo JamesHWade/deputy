@@ -87,7 +87,7 @@ create_delegation_child_chat <- function() {
       },
       on_tool_request = function(callback) state$on_tool_request <- callback,
       on_tool_result = function(callback) state$on_tool_result <- callback,
-      clone = function() chat
+      clone = function(deep = FALSE) chat
     ),
     class = "Chat"
   )
@@ -217,7 +217,7 @@ create_delegation_parent_chat <- function(child_chat) {
       },
       on_tool_request = function(callback) state$on_tool_request <- callback,
       on_tool_result = function(callback) state$on_tool_result <- callback,
-      clone = function() child_chat
+      clone = function(deep = FALSE) child_chat
     ),
     class = "Chat"
   )

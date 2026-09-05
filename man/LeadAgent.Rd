@@ -24,6 +24,8 @@ sub-agents based on registered AgentDefinitions.
     \item \href{#method-LeadAgent-initialize}{\code{LeadAgent$new()}}
     \item \href{#method-LeadAgent-register_sub_agent}{\code{LeadAgent$register_sub_agent()}}
     \item \href{#method-LeadAgent-available_sub_agents}{\code{LeadAgent$available_sub_agents()}}
+    \item \href{#method-LeadAgent-parallel_delegate}{\code{LeadAgent$parallel_delegate()}}
+    \item \href{#method-LeadAgent-parallel_delegate_async}{\code{LeadAgent$parallel_delegate_async()}}
     \item \href{#method-LeadAgent-list_subagents}{\code{LeadAgent$list_subagents()}}
     \item \href{#method-LeadAgent-get_subagent_results}{\code{LeadAgent$get_subagent_results()}}
     \item \href{#method-LeadAgent-get_subagent_messages}{\code{LeadAgent$get_subagent_messages()}}
@@ -180,6 +182,82 @@ runs and delegated agents.}
   }
   \subsection{Returns}{
     Character vector of sub-agent names
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-parallel_delegate"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-parallel_delegate}{}}}
+\subsection{\code{LeadAgent$parallel_delegate()}}{
+  Run independent, stateless responders concurrently.
+
+Each selected AgentDefinition gets a fresh conversation and at most one
+model request. Definitions with tools, skills, or MCP servers are
+rejected. This is tier-1 fan-out, not background tool-using agents.
+Results preserve input order, including failures and unstarted tasks.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$parallel_delegate(
+  tasks,
+  max_active = 2L,
+  mode = "stateless",
+  usage_limits = NULL,
+  run_context = list()
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{tasks}}{A named character vector of tasks. Names select unique
+registered AgentDefinitions.}
+      \item{\code{max_active}}{Maximum simultaneous responders.}
+      \item{\code{mode}}{Execution contract. Currently only \code{"stateless"} is supported.}
+      \item{\code{usage_limits}}{Optional batch-wide \link{UsageLimits}. Unset fields
+inherit the lead's defaults. Requests are reserved before dispatch;
+token and cost ceilings are divided across each concurrent wave and
+checked after responses, with possible overage by one response per
+active responder.}
+      \item{\code{run_context}}{Additional immutable context for the batch.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list with \code{mode}, named \code{results} (\link{AgentResult} or \code{NULL}),
+named \code{errors}, named \code{status}, and an aggregate \code{run} (\link{AgentResult}).
+\verb{$last_run()} retains the aggregate run. The lead's conversation is
+unchanged. Failed responders do not discard successful siblings.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-parallel_delegate_async"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-parallel_delegate_async}{}}}
+\subsection{\code{LeadAgent$parallel_delegate_async()}}{
+  Run stateless fan-out without blocking the R event loop.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$parallel_delegate_async(
+  tasks,
+  max_active = 2L,
+  mode = "stateless",
+  usage_limits = NULL,
+  run_context = list()
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{tasks, max_active, mode, usage_limits, run_context}}{See
+\verb{$parallel_delegate()}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A promise resolving to the same batch result as
+\verb{$parallel_delegate()}. \verb{$interrupt()} cancels queued work and asks
+active responders to stop at their next supported provider boundary.
   }
 }
 
