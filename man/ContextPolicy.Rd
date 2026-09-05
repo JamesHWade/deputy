@@ -27,9 +27,14 @@ from the Agent's task \code{fallback_chats}.}
 
 \item{max_tool_result_bytes}{Serialized size above which a tool result is
 stored outside the model context. Use \code{NULL} to disable result offloading.
-Compaction applies this limit to explicit \code{ellmer::ContentToolResult}
-payloads too, retaining a preview and recoverable reference.
-Model-generated summaries preserve references across later compactions.}
+Compaction applies this limit to the public evidence in explicit
+\code{ellmer::ContentToolResult} payloads too, retaining a preview and recoverable
+reference. Content objects use their public text rather than class metadata.
+A conservative rendered-size bound also covers compact sequences and shared
+strings before JSON expansion. Generated summaries retain up to eight direct
+recovery references; larger sets use one durable, chunk-readable catalog.
+Catalogs preserve earlier entries across compactions and session restores,
+including existing references when new result offloading is disabled.}
 
 \item{offload_dir}{Directory for durable result envelopes. Relative paths
 are anchored to the current working directory when the policy is created.

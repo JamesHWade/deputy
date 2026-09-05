@@ -1,14 +1,117 @@
+compaction_tool_result_reference_pattern <- paste0(
+  "deputy://tool-result/result_[a-f0-9]{64}",
+  "\\?text_sha256=[a-f0-9]{64}"
+)
+
 compaction_tool_result_references <- function(text) {
   unique(unlist(
     regmatches(
       text,
       gregexpr(
-        "deputy://tool-result/result_[a-f0-9]{64}\\?text_sha256=[a-f0-9]{64}",
+        compaction_tool_result_reference_pattern,
         text
       )
     ),
     use.names = FALSE
   ))
+}
+
+compaction_evidence_exceeds_limit <- function(value, limit) {
+  if (is.null(limit)) {
+    return(FALSE)
+  }
+  estimate <- function(value, budget) {
+    if (is.null(value)) {
+      return(4)
+    }
+    if (budget < 2 || length(value) > budget) {
+      return(budget + 1)
+    }
+    size <- 2
+    if (!is.null(names(value))) {
+      repetitions <- if (is.data.frame(value)) nrow(value) else 1
+      size <- size + repetitions * estimate(names(value), budget)
+    }
+    if (is.data.frame(value)) {
+      size <- size + 2 * nrow(value)
+    }
+    if (size > budget) {
+      return(size)
+    }
+    if (is.factor(value)) {
+      value <- as.character(value)
+    } else if (is.object(value) && !is.data.frame(value)) {
+      # Other class-specific JSON methods do not have a generic size bound.
+      return(budget + 1)
+    }
+    if (is.character(value)) {
+      for (index in seq_along(value)) {
+        # JSON can expand one control byte to six characters. Count repeated
+        # strings separately even when R shares their underlying storage.
+        bytes <- if (is.na(value[[index]])) {
+          4
+        } else {
+          nchar(value[[index]], "bytes")
+        }
+        size <- size + 6 * bytes + 3
+        if (size > budget) return(size)
+      }
+    } else if (is.list(value)) {
+      for (index in seq_along(value)) {
+        size <- size + estimate(value[[index]], budget - size) + 1
+        if (size > budget) return(size)
+      }
+    } else if (is.atomic(value)) {
+      # Includes expanded ALTREP sequences without allocating their JSON.
+      size <- size + 32 * length(value)
+    } else {
+      size <- budget + 1
+    }
+    size
+  }
+  estimate(value, limit) > limit
+}
+
+compaction_reference_handles <- function(
+  references,
+  policy,
+  session_id,
+  agent_id
+) {
+  references <- unique(unlist(
+    lapply(references, function(reference) {
+      envelope <- tryCatch(
+        read_tool_result_envelope(reference, policy, session_id),
+        error = function(error) NULL
+      )
+      if (
+        !is.null(envelope) &&
+          identical(envelope$tool_name, "deputy_compaction_catalog") &&
+          inherits(envelope$value, "deputy_compaction_catalog")
+      ) {
+        unclass(envelope$value)
+      } else {
+        reference
+      }
+    }),
+    use.names = FALSE
+  ))
+  if (length(references) <= 8L) {
+    return(paste(references, collapse = "\n"))
+  }
+  record <- offload_tool_result(
+    structure(references, class = "deputy_compaction_catalog"),
+    tool_name = "deputy_compaction_catalog",
+    policy = policy,
+    session_id = session_id,
+    agent_id = agent_id,
+    force = TRUE
+  )
+  paste(
+    paste0("Catalog of ", length(references), " tool results: ", record$uri),
+    "Call deputy_read_tool_result on this catalog for individual references.",
+    sep = "\n"
+  )
 }
 
 clone_compaction_chat <- function(chat) {
@@ -373,7 +476,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         )
       }
       summary <- paste(as.character(summary), collapse = "\n")
-      if (identical(method, "llm")) {
+      if (method %in% c("llm", "text")) {
         # The summary provider may omit every reference. Preserve the handles
         # from both newly compacted evidence and the prior accepted summary.
         references <- compaction_tool_result_references(c(
@@ -384,15 +487,23 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
             character(1)
           )
         ))
-        missing_references <- setdiff(
-          references,
-          compaction_tool_result_references(summary)
-        )
-        if (length(missing_references)) {
+        if (length(references)) {
+          handles <- compaction_reference_handles(
+            references,
+            private$.context_policy,
+            private$.session_id,
+            private$.agent_id
+          )
+          private$ensure_tool_result_reader()
+          summary <- trimws(gsub(
+            compaction_tool_result_reference_pattern,
+            "",
+            summary
+          ))
           summary <- paste(
             summary,
             "Recoverable tool results:",
-            paste(missing_references, collapse = "\n"),
+            handles,
             sep = "\n\n"
           )
         }
@@ -473,10 +584,24 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       # Keep ordinary structured results intact. Project Content objects through
       # their public formatter, including inside named/nested payloads, without
       # including tool-result display `extra`.
-      value <- content@value
+      project_content <- function(value, for_json = FALSE) {
+        if (inherits(value, "ellmer::Content")) {
+          return(private$compaction_content_text(value))
+        }
+        if (for_json && is.atomic(value) && !is.null(names(value))) {
+          value <- as.list(value)
+        }
+        if (is.list(value)) {
+          value[] <- lapply(value, project_content, for_json = for_json)
+        }
+        value
+      }
+      # Serialize public evidence, not S7 class environments: those can be
+      # large and their bytes need not survive a save/load round trip.
+      value <- project_content(content@value)
       # Results supplied as ContentToolResult, including restored turns, can
       # bypass runtime offloading. Bound them before paste/JSON allocates the
-      # summary evidence, while keeping the source value recoverable.
+      # summary evidence, while keeping public evidence recoverable.
       record <- offload_tool_result(
         value = value,
         tool_name = if (is.null(content@request)) {
@@ -486,7 +611,11 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         },
         policy = private$.context_policy,
         session_id = private$.session_id,
-        agent_id = private$.agent_id
+        agent_id = private$.agent_id,
+        force = compaction_evidence_exceeds_limit(
+          value,
+          private$.context_policy$max_tool_result_bytes
+        )
       )
       if (!is.null(record)) {
         private$ensure_tool_result_reader()
@@ -496,35 +625,23 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           sep = "\n"
         ))
       }
-      project_content <- function(value) {
-        if (inherits(value, "ellmer::Content")) {
-          return(private$compaction_content_text(value))
-        }
-        if (is.atomic(value) && !is.null(names(value))) {
-          value <- as.list(value)
-        }
-        if (is.list(value)) {
-          value[] <- lapply(value, project_content)
-        }
-        value
-      }
-      text <- if (inherits(value, "ellmer::Content")) {
-        private$compaction_content_text(value)
-      } else if (
-        is.list(value) &&
-          is.null(names(value)) &&
-          length(value) > 0L &&
-          all(vapply(value, inherits, logical(1), what = "ellmer::Content"))
+      text <- if (
+        is.list(content@value) &&
+          is.null(names(content@value)) &&
+          length(content@value) > 0L &&
+          all(vapply(
+            content@value,
+            inherits,
+            logical(1),
+            what = "ellmer::Content"
+          ))
       ) {
-        paste(
-          vapply(value, private$compaction_content_text, character(1)),
-          collapse = "\n"
-        )
+        paste(value, collapse = "\n")
       } else if (is.character(value) && is.null(names(value))) {
         paste(value, collapse = "\n")
       } else {
         as.character(jsonlite::toJSON(
-          project_content(value),
+          project_content(value, for_json = TRUE),
           auto_unbox = TRUE,
           digits = NA,
           null = "null"

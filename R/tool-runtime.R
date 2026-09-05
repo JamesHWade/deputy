@@ -323,16 +323,20 @@ offload_tool_result <- function(
   tool_name,
   policy,
   session_id,
-  agent_id
+  agent_id,
+  force = FALSE
 ) {
   threshold <- policy$max_tool_result_bytes
-  if (is.null(threshold) || inherits(value, "ellmer::ContentToolResult")) {
+  if (
+    (is.null(threshold) && !force) ||
+      inherits(value, "ellmer::ContentToolResult")
+  ) {
     return(NULL)
   }
 
   serialized <- serialize(value, NULL, version = 3)
   bytes <- length(serialized)
-  if (bytes <= threshold) {
+  if (!force && bytes <= threshold) {
     return(NULL)
   }
 

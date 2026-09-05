@@ -297,6 +297,11 @@ fallback Chats never select the task provider or inherit executable tools and
 callbacks. Installing a compacted window preserves prior usage and completed
 tool effects. Manual `compact()` remains synchronous. Evaluation cases and the
 future history-retrieval comparison are described in `dev/compaction-evaluation.md`.
+Compaction projects ellmer Content objects to public evidence before offloading,
+and bounds potential rendered expansion as well as serialized size. Generated
+summaries preserve up to eight direct recovery references; larger sets use one
+durable catalog, flattened across compactions and retained by session save/load.
+Caller-supplied summaries retain control over their content.
 
 ### Permission Modes
 

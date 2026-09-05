@@ -572,7 +572,8 @@ Agent <- R6::R6Class(
     #' @description Resolve a durable tool-result reference.
     #' @param reference A `deputy://tool-result/...` URI or reference text
     #'   emitted into model context.
-    #' @return The complete original R value.
+    #' @return The complete stored R value. Content evidence offloaded during
+    #'   compaction uses its public text representation.
     resolve_tool_result = function(reference) {
       read_tool_result_envelope(
         reference,
