@@ -1,5 +1,9 @@
 # deputy (development version)
 
+* Split runtime, permission, checkpoint, and built-in tool support into cohesive
+  modules, with tests grouped by behavior. Public class interfaces and session
+  formats are unchanged by the mechanical extraction.
+
 * Use released ellmer >= 0.5.0 for public request callbacks, model objects,
   conversation trace IDs, and native structured streaming.
 * Structured output now uses ellmer types throughout. `run()`, `run_sync()`,

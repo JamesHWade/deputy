@@ -1,44 +1,5 @@
 # Agent class for deputy
 
-clone_compaction_chat <- function(chat) {
-  summary_chat <- clone_governed_chat(chat)
-  if (identical(summary_chat, chat)) {
-    cli::cli_abort("Chat cloning returned the original mutable object")
-  }
-  validate_chat(summary_chat)
-
-  callback_names <- c(
-    "callback_on_tool_request",
-    "callback_on_tool_result"
-  )
-  live_private <- chat$.__enclos_env__$private
-  summary_private <- summary_chat$.__enclos_env__$private
-
-  for (callback_name in callback_names) {
-    live_manager <- live_private[[callback_name]]
-    summary_manager <- summary_private[[callback_name]]
-    if (is.null(summary_manager) || !is.function(summary_manager$clear)) {
-      cli::cli_abort(
-        "The summary chat does not expose an isolated {callback_name} manager"
-      )
-    }
-    if (identical(summary_manager, live_manager)) {
-      cli::cli_abort(
-        "The summary chat shares its {callback_name} manager with the live chat"
-      )
-    }
-  }
-
-  for (callback_name in callback_names) {
-    summary_private[[callback_name]]$clear()
-  }
-  summary_chat$set_turns(list())
-  summary_chat$set_system_prompt(NULL)
-  summary_chat$set_tools(list())
-
-  summary_chat
-}
-
 #' Agent R6 Class
 #'
 #' @description
@@ -86,7 +47,9 @@ clone_compaction_chat <- function(chat) {
 #'     invalidate later file history. Conversation history is not changed.}
 #' }
 #'
+#' @include agent-stream.R agent-session.R agent-context.R agent-tool-callbacks.R agent-tool-records.R
 #' @importFrom later run_now
+#' @importFrom utils tail
 #' @export
 #'
 #' @examples
@@ -1819,2648 +1782,556 @@ Agent <- R6::R6Class(
     }
   ),
 
-  private = list(
-    .chat = NULL,
-    .fallback_chats = list(),
-    .fallback_position = 0L,
-    .permissions = NULL,
-    .usage_limits = NULL,
-    .context_policy = NULL,
-    .working_dir = NULL,
-    .hooks = NULL,
-    .run_context = list(),
-    .agent_id = NULL,
-    .agent_name = NULL,
-    .session_id = NULL,
-    .parent_agent_id = NULL,
-    .parent_run_id = NULL,
-    .delegation_id = NULL,
-    .file_checkpoints = NULL,
-    .file_checkpoint_config = NULL,
+  private = c(
+    list(
+      .chat = NULL,
+      .fallback_chats = list(),
+      .fallback_position = 0L,
+      .permissions = NULL,
+      .usage_limits = NULL,
+      .context_policy = NULL,
+      .working_dir = NULL,
+      .hooks = NULL,
+      .run_context = list(),
+      .agent_id = NULL,
+      .agent_name = NULL,
+      .session_id = NULL,
+      .parent_agent_id = NULL,
+      .parent_run_id = NULL,
+      .delegation_id = NULL,
+      .file_checkpoints = NULL,
+      .file_checkpoint_config = NULL,
 
-    # Flag to signal stopping from hooks
-    should_stop = FALSE,
-    stop_reason_from_hook = NULL,
+      # Flag to signal stopping from hooks
+      should_stop = FALSE,
+      stop_reason_from_hook = NULL,
 
-    # Run-scoped tracing and usage state.
-    run_active = FALSE,
-    current_run_id = NULL,
-    current_run_context = NULL,
-    current_run_state = NULL,
-    last_run_context = NULL,
-    current_usage_limits = NULL,
-    current_usage_baseline = NULL,
-    current_tool_calls = 0L,
-    current_tool_results = 0L,
-    current_outer_requests = 0L,
-    current_external_usage = NULL,
-    current_stream_controller = NULL,
-    current_stream_content = FALSE,
-    pending_events = list(),
-    tool_started_at = list(),
-    tool_event_overrides = list(),
-    tool_call_records = list(),
-    pending_delegations = list(),
-    original_tool_results = list(),
-    last_run_usage = NULL,
-    .last_run_result = NULL,
-    last_limit_status = NULL,
-    last_tool_cycle_signature = NULL,
-    consecutive_tool_cycles = 0L,
-    .last_compaction = NULL,
-    .compaction_summary = NULL,
-    .tool_result_reader_registered = FALSE,
-    .tool_request_observers = list(),
-    .tool_result_observers = list(),
-    .tool_observer_id = 0L,
-    .tool_observer_removers = list(),
-    .r6_clone = NULL,
-    current_run_checkpoint_id = NULL,
+      # Run-scoped tracing and usage state.
+      run_active = FALSE,
+      current_run_id = NULL,
+      current_run_context = NULL,
+      current_run_state = NULL,
+      last_run_context = NULL,
+      current_usage_limits = NULL,
+      current_usage_baseline = NULL,
+      current_tool_calls = 0L,
+      current_tool_results = 0L,
+      current_outer_requests = 0L,
+      current_external_usage = NULL,
+      current_stream_controller = NULL,
+      current_stream_content = FALSE,
+      pending_events = list(),
+      tool_started_at = list(),
+      tool_event_overrides = list(),
+      tool_call_records = list(),
+      pending_delegations = list(),
+      original_tool_results = list(),
+      last_run_usage = NULL,
+      .last_run_result = NULL,
+      last_limit_status = NULL,
+      last_tool_cycle_signature = NULL,
+      consecutive_tool_cycles = 0L,
+      .last_compaction = NULL,
+      .compaction_summary = NULL,
+      .tool_result_reader_registered = FALSE,
+      .tool_request_observers = list(),
+      .tool_result_observers = list(),
+      .tool_observer_id = 0L,
+      .tool_observer_removers = list(),
+      .r6_clone = NULL,
+      current_run_checkpoint_id = NULL,
 
-    clone_client = function(deep = FALSE) {
-      invisible(deep)
-      cloned <- private$.r6_clone(deep = TRUE)
-      cloned$.__enclos_env__$private$rewire_chat_runtime()
-      cloned
-    },
+      clone_client = function(deep = FALSE) {
+        invisible(deep)
+        cloned <- private$.r6_clone(deep = TRUE)
+        cloned$.__enclos_env__$private$rewire_chat_runtime()
+        cloned
+      },
 
-    deep_clone = function(name, value) {
-      if (identical(name, ".chat") && is.function(value$clone)) {
-        return(clone_governed_chat(value))
-      }
-      is_r6_object <- is.environment(value) &&
-        !is.null(get0(".__enclos_env__", value, inherits = FALSE))
-      if (is_r6_object) {
-        return(value$clone(deep = TRUE))
-      }
-      value
-    },
-
-    rewire_chat_runtime = function() {
-      clear_chat_tool_callbacks(private$.chat)
-
-      tools <- private$.chat$get_tools()
-      had_result_reader <- "deputy_read_tool_result" %in% names(tools)
-      tools[["deputy_read_tool_result"]] <- NULL
-      tools <- validate_tool_batch(tools)
-      private$.chat$set_tools(lapply(tools, private$prepare_cloned_tool))
-      private$.tool_result_reader_registered <- FALSE
-      if (isTRUE(had_result_reader)) {
-        private$ensure_tool_result_reader()
-      }
-      private$.chat$on_tool_request(private$handle_tool_request)
-      private$.chat$on_tool_result(private$handle_tool_result)
-      rebind_tool_observers(self)
-      invisible(NULL)
-    },
-
-    prepare_cloned_tool = function(tool) {
-      private$adapt_tool(tool)
-    },
-
-    discard_stale_mcp_tools = function() {
-      tools <- private$.chat$get_tools()
-      current <- vapply(tools, mcp_tool_is_current, logical(1))
-      if (all(current)) {
-        return(invisible(NULL))
-      }
-      removed <- names(tools)[!current]
-      # These are already adapted tools; only remove invalidated handles.
-      private$.chat$set_tools(tools[current])
-      private$loaded_mcp_tools <- setdiff(private$loaded_mcp_tools, removed)
-      invisible(NULL)
-    },
-
-    new_file_checkpoint_store = function() {
-      FileCheckpointStore$new(
-        private$.working_dir,
-        max_file_bytes = private$.file_checkpoint_config$max_file_bytes,
-        max_journal_bytes = private$.file_checkpoint_config$max_journal_bytes
-      )
-    },
-
-    resolve_tool_arguments = function(tool_name, arguments) {
-      resolve_runtime_tool_arguments(
-        tool_name,
-        arguments,
-        private$.working_dir
-      )
-    },
-
-    adapt_tool = function(tool) {
-      if (inherits(tool, "ellmer::ToolBuiltIn")) {
-        tool_name <- tryCatch(tool@name, error = function(error) NULL)
-        tool_id <- normalize_native_tool_id(tool_name %||% "")
-        if (!tool_id %in% c("web_search", "web_fetch")) {
-          cli_abort(c(
-            "Unsupported provider-native tool: {.val {tool_name %||% '<unknown>'}}",
-            "x" = paste0(
-              "Deputy cannot interpose on provider-side execution for this ",
-              "tool."
-            )
-          ))
+      deep_clone = function(name, value) {
+        if (identical(name, ".chat") && is.function(value$clone)) {
+          return(clone_governed_chat(value))
         }
-        if (!isTRUE(self$permissions$web)) {
-          cli_abort(c(
-            "Provider-native web tool {.val {tool_name}} is not authorized.",
-            "i" = "Set {.code web = TRUE} and explicitly allow the tool."
-          ))
+        is_r6_object <- is.environment(value) &&
+          !is.null(get0(".__enclos_env__", value, inherits = FALSE))
+        if (is_r6_object) {
+          return(value$clone(deep = TRUE))
         }
-        allowlist <- self$permissions$tool_allowlist %||% character()
-        allowlist_ids <- unique(vapply(
-          allowlist,
-          normalize_native_tool_id,
-          character(1)
-        ))
-        if (!tool_id %in% allowlist_ids) {
-          cli_abort(c(
-            "Provider-native web tool {.val {tool_name}} is not explicitly allowed.",
-            "i" = "Add the tool name to {.arg tool_allowlist}."
-          ))
+        value
+      },
+
+      rewire_chat_runtime = function() {
+        clear_chat_tool_callbacks(private$.chat)
+
+        tools <- private$.chat$get_tools()
+        had_result_reader <- "deputy_read_tool_result" %in% names(tools)
+        tools[["deputy_read_tool_result"]] <- NULL
+        tools <- validate_tool_batch(tools)
+        private$.chat$set_tools(lapply(tools, private$prepare_cloned_tool))
+        private$.tool_result_reader_registered <- FALSE
+        if (isTRUE(had_result_reader)) {
+          private$ensure_tool_result_reader()
         }
-        if (!is.null(self$permissions$can_use_tool)) {
-          cli_abort(c(
-            "Provider-native tool {.val {tool_name}} cannot use a custom permission callback.",
-            "x" = paste0(
-              "Provider-side requests cannot be checked against request ",
-              "arguments or run context."
-            ),
-            "i" = paste0(
-              "Remove {.arg can_use_tool} or use Deputy's universal ",
-              "function tool."
-            )
-          ))
+        private$.chat$on_tool_request(private$handle_tool_request)
+        private$.chat$on_tool_result(private$handle_tool_result)
+        rebind_tool_observers(self)
+        invisible(NULL)
+      },
+
+      prepare_cloned_tool = function(tool) {
+        private$adapt_tool(tool)
+      },
+
+      discard_stale_mcp_tools = function() {
+        tools <- private$.chat$get_tools()
+        current <- vapply(tools, mcp_tool_is_current, logical(1))
+        if (all(current)) {
+          return(invisible(NULL))
         }
-        permission <- self$permissions$check(
+        removed <- names(tools)[!current]
+        # These are already adapted tools; only remove invalidated handles.
+        private$.chat$set_tools(tools[current])
+        private$loaded_mcp_tools <- setdiff(private$loaded_mcp_tools, removed)
+        invisible(NULL)
+      },
+
+      new_file_checkpoint_store = function() {
+        FileCheckpointStore$new(
+          private$.working_dir,
+          max_file_bytes = private$.file_checkpoint_config$max_file_bytes,
+          max_journal_bytes = private$.file_checkpoint_config$max_journal_bytes
+        )
+      },
+
+      resolve_tool_arguments = function(tool_name, arguments) {
+        resolve_runtime_tool_arguments(
           tool_name,
-          list(),
-          list(
-            working_dir = private$.working_dir,
-            tool_annotations = tool@annotations
-          )
+          arguments,
+          private$.working_dir
         )
-        if (inherits(permission, "PermissionResultDeny")) {
-          cli_abort(c(
-            "Provider-native tool {.val {tool_name}} was denied at registration.",
-            "x" = permission$reason,
-            "i" = paste0(
-              "Provider-native tools are authorized before a request because ",
-              "they execute inside the provider."
-            )
-          ))
-        }
-        return(tool)
-      }
-      runtime_wrap_tool(
-        tool,
-        resolve_arguments = if (
-          identical(tool_metadata(tool)$source$type, "mcp")
-        ) {
-          function(tool_name, arguments) arguments
-        } else {
-          private$resolve_tool_arguments
-        },
-        process_result = private$offload_tool_result,
-        begin_execution = private$begin_tool_execution,
-        execute = private$execute_tool
-      )
-    },
+      },
 
-    execute_tool = function(tool, arguments) {
-      workspace_runner <- attr(
-        tool,
-        "deputy_workspace_runner",
-        exact = TRUE
-      )
-      if (is.function(workspace_runner)) {
-        return(workspace_runner(arguments, private$.working_dir))
-      }
-      do.call(tool, arguments)
-    },
-
-    offload_tool_result = function(tool_name, value, execution_id = NULL) {
-      if (identical(tool_name, "deputy_read_tool_result")) {
-        return(value)
-      }
-      record <- offload_tool_result(
-        value = value,
-        tool_name = tool_name,
-        policy = private$.context_policy,
-        session_id = private$.session_id,
-        agent_id = private$.agent_id
-      )
-      if (is.null(record)) {
-        return(value)
-      }
-      private$ensure_tool_result_reader()
-      private$notify(
-        paste0("Offloaded large result from ", tool_name, "."),
-        level = "info",
-        code = "tool_result_offloaded",
-        tool_name = tool_name,
-        result_reference = record$uri,
-        result_bytes = record$bytes,
-        result_sha256 = record$sha256
-      )
-      if (is_nonempty_string(execution_id)) {
-        private$original_tool_results[[execution_id]] <- value
-      }
-      tool_result_reference_text(record)
-    },
-
-    ensure_tool_result_reader = function() {
-      if (isTRUE(private$.tool_result_reader_registered)) {
-        return(invisible(NULL))
-      }
-      private$.chat$register_tool(
-        private$adapt_tool(tool_result_reader_tool(
-          private$read_tool_result_chunk
-        ))
-      )
-      private$.tool_result_reader_registered <- TRUE
-      invisible(NULL)
-    },
-
-    read_tool_result_chunk = function(reference, offset, max_chars) {
-      read_tool_result_chunk(
-        reference = reference,
-        offset = offset,
-        max_chars = max_chars,
-        policy = private$.context_policy,
-        session_id = private$.session_id
-      )
-    },
-
-    fire_hook = function(event, tool_name = NULL, ...) {
-      if (length(self$hooks$get_hooks(event, tool_name))) {
-        on.exit(
-          private$record_run_event(private$agent_event("hook", hook = event)),
-          add = TRUE
-        )
-      }
-      self$hooks$fire(event, tool_name = tool_name, ...)
-    },
-
-    record_run_event = function(event) {
-      state <- private$current_run_state
-      if (!is.null(state)) {
-        state$events[[length(state$events) + 1L]] <- event
-        trace_governance_event(state$trace_span, event)
-      }
-      invisible(event)
-    },
-
-    start_async_stream = function(
-      messages,
-      tool_mode,
-      stream,
-      controller,
-      structured = NULL,
-      stream_type = NULL
-    ) {
-      if (!is.null(structured)) {
-        return(governed_structured_request(self, messages, structured))
-      }
-      # Real ellmer streams count each model round through public callbacks.
-      # Protocol test doubles without those callbacks retain dispatch counting.
-      if (!is.function(private$.chat$on_request_start)) {
-        begin_model_request(self)
-      }
-      stream_fun <- private$.chat$stream_async
-      stream_formals <- names(formals(stream_fun))
-      args <- messages
-      if ("tool_mode" %in% stream_formals) {
-        args$tool_mode <- tool_mode
-      }
-      if ("stream" %in% stream_formals) {
-        args$stream <- stream
-      }
-      if (!is.null(controller) && "controller" %in% stream_formals) {
-        args$controller <- controller
-      }
-      if (!is.null(stream_type)) {
-        args$type <- stream_type
-      }
-      with_run_trace(private$current_run_state, do.call(stream_fun, args))
-    },
-
-    start_governed_stream = function(
-      messages,
-      limits,
-      run_context,
-      tool_mode = "concurrent",
-      stream = "content",
-      controller = NULL,
-      structured = NULL,
-      extraction = NULL,
-      stream_type = NULL
-    ) {
-      if (isTRUE(private$run_active)) {
-        cli::cli_abort(
-          "This agent already has an active run",
-          class = c("deputy_run_active", "deputy_error")
-        )
-      }
-      limits <- normalize_usage_limits(limits)
-      state <- private$new_callback_run_state()
-      governed <- private$callback_run_stream(
-        messages = messages,
-        limits = limits,
-        run_context = run_context,
-        tool_mode = tool_mode,
-        stream_mode = stream,
-        controller = controller,
-        structured = structured,
-        extraction = extraction,
-        stream_type = stream_type,
-        state = state
-      )
-      agent <- self
-      reg.finalizer(
-        environment(governed),
-        function(environment) {
-          if (
-            !isTRUE(state$finished) &&
-              !is.null(state$active_run_id)
-          ) {
-            state$reason <- "abandoned"
-            try(
-              agent$.__enclos_env__$private$request_stream_stop("abandoned"),
-              silent = TRUE
-            )
-            try(
-              agent$.__enclos_env__$private$finish_callback_run(state),
-              silent = TRUE
-            )
-          }
-        },
-        onexit = TRUE
-      )
-      list(stream = governed, state = state, limits = limits)
-    },
-
-    collect_governed_stream = function(governed_run) {
-      stream <- governed_run$stream
-      state <- governed_run$state
-      coro::async(function() {
-        repeat {
-          chunk <- coro::await(stream())
-          if (coro::is_exhausted(chunk)) {
-            break
-          }
-        }
-        result <- state$result
-        if (is.null(result)) {
-          cli_abort("The governed run ended without an AgentResult")
-        }
-        result
-      })()
-    },
-
-    echo_chat_result = function(response, echo) {
-      if (is.null(echo)) {
-        echo <- getOption("ellmer_echo", "none")
-      }
-      if (isTRUE(echo)) {
-        echo <- "output"
-      } else if (isFALSE(echo)) {
-        echo <- "none"
-      } else if (identical(echo, "text")) {
-        echo <- "output"
-      }
-      echo <- match.arg(echo, c("none", "output", "all"))
-      if (!identical(echo, "none") && !is.null(response)) {
-        cli::cli_text("{response}")
-      }
-      invisible(NULL)
-    },
-
-    resolve_promise = function(promise) {
-      if (!promises::is.promising(promise)) {
-        return(promise)
-      }
-      value <- NULL
-      error <- NULL
-      done <- FALSE
-      promise |>
-        promises::then(function(result) {
-          value <<- result
-          done <<- TRUE
-        }) |>
-        promises::catch(function(condition) {
-          error <<- condition
-          done <<- TRUE
-        })
-      while (!done) {
-        run_now(0.1)
-      }
-      if (!is.null(error)) {
-        rlang::cnd_signal(error)
-      }
-      value
-    },
-
-    sync_stream_generator = function(async_stream) {
-      agent <- self
-      coro::generator(function() {
-        repeat {
-          chunk <- agent$.__enclos_env__$private$resolve_promise(
-            async_stream()
-          )
-          if (coro::is_exhausted(chunk)) {
-            break
-          }
-          coro::yield(chunk)
-        }
-      })()
-    },
-
-    event_generator = function(
-      governed_run,
-      include_partial_messages
-    ) {
-      agent <- self
-      async_stream <- governed_run$stream
-      state <- governed_run$state
-      coro::generator(function() {
-        next_event <- 1L
-        exhausted <- FALSE
-        repeat {
-          while (next_event <= length(state$events)) {
-            event <- state$events[[next_event]]
-            next_event <- next_event + 1L
-            if (
-              isTRUE(include_partial_messages) ||
-                !identical(event$type, "text")
-            ) {
-              coro::yield(event)
-            }
-          }
-          if (isTRUE(exhausted)) {
-            break
-          }
-          chunk <- agent$.__enclos_env__$private$resolve_promise(
-            async_stream()
-          )
-          exhausted <- coro::is_exhausted(chunk)
-        }
-      })()
-    },
-
-    request_stream_stop = function(reason) {
-      private$should_stop <- TRUE
-      private$stop_reason_from_hook <- reason
-      controller <- private$current_stream_controller
-      if (!is.null(controller)) {
-        tryCatch(
-          controller$cancel(reason = reason),
-          error = function(e) controller$cancel()
-        )
-      }
-      invisible(reason)
-    },
-
-    finalize_pending_checkpoints = function() {
-      if (is.null(private$.file_checkpoints)) {
-        return(invisible(0L))
-      }
-      private$.file_checkpoints$finalize_pending()
-    },
-
-    # Shared state for one governed callback-driven run.
-    # The stream body and its exit handler communicate through this env so a
-    # consumer can read the terminal reason, usage, and cost after the stream
-    # is exhausted and run-scoped private fields have been cleared.
-    new_callback_run_state = function() {
-      state <- new.env(parent = emptyenv())
-      state$reason <- "complete"
-      state$active_run_id <- NULL
-      state$session_started <- FALSE
-      state$finished <- FALSE
-      state$usage <- NULL
-      state$cost <- NULL
-      state$events <- list()
-      state$response_parts <- character()
-      state$structured_output <- NULL
-      state$started_at <- Sys.time()
-      state$run_context <- list()
-      state$limits <- NULL
-      state$result <- NULL
-      state$turns_before <- 0L
-      state
-    },
-
-    # Assemble the `AgentResult` for a finished `run_async()` run. Honors
-    # `on_exceed = "error"` by signalling the structured limit error when the
-    # run stopped because of the recorded limit.
-    callback_run_result = function(state) {
-      response <- if (length(state$response_parts) > 0L) {
-        paste(state$response_parts, collapse = "")
-      } else if (
-        identical(state$reason, "complete") &&
-          length(private$.chat$get_turns()) > state$turns_before
-      ) {
-        tryCatch(private$get_last_response(), error = function(e) NULL)
-      } else {
-        NULL
-      }
-
-      AgentResult$new(
-        response = response,
-        turns = private$.chat$get_turns(),
-        cost = state$cost %||% self$cost(),
-        events = state$events,
-        duration = as.numeric(Sys.time() - state$started_at, units = "secs"),
-        stop_reason = state$reason %||% "complete",
-        structured_output = state$structured_output,
-        session_id = private$.session_id,
-        run_id = state$active_run_id,
-        agent_id = self$agent_id,
-        agent_name = self$agent_name,
-        parent_agent_id = private$.parent_agent_id,
-        parent_run_id = private$.parent_run_id,
-        delegation_id = private$.delegation_id,
-        run_context = state$run_context,
-        usage = state$usage %||% AgentUsage()
-      )
-    },
-
-    # The single run kernel. Every public run interface is an adapter
-    # over this lazily-started governed stream.
-    callback_run_stream = function(
-      messages,
-      limits,
-      run_context,
-      tool_mode,
-      stream_mode,
-      controller,
-      structured,
-      extraction,
-      stream_type,
-      state
-    ) {
-      agent <- self
-      stream_state <- state
-      effective_run_context <- run_context
-      run_limits <- limits
-
-      coro::async_generator(function() {
-        if (isTRUE(agent$.__enclos_env__$private$run_active)) {
-          cli::cli_abort(
-            "This agent already has an active run",
-            class = c("deputy_run_active", "deputy_error")
-          )
-        }
-
-        compaction <- agent$.__enclos_env__$private$maybe_auto_compact(
-          messages,
-          limits = run_limits,
-          usage = AgentUsage()
-        )
-        compaction_usage <- AgentUsage()
-        if (!is.null(compaction)) {
-          compaction_usage <- compaction$usage
-        }
-
-        on.exit(
-          agent$.__enclos_env__$private$finish_callback_run(stream_state),
-          add = TRUE
-        )
-        initialize_agent_run(
-          agent,
-          stream_state,
-          messages,
-          run_limits,
-          effective_run_context,
-          controller,
-          stream_mode,
-          compaction_usage
-        )
-        active_run_id <- stream_state$active_run_id
-
-        if (agent$.__enclos_env__$private$should_stop) {
-          stream <- coro::async_generator(function() {
-            if (FALSE) coro::yield("unreachable")
-          })()
-        } else {
-          stream <- tryCatch(
-            agent$.__enclos_env__$private$start_async_stream(
-              messages = messages,
-              tool_mode = tool_mode,
-              stream = stream_mode,
-              controller = agent$.__enclos_env__$private$current_stream_controller,
-              structured = structured,
-              stream_type = stream_type
-            ),
-            error = function(error) {
-              promises::promise_reject(error)
-            }
-          )
-        }
-        is_generator <- inherits(stream, "coro_generator_instance")
-
-        repeat {
-          if (agent$.__enclos_env__$private$should_stop) {
-            stream_state$reason <-
-              agent$.__enclos_env__$private$stop_reason_from_hook %||%
-              "interrupted"
-            break
-          }
-
-          stream_error <- NULL
-          chunk <- NULL
-          if (isTRUE(is_generator)) {
-            chunk <- tryCatch(
-              with_run_trace(stream_state, stream()),
-              error = function(error) {
-                stream_error <<- error
-                NULL
-              }
-            )
-          } else {
-            chunk <- stream
-          }
-
-          if (is.null(stream_error) && promises::is.promising(chunk)) {
-            chunk <- tryCatch(
-              coro::await(chunk),
-              error = function(error) {
-                stream_error <<- error
-                NULL
-              }
-            )
-          }
-
-          if (!is.null(stream_error)) {
-            if (agent$.__enclos_env__$private$should_stop) {
-              stream_state$reason <-
-                agent$.__enclos_env__$private$stop_reason_from_hook %||%
-                "interrupted"
-              break
-            }
-            record_model_failure(agent, stream_error)
-            if (try_chat_fallback(agent, stream_error)) {
-              stream <- agent$.__enclos_env__$private$start_async_stream(
-                messages,
-                tool_mode,
-                stream_mode,
-                agent$.__enclos_env__$private$current_stream_controller,
-                structured,
-                stream_type
+      adapt_tool = function(tool) {
+        if (inherits(tool, "ellmer::ToolBuiltIn")) {
+          tool_name <- tryCatch(tool@name, error = function(error) NULL)
+          tool_id <- normalize_native_tool_id(tool_name %||% "")
+          if (!tool_id %in% c("web_search", "web_fetch")) {
+            cli_abort(c(
+              "Unsupported provider-native tool: {.val {tool_name %||% '<unknown>'}}",
+              "x" = paste0(
+                "Deputy cannot interpose on provider-side execution for this ",
+                "tool."
               )
-              is_generator <- inherits(stream, "coro_generator_instance")
-              next
-            }
-            if (agent$.__enclos_env__$private$should_stop) {
-              stream_state$reason <- agent$.__enclos_env__$private$stop_reason_from_hook
-              break
-            }
-            stream_state$reason <- "error"
-            rlang::cnd_signal(stream_error)
-          }
-
-          if (agent$.__enclos_env__$private$should_stop) {
-            stream_state$reason <-
-              agent$.__enclos_env__$private$stop_reason_from_hook %||%
-              "interrupted"
-            break
-          }
-
-          if (coro::is_exhausted(chunk)) {
-            break
-          }
-
-          stream_state$response_seen <- TRUE
-          if (!is.null(structured)) {
-            stream_state$structured_output <- chunk
-          }
-
-          if (inherits(chunk, "ellmer::ContentToolRequest")) {
-            extracted <- agent$.__enclos_env__$private$extract_tool_request_data(
-              chunk
-            )
-            agent$.__enclos_env__$private$record_run_event(
-              agent$.__enclos_env__$private$tool_start_event(extracted)
-            )
-          } else if (inherits(chunk, "ellmer::ContentToolResult")) {
-            stream_state$response_parts <- character()
-          } else if (inherits(chunk, "ellmer::ContentText")) {
-            stream_state$response_parts <- c(
-              stream_state$response_parts,
-              chunk@text
-            )
-            agent$.__enclos_env__$private$record_run_event(
-              AgentEvent(
-                "text",
-                run_id = active_run_id,
-                text = chunk@text,
-                is_complete = FALSE
-              )
-            )
-          } else if (is.character(chunk) && length(chunk) == 1L) {
-            stream_state$response_parts <- c(
-              stream_state$response_parts,
-              chunk
-            )
-            agent$.__enclos_env__$private$record_run_event(
-              AgentEvent(
-                "text",
-                run_id = active_run_id,
-                text = chunk,
-                is_complete = FALSE
-              )
-            )
-          } else if (
-            !inherits(chunk, "ellmer::ContentToolRequest") &&
-              !inherits(chunk, "ellmer::ContentToolResult")
-          ) {
-            agent$.__enclos_env__$private$record_run_event(
-              AgentEvent(
-                "content",
-                run_id = active_run_id,
-                content = chunk,
-                content_type = class(chunk)[[1L]] %||% "unknown"
-              )
-            )
-          }
-
-          coro::yield(chunk)
-          if (!isTRUE(is_generator)) {
-            break
-          }
-        }
-        if (
-          !is.null(extraction) && !agent$.__enclos_env__$private$should_stop
-        ) {
-          extracted_output <- tryCatch(
-            coro::await(governed_structured_request(
-              agent,
-              list(
-                "Extract the requested structured result from the completed task and conversation."
-              ),
-              extraction
-            )),
-            error = function(error) {
-              if (!agent$.__enclos_env__$private$should_stop) {
-                stream_state$reason <- "error"
-                rlang::cnd_signal(error)
-              }
-              NULL
-            }
-          )
-          stream_state$structured_output <- extracted_output
-        }
-      })()
-    },
-
-    # Terminal accounting for a callback-driven run: settles the stop reason,
-    # fires Stop/SessionEnd, records
-    # run-scoped usage and cost on `state`, and releases the active run.
-    finish_callback_run = function(state) {
-      active_run_id <- state$active_run_id
-      if (
-        isTRUE(state$finished) ||
-          is.null(active_run_id) ||
-          !identical(private$current_run_id, active_run_id)
-      ) {
-        return(invisible(NULL))
-      }
-      state$finished <- TRUE
-      on.exit(finish_run_trace(state), add = TRUE)
-      on.exit(remove_request_callbacks(private$.chat), add = TRUE)
-
-      cleanup_error <- NULL
-      tryCatch(
-        {
-          observed_last_turn <- tryCatch(
-            private$.chat$last_turn(),
-            error = function(e) NULL
-          )
-          if (
-            isTRUE(private$should_stop) && identical(state$reason, "complete")
-          ) {
-            state$reason <- private$stop_reason_from_hook %||%
-              "hook_requested_stop"
-          }
-          incomplete_tool_call <-
-            private$current_tool_calls > private$current_tool_results
-          private$finalize_pending_checkpoints()
-          usage <- private$current_run_usage()
-          state$usage <- usage
-          state$cost <- tryCatch(self$cost(), error = function(e) NULL)
-          if (!is.null(state$cost) && is.na(usage$cost_usd)) {
-            state$cost$total <- NA_real_
-            state$cost$complete <- FALSE
-            state$cost$missing <- max(1L, state$cost$missing %||% 0L)
-          }
-          private$last_run_usage <- usage
-          limits <- private$current_usage_limits
-          if (
-            identical(state$reason, "complete") &&
-              isTRUE(incomplete_tool_call)
-          ) {
-            state$reason <- "provider_error"
-            private$notify(
-              "Provider stream ended before a tool result arrived.",
-              level = "warning",
-              code = "provider_error",
-              usage = usage
-            )
-          }
-          if (identical(state$reason, "complete") && !is.null(limits)) {
-            limit_status <- usage_limit_status(usage, limits)
-            if (!is.null(limit_status)) {
-              private$last_limit_status <- limit_status
-              state$reason <- limit_status$reason
-              private$notify(
-                usage_limit_message(limit_status),
-                level = "warning",
-                code = limit_status$reason,
-                usage = usage,
-                limit = limit_status$limit
-              )
-            }
-          }
-          if (
-            is.null(private$last_limit_status) &&
-              !is.null(limits$max_cost_usd) &&
-              is.finite(usage$cost_usd) &&
-              usage$cost_usd >= limits$max_cost_usd * 0.9
-          ) {
-            private$notify(
-              paste0(
-                "Approaching run cost limit: ",
-                format_cost(usage$cost_usd),
-                " / ",
-                format_cost(limits$max_cost_usd)
-              ),
-              level = "warning",
-              code = "cost_limit_warning",
-              usage = usage,
-              max_cost_usd = limits$max_cost_usd
-            )
-            cli::cli_warn(
-              "Approaching run cost limit: {format_cost(usage$cost_usd)} / {format_cost(limits$max_cost_usd)}"
-            )
-          }
-          if (isTRUE(state$session_started)) {
-            private$fire_hook(
-              "Stop",
-              reason = state$reason,
-              context = private$hook_context(
-                cost = self$cost(),
-                usage = usage,
-                run_id = active_run_id
-              )
-            )
-            private$fire_hook(
-              "SessionEnd",
-              reason = state$reason,
-              context = private$hook_context(
-                cost = self$cost(),
-                usage = usage,
-                run_id = active_run_id
-              )
-            )
-          }
-
-          if (length(state$response_parts) > 0L) {
-            private$record_run_event(AgentEvent(
-              "text_complete",
-              run_id = active_run_id,
-              text = paste(state$response_parts, collapse = "")
             ))
           }
-          current_turn_count <- length(private$.chat$get_turns())
-          if (current_turn_count > state$turns_before) {
-            last_turn <- observed_last_turn
-          } else {
-            last_turn <- NULL
-          }
-          if (!is.null(last_turn)) {
-            private$record_run_event(private$agent_event(
-              "turn",
-              turn = last_turn,
-              turn_number = max(1L, usage$requests)
+          if (!isTRUE(self$permissions$web)) {
+            cli_abort(c(
+              "Provider-native web tool {.val {tool_name}} is not authorized.",
+              "i" = "Set {.code web = TRUE} and explicitly allow the tool."
             ))
           }
-          private$record_run_event(private$agent_event(
-            "usage",
-            usage = usage,
-            limits = limits
+          allowlist <- self$permissions$tool_allowlist %||% character()
+          allowlist_ids <- unique(vapply(
+            allowlist,
+            normalize_native_tool_id,
+            character(1)
           ))
-          private$record_run_event(private$agent_event(
-            "stop",
-            reason = state$reason,
-            cost = state$cost,
-            usage = usage,
-            limit = private$last_limit_status
-          ))
-          state$result <- private$callback_run_result(state)
-          private$.last_run_result <- state$result
-
-          limit_status <- private$last_limit_status
-          if (
-            !is.null(limit_status) &&
-              identical(state$limits$on_exceed, "error") &&
-              identical(state$reason, limit_status$reason)
-          ) {
-            private$abort_usage_limit(limit_status)
+          if (!tool_id %in% allowlist_ids) {
+            cli_abort(c(
+              "Provider-native web tool {.val {tool_name}} is not explicitly allowed.",
+              "i" = "Add the tool name to {.arg tool_allowlist}."
+            ))
           }
-        },
-        error = function(error) {
-          cleanup_error <<- error
-        }
-      )
-
-      private$tool_call_limit <- NULL
-      private$tool_call_count <- 0L
-      private$last_tool_cycle_signature <- NULL
-      private$consecutive_tool_cycles <- 0L
-      private$should_stop <- FALSE
-      private$stop_reason_from_hook <- NULL
-      tryCatch(
-        private$finish_active_run(),
-        error = function(error) {
-          if (is.null(cleanup_error)) {
-            cleanup_error <<- error
-          }
-        }
-      )
-      if (!is.null(cleanup_error)) {
-        stop(cleanup_error)
-      }
-      invisible(NULL)
-    },
-
-    finish_active_run = function() {
-      checkpoint_error <- NULL
-      tryCatch(
-        private$finalize_pending_checkpoints(),
-        error = function(error) {
-          checkpoint_error <<- error
-        }
-      )
-      private$current_stream_controller <- NULL
-      private$current_stream_content <- FALSE
-      private$current_usage_limits <- NULL
-      private$current_usage_baseline <- NULL
-      private$current_tool_calls <- 0L
-      private$current_tool_results <- 0L
-      private$current_outer_requests <- 0L
-      private$current_external_usage <- NULL
-      private$current_run_state <- NULL
-      private$pending_events <- list()
-      private$tool_started_at <- list()
-      private$tool_event_overrides <- list()
-      private$tool_call_records <- list()
-      private$pending_delegations <- list()
-      private$original_tool_results <- list()
-      private$last_tool_cycle_signature <- NULL
-      private$consecutive_tool_cycles <- 0L
-      if (!is.null(private$current_run_context)) {
-        private$last_run_context <- clone_run_context(
-          private$current_run_context
-        )
-      }
-      private$current_run_context <- NULL
-      private$run_active <- FALSE
-      if (!is.null(checkpoint_error)) {
-        stop(checkpoint_error)
-      }
-      invisible(NULL)
-    },
-
-    # Track hashes of hook-supplied additional_context chunks already appended
-    # to the system prompt so repeated hook returns don't grow it unboundedly.
-    appended_hook_context_hashes = character(),
-
-    build_session_payload = function() {
-      list(
-        schema_version = 2L,
-        turns = private$.chat$get_turns(),
-        system_prompt = private$.chat$get_system_prompt(),
-        compaction_summary = private$.compaction_summary,
-        tool_result_envelopes = collect_tool_result_envelopes(
-          private$.context_policy,
-          private$.session_id
-        ),
-        run_context = private$snapshot_run_context(),
-        appended_hook_context_hashes = private$appended_hook_context_hashes,
-        file_checkpoint_state = if (is.null(private$.file_checkpoints)) {
-          NULL
-        } else {
-          private$.file_checkpoints$export_state()
-        },
-        metadata = list(
-          saved_at = Sys.time(),
-          deputy_version = as.character(utils::packageVersion("deputy")),
-          provider = self$provider(),
-          session_id = private$.session_id,
-          agent_id = private$.agent_id,
-          agent_name = private$.agent_name
-        )
-      )
-    },
-
-    restore_session_payload = function(session, source = NULL) {
-      if (!is.list(session)) {
-        abort_session_load(
-          "Invalid session file - expected a named list",
-          path = source
-        )
-      }
-
-      if (!"schema_version" %in% names(session)) {
-        abort_session_load(
-          c(
-            "Invalid session file - missing required fields",
-            "x" = "Missing: schema_version"
-          ),
-          path = source
-        )
-      }
-
-      if (!identical(session$schema_version, 2L)) {
-        abort_session_load(
-          "Unsupported session schema - expected version 2",
-          path = source
-        )
-      }
-
-      required_fields <- c(
-        "turns",
-        "system_prompt",
-        "compaction_summary",
-        "tool_result_envelopes",
-        "run_context",
-        "appended_hook_context_hashes",
-        "file_checkpoint_state",
-        "metadata"
-      )
-      missing <- setdiff(required_fields, names(session))
-      if (length(missing) > 0) {
-        abort_session_load(
-          c(
-            "Invalid session file - missing required fields",
-            "x" = "Missing: {.val {missing}}"
-          ),
-          path = source
-        )
-      }
-
-      metadata <- session$metadata
-      if (!is.list(metadata)) {
-        abort_session_load(
-          "Invalid session file - metadata must be a list",
-          path = source
-        )
-      }
-      if (!is.list(session$turns)) {
-        abort_session_load(
-          "Invalid session file - turns must be a list",
-          path = source
-        )
-      }
-      if (
-        !is.null(session$system_prompt) &&
-          (!is.character(session$system_prompt) ||
-            length(session$system_prompt) != 1L ||
-            is.na(session$system_prompt))
-      ) {
-        abort_session_load(
-          "Invalid session file - system_prompt must be one string or NULL",
-          path = source
-        )
-      }
-      if (
-        !is.null(session$compaction_summary) &&
-          (!is.character(session$compaction_summary) ||
-            length(session$compaction_summary) != 1L ||
-            is.na(session$compaction_summary))
-      ) {
-        abort_session_load(
-          "Invalid session file - compaction_summary must be one string or NULL",
-          path = source
-        )
-      }
-
-      restored_tool_results <- tryCatch(
-        validate_tool_result_envelopes(
-          session$tool_result_envelopes,
-          metadata$session_id
-        ),
-        error = function(error) {
-          abort_session_load(
-            c(
-              "Invalid session file - saved tool results failed validation",
-              "x" = error$message
-            ),
-            path = source,
-            parent = error
-          )
-        }
-      )
-
-      restored_run_context <- tryCatch(
-        {
-          saved_context <- normalize_run_context(
-            session$run_context,
-            argument = "session$run_context"
-          )
-          merge_run_context(private$.run_context, saved_context)
-        },
-        deputy_run_context_error = function(error) {
-          abort_session_load(
-            c(
-              "Invalid session file - run_context is unsafe",
-              "x" = error$message
-            ),
-            path = source,
-            parent = error
-          )
-        }
-      )
-
-      restored_hashes <- tryCatch(
-        {
-          as.character(session$appended_hook_context_hashes)
-        },
-        error = function(error) {
-          abort_session_load(
-            c(
-              "Invalid session file - hook context hashes are malformed",
-              "x" = error$message
-            ),
-            path = source,
-            parent = error
-          )
-        }
-      )
-      # Validate recoverable filesystem state before mutating any conversation
-      # state so a rejected cross-root or oversized journal leaves the receiver
-      # unchanged.
-      restored_checkpoints <- NULL
-      if (!is.null(private$.file_checkpoints)) {
-        restored_checkpoints <- private$new_file_checkpoint_store()
-        if (!is.null(session$file_checkpoint_state)) {
-          restored_checkpoints$restore_state(session$file_checkpoint_state)
-        }
-      }
-
-      previous_turns <- private$.chat$get_turns()
-      previous_prompt <- private$.chat$get_system_prompt()
-      previous_tools <- private$.chat$get_tools()
-      previous_reader_registered <- private$.tool_result_reader_registered
-      tool_result_replacement <- NULL
-      tryCatch(
-        {
-          tool_result_replacement <- begin_tool_result_envelope_replacement(
-            restored_tool_results,
-            policy = private$.context_policy,
-            source_session_id = metadata$session_id,
-            target_session_id = private$.session_id
-          )
-          private$.chat$set_turns(session$turns)
-          private$.chat$set_system_prompt(session$system_prompt)
-          if (length(restored_tool_results) > 0L) {
-            private$ensure_tool_result_reader()
-          }
-          commit_tool_result_envelope_replacement(tool_result_replacement)
-        },
-        error = function(error) {
-          try(private$.chat$set_turns(previous_turns), silent = TRUE)
-          try(private$.chat$set_system_prompt(previous_prompt), silent = TRUE)
-          try(private$.chat$set_tools(previous_tools), silent = TRUE)
-          private$.tool_result_reader_registered <- previous_reader_registered
-          if (!is.null(tool_result_replacement)) {
-            try(
-              rollback_tool_result_envelope_replacement(
-                tool_result_replacement
+          if (!is.null(self$permissions$can_use_tool)) {
+            cli_abort(c(
+              "Provider-native tool {.val {tool_name}} cannot use a custom permission callback.",
+              "x" = paste0(
+                "Provider-side requests cannot be checked against request ",
+                "arguments or run context."
               ),
-              silent = TRUE
-            )
-          }
-          abort_session_load(
-            c(
-              "Failed to restore session conversation state",
-              "x" = error$message
-            ),
-            path = source,
-            parent = error
-          )
-        }
-      )
-
-      # Session data is conversational state, not control-plane authority.
-      # Constructor permissions and the workspace root remain immutable even
-      # when the payload came from outside the process. Checkpoint state is
-      # restored only when the receiver explicitly enabled checkpointing;
-      # FileCheckpointStore also requires an exact configured-root match.
-      if (!is.null(restored_checkpoints)) {
-        private$.file_checkpoints <- restored_checkpoints
-      }
-
-      private$.run_context <- restored_run_context
-      private$last_run_context <- clone_run_context(restored_run_context)
-      private$appended_hook_context_hashes <- restored_hashes
-      private$.compaction_summary <- session$compaction_summary
-    },
-
-    notify = function(message, level = "info", code = NULL, ...) {
-      private$fire_hook(
-        "Notification",
-        message = message,
-        context = private$hook_context(
-          level = level,
-          code = code,
-          ...
-        )
-      )
-      invisible(NULL)
-    },
-
-    require_file_checkpoint_store = function() {
-      if (is.null(private$.file_checkpoints)) {
-        file_checkpoint_abort(c(
-          "File checkpointing is not enabled for this agent.",
-          "i" = "Create the agent with {.code enable_file_checkpointing = TRUE}."
-        ))
-      }
-      private$.file_checkpoints
-    },
-
-    new_run_id = function() {
-      new_deputy_id("run_")
-    },
-
-    active_run_id = function() {
-      if (isTRUE(private$run_active)) {
-        private$current_run_id
-      } else {
-        NULL
-      }
-    },
-
-    effective_run_context = function() {
-      clone_run_context(
-        private$current_run_context %||% private$.run_context
-      )
-    },
-
-    snapshot_run_context = function() {
-      clone_run_context(
-        private$current_run_context %||%
-          private$last_run_context %||%
-          private$.run_context
-      )
-    },
-
-    event_correlation = function(delegation_id = NULL) {
-      Filter(
-        Negate(is.null),
-        list(
-          agent_id = private$.agent_id,
-          agent_name = private$.agent_name,
-          session_id = private$.session_id,
-          run_id = private$active_run_id(),
-          parent_agent_id = private$.parent_agent_id,
-          parent_run_id = private$.parent_run_id,
-          delegation_id = delegation_id %||% private$.delegation_id,
-          run_context = private$effective_run_context()
-        )
-      )
-    },
-
-    agent_event = function(type, ..., delegation_id = NULL) {
-      do.call(
-        AgentEvent,
-        c(
-          list(type = type),
-          private$event_correlation(delegation_id = delegation_id),
-          list(...)
-        )
-      )
-    },
-
-    hook_context = function(..., delegation_id = NULL) {
-      context <- utils::modifyList(
-        list(working_dir = self$working_dir),
-        list(...),
-        keep.null = TRUE
-      )
-      correlation <- private$event_correlation(
-        delegation_id = delegation_id
-      )
-      for (field in names(correlation)) {
-        context[[field]] <- correlation[[field]]
-      }
-      context
-    },
-
-    tool_call_record = function(extracted, phase) {
-      phase <- match.arg(phase, c("start", "request", "result", "end"))
-      tool_name <- extracted$tool_name %||% "unknown"
-      tool_name <- as.character(tool_name[[1L]])
-      provider_tool_call_id <- extracted$provider_tool_call_id
-      if (
-        is.null(provider_tool_call_id) ||
-          length(provider_tool_call_id) != 1L ||
-          is.na(provider_tool_call_id) ||
-          !nzchar(as.character(provider_tool_call_id))
-      ) {
-        provider_tool_call_id <- NULL
-      } else {
-        provider_tool_call_id <- as.character(provider_tool_call_id)
-      }
-
-      records <- private$tool_call_records
-      index <- NULL
-      if (!is.null(provider_tool_call_id)) {
-        matches <- which(vapply(
-          records,
-          function(record) {
-            identical(record$provider_tool_call_id, provider_tool_call_id)
-          },
-          logical(1)
-        ))
-        if (length(matches) > 0L) {
-          index <- matches[[1L]]
-        }
-      } else if (length(records) > 0L) {
-        phase_field <- paste0(phase, "_seen")
-        matches <- which(vapply(
-          records,
-          function(record) {
-            is.null(record$provider_tool_call_id) &&
-              identical(record$tool_name, tool_name) &&
-              !isTRUE(record[[phase_field]])
-          },
-          logical(1)
-        ))
-        if (length(matches) > 0L) {
-          index <- matches[[1L]]
-        }
-      }
-
-      if (is.null(index)) {
-        if (is.null(provider_tool_call_id)) {
-          ambiguous <- any(vapply(
-            records,
-            function(record) {
-              is.null(record$provider_tool_call_id) &&
-                identical(record$tool_name, tool_name) &&
-                !isTRUE(record$end_seen)
-            },
-            logical(1)
-          ))
-          if (isTRUE(ambiguous)) {
-            cli_abort(
-              c(
-                "Cannot correlate concurrent tool calls without provider IDs.",
-                "i" = paste0(
-                  "The provider must supply a non-empty tool request ID for ",
-                  "concurrent calls to the same tool."
-                )
-              ),
-              class = c(
-                "deputy_tool_correlation_error",
-                "deputy_error"
+              "i" = paste0(
+                "Remove {.arg can_use_tool} or use Deputy's universal ",
+                "function tool."
               )
-            )
+            ))
           }
-        }
-        index <- length(records) + 1L
-        records[[index]] <- list(
-          tool_call_id = provider_tool_call_id %||%
-            new_deputy_id("tool_"),
-          provider_tool_call_id = provider_tool_call_id,
-          tool_name = tool_name,
-          delegation_id = if (identical(tool_name, "delegate_to_agent")) {
-            new_deputy_id("delegation_")
-          } else {
-            NULL
-          },
-          delegation_queued = FALSE,
-          execution_started = FALSE,
-          start_seen = FALSE,
-          request_seen = FALSE,
-          result_seen = FALSE,
-          end_seen = FALSE
-        )
-      }
-
-      record <- records[[index]]
-      record[[paste0(phase, "_seen")]] <- TRUE
-      records[[index]] <- record
-      private$tool_call_records <- records
-      record$record_index <- index
-      record
-    },
-
-    begin_tool_execution = function(tool_name) {
-      records <- private$tool_call_records
-      matches <- which(vapply(
-        records,
-        function(record) {
-          identical(record$tool_name, tool_name) &&
-            isTRUE(record$request_seen) &&
-            !isTRUE(record$result_seen) &&
-            !isTRUE(record$execution_started)
-        },
-        logical(1)
-      ))
-      if (length(matches) == 0L) {
-        return(NULL)
-      }
-
-      index <- matches[[1L]]
-      records[[index]]$execution_started <- TRUE
-      private$tool_call_records <- records
-      records[[index]]$tool_call_id
-    },
-
-    claim_original_tool_result = function(tool_call_id, fallback) {
-      if (
-        !is_nonempty_string(tool_call_id) ||
-          !tool_call_id %in% names(private$original_tool_results)
-      ) {
-        return(fallback)
-      }
-      value <- private$original_tool_results[[tool_call_id]]
-      private$original_tool_results[[tool_call_id]] <- NULL
-      value
-    },
-
-    queue_delegation = function(record) {
-      if (
-        is.null(record$delegation_id) ||
-          isTRUE(record$delegation_queued)
-      ) {
-        return(invisible(record))
-      }
-      private$pending_delegations <- c(
-        private$pending_delegations,
-        list(list(
-          tool_call_id = record$tool_call_id,
-          delegation_id = record$delegation_id,
-          parent_agent_id = private$.agent_id,
-          parent_run_id = private$active_run_id(),
-          run_context = private$effective_run_context()
-        ))
-      )
-      index <- record$record_index
-      private$tool_call_records[[index]]$delegation_queued <- TRUE
-      record$delegation_queued <- TRUE
-      invisible(record)
-    },
-
-    claim_delegation = function() {
-      if (length(private$pending_delegations) > 0L) {
-        correlation <- private$pending_delegations[[1L]]
-        private$pending_delegations <- private$pending_delegations[-1L]
-        return(correlation)
-      }
-      list(
-        tool_call_id = NULL,
-        delegation_id = new_deputy_id("delegation_"),
-        parent_agent_id = private$.agent_id,
-        parent_run_id = private$active_run_id(),
-        run_context = private$effective_run_context()
-      )
-    },
-
-    current_run_usage = function() {
-      baseline <- private$current_usage_baseline %||% AgentUsage()
-      current <- agent_usage_snapshot(private$.chat)
-      requests <- max(
-        current$requests - baseline$requests,
-        private$current_outer_requests
-      )
-      usage <- agent_usage_difference(
-        current,
-        baseline,
-        tool_calls = private$current_tool_calls,
-        requests = requests
-      )
-      agent_usage_add(
-        usage,
-        private$current_external_usage %||% AgentUsage()
-      )
-    },
-
-    add_external_usage = function(usage) {
-      if (!inherits(usage, "AgentUsage")) {
-        return(invisible(FALSE))
-      }
-      private$current_external_usage <- agent_usage_add(
-        private$current_external_usage %||% AgentUsage(),
-        usage
-      )
-      if (!is.null(private$current_usage_limits)) {
-        limit_status <- usage_limit_status(
-          private$current_run_usage(),
-          private$current_usage_limits,
-          require_followup = TRUE
-        )
-        if (!is.null(limit_status)) {
-          private$mark_usage_limit(limit_status)
-        }
-      }
-      invisible(TRUE)
-    },
-
-    mark_usage_limit = function(status) {
-      if (is.null(status)) {
-        return(invisible(NULL))
-      }
-      if (is.null(private$last_limit_status)) {
-        private$last_limit_status <- status
-      }
-      private$should_stop <- TRUE
-      private$stop_reason_from_hook <- status$reason
-
-      message <- usage_limit_message(status)
-      private$notify(
-        message,
-        level = "warning",
-        code = status$reason,
-        usage = private$current_run_usage(),
-        limit = status$limit
-      )
-
-      private$request_stream_stop(status$reason)
-      invisible(status)
-    },
-
-    abort_usage_limit = function(status) {
-      if (is.null(status)) {
-        return(invisible(NULL))
-      }
-      message <- usage_limit_message(status)
-      if (identical(status$reason, "request_limit")) {
-        abort_request_limit(
-          message,
-          current_requests = status$actual,
-          max_requests = status$limit,
-          run_id = private$current_run_id
-        )
-      }
-      if (identical(status$reason, "cost_unavailable")) {
-        abort_cost_unavailable(
-          message,
-          max_cost = status$limit,
-          run_id = private$current_run_id
-        )
-      }
-      abort_budget_exceeded(
-        message,
-        current_cost = if (identical(status$reason, "cost_limit")) {
-          status$actual
-        } else {
-          NULL
-        },
-        max_cost = if (identical(status$reason, "cost_limit")) {
-          status$limit
-        } else {
-          NULL
-        },
-        budget_type = status$field,
-        actual = status$actual,
-        limit = status$limit,
-        run_id = private$current_run_id
-      )
-    },
-
-    tool_start_event = function(extracted) {
-      record <- private$tool_call_record(extracted, "start")
-      private$tool_started_at[[record$tool_call_id]] <- Sys.time()
-      private$agent_event(
-        "tool_start",
-        delegation_id = record$delegation_id,
-        tool_call_id = record$tool_call_id,
-        tool_name = extracted$tool_name,
-        tool_input = extracted$tool_input
-      )
-    },
-
-    tool_end_event = function(extracted) {
-      record <- private$tool_call_record(extracted, "end")
-      key <- record$tool_call_id
-      started_at <- private$tool_started_at[[key]]
-      duration <- if (is.null(started_at)) {
-        NA_real_
-      } else {
-        as.numeric(difftime(Sys.time(), started_at, units = "secs"))
-      }
-      private$tool_started_at[[key]] <- NULL
-
-      override <- private$tool_event_overrides[[key]]
-      private$tool_event_overrides[[key]] <- NULL
-      suppressed <- isTRUE(override$suppress_output)
-      event_result <- if (suppressed) {
-        NULL
-      } else {
-        override$updated_tool_output %||% extracted$tool_result
-      }
-
-      private$agent_event(
-        "tool_end",
-        delegation_id = record$delegation_id,
-        tool_call_id = record$tool_call_id,
-        tool_name = extracted$tool_name,
-        tool_result = event_result,
-        tool_error = extracted$tool_error,
-        suppressed = suppressed,
-        duration = duration
-      )
-    },
-
-    # Callback for tool requests (permission checking + hooks)
-    handle_tool_request = function(request) {
-      # Validate and extract request data safely
-      extracted <- private$extract_tool_request_data(request)
-      if (!is.null(extracted$tool_identity_error)) {
-        ellmer::tool_reject(extracted$tool_identity_error)
-      }
-      tool_name <- extracted$tool_name
-      tool_input <- extracted$tool_input
-      tool_annotations <- extracted$tool_annotations
-      provider_tool_call_id <- extracted$provider_tool_call_id
-
-      private$current_tool_calls <- private$current_tool_calls + 1L
-      record <- private$tool_call_record(extracted, "request")
-      extracted$tool_call_id <- record$tool_call_id
-      private$tool_call_records[[record$record_index]]$request_signature <-
-        tool_request_signature(tool_name, tool_input)
-      if (!isTRUE(record$start_seen)) {
-        private$record_run_event(private$tool_start_event(extracted))
-      }
-
-      usage <- private$current_run_usage()
-      limits <- private$current_usage_limits %||% self$usage_limits
-      limit_status <- usage_limit_status(
-        usage,
-        limits,
-        require_followup = TRUE
-      )
-      if (!is.null(limit_status)) {
-        private$mark_usage_limit(limit_status)
-        ellmer::tool_reject(usage_limit_message(limit_status))
-      }
-
-      # Retain the adapter-specific counter for callers that configure it
-      # directly. The governed run limit above counts all requests.
-      if (!is.null(private$tool_call_limit)) {
-        private$tool_call_count <- private$tool_call_count + 1L
-        if (private$tool_call_count > private$tool_call_limit) {
-          private$request_stream_stop("tool_call_limit")
-          message <- paste0(
-            "Tool call limit reached. Please provide your final answer with ",
-            "the information gathered so far."
-          )
-          private$notify(
-            message,
-            level = "warning",
-            code = "tool_call_limit"
-          )
-          ellmer::tool_reject(message)
-        }
-      }
-
-      context <- private$hook_context(
-        tool_annotations = tool_annotations,
-        tool_metadata = extracted$tool_metadata,
-        tool_call_id = record$tool_call_id,
-        permission_mode = self$permissions$mode,
-        usage = usage,
-        usage_limits = limits,
-        delegation_id = record$delegation_id
-      )
-
-      # Deputy's session-local result reader is not part of the configured tool
-      # surface. Its private marker exempts only the allowlist gate; ordinary
-      # denylist, callback, mode, and capability checks still apply.
-      permission_context <- context
-      permission_context$.deputy_internal_tool <- extracted$internal_tool
-      perm_result <- self$permissions$check(
-        tool_name,
-        tool_input,
-        permission_context
-      )
-
-      if (inherits(perm_result, "PermissionResultDeny")) {
-        request_result <- private$fire_hook(
-          "PermissionRequest",
-          tool_name = tool_name,
-          tool_input = tool_input,
-          permission_result = perm_result,
-          context = context
-        )
-
-        if (inherits(request_result, "PermissionResultAllow")) {
-          perm_result <- request_result
-        } else if (inherits(request_result, "PermissionResultDeny")) {
-          perm_result <- request_result
-        } else if (
-          inherits(request_result, "HookResultPreToolUse") &&
-            identical(request_result$permission, "allow")
-        ) {
-          perm_result <- PermissionResultAllow()
-        }
-      }
-
-      private$record_run_event(private$agent_event(
-        "permission",
-        tool_call_id = record$tool_call_id,
-        decision = if (inherits(perm_result, "PermissionResultDeny")) {
-          "deny"
-        } else {
-          "allow"
-        }
-      ))
-      if (inherits(perm_result, "PermissionResultDeny")) {
-        if (isTRUE(perm_result$interrupt)) {
-          private$request_stream_stop("permission_denied")
-        }
-        private$notify(
-          perm_result$reason,
-          level = "warning",
-          code = "permission_denied",
-          tool_name = tool_name,
-          tool_input = tool_input
-        )
-        ellmer::tool_reject(perm_result$reason)
-      }
-
-      # Fire PreToolUse hooks
-      hook_result <- private$fire_hook(
-        "PreToolUse",
-        tool_name = tool_name,
-        tool_input = tool_input,
-        context = context
-      )
-
-      # Check hook result
-      if (inherits(hook_result, "HookResultPreToolUse")) {
-        if (!is.null(hook_result$additional_context)) {
-          private$append_hook_context(hook_result$additional_context)
-        }
-        # Check continue field - signal to stop after this tool
-        if (!is.null(hook_result$continue) && !hook_result$continue) {
-          private$request_stream_stop(
-            hook_result$stop_reason %||% "hook_requested_stop"
-          )
-        }
-        if (hook_result$permission == "deny") {
-          private$record_run_event(private$agent_event(
-            "permission",
-            tool_call_id = record$tool_call_id,
-            decision = "deny"
-          ))
-          ellmer::tool_reject(hook_result$reason %||% "Denied by hook")
-        }
-      }
-
-      if (
-        !is.null(private$.file_checkpoints) &&
-          !is_mcp_tool_context(context)
-      ) {
-        captured <- tryCatch(
-          private$.file_checkpoints$before_tool(
+          permission <- self$permissions$check(
             tool_name,
-            tool_input,
-            provider_tool_call_id %||% record$tool_call_id
-          ),
-          deputy_file_checkpoint_error = function(e) {
-            private$notify(
-              conditionMessage(e),
-              level = "warning",
-              code = "file_checkpoint_capture_failed",
-              tool_name = tool_name,
-              tool_call_id = record$tool_call_id
+            list(),
+            list(
+              working_dir = private$.working_dir,
+              tool_annotations = tool@annotations
             )
-            ellmer::tool_reject(conditionMessage(e))
-          }
-        )
-        private$tool_call_records[[
-          record$record_index
-        ]]$file_checkpoint_captured <-
-          isTRUE(captured)
-      }
-
-      # Queue delegated-run correlation only after every gate has allowed the
-      # request. A denied request never invokes the tool closure and therefore
-      # must not leave correlation for a later delegation to claim.
-      private$queue_delegation(record)
-
-      # Allow the tool to proceed
-      invisible(NULL)
-    },
-
-    # Callback for tool results (hooks)
-    handle_tool_result = function(result) {
-      # Validate and extract tool result data safely
-      # ContentToolResult (S7) has: value, error, extra, request
-      # request is ContentToolRequest with: id, name, arguments, tool, extra
-      extracted <- private$extract_tool_result_data(result)
-      private$current_tool_results <- private$current_tool_results + 1L
-      record <- private$tool_call_record(extracted, "result")
-      extracted$tool_call_id <- record$tool_call_id
-      hook_tool_result <- private$claim_original_tool_result(
-        record$tool_call_id,
-        extracted$tool_result
-      )
-
-      # Finalize only captures started by this request. Remote tools never
-      # enter the local journal, even when their names resemble file tools.
-      if (
-        !is.null(private$.file_checkpoints) &&
-          isTRUE(record$file_checkpoint_captured)
-      ) {
-        tryCatch(
-          private$.file_checkpoints$after_tool(
-            extracted$provider_tool_call_id %||% record$tool_call_id,
-            is.null(extracted$tool_error)
-          ),
-          deputy_file_checkpoint_error = function(e) {
-            private$should_stop <- TRUE
-            private$stop_reason_from_hook <- "file_checkpoint_error"
-            private$notify(
-              conditionMessage(e),
-              level = "warning",
-              code = "file_checkpoint_commit_failed",
-              tool_name = extracted$tool_name,
-              tool_call_id = record$tool_call_id
-            )
-            stop(e)
-          }
-        )
-        private$tool_call_records[[
-          record$record_index
-        ]]$file_checkpoint_captured <-
-          FALSE
-      }
-
-      context <- private$hook_context(
-        tool_call_id = record$tool_call_id,
-        permission_mode = self$permissions$mode,
-        usage = private$current_run_usage(),
-        usage_limits = private$current_usage_limits,
-        delegation_id = record$delegation_id
-      )
-
-      # Fire PostToolUse hooks
-      hook_result <- private$fire_hook(
-        "PostToolUse",
-        tool_name = extracted$tool_name,
-        tool_result = hook_tool_result,
-        tool_error = extracted$tool_error,
-        context = context
-      )
-
-      # Check continue field in PostToolUse result
-      if (inherits(hook_result, "HookResultPostToolUse")) {
-        private$tool_event_overrides[[record$tool_call_id]] <- list(
-          suppress_output = hook_result$suppress_output,
-          updated_tool_output = hook_result$updated_tool_output
-        )
-        if (!is.null(hook_result$additional_context)) {
-          private$append_hook_context(hook_result$additional_context)
-        }
-        if (!is.null(hook_result$continue) && !hook_result$continue) {
-          private$should_stop <- TRUE
-          private$stop_reason_from_hook <- hook_result$stop_reason %||%
-            "hook_requested_stop"
-        }
-      }
-
-      if (!is.null(extracted$tool_error)) {
-        private$fire_hook(
-          "PostToolUseFailure",
-          tool_name = extracted$tool_name,
-          tool_result = hook_tool_result,
-          tool_error = extracted$tool_error,
-          context = context
-        )
-      }
-
-      private$record_run_event(private$tool_end_event(extracted))
-
-      record_state <- private$tool_call_records[[record$record_index]]
-      request_signature <- record_state$request_signature
-      cycle_signature <- if (is.null(request_signature)) {
-        NULL
-      } else {
-        tool_cycle_signature(
-          request_signature,
-          hook_tool_result,
-          extracted$tool_error
-        )
-      }
-      if (is.null(cycle_signature)) {
-        private$last_tool_cycle_signature <- NULL
-        private$consecutive_tool_cycles <- 0L
-      } else {
-        loop <- advance_tool_loop(
-          signature = cycle_signature,
-          last_signature = private$last_tool_cycle_signature,
-          consecutive_calls = private$consecutive_tool_cycles
-        )
-        private$last_tool_cycle_signature <- loop$signature
-        private$consecutive_tool_cycles <- loop$consecutive_calls
-        if (isTRUE(loop$stalled) && !isTRUE(private$should_stop)) {
-          message <- paste0(
-            "Tool request `",
-            extracted$tool_name,
-            "` completed with the same result ",
-            loop$consecutive_calls,
-            " times without progress."
           )
-          private$request_stream_stop("tool_loop")
-          private$notify(
-            message,
-            level = "warning",
-            code = "tool_loop",
-            tool_name = extracted$tool_name,
-            repeated = loop$consecutive_calls
-          )
-        }
-      }
-
-      # ellmer may make another provider request after this tool result. Check
-      # the complete context again while the run is between provider turns.
-      if (!isTRUE(private$should_stop)) {
-        private$maybe_auto_compact(messages = list())
-      }
-
-      invisible(NULL)
-    },
-
-    # Safely extract data from an ellmer tool request.
-    extract_tool_request_data = function(request) {
-      # Default values if extraction fails
-      tool_name <- "unknown"
-      tool_input <- list()
-      tool_annotations <- NULL
-      internal_tool <- NULL
-      provider_tool_call_id <- NULL
-      tool_identity_error <- NULL
-
-      # Check if we have a valid request object
-      if (is.null(request)) {
-        cli_warn("Tool request callback received NULL request")
-        return(list(
-          tool_name = tool_name,
-          tool_input = tool_input,
-          tool_annotations = tool_annotations,
-          internal_tool = internal_tool,
-          provider_tool_call_id = provider_tool_call_id,
-          tool_identity_error = tool_request_identity_error(request)
-        ))
-      }
-
-      # Check if it's a ContentToolRequest (S7 class)
-      if (!inherits(request, "ellmer::ContentToolRequest")) {
-        cli_warn(c(
-          "Tool request is not a ContentToolRequest",
-          "i" = "Got class: {.cls {class(request)}}"
-        ))
-
-        return(list(
-          tool_name = tool_name,
-          tool_input = tool_input,
-          tool_annotations = tool_annotations,
-          internal_tool = internal_tool,
-          provider_tool_call_id = provider_tool_call_id,
-          tool_identity_error = tool_request_identity_error(request)
-        ))
-      }
-
-      # Extract from S7 object with error handling
-      # Tool name
-      request_name <- read_tool_request_name(request)
-      tool_name <- request_name$value
-      tool_identity_error <- request_name$error
-
-      # Tool arguments
-      tool_input <- tryCatch(
-        request@arguments %||% list(),
-        error = function(e) {
-          cli_warn("Failed to extract tool arguments from request: {e$message}")
-          list()
-        }
-      )
-
-      provider_tool_call_id <- read_provider_tool_call_id(
-        function() request@id,
-        source = "request",
-        object = request
-      )
-
-      # Resolve annotations from the registered executable. Providers may omit
-      # the tool object or attach a stale copy to the request.
-      registered_tool <- private$.chat$get_tools()[[tool_name]]
-      metadata <- if (is.null(registered_tool)) {
-        NULL
-      } else {
-        tool_metadata(registered_tool)
-      }
-      tool_annotations <- tryCatch(
-        {
-          if (!is.null(registered_tool)) {
-            registered_tool@annotations
-          } else {
-            NULL
+          if (inherits(permission, "PermissionResultDeny")) {
+            cli_abort(c(
+              "Provider-native tool {.val {tool_name}} was denied at registration.",
+              "x" = permission$reason,
+              "i" = paste0(
+                "Provider-native tools are authorized before a request because ",
+                "they execute inside the provider."
+              )
+            ))
           }
-        },
-        error = function(e) {
-          # Annotations are optional, don't warn
-          NULL
+          return(tool)
         }
-      )
-      internal_tool <- tryCatch(
-        {
-          if (is.null(registered_tool)) {
-            NULL
+        runtime_wrap_tool(
+          tool,
+          resolve_arguments = if (
+            identical(tool_metadata(tool)$source$type, "mcp")
+          ) {
+            function(tool_name, arguments) arguments
           } else {
-            attr(registered_tool, "deputy_internal_tool", exact = TRUE)
-          }
-        },
-        error = function(e) NULL
-      )
-
-      list(
-        tool_name = tool_name,
-        tool_input = tool_input,
-        tool_annotations = tool_annotations,
-        tool_metadata = metadata,
-        internal_tool = internal_tool,
-        provider_tool_call_id = provider_tool_call_id,
-        tool_identity_error = tool_identity_error
-      )
-    },
-
-    # Safely extract data from an ellmer tool result.
-    extract_tool_result_data = function(result) {
-      # Default values if extraction fails
-      tool_name <- "unknown"
-      tool_result <- NULL
-      tool_error <- NULL
-      provider_tool_call_id <- NULL
-
-      # Check if we have a valid result object
-      if (is.null(result)) {
-        cli_warn("Tool result callback received NULL result")
-        return(list(
-          tool_name = tool_name,
-          tool_result = tool_result,
-          tool_error = "NULL result received",
-          provider_tool_call_id = provider_tool_call_id
-        ))
-      }
-
-      # Check if it's a ContentToolResult (S7 class)
-      if (!inherits(result, "ellmer::ContentToolResult")) {
-        cli_warn(c(
-          "Tool result is not a ContentToolResult",
-          "i" = "Got class: {.cls {class(result)}}"
-        ))
-
-        return(list(
-          tool_name = tool_name,
-          tool_result = tool_result,
-          tool_error = tool_error,
-          provider_tool_call_id = provider_tool_call_id
-        ))
-      }
-
-      # Extract from S7 object with error handling
-      # Tool name from request
-      tool_name <- tryCatch(
-        {
-          if (!is.null(result@request)) {
-            result@request@name %||% "unknown"
-          } else {
-            "unknown"
-          }
-        },
-        error = function(e) {
-          cli_warn("Failed to extract tool name from result: {e$message}")
-          "unknown"
-        }
-      )
-
-      # Tool result value
-      tool_result <- tryCatch(
-        result@value,
-        error = function(e) {
-          cli_warn("Failed to extract tool result value: {e$message}")
-          NULL
-        }
-      )
-
-      # Tool error
-      tool_error <- tryCatch(
-        result@error,
-        error = function(e) {
-          cli_warn("Failed to extract tool error: {e$message}")
-          NULL
-        }
-      )
-
-      provider_tool_call_id <- read_provider_tool_call_id(
-        function() {
-          if (!is.null(result@request)) {
-            result@request@id
-          } else {
-            NULL
-          }
-        },
-        source = "result",
-        object = result
-      )
-
-      list(
-        tool_name = tool_name,
-        tool_result = tool_result,
-        tool_error = tool_error,
-        provider_tool_call_id = provider_tool_call_id
-      )
-    },
-
-    append_hook_context = function(additional_context) {
-      if (is.null(additional_context)) {
-        return(invisible(NULL))
-      }
-
-      context_text <- paste(as.character(additional_context), collapse = "\n")
-      if (!nzchar(trimws(context_text))) {
-        return(invisible(NULL))
-      }
-
-      # De-duplicate by content hash. A hook that fires on every tool call
-      # with the same context would otherwise grow the system prompt without
-      # bound and inflate every subsequent persisted session payload.
-      chunk_hash <- digest::digest(context_text, algo = "sha1")
-      if (chunk_hash %in% private$appended_hook_context_hashes) {
-        return(invisible(NULL))
-      }
-      private$appended_hook_context_hashes <- c(
-        private$appended_hook_context_hashes,
-        chunk_hash
-      )
-
-      current_prompt <- private$.chat$get_system_prompt() %||% ""
-      private$.chat$set_system_prompt(paste(
-        current_prompt,
-        "",
-        "# Hook Additional Context",
-        context_text,
-        sep = "\n"
-      ))
-
-      invisible(NULL)
-    },
-
-    # Create a true coro generator for streaming events
-
-    get_last_response = function() {
-      last <- private$.chat$last_turn()
-      if (is.null(last)) {
-        return(NULL)
-      }
-      last@text
-    },
-
-    compaction_prompt_parts = function(prompt) {
-      if (
-        !is.character(prompt) ||
-          length(prompt) != 1L ||
-          is.na(prompt)
-      ) {
-        return(NULL)
-      }
-      start_pattern <- paste0(
-        "\\n\\n<!-- deputy-compaction-summary:v1 chars=([0-9]+) ",
-        "sha256=([a-f0-9]{64}) -->\\n",
-        "## Previous Conversation Summary\\n"
-      )
-      start <- regexec(start_pattern, prompt, perl = TRUE)[[1L]]
-      captured <- regmatches(prompt, list(start))[[1L]]
-      if (length(captured) != 3L) {
-        return(NULL)
-      }
-      summary_chars <- suppressWarnings(as.numeric(captured[[2L]]))
-      if (
-        length(summary_chars) != 1L ||
-          is.na(summary_chars) ||
-          !is.finite(summary_chars) ||
-          summary_chars < 0 ||
-          summary_chars != floor(summary_chars)
-      ) {
-        return(NULL)
-      }
-
-      summary_start <- start[[1L]] + attr(start, "match.length")[[1L]]
-      summary_end <- summary_start + summary_chars - 1
-      summary <- if (summary_chars == 0) {
-        ""
-      } else {
-        substr(prompt, summary_start, summary_end)
-      }
-      if (
-        !identical(
-          digest::digest(summary, algo = "sha256", serialize = FALSE),
-          captured[[3L]]
-        )
-      ) {
-        return(NULL)
-      }
-
-      end_marker <- paste0(
-        "\n\n## End Previous Conversation Summary\n",
-        "<!-- deputy-compaction-summary:v1:end -->"
-      )
-      end_start <- summary_start + summary_chars
-      end_end <- end_start + nchar(end_marker, type = "chars") - 1
-      if (!identical(substr(prompt, end_start, end_end), end_marker)) {
-        return(NULL)
-      }
-
-      before <- substr(prompt, 1L, start[[1L]] - 1L)
-      after_start <- end_end + 1
-      after <- if (after_start > nchar(prompt)) {
-        ""
-      } else {
-        substr(prompt, after_start, nchar(prompt))
-      }
-      list(before = before, summary = summary, after = after)
-    },
-
-    compaction_prompt_block = function(summary) {
-      paste0(
-        "\n\n<!-- deputy-compaction-summary:v1 chars=",
-        nchar(summary, type = "chars"),
-        " sha256=",
-        digest::digest(summary, algo = "sha256", serialize = FALSE),
-        " -->\n## Previous Conversation Summary\n",
-        summary,
-        "\n\n## End Previous Conversation Summary\n",
-        "<!-- deputy-compaction-summary:v1:end -->"
-      )
-    },
-
-    system_prompt_without_compaction = function() {
-      prompt <- private$.chat$get_system_prompt() %||% ""
-      if (is.null(private$.compaction_summary)) {
-        return(prompt)
-      }
-      parts <- private$compaction_prompt_parts(prompt)
-      if (
-        is.null(parts) ||
-          !identical(parts$summary, private$.compaction_summary)
-      ) {
-        return(prompt)
-      }
-      paste0(parts$before, parts$after)
-    },
-
-    context_token_count = function(messages, turns = NULL) {
-      chat <- private$.chat
-      if (!is.null(turns)) {
-        chat <- tryCatch(clone_governed_chat(chat), error = function(e) NULL)
-        if (is.null(chat) || identical(chat, private$.chat)) {
-          return(NULL)
-        }
-        turns_set <- tryCatch(
-          {
-            chat$set_turns(turns)
-            TRUE
+            private$resolve_tool_arguments
           },
-          error = function(e) FALSE
+          process_result = private$offload_tool_result,
+          begin_execution = private$begin_tool_execution,
+          execute = private$execute_tool
         )
-        if (!isTRUE(turns_set)) {
-          return(NULL)
-        }
-      }
+      },
 
-      count <- tryCatch(
+      execute_tool = function(tool, arguments) {
+        workspace_runner <- attr(
+          tool,
+          "deputy_workspace_runner",
+          exact = TRUE
+        )
+        if (is.function(workspace_runner)) {
+          return(workspace_runner(arguments, private$.working_dir))
+        }
+        do.call(tool, arguments)
+      },
+
+      offload_tool_result = function(tool_name, value, execution_id = NULL) {
+        if (identical(tool_name, "deputy_read_tool_result")) {
+          return(value)
+        }
+        record <- offload_tool_result(
+          value = value,
+          tool_name = tool_name,
+          policy = private$.context_policy,
+          session_id = private$.session_id,
+          agent_id = private$.agent_id
+        )
+        if (is.null(record)) {
+          return(value)
+        }
+        private$ensure_tool_result_reader()
+        private$notify(
+          paste0("Offloaded large result from ", tool_name, "."),
+          level = "info",
+          code = "tool_result_offloaded",
+          tool_name = tool_name,
+          result_reference = record$uri,
+          result_bytes = record$bytes,
+          result_sha256 = record$sha256
+        )
+        if (is_nonempty_string(execution_id)) {
+          private$original_tool_results[[execution_id]] <- value
+        }
+        tool_result_reference_text(record)
+      },
+
+      ensure_tool_result_reader = function() {
+        if (isTRUE(private$.tool_result_reader_registered)) {
+          return(invisible(NULL))
+        }
+        private$.chat$register_tool(
+          private$adapt_tool(tool_result_reader_tool(
+            private$read_tool_result_chunk
+          ))
+        )
+        private$.tool_result_reader_registered <- TRUE
+        invisible(NULL)
+      },
+
+      read_tool_result_chunk = function(reference, offset, max_chars) {
+        read_tool_result_chunk(
+          reference = reference,
+          offset = offset,
+          max_chars = max_chars,
+          policy = private$.context_policy,
+          session_id = private$.session_id
+        )
+      },
+
+      fire_hook = function(event, tool_name = NULL, ...) {
+        if (length(self$hooks$get_hooks(event, tool_name))) {
+          on.exit(
+            private$record_run_event(private$agent_event("hook", hook = event)),
+            add = TRUE
+          )
+        }
+        self$hooks$fire(event, tool_name = tool_name, ...)
+      },
+
+      record_run_event = function(event) {
+        state <- private$current_run_state
+        if (!is.null(state)) {
+          state$events[[length(state$events) + 1L]] <- event
+          trace_governance_event(state$trace_span, event)
+        }
+        invisible(event)
+      },
+
+      # Track hashes of hook-supplied additional_context chunks already appended
+      # to the system prompt so repeated hook returns don't grow it unboundedly.
+      appended_hook_context_hashes = character(),
+
+      notify = function(message, level = "info", code = NULL, ...) {
+        private$fire_hook(
+          "Notification",
+          message = message,
+          context = private$hook_context(
+            level = level,
+            code = code,
+            ...
+          )
+        )
+        invisible(NULL)
+      },
+
+      require_file_checkpoint_store = function() {
+        if (is.null(private$.file_checkpoints)) {
+          file_checkpoint_abort(c(
+            "File checkpointing is not enabled for this agent.",
+            "i" = "Create the agent with {.code enable_file_checkpointing = TRUE}."
+          ))
+        }
+        private$.file_checkpoints
+      },
+
+      new_run_id = function() {
+        new_deputy_id("run_")
+      },
+
+      active_run_id = function() {
+        if (isTRUE(private$run_active)) {
+          private$current_run_id
+        } else {
+          NULL
+        }
+      },
+
+      effective_run_context = function() {
+        clone_run_context(
+          private$current_run_context %||% private$.run_context
+        )
+      },
+
+      snapshot_run_context = function() {
+        clone_run_context(
+          private$current_run_context %||%
+            private$last_run_context %||%
+            private$.run_context
+        )
+      },
+
+      event_correlation = function(delegation_id = NULL) {
+        Filter(
+          Negate(is.null),
+          list(
+            agent_id = private$.agent_id,
+            agent_name = private$.agent_name,
+            session_id = private$.session_id,
+            run_id = private$active_run_id(),
+            parent_agent_id = private$.parent_agent_id,
+            parent_run_id = private$.parent_run_id,
+            delegation_id = delegation_id %||% private$.delegation_id,
+            run_context = private$effective_run_context()
+          )
+        )
+      },
+
+      agent_event = function(type, ..., delegation_id = NULL) {
         do.call(
-          chat$token_count,
-          c(messages, list(include = "complete"))
-        ),
-        error = function(e) NULL
-      )
-      if (!is.numeric(count) || length(count) == 0L || anyNA(count)) {
-        return(NULL)
-      }
-      as.numeric(sum(count))
-    },
-
-    is_human_turn = function(turn) {
-      if (!inherits(turn, "ellmer::UserTurn")) {
-        return(FALSE)
-      }
-      contents <- tryCatch(turn@contents, error = function(e) list())
-      !any(vapply(
-        contents,
-        inherits,
-        logical(1),
-        what = "ellmer::ContentToolResult"
-      ))
-    },
-
-    has_tool_request = function(turn) {
-      if (!inherits(turn, "ellmer::AssistantTurn")) {
-        return(FALSE)
-      }
-      contents <- tryCatch(turn@contents, error = function(e) list())
-      any(vapply(
-        contents,
-        inherits,
-        logical(1),
-        what = "ellmer::ContentToolRequest"
-      ))
-    },
-
-    compaction_keep_last = function(messages, target_tokens) {
-      turns <- private$.chat$get_turns()
-      if (length(turns) == 0L) {
-        return(0L)
-      }
-
-      starts <- which(vapply(turns, private$is_human_turn, logical(1)))
-      minimum_keep <- 0L
-      if (
-        isTRUE(private$run_active) &&
-          private$has_tool_request(tail(turns, 1L)[[1L]])
-      ) {
-        recent_human <- tail(starts, 1L)
-        minimum_keep <- if (length(recent_human) == 0L) {
-          1L
-        } else {
-          length(turns) - recent_human + 1L
-        }
-      }
-      candidates <- unique(c(starts, length(turns) + 1L))
-      for (start in candidates) {
-        kept <- if (start > length(turns)) {
-          list()
-        } else {
-          turns[start:length(turns)]
-        }
-        if (length(kept) < minimum_keep) {
-          next
-        }
-        count <- private$context_token_count(messages, turns = kept)
-        if (!is.null(count) && count <= target_tokens) {
-          return(as.integer(length(kept)))
-        }
-      }
-
-      # A conservative fallback for providers that cannot estimate cloned
-      # contexts. Keep a complete recent user/assistant exchange when possible.
-      recent <- tail(starts, 1L)
-      if (length(recent) == 0L) {
-        return(as.integer(minimum_keep))
-      }
-      as.integer(max(minimum_keep, length(turns) - recent + 1L))
-    },
-
-    maybe_auto_compact = function(messages, limits = NULL, usage = NULL) {
-      policy <- private$.context_policy
-      if (is.null(policy$max_tokens)) {
-        return(NULL)
-      }
-      turns <- private$.chat$get_turns()
-      if (length(turns) == 0L) {
-        return(NULL)
-      }
-
-      if (is.null(limits) && isTRUE(private$run_active)) {
-        limits <- private$current_usage_limits
-      }
-      if (!is.null(limits)) {
-        if (is.null(usage)) {
-          usage <- if (isTRUE(private$run_active)) {
-            private$current_run_usage()
-          } else {
-            AgentUsage()
-          }
-        }
-        limit_status <- usage_limit_status(
-          usage,
-          limits,
-          require_followup = TRUE
+          AgentEvent,
+          c(
+            list(type = type),
+            private$event_correlation(delegation_id = delegation_id),
+            list(...)
+          )
         )
-        if (!is.null(limit_status)) {
-          if (isTRUE(private$run_active)) {
+      },
+
+      hook_context = function(..., delegation_id = NULL) {
+        context <- utils::modifyList(
+          list(working_dir = self$working_dir),
+          list(...),
+          keep.null = TRUE
+        )
+        correlation <- private$event_correlation(
+          delegation_id = delegation_id
+        )
+        for (field in names(correlation)) {
+          context[[field]] <- correlation[[field]]
+        }
+        context
+      },
+
+      current_run_usage = function() {
+        baseline <- private$current_usage_baseline %||% AgentUsage()
+        current <- agent_usage_snapshot(private$.chat)
+        requests <- max(
+          current$requests - baseline$requests,
+          private$current_outer_requests
+        )
+        usage <- agent_usage_difference(
+          current,
+          baseline,
+          tool_calls = private$current_tool_calls,
+          requests = requests
+        )
+        agent_usage_add(
+          usage,
+          private$current_external_usage %||% AgentUsage()
+        )
+      },
+
+      add_external_usage = function(usage) {
+        if (!inherits(usage, "AgentUsage")) {
+          return(invisible(FALSE))
+        }
+        private$current_external_usage <- agent_usage_add(
+          private$current_external_usage %||% AgentUsage(),
+          usage
+        )
+        if (!is.null(private$current_usage_limits)) {
+          limit_status <- usage_limit_status(
+            private$current_run_usage(),
+            private$current_usage_limits,
+            require_followup = TRUE
+          )
+          if (!is.null(limit_status)) {
             private$mark_usage_limit(limit_status)
           }
+        }
+        invisible(TRUE)
+      },
+
+      mark_usage_limit = function(status) {
+        if (is.null(status)) {
+          return(invisible(NULL))
+        }
+        if (is.null(private$last_limit_status)) {
+          private$last_limit_status <- status
+        }
+        private$should_stop <- TRUE
+        private$stop_reason_from_hook <- status$reason
+
+        message <- usage_limit_message(status)
+        private$notify(
+          message,
+          level = "warning",
+          code = status$reason,
+          usage = private$current_run_usage(),
+          limit = status$limit
+        )
+
+        private$request_stream_stop(status$reason)
+        invisible(status)
+      },
+
+      abort_usage_limit = function(status) {
+        if (is.null(status)) {
+          return(invisible(NULL))
+        }
+        message <- usage_limit_message(status)
+        if (identical(status$reason, "request_limit")) {
+          abort_request_limit(
+            message,
+            current_requests = status$actual,
+            max_requests = status$limit,
+            run_id = private$current_run_id
+          )
+        }
+        if (identical(status$reason, "cost_unavailable")) {
+          abort_cost_unavailable(
+            message,
+            max_cost = status$limit,
+            run_id = private$current_run_id
+          )
+        }
+        abort_budget_exceeded(
+          message,
+          current_cost = if (identical(status$reason, "cost_limit")) {
+            status$actual
+          } else {
+            NULL
+          },
+          max_cost = if (identical(status$reason, "cost_limit")) {
+            status$limit
+          } else {
+            NULL
+          },
+          budget_type = status$field,
+          actual = status$actual,
+          limit = status$limit,
+          run_id = private$current_run_id
+        )
+      },
+
+      append_hook_context = function(additional_context) {
+        if (is.null(additional_context)) {
+          return(invisible(NULL))
+        }
+
+        context_text <- paste(as.character(additional_context), collapse = "\n")
+        if (!nzchar(trimws(context_text))) {
+          return(invisible(NULL))
+        }
+
+        # De-duplicate by content hash. A hook that fires on every tool call
+        # with the same context would otherwise grow the system prompt without
+        # bound and inflate every subsequent persisted session payload.
+        chunk_hash <- digest::digest(context_text, algo = "sha1")
+        if (chunk_hash %in% private$appended_hook_context_hashes) {
+          return(invisible(NULL))
+        }
+        private$appended_hook_context_hashes <- c(
+          private$appended_hook_context_hashes,
+          chunk_hash
+        )
+
+        current_prompt <- private$.chat$get_system_prompt() %||% ""
+        private$.chat$set_system_prompt(paste(
+          current_prompt,
+          "",
+          "# Hook Additional Context",
+          context_text,
+          sep = "\n"
+        ))
+
+        invisible(NULL)
+      },
+
+      # Create a true coro generator for streaming events
+
+      get_last_response = function() {
+        last <- private$.chat$last_turn()
+        if (is.null(last)) {
           return(NULL)
         }
-      }
+        last@text
+      },
 
-      estimated <- private$context_token_count(messages)
-      if (is.null(estimated) || estimated <= policy$max_tokens) {
-        return(NULL)
-      }
+      # Storage for loaded skills
+      loaded_skills = list(),
 
-      keep_last <- private$compaction_keep_last(
-        messages = messages,
-        target_tokens = floor(policy$max_tokens * policy$compact_to)
-      )
-      result <- self$compact(
-        keep_last = keep_last,
-        fallback = policy$fallback,
-        automatic = TRUE,
-        estimated_tokens = estimated
-      )
-      if (isTRUE(private$run_active)) {
-        private$add_external_usage(result$usage)
-      }
-      result
-    },
+      # Storage for loaded MCP tool names
+      loaded_mcp_tools = character(),
+      loaded_mcp_status = list(),
 
-    # Generate a summary of turns using the LLM
-    generate_compaction_summary = function(turns, fallback = "error") {
-      fallback <- match.arg(fallback, c("error", "text"))
-      # Format turns for compaction
-      turn_texts <- vapply(
-        turns,
-        function(turn) {
-          role <- if (inherits(turn, "ellmer::UserTurn")) {
-            "User"
-          } else if (inherits(turn, "ellmer::AssistantTurn")) {
-            "Assistant"
-          } else {
-            cli_warn(c(
-              "Unknown turn type in compaction summary",
-              "i" = "Got class: {.cls {class(turn)}}",
-              "i" = "Defaulting to 'Unknown'"
-            ))
-            "Unknown"
-          }
-          text <- turn@text %||% "[no text]"
+      # Tool call counter for callback-based limits
+      tool_call_count = 0L,
 
-          # Include tool information if present
-          tool_info <- ""
-          if (inherits(turn, "ellmer::AssistantTurn")) {
-            contents <- turn@contents %||% list()
-            tool_requests <- Filter(
-              function(c) inherits(c, "ellmer::ContentToolRequest"),
-              contents
-            )
-            if (length(tool_requests) > 0) {
-              tool_names <- vapply(
-                tool_requests,
-                function(tool) tool@name %||% "unknown",
-                character(1)
-              )
-              tool_info <- paste0(
-                " [Tools: ",
-                paste(tool_names, collapse = ", "),
-                "]"
-              )
-            }
-          }
-
-          paste0(role, tool_info, ": ", text)
-        },
-        character(1)
-      )
-
-      conversation_text <- paste(turn_texts, collapse = "\n\n")
-      prior_summary <- private$.compaction_summary
-      prior_summary_text <- if (is.null(prior_summary)) {
-        ""
-      } else {
-        paste0(
-          "Existing summary from earlier compactions:\n",
-          prior_summary,
-          "\n\n"
-        )
-      }
-
-      # Create the compaction prompt
-      compaction_prompt <- paste0(
-        "Summarize the following conversation excerpt concisely. ",
-        "Focus on:\n",
-        "1. Key decisions made\n",
-        "2. Important findings or results\n",
-        "3. Files created, modified, or discussed\n",
-        "4. Any errors encountered and how they were resolved\n",
-        "5. Current state/progress of the task\n\n",
-        "Keep the summary under 500 words. Be factual and specific.\n\n",
-        prior_summary_text,
-        "Conversation excerpt to merge into the summary:\n",
-        "---\n",
-        conversation_text,
-        "\n---\n\n",
-        "Summary:"
-      )
-
-      temp_chat <- tryCatch(
-        clone_compaction_chat(private$.chat),
-        error = function(e) e
-      )
-      response <- if (inherits(temp_chat, "error")) {
-        temp_chat
-      } else {
-        tryCatch(
-          temp_chat$chat(compaction_prompt, echo = "none"),
-          error = function(e) e
-        )
-      }
-
-      if (!inherits(response, "error")) {
-        return(list(
-          summary = response,
-          method = "llm",
-          usage = agent_usage_snapshot(temp_chat)
-        ))
-      }
-
-      if (identical(fallback, "error")) {
-        cli_abort(
-          c(
-            "Conversation compaction failed.",
-            "x" = response$message,
-            "i" = "Set ContextPolicy(fallback = 'text') to permit degraded compaction."
-          ),
-          class = c("deputy_compaction_error", "deputy_error"),
-          parent = response
-        )
-      }
-
-      private$notify(
-        "Compaction used the configured deterministic text fallback.",
-        level = "warning",
-        code = "compact_fallback",
-        error = response$message
-      )
-      list(
-        summary = private$generate_fallback_summary(turns),
-        method = "text",
-        usage = AgentUsage()
-      )
-    },
-
-    # Fallback summary when LLM is unavailable
-    generate_fallback_summary = function(turns) {
-      summary_parts <- vapply(
-        turns,
-        function(turn) {
-          role <- if (inherits(turn, "ellmer::UserTurn")) {
-            "User"
-          } else if (inherits(turn, "ellmer::AssistantTurn")) {
-            "Assistant"
-          } else {
-            cli_warn(c(
-              "Unknown turn type in fallback summary",
-              "i" = "Got class: {.cls {class(turn)}}",
-              "i" = "Defaulting to 'Unknown'"
-            ))
-            "Unknown"
-          }
-          text <- turn@text %||% "[no text]"
-          if (nchar(text) > 200) {
-            text <- paste0(substr(text, 1, 197), "...")
-          }
-          paste0(role, ": ", text)
-        },
-        character(1)
-      )
-
-      excerpt_summary <- paste0(
-        "[Compacted ",
-        length(turns),
-        " earlier turns - LLM summary unavailable]\n\n",
-        paste(summary_parts, collapse = "\n\n")
-      )
-      if (is.null(private$.compaction_summary)) {
-        return(excerpt_summary)
-      }
-      paste0(
-        "[Prior compacted conversation]\n",
-        private$.compaction_summary,
-        "\n\n",
-        excerpt_summary
-      )
-    },
-
-    # Storage for loaded skills
-    loaded_skills = list(),
-
-    # Storage for loaded MCP tool names
-    loaded_mcp_tools = character(),
-    loaded_mcp_status = list(),
-
-    # Tool call counter for callback-based limits
-    tool_call_count = 0L,
-
-    # Active tool call limit; NULL means unbounded.
-    tool_call_limit = NULL
+      # Active tool call limit; NULL means unbounded.
+      tool_call_limit = NULL
+    ),
+    deputy_agent_stream_methods(),
+    deputy_agent_session_methods(),
+    deputy_agent_context_methods(),
+    deputy_agent_tool_callbacks_methods(),
+    deputy_agent_tool_records_methods()
   )
 )

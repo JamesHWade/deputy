@@ -23,7 +23,9 @@ Key capabilities:
 ```
 deputy/
 ├── R/                      # Source code (R6 classes and functions)
-│   ├── agent.R             # Agent class - main agentic workflow engine
+│   ├── agent.R             # Public Agent API and runtime wiring
+│   ├── agent-stream.R      # Shared governed stream and finalization
+│   ├── agent-requests.R    # Public ellmer callbacks and explicit fallback
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
@@ -34,7 +36,9 @@ deputy/
 │   ├── permissions.R       # Permission system and tool annotations
 │   ├── hooks.R             # HookRegistry for lifecycle events
 │   ├── skills.R            # Skill loading system
-│   ├── tools-builtin.R     # Built-in tools (read_file, write_file, etc.)
+│   ├── tools-files.R       # Native filesystem tools
+│   ├── tools-documents.R   # Document conversion
+│   ├── tools-execution.R   # Trusted one-shot R and shell tools
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
 │   ├── tools-mcp.R         # MCP discovery and sandboxed mcp-repl boundary
@@ -343,7 +347,7 @@ the AgentDefinition supplies the child's executable registry.
 | `R/agent.R` | Main Agent class with run/run_sync/run_shiny |
 | `R/permissions.R` | Permission system and tool annotations |
 | `R/hooks.R` | HookRegistry and event system |
-| `R/tools-builtin.R` | Built-in tools implementation |
+| `R/tools-files.R`, `R/tools-documents.R`, `R/tools-execution.R` | Built-in tools by capability |
 | `exec/deputy.R` | CLI application using Rapp |
 | `tests/testthat/helper-mocks.R` | Mock objects for testing |
 
@@ -564,3 +568,6 @@ notice has no token permissions, checkout, or secrets. Keep this workflow on
 `pull_request`; do not use a privileged fork checkout to bypass authentication
 restrictions. This policy applies to automatic review, not the separate
 mention-triggered Claude workflow.
+
+See `dev/runtime-modules.md` for internal module boundaries and the documented
+size exception for the public Agent facade.
