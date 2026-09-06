@@ -70,8 +70,8 @@ may leave a partial response. Inspect the work behind the answer with:
 
 ``` r
 result$usage
-result$tool_calls()
-result$tool_results()
+result_tool_calls(result)
+result_tool_results(result)
 ```
 
 The [getting-started

@@ -35,7 +35,7 @@ test_that("absent MCP metadata is safe in permission contexts", {
   )) {
     expect_false(is_mcp_tool_context(context))
     expect_s3_class(
-      permissions_standard()$check("read_file", list(), context),
+      permissions_check(permissions_standard(), "read_file", list(), context),
       "PermissionResultAllow"
     )
   }
@@ -84,7 +84,7 @@ test_that("MCP names do not acquire native capability restrictions", {
     tool_annotations = list(read_only_hint = TRUE, open_world_hint = FALSE)
   )
   for (mode in c("standard", "readonly", "plan")) {
-    permissions <- Permissions$new(
+    permissions <- Permissions(
       mode = mode,
       file_read = FALSE,
       file_write = FALSE,
@@ -92,31 +92,31 @@ test_that("MCP names do not acquire native capability restrictions", {
     )
     for (name in names) {
       expect_s3_class(
-        permissions$check(name, list(), context),
+        permissions_check(permissions, name, list(), context),
         "PermissionResultAllow"
       )
       native <- context
       native$tool_metadata <- NULL
       expect_s3_class(
-        permissions$check(name, list(), native),
+        permissions_check(permissions, name, list(), native),
         "PermissionResultDeny"
       )
       external <- context
       external$tool_annotations$open_world_hint <- TRUE
       expect_s3_class(
-        permissions$check(name, list(), external),
+        permissions_check(permissions, name, list(), external),
         "PermissionResultDeny"
       )
       destructive <- context
       destructive$tool_annotations$destructive_hint <- TRUE
       expect_s3_class(
-        permissions$check(name, list(), destructive),
+        permissions_check(permissions, name, list(), destructive),
         "PermissionResultDeny"
       )
       unannotated <- context
       unannotated$tool_annotations <- NULL
       expect_s3_class(
-        permissions$check(name, list(), unannotated),
+        permissions_check(permissions, name, list(), unannotated),
         "PermissionResultDeny"
       )
     }
@@ -198,7 +198,12 @@ test_that("released MCP transport preserves origin, annotations and connection i
       decisions <- vapply(
         names(tools),
         function(name) {
-          agent$permissions$check(name, list(), context(name))$decision
+          permissions_check(
+            agent$permissions,
+            name,
+            list(),
+            context(name)
+          )$decision
         },
         character(1)
       )
@@ -222,7 +227,7 @@ test_that("released MCP transport preserves origin, annotations and connection i
       plan_agent <- Agent$new(
         chat = plan_chat$chat,
         tools = tools,
-        permissions = Permissions$new(
+        permissions = Permissions(
           mode = "plan",
           file_read = FALSE,
           file_write = FALSE,
@@ -271,7 +276,7 @@ test_that("released MCP transport preserves origin, annotations and connection i
             chat = parent_chat,
             sub_agents = list(loaded),
             tools = list(tools$inspect_evidence),
-            permissions = Permissions$new(web = FALSE, file_write = FALSE)
+            permissions = Permissions(web = FALSE, file_write = FALSE)
           )
           child <- lead$.__enclos_env__$private$create_sub_agent(loaded)
           child$add_hook(HookMatcher(
@@ -436,7 +441,7 @@ test_that("released MCP transport preserves origin, annotations and connection i
           writer <- Agent$new(
             chat = writer_chat$chat,
             tools = remote_writer,
-            permissions = Permissions$new(file_write = TRUE),
+            permissions = Permissions(file_write = TRUE),
             enable_file_checkpointing = TRUE,
             working_dir = root
           )

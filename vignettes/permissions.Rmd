@@ -48,12 +48,34 @@ agent <- Agent$new(
 )
 ```
 
+## S7 policy values
+
+`Permissions(...)` creates a read-only S7 policy; presets return the same class.
+Use `permissions_check(policy, tool_name, tool_input, context)` to inspect a
+permission decision. Read fields with `S7::prop(policy, "mode")` or `policy$mode`.
+Constructor flags must each be `TRUE` or `FALSE`, and a custom callback must be
+a function. An empty tool allowlist denies all tools, while `NULL` disables that
+gate.
+
+```{r}
+policy <- Permissions(file_write = FALSE)
+permissions_check(policy, "write_file", list(path = "output.txt"))
+S7::prop(policy, "file_write")
+```
+
+Create a new Agent to explicitly adopt broader authority. An existing Agent's
+`set_permission_mode()` can only preserve or narrow its current policy; its
+policy cannot be replaced. Serializing a policy retains configuration for the
+caller to inspect, including its canonical directory grant. It does not grant
+a restored record authority over an existing Agent. Callback closures remain
+caller-owned executable state.
+
 ## Custom Permissions
 
 For fine-grained control, create a `Permissions` object directly:
 
 ```{r, eval = FALSE}
-perms <- Permissions$new(
+perms <- Permissions(
   file_read = TRUE,
   file_write = "/path/to/allowed/dir",
   bash = FALSE,
@@ -66,8 +88,8 @@ perms <- Permissions$new(
 Setting `r_code = TRUE` or `bash = TRUE` authorizes Deputy's built-in
 trusted-code tools. It does not confine the subprocess. Use this only when the
 model, prompt, inputs, and current-user filesystem authority are all within the
-same trust boundary. Direct `Permissions$new()` policies default `r_code` to
-`FALSE`, including partial policies such as `Permissions$new(web = TRUE)`.
+same trust boundary. Direct `Permissions()` policies default `r_code` to
+`FALSE`, including partial policies such as `Permissions(web = TRUE)`.
 
 Fields:
 
@@ -96,7 +118,7 @@ The `mode` field provides broad policy shortcuts:
 | `"full"` | Allow every tool (dangerous!) |
 
 ```{r, eval = FALSE}
-perms <- Permissions$new(mode = "readonly")
+perms <- Permissions(mode = "readonly")
 ```
 
 `permissions_plan()` creates a planning-oriented policy:
@@ -168,7 +190,7 @@ annotations participate in the configured capability checks.
 For complex logic, provide a `can_use_tool` callback:
 
 ```{r, eval = FALSE}
-perms <- Permissions$new(
+perms <- Permissions(
   can_use_tool = function(tool_name, tool_input, context) {
     # Block writes to sensitive files
     if (tool_name == "write_file") {

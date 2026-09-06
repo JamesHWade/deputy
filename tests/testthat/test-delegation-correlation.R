@@ -323,8 +323,8 @@ test_that("delegated runs retain end-to-end correlation", {
     lead$stream_async("Delegate evidence review", stream = "content")
   )
   parent_result <- lead$last_run()
-  parent_start <- parent_result$tool_calls()[[1L]]
-  parent_end <- parent_result$tool_results()[[1L]]
+  parent_start <- result_tool_calls(parent_result)[[1L]]
+  parent_end <- result_tool_results(parent_result)[[1L]]
 
   expect_true(length(chunks) > 0L)
   expect_identical(parent_result$response, "lead complete")
@@ -349,7 +349,7 @@ test_that("delegated runs retain end-to-end correlation", {
   )
   expect_length(child_results, 1L)
   child_result <- child_results[[1L]]
-  expect_s3_class(child_result, "AgentResult")
+  expect_s7_class(child_result, AgentResult)
   expect_identical(runs$agent_id, child_result$agent_id)
   expect_identical(runs$run_id, child_result$run_id)
   expect_identical(child_result$agent_name, "evidence_reviewer")
@@ -367,8 +367,8 @@ test_that("delegated runs retain end-to-end correlation", {
   }
 
   expect_identical(child$state$executions, 1L)
-  child_start <- child_result$tool_calls()[[1L]]
-  child_end <- child_result$tool_results()[[1L]]
+  child_start <- result_tool_calls(child_result)[[1L]]
+  child_end <- result_tool_results(child_result)[[1L]]
   expect_identical(child_start$tool_name, "inspect_evidence")
   expect_identical(child_start$tool_call_id, "child-tool-call-1")
   expect_identical(child_end$tool_call_id, child_start$tool_call_id)
@@ -409,8 +409,8 @@ test_that("failed delegated runs retain parent tool correlation", {
   )
 
   result <- suppressWarnings(lead$run_sync("Delegate failing review"))
-  tool_start <- result$tool_calls()[[1L]]
-  tool_end <- result$tool_results()[[1L]]
+  tool_start <- result_tool_calls(result)[[1L]]
+  tool_end <- result_tool_results(result)[[1L]]
   runs <- lead$list_subagents()
 
   expect_equal(nrow(runs), 1L)

@@ -351,7 +351,7 @@ invalid files stop discovery rather than silently dropping a definition.
 lead <- LeadAgent$new(
   chat = ellmer::chat_openai(model = "gpt-5.6-luna"),
   sub_agents = definitions,
-  permissions = Permissions$new(mode = "standard", file_write = FALSE),
+  permissions = Permissions(mode = "standard", file_write = FALSE),
   usage_limits = UsageLimits(max_requests = 6)
 )
 result <- lead$run_sync("Delegate a review of input.txt to reviewer.")

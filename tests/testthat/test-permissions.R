@@ -3,7 +3,7 @@
 test_that("permissions_standard creates valid permissions", {
   perms <- permissions_standard()
 
-  expect_s3_class(perms, "Permissions")
+  expect_s7_class(perms, Permissions)
   expect_equal(perms$mode, "standard")
   expect_true(perms$file_read)
   expect_false(perms$r_code)
@@ -33,7 +33,12 @@ test_that("permission check allows read tools", {
   perms <- permissions_standard()
   context <- list(working_dir = getwd())
 
-  result <- perms$check("read_file", list(path = "test.txt"), context)
+  result <- permissions_check(
+    perms,
+    "read_file",
+    list(path = "test.txt"),
+    context
+  )
   expect_s3_class(result, "PermissionResultAllow")
 })
 
@@ -41,7 +46,7 @@ test_that("permission check blocks bash by default", {
   perms <- permissions_standard()
   context <- list(working_dir = getwd())
 
-  result <- perms$check("run_bash", list(command = "ls"), context)
+  result <- permissions_check(perms, "run_bash", list(command = "ls"), context)
   expect_s3_class(result, "PermissionResultDeny")
   expect_true(grepl("not allowed", result$reason))
 })
@@ -49,16 +54,16 @@ test_that("permission check blocks bash by default", {
 test_that("permission check blocks unrestricted R code by default", {
   perms <- permissions_standard()
 
-  result <- perms$check("run_r_code", list(code = "1 + 1"), list())
+  result <- permissions_check(perms, "run_r_code", list(code = "1 + 1"), list())
 
   expect_s3_class(result, "PermissionResultDeny")
   expect_match(result$reason, "not allowed")
 })
 
 test_that("partial direct policies block unrestricted R code by default", {
-  perms <- Permissions$new(web = TRUE)
+  perms <- Permissions(web = TRUE)
 
-  result <- perms$check("run_r_code", list(code = "1 + 1"), list())
+  result <- permissions_check(perms, "run_r_code", list(code = "1 + 1"), list())
 
   expect_false(perms$r_code)
   expect_s3_class(result, "PermissionResultDeny")
@@ -74,7 +79,8 @@ test_that("permission check blocks writes outside working_dir", {
   context <- list(working_dir = temp_dir)
 
   # Write inside working_dir - should allow
-  inside_result <- perms$check(
+  inside_result <- permissions_check(
+    perms,
     "write_file",
     list(path = file.path(temp_dir, "test.txt")),
     context
@@ -82,7 +88,8 @@ test_that("permission check blocks writes outside working_dir", {
   expect_s3_class(inside_result, "PermissionResultAllow")
 
   # Write outside working_dir - should deny
-  outside_result <- perms$check(
+  outside_result <- permissions_check(
+    perms,
     "write_file",
     list(path = "/tmp/outside.txt"),
     context
@@ -97,7 +104,12 @@ test_that("permission check blocks path traversal", {
   context <- list(working_dir = temp_dir)
 
   # Path with .. should be denied
-  result <- perms$check("write_file", list(path = "../escape.txt"), context)
+  result <- permissions_check(
+    perms,
+    "write_file",
+    list(path = "../escape.txt"),
+    context
+  )
   expect_s3_class(result, "PermissionResultDeny")
   expect_true(grepl("traversal", result$reason, ignore.case = TRUE))
 })
@@ -113,7 +125,8 @@ test_that("path-scoped writes reject dangling symlinks outside the root", {
   link <- file.path(root, "link.txt")
   expect_true(file.symlink(outside_target, link))
 
-  result <- permissions_standard(root)$check(
+  result <- permissions_check(
+    permissions_standard(root),
     "write_file",
     list(path = link),
     list(working_dir = root)
@@ -140,22 +153,25 @@ test_that("path-scoped writes cover native write tools", {
   }
 
   for (case in cases) {
-    inside <- perms$check(
+    inside <- permissions_check(
+      perms,
       case$name,
       tool_input(case, file.path(temp_dir, "inside.txt")),
       list()
     )
-    outside <- perms$check(
+    outside <- permissions_check(
+      perms,
       case$name,
       tool_input(case, outside_path),
       list()
     )
-    traversal <- perms$check(
+    traversal <- permissions_check(
+      perms,
       case$name,
       tool_input(case, "../escape.txt"),
       list()
     )
-    missing <- perms$check(case$name, list(), list())
+    missing <- permissions_check(perms, case$name, list(), list())
 
     expect_s3_class(inside, "PermissionResultAllow")
     expect_s3_class(outside, "PermissionResultDeny")
@@ -188,17 +204,20 @@ test_that("relative writes use context working_dir for every write tool", {
     input <- stats::setNames(list("nested/file.txt"), case$path_arg)
     traversal_input <- stats::setNames(list("../escape.txt"), case$path_arg)
 
-    allowed <- permissions$check(
+    allowed <- permissions_check(
+      permissions,
       case$name,
       input,
       list(working_dir = allowed_dir)
     )
-    wrong_context <- permissions$check(
+    wrong_context <- permissions_check(
+      permissions,
       case$name,
       input,
       list(working_dir = process_dir)
     )
-    traversal <- permissions$check(
+    traversal <- permissions_check(
+      permissions,
       case$name,
       traversal_input,
       list(working_dir = allowed_dir)
@@ -235,13 +254,14 @@ test_that("readonly recognizes native mutating tools", {
   )
 
   for (tool_name in mutating_tools) {
-    result <- perms$check(tool_name, list(), misleading_context)
+    result <- permissions_check(perms, tool_name, list(), misleading_context)
     expect_s3_class(result, "PermissionResultDeny")
   }
 })
 
 test_that("readonly fails closed for unknown unannotated tools", {
-  result <- permissions_readonly()$check(
+  result <- permissions_check(
+    permissions_readonly(),
     "delete_everything",
     list(),
     list()
@@ -260,9 +280,20 @@ test_that("readonly still enforces capability fields before annotations", {
     )
   )
 
-  web <- permissions$check("web_search", list(query = "R"), read_only_web)
-  unknown_web <- permissions$check("custom_search", list(), read_only_web)
-  delegation <- permissions$check(
+  web <- permissions_check(
+    permissions,
+    "web_search",
+    list(query = "R"),
+    read_only_web
+  )
+  unknown_web <- permissions_check(
+    permissions,
+    "custom_search",
+    list(),
+    read_only_web
+  )
+  delegation <- permissions_check(
+    permissions,
     "delegate_to_agent",
     list(),
     list(tool_annotations = list(read_only_hint = FALSE))
@@ -272,7 +303,12 @@ test_that("readonly still enforces capability fields before annotations", {
   expect_s3_class(unknown_web, "PermissionResultDeny")
   expect_s3_class(delegation, "PermissionResultDeny")
   expect_s3_class(
-    permissions$check("read_file", list(path = "safe.txt"), list()),
+    permissions_check(
+      permissions,
+      "read_file",
+      list(path = "safe.txt"),
+      list()
+    ),
     "PermissionResultAllow"
   )
 })
@@ -286,11 +322,11 @@ test_that("readonly denies contradictory destructive annotations", {
   )
 
   expect_s3_class(
-    permissions_readonly()$check("custom_tool", list(), context),
+    permissions_check(permissions_readonly(), "custom_tool", list(), context),
     "PermissionResultDeny"
   )
   expect_s3_class(
-    permissions_readonly()$check("read_file", list(), context),
+    permissions_check(permissions_readonly(), "read_file", list(), context),
     "PermissionResultDeny"
   )
 })
@@ -300,11 +336,16 @@ test_that("full mode allows everything", {
   context <- list(working_dir = getwd())
 
   # Bash should be allowed
-  result <- perms$check("run_bash", list(command = "rm -rf /"), context)
+  result <- permissions_check(
+    perms,
+    "run_bash",
+    list(command = "rm -rf /"),
+    context
+  )
   expect_s3_class(result, "PermissionResultAllow")
 
   # Any tool should be allowed
-  result <- perms$check("dangerous_tool", list(), context)
+  result <- permissions_check(perms, "dangerous_tool", list(), context)
   expect_s3_class(result, "PermissionResultAllow")
 })
 
@@ -312,14 +353,19 @@ test_that("readonly mode blocks all writes", {
   perms <- permissions_readonly()
   context <- list(working_dir = getwd())
 
-  result <- perms$check("write_file", list(path = "test.txt"), context)
+  result <- permissions_check(
+    perms,
+    "write_file",
+    list(path = "test.txt"),
+    context
+  )
   expect_s3_class(result, "PermissionResultDeny")
 })
 
 test_that("custom permission callback is called", {
   callback_called <- FALSE
 
-  perms <- Permissions$new(
+  perms <- Permissions(
     can_use_tool = function(tool_name, tool_input, context) {
       callback_called <<- TRUE
       PermissionResultAllow()
@@ -327,7 +373,7 @@ test_that("custom permission callback is called", {
   )
   context <- list(working_dir = getwd())
 
-  result <- perms$check("custom_tool", list(), context)
+  result <- permissions_check(perms, "custom_tool", list(), context)
   expect_true(callback_called)
   expect_s3_class(result, "PermissionResultAllow")
 })
@@ -361,17 +407,22 @@ test_that("readonly annotations do not grant authority to unknown tools", {
       tool_annotations = list(read_only_hint = TRUE, open_world_hint = FALSE)
     )
   )
-  result <- perms$check("unknown_tool", list(), read_only_context)
+  result <- permissions_check(perms, "unknown_tool", list(), read_only_context)
   expect_s3_class(result, "PermissionResultDeny")
 
   destructive_context <- c(
     context,
     list(tool_annotations = list(destructive_hint = TRUE))
   )
-  result <- perms$check("unknown_tool", list(), destructive_context)
+  result <- permissions_check(
+    perms,
+    "unknown_tool",
+    list(),
+    destructive_context
+  )
   expect_s3_class(result, "PermissionResultDeny")
 
-  explicitly_allowed <- Permissions$new(
+  explicitly_allowed <- Permissions(
     mode = "readonly",
     file_read = TRUE,
     file_write = FALSE,
@@ -381,7 +432,8 @@ test_that("readonly annotations do not grant authority to unknown tools", {
     install_packages = FALSE,
     tool_allowlist = "unknown_tool"
   )
-  result <- explicitly_allowed$check(
+  result <- permissions_check(
+    explicitly_allowed,
     "unknown_tool",
     list(),
     read_only_context
@@ -400,7 +452,12 @@ test_that("standard mode uses annotations for unknown tools", {
       tool_annotations = list(read_only_hint = TRUE, open_world_hint = FALSE)
     )
   )
-  result <- perms$check("custom_read_tool", list(), read_only_context)
+  result <- permissions_check(
+    perms,
+    "custom_read_tool",
+    list(),
+    read_only_context
+  )
   expect_s3_class(result, "PermissionResultAllow")
 
   # Open-world tool with web disabled should be denied
@@ -408,7 +465,12 @@ test_that("standard mode uses annotations for unknown tools", {
     context,
     list(tool_annotations = list(open_world_hint = TRUE))
   )
-  result <- perms$check("custom_web_tool", list(), open_world_context)
+  result <- permissions_check(
+    perms,
+    "custom_web_tool",
+    list(),
+    open_world_context
+  )
   expect_s3_class(result, "PermissionResultDeny")
 
   combined_context <- c(
@@ -420,12 +482,17 @@ test_that("standard mode uses annotations for unknown tools", {
       )
     )
   )
-  result <- perms$check("custom_read_web_tool", list(), combined_context)
+  result <- permissions_check(
+    perms,
+    "custom_read_web_tool",
+    list(),
+    combined_context
+  )
   expect_s3_class(result, "PermissionResultDeny")
 })
 
 test_that("plan mode preserves capability ceilings before annotations", {
-  permissions <- Permissions$new(
+  permissions <- Permissions(
     mode = "plan",
     file_read = TRUE,
     file_write = FALSE,
@@ -450,11 +517,16 @@ test_that("plan mode preserves capability ceilings before annotations", {
   )
 
   expect_s3_class(
-    permissions$check("custom_search", list(), read_only_web),
+    permissions_check(permissions, "custom_search", list(), read_only_web),
     "PermissionResultDeny"
   )
   expect_s3_class(
-    permissions$check("write_file", list(path = "x"), misleading_write),
+    permissions_check(
+      permissions,
+      "write_file",
+      list(path = "x"),
+      misleading_write
+    ),
     "PermissionResultDeny"
   )
 })
@@ -470,8 +542,8 @@ test_that("permissions mode is immutable after construction", {
   # Writing should error
 
   expect_error(
-    perms$mode <- "full",
-    "immutable after construction"
+    perms@mode <- "full",
+    "read-only"
   )
 
   # Original value should be unchanged
@@ -488,8 +560,8 @@ test_that("permissions file_write is immutable after construction", {
 
   # Writing should error
   expect_error(
-    perms$file_write <- TRUE,
-    "immutable after construction"
+    perms@file_write <- TRUE,
+    "read-only"
   )
 
   # Original value should be unchanged
@@ -504,8 +576,8 @@ test_that("permissions bash is immutable after construction", {
 
   # Writing should error
   expect_error(
-    perms$bash <- TRUE,
-    "immutable after construction"
+    perms@bash <- TRUE,
+    "read-only"
   )
 
   # Original value should be unchanged
@@ -514,15 +586,15 @@ test_that("permissions bash is immutable after construction", {
 
 test_that("permissions can_use_tool is immutable after construction", {
   callback <- function(tool_name, tool_input, context) PermissionResultAllow()
-  perms <- Permissions$new(can_use_tool = callback)
+  perms <- Permissions(can_use_tool = callback)
 
   # Reading should work
   expect_true(is.function(perms$can_use_tool))
 
   # Writing should error
   expect_error(
-    perms$can_use_tool <- function(...) PermissionResultDeny("blocked"),
-    "immutable after construction"
+    perms@can_use_tool <- function(...) PermissionResultDeny("blocked"),
+    "read-only"
   )
 
   # Original callback should be unchanged (call it to verify)
@@ -534,19 +606,19 @@ test_that("all permission fields reject modification attempts", {
   perms <- permissions_full()
 
   # All these should error
-  expect_error(perms$mode <- "readonly", "immutable")
-  expect_error(perms$file_read <- FALSE, "immutable")
-  expect_error(perms$file_write <- FALSE, "immutable")
-  expect_error(perms$bash <- FALSE, "immutable")
-  expect_error(perms$r_code <- FALSE, "immutable")
-  expect_error(perms$web <- FALSE, "immutable")
-  expect_error(perms$install_packages <- FALSE, "immutable")
-  expect_error(perms$can_use_tool <- function(...) NULL, "immutable")
-  expect_error(perms$tool_allowlist <- "read_file", "immutable")
-  expect_error(perms$tool_denylist <- "run_bash", "immutable")
+  expect_error(perms@mode <- "readonly", "read-only")
+  expect_error(perms@file_read <- FALSE, "read-only")
+  expect_error(perms@file_write <- FALSE, "read-only")
+  expect_error(perms@bash <- FALSE, "read-only")
+  expect_error(perms@r_code <- FALSE, "read-only")
+  expect_error(perms@web <- FALSE, "read-only")
+  expect_error(perms@install_packages <- FALSE, "read-only")
+  expect_error(perms@can_use_tool <- function(...) NULL, "read-only")
+  expect_error(perms@tool_allowlist <- "read_file", "read-only")
+  expect_error(perms@tool_denylist <- "run_bash", "read-only")
   expect_error(
-    perms$permission_prompt_tool_name <- "ask_user",
-    "immutable"
+    perms@permission_prompt_tool_name <- "ask_user",
+    "read-only"
   )
 })
 
@@ -560,7 +632,7 @@ test_that("permissions print works with active bindings", {
 })
 
 test_that("tool denylist blocks tools before mode checks", {
-  perms <- Permissions$new(
+  perms <- Permissions(
     mode = "full",
     file_read = TRUE,
     file_write = TRUE,
@@ -569,13 +641,13 @@ test_that("tool denylist blocks tools before mode checks", {
     tool_denylist = "run_bash"
   )
 
-  result <- perms$check("run_bash", list(command = "pwd"), list())
+  result <- permissions_check(perms, "run_bash", list(command = "pwd"), list())
   expect_s3_class(result, "PermissionResultDeny")
   expect_match(result$reason, "denylist")
 })
 
 test_that("tool allowlist restricts tools when configured", {
-  perms <- Permissions$new(
+  perms <- Permissions(
     file_read = TRUE,
     file_write = TRUE,
     bash = TRUE,
@@ -583,8 +655,18 @@ test_that("tool allowlist restricts tools when configured", {
     tool_allowlist = "read_file"
   )
 
-  allow_result <- perms$check("read_file", list(path = "x.txt"), list())
-  deny_result <- perms$check("write_file", list(path = "x.txt"), list())
+  allow_result <- permissions_check(
+    perms,
+    "read_file",
+    list(path = "x.txt"),
+    list()
+  )
+  deny_result <- permissions_check(
+    perms,
+    "write_file",
+    list(path = "x.txt"),
+    list()
+  )
 
   expect_s3_class(allow_result, "PermissionResultAllow")
   expect_s3_class(deny_result, "PermissionResultDeny")
@@ -592,7 +674,7 @@ test_that("tool allowlist restricts tools when configured", {
 })
 
 test_that("denylist takes precedence over allowlist", {
-  perms <- Permissions$new(
+  perms <- Permissions(
     mode = "full",
     file_read = TRUE,
     file_write = TRUE,
@@ -602,13 +684,13 @@ test_that("denylist takes precedence over allowlist", {
     tool_denylist = "run_bash"
   )
 
-  result <- perms$check("run_bash", list(command = "pwd"), list())
+  result <- permissions_check(perms, "run_bash", list(command = "pwd"), list())
   expect_s3_class(result, "PermissionResultDeny")
   expect_match(result$reason, "denylist")
 })
 
 test_that("permission prompt tool is allowed and referenced in denies", {
-  perms <- Permissions$new(
+  perms <- Permissions(
     file_read = TRUE,
     file_write = TRUE,
     bash = FALSE,
@@ -617,12 +699,18 @@ test_that("permission prompt tool is allowed and referenced in denies", {
     permission_prompt_tool_name = "ask_user"
   )
 
-  prompt_result <- perms$check(
+  prompt_result <- permissions_check(
+    perms,
     "ask_user",
     list(question = "Allow?"),
     list()
   )
-  deny_result <- perms$check("write_file", list(path = "x.txt"), list())
+  deny_result <- permissions_check(
+    perms,
+    "write_file",
+    list(path = "x.txt"),
+    list()
+  )
 
   expect_s3_class(prompt_result, "PermissionResultAllow")
   expect_s3_class(deny_result, "PermissionResultDeny")
@@ -630,19 +718,19 @@ test_that("permission prompt tool is allowed and referenced in denies", {
 })
 
 test_that("explicit tool gating applies to permission prompt tools", {
-  denied <- Permissions$new(
+  denied <- Permissions(
     mode = "plan",
     tool_denylist = "ask_user",
     permission_prompt_tool_name = "ask_user"
   )
-  excluded <- Permissions$new(
+  excluded <- Permissions(
     mode = "plan",
     tool_allowlist = "read_file",
     permission_prompt_tool_name = "ask_user"
   )
 
-  deny_result <- denied$check("ask_user", list(), list())
-  excluded_result <- excluded$check("ask_user", list(), list())
+  deny_result <- permissions_check(denied, "ask_user", list(), list())
+  excluded_result <- permissions_check(excluded, "ask_user", list(), list())
 
   expect_s3_class(deny_result, "PermissionResultDeny")
   expect_match(deny_result$reason, "denylist")
@@ -651,7 +739,12 @@ test_that("explicit tool gating applies to permission prompt tools", {
   expect_match(excluded_result$reason, "allowlist")
   expect_false(grepl("Use ask_user", excluded_result$reason, fixed = TRUE))
 
-  other_denial <- excluded$check("write_file", list(path = "x.txt"), list())
+  other_denial <- permissions_check(
+    excluded,
+    "write_file",
+    list(path = "x.txt"),
+    list()
+  )
   expect_s3_class(other_denial, "PermissionResultDeny")
   expect_false(grepl("Use ask_user", other_denial$reason, fixed = TRUE))
 })
@@ -703,10 +796,11 @@ test_that("file-write intersections return stable canonical roots", {
   expect_identical(first, canonical)
   expect_false(is_path_within(file.path(other_root, "file.txt"), first))
 
-  permissions <- Permissions$new(file_write = real_root)
+  permissions <- Permissions(file_write = real_root)
   unlink(real_root, recursive = TRUE)
   expect_true(file.symlink(other_root, real_root))
-  escaped <- permissions$check(
+  escaped <- permissions_check(
+    permissions,
     "write_file",
     list(path = file.path(real_root, "file.txt")),
     list()
@@ -718,20 +812,20 @@ test_that("file-write directory grants are canonical and fail closed", {
   withr::local_tempdir(pattern = "deputy-permission-root") -> root
   canonical <- normalizePath(root, winslash = "/")
 
-  permissions <- Permissions$new(file_write = root)
+  permissions <- Permissions(file_write = root)
   expect_identical(permissions$file_write, canonical)
   expect_error(
-    Permissions$new(file_write = "relative/root"),
+    Permissions(file_write = "relative/root"),
     "existing absolute directory"
   )
   expect_error(
-    Permissions$new(file_write = file.path(root, "missing")),
+    Permissions(file_write = file.path(root, "missing")),
     "existing absolute directory"
   )
 })
 
 test_that("tool name matching ignores case", {
-  perms <- Permissions$new(
+  perms <- Permissions(
     mode = "full",
     file_read = TRUE,
     file_write = TRUE,
@@ -740,6 +834,68 @@ test_that("tool name matching ignores case", {
     tool_denylist = "RUN_BASH"
   )
 
-  result <- perms$check("run_bash", list(command = "pwd"), list())
+  result <- permissions_check(perms, "run_bash", list(command = "pwd"), list())
   expect_s3_class(result, "PermissionResultDeny")
+})
+
+test_that("S7 permissions reject malformed capability values at construction", {
+  expect_snapshot(error = TRUE, Permissions(file_read = NA))
+  expect_snapshot(error = TRUE, Permissions(bash = c(TRUE, FALSE)))
+  expect_snapshot(error = TRUE, Permissions(r_code = 1))
+  expect_snapshot(error = TRUE, Permissions(web = logical()))
+  expect_snapshot(error = TRUE, Permissions(install_packages = "yes"))
+  expect_snapshot(error = TRUE, Permissions(can_use_tool = "allow"))
+  expect_snapshot(error = TRUE, Permissions(tool_allowlist = NA_character_))
+  expect_snapshot(
+    error = TRUE,
+    Permissions(permission_prompt_tool_name = NA_character_)
+  )
+})
+
+test_that("nullable S7 permission properties and bulk replacement stay frozen", {
+  policy <- Permissions(file_write = FALSE)
+  expect_null(policy@can_use_tool)
+  expect_null(policy@tool_allowlist)
+  expect_null(policy@tool_denylist)
+  expect_null(policy@permission_prompt_tool_name)
+  expect_snapshot(
+    error = TRUE,
+    policy@can_use_tool <- function(...) PermissionResultAllow()
+  )
+  expect_snapshot(error = TRUE, policy@tool_allowlist <- "write_file")
+  expect_snapshot(error = TRUE, policy@tool_denylist <- "read_file")
+  expect_snapshot(
+    error = TRUE,
+    policy@permission_prompt_tool_name <- "ask_user"
+  )
+  expect_snapshot(error = TRUE, S7::props(policy) <- list(file_write = TRUE))
+  expect_s3_class(
+    permissions_check(policy, "write_file", list(path = "x")),
+    "PermissionResultDeny"
+  )
+})
+
+test_that("S7 permission callbacks retain caller-owned state and vetoes", {
+  state <- new.env(parent = emptyenv())
+  state$calls <- list()
+  callback <- function(tool_name, tool_input, context) {
+    state$calls <- append(
+      state$calls,
+      list(list(tool_name, tool_input, context))
+    )
+    PermissionResultDeny(reason = "host veto")
+  }
+  policy <- Permissions(
+    mode = "readonly",
+    file_write = FALSE,
+    can_use_tool = callback
+  )
+  context <- list(host = "test")
+  result <- permissions_check(policy, "read_file", list(path = "x"), context)
+  expect_identical(policy@can_use_tool, callback)
+  expect_identical(
+    state$calls,
+    list(list("read_file", list(path = "x"), context))
+  )
+  expect_identical(result$reason, "host veto")
 })

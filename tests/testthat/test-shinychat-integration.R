@@ -39,7 +39,7 @@ test_that("Agent stream_async is consumed directly by shinychat", {
 
   expect_true(promises::is.promising(appended))
   expect_no_error(resolve_async_value(appended))
-  expect_s3_class(agent$last_run(), "AgentResult")
+  expect_s7_class(agent$last_run(), AgentResult)
   expect_identical(agent$last_run()$response, "Governed reply")
 })
 
@@ -100,7 +100,7 @@ test_that("Agent implements structured ellmer Chat methods through the kernel", 
   value <- agent$chat_structured("Question", type = type)
 
   expect_identical(value, list(answer = "governed"))
-  expect_s3_class(agent$last_run(), "AgentResult")
+  expect_s7_class(agent$last_run(), AgentResult)
   expect_identical(
     agent$last_run()$structured_output,
     list(answer = "governed")

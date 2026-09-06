@@ -18,4 +18,8 @@ result <- agent$run_sync("Use write_file to write hello to blocked.txt.")
 stopifnot(!file.exists(file.path(workspace, "blocked.txt")))
 cli::cli_text("{result$response}")
 # Switching modes may narrow authority, never widen it.
-print(agent$permissions$check("write_file", list(path = "blocked.txt")))
+print(permissions_check(
+  agent$permissions,
+  "write_file",
+  list(path = "blocked.txt")
+))

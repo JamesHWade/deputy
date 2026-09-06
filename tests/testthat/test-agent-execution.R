@@ -26,19 +26,19 @@ test_that("run exists and returns a generator", {
 
 test_that("AgentResult class has expected fields", {
   # Test AgentResult directly without running agent
-  result <- AgentResult$new(
+  result <- AgentResult(
     response = "test",
     turns = list(),
     cost = list(total = 0.01)
   )
 
-  expect_s3_class(result, "AgentResult")
+  expect_s7_class(result, AgentResult)
   expect_equal(result$response, "test")
   expect_equal(result$cost$total, 0.01)
 })
 
 test_that("AgentResult print method works", {
-  result <- AgentResult$new(
+  result <- AgentResult(
     response = "test response here",
     turns = list(1, 2), # 2 mock turns
     cost = list(total = 0.05)
@@ -109,7 +109,7 @@ test_that("AgentEvent creates different event types", {
 
 # AgentResult tests
 test_that("AgentResult stores all metadata", {
-  result <- AgentResult$new(
+  result <- AgentResult(
     response = "Final response",
     turns = list("turn1", "turn2", "turn3"),
     cost = list(total = 0.05, input_tokens = 100, output_tokens = 50),
@@ -128,7 +128,7 @@ test_that("AgentResult stores all metadata", {
 })
 
 test_that("AgentResult has sensible defaults", {
-  result <- AgentResult$new(
+  result <- AgentResult(
     response = "test",
     turns = list(),
     cost = list(total = 0)
@@ -144,7 +144,7 @@ test_that("AgentResult has sensible defaults", {
 })
 
 test_that("AgentResult print shows key information", {
-  result <- AgentResult$new(
+  result <- AgentResult(
     response = "A response that is longer than fifty characters for testing truncation",
     turns = list(1, 2, 3, 4, 5),
     cost = list(total = 0.123),
@@ -343,7 +343,7 @@ test_that("run_sync accumulates events from generator", {
   result <- agent$run_sync("Say hello")
 
   # Verify result contains events
-  expect_s3_class(result, "AgentResult")
+  expect_s7_class(result, AgentResult)
   expect_true(length(result$events) > 0)
 
   # Should have at least: start, text, text_complete, turn, stop

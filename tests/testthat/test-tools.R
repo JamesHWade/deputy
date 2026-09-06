@@ -580,7 +580,7 @@ test_that("provider-native web tools require explicit registration authority", {
     Agent$new(
       chat = create_mock_chat(),
       tools = list(native_web),
-      permissions = Permissions$new(
+      permissions = Permissions(
         web = FALSE,
         tool_allowlist = "web_search"
       )
@@ -592,7 +592,7 @@ test_that("provider-native web tools require explicit registration authority", {
     Agent$new(
       chat = create_mock_chat(),
       tools = list(native_web),
-      permissions = Permissions$new(web = TRUE)
+      permissions = Permissions(web = TRUE)
     ),
     "not explicitly allowed"
   )
@@ -601,7 +601,7 @@ test_that("provider-native web tools require explicit registration authority", {
     Agent$new(
       chat = create_mock_chat(),
       tools = list(native_web),
-      permissions = Permissions$new(
+      permissions = Permissions(
         web = TRUE,
         tool_allowlist = "web_search",
         can_use_tool = function(tool_name, tool_input, context) {
@@ -618,7 +618,7 @@ test_that("provider-native web tools require explicit registration authority", {
   agent <- Agent$new(
     chat = create_mock_chat(),
     tools = list(native_web),
-    permissions = Permissions$new(
+    permissions = Permissions(
       web = TRUE,
       tool_allowlist = "web_search"
     )

@@ -2,70 +2,9 @@
 % Please edit documentation in R/permissions.R
 \name{Permissions}
 \alias{Permissions}
-\title{Permissions R6 Class}
-\description{
-Controls what an agent is allowed to do. Permissions can be configured
-with fine-grained controls for different tool types, or with a custom
-callback for complex logic.
-
-Tool gating fields:
-\itemize{
-\item \code{tool_allowlist}: Optional list of tools that are allowed. When set,
-tools not in the list are denied.
-\item \code{tool_denylist}: Optional list of tools that are always denied.
-\item \code{permission_prompt_tool_name}: Optional tool name to mention in deny
-messages for gated tools (e.g., "ask_user").
-}
-
-\strong{Security Note:} Permission fields are immutable after construction.
-This prevents adversarial code from modifying permissions at runtime.
-All fields use active bindings that reject modification attempts.
-}
-\section{Active bindings}{
-  \if{html}{\out{<div class="r6-active-bindings">}}
-  \describe{
-    \item{\code{mode}}{Permission mode (see \link{PermissionMode}). Read-only after construction.}
-
-    \item{\code{file_read}}{Allow file reading. Read-only after construction.}
-
-    \item{\code{file_write}}{Allow file writing. Can be \code{TRUE}, \code{FALSE}, or a
-canonical absolute directory path. Read-only after construction.}
-
-    \item{\code{bash}}{Allow bash command execution. Read-only after construction.}
-
-    \item{\code{r_code}}{Allow R code execution. Read-only after construction.}
-
-    \item{\code{web}}{Allow web requests. Read-only after construction.}
-
-    \item{\code{install_packages}}{Allow package installation. Read-only after construction.}
-
-    \item{\code{can_use_tool}}{Custom permission callback. Read-only after construction.}
-
-    \item{\code{tool_allowlist}}{Optional character vector of allowed tool names. Read-only after construction.}
-
-    \item{\code{tool_denylist}}{Optional character vector of denied tool names. Read-only after construction.}
-
-    \item{\code{permission_prompt_tool_name}}{Optional tool name used in gating deny messages. Read-only after construction.}
-  }
-  \if{html}{\out{</div>}}
-}
-\section{Methods}{
-\subsection{Public methods}{
-  \itemize{
-    \item \href{#method-Permissions-initialize}{\code{Permissions$new()}}
-    \item \href{#method-Permissions-check}{\code{Permissions$check()}}
-    \item \href{#method-Permissions-print}{\code{Permissions$print()}}
-    \item \href{#method-Permissions-clone}{\code{Permissions$clone()}}
-  }
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-Permissions-initialize"></a>}}
-\if{latex}{\out{\hypertarget{method-Permissions-initialize}{}}}
-\subsection{\code{Permissions$new()}}{
-  Create a new Permissions object.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{Permissions$new(
+\title{Create a permission policy}
+\usage{
+Permissions(
   mode = "standard",
   file_read = TRUE,
   file_write = getwd(),
@@ -77,89 +16,53 @@ canonical absolute directory path. Read-only after construction.}
   tool_allowlist = NULL,
   tool_denylist = NULL,
   permission_prompt_tool_name = NULL
-)}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Arguments}{
-    \if{html}{\out{<div class="arguments">}}
-    \describe{
-      \item{\code{mode}}{Permission mode}
-      \item{\code{file_read}}{Allow file reading}
-      \item{\code{file_write}}{Allow file writing (\code{TRUE}, \code{FALSE}, or an existing
-absolute directory path). Directory grants are canonicalized once when
-the policy is constructed.}
-      \item{\code{bash}}{Allow bash commands}
-      \item{\code{r_code}}{Allow R code execution. Defaults to \code{FALSE}; grant it
-explicitly for trusted code or use \code{\link[=permissions_full]{permissions_full()}}.}
-      \item{\code{web}}{Allow web requests}
-      \item{\code{install_packages}}{Allow package installation}
-      \item{\code{can_use_tool}}{Custom callback function}
-      \item{\code{tool_allowlist}}{Optional character vector of allowed tool names}
-      \item{\code{tool_denylist}}{Optional character vector of denied tool names}
-      \item{\code{permission_prompt_tool_name}}{Optional dedicated approval-tool name
-to suggest in permission deny messages for gated tools. Native
-capability-bearing tools cannot be used as approval prompts.}
-    }
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Returns}{
-    A new \code{Permissions} object
-  }
+)
 }
+\arguments{
+\item{mode}{One of \code{"standard"}, \code{"plan"}, \code{"readonly"}, or \code{"full"}.}
 
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-Permissions-check"></a>}}
-\if{latex}{\out{\hypertarget{method-Permissions-check}{}}}
-\subsection{\code{Permissions$check()}}{
-  Check if a tool is allowed to execute.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{Permissions$check(tool_name, tool_input, context = list())}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Arguments}{
-    \if{html}{\out{<div class="arguments">}}
-    \describe{
-      \item{\code{tool_name}}{Name of the tool}
-      \item{\code{tool_input}}{Arguments passed to the tool}
-      \item{\code{context}}{Additional context (e.g., working_dir, tool_annotations)}
-    }
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Returns}{
-    A \link{PermissionResultAllow} or \link{PermissionResultDeny}
-  }
+\item{file_read}{Allow file reading. One non-missing logical value.}
+
+\item{file_write}{\code{TRUE}, \code{FALSE}, or an existing absolute directory path.}
+
+\item{bash}{Allow shell commands. One non-missing logical value.}
+
+\item{r_code}{Allow R code execution. One non-missing logical value;
+defaults to \code{FALSE}.}
+
+\item{web}{Allow web requests. One non-missing logical value.}
+
+\item{install_packages}{Allow package installation. One non-missing logical
+value.}
+
+\item{can_use_tool}{A function accepting tool name, input, and context,
+returning a \link{PermissionResultAllow} or \link{PermissionResultDeny}, or \code{NULL}.}
+
+\item{tool_allowlist}{Character vector of allowed tool names, or \code{NULL}.
+An empty vector denies all tools; \code{NULL} disables this gate.}
+
+\item{tool_denylist}{Character vector of denied tool names, or \code{NULL}.}
+
+\item{permission_prompt_tool_name}{Optional dedicated approval-tool name to
+suggest in deny messages. Native capability-bearing tools cannot be used.}
 }
-
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-Permissions-print"></a>}}
-\if{latex}{\out{\hypertarget{method-Permissions-print}{}}}
-\subsection{\code{Permissions$print()}}{
-  Print the permissions configuration.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{Permissions$print()}
-    \if{html}{\out{</div>}}
-  }
+\value{
+A read-only \code{Permissions} S7 object.
 }
+\description{
+A read-only S7 value controlling tool access. Use \code{\link[=permissions_check]{permissions_check()}} to
+evaluate a call. Read properties with \code{S7::prop(policy, "mode")} or \code{$}.
+To narrow an active Agent, use its \code{set_permission_mode()} method; replacing
+its policy or changing its properties is not supported.
 
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-Permissions-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-Permissions-clone}{}}}
-\subsection{\code{Permissions$clone()}}{
-  The objects of this class are cloneable with this method.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{Permissions$clone(deep = FALSE)}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Arguments}{
-    \if{html}{\out{<div class="arguments">}}
-    \describe{
-      \item{\code{deep}}{Whether to make a deep clone.}
-    }
-    \if{html}{\out{</div>}}
-  }
+Directory grants are canonicalized at construction. The callback retains
+its caller-owned executable state. Read-only properties protect the public
+configuration; they are not an execution sandbox. Serialized policies are
+configuration records, not portable authority grants or a way to widen an
+existing Agent's authority.
 }
-
+\examples{
+policy <- Permissions(file_write = FALSE)
+permissions_check(policy, "write_file", list(path = "output.txt"))
+S7::prop(policy, "file_write")
 }

@@ -898,7 +898,7 @@ hook_block_dangerous_bash <- function(
 #' @export
 hook_limit_file_writes <- function(allowed_dir) {
   allowed_dir <- normalizePath(allowed_dir, mustWork = TRUE)
-  permissions <- Permissions$new(
+  permissions <- Permissions(
     file_write = allowed_dir,
     bash = FALSE,
     r_code = FALSE,
@@ -911,7 +911,7 @@ hook_limit_file_writes <- function(allowed_dir) {
     pattern = "^(write_file|edit_file|multi_edit)$",
     timeout = 0, # Run in main process
     callback = function(tool_name, tool_input, context) {
-      result <- permissions$check(tool_name, tool_input, context)
+      result <- permissions_check(permissions, tool_name, tool_input, context)
       if (identical(result$decision, "deny")) {
         HookResultPreToolUse(
           permission = "deny",

@@ -975,7 +975,7 @@ LeadAgent <- R6::R6Class(
         )
       }
 
-      Permissions$new(
+      Permissions(
         mode = requested_mode,
         file_read = capabilities$file_read,
         file_write = capabilities$file_write,

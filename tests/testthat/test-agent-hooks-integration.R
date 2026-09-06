@@ -146,7 +146,7 @@ test_that("Hook denial takes precedence over permission allow", {
   agent <- Agent$new(
     chat = mock$chat,
     tools = list(tool_read_file),
-    permissions = Permissions$new(file_read = TRUE)
+    permissions = Permissions(file_read = TRUE)
   )
 
   agent$hooks$add(HookMatcher(
@@ -249,11 +249,12 @@ test_that("Permission check occurs before PreToolUse hooks", {
   agent <- Agent$new(
     chat = create_mock_chat(),
     tools = list(tool_read_file),
-    permissions = Permissions$new(file_read = FALSE)
+    permissions = Permissions(file_read = FALSE)
   )
 
   # Verify permission check would deny this tool
-  perm_result <- agent$permissions$check(
+  perm_result <- permissions_check(
+    agent$permissions,
     "read_file",
     list(path = "test.txt"),
     list()
@@ -357,7 +358,7 @@ test_that("Agent stops when PostToolUse hook returns continue=FALSE", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(tool_read_file),
-    permissions = Permissions$new(file_read = TRUE)
+    permissions = Permissions(file_read = TRUE)
   )
 
   # Add PostToolUse hook that returns continue=FALSE
@@ -463,7 +464,7 @@ test_that("PostToolUse continue=FALSE takes precedence with multiple hooks", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(tool_read_file),
-    permissions = Permissions$new(file_read = TRUE)
+    permissions = Permissions(file_read = TRUE)
   )
 
   # Add first hook that returns continue=TRUE
@@ -580,7 +581,7 @@ test_that("PostToolUse continue=FALSE stops agent even when tool fails", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(tool_read_file),
-    permissions = Permissions$new(file_read = TRUE)
+    permissions = Permissions(file_read = TRUE)
   )
 
   # Add PostToolUse hook that inspects tool result and returns continue=FALSE
@@ -691,7 +692,7 @@ test_that("PostToolUse continue=FALSE stops streaming agent", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(tool_read_file),
-    permissions = Permissions$new(file_read = TRUE)
+    permissions = Permissions(file_read = TRUE)
   )
 
   # Add PostToolUse hook that returns continue=FALSE

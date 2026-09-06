@@ -187,10 +187,11 @@ test_that("web permission is checked correctly", {
   agent_no_web <- Agent$new(
     chat = mock_chat,
     tools = list(tool_web_fetch),
-    permissions = Permissions$new(web = FALSE)
+    permissions = Permissions(web = FALSE)
   )
 
-  result_no_web <- agent_no_web$permissions$check(
+  result_no_web <- permissions_check(
+    agent_no_web$permissions,
     "web_fetch",
     list(url = "https://example.com"),
     list()
@@ -201,10 +202,11 @@ test_that("web permission is checked correctly", {
   agent_web <- Agent$new(
     chat = create_mock_chat(),
     tools = list(tool_web_fetch),
-    permissions = Permissions$new(web = TRUE)
+    permissions = Permissions(web = TRUE)
   )
 
-  result_web <- agent_web$permissions$check(
+  result_web <- permissions_check(
+    agent_web$permissions,
     "web_fetch",
     list(url = "https://example.com"),
     list()
@@ -219,10 +221,11 @@ test_that("web_search permission is checked correctly", {
   agent_no_web <- Agent$new(
     chat = mock_chat,
     tools = list(tool_web_search),
-    permissions = Permissions$new(web = FALSE)
+    permissions = Permissions(web = FALSE)
   )
 
-  result_no_web <- agent_no_web$permissions$check(
+  result_no_web <- permissions_check(
+    agent_no_web$permissions,
     "web_search",
     list(query = "test"),
     list()
@@ -233,10 +236,11 @@ test_that("web_search permission is checked correctly", {
   agent_web <- Agent$new(
     chat = create_mock_chat(),
     tools = list(tool_web_search),
-    permissions = Permissions$new(web = TRUE)
+    permissions = Permissions(web = TRUE)
   )
 
-  result_web <- agent_web$permissions$check(
+  result_web <- permissions_check(
+    agent_web$permissions,
     "web_search",
     list(query = "test"),
     list()

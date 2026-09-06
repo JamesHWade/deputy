@@ -165,8 +165,12 @@ Agent <- R6::R6Class(
       }
       working_dir <- normalizePath(working_dir, mustWork = TRUE, winslash = "/")
 
+      permissions <- permissions %||% permissions_standard(working_dir)
+      if (!S7::S7_inherits(permissions, Permissions)) {
+        cli_abort("{.arg permissions} must be a Permissions object")
+      }
       private$.chat <- chat
-      private$.permissions <- permissions %||% permissions_standard(working_dir)
+      private$.permissions <- permissions
       private$.usage_limits <- normalize_usage_limits(usage_limits)
       private$.context_policy <- normalize_context_policy(context_policy)
       private$.working_dir <- working_dir
@@ -897,7 +901,7 @@ Agent <- R6::R6Class(
         permission_mode_capabilities(mode, self$working_dir)
       )
 
-      narrowed_permissions <- Permissions$new(
+      narrowed_permissions <- Permissions(
         mode = mode,
         file_read = capabilities$file_read,
         file_write = capabilities$file_write,
@@ -1880,7 +1884,8 @@ Agent <- R6::R6Class(
               )
             ))
           }
-          permission <- self$permissions$check(
+          permission <- permissions_check(
+            self$permissions,
             tool_name,
             list(),
             list(

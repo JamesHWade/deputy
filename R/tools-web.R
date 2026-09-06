@@ -28,7 +28,7 @@
 #' agent <- Agent$new(
 #'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = list(tool_web_fetch),
-#'   permissions = Permissions$new(web = TRUE)
+#'   permissions = Permissions(web = TRUE)
 #' )
 #' }
 #'
@@ -121,7 +121,7 @@ tool_web_fetch <- ellmer::tool(
 #' agent <- Agent$new(
 #'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = list(tool_web_search),
-#'   permissions = Permissions$new(web = TRUE)
+#'   permissions = Permissions(web = TRUE)
 #' )
 #' }
 #'

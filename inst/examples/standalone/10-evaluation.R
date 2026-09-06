@@ -30,7 +30,7 @@ rows <- lapply(seq_len(nrow(cases)), function(i) {
     session_id = result$session_id,
     stop_reason = result$stop_reason,
     passed = is.null(failure) &&
-      result$is_success() &&
+      result_is_success(result) &&
       identical(trimws(result$response), cases$expected[[i]]),
     requests = result$usage$requests,
     reported_tokens = result$usage$total_tokens,

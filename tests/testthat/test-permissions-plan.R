@@ -3,7 +3,7 @@
 test_that("permissions_plan creates planning permissions", {
   perms <- permissions_plan()
 
-  expect_s3_class(perms, "Permissions")
+  expect_s7_class(perms, Permissions)
   expect_equal(perms$mode, "plan")
   expect_true(perms$file_read)
   expect_false(perms$file_write)
@@ -25,14 +25,16 @@ test_that("permission mode validation rejects unknown values", {
 test_that("plan mode allows only annotated read-only tools", {
   perms <- permissions_plan()
 
-  allow <- perms$check(
+  allow <- permissions_check(
+    perms,
     "custom_read",
     list(),
     list(tool_annotations = list(read_only_hint = TRUE))
   )
   expect_s3_class(allow, "PermissionResultAllow")
 
-  destructive <- perms$check(
+  destructive <- permissions_check(
+    perms,
     "custom_edit",
     list(),
     list(
@@ -45,7 +47,7 @@ test_that("plan mode allows only annotated read-only tools", {
   expect_s3_class(destructive, "PermissionResultDeny")
   expect_match(destructive$reason, "destructive", ignore.case = TRUE)
 
-  unannotated <- perms$check("mystery_tool", list(), list())
+  unannotated <- permissions_check(perms, "mystery_tool", list(), list())
   expect_s3_class(unannotated, "PermissionResultDeny")
   expect_match(unannotated$reason, "read-only", ignore.case = TRUE)
 })
@@ -53,12 +55,12 @@ test_that("plan mode allows only annotated read-only tools", {
 test_that("plan mode always allows the permission prompt tool", {
   perms <- permissions_plan(permission_prompt_tool_name = "ask_user")
 
-  result <- perms$check("ask_user", list(), list())
+  result <- permissions_check(perms, "ask_user", list(), list())
   expect_s3_class(result, "PermissionResultAllow")
 })
 
 test_that("plan mode respects a disabled file-read capability", {
-  perms <- Permissions$new(
+  perms <- Permissions(
     mode = "plan",
     file_read = FALSE,
     file_write = FALSE,
@@ -69,7 +71,8 @@ test_that("plan mode respects a disabled file-read capability", {
   )
 
   for (tool_name in permission_file_read_tool_ids) {
-    result <- perms$check(
+    result <- permissions_check(
+      perms,
       tool_name,
       list(path = "blocked.txt"),
       list(
@@ -87,7 +90,7 @@ test_that("plan mode respects a disabled file-read capability", {
 test_that("permission prompts must use dedicated approval tools", {
   for (tool_name in c("read_file", "delegate_to_agent")) {
     expect_error(
-      Permissions$new(
+      Permissions(
         mode = "plan",
         file_read = FALSE,
         permission_prompt_tool_name = tool_name

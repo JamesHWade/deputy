@@ -1,6 +1,9 @@
 # Use S7 value contracts alongside R6 runtime owners
 
 Decision date: 2026-09-06. Baseline: `9e9aa93`.
+Follow-up: [ADR-0010](0010-s7-results-permissions.md) records the subsequent
+AgentResult and Permissions migration.
+
 Issues: [#59](https://github.com/JamesHWade/deputy/issues/59) and
 [#58](https://github.com/JamesHWade/deputy/issues/58).
 

@@ -1,5 +1,13 @@
 # deputy (development version)
 
+* `AgentResult()` and `Permissions()` now construct read-only S7 values. Use
+  `result_n_turns()`, `result_tool_calls()`, `result_tool_results()`,
+  `result_text_chunks()`, and `result_is_success()` to inspect results, and
+  `permissions_check()` to evaluate policies. `$` field reads remain available;
+  `$new()` and instance methods are removed. Permission constructors reject
+  malformed flags and callbacks while Agent mode changes still only narrow
+  the configured authority ceiling (#117).
+
 * `AgentEvent()` and `HookMatcher()` are S7 values with read-only properties.
   Construct matchers with `HookMatcher(...)` and test names with
   `hook_matches()`. Event types use `event$type` instead of S3 subtype classes;

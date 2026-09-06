@@ -50,6 +50,11 @@ reference:
   contents:
   - Agent
   - AgentResult
+  - result_n_turns
+  - result_tool_calls
+  - result_tool_results
+  - result_text_chunks
+  - result_is_success
   - AgentEvent
   - AgentUsage
   - UsageLimits
@@ -89,6 +94,7 @@ reference:
   desc: Control what agents can do
   contents:
   - Permissions
+  - permissions_check
   - PermissionMode
   - PermissionResultAllow
   - PermissionResultDeny

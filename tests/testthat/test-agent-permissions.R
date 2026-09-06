@@ -3,7 +3,7 @@
 
 test_that("reapplying a permission mode preserves the custom policy", {
   callback <- function(...) PermissionResultDeny(reason = "custom ceiling")
-  permissions <- Permissions$new(
+  permissions <- Permissions(
     mode = "standard",
     file_read = FALSE,
     file_write = FALSE,
@@ -36,7 +36,7 @@ test_that("reapplying a permission mode preserves the custom policy", {
 })
 
 test_that("permission mode changes can only narrow the current policy", {
-  permissions <- Permissions$new(
+  permissions <- Permissions(
     mode = "standard",
     file_read = FALSE,
     file_write = FALSE,
@@ -57,7 +57,11 @@ test_that("permission mode changes can only narrow the current policy", {
   expect_false(agent$permissions$file_write)
   expect_false(agent$permissions$r_code)
   expect_s3_class(
-    agent$permissions$check("read_file", list(path = "blocked.txt")),
+    permissions_check(
+      agent$permissions,
+      "read_file",
+      list(path = "blocked.txt")
+    ),
     "PermissionResultDeny"
   )
 
@@ -85,7 +89,7 @@ test_that("narrowing removes native tools that lose provider-side authority", {
   agent <- Agent$new(
     chat = create_mock_chat(),
     tools = list(tool_read_file, native_web),
-    permissions = Permissions$new(
+    permissions = Permissions(
       mode = "standard",
       file_read = TRUE,
       file_write = FALSE,
@@ -153,23 +157,31 @@ test_that("readonly transitions retain callback denials as a veto", {
   }
   agent <- Agent$new(
     chat = create_mock_chat(),
-    permissions = Permissions$new(
+    permissions = Permissions(
       mode = "standard",
       can_use_tool = callback
     )
   )
 
   expect_s3_class(
-    agent$permissions$check("read_file", list(path = "blocked.txt")),
+    permissions_check(
+      agent$permissions,
+      "read_file",
+      list(path = "blocked.txt")
+    ),
     "PermissionResultDeny"
   )
   agent$set_permission_mode("readonly")
   expect_s3_class(
-    agent$permissions$check("read_file", list(path = "blocked.txt")),
+    permissions_check(
+      agent$permissions,
+      "read_file",
+      list(path = "blocked.txt")
+    ),
     "PermissionResultDeny"
   )
   expect_s3_class(
-    agent$permissions$check("run_bash", list(command = "pwd")),
+    permissions_check(agent$permissions, "run_bash", list(command = "pwd")),
     "PermissionResultDeny"
   )
 })
@@ -179,7 +191,7 @@ test_that("narrowing a full policy retains a custom write root", {
   nested <- file.path(root, "nested")
   dir.create(nested)
   nested <- normalizePath(nested, winslash = "/")
-  permissions <- Permissions$new(
+  permissions <- Permissions(
     mode = "full",
     file_read = TRUE,
     file_write = nested,
@@ -206,11 +218,12 @@ test_that("Agent rejects tool when permission denies", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(tool_read_file),
-    permissions = Permissions$new(file_read = FALSE)
+    permissions = Permissions(file_read = FALSE)
   )
 
   # Check that permission would deny read_file
-  result <- agent$permissions$check(
+  result <- permissions_check(
+    agent$permissions,
     "read_file",
     list(path = "test.txt"),
     list()
@@ -225,11 +238,12 @@ test_that("Agent allows tool when permission allows", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(tool_read_file),
-    permissions = Permissions$new(file_read = TRUE)
+    permissions = Permissions(file_read = TRUE)
   )
 
   # Check that permission would allow read_file
-  result <- agent$permissions$check(
+  result <- permissions_check(
+    agent$permissions,
     "read_file",
     list(path = "test.txt"),
     list()
@@ -247,7 +261,8 @@ test_that("Agent respects readonly mode", {
   )
 
   # Read should be allowed
-  read_result <- agent$permissions$check(
+  read_result <- permissions_check(
+    agent$permissions,
     "read_file",
     list(path = "test.txt"),
     list()
@@ -255,7 +270,8 @@ test_that("Agent respects readonly mode", {
   expect_s3_class(read_result, "PermissionResultAllow")
 
   # Write should be denied
-  write_result <- agent$permissions$check(
+  write_result <- permissions_check(
+    agent$permissions,
     "write_file",
     list(path = "test.txt", content = "data"),
     list()
@@ -278,7 +294,8 @@ test_that("Agent respects working directory restriction", {
 
   # Write within allowed dir should be allowed
   allowed_path <- file.path(temp_dir, "test.txt")
-  result_allowed <- agent$permissions$check(
+  result_allowed <- permissions_check(
+    agent$permissions,
     "write_file",
     list(path = allowed_path, content = "data"),
     list()
@@ -287,7 +304,8 @@ test_that("Agent respects working directory restriction", {
 
   # Write outside allowed dir should be denied
   outside_path <- file.path(dirname(temp_dir), "outside.txt")
-  result_denied <- agent$permissions$check(
+  result_denied <- permissions_check(
+    agent$permissions,
     "write_file",
     list(path = outside_path, content = "data"),
     list()
@@ -302,7 +320,7 @@ test_that("Agent uses custom permission callback", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(tool_read_file),
-    permissions = Permissions$new(
+    permissions = Permissions(
       can_use_tool = function(tool_name, tool_input, context) {
         callback_called <<- TRUE
         PermissionResultAllow()
@@ -310,7 +328,8 @@ test_that("Agent uses custom permission callback", {
     )
   )
 
-  result <- agent$permissions$check(
+  result <- permissions_check(
+    agent$permissions,
     "read_file",
     list(path = "test.txt"),
     list()
@@ -325,7 +344,7 @@ test_that("Permission callback errors result in deny (fail-safe)", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(tool_read_file),
-    permissions = Permissions$new(
+    permissions = Permissions(
       can_use_tool = function(tool_name, tool_input, context) {
         stop("Callback error!")
       }
@@ -334,7 +353,8 @@ test_that("Permission callback errors result in deny (fail-safe)", {
 
   # Should deny when callback errors (fail-safe behavior)
   suppressWarnings({
-    result <- agent$permissions$check(
+    result <- permissions_check(
+      agent$permissions,
       "read_file",
       list(path = "test.txt"),
       list()
@@ -350,7 +370,7 @@ test_that("Permission callback invalid return results in deny", {
   agent <- Agent$new(
     chat = mock_chat,
     tools = list(tool_read_file),
-    permissions = Permissions$new(
+    permissions = Permissions(
       can_use_tool = function(tool_name, tool_input, context) {
         # Return invalid type
         "not a PermissionResult"
@@ -359,7 +379,8 @@ test_that("Permission callback invalid return results in deny", {
   )
 
   suppressWarnings({
-    result <- agent$permissions$check(
+    result <- permissions_check(
+      agent$permissions,
       "read_file",
       list(path = "test.txt"),
       list()
@@ -377,9 +398,10 @@ test_that("Agent respects bash permission", {
   agent_no_bash <- Agent$new(
     chat = mock_chat,
     tools = list(tool_run_bash),
-    permissions = Permissions$new(bash = FALSE)
+    permissions = Permissions(bash = FALSE)
   )
-  result_no_bash <- agent_no_bash$permissions$check(
+  result_no_bash <- permissions_check(
+    agent_no_bash$permissions,
     "run_bash",
     list(command = "echo test"),
     list()
@@ -390,9 +412,10 @@ test_that("Agent respects bash permission", {
   agent_bash <- Agent$new(
     chat = create_mock_chat(),
     tools = list(tool_run_bash),
-    permissions = Permissions$new(bash = TRUE)
+    permissions = Permissions(bash = TRUE)
   )
-  result_bash <- agent_bash$permissions$check(
+  result_bash <- permissions_check(
+    agent_bash$permissions,
     "run_bash",
     list(command = "echo test"),
     list()
@@ -407,9 +430,10 @@ test_that("Agent respects r_code permission", {
   agent_no_r <- Agent$new(
     chat = mock_chat,
     tools = list(tool_run_r_code),
-    permissions = Permissions$new(r_code = FALSE)
+    permissions = Permissions(r_code = FALSE)
   )
-  result_no_r <- agent_no_r$permissions$check(
+  result_no_r <- permissions_check(
+    agent_no_r$permissions,
     "run_r_code",
     list(code = "1 + 1"),
     list()
@@ -420,9 +444,10 @@ test_that("Agent respects r_code permission", {
   agent_r <- Agent$new(
     chat = create_mock_chat(),
     tools = list(tool_run_r_code),
-    permissions = Permissions$new(r_code = TRUE)
+    permissions = Permissions(r_code = TRUE)
   )
-  result_r <- agent_r$permissions$check(
+  result_r <- permissions_check(
+    agent_r$permissions,
     "run_r_code",
     list(code = "1 + 1"),
     list()
@@ -439,7 +464,8 @@ test_that("full mode allows everything", {
   )
 
   # Even bash should be allowed
-  result_bash <- agent$permissions$check(
+  result_bash <- permissions_check(
+    agent$permissions,
     "run_bash",
     list(command = "rm -rf /"),
     list()
@@ -447,10 +473,30 @@ test_that("full mode allows everything", {
   expect_s3_class(result_bash, "PermissionResultAllow")
 
   # File write should be allowed
-  result_write <- agent$permissions$check(
+  result_write <- permissions_check(
+    agent$permissions,
     "write_file",
     list(path = "/etc/passwd", content = "bad"),
     list()
   )
   expect_s3_class(result_write, "PermissionResultAllow")
+})
+
+test_that("Agents require an S7 policy and cannot replace their authority ceiling", {
+  expect_snapshot(
+    error = TRUE,
+    Agent$new(chat = create_mock_chat(), permissions = list(mode = "full"))
+  )
+  policy <- Permissions(file_write = FALSE, r_code = FALSE)
+  agent <- Agent$new(chat = create_mock_chat(), permissions = policy)
+  replacement <- unserialize(serialize(permissions_full(), NULL))
+  expect_snapshot(error = TRUE, agent$permissions <- replacement)
+  agent$set_permission_mode("readonly")
+  expect_identical(policy@mode, "standard")
+  expect_identical(agent$permissions@mode, "readonly")
+  expect_s7_class(agent$permissions, Permissions)
+  expect_s3_class(
+    permissions_check(agent$permissions, "run_r_code", list(code = "1 + 1")),
+    "PermissionResultDeny"
+  )
 })

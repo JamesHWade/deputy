@@ -165,221 +165,314 @@ S7::method(print, AgentEvent) <- function(x, ...) {
   invisible(x)
 }
 
-#' Agent Result R6 Class
+#' Create a completed agent result
 #'
 #' @description
-#' Contains the result of an agent task execution, including the final response,
-#' conversation history, cost information, and all events that occurred during
-#' execution.
+#' A read-only S7 snapshot of a governed run. It contains original ellmer turns,
+#' Deputy events, usage, and correlation metadata. Read properties with
+#' `S7::prop(result, "response")` or `$`; use [result_n_turns()],
+#' [result_tool_calls()], [result_tool_results()], [result_text_chunks()], and
+#' [result_is_success()] for inspection.
 #'
+#' All properties are read-only, including previously writable R6 fields.
+#' Ordinary nested lists use R value semantics. Embedded provider objects,
+#' conditions, environments, and closures retain their own reference semantics;
+#' the result does not deep-copy or sanitize their contents. Run context is
+#' separately normalized to canonical JSON-compatible values.
+#'
+#' @param response Final text response, or `NULL`.
+#' @param turns List of original conversation turns.
+#' @param cost Cost information, including provider coverage metadata, or
+#'   `NULL`. An incomplete total is `NA_real_`.
+#' @param events List of [AgentEvent] objects.
+#' @param duration Finite, nonnegative duration in seconds, or `NULL`.
+#' @param stop_reason One nonempty stop-reason string.
+#' @param structured_output Parsed structured output, if any.
+#' @param session_id,run_id,agent_id,agent_name,parent_agent_id,parent_run_id,delegation_id
+#'   Optional nonempty correlation and identity strings.
+#' @param usage Run-scoped [AgentUsage], or `NULL`.
+#' @param run_context Canonical product context for the run.
+#' @return An `AgentResult` S7 object.
+#' @examples
+#' result <- AgentResult(response = "Done", events = list(
+#'   AgentEvent("text", text = "Done")
+#' ))
+#' result_is_success(result)
+#' result_text_chunks(result)
 #' @export
-AgentResult <- R6::R6Class(
+AgentResult <- S7::new_class(
   "AgentResult",
-
-  public = list(
-    #' @field response The final text response from the agent
+  package = "deputy",
+  properties = list(
+    response = readonly_property(
+      "response",
+      S7::new_union(NULL, S7::class_character)
+    ),
+    turns = readonly_property("turns", S7::class_list),
+    cost = readonly_property(
+      "cost",
+      S7::new_union(NULL, S7::class_list)
+    ),
+    events = readonly_property("events", S7::class_list),
+    duration = readonly_property(
+      "duration",
+      S7::new_union(NULL, S7::class_numeric)
+    ),
+    stop_reason = readonly_property("stop_reason", S7::class_character),
+    structured_output = readonly_property("structured_output", S7::class_any),
+    session_id = readonly_property(
+      "session_id",
+      S7::new_union(NULL, S7::class_character)
+    ),
+    run_id = readonly_property(
+      "run_id",
+      S7::new_union(NULL, S7::class_character)
+    ),
+    usage = readonly_property(
+      "usage",
+      S7::new_union(NULL, S7::new_S3_class("AgentUsage"))
+    ),
+    agent_id = readonly_property(
+      "agent_id",
+      S7::new_union(NULL, S7::class_character)
+    ),
+    agent_name = readonly_property(
+      "agent_name",
+      S7::new_union(NULL, S7::class_character)
+    ),
+    parent_agent_id = readonly_property(
+      "parent_agent_id",
+      S7::new_union(NULL, S7::class_character)
+    ),
+    parent_run_id = readonly_property(
+      "parent_run_id",
+      S7::new_union(NULL, S7::class_character)
+    ),
+    delegation_id = readonly_property(
+      "delegation_id",
+      S7::new_union(NULL, S7::class_character)
+    ),
+    run_context = readonly_property("run_context", S7::class_list)
+  ),
+  constructor = function(
     response = NULL,
-
-    #' @field turns List of conversation turns
-    turns = NULL,
-
-    #' @field cost Cost information with input, output, cached, total,
-    #'   complete, and missing fields. An incomplete total is `NA_real_`.
-    cost = NULL,
-
-    #' @field events List of all AgentEvent objects from execution
-    events = NULL,
-
-    #' @field duration Execution duration in seconds
+    turns = list(),
+    cost = list(
+      input = 0,
+      output = 0,
+      cached = 0,
+      total = 0,
+      complete = TRUE,
+      missing = 0L
+    ),
+    events = list(),
     duration = NULL,
-
-    #' @field stop_reason Reason the agent stopped
-    stop_reason = NULL,
-
-    #' @field structured_output Data converted by ellmer using the requested type (if any)
+    stop_reason = "complete",
     structured_output = NULL,
-
-    #' @field session_id Stable session identifier for run correlation
     session_id = NULL,
-
-    #' @field run_id Unique identifier shared by events from this run
     run_id = NULL,
-
-    #' @field agent_id Immutable identifier for the Agent instance
+    usage = AgentUsage(),
     agent_id = NULL,
-
-    #' @field agent_name Optional human-readable Agent name
     agent_name = NULL,
-
-    #' @field parent_agent_id Parent Agent identifier for delegated runs
     parent_agent_id = NULL,
-
-    #' @field parent_run_id Parent run identifier for delegated runs
     parent_run_id = NULL,
-
-    #' @field delegation_id Delegation identifier for delegated runs
     delegation_id = NULL,
-
-    #' @field usage Run-scoped [AgentUsage]
-    usage = NULL,
-
-    #' @description
-    #' Create a new AgentResult object.
-    #'
-    #' @param response Final text response
-    #' @param turns List of conversation turns
-    #' @param cost Cost information, including provider coverage metadata
-    #' @param events List of AgentEvent objects
-    #' @param duration Execution duration in seconds
-    #' @param stop_reason Reason for stopping
-    #' @param structured_output Parsed structured output (if any)
-    #' @param session_id Stable session identifier (if any)
-    #' @param run_id Unique run identifier (if any)
-    #' @param usage Run-scoped [AgentUsage]
-    #' @param agent_id Agent instance identifier (if any)
-    #' @param agent_name Optional human-readable Agent name
-    #' @param parent_agent_id Parent Agent identifier for delegated runs
-    #' @param parent_run_id Parent run identifier for delegated runs
-    #' @param delegation_id Delegation identifier for delegated runs
-    #' @param run_context Immutable product context for this run
-    #' @return A new `AgentResult` object
-    initialize = function(
-      response = NULL,
-      turns = list(),
-      cost = list(
-        input = 0,
-        output = 0,
-        cached = 0,
-        total = 0,
-        complete = TRUE,
-        missing = 0L
-      ),
-      events = list(),
-      duration = NULL,
-      stop_reason = "complete",
-      structured_output = NULL,
-      session_id = NULL,
-      run_id = NULL,
-      usage = AgentUsage(),
-      agent_id = NULL,
-      agent_name = NULL,
-      parent_agent_id = NULL,
-      parent_run_id = NULL,
-      delegation_id = NULL,
-      run_context = list()
-    ) {
-      self$response <- response
-      self$turns <- turns
-      self$cost <- cost
-      self$events <- events
-      self$duration <- duration
-      self$stop_reason <- stop_reason
-      self$structured_output <- structured_output
-      self$session_id <- session_id
-      self$run_id <- run_id
-      self$agent_id <- agent_id
-      self$agent_name <- agent_name
-      self$parent_agent_id <- parent_agent_id
-      self$parent_run_id <- parent_run_id
-      self$delegation_id <- delegation_id
-      private$.run_context <- normalize_run_context(run_context)
-      self$usage <- usage
-    },
-
-    #' @description
-    #' Get the number of turns in the conversation.
-    #' @return Integer count of turns
-    n_turns = function() {
-      length(self$turns)
-    },
-
-    #' @description
-    #' Get all tool calls made during execution.
-    #' @return List of tool_start events
-    tool_calls = function() {
-      Filter(function(e) e$type == "tool_start", self$events)
-    },
-
-    #' @description
-    #' Get all completed tool events from execution.
-    #' @return List of `tool_end` events
-    tool_results = function() {
-      Filter(function(e) e$type == "tool_end", self$events)
-    },
-
-    #' @description
-    #' Get all text chunks from the response.
-    #' @return Character vector of text chunks
-    text_chunks = function() {
-      text_events <- Filter(function(e) e$type == "text", self$events)
-      sapply(text_events, function(e) e$text)
-    },
-
-    #' @description
-    #' Check if the agent completed successfully.
-    #' @return Logical indicating success
-    is_success = function() {
-      self$stop_reason == "complete"
-    },
-
-    #' @description
-    #' Print the result summary.
-    print = function() {
-      cli::cat_line(cli::cli_format_method({
-        cli::cli_text("<AgentResult>")
-        cli::cli_div(theme = list(div = list("margin-left" = 2)))
-        cli::cli_text("status: {self$stop_reason}")
-        cli::cli_text("turns: {self$n_turns()}")
-        cli::cli_text("tool_calls: {length(self$tool_calls())}")
-
-        if (!is.null(self$duration)) {
-          cli::cli_text("duration: {round(self$duration, 2)} seconds")
-        }
-
-        if (!is.null(self$cost) && !is.null(self$cost$total)) {
-          cli::cli_text("cost: {format_cost(self$cost$total)}")
-        }
-
-        if (!is.null(self$response)) {
-          cli::cli_text("response: {truncate_string(self$response, 60)}")
-        }
-        if (!is.null(self$session_id)) {
-          cli::cli_text("session_id: {self$session_id}")
-        }
-        if (!is.null(self$run_id)) {
-          cli::cli_text("run_id: {self$run_id}")
-        }
-        if (!is.null(self$agent_id)) {
-          cli::cli_text("agent_id: {self$agent_id}")
-        }
-        if (!is.null(self$delegation_id)) {
-          cli::cli_text("delegation_id: {self$delegation_id}")
-        }
-        if (!is.null(self$usage)) {
-          cli::cli_text("requests: {self$usage$requests}")
-          cli::cli_text("tokens: {self$usage$total_tokens}")
-        }
-        if (!is.null(self$structured_output)) {
-          cli::cli_text(
-            "  structured_output: <{class(self$structured_output)[[1L]]}>"
-          )
-        }
-      }))
-      invisible(self)
-    }
-  ),
-
-  active = list(
-    #' @field run_context Canonical product context for the run. Read-only.
-    run_context = function(value) {
-      if (missing(value)) {
-        return(clone_run_context(private$.run_context))
+    run_context = list()
+  ) {
+    ids <- list(
+      session_id = session_id,
+      run_id = run_id,
+      agent_id = agent_id,
+      agent_name = agent_name,
+      parent_agent_id = parent_agent_id,
+      parent_run_id = parent_run_id,
+      delegation_id = delegation_id
+    )
+    for (name in names(ids)) {
+      if (!is.null(ids[[name]]) && !is_nonempty_string(ids[[name]])) {
+        cli_abort("{.arg {name}} must be NULL or one non-empty string")
       }
-      cli_abort("Cannot modify AgentResult: run_context is immutable")
     }
-  ),
-
-  private = list(
-    .run_context = list()
-  )
+    if (!is_nonempty_string(stop_reason)) {
+      cli_abort("{.arg stop_reason} must be one non-empty string")
+    }
+    if (
+      !is.null(response) &&
+        (!is.character(response) || length(response) != 1L || is.na(response))
+    ) {
+      cli_abort("{.arg response} must be NULL or one non-missing string")
+    }
+    if (
+      !is.null(duration) &&
+        (!is.numeric(duration) ||
+          length(duration) != 1L ||
+          !is.finite(duration) ||
+          duration < 0)
+    ) {
+      cli_abort("{.arg duration} must be NULL or one finite nonnegative number")
+    }
+    if (
+      !is.list(events) ||
+        !all(vapply(events, S7::S7_inherits, logical(1), class = AgentEvent))
+    ) {
+      cli_abort("{.arg events} must be a list of AgentEvent objects")
+    }
+    run_context <- normalize_run_context(run_context)
+    value <- S7::new_object(
+      S7::S7_object(),
+      response = response,
+      turns = turns,
+      cost = cost,
+      events = events,
+      duration = duration,
+      stop_reason = stop_reason,
+      structured_output = structured_output,
+      session_id = session_id,
+      run_id = run_id,
+      usage = usage,
+      agent_id = agent_id,
+      agent_name = agent_name,
+      parent_agent_id = parent_agent_id,
+      parent_run_id = parent_run_id,
+      delegation_id = delegation_id,
+      run_context = run_context
+    )
+    freeze_value(value)
+  }
 )
+
+local({
+  S7::method(`$`, AgentResult) <- function(x, name) S7::prop(x, name)
+})
+
+#' Count conversation turns
+#'
+#' @param result An [AgentResult] S7 value.
+#' @return Integer count of turns.
+#' @export
+result_n_turns <- S7::new_generic("result_n_turns", "result", function(result) {
+  S7::S7_dispatch()
+})
+
+S7::method(result_n_turns, AgentResult) <- function(result) {
+  length(result@turns)
+}
+
+#' Inspect tool calls
+#'
+#' @param result An [AgentResult] S7 value.
+#' @return List of `tool_start` events.
+#' @export
+result_tool_calls <- S7::new_generic(
+  "result_tool_calls",
+  "result",
+  function(result) {
+    S7::S7_dispatch()
+  }
+)
+
+S7::method(result_tool_calls, AgentResult) <- function(result) {
+  Filter(function(e) e$type == "tool_start", result@events)
+}
+
+#' Inspect completed tool calls
+#'
+#' @param result An [AgentResult] S7 value.
+#' @return List of `tool_end` events.
+#' @export
+result_tool_results <- S7::new_generic(
+  "result_tool_results",
+  "result",
+  function(result) {
+    S7::S7_dispatch()
+  }
+)
+
+S7::method(result_tool_results, AgentResult) <- function(result) {
+  Filter(function(e) e$type == "tool_end", result@events)
+}
+
+#' Inspect streamed text
+#'
+#' @param result An [AgentResult] S7 value.
+#' @return Character vector of text chunks; empty when none were emitted.
+#'   Missing and non-character text payloads are ignored. Character-vector
+#'   payloads are flattened in event order.
+#' @export
+result_text_chunks <- S7::new_generic(
+  "result_text_chunks",
+  "result",
+  function(result) {
+    S7::S7_dispatch()
+  }
+)
+
+S7::method(result_text_chunks, AgentResult) <- function(result) {
+  text_events <- Filter(
+    function(e) e$type == "text" && is.character(e$text),
+    result@events
+  )
+  unlist(lapply(text_events, function(e) e$text), use.names = FALSE) %||%
+    character()
+}
+
+#' Inspect run success
+#'
+#' @param result An [AgentResult] S7 value.
+#' @return Whether the stop reason is `"complete"`.
+#' @export
+result_is_success <- S7::new_generic(
+  "result_is_success",
+  "result",
+  function(result) {
+    S7::S7_dispatch()
+  }
+)
+
+S7::method(result_is_success, AgentResult) <- function(result) {
+  result@stop_reason == "complete"
+}
+
+S7::method(print, AgentResult) <- function(x, ...) {
+  cli::cat_line(cli::cli_format_method({
+    cli::cli_text("<AgentResult>")
+    cli::cli_div(theme = list(div = list("margin-left" = 2)))
+    cli::cli_text("status: {x@stop_reason}")
+    cli::cli_text("turns: {result_n_turns(x)}")
+    cli::cli_text("tool_calls: {length(result_tool_calls(x))}")
+
+    if (!is.null(x@duration)) {
+      cli::cli_text("duration: {round(x@duration, 2)} seconds")
+    }
+
+    if (!is.null(x@cost) && !is.null(x@cost$total)) {
+      cli::cli_text("cost: {format_cost(x@cost$total)}")
+    }
+
+    if (!is.null(x@response)) {
+      cli::cli_text("response: {truncate_string(x@response, 60)}")
+    }
+    if (!is.null(x@session_id)) {
+      cli::cli_text("session_id: {x@session_id}")
+    }
+    if (!is.null(x@run_id)) {
+      cli::cli_text("run_id: {x@run_id}")
+    }
+    if (!is.null(x@agent_id)) {
+      cli::cli_text("agent_id: {x@agent_id}")
+    }
+    if (!is.null(x@delegation_id)) {
+      cli::cli_text("delegation_id: {x@delegation_id}")
+    }
+    if (!is.null(x@usage)) {
+      cli::cli_text("requests: {x@usage$requests}")
+      cli::cli_text("tokens: {x@usage$total_tokens}")
+    }
+    if (!is.null(x@structured_output)) {
+      cli::cli_text(
+        "  structured_output: <{class(x@structured_output)[[1L]]}>"
+      )
+    }
+  }))
+  invisible(x)
+}

@@ -23,7 +23,7 @@ test_that("run_async resolves to an AgentResult with the final turn's text", {
   expect_true(promises::is.promising(promise))
 
   result <- resolve_async_value(promise)
-  expect_s3_class(result, "AgentResult")
+  expect_s7_class(result, AgentResult)
   # Text before the tool call is narration; only the last turn survives.
   expect_identical(result$response, "Final answer")
   expect_identical(result$stop_reason, "complete")

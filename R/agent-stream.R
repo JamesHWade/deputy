@@ -259,7 +259,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         NULL
       }
 
-      AgentResult$new(
+      AgentResult(
         response = response,
         turns = private$.chat$get_turns(),
         cost = state$cost %||% self$cost(),

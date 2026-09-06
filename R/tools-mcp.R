@@ -135,7 +135,7 @@ validate_mcp_repl_sandbox_server <- function(server, sandbox) {
 #' agent <- Agent$new(
 #'   chat = ellmer::chat("openai/gpt-5.6-luna"),
 #'   tools = repl_tools,
-#'   permissions = Permissions$new(web = FALSE)
+#'   permissions = Permissions(web = FALSE)
 #' )
 #' }
 tools_mcp_repl <- function(

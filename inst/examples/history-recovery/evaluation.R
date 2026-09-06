@@ -277,7 +277,7 @@ history_prepare <- function(
         open_world_hint = FALSE
       )
     )),
-    permissions = deputy::Permissions$new(
+    permissions = deputy::Permissions(
       mode = "readonly",
       file_write = FALSE,
       tool_allowlist = "load_checkpoint"
@@ -336,7 +336,10 @@ history_prepare <- function(
       paste(trial_id, "prepare", i, sep = "/"),
       max_run_requests = 5L
     )
-    if (!is.null(outcome$error_class) || !outcome$result$is_success()) {
+    if (
+      !is.null(outcome$error_class) ||
+        !deputy::result_is_success(outcome$result)
+    ) {
       cli::cli_abort(
         "Context preparation stopped; do not score an unfinished trial.",
         class = "history_evaluation_incomplete"
@@ -419,7 +422,7 @@ history_continue <- function(
   agent <- deputy::Agent$new(
     chat,
     tools = tools,
-    permissions = deputy::Permissions$new(
+    permissions = deputy::Permissions(
       mode = "readonly",
       file_write = FALSE,
       tool_allowlist = c("history_search", "history_read")
@@ -442,7 +445,9 @@ history_continue <- function(
     type = history_answer_type()
   )
   result <- outcome$result
-  answer <- if (is.null(outcome$error_class) && result$is_success()) {
+  answer <- if (
+    is.null(outcome$error_class) && deputy::result_is_success(result)
+  ) {
     result$structured_output
   } else {
     NULL

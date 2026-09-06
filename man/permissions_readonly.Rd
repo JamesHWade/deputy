@@ -15,6 +15,6 @@ All write operations, code execution, and web access are denied.
 }
 \examples{
 perms <- permissions_readonly()
-perms$check("read_file", list(path = "test.txt"))
+permissions_check(perms, "read_file", list(path = "test.txt"))
 
 }
