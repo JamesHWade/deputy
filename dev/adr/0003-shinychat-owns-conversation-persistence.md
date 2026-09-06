@@ -1,32 +1,52 @@
-# shinychat owns conversation persistence
+# Hosts own conversation persistence
 
-deputy and shinychat both persist conversations: deputy through `Agent$save_session()` / `load_session()` / `session_id()`, shinychat through `ConversationStore` with its own ids, partitions and scoping. shinychat's store is authoritative. deputy's job is to produce and consume conversation state, not to own where it lives.
+Revised 2026-09-05: shinychat integration is optional. Its upstream history API
+discussion does not block Deputy implementation or evaluation.
+
+The host owns durable conversation history, identity, branch selection and
+storage. Deputy consumes the selected context and owns permissions, run limits,
+execution state and session snapshots. A host using shinychat can retain
+shinychat's conversation format and branch semantics when a supported adapter
+is available.
 
 ## Why
 
-shinychat's model is strictly richer. A stored record is a **tree** — `nodes` with `selected_child` links, a `current_leaf` pointer, and helpers that walk a path from root to leaf — because branching is what edit, retry and regenerate need in the UI. deputy's snapshot is a flat serialization of one conversation. Anything deputy built on top of its own format would have to grow into that tree eventually, and would then be a second, worse implementation of a structure that already exists.
+An Agent's compacted context and session snapshot are not a complete conversation
+archive. A host must retain original evidence independently if later runs need
+to recover it. Coupling this boundary to an unreleased shinychat API would block
+headless workers and history-recovery work that already runs with caller-owned
+records and released ellmer APIs.
 
-The store also works headless. `FileConversationStore$new(dir)` instantiates and round-trips outside a Shiny session, so deferring to it does not make persistence Shiny-only and stays consistent with ADR-0002.
+The original decision chose shinychat as the universal persistence owner. This
+revision retains host ownership without requiring every host to use that store.
+It does not introduce a Deputy conversation database or copy shinychat's tree.
 
-## Consequences
+## Implementation boundary
 
-- **Conversation forking is largely already built.** `current_leaf` plus `nodes` is a branching model; a fork is selecting a different leaf, not copying a record. See issue #62, whose scope shrinks accordingly.
-- **deputy needs API from shinychat that is currently internal.** `conversation_partition()` is unexported, so a partition — required by every `put()`, `get()` and `list()` call — cannot be constructed by another package without `:::`, which is not acceptable in a released package. The branching helpers (`record_set_current_leaf()`, `record_path_node_ids()`, `record_subtree_leaf()`) are likewise internal. **This decision is blocked on an upstream export request.**
-- **`save_session()` / `load_session()` become the headless fallback**, not the primary mechanism, and should not grow features that duplicate the store.
-- **Correlation is still deputy's problem.** `Agent$session_id()` and a shinychat conversation id are different identifiers, and runs, delegations and checkpoints key off deputy's. The mapping between them has to be explicit.
-- **The record schema is shinychat's to change**, and deputy tracks it. This is not a reluctant cost. deputy and shinychat are meant to work well together and stay in sync, which means following upstream rather than insulating against it. Insulation would mean a translation layer, and a translation layer is how two packages drift apart while appearing to cooperate.
+- Continue bounded recovery with caller-owned records, as exercised in
+  `inst/examples/history-recovery/`. This example is the current producer, not
+  a new public persistence API.
+- The host binds owner, conversation, Agent and selected branch before exposing
+  history tools. Stable source IDs and revisions support stale-reference checks;
+  reads preserve provenance and enforce per-response and aggregate budgets.
+- Retrieved history supplies evidence. Current host policy supplies execution
+  authority; conversation text and saved metadata cannot restore permissions.
+- `Agent$save_session()` and `load_session()` remain supported execution
+  snapshots. Removed turns are recoverable only if the host retained them
+  independently. Session IDs and host conversation IDs require explicit mapping.
+- Branch restoration and hosted resume must be proved against the chosen host's
+  history producer. The recovery fixture alone does not establish durable
+  storage, branch editing or restart behavior for a production host.
 
-## Timing
+## Optional shinychat integration
 
-The store API described here is not part of the released shinychat dependency
-targeted by deputy 0.1.0. This decision therefore describes planned integration,
-not functionality in the CRAN package.
+Await the upstream outcome tracked in #66 and
+[`dev/shinychat-history-consumer.md`](../shinychat-history-consumer.md). Only the
+adapter is gated on a supported, released public R contract and focused
+integration tests under ADR-0004. Use public APIs; do not depend on private tree
+fields or store helpers. A future adapter must preserve the same authorization,
+revision and bounded-read behavior as other host-supplied history.
 
-Before deputy can depend on the store:
-
-- The required API must ship in a shinychat release and deputy must declare that
-  released version as its minimum. Focused checks against upstream development
-  versions can inform the integration work, but they do not replace the
-  released-dependency CI policy in ADR-0004.
-- deputy needs actual shinychat integration tests. There are currently none,
-  despite ADR-0002 naming it the primary host.
+Implementation and evaluation under #112 can proceed independently. Live-model
+quality conclusions still require authorized repeated trials; removing the
+shinychat prerequisite does not supply that evidence.

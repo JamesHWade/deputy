@@ -602,7 +602,10 @@ emitted into model context.}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    The complete original R value.
+    The complete stored R value. Content evidence offloaded during
+compaction uses its public text representation.
+Compaction may retire superseded internal catalog URIs after installing
+their replacement; saved sessions retain their catalog snapshots.
   }
 }
 

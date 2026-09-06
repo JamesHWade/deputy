@@ -21,7 +21,11 @@ local_runtime_server <- function(responses, .local_envir = parent.frame()) {
             list(body = request, path = req$PATH_INFO),
             file.path(directory, sprintf("%04d.rds", count))
           )
-          response <- responses[[min(count, length(responses))]]
+          response <- if (is.function(responses)) {
+            responses(request, count)
+          } else {
+            responses[[min(count, length(responses))]]
+          }
           delay <- attr(response, "fixture_delay")
           if (is.null(delay)) {
             response

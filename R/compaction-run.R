@@ -3,6 +3,7 @@
 governed_compaction <- function(agent, messages) {
   private <- agent$.__enclos_env__$private
   state <- private$current_run_state
+  artifacts <- NULL
   operation <- coro::async(function() {
     policy <- private$.context_policy
     if (
@@ -39,6 +40,7 @@ governed_compaction <- function(agent, messages) {
       turns_compacted = length(plan$turns_to_compact),
       turns_kept = length(plan$turns_to_keep)
     ))
+    artifacts <<- private$begin_compaction_artifacts()
     if (is.null(plan$summary)) {
       generated <- coro::await(compaction_summary_requests(
         agent,
@@ -67,6 +69,9 @@ governed_compaction <- function(agent, messages) {
     compaction_can_continue(agent)
     result
   })()
+  operation <- promises::finally(operation, function() {
+    if (!is.null(artifacts)) private$finish_compaction_artifacts(artifacts)
+  })
   promises::catch(operation, function(error) {
     state$failure_phase <- "compaction"
     rlang::cnd_signal(error)
