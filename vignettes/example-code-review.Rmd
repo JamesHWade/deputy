@@ -15,25 +15,10 @@ knitr::opts_chunk$set(
 )
 ```
 
-This example builds a code review system using multiple specialised agents
-coordinated by a lead agent. Each reviewer focuses on a different aspect
-of code quality, and the lead synthesises their findings into a structured
-report.
-
-This follows the **Orchestrator-Workers** pattern: a lead agent delegates
-to specialised sub-agents, each with their own expertise and tools.
-
-## When to Use Multi-Agent
-
-Multi-agent orchestration works well when:
-
-- Different aspects of a task need different expertise
-- Sub-tasks benefit from isolated system prompts
-- You want per-agent audit trails and cost tracking
-- A single "do everything" prompt would be too broad
-
-For simpler tasks, a single agent is usually enough. For sequential
-pipelines, see `vignette("example-extraction-pipeline")`.
+This example assigns separate reviewers to bugs, code style, and documentation
+in an R package. A lead agent combines their findings into a report. Each
+reviewer has its own prompt and conversation, so you can inspect its results
+separately.
 
 ## Define the Reviewer Agents
 

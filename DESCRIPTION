@@ -1,17 +1,14 @@
 Package: deputy
-Title: Governed Agentic Artificial Intelligence Workflows
+Title: Run Tasks with Language Models and R Tools
 Version: 0.0.0.9000
 Authors@R:
     person("James", "Wade", , "github@jameshwade.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0002-9740-1905"))
-Description: Run provider-agnostic, agentic artificial intelligence (AI)
-    workflows with explicit boundaries for tools, permissions, budgets, and
-    filesystem access. Builds on 'ellmer' to provide multi-step reasoning,
-    lifecycle hooks, structured events, human input, session persistence, and
-    delegation. Returns inspectable results and supports synchronous,
-    asynchronous, terminal, and 'Shiny' hosts. Designed for applications that
-    need governance and observability around tool-using language models in
-    'R'.
+Description: Run tasks with language models and R tools using 'ellmer'.
+    Control tool access with permissions, set limits on requests and usage,
+    and inspect responses, tool calls, and the reason each run stopped.
+    Supports streaming output, 'Shiny' applications, saved conversations,
+    file checkpoints, and delegation to other agents.
 URL: https://github.com/JamesHWade/deputy, https://jameshwade.github.io/deputy/
 BugReports: https://github.com/JamesHWade/deputy/issues
 License: MIT + file LICENSE

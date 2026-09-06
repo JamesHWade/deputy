@@ -4,24 +4,19 @@
 \name{deputy-package}
 \alias{deputy-package}
 \alias{deputy}
-\title{deputy: Governed Agentic Artificial Intelligence Workflows}
+\title{deputy: Run Tasks with Language Models and R Tools}
 \description{
 \if{html}{\figure{logo.svg}{options: style='float: right' alt='logo' width='120'}}
 
-Run provider-agnostic, agentic artificial intelligence (AI) workflows with explicit boundaries for tools, permissions, budgets, and filesystem access. Builds on 'ellmer' to provide multi-step reasoning, lifecycle hooks, structured events, human input, session persistence, and delegation. Returns inspectable results and supports synchronous, asynchronous, terminal, and 'Shiny' hosts. Designed for applications that need governance and observability around tool-using language models in 'R'.
-
-A provider-agnostic framework for building agentic AI workflows in R.
-Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, human-in-the-loop capabilities, and multi-agent
-delegation.
+Run tasks with language models and R tools using 'ellmer'. Control tool access with permissions, set limits on requests and usage, and inspect responses, tool calls, and the reason each run stopped. Supports streaming output, 'Shiny' applications, saved conversations, file checkpoints, and delegation to other agents.
 }
 \section{Main Functions}{
 
 \itemize{
 \item \link{Agent} - The main class for creating agents
 \item \link{LeadAgent} - Coordinate specialized delegated agents
-\item \code{\link[=tools_preset]{tools_preset()}} - Curated built-in tool collections
-\item \code{\link[=UsageLimits]{UsageLimits()}} - Run-scoped request, tool, token, and cost limits
+\item \code{\link[=tools_preset]{tools_preset()}} - Choose a set of built-in tools
+\item \code{\link[=UsageLimits]{UsageLimits()}} - Set request, tool, token, and cost limits
 \item \code{\link[=permissions_standard]{permissions_standard()}} - Standard permission policy
 \item \code{\link[=permissions_plan]{permissions_plan()}} - Planning permission policy
 \item \code{\link[=permissions_readonly]{permissions_readonly()}} - Read-only permission policy
@@ -33,19 +28,17 @@ delegation.
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{library(deputy)
 
-# Create an agent with file tools
 agent <- Agent$new(
   chat = ellmer::chat("openai/gpt-5.6-luna"),
-  tools = tools_preset("standard")
+  tools = tools_preset("minimal"),
+  permissions = permissions_readonly(),
+  usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),
+  working_dir = getwd()
 )
 
-# Run a task with streaming output
-events <- agent$run("List files in current directory")
-repeat \{
-  event <- events()
-  if (coro::is_exhausted(event)) break
-  if (event$type == "text") cat(event$text)
-\}
+result <- agent$run_sync("Read DESCRIPTION and explain what this package does.")
+result$response
+result$stop_reason
 }\if{html}{\out{</div>}}
 }
 
