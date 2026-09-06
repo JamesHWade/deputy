@@ -6,17 +6,16 @@ template:
 
 navbar:
   structure:
-    left: [intro, reference, articles]
+    left: [intro, articles, reference]
     right: [search, github]
   components:
+    intro:
+      text: Get started
+      href: articles/getting-started.html
     articles:
       text: Articles
       menu:
-      - text: "Intro"
-      - text: Getting Started
-        href: articles/getting-started.html
-      - text: "---"
-      - text: "Concepts"
+      - text: "Guides"
       - text: Tools and Tool Bundles
         href: articles/tools.html
       - text: Permissions and Safety
@@ -24,7 +23,7 @@ navbar:
       - text: Hooks
         href: articles/hooks.html
       - text: "---"
-      - text: "Hosts"
+      - text: "Apps"
       - text: Shiny Chat
         href: articles/example-shiny-chat.html
       - text: "---"
@@ -47,7 +46,7 @@ navbar:
 reference:
 - title: Agent
 
-  desc: Core agent class for agentic AI workflows
+  desc: Run a task and inspect its response, tool calls, and usage.
   contents:
   - Agent
   - AgentResult
@@ -111,7 +110,7 @@ reference:
   - hook_limit_file_writes
 
 - title: Skills
-  desc: Extend agents with specialized capabilities
+  desc: Load reusable instructions for an agent.
   contents:
   - Skill
   - skill_load
@@ -127,7 +126,7 @@ reference:
   - agent_definition_read
 
 - title: Errors
-  desc: Identify structured Deputy conditions
+  desc: Catch errors by class and inspect their details.
   contents:
   - deputy-errors
   - is_deputy_error
@@ -137,12 +136,12 @@ articles:
   navbar: ~
   contents:
   - getting-started
-- title: Concepts
+- title: Guides
   contents:
   - tools
   - permissions
   - hooks
-- title: Hosts
+- title: Apps
   contents:
   - example-shiny-chat
 - title: Advanced

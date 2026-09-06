@@ -15,8 +15,9 @@ knitr::opts_chunk$set(
 )
 ```
 
-Tools are how agents interact with the world. deputy provides built-in tools
-for common tasks and makes it easy to create your own.
+Tools let a model call R functions: read a file, fetch a page, or run a
+calculation. Choose built-in tools or register functions with `ellmer::tool()`.
+Permissions determine which calls can run.
 
 ## Built-in Tools
 
@@ -44,77 +45,6 @@ whether the agent is allowed to use it. See `vignette("permissions")` for
 details.
 
 ## Tool Bundles
-
-Use `ellmer::tool()` for local functions, package exports, and service call
-wrappers, then register those objects through the same Agent API. Registration
-does not load packages or infer a function's effects. Describe them explicitly:
-
-```{r registration-contract, eval=TRUE}
-library(deputy)
-uppercase <- ellmer::tool(
-  base::toupper,
-  name = "uppercase",
-  description = "Uppercase local text.",
-  arguments = list(x = ellmer::type_string()),
-  annotations = ellmer::tool_annotations(
-    read_only_hint = TRUE, destructive_hint = FALSE,
-    open_world_hint = FALSE, idempotent_hint = TRUE
-  )
-)
-# Constructing this Chat does not make a model request.
-chat <- ellmer::chat_openai(credentials = function() "example", model = "gpt-5.6-luna")
-agent <- Agent$new(chat = chat, tools = list(uppercase))
-agent$get_tools()$uppercase("hello")
-agent$register_tool(uppercase, replace = TRUE)
-```
-
-Existing names are errors unless `replace = TRUE` is explicit. Repeated names
-inside one batch always fail, including with replacement enabled. List names
-do not rename a tool. `set_tools()` replaces the whole user registry. Both
-methods and construction validate and adapt the complete batch before changing
-the backend registry; a malformed later tool leaves earlier tools untouched.
-Skills use `load_skill(..., allow_conflicts = TRUE)` for explicit replacement.
-
-Missing annotations stay absent on the source object. For custom tools,
-permissions assume possible modification, destruction, and external access,
-and no idempotence. An explicit read-only annotation makes an omitted
-destructive annotation irrelevant. A local read tool therefore needs at least
-`read_only_hint = TRUE` and `open_world_hint = FALSE` under standard permissions.
-Readonly mode additionally requires an explicit allowlist entry for custom
-tools. Annotations do not grant authority or verify a service's trustworthiness.
-See `PermissionMode` for callback and mode behavior.
-
-Inspect the supplied fields and defaults without executing the tool:
-
-```{r tool-metadata, eval=TRUE}
-tool_metadata(agent$get_tools()$uppercase)
-```
-
-For service tools, `tools_mcp(config, servers = "evidence")` selects an exact
-configured server name before connecting. The qualified mcptools 1.0.2 bridge
-retains annotations from the server and records `source$type = "mcp"`, its
-server name, and tool name. It reports missing metadata rather than inventing
-safe effects. Other mcptools versions fail explicitly pending qualification.
-The caller must trust the configured service; metadata does not establish trust.
-
-Pass these objects to `Agent$new(tools = ...)`, `register_tools()`, or an
-explicit tool registry used by `agent_definition_read()`. The same metadata
-survives YAML selection, Agent wrapping, cloning, and delegation. Permission
-callbacks receive it as `context$tool_metadata`, alongside the supplied
-`context$tool_annotations`. A service called `read_file` still uses its service
-annotations and capabilities; its name does not confer native file access.
-Local file checkpointing excludes MCP calls, so rewinding files never treats a
-remote service write as a change to the local workspace.
-
-Reconnecting a server invalidates tools from its old connection. Reload and
-replace explicitly with `agent$load_mcp(config, servers = "evidence", replace = TRUE)`.
-This refresh removes obsolete tools from the selected servers, including when
-discovery succeeds with an empty tool set. Unrelated tools remain registered.
-A load failure records a failed attempt in `mcp_status()`. Tools that still
-have working connections remain registered. If mcptools already closed an
-old connection, its invalidated handles are removed even when discovery or
-registration fails. Malformed metadata never silently becomes an unannotated
-executable.
 
 Bundles group related tools together:
 
@@ -159,22 +89,19 @@ tools_preset("full")
 | `dev` | native files plus trusted R and shell execution |
 | `full` | every built-in tool |
 
-## Creating Custom Tools
+## Create a tool from an R function
 
-Use `ellmer::tool()` to define custom tools with type-safe arguments and
-annotations:
+A tool wraps an R function with a name, a description, and argument types that
+the model can use. Start with a function you can call directly. This example
+wraps `toupper()`; a package function or your own function works the same way.
 
-```{r, eval = FALSE}
-tool_lookup_user <- ellmer::tool(
-  fun = function(user_id) {
-    # your implementation
-    list(name = "Alice", email = "alice@example.com")
-  },
-  name = "lookup_user",
-  description = "Look up a user by their ID",
-  arguments = list(
-    user_id = ellmer::type_string("The user ID to look up")
-  ),
+```{r custom-tool, eval = TRUE}
+library(deputy)
+uppercase <- ellmer::tool(
+  base::toupper,
+  name = "uppercase",
+  description = "Uppercase local text.",
+  arguments = list(x = ellmer::type_string()),
   annotations = ellmer::tool_annotations(
     read_only_hint = TRUE,
     destructive_hint = FALSE,
@@ -182,38 +109,58 @@ tool_lookup_user <- ellmer::tool(
     idempotent_hint = TRUE
   )
 )
+uppercase("hello")
 ```
 
-The `annotations` are optional but recommended. They tell the permission
-system about the tool's behaviour:
+Register the tool when constructing the agent:
 
-- `read_only_hint` -- Tool does not change state
-- `destructive_hint` -- Tool may delete or overwrite data
-- `open_world_hint` -- Tool accesses external systems (network, APIs)
-- `idempotent_hint` -- Safe to call multiple times with same input
-
-### Using a Custom Tool
-
-```{r tools-custom-demo}
-library(deputy)
-
-tool_dice <- ellmer::tool(
-  fun = function(n = 1, sides = 6) {
-    rolls <- sample(sides, n, replace = TRUE)
-    paste("Rolled:", paste(rolls, collapse = ", "))
-  },
-  name = "roll_dice",
-  description = "Roll one or more dice",
-  arguments = list(
-    n = ellmer::type_integer("Number of dice to roll"),
-    sides = ellmer::type_integer("Number of sides per die")
-  )
+```{r custom-agent, eval = FALSE}
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  tools = list(uppercase),
+  permissions = Permissions$new(file_write = FALSE)
 )
+result <- agent$run_sync("Use uppercase to convert 'hello' to capitals.")
+result$response
+```
 
-chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
-agent <- Agent$new(chat = chat, tools = list(tool_dice))
-result <- agent$run_sync("Roll 2d20 for me")
-cat(result$response)
+The annotations describe the function's effects. Here the tool changes no
+files, uses no network, and returns the same answer for the same input. Deputy
+uses these declarations when checking permissions; it does not inspect the
+function body to verify them.
+
+| Annotation | Meaning when `TRUE` |
+|---|---|
+| `read_only_hint` | Does not change state |
+| `destructive_hint` | May delete or overwrite data |
+| `open_world_hint` | Accesses external systems |
+| `idempotent_hint` | Repeated calls have the same effect |
+
+### Replace or inspect registered tools
+
+Use `agent$register_tool(tool)` to add a tool to an existing agent, or
+`agent$register_tool(tool, replace = TRUE)` to replace a tool with the same name.
+
+Existing names are errors unless `replace = TRUE` is explicit. Repeated names
+inside one batch always fail, including with replacement enabled. List names
+do not rename a tool. `set_tools()` replaces the whole user registry. Both
+methods and construction validate and adapt the complete batch before changing
+the backend registry; a malformed later tool leaves earlier tools untouched.
+Skills use `load_skill(..., allow_conflicts = TRUE)` for explicit replacement.
+
+Missing annotations stay absent on the source object. For custom tools,
+permissions assume possible modification, destruction, and external access,
+and no idempotence. An explicit read-only annotation makes an omitted
+destructive annotation irrelevant. A local read tool therefore needs at least
+`read_only_hint = TRUE` and `open_world_hint = FALSE` under standard permissions.
+Readonly mode additionally requires an explicit allowlist entry for custom
+tools. Annotations do not grant authority or verify a service's trustworthiness.
+See `PermissionMode` for callback and mode behavior.
+
+Inspect the supplied fields and defaults without executing the tool:
+
+```{r tool-metadata, eval = TRUE}
+tool_metadata(uppercase)
 ```
 
 ## Web Tools
@@ -265,6 +212,34 @@ agent <- Agent$new(
 `tools_mcp()` returns an empty list with a warning when `mcptools` is not
 installed or no tools are available. MCP servers are configured in
 `~/.config/mcptools/config.json`; see the mcptools documentation for setup.
+
+### Server metadata and reconnection
+
+For service tools, `tools_mcp(config, servers = "evidence")` selects an exact
+configured server name before connecting. The qualified mcptools 1.0.2 bridge
+retains annotations from the server and records `source$type = "mcp"`, its
+server name, and tool name. It reports missing metadata rather than inventing
+safe effects. Other mcptools versions fail explicitly pending qualification.
+The caller must trust the configured service; metadata does not establish trust.
+
+Pass these objects to `Agent$new(tools = ...)`, `register_tools()`, or an
+explicit tool registry used by `agent_definition_read()`. The same metadata
+survives YAML selection, Agent wrapping, cloning, and delegation. Permission
+callbacks receive it as `context$tool_metadata`, alongside the supplied
+`context$tool_annotations`. A service called `read_file` still uses its service
+annotations and capabilities; its name does not confer native file access.
+Local file checkpointing excludes MCP calls, so rewinding files never treats a
+remote service write as a change to the local workspace.
+
+Reconnecting a server invalidates tools from its old connection. Reload and
+replace explicitly with `agent$load_mcp(config, servers = "evidence", replace = TRUE)`.
+This refresh removes obsolete tools from the selected servers, including when
+discovery succeeds with an empty tool set. Unrelated tools remain registered.
+A load failure records a failed attempt in `mcp_status()`. Tools that still
+have working connections remain registered. If mcptools already closed an
+old connection, its invalidated handles are removed even when discovery or
+registration fails. Malformed metadata never silently becomes an unannotated
+executable.
 
 ### Sandboxed R with mcp-repl
 

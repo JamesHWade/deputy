@@ -12,19 +12,11 @@
 NULL
 
 # Package-level documentation
-#' deputy: Agentic AI Workflows for R
-#'
-#' @description
-#' A provider-agnostic framework for building agentic AI workflows in R.
-#' Built on ellmer, it enables multi-step reasoning with tool use,
-#' permissions, hooks, human-in-the-loop capabilities, and multi-agent
-#' delegation.
-#'
 #' @section Main Functions:
 #' * [Agent] - The main class for creating agents
 #' * [LeadAgent] - Coordinate specialized delegated agents
-#' * [tools_preset()] - Curated built-in tool collections
-#' * [UsageLimits()] - Run-scoped request, tool, token, and cost limits
+#' * [tools_preset()] - Choose a set of built-in tools
+#' * [UsageLimits()] - Set request, tool, token, and cost limits
 #' * [permissions_standard()] - Standard permission policy
 #' * [permissions_plan()] - Planning permission policy
 #' * [permissions_readonly()] - Read-only permission policy
@@ -33,19 +25,17 @@ NULL
 #' ```r
 #' library(deputy)
 #'
-#' # Create an agent with file tools
 #' agent <- Agent$new(
 #'   chat = ellmer::chat("openai/gpt-5.6-luna"),
-#'   tools = tools_preset("standard")
+#'   tools = tools_preset("minimal"),
+#'   permissions = permissions_readonly(),
+#'   usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),
+#'   working_dir = getwd()
 #' )
 #'
-#' # Run a task with streaming output
-#' events <- agent$run("List files in current directory")
-#' repeat {
-#'   event <- events()
-#'   if (coro::is_exhausted(event)) break
-#'   if (event$type == "text") cat(event$text)
-#' }
+#' result <- agent$run_sync("Read DESCRIPTION and explain what this package does.")
+#' result$response
+#' result$stop_reason
 #' ```
 #'
 #' @name deputy-package

@@ -14,250 +14,176 @@ knitr::opts_chunk$set(
 )
 ```
 
-Deputy turns an ellmer chat into a governed R Agent. In this guide you will
-create a bounded, read-only Agent; inspect its result; then deliberately grant
-one workspace-scoped write capability and protect it with a checkpoint.
+This guide uses Deputy to explain an R package from its source files. You will
+run a task, inspect the answer and tool calls, then create an agent that can
+write a summary file.
 
-## Before you begin
+## Install and connect
 
-Before Deputy's first CRAN release, install the development version from
-GitHub:
+Install Deputy from GitHub:
 
 ```r
 # install.packages("pak")
 pak::pak("JamesHWade/deputy")
 ```
 
-After the release is available from CRAN, install the released package with:
+You need credentials for an [ellmer provider](https://ellmer.tidyverse.org/reference/index.html).
+These examples use OpenAI with `gpt-5.6-luna`. Set `OPENAI_API_KEY` in your R
+environment before running them. You can edit your user `.Renviron` file with
+[`usethis::edit_r_environ()`](https://usethis.r-lib.org/reference/edit.html) if you have usethis installed; restart R after
+saving it. Keep credentials out of scripts and version control.
 
-```r
-install.packages("deputy")
-```
+Use another ellmer chat constructor if you prefer a different provider. Deputy
+keeps the model and parameters of the chat you supply.
 
-You also need credentials for one
-[ellmer provider](https://ellmer.tidyverse.org/reference/index.html). The
-examples use OpenAI's `gpt-5.6-luna` with `OPENAI_API_KEY`, but the Deputy API is
-provider-independent. To use a larger GPT-5.6 model, select `gpt-5.6-terra` or
-`gpt-5.6-sol` explicitly when creating the Chat. The `gpt-5.6` alias selects Sol.
+## Create an agent
 
-## 1. Define the workspace and limits
-
-Make the authority for the first run visible before creating a chat. The
-`minimal` preset contains only `read_file`, `read_markdown`, and `list_files`.
-The permission policy denies writes, code execution, shell commands, web
-requests, and package installation. The run also has finite request and
-tool-call budgets.
-
-```{r first-policy}
-library(deputy)
-
-workspace <- normalizePath(getwd(), winslash = "/")
-first_tools <- tools_preset("minimal")
-first_permissions <- permissions_readonly()
-first_limits <- UsageLimits(max_requests = 6, max_tool_calls = 8)
-
-stopifnot(
-  dir.exists(workspace),
-  length(first_tools) == 3L,
-  identical(first_permissions$mode, "readonly"),
-  identical(first_limits$max_tool_calls, 8L)
-)
-```
-
-Run this from the package you want to inspect, or replace `getwd()` with that
-package's absolute path.
-
-`working_dir` gives relative paths a stable base. It does not create a read
-sandbox: a read permission can reach files that the R process can reach. Keep
-the task narrow and run Deputy with operating-system isolation when the input
-or generated code is untrusted.
-
-## 2. Create the Agent
-
-An `Agent` combines an ellmer chat with the runtime policy you just defined.
-This chunk makes a provider request, so it is displayed but not run while the
-vignette is built.
+Open an R session in the package you want to inspect, then run:
 
 ```{r first-agent, eval = FALSE}
-chat <- ellmer::chat("openai/gpt-5.6-luna")
+library(deputy)
+
+workspace <- normalizePath(getwd(), winslash = "/", mustWork = TRUE)
 
 agent <- Agent$new(
-  chat = chat,
-  tools = first_tools,
-  permissions = first_permissions,
-  usage_limits = first_limits,
-  working_dir = workspace,
-  agent_name = "package-scout"
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  tools = tools_preset("minimal"),
+  permissions = permissions_readonly(),
+  usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),
+  working_dir = workspace
 )
 ```
 
-The chat owns provider interaction. Deputy owns the tool loop around it:
-permissions, hooks, limits, events, persistence, checkpoints, and delegation.
+Each setting has one job:
 
-## 3. Run one useful task
+- `chat` connects to the model through ellmer.
+- `tools` gives the model three tools: `read_file`, `read_markdown`, and
+  `list_files`.
+- `permissions` allows those reads and denies writes, code execution, and web
+  requests.
+- `usage_limits` stops the run after at most six model requests or eight tool
+  calls.
+- `working_dir = workspace` sets the base for relative file paths. To inspect
+  a package elsewhere, replace `getwd()` in the `workspace <- normalizePath(...)`
+  line with that package's path.
 
-Ask for an answer that the available tools can support. A read-only package
-inspection is a better first task than an open-ended request to “improve the
-code.”
+The read-only policy still allows access to files outside `working_dir` when
+the R process can read them. It is not a filesystem sandbox.
+
+## Run a task
+
+Ask for an answer that the available files can support:
 
 ```{r first-run, eval = FALSE}
 result <- agent$run_sync(
-  paste(
-    "Read DESCRIPTION and list the R/ directory.",
-    "Explain the package purpose and identify three good entry-point files.",
-    "Cite the paths you used. Do not propose or make edits."
-  ),
-  run_context = list(stage = "package-review")
+  "Read DESCRIPTION and list R/. Explain what this package does and cite the files you used."
 )
+
+result$response
 ```
 
-`run_sync()` blocks until the run stops and returns an `AgentResult`. The result
-keeps the outcome and the evidence needed to understand how it happened:
+`run_sync()` waits until the run stops, then returns an `AgentResult`.
+The answer depends on the package and model. Check whether it finished before
+using the response:
 
 ```{r inspect-result, eval = FALSE}
-cat(result$response)
-
 result$stop_reason
 result$usage
-result$session_id
-result$run_id
+```
+
+`"complete"` means the task finished. Other reasons include `"request_limit"`
+and `"tool_call_limit"`. A stopped run can still have a partial response.
+`result$usage` reports requests, tokens, and any cost reported by the provider.
+
+Inspect the tool calls to see which files the agent used:
+
+```{r inspect-tools, eval = FALSE}
 result$tool_calls()
 result$tool_results()
 ```
 
-Check `stop_reason` before treating the response as complete. A request,
-tool-call, token, or cost limit produces a typed stop reason rather than a
-silently truncated success. `"tool_loop"` means the model requested the same
-tool with the same arguments and received the same result three times
-consecutively; changing results count as progress. If a cost limit is set but
-the provider omits any cost record, Deputy stops with
-`"cost_unavailable"`; it never presents a known lower bound as the total.
+The [AgentResult reference](../reference/AgentResult.html) describes the other
+fields, including events and run identifiers.
 
-## 4. Grant writes deliberately
+## Show progress in the console
 
-When a task really needs to create a file, replace the read-only policy with an
-explicit one. This policy permits Deputy's native file tools to write only
-inside the canonical workspace. R execution, shell access, web access, and
-package installation remain off.
+Add a logging hook before the next run to see tool activity as it happens:
 
-```{r write-policy}
-write_permissions <- Permissions$new(
-  mode = "standard",
-  file_read = TRUE,
-  file_write = workspace,
-  bash = FALSE,
-  r_code = FALSE,
-  web = FALSE,
-  install_packages = FALSE
-)
-
-stopifnot(
-  identical(write_permissions$file_write, workspace),
-  identical(write_permissions$r_code, FALSE),
-  identical(write_permissions$bash, FALSE)
-)
+```{r log-tools, eval = FALSE}
+agent$add_hook(hook_log_tools())
+result <- agent$run_sync("Read DESCRIPTION and name the package's imported dependencies.")
+result$response
 ```
 
-Create a separate Agent with file checkpointing enabled. The checkpoint marks
-the state before the task. Deputy records preimages when its native write,
-edit, and multi-edit tools change files.
+`hook_log_tools()` uses cli for console output. See [Hooks](hooks.html) to
+write a callback or change what gets reported.
+
+## Write a summary file
+
+Writing needs a different permission policy. Create a new agent: permissions
+on an existing agent can be narrowed, but cannot be expanded beyond those set
+at construction.
+
+This policy permits native file writes inside `workspace`. R execution, shell
+commands, web requests, and package installation remain disabled by default.
 
 ```{r write-agent, eval = FALSE}
 write_agent <- Agent$new(
-  chat = chat$clone()$set_turns(list()),
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = tools_file(),
-  permissions = write_permissions,
-  usage_limits = first_limits,
+  permissions = Permissions$new(file_write = workspace),
+  usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),
   enable_file_checkpointing = TRUE,
-  working_dir = workspace,
-  agent_name = "summary-writer"
+  working_dir = workspace
 )
 
 checkpoint_id <- write_agent$checkpoint("before package summary")
 
 write_result <- write_agent$run_sync(
-  paste(
-    "Read DESCRIPTION and write a concise package summary to deputy-summary.md.",
-    "Do not modify any other file."
-  )
+  "Read DESCRIPTION and write a short package summary to deputy-summary.md. Leave other files unchanged."
 )
+
+write_result$stop_reason
+write_result$tool_calls()
 ```
 
-Review the result and the actual diff. If the native file-tool changes are not
-useful, rewind them:
+Open `deputy-summary.md` and review the changes in Git. Deputy saved the
+previous contents of files changed by its native write tools after the
+checkpoint. If you want to undo those changes, run:
 
 ```{r rewind, eval = FALSE}
-write_result$stop_reason
-write_agent$list_checkpoints()
 write_agent$rewind_files(checkpoint_id)
 ```
 
-Checkpoints do not capture changes made outside Deputy's native file tools, and
-they do not replace Git or backups.
+Checkpoints cover Deputy's native write, edit, and multi-edit tools. They do
+not capture changes made by R code, shell commands, or other programs. See
+[Permissions](permissions.html) for the limits of file policies and code
+execution.
 
-## Common failures
+## Troubleshooting
 
 ### The provider cannot authenticate
 
-Configure the credential expected by your chosen ellmer provider, then verify a
-plain ellmer chat before adding Deputy. Deputy does not manage provider keys.
+Check the credential expected by your ellmer provider. Try a plain ellmer
+chat to confirm the connection before adding tools or Deputy settings.
 
 ### A tool call is denied
 
-Treat the denial as useful policy feedback. Check that the tool belongs in this
-task, that it is registered, and that the relevant capability is explicit. Do
-not switch to `permissions_full()` merely to make the error disappear.
+Check that the tool is registered and that its required permission is enabled.
+For custom tools, check their annotations and any allowlist as well. The
+[Tools guide](tools.html) includes a complete custom-tool example.
 
-### The run stops at a limit
+### The run stops before finishing
 
-Inspect `result$stop_reason` and `result$usage`. Tighten the task first; increase
-only the specific limit whose additional work is justified.
+Inspect `result$stop_reason` and `result$usage`. Try a smaller task, or raise the
+limit that was reached. `"tool_loop"` means an identical tool call returned the
+same result three times in a row. `"cost_unavailable"` means a cost limit was
+set, but the provider did not report enough cost information to enforce it.
+See `UsageLimits()` for all stop reasons.
 
-### Code execution sounds safer than it is
+## Next steps
 
-`run_r_code` starts a separate R process, but process separation is not an OS
-sandbox. `run_bash` runs with the current user's privileges. Both are denied by
-`permissions_standard()`. For untrusted model-generated R, configure mcp-repl
-with an explicit OS policy and load it through `tools_mcp_repl()`; Deputy
-refuses to load a server whose effective sandbox differs from the requested
-one.
-
-### A Shiny task reads the wrong directory
-
-Shiny process working directories can differ from the app directory. Pass an
-existing absolute `working_dir` and construct any directory-valued write grant
-from that same path.
-
-## Where next?
-
-| If you want to... | Continue with... |
-|---|---|
-| Choose or build tools | `vignette("tools", package = "deputy")` |
-| Design permission policy | `vignette("permissions", package = "deputy")` |
-| Observe and intervene in runs | `vignette("hooks", package = "deputy")` |
-| Stream an Agent into an app | `vignette("example-shiny-chat", package = "deputy")` |
-| Delegate to specialist Agents | `vignette("multi-agent", package = "deputy")` |
-| Require typed model output | `vignette("structured-output", package = "deputy")` |
-| Build a concrete workflow | `vignette("example-data-analysis", package = "deputy")` |
-
-The durable pattern is the same in every host: make the workspace, tools,
-permissions, and limits explicit; run one bounded job; then inspect the typed
-result before granting more authority.
-
-
-## Standalone scripts
-
-The package includes eight independent scripts for basic runs, tools,
-permissions, hooks, delegation, structured output, session resume, and skills.
-They are executed in CI with deterministic provider responses. To run one
-against OpenAI, set `OPENAI_API_KEY` and source the installed file:
-
-```{r, eval = FALSE}
-source(system.file("examples", "standalone", "01-basic.R", package = "deputy"))
-```
-
-Find the other scripts and their setup guide with:
-
-```{r, eval = FALSE}
-list.files(system.file("examples", "standalone", package = "deputy"))
-```
+- [Tools](tools.html): select a preset or register an R function.
+- [Structured output](structured-output.html): extract data with ellmer types.
+- [Shiny chat](example-shiny-chat.html): use the agent in an app.
+- [Multiple agents](multi-agent.html): give separate tasks to other agents.
