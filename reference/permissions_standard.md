@@ -29,7 +29,7 @@ object
 
 ``` r
 perms <- permissions_standard()
-perms$check("write_file", list(path = "output.txt"))
+permissions_check(perms, "write_file", list(path = "output.txt"))
 #> $decision
 #> [1] "allow"
 #> 

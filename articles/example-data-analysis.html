@@ -104,7 +104,7 @@ sandbox such as mcp-repl through <code><a href="../reference/tools_mcp_repl.html
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
 <span>    file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>    file_write <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>    r_code <span class="op">=</span> <span class="cn">TRUE</span></span>
@@ -167,7 +167,7 @@ time:</p>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
 <span>    file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>    file_write <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>    r_code <span class="op">=</span> <span class="cn">TRUE</span></span>
@@ -195,14 +195,14 @@ time:</p>
 <p><code>AgentResult</code> captures everything about the run:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Did it succeed?</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="fu">is_success</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/result_is_success.html">result_is_success</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span></span>
 <span></span>
 <span><span class="co"># How many turns did the agent take?</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="fu">n_turns</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/result_n_turns.html">result_n_turns</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># What tools were called?</span></span>
-<span><span class="va">tool_calls</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">$</span><span class="fu">tool_calls</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">tool_calls</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/result_tool_calls.html">result_tool_calls</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">tool_calls</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># How long and how much?</span></span>
@@ -220,7 +220,7 @@ constrain the agent:</p>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
 <span>    r_code <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>    bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>    file_write <span class="op">=</span> <span class="cn">FALSE</span></span>

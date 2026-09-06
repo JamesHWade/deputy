@@ -1,290 +1,106 @@
-# Agent Result R6 Class
+# Create a completed agent result
 
-Contains the result of an agent task execution, including the final
-response, conversation history, cost information, and all events that
-occurred during execution.
+A read-only S7 snapshot of a governed run. It contains original ellmer
+turns, Deputy events, usage, and correlation metadata. Read properties
+with `S7::prop(result, "response")` or `$`; use
+[`result_n_turns()`](https://jameshwade.github.io/deputy/reference/result_n_turns.md),
+[`result_tool_calls()`](https://jameshwade.github.io/deputy/reference/result_tool_calls.md),
+[`result_tool_results()`](https://jameshwade.github.io/deputy/reference/result_tool_results.md),
+[`result_text_chunks()`](https://jameshwade.github.io/deputy/reference/result_text_chunks.md),
+and
+[`result_is_success()`](https://jameshwade.github.io/deputy/reference/result_is_success.md)
+for inspection.
 
-## Public fields
+All properties are read-only, including previously writable R6 fields.
+Ordinary nested lists use R value semantics. Embedded provider objects,
+conditions, environments, and closures retain their own reference
+semantics; the result does not deep-copy or sanitize their contents. Run
+context is separately normalized to canonical JSON-compatible values.
 
-- `response`:
+## Usage
 
-  The final text response from the agent
+``` r
+AgentResult(
+  response = NULL,
+  turns = list(),
+  cost = list(input = 0, output = 0, cached = 0, total = 0, complete = TRUE, missing =
+    0L),
+  events = list(),
+  duration = NULL,
+  stop_reason = "complete",
+  structured_output = NULL,
+  session_id = NULL,
+  run_id = NULL,
+  usage = AgentUsage(),
+  agent_id = NULL,
+  agent_name = NULL,
+  parent_agent_id = NULL,
+  parent_run_id = NULL,
+  delegation_id = NULL,
+  run_context = list()
+)
+```
 
-- `turns`:
+## Arguments
 
-  List of conversation turns
+- response:
 
-- `cost`:
+  Final text response, or `NULL`.
 
-  Cost information with input, output, cached, total, complete, and
-  missing fields. An incomplete total is `NA_real_`.
+- turns:
 
-- `events`:
+  List of original conversation turns.
 
-  List of all AgentEvent objects from execution
+- cost:
 
-- `duration`:
+  Cost information, including provider coverage metadata, or `NULL`. An
+  incomplete total is `NA_real_`.
 
-  Execution duration in seconds
+- events:
 
-- `stop_reason`:
+  List of
+  [AgentEvent](https://jameshwade.github.io/deputy/reference/AgentEvent.md)
+  objects.
 
-  Reason the agent stopped
+- duration:
 
-- `structured_output`:
+  Finite, nonnegative duration in seconds, or `NULL`.
 
-  Data converted by ellmer using the requested type (if any)
+- stop_reason:
 
-- `session_id`:
+  One nonempty stop-reason string.
 
-  Stable session identifier for run correlation
+- structured_output:
 
-- `run_id`:
+  Parsed structured output, if any.
 
-  Unique identifier shared by events from this run
+- session_id, run_id, agent_id, agent_name, parent_agent_id,
+  parent_run_id, delegation_id:
 
-- `agent_id`:
+  Optional nonempty correlation and identity strings.
 
-  Immutable identifier for the Agent instance
-
-- `agent_name`:
-
-  Optional human-readable Agent name
-
-- `parent_agent_id`:
-
-  Parent Agent identifier for delegated runs
-
-- `parent_run_id`:
-
-  Parent run identifier for delegated runs
-
-- `delegation_id`:
-
-  Delegation identifier for delegated runs
-
-- `usage`:
+- usage:
 
   Run-scoped
-  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md),
+  or `NULL`.
 
-## Active bindings
+- run_context:
 
-- `run_context`:
+  Canonical product context for the run.
 
-  Canonical product context for the run. Read-only.
+## Value
 
-## Methods
+An `AgentResult` S7 object.
 
-### Public methods
+## Examples
 
-- [`AgentResult$new()`](#method-AgentResult-initialize)
-
-- [`AgentResult$n_turns()`](#method-AgentResult-n_turns)
-
-- [`AgentResult$tool_calls()`](#method-AgentResult-tool_calls)
-
-- [`AgentResult$tool_results()`](#method-AgentResult-tool_results)
-
-- [`AgentResult$text_chunks()`](#method-AgentResult-text_chunks)
-
-- [`AgentResult$is_success()`](#method-AgentResult-is_success)
-
-- [`AgentResult$print()`](#method-AgentResult-print)
-
-- [`AgentResult$clone()`](#method-AgentResult-clone)
-
-------------------------------------------------------------------------
-
-### `AgentResult$new()`
-
-Create a new AgentResult object.
-
-#### Usage
-
-    AgentResult$new(
-      response = NULL,
-      turns = list(),
-      cost = list(input = 0, output = 0, cached = 0, total = 0, complete = TRUE, missing =
-        0L),
-      events = list(),
-      duration = NULL,
-      stop_reason = "complete",
-      structured_output = NULL,
-      session_id = NULL,
-      run_id = NULL,
-      usage = AgentUsage(),
-      agent_id = NULL,
-      agent_name = NULL,
-      parent_agent_id = NULL,
-      parent_run_id = NULL,
-      delegation_id = NULL,
-      run_context = list()
-    )
-
-#### Arguments
-
-- `response`:
-
-  Final text response
-
-- `turns`:
-
-  List of conversation turns
-
-- `cost`:
-
-  Cost information, including provider coverage metadata
-
-- `events`:
-
-  List of AgentEvent objects
-
-- `duration`:
-
-  Execution duration in seconds
-
-- `stop_reason`:
-
-  Reason for stopping
-
-- `structured_output`:
-
-  Parsed structured output (if any)
-
-- `session_id`:
-
-  Stable session identifier (if any)
-
-- `run_id`:
-
-  Unique run identifier (if any)
-
-- `usage`:
-
-  Run-scoped
-  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
-
-- `agent_id`:
-
-  Agent instance identifier (if any)
-
-- `agent_name`:
-
-  Optional human-readable Agent name
-
-- `parent_agent_id`:
-
-  Parent Agent identifier for delegated runs
-
-- `parent_run_id`:
-
-  Parent run identifier for delegated runs
-
-- `delegation_id`:
-
-  Delegation identifier for delegated runs
-
-- `run_context`:
-
-  Immutable product context for this run
-
-#### Returns
-
-A new `AgentResult` object
-
-------------------------------------------------------------------------
-
-### `AgentResult$n_turns()`
-
-Get the number of turns in the conversation.
-
-#### Usage
-
-    AgentResult$n_turns()
-
-#### Returns
-
-Integer count of turns
-
-------------------------------------------------------------------------
-
-### `AgentResult$tool_calls()`
-
-Get all tool calls made during execution.
-
-#### Usage
-
-    AgentResult$tool_calls()
-
-#### Returns
-
-List of tool_start events
-
-------------------------------------------------------------------------
-
-### `AgentResult$tool_results()`
-
-Get all completed tool events from execution.
-
-#### Usage
-
-    AgentResult$tool_results()
-
-#### Returns
-
-List of `tool_end` events
-
-------------------------------------------------------------------------
-
-### `AgentResult$text_chunks()`
-
-Get all text chunks from the response.
-
-#### Usage
-
-    AgentResult$text_chunks()
-
-#### Returns
-
-Character vector of text chunks
-
-------------------------------------------------------------------------
-
-### `AgentResult$is_success()`
-
-Check if the agent completed successfully.
-
-#### Usage
-
-    AgentResult$is_success()
-
-#### Returns
-
-Logical indicating success
-
-------------------------------------------------------------------------
-
-### `AgentResult$print()`
-
-Print the result summary.
-
-#### Usage
-
-    AgentResult$print()
-
-------------------------------------------------------------------------
-
-### `AgentResult$clone()`
-
-The objects of this class are cloneable with this method.
-
-#### Usage
-
-    AgentResult$clone(deep = FALSE)
-
-#### Arguments
-
-- `deep`:
-
-  Whether to make a deep clone.
+``` r
+result <- AgentResult(response = "Done", events = list(
+  AgentEvent("text", text = "Done")
+))
+result_is_success(result)
+#> [1] TRUE
+result_text_chunks(result)
+#> [1] "Done"
+```

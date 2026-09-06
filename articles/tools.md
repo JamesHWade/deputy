@@ -116,7 +116,7 @@ Register the tool when constructing the agent:
 agent <- Agent$new(
   chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = list(uppercase),
-  permissions = Permissions$new(file_write = FALSE)
+  permissions = Permissions(file_write = FALSE)
 )
 result <- agent$run_sync("Use uppercase to convert 'hello' to capitals.")
 result$response
@@ -218,7 +218,7 @@ chat <- ellmer::chat_anthropic()
 agent <- Agent$new(
   chat = chat,
   tools = tools_web(chat),
-  permissions = Permissions$new(
+  permissions = Permissions(
     web = TRUE,
     tool_allowlist = c("web_search", "web_fetch")
   )
@@ -312,7 +312,7 @@ repl_tools <- tools_mcp_repl(
 agent <- Agent$new(
   chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = repl_tools,
-  permissions = Permissions$new(web = FALSE)
+  permissions = Permissions(web = FALSE)
 )
 ```
 

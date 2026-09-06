@@ -118,8 +118,8 @@
 <p><code>run_sync()</code> waits for the run to finish and returns an <code>AgentResult</code>. A <code>stop_reason</code> of <code>"complete"</code> means the agent finished; a limit or error may leave a partial response. Inspect the work behind the answer with:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span><span class="op">$</span><span class="va">usage</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="fu">tool_calls</span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="fu">tool_results</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="reference/result_tool_calls.html">result_tool_calls</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/result_tool_results.html">result_tool_results</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span></code></pre></div>
 <p>The <a href="https://jameshwade.github.io/deputy/articles/getting-started.html">getting-started guide</a> explains these settings, shows how to allow file writes, and covers common errors.</p>
 </div>
 <div class="section level2">

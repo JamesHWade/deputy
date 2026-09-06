@@ -6,8 +6,18 @@ Run a task and inspect its response, tool calls, and usage.
 
 - [`Agent`](https://jameshwade.github.io/deputy/reference/Agent.md) :
   Agent R6 Class
-- [`AgentResult`](https://jameshwade.github.io/deputy/reference/AgentResult.md)
-  : Agent Result R6 Class
+- [`AgentResult()`](https://jameshwade.github.io/deputy/reference/AgentResult.md)
+  : Create a completed agent result
+- [`result_n_turns()`](https://jameshwade.github.io/deputy/reference/result_n_turns.md)
+  : Count conversation turns
+- [`result_tool_calls()`](https://jameshwade.github.io/deputy/reference/result_tool_calls.md)
+  : Inspect tool calls
+- [`result_tool_results()`](https://jameshwade.github.io/deputy/reference/result_tool_results.md)
+  : Inspect completed tool calls
+- [`result_text_chunks()`](https://jameshwade.github.io/deputy/reference/result_text_chunks.md)
+  : Inspect streamed text
+- [`result_is_success()`](https://jameshwade.github.io/deputy/reference/result_is_success.md)
+  : Inspect run success
 - [`AgentEvent()`](https://jameshwade.github.io/deputy/reference/AgentEvent.md)
   : Create an agent event
 - [`AgentUsage()`](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
@@ -76,8 +86,10 @@ Built-in tools and tool bundles
 
 Control what agents can do
 
-- [`Permissions`](https://jameshwade.github.io/deputy/reference/Permissions.md)
-  : Permissions R6 Class
+- [`Permissions()`](https://jameshwade.github.io/deputy/reference/Permissions.md)
+  : Create a permission policy
+- [`permissions_check()`](https://jameshwade.github.io/deputy/reference/permissions_check.md)
+  : Evaluate a tool call against a permission policy
 - [`PermissionMode`](https://jameshwade.github.io/deputy/reference/PermissionMode.md)
   : Permission modes for agent tool access
 - [`PermissionResultAllow()`](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md)

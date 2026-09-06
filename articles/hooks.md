@@ -119,7 +119,7 @@ agent$add_hook(hook_block_dangerous_bash(
 
 ### Limiting File Writes
 
-Set `Permissions$new(file_write = output_dir)` to restrict native file
+Set `Permissions(file_write = output_dir)` to restrict native file
 writes to a directory.
 [`hook_limit_file_writes()`](https://jameshwade.github.io/deputy/reference/hook_limit_file_writes.md)
 adds a second check using the same path rules for `write_file`,
@@ -191,7 +191,7 @@ agent$add_hook(hook_audit)
 result <- agent$run_sync("What files are in the current directory?")
 
 # For post-hoc analysis, use AgentResult instead of hook state:
-result$tool_calls()
+result_tool_calls(result)
 ```
 
 Set `continue = FALSE` to stop the agent after a tool call:

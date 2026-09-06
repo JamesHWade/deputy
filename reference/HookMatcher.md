@@ -31,8 +31,8 @@ HookMatcher(event, callback, pattern = NULL, timeout = 0)
 
   Maximum callback time in seconds. Zero runs in the caller's process.
   Positive values use a clean
-  [`callr::r()`](https://rdrr.io/pkg/callr/man/r.html) subprocess, where
-  caller-process state and side effects are not available.
+  [`callr::r()`](https://callr.r-lib.org/reference/r.html) subprocess,
+  where caller-process state and side effects are not available.
 
 ## Value
 

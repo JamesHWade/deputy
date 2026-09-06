@@ -117,12 +117,35 @@ tool.</p>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
+<h2 id="s7-policy-values">S7 policy values<a class="anchor" aria-label="anchor" href="#s7-policy-values"></a>
+</h2>
+<p><code>Permissions(...)</code> creates a read-only S7 policy; presets
+return the same class. Use
+<code>permissions_check(policy, tool_name, tool_input, context)</code>
+to inspect a permission decision. Read fields with
+<code>S7::prop(policy, "mode")</code> or <code>policy$mode</code>.
+Constructor flags must each be <code>TRUE</code> or <code>FALSE</code>,
+and a custom callback must be a function. An empty tool allowlist denies
+all tools, while <code>NULL</code> disables that gate.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>file_write <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/permissions_check.html">permissions_check</a></span><span class="op">(</span><span class="va">policy</span>, <span class="st">"write_file"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>path <span class="op">=</span> <span class="st">"output.txt"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">prop</a></span><span class="op">(</span><span class="va">policy</span>, <span class="st">"file_write"</span><span class="op">)</span></span></code></pre></div>
+<p>Create a new Agent to explicitly adopt broader authority. An existing
+Agent’s <code>set_permission_mode()</code> can only preserve or narrow
+its current policy; its policy cannot be replaced. Serializing a policy
+retains configuration for the caller to inspect, including its canonical
+directory grant. It does not grant a restored record authority over an
+existing Agent. Callback closures remain caller-owned executable
+state.</p>
+</div>
+<div class="section level2">
 <h2 id="custom-permissions">Custom Permissions<a class="anchor" aria-label="anchor" href="#custom-permissions"></a>
 </h2>
 <p>For fine-grained control, create a <code>Permissions</code> object
 directly:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
 <span>  file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  file_write <span class="op">=</span> <span class="st">"/path/to/allowed/dir"</span>,</span>
 <span>  bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -134,9 +157,9 @@ directly:</p>
 authorizes Deputy’s built-in trusted-code tools. It does not confine the
 subprocess. Use this only when the model, prompt, inputs, and
 current-user filesystem authority are all within the same trust
-boundary. Direct <code>Permissions$new()</code> policies default
+boundary. Direct <code><a href="../reference/Permissions.html">Permissions()</a></code> policies default
 <code>r_code</code> to <code>FALSE</code>, including partial policies
-such as <code>Permissions$new(web = TRUE)</code>.</p>
+such as <code>Permissions(web = TRUE)</code>.</p>
 <p>Fields:</p>
 <table class="table">
 <colgroup>
@@ -237,11 +260,11 @@ the human approval prompt tool</td>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"readonly"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"readonly"</span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="../reference/permissions_plan.html">permissions_plan()</a></code> creates a planning-oriented
 policy:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -295,7 +318,7 @@ provider-native web tools before activating the new policy. Ordinary
 function tools stay registered because Deputy can still deny them when
 they are requested; provider-side tools have no equivalent interception
 point.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">set_permission_mode</span><span class="op">(</span><span class="st">"readonly"</span><span class="op">)</span></span></code></pre></div>
 <p>Create a newly configured <code>Agent</code> when broader or
 incomparable authority is required.</p>
@@ -305,7 +328,7 @@ incomparable authority is required.</p>
 </h2>
 <p>Tools carry annotations that describe their behaviour. The permission
 system uses these annotations to make decisions:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># A read-only tool</span></span>
 <span><span class="va">tool_safe</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
 <span>  fun <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span>,</span>
@@ -329,8 +352,8 @@ annotations participate in the configured capability checks.</p>
 <h2 id="custom-permission-callbacks">Custom Permission Callbacks<a class="anchor" aria-label="anchor" href="#custom-permission-callbacks"></a>
 </h2>
 <p>For complex logic, provide a <code>can_use_tool</code> callback:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
 <span>  can_use_tool <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="co"># Block writes to sensitive files</span></span>
 <span>    <span class="kw">if</span> <span class="op">(</span><span class="va">tool_name</span> <span class="op">==</span> <span class="st">"write_file"</span><span class="op">)</span> <span class="op">{</span></span>
@@ -365,7 +388,7 @@ on request arguments or run context.</p>
 <h2 id="example-read-only-agent">Example: Read-Only Agent<a class="anchor" aria-label="anchor" href="#example-read-only-agent"></a>
 </h2>
 <p>A read-only agent can explore files but cannot change anything:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
@@ -384,7 +407,7 @@ on request arguments or run context.</p>
 <p>Permissions decide whether a tool may run. Configure resource limits
 separately with <code><a href="../reference/UsageLimits.html">UsageLimits()</a></code> on the agent or an individual
 run:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -424,18 +447,18 @@ from both the standard permission policy and the standard tool
 preset.</p>
 <p>For model-generated R that needs confinement, use mcp-repl as the
 execution backend. Its server entry must name the policy explicitly:</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="dt">"mcpServers"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    <span class="dt">"r"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>      <span class="dt">"command"</span><span class="fu">:</span> <span class="st">"/absolute/path/to/mcp-repl"</span><span class="fu">,</span></span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>      <span class="dt">"args"</span><span class="fu">:</span> <span class="ot">[</span></span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>        <span class="st">"--sandbox"</span><span class="ot">,</span> <span class="st">"workspace-write"</span><span class="ot">,</span></span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>        <span class="st">"--interpreter"</span><span class="ot">,</span> <span class="st">"r"</span></span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>      <span class="ot">]</span></span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>    <span class="fu">}</span></span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="fu">}</span></span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  <span class="dt">"mcpServers"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>    <span class="dt">"r"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>      <span class="dt">"command"</span><span class="fu">:</span> <span class="st">"/absolute/path/to/mcp-repl"</span><span class="fu">,</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>      <span class="dt">"args"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>        <span class="st">"--sandbox"</span><span class="ot">,</span> <span class="st">"workspace-write"</span><span class="ot">,</span></span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>        <span class="st">"--interpreter"</span><span class="ot">,</span> <span class="st">"r"</span></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>      <span class="ot">]</span></span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repl_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tools_mcp_repl.html">tools_mcp_repl</a></span><span class="op">(</span></span>
 <span>  server <span class="op">=</span> <span class="st">"r"</span>,</span>
 <span>  sandbox <span class="op">=</span> <span class="st">"workspace-write"</span></span>

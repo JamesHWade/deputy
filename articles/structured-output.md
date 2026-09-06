@@ -55,7 +55,7 @@ agent <- Agent$new(
   usage_limits = UsageLimits(max_requests = 8)
 )
 result <- agent$run_sync("Review the README", type = status_type)
-if (!result$is_success()) {
+if (!result_is_success(result)) {
   cli::cli_abort("Review stopped early: {result$stop_reason}.")
 }
 result$structured_output

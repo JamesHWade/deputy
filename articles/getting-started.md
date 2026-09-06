@@ -94,9 +94,17 @@ Inspect the tool calls to see which files the agent used:
 
 ``` r
 
-result$tool_calls()
-result$tool_results()
+result_tool_calls(result)
+result_tool_results(result)
 ```
+
+Results are read-only S7 values. For example,
+`S7::prop(result, "response")` reads the same value as
+`result$response`. Construct a separate
+[`AgentResult()`](https://jameshwade.github.io/deputy/reference/AgentResult.md)
+when you need a different record; changing a completed result’s
+properties is not supported. Original provider objects and conditions
+retain their own reference semantics inside the record.
 
 The [AgentResult
 reference](https://jameshwade.github.io/deputy/reference/AgentResult.md)
@@ -134,7 +142,7 @@ by default.
 write_agent <- Agent$new(
   chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = tools_file(),
-  permissions = Permissions$new(file_write = workspace),
+  permissions = Permissions(file_write = workspace),
   usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),
   enable_file_checkpointing = TRUE,
   working_dir = workspace
@@ -147,7 +155,7 @@ write_result <- write_agent$run_sync(
 )
 
 write_result$stop_reason
-write_result$tool_calls()
+result_tool_calls(write_result)
 ```
 
 Open `deputy-summary.md` and review the changes in Git. Deputy saved the

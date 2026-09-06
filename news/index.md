@@ -2,6 +2,24 @@
 
 ## deputy (development version)
 
+- [`AgentResult()`](https://jameshwade.github.io/deputy/reference/AgentResult.md)
+  and
+  [`Permissions()`](https://jameshwade.github.io/deputy/reference/Permissions.md)
+  now construct read-only S7 values. Use
+  [`result_n_turns()`](https://jameshwade.github.io/deputy/reference/result_n_turns.md),
+  [`result_tool_calls()`](https://jameshwade.github.io/deputy/reference/result_tool_calls.md),
+  [`result_tool_results()`](https://jameshwade.github.io/deputy/reference/result_tool_results.md),
+  [`result_text_chunks()`](https://jameshwade.github.io/deputy/reference/result_text_chunks.md),
+  and
+  [`result_is_success()`](https://jameshwade.github.io/deputy/reference/result_is_success.md)
+  to inspect results, and
+  [`permissions_check()`](https://jameshwade.github.io/deputy/reference/permissions_check.md)
+  to evaluate policies. `$` field reads remain available; `$new()` and
+  instance methods are removed. Permission constructors reject malformed
+  flags and callbacks while Agent mode changes still only narrow the
+  configured authority ceiling
+  ([\#117](https://github.com/JamesHWade/deputy/issues/117)).
+
 - [`AgentEvent()`](https://jameshwade.github.io/deputy/reference/AgentEvent.md)
   and
   [`HookMatcher()`](https://jameshwade.github.io/deputy/reference/HookMatcher.md)

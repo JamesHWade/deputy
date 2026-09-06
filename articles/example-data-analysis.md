@@ -25,7 +25,7 @@ chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 agent <- Agent$new(
   chat = chat,
   tools = c(tools_data(), tools_code()),
-  permissions = Permissions$new(
+  permissions = Permissions(
     file_read = TRUE,
     file_write = FALSE,
     r_code = TRUE
@@ -87,7 +87,7 @@ chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 agent <- Agent$new(
   chat = chat,
   tools = c(tools_data(), tools_code()),
-  permissions = Permissions$new(
+  permissions = Permissions(
     file_read = TRUE,
     file_write = FALSE,
     r_code = TRUE
@@ -117,14 +117,14 @@ repeat {
 ``` r
 
 # Did it succeed?
-result$is_success()
+result_is_success(result)
 result$stop_reason
 
 # How many turns did the agent take?
-result$n_turns()
+result_n_turns(result)
 
 # What tools were called?
-tool_calls <- result$tool_calls()
+tool_calls <- result_tool_calls(result)
 length(tool_calls)
 
 # How long and how much?
@@ -144,7 +144,7 @@ chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
 agent <- Agent$new(
   chat = chat,
   tools = c(tools_data(), tools_code()),
-  permissions = Permissions$new(
+  permissions = Permissions(
     r_code = TRUE,
     bash = FALSE,
     file_write = FALSE

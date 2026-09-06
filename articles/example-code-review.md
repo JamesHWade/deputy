@@ -249,7 +249,7 @@ if (!isTRUE(result$cost$complete)) {
 }
 
 # All tool calls made during the review
-tool_calls <- result$tool_calls()
+tool_calls <- result_tool_calls(result)
 cli::cli_alert_info("Total tool calls: {length(tool_calls)}")
 
 # How many model requests were used?

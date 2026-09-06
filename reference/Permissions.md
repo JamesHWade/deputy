@@ -1,218 +1,108 @@
-# Permissions R6 Class
+# Create a permission policy
 
-Controls what an agent is allowed to do. Permissions can be configured
-with fine-grained controls for different tool types, or with a custom
-callback for complex logic.
+A read-only S7 value controlling tool access. Use
+[`permissions_check()`](https://jameshwade.github.io/deputy/reference/permissions_check.md)
+to evaluate a call. Read properties with `S7::prop(policy, "mode")` or
+`$`. To narrow an active Agent, use its `set_permission_mode()` method;
+replacing its policy or changing its properties is not supported.
 
-Tool gating fields:
+Directory grants are canonicalized at construction. The callback retains
+its caller-owned executable state. Read-only properties protect the
+public configuration; they are not an execution sandbox. Serialized
+policies are configuration records, not portable authority grants or a
+way to widen an existing Agent's authority.
 
-- `tool_allowlist`: Optional list of tools that are allowed. When set,
-  tools not in the list are denied.
+## Usage
 
-- `tool_denylist`: Optional list of tools that are always denied.
+``` r
+Permissions(
+  mode = "standard",
+  file_read = TRUE,
+  file_write = getwd(),
+  bash = FALSE,
+  r_code = FALSE,
+  web = FALSE,
+  install_packages = FALSE,
+  can_use_tool = NULL,
+  tool_allowlist = NULL,
+  tool_denylist = NULL,
+  permission_prompt_tool_name = NULL
+)
+```
 
-- `permission_prompt_tool_name`: Optional tool name to mention in deny
-  messages for gated tools (e.g., "ask_user").
+## Arguments
 
-**Security Note:** Permission fields are immutable after construction.
-This prevents adversarial code from modifying permissions at runtime.
-All fields use active bindings that reject modification attempts.
+- mode:
 
-## Active bindings
+  One of `"standard"`, `"plan"`, `"readonly"`, or `"full"`.
 
-- `mode`:
+- file_read:
 
-  Permission mode (see
-  [PermissionMode](https://jameshwade.github.io/deputy/reference/PermissionMode.md)).
-  Read-only after construction.
+  Allow file reading. One non-missing logical value.
 
-- `file_read`:
+- file_write:
 
-  Allow file reading. Read-only after construction.
+  `TRUE`, `FALSE`, or an existing absolute directory path.
 
-- `file_write`:
+- bash:
 
-  Allow file writing. Can be `TRUE`, `FALSE`, or a canonical absolute
-  directory path. Read-only after construction.
+  Allow shell commands. One non-missing logical value.
 
-- `bash`:
+- r_code:
 
-  Allow bash command execution. Read-only after construction.
+  Allow R code execution. One non-missing logical value; defaults to
+  `FALSE`.
 
-- `r_code`:
+- web:
 
-  Allow R code execution. Read-only after construction.
+  Allow web requests. One non-missing logical value.
 
-- `web`:
+- install_packages:
 
-  Allow web requests. Read-only after construction.
+  Allow package installation. One non-missing logical value.
 
-- `install_packages`:
+- can_use_tool:
 
-  Allow package installation. Read-only after construction.
+  A function accepting tool name, input, and context, returning a
+  [PermissionResultAllow](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md)
+  or
+  [PermissionResultDeny](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md),
+  or `NULL`.
 
-- `can_use_tool`:
+- tool_allowlist:
 
-  Custom permission callback. Read-only after construction.
+  Character vector of allowed tool names, or `NULL`. An empty vector
+  denies all tools; `NULL` disables this gate.
 
-- `tool_allowlist`:
+- tool_denylist:
 
-  Optional character vector of allowed tool names. Read-only after
-  construction.
+  Character vector of denied tool names, or `NULL`.
 
-- `tool_denylist`:
+- permission_prompt_tool_name:
 
-  Optional character vector of denied tool names. Read-only after
-  construction.
+  Optional dedicated approval-tool name to suggest in deny messages.
+  Native capability-bearing tools cannot be used.
 
-- `permission_prompt_tool_name`:
+## Value
 
-  Optional tool name used in gating deny messages. Read-only after
-  construction.
+A read-only `Permissions` S7 object.
 
-## Methods
+## Examples
 
-### Public methods
-
-- [`Permissions$new()`](#method-Permissions-initialize)
-
-- [`Permissions$check()`](#method-Permissions-check)
-
-- [`Permissions$print()`](#method-Permissions-print)
-
-- [`Permissions$clone()`](#method-Permissions-clone)
-
-------------------------------------------------------------------------
-
-### `Permissions$new()`
-
-Create a new Permissions object.
-
-#### Usage
-
-    Permissions$new(
-      mode = "standard",
-      file_read = TRUE,
-      file_write = getwd(),
-      bash = FALSE,
-      r_code = FALSE,
-      web = FALSE,
-      install_packages = FALSE,
-      can_use_tool = NULL,
-      tool_allowlist = NULL,
-      tool_denylist = NULL,
-      permission_prompt_tool_name = NULL
-    )
-
-#### Arguments
-
-- `mode`:
-
-  Permission mode
-
-- `file_read`:
-
-  Allow file reading
-
-- `file_write`:
-
-  Allow file writing (`TRUE`, `FALSE`, or an existing absolute directory
-  path). Directory grants are canonicalized once when the policy is
-  constructed.
-
-- `bash`:
-
-  Allow bash commands
-
-- `r_code`:
-
-  Allow R code execution. Defaults to `FALSE`; grant it explicitly for
-  trusted code or use
-  [`permissions_full()`](https://jameshwade.github.io/deputy/reference/permissions_full.md).
-
-- `web`:
-
-  Allow web requests
-
-- `install_packages`:
-
-  Allow package installation
-
-- `can_use_tool`:
-
-  Custom callback function
-
-- `tool_allowlist`:
-
-  Optional character vector of allowed tool names
-
-- `tool_denylist`:
-
-  Optional character vector of denied tool names
-
-- `permission_prompt_tool_name`:
-
-  Optional dedicated approval-tool name to suggest in permission deny
-  messages for gated tools. Native capability-bearing tools cannot be
-  used as approval prompts.
-
-#### Returns
-
-A new `Permissions` object
-
-------------------------------------------------------------------------
-
-### `Permissions$check()`
-
-Check if a tool is allowed to execute.
-
-#### Usage
-
-    Permissions$check(tool_name, tool_input, context = list())
-
-#### Arguments
-
-- `tool_name`:
-
-  Name of the tool
-
-- `tool_input`:
-
-  Arguments passed to the tool
-
-- `context`:
-
-  Additional context (e.g., working_dir, tool_annotations)
-
-#### Returns
-
-A
-[PermissionResultAllow](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md)
-or
-[PermissionResultDeny](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md)
-
-------------------------------------------------------------------------
-
-### `Permissions$print()`
-
-Print the permissions configuration.
-
-#### Usage
-
-    Permissions$print()
-
-------------------------------------------------------------------------
-
-### `Permissions$clone()`
-
-The objects of this class are cloneable with this method.
-
-#### Usage
-
-    Permissions$clone(deep = FALSE)
-
-#### Arguments
-
-- `deep`:
-
-  Whether to make a deep clone.
+``` r
+policy <- Permissions(file_write = FALSE)
+permissions_check(policy, "write_file", list(path = "output.txt"))
+#> $decision
+#> [1] "deny"
+#> 
+#> $reason
+#> [1] "File writing is not allowed"
+#> 
+#> $interrupt
+#> [1] FALSE
+#> 
+#> attr(,"class")
+#> [1] "PermissionResultDeny" "PermissionResult"     "list"                
+S7::prop(policy, "file_write")
+#> [1] FALSE
+```

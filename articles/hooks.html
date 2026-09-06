@@ -235,7 +235,7 @@ more:</p>
 <div class="section level3">
 <h3 id="limiting-file-writes">Limiting File Writes<a class="anchor" aria-label="anchor" href="#limiting-file-writes"></a>
 </h3>
-<p>Set <code>Permissions$new(file_write = output_dir)</code> to restrict
+<p>Set <code>Permissions(file_write = output_dir)</code> to restrict
 native file writes to a directory. <code><a href="../reference/hook_limit_file_writes.html">hook_limit_file_writes()</a></code>
 adds a second check using the same path rules for
 <code>write_file</code>, <code>edit_file</code>, and
@@ -302,7 +302,7 @@ for logging, metrics, or conditional stopping:</p>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"What files are in the current directory?"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># For post-hoc analysis, use AgentResult instead of hook state:</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="fu">tool_calls</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="../reference/result_tool_calls.html">result_tool_calls</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span></code></pre></div>
 <p>Set <code>continue = FALSE</code> to stop the agent after a tool
 call:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">

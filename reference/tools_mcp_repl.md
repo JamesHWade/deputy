@@ -57,7 +57,7 @@ repl_tools <- tools_mcp_repl(
 agent <- Agent$new(
   chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = repl_tools,
-  permissions = Permissions$new(web = FALSE)
+  permissions = Permissions(web = FALSE)
 )
 } # }
 ```

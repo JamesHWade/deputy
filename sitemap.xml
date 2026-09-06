@@ -51,10 +51,16 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/normalize_provider_name.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/parse_markdown_frontmatter.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/parse_user_response.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/permissions_check.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/permissions_full.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/permissions_plan.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/permissions_readonly.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/permissions_standard.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/result_is_success.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/result_n_turns.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/result_text_chunks.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/result_tool_calls.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/result_tool_results.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/set_ask_user_callback.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_create.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_load.html</loc></url>
