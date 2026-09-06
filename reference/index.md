@@ -99,8 +99,10 @@ Intercept and customize agent behavior
 
 - [`HookEvent`](https://jameshwade.github.io/deputy/reference/HookEvent.md)
   : Hook events supported by deputy
-- [`HookMatcher`](https://jameshwade.github.io/deputy/reference/HookMatcher.md)
-  : HookMatcher R6 Class
+- [`HookMatcher()`](https://jameshwade.github.io/deputy/reference/HookMatcher.md)
+  : Match a lifecycle hook
+- [`hook_matches()`](https://jameshwade.github.io/deputy/reference/hook_matches.md)
+  : Test whether a hook matches a tool name
 - [`HookResultPreToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.md)
   : Create a PreToolUse hook result
 - [`HookResultPostToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.md)

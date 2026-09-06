@@ -104,7 +104,7 @@ logging and blocking; use `AgentResult` for post-hoc analysis.
 ``` r
 
 # Log when each sub-agent finishes
-hook_sub_agent_log <- HookMatcher$new(
+hook_sub_agent_log <- HookMatcher(
   event = "SubagentStop",
   callback = function(agent_name, task, result, context) {
     cli::cli_alert_info("Sub-agent {.val {agent_name}} finished")

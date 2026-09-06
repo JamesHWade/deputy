@@ -235,7 +235,7 @@ The context parameter is always a named list. Common fields:
 ``` r
 if (FALSE) { # \dontrun{
 # PreToolUse callback example
-agent$add_hook(HookMatcher$new(
+agent$add_hook(HookMatcher(
   event = "PreToolUse",
   callback = function(tool_name, tool_input, context) {
     message("Tool: ", tool_name, " in ", context$working_dir)
@@ -244,7 +244,7 @@ agent$add_hook(HookMatcher$new(
 ))
 
 # PostToolUse callback example
-agent$add_hook(HookMatcher$new(
+agent$add_hook(HookMatcher(
   event = "PostToolUse",
   callback = function(tool_name, tool_result, tool_error, context) {
     if (!is.null(tool_error)) {

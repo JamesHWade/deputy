@@ -77,21 +77,51 @@ A `UsageLimits` object.
 
 ``` r
 UsageLimits(max_requests = 5, max_tool_calls = 10)
-#> <UsageLimits>
-#>   max_requests: 5
-#>   max_tool_calls: 10
-#>   max_input_tokens: unlimited
-#>   max_output_tokens: unlimited
-#>   max_total_tokens: unlimited
-#>   max_cost_usd: unlimited
-#>   on_exceed: stop
+#> $max_requests
+#> [1] 5
+#> 
+#> $max_tool_calls
+#> [1] 10
+#> 
+#> $max_input_tokens
+#> NULL
+#> 
+#> $max_output_tokens
+#> NULL
+#> 
+#> $max_total_tokens
+#> NULL
+#> 
+#> $max_cost_usd
+#> NULL
+#> 
+#> $on_exceed
+#> [1] "stop"
+#> 
+#> attr(,"class")
+#> [1] "UsageLimits" "list"       
 UsageLimits(max_cost_usd = 0.25, on_exceed = "error")
-#> <UsageLimits>
-#>   max_requests: unlimited
-#>   max_tool_calls: unlimited
-#>   max_input_tokens: unlimited
-#>   max_output_tokens: unlimited
-#>   max_total_tokens: unlimited
-#>   max_cost_usd: 0.25
-#>   on_exceed: error
+#> $max_requests
+#> NULL
+#> 
+#> $max_tool_calls
+#> NULL
+#> 
+#> $max_input_tokens
+#> NULL
+#> 
+#> $max_output_tokens
+#> NULL
+#> 
+#> $max_total_tokens
+#> NULL
+#> 
+#> $max_cost_usd
+#> [1] 0.25
+#> 
+#> $on_exceed
+#> [1] "error"
+#> 
+#> attr(,"class")
+#> [1] "UsageLimits" "list"       
 ```

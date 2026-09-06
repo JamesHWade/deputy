@@ -1,7 +1,16 @@
 # Create an agent event
 
 Agent events are yielded by the `run()` generator to provide streaming
-updates on agent progress.
+updates on agent progress. Events are S7 values with read-only `type`,
+`timestamp`, and `data` properties. Use `S7::prop(event, "data")` to
+obtain the named payload; `event$text` and other `$` reads are
+conveniences for looking up payload fields. Missing fields return
+`NULL`.
+
+Select an event with its `type` property, not an S3 subtype class.
+Read-only properties protect the record, but environments, provider
+objects, and conditions inside the payload retain their own reference
+semantics.
 
 ## Usage
 
@@ -17,7 +26,8 @@ AgentEvent(type, ...)
 
 - ...:
 
-  Additional event data
+  Named event data with unique names. The envelope names `type`,
+  `timestamp`, and `data` are reserved.
 
 ## Value
 
@@ -77,20 +87,30 @@ Run-boundary and tool lifecycle events also carry `agent_id`, `run_id`,
 immutable `run_context`, and delegated-run correlation fields when
 applicable.
 
+## Additional properties
+
+- `@timestamp`:
+
+  Construction time as a `POSIXct` value. Read-only.
+
+- `@data`:
+
+  Named list of event-specific data. Read-only.
+
 ## Examples
 
 ``` r
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-09-06 12:24:32 
+#>   timestamp: 2026-09-06 14:52:00
 #>   task: Analyze data.csv
 
 # Create a text event
 AgentEvent("text", text = "Hello", is_complete = FALSE
 )
 #> <AgentEvent: text >
-#>   timestamp: 2026-09-06 12:24:32 
+#>   timestamp: 2026-09-06 14:52:00
 #>   text: Hello
 #>   is_complete: FALSE
 ```

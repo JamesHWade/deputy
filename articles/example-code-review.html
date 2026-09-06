@@ -183,7 +183,7 @@ logging and blocking; use <code>AgentResult</code> for post-hoc
 analysis.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Log when each sub-agent finishes</span></span>
-<span><span class="va">hook_sub_agent_log</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span><span class="va">hook_sub_agent_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"SubagentStop"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">agent_name</span>, <span class="va">task</span>, <span class="va">result</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Sub-agent {.val {agent_name}} finished"</span><span class="op">)</span></span>

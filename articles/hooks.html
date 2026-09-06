@@ -155,11 +155,16 @@ your app.</p>
 <div class="section level2">
 <h2 id="creating-hooks">Creating Hooks<a class="anchor" aria-label="anchor" href="#creating-hooks"></a>
 </h2>
-<p>Hooks are created with <code>HookMatcher$new()</code>:</p>
+<p>Hooks are S7 values created with <code><a href="../reference/HookMatcher.html">HookMatcher()</a></code>. Their
+configuration is read-only after construction. Use
+<code>S7::prop(hook, "event")</code> to read a property and
+<code>hook_matches(hook, "write_file")</code> to test a tool name.
+Callback closures retain their caller-owned state.</p>
+<p>Hooks are created with <code><a href="../reference/HookMatcher.html">HookMatcher()</a></code>:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">hook</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span><span class="va">hook</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PostToolUse"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_result</span>, <span class="va">tool_error</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Tool {tool_name} completed"</span><span class="op">)</span></span>
@@ -182,7 +187,7 @@ state; qualify package functions such as
 which tools the hook applies to:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Only fires for bash commands</span></span>
-<span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span><span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PreToolUse"</span>,</span>
 <span>  pattern <span class="op">=</span> <span class="st">"^run_bash$"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
@@ -249,7 +254,7 @@ adds a second check using the same path rules for
 <code><a href="../reference/HookResultPreToolUse.html">HookResultPreToolUse()</a></code> with
 <code>permission = "allow"</code> or <code>"deny"</code>:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">hook_no_secrets</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="va">hook_no_secrets</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PreToolUse"</span>,</span>
 <span>  pattern <span class="op">=</span> <span class="st">"^write_file$"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
@@ -274,7 +279,7 @@ adds a second check using the same path rules for
 <p><code>PostToolUse</code> hooks run after a tool completes. Use them
 for logging, metrics, or conditional stopping:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">hook_audit</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="va">hook_audit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PostToolUse"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_result</span>, <span class="va">tool_error</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">tool_error</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
@@ -308,7 +313,7 @@ call:</p>
 </h2>
 <p>Session hooks fire at the start and end of a session:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"SessionStart"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli_inform</a></span><span class="op">(</span><span class="st">"Session started at {Sys.time()}"</span><span class="op">)</span></span>
@@ -323,7 +328,7 @@ call:</p>
 that should not alter control flow, such as permission-denied guidance,
 session-load notices, or compaction fallbacks:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"Notification"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">message</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"[{context$code}] {message}"</span><span class="op">)</span></span>
@@ -361,7 +366,7 @@ request:</p>
 <span>  <span class="fu"><a href="https://rdrr.io/r/stats/setNames.html" class="external-link">setNames</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"Deny"</span><span class="op">)</span>, <span class="va">questions</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">question</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="va">gate</span> <span class="op">&lt;-</span> <span class="fu">approval_gate</span><span class="op">(</span>callback <span class="op">=</span> <span class="va">decline</span><span class="op">)</span></span>
-<span><span class="va">gate</span><span class="op">$</span><span class="fu">callback</span><span class="op">(</span></span>
+<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">prop</a></span><span class="op">(</span><span class="va">gate</span>, <span class="st">"callback"</span><span class="op">)</span><span class="op">(</span></span>
 <span>  <span class="st">"write_file"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>path <span class="op">=</span> <span class="st">"report.txt"</span>, content <span class="op">=</span> <span class="st">"Draft"</span><span class="op">)</span>,</span>
 <span>  context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>run_id <span class="op">=</span> <span class="st">"example-run"</span><span class="op">)</span></span>
 <span><span class="op">)</span><span class="op">$</span><span class="va">permission</span></span>
@@ -399,18 +404,18 @@ identify these operations.</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">hooks</span> <span class="op">&lt;-</span> <span class="fu">approval_after_install</span><span class="op">(</span>callback <span class="op">=</span> <span class="va">decline</span><span class="op">)</span></span>
 <span><span class="va">run</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>run_id <span class="op">=</span> <span class="st">"installation-run"</span><span class="op">)</span></span>
-<span><span class="va">hooks</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">callback</span><span class="op">(</span></span>
+<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">prop</a></span><span class="op">(</span><span class="va">hooks</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span>, <span class="st">"callback"</span><span class="op">)</span><span class="op">(</span></span>
 <span>  <span class="st">"install_dependency"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>installed <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="cn">NULL</span>, <span class="va">run</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt; NULL</span></span>
-<span><span class="va">hooks</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">callback</span><span class="op">(</span><span class="st">"push_changes"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>remote <span class="op">=</span> <span class="st">"origin"</span><span class="op">)</span>, <span class="va">run</span><span class="op">)</span><span class="op">$</span><span class="va">permission</span></span>
+<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">prop</a></span><span class="op">(</span><span class="va">hooks</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span>, <span class="st">"callback"</span><span class="op">)</span><span class="op">(</span><span class="st">"push_changes"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>remote <span class="op">=</span> <span class="st">"origin"</span><span class="op">)</span>, <span class="va">run</span><span class="op">)</span><span class="op">$</span><span class="va">permission</span></span>
 <span><span class="co">#&gt; [1] "deny"</span></span>
 <span><span class="co"># A different run has no installation receipt.</span></span>
-<span><span class="va">hooks</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">callback</span><span class="op">(</span></span>
+<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">prop</a></span><span class="op">(</span><span class="va">hooks</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span>, <span class="st">"callback"</span><span class="op">)</span><span class="op">(</span></span>
 <span>  <span class="st">"push_changes"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>remote <span class="op">=</span> <span class="st">"origin"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>run_id <span class="op">=</span> <span class="st">"another-run"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt; NULL</span></span>
-<span><span class="va">hooks</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">callback</span><span class="op">(</span><span class="st">"end_turn"</span>, <span class="va">run</span><span class="op">)</span></span>
+<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">prop</a></span><span class="op">(</span><span class="va">hooks</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span>, <span class="st">"callback"</span><span class="op">)</span><span class="op">(</span><span class="st">"end_turn"</span>, <span class="va">run</span><span class="op">)</span></span>
 <span><span class="co">#&gt; NULL</span></span></code></pre></div>
 <p>Attach all three hooks together:</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">

@@ -108,7 +108,7 @@ Hooks attach to the Agent as usual:
 
 agent$add_hook(hook_log_tools(verbose = TRUE))
 
-agent$add_hook(HookMatcher$new(
+agent$add_hook(HookMatcher(
   event = "PostCompact",
   callback = function(result, context) {
     cli::cli_inform("Compacted with: {result$method}")

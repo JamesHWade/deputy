@@ -260,7 +260,7 @@ Use a `SubagentStop` hook to log or inspect sub-agent results:
 
 ``` r
 
-hook_monitor <- HookMatcher$new(
+hook_monitor <- HookMatcher(
   event = "SubagentStop",
   callback = function(agent_name, task, result, context) {
     cli::cli_alert_info("Sub-agent {agent_name} finished")

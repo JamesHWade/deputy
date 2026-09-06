@@ -22,13 +22,21 @@ deputy fires hooks at these events:
 
 ## Creating Hooks
 
-Hooks are created with `HookMatcher$new()`:
+Hooks are S7 values created with
+[`HookMatcher()`](https://jameshwade.github.io/deputy/reference/HookMatcher.md).
+Their configuration is read-only after construction. Use
+`S7::prop(hook, "event")` to read a property and
+`hook_matches(hook, "write_file")` to test a tool name. Callback
+closures retain their caller-owned state.
+
+Hooks are created with
+[`HookMatcher()`](https://jameshwade.github.io/deputy/reference/HookMatcher.md):
 
 ``` r
 
 library(deputy)
 
-hook <- HookMatcher$new(
+hook <- HookMatcher(
   event = "PostToolUse",
   callback = function(tool_name, tool_result, tool_error, context) {
     cli::cli_alert_info("Tool {tool_name} completed")
@@ -60,7 +68,7 @@ hook applies to:
 ``` r
 
 # Only fires for bash commands
-HookMatcher$new(
+HookMatcher(
   event = "PreToolUse",
   pattern = "^run_bash$",
   callback = function(tool_name, tool_input, context) {
@@ -133,7 +141,7 @@ with `permission = "allow"` or `"deny"`:
 
 ``` r
 
-hook_no_secrets <- HookMatcher$new(
+hook_no_secrets <- HookMatcher(
   event = "PreToolUse",
   pattern = "^write_file$",
   callback = function(tool_name, tool_input, context) {
@@ -160,7 +168,7 @@ metrics, or conditional stopping:
 
 ``` r
 
-hook_audit <- HookMatcher$new(
+hook_audit <- HookMatcher(
   event = "PostToolUse",
   callback = function(tool_name, tool_result, tool_error, context) {
     if (!is.null(tool_error)) {
@@ -199,7 +207,7 @@ Session hooks fire at the start and end of a session:
 
 ``` r
 
-HookMatcher$new(
+HookMatcher(
   event = "SessionStart",
   callback = function(context) {
     cli::cli_inform("Session started at {Sys.time()}")
@@ -216,7 +224,7 @@ notices, or compaction fallbacks:
 
 ``` r
 
-agent$add_hook(HookMatcher$new(
+agent$add_hook(HookMatcher(
   event = "Notification",
   callback = function(message, context) {
     cli::cli_alert_info("[{context$code}] {message}")
@@ -262,7 +270,7 @@ decline <- function(questions, context) {
   setNames(list("Deny"), questions[[1]]$question)
 }
 gate <- approval_gate(callback = decline)
-gate$callback(
+S7::prop(gate, "callback")(
   "write_file", list(path = "report.txt", content = "Draft"),
   context = list(run_id = "example-run")
 )$permission
@@ -305,18 +313,18 @@ shell text would not reliably identify these operations.
 
 hooks <- approval_after_install(callback = decline)
 run <- list(run_id = "installation-run")
-hooks[[1]]$callback(
+S7::prop(hooks[[1]], "callback")(
   "install_dependency", list(installed = TRUE), NULL, run
 )
 #> NULL
-hooks[[2]]$callback("push_changes", list(remote = "origin"), run)$permission
+S7::prop(hooks[[2]], "callback")("push_changes", list(remote = "origin"), run)$permission
 #> [1] "deny"
 # A different run has no installation receipt.
-hooks[[2]]$callback(
+S7::prop(hooks[[2]], "callback")(
   "push_changes", list(remote = "origin"), list(run_id = "another-run")
 )
 #> NULL
-hooks[[3]]$callback("end_turn", run)
+S7::prop(hooks[[3]], "callback")("end_turn", run)
 #> NULL
 ```
 

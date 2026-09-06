@@ -61,10 +61,27 @@ AgentUsage(
   output_tokens = 30,
   cost_usd = 0.002
 )
-#> <AgentUsage>
-#>   requests: 2
-#>   tool_calls: 1
-#>   tokens: 150
-#>   cached_tokens: 0
-#>   cost_usd: $0.0020
+#> $requests
+#> [1] 2
+#> 
+#> $tool_calls
+#> [1] 1
+#> 
+#> $input_tokens
+#> [1] 120
+#> 
+#> $output_tokens
+#> [1] 30
+#> 
+#> $cached_tokens
+#> [1] 0
+#> 
+#> $total_tokens
+#> [1] 150
+#> 
+#> $cost_usd
+#> [1] 0.002
+#> 
+#> attr(,"class")
+#> [1] "AgentUsage" "list"      
 ```

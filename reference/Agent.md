@@ -1187,7 +1187,7 @@ Invisible self for chaining
     agent$add_hook(hook_block_dangerous_bash())
 
     # Add a custom PreToolUse hook
-    agent$add_hook(HookMatcher$new(
+    agent$add_hook(HookMatcher(
       event = "PreToolUse",
       pattern = "^write_file$",
       callback = function(tool_name, tool_input, context) {
@@ -1784,7 +1784,7 @@ if (FALSE) { # \dontrun{
 agent$add_hook(hook_block_dangerous_bash())
 
 # Add a custom PreToolUse hook
-agent$add_hook(HookMatcher$new(
+agent$add_hook(HookMatcher(
   event = "PreToolUse",
   pattern = "^write_file$",
   callback = function(tool_name, tool_input, context) {
