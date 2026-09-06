@@ -30,6 +30,7 @@ deputy/
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
 │   ├── compaction-run.R    # Governed asynchronous summary attempts and recovery
+│   ├── agent-definition.R # S7 AgentDefinition values and routing normalization
 │   ├── agent-definition-files.R # Portable YAML AgentDefinitions
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
 │   ├── run-usage.R         # Run accounting and fail-closed limits
@@ -173,7 +174,8 @@ minimum version or adopting an unreleased API.
 - **Classes**: Use S7 for value contracts and R6 for mutable runtime owners.
   `HookMatcher(...)`, `AgentEvent(...)`, `AgentResult(...)`, `Permissions(...)`,
   `AgentUsage(...)`, `UsageLimits(...)`, `ContextPolicy(...)`, and
-  `DeputyCompaction(...)` are read-only S7 values. Use
+  `DeputyCompaction(...)`, and `AgentDefinition(...)` are read-only S7 values.
+  `agent_definition()` is the same S7 constructor as `AgentDefinition()`. Use
   `hook_matches()`, `permissions_check()`, and `result_*()` inspection functions.
   `$` reads on events, results, policies, usage, and limits are property
   conveniences; there are no R6 constructor or method facades for these values.
@@ -186,6 +188,8 @@ minimum version or adopting an unreleased API.
   ADR-0012 records ContextPolicy template isolation, compaction evidence, and
   reporting projections. Nested summary Chats and provider conditions retain
   reference semantics; policy construction and Agent getters clone templates.
+  ADR-0013 records definition routing, executable-object composition, and
+  version-1 YAML serialization through explicit host registries.
 - **Printing**: Format summaries with `cli::cli_format_method()` and write the
   resulting lines with `cli::cat_line()` so printing remains on stdout. Pass
   user strings as interpolated values, never as cli templates, and return the

@@ -5,7 +5,7 @@ test_that("agent_definition creates correct structure", {
     prompt = "You are a test assistant"
   )
 
-  expect_s3_class(def, "AgentDefinition")
+  expect_s7_class(def, AgentDefinition)
   expect_equal(def$name, "test_agent")
   expect_equal(def$description, "A test agent")
   expect_equal(def$prompt, "You are a test assistant")
@@ -14,7 +14,7 @@ test_that("agent_definition creates correct structure", {
   expect_equal(def$skills, list())
   expect_null(def$max_requests)
   expect_named(
-    def,
+    S7::props(def),
     c(
       "name",
       "description",
@@ -226,7 +226,7 @@ test_that("agent_definition with empty tools is valid", {
   )
 
   expect_equal(def$tools, list())
-  expect_s3_class(def, "AgentDefinition")
+  expect_s7_class(def, AgentDefinition)
 })
 
 test_that("agent_definition with empty skills is valid", {
@@ -237,7 +237,7 @@ test_that("agent_definition with empty skills is valid", {
   )
 
   expect_equal(def$skills, list())
-  expect_s3_class(def, "AgentDefinition")
+  expect_s7_class(def, AgentDefinition)
 })
 
 test_that("agent_definition handles special characters in name", {
@@ -293,4 +293,74 @@ test_that("agent_definition accepts all parameter types", {
   expect_true(length(def$tools) >= 3) # tools_file() returns multiple tools
   expect_equal(def$model, "openai/gpt-4o-mini")
   expect_equal(def$skills, list("skill1", "skill2"))
+})
+
+test_that("both definition constructors expose the same S7 contract", {
+  expect_identical(agent_definition, AgentDefinition)
+  definition <- agent_definition(" Reviewer ", "Reviews text", "Read carefully")
+  expect_s7_class(definition, AgentDefinition)
+  expect_identical(definition$name, S7::prop(definition, "name"))
+  expect_snapshot(error = TRUE, definition@name <- "changed")
+  expect_snapshot(error = TRUE, definition@max_requests <- 2L)
+  expect_snapshot(error = TRUE, definition@permission_mode <- "full")
+  expect_snapshot(
+    error = TRUE,
+    S7::props(definition) <- list(prompt = "changed")
+  )
+  fields <- S7::props(definition)
+  fields$name <- "LIMITED"
+  fields$max_requests <- 0L
+  revised <- do.call(agent_definition, fields)
+  expect_identical(revised$name, "limited")
+  expect_identical(revised$max_requests, 0L)
+  expect_identical(definition$name, "reviewer")
+  expect_null(definition$max_requests)
+})
+
+test_that("definition values compose original tools and caller-owned skill state", {
+  state <- new.env(parent = emptyenv())
+  state$count <- 0L
+  tool <- ellmer::tool(
+    function() {
+      state$count <- state$count + 1L
+      state$count
+    },
+    name = "counter",
+    description = "Count calls"
+  )
+  skill <- Skill$new("concise", "Be concise", "Keep it short")
+  definition <- agent_definition(
+    "helper",
+    "Helps",
+    "Help",
+    tools = list(tool),
+    skills = list(skill)
+  )
+  lead <- LeadAgent$new(create_mock_chat(), sub_agents = list(definition))
+  snapshot <- lead$sub_agent_defs[[1L]]
+  expect_identical(definition$tools[[1L]], tool)
+  expect_s7_class(snapshot$tools[[1L]], ellmer::ToolDef)
+  expect_identical(snapshot$skills[[1L]], skill)
+  expect_identical(snapshot$tools[[1L]](), 1L)
+  expect_identical(state$count, 1L)
+  skill$prompt <- "Use one sentence"
+  expect_identical(snapshot$skills[[1L]]$prompt, "Use one sentence")
+  expect_snapshot(error = TRUE, definition@tools <- list())
+  expect_snapshot(error = TRUE, definition@skills <- list())
+  fields <- S7::props(definition)
+  fields$tools <- list()
+  expect_length(definition$tools, 1L)
+  expect_length(lead$sub_agent_defs[[1L]]$tools, 1L)
+})
+
+test_that("definition consumers reject old S3 lookalikes", {
+  fields <- S7::props(agent_definition("helper", "Helps", "Help"))
+  old <- structure(fields, class = "AgentDefinition")
+  expect_snapshot(error = TRUE, copy_agent_definition(old))
+  expect_snapshot(
+    error = TRUE,
+    LeadAgent$new(create_mock_chat(), sub_agents = list(old))
+  )
+  lead <- LeadAgent$new(create_mock_chat())
+  expect_snapshot(error = TRUE, lead$register_sub_agent(old))
 })

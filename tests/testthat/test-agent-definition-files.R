@@ -51,6 +51,7 @@ test_that("every AgentDefinition field round-trips through YAML", {
     tools = tool_registry,
     skills = skill_registry
   )
+  expect_s7_class(restored, AgentDefinition)
   expect_identical(restored, definition)
   expect_false(as.raw(13) %in% readBin(path, "raw", n = file.size(path)))
   expect_identical(restored$tools[[1]]@annotations, tool_read_file@annotations)
@@ -64,10 +65,12 @@ test_that("omitted fields, nulls and empty sequences retain constructor defaults
   expect_identical(agent_definition_read(path), expected)
   agent_definition_write(expected, path, overwrite = TRUE)
   expect_identical(agent_definition_read(path), expected)
-  expected$memory <- character()
-  expected$disallowed_tools <- character()
-  expected$mcp_servers <- character()
-  expected$max_requests <- 0L
+  fields <- S7::props(expected)
+  fields$memory <- character()
+  fields$disallowed_tools <- character()
+  fields$mcp_servers <- character()
+  fields$max_requests <- 0L
+  expected <- do.call(agent_definition, fields)
   agent_definition_write(expected, path, overwrite = TRUE)
   expect_identical(agent_definition_read(path), expected)
 })
@@ -86,7 +89,10 @@ test_that("named character vectors are written as sequences", {
   agent_definition_write(definition, path)
   restored <- agent_definition_read(path)
   for (field in c("memory", "mcp_servers", "disallowed_tools")) {
-    expect_identical(restored[[field]], unname(definition[[field]]))
+    expect_identical(
+      S7::prop(restored, field),
+      unname(S7::prop(definition, field))
+    )
   }
 })
 
@@ -228,7 +234,9 @@ test_that("a failed rename leaves the original definition intact", {
   root <- withr::local_tempdir()
   path <- write_definition_fixture(minimal_definition_yaml, root)
   definition <- agent_definition_read(path)
-  definition$prompt <- "A replacement prompt"
+  fields <- S7::props(definition)
+  fields$prompt <- "A replacement prompt"
+  definition <- do.call(agent_definition, fields)
   local_mocked_bindings(
     file.rename = function(from, to) FALSE,
     .package = "base"
@@ -276,11 +284,14 @@ test_that("the size boundary includes every byte written", {
   path <- file.path(root, "agent.yaml")
   definition <- agent_definition("reviewer", "Reviews text", "x")
   agent_definition_write(definition, path)
-  definition$prompt <- strrep("x", 1024^2 - file.size(path) + 1L)
+  fields <- S7::props(definition)
+  fields$prompt <- strrep("x", 1024^2 - file.size(path) + 1L)
+  definition <- do.call(agent_definition, fields)
   agent_definition_write(definition, path, overwrite = TRUE)
   expect_equal(file.size(path), 1024^2)
   expect_identical(agent_definition_read(path), definition)
-  definition$prompt <- paste0(definition$prompt, "x")
+  fields$prompt <- paste0(fields$prompt, "x")
+  definition <- do.call(agent_definition, fields)
   expect_error(
     agent_definition_write(definition, path, overwrite = TRUE),
     "exceeds 1 MiB",

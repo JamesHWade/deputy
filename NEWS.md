@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* `agent_definition()` and `AgentDefinition()` now construct the same read-only
+  S7 value. Use `S7::props()` to prepare a revised definition. Routing names,
+  tool and skill registry identity, YAML version 1, and delegated permission
+  and request limits retain their existing behavior (#125).
+
 * `AgentUsage()` and `UsageLimits()` now construct read-only S7 values.
   Constructors and `$` property reads retain their existing names; use
   `S7::props()` for plain reporting records instead of list indexing or

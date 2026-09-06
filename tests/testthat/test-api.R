@@ -13,6 +13,7 @@ test_that("public API is deliberate", {
     "ContextPolicy",
     "DeputyCompaction",
     "LeadAgent",
+    "AgentDefinition",
     "agent_definition",
     "agent_definition_read",
     "agent_definition_write",
