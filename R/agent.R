@@ -573,7 +573,8 @@ Agent <- R6::R6Class(
     },
 
     #' @description Return the most recent compaction outcome.
-    #' @return A `DeputyCompaction`, or `NULL` before compaction occurs.
+    #' @return A read-only [DeputyCompaction] S7 value, or `NULL` before
+    #'   compaction occurs.
     last_compaction = function() {
       private$.last_compaction
     },
@@ -1178,7 +1179,8 @@ Agent <- R6::R6Class(
     #' @param fallback What to do when LLM summary generation fails.
     #' @param automatic Whether the run kernel triggered this compaction.
     #' @param estimated_tokens Optional pre-compaction token estimate.
-    #' @return A `DeputyCompaction` describing the method and usage.
+    #' @return A read-only [DeputyCompaction] S7 value describing the method
+    #'   and usage.
     #'
     #' @details
     #' The compaction process:

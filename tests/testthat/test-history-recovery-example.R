@@ -341,6 +341,18 @@ for (scenario in c("original", "changed-constraint")) {
     saved <- jsonlite::fromJSON(json, simplifyVector = FALSE)
     expect_equal(saved$runs[[1L]]$usage, evaluation$runs[[1L]]$usage)
     expect_equal(saved$trials[[1L]]$usage, evaluation$trials[[1L]]$usage)
+    saved_compactions <- Filter(
+      function(run) identical(run$compaction$method, "llm"),
+      saved$runs
+    )
+    # The final preparation run in each trial ends with an LLM replacement.
+    expect_length(saved_compactions, 2L)
+    expect_identical(saved_compactions[[1L]]$compaction$method, "llm")
+    expect_gt(saved_compactions[[1L]]$compaction$usage$requests, 0)
+    expect_gt(
+      saved_compactions[[1L]]$compaction$attempts[[1L]]$usage$requests,
+      0
+    )
   })
 }
 

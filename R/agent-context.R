@@ -541,6 +541,12 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       automatic,
       estimated_tokens
     ) {
+      automatic <- compaction_automatic(automatic)
+      estimated_tokens <- validate_usage_limit(
+        estimated_tokens,
+        "estimated_tokens",
+        integer = FALSE
+      )
       turns <- private$.chat$get_turns()
       fallback <- match.arg(fallback, c("error", "text"))
 
@@ -563,7 +569,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       }
 
       if (length(turns) <= keep_last) {
-        result <- new_compaction_result(
+        result <- DeputyCompaction(
           method = "none",
           automatic = automatic,
           turns_compacted = 0L,
@@ -597,7 +603,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
 
       # Check if hook wants to cancel compaction
       if (!is.null(hook_result) && isFALSE(hook_result$continue)) {
-        result <- new_compaction_result(
+        result <- DeputyCompaction(
           method = "cancelled",
           automatic = automatic,
           turns_compacted = 0L,
@@ -742,7 +748,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         }
       }
 
-      result <- new_compaction_result(
+      result <- DeputyCompaction(
         method = method,
         automatic = plan$automatic,
         turns_compacted = length(plan$turns_to_compact),

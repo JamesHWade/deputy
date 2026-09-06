@@ -59,6 +59,7 @@ reference:
   - AgentUsage
   - UsageLimits
   - ContextPolicy
+  - DeputyCompaction
 
 - title: Tools
   desc: Built-in tools and tool bundles

@@ -656,6 +656,8 @@ test_that("summary destinations cannot be changed through caller templates or po
   policy <- ContextPolicy(summary_fallback_chats = list(template))
   agent <- Agent$new(runtime_chat(server), context_policy = policy)
   template$set_model("changed-template")
+  expect_identical(policy$summary_fallback_chats[[1]]$get_model(), "configured")
+  expect_s7_class(policy, ContextPolicy)
   policy$summary_fallback_chats[[1]]$set_model("changed-policy")
   snapshot <- agent$context_policy
   snapshot$summary_fallback_chats[[1]]$set_model("changed-snapshot")

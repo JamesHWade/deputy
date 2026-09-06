@@ -17,7 +17,7 @@ token_counting_chat <- function(responses = list("done")) {
 
 test_that("ContextPolicy validates context and offload thresholds", {
   policy <- ContextPolicy()
-  expect_s3_class(policy, "ContextPolicy")
+  expect_s7_class(policy, ContextPolicy)
   expect_identical(policy$max_tokens, 32000L)
   expect_identical(policy$fallback, "error")
 
@@ -94,7 +94,7 @@ test_that("the run kernel compacts automatically before the provider call", {
   compaction <- agent$last_compaction()
 
   expect_s7_class(result, AgentResult)
-  expect_s3_class(compaction, "DeputyCompaction")
+  expect_s7_class(compaction, DeputyCompaction)
   expect_true(compaction$automatic)
   expect_identical(compaction$method, "text")
   expect_identical(compaction$turns_compacted, 4L)
@@ -1077,4 +1077,125 @@ test_that("bash tools execute from the Agent workspace", {
   expect_match(result, normalizePath(root, winslash = "/"), fixed = TRUE)
   expect_true(file.exists(expected))
   expect_false(file.exists(file.path(outside, "bash-working-dir.txt")))
+})
+
+test_that("S7 context policies freeze configuration and reject list lookalikes", {
+  policy <- ContextPolicy(max_tokens = NULL, max_tool_result_bytes = NULL)
+  expect_s7_class(policy, ContextPolicy)
+  expect_identical(policy$compact_to, S7::prop(policy, "compact_to"))
+  expect_snapshot(error = TRUE, policy$max_tokens <- 100L)
+  expect_snapshot(error = TRUE, S7::prop(policy, "offload_dir") <- "changed")
+  expect_snapshot(error = TRUE, S7::props(policy) <- list(fallback = "text"))
+  fields <- S7::props(policy)
+  fields$max_tokens <- 100L
+  replacement <- do.call(ContextPolicy, fields)
+  expect_identical(replacement$max_tokens, 100L)
+  expect_null(policy$max_tokens)
+  expect_snapshot(
+    error = TRUE,
+    normalize_context_policy(structure(
+      fields,
+      class = c("ContextPolicy", "list")
+    ))
+  )
+})
+
+test_that("S7 compactions preserve provider evidence while freezing records", {
+  state <- new.env(parent = emptyenv())
+  state$observed <- 1L
+  condition <- structure(
+    list(message = "provider failure", call = NULL, state = state),
+    class = c("provider_test_error", "error", "condition")
+  )
+  usage <- AgentUsage(requests = 1, cost_usd = NA_real_)
+  attempt <- list(
+    fallback_index = 0L,
+    provider = "test",
+    model = "test-model",
+    usage = usage,
+    condition = condition
+  )
+  outcome <- DeputyCompaction(
+    "text",
+    TRUE,
+    2,
+    1,
+    100,
+    usage = usage,
+    summary = "Retained evidence",
+    attempts = list(attempt)
+  )
+  expect_s7_class(outcome, DeputyCompaction)
+  expect_identical(outcome$usage, usage)
+  expect_identical(outcome$attempts[[1L]]$condition, condition)
+  expect_identical(outcome$turns_compacted, 2L)
+  expect_identical(outcome$estimated_tokens, 100)
+  expect_s3_class(outcome$compacted_at, "POSIXct")
+  expect_snapshot(error = TRUE, outcome$run_id <- "changed")
+  expect_snapshot(error = TRUE, outcome@attempts[[1L]]$provider <- "changed")
+  expect_snapshot(error = TRUE, outcome@usage@requests <- 3L)
+  expect_snapshot(error = TRUE, S7::props(outcome) <- list(summary = "changed"))
+  fields <- S7::props(outcome)
+  fields$attempts[[1L]]$provider <- "copy"
+  expect_identical(outcome$attempts[[1L]]$provider, "test")
+  state$observed <- 2L
+  expect_identical(outcome$attempts[[1L]]$condition$state$observed, 2L)
+})
+
+test_that("S7 compaction constructors validate counts and optional evidence", {
+  expect_snapshot(error = TRUE, DeputyCompaction("invalid", FALSE, 0, 0))
+  expect_snapshot(error = TRUE, DeputyCompaction("none", NA, 0, 0))
+  expect_snapshot(error = TRUE, DeputyCompaction("none", FALSE, -1, 0))
+  expect_snapshot(error = TRUE, DeputyCompaction("none", FALSE, 0, 1.5))
+  expect_snapshot(error = TRUE, DeputyCompaction("none", FALSE, 0, 0, Inf))
+  expect_snapshot(
+    error = TRUE,
+    DeputyCompaction("none", FALSE, 0, 0, summary = NA_character_)
+  )
+  expect_snapshot(
+    error = TRUE,
+    DeputyCompaction("none", FALSE, 0, 0, run_id = c("one", "two"))
+  )
+  expect_snapshot(
+    error = TRUE,
+    DeputyCompaction("none", FALSE, 0, 0, attempts = "invalid")
+  )
+  expect_snapshot(
+    error = TRUE,
+    DeputyCompaction(
+      "none",
+      FALSE,
+      0,
+      0,
+      usage = structure(list(), class = c("AgentUsage", "list"))
+    )
+  )
+})
+
+test_that("invalid compaction evidence is rejected before hooks or context changes", {
+  chat <- create_compaction_mock_chat(responses = list("Unused summary"))
+  turns <- list(
+    create_mock_user_turn("Keep this"),
+    create_mock_assistant_turn("And this")
+  )
+  chat$set_turns(turns)
+  agent <- Agent$new(chat = chat, system_prompt = "Host policy")
+  hooks <- 0L
+  agent$add_hook(HookMatcher(
+    "PreCompact",
+    function(...) {
+      hooks <<- hooks + 1L
+      NULL
+    },
+    timeout = 0
+  ))
+  expect_snapshot(
+    error = TRUE,
+    agent$compact(keep_last = 0, estimated_tokens = Inf)
+  )
+  expect_snapshot(error = TRUE, agent$compact(keep_last = 0, automatic = NA))
+  expect_identical(hooks, 0L)
+  expect_identical(chat$get_turns(), turns)
+  expect_identical(chat$get_system_prompt(), "Host policy")
+  expect_null(agent$last_compaction())
 })

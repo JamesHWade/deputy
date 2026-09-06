@@ -304,3 +304,92 @@ test_that("serialized usage values retain incomplete-cost evidence and limits", 
   expect_identical(restored$usage_frozen, TRUE)
   expect_identical(restored$limits_frozen, TRUE)
 })
+
+test_that("serialized context values retain dispatch and original condition evidence", {
+  path <- withr::local_tempfile(fileext = ".rds")
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = NULL,
+    fallback = "text"
+  )
+  condition <- simpleError("original provider failure")
+  usage <- AgentUsage(requests = 1, cost_usd = NA_real_)
+  outcome <- DeputyCompaction(
+    "text",
+    TRUE,
+    2,
+    1,
+    usage = usage,
+    summary = "retained summary",
+    attempts = list(list(
+      fallback_index = 0L,
+      provider = "test",
+      model = "test-model",
+      usage = usage,
+      condition = condition
+    ))
+  )
+  saveRDS(list(policy = policy, outcome = outcome), path)
+  restored <- callr::r(
+    function(path, package_path) {
+      if (file.exists(file.path(package_path, "R", "agent.R"))) {
+        pkgload::load_all(package_path, quiet = TRUE)
+      } else {
+        library(deputy, lib.loc = dirname(package_path))
+      }
+      values <- readRDS(path)
+      normalized <- getFromNamespace("normalize_context_policy", "deputy")(
+        values$policy
+      )
+      frozen <- function(value, field, replacement) {
+        tryCatch(
+          {
+            S7::prop(value, field) <- replacement
+            FALSE
+          },
+          error = function(error) grepl("read-only", conditionMessage(error))
+        )
+      }
+      list(
+        policy_class = S7::S7_inherits(normalized, ContextPolicy),
+        outcome_class = S7::S7_inherits(values$outcome, DeputyCompaction),
+        policy = S7::props(normalized),
+        usage = S7::props(values$outcome$usage),
+        attempt_usage = S7::props(values$outcome$attempts[[1L]]$usage),
+        condition = values$outcome$attempts[[1L]]$condition,
+        timestamp = values$outcome$compacted_at,
+        estimated_tokens = values$outcome$estimated_tokens,
+        run_id = values$outcome$run_id,
+        policy_frozen = frozen(normalized, "max_tokens", 100L),
+        outcome_frozen = frozen(values$outcome, "run_id", "changed"),
+        policy_output = capture.output(print(normalized)),
+        outcome_output = capture.output(print(values$outcome))
+      )
+    },
+    args = list(
+      path = path,
+      package_path = getNamespaceInfo(asNamespace("deputy"), "path")
+    )
+  )
+  expect_identical(restored$policy_class, TRUE)
+  expect_identical(restored$outcome_class, TRUE)
+  expect_identical(restored$policy, S7::props(policy))
+  expect_identical(restored$usage, S7::props(usage))
+  expect_identical(restored$attempt_usage, S7::props(usage))
+  expect_identical(restored$condition, condition)
+  expect_identical(restored$timestamp, outcome$compacted_at)
+  expect_null(restored$estimated_tokens)
+  expect_null(restored$run_id)
+  expect_identical(restored$policy_frozen, TRUE)
+  expect_identical(restored$outcome_frozen, TRUE)
+  expect_match(
+    paste(restored$policy_output, collapse = "\n"),
+    "<ContextPolicy>",
+    fixed = TRUE
+  )
+  expect_match(
+    paste(restored$outcome_output, collapse = "\n"),
+    "<DeputyCompaction>",
+    fixed = TRUE
+  )
+})
