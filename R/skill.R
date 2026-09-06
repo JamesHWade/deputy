@@ -243,10 +243,12 @@ skill_check_requirements <- function(skill, current_provider = NULL) {
   }
   missing <- character()
   provider_mismatch <- FALSE
+  required_packages <- skill$requires[["packages"]]
+  required_providers <- skill$requires[["providers"]]
 
   # Check required packages
-  if (!is.null(skill$requires$packages)) {
-    for (pkg in skill$requires$packages) {
+  if (!is.null(required_packages)) {
+    for (pkg in required_packages) {
       if (!rlang::is_installed(pkg)) {
         missing <- c(missing, paste0("package:", pkg))
       }
@@ -254,8 +256,7 @@ skill_check_requirements <- function(skill, current_provider = NULL) {
   }
 
   # Check provider requirements if current_provider is specified
-  if (!is.null(current_provider) && !is.null(skill$requires$providers)) {
-    required_providers <- skill$requires$providers
+  if (!is.null(current_provider) && !is.null(required_providers)) {
     if (length(required_providers) > 0) {
       provider_key <- provider_requirement_key(current_provider)
       required_keys <- vapply(
@@ -281,7 +282,7 @@ skill_check_requirements <- function(skill, current_provider = NULL) {
     missing = missing,
     provider_mismatch = provider_mismatch,
     current_provider = current_provider,
-    required_providers = skill$requires$providers
+    required_providers = required_providers
   )
 }
 
@@ -295,7 +296,14 @@ S7::method(print, Skill) <- function(x, ...) {
     }
     cli::cli_text("tools: {length(x$tools)}")
     if (length(x$tools) > 0) {
-      tool_names <- sapply(x$tools, function(t) t@name)
+      tool_names <- vapply(
+        x$tools,
+        function(tool) {
+          name <- tryCatch(tool@name, error = function(e) NULL)
+          if (is_nonempty_string(name)) name else "<unnamed>"
+        },
+        character(1)
+      )
       cli::cli_text("{paste(tool_names, collapse = \", \")}")
     }
     if (!is.null(x$prompt)) {

@@ -101,3 +101,58 @@ test_that("Skill boundaries reject legacy lookalikes", {
     validate_definition_registry(list(legacy = old), "skills")
   )
 })
+
+test_that("only exact reserved requirement names are evaluated", {
+  skill <- Skill(
+    "metadata",
+    requires = list(
+      packages_version = "nonexistent_package_12345",
+      providers_note = "openai"
+    )
+  )
+  expect_identical(
+    skill_check_requirements(skill, "anthropic"),
+    list(
+      ok = TRUE,
+      missing = character(),
+      provider_mismatch = FALSE,
+      current_provider = "anthropic",
+      required_providers = NULL
+    )
+  )
+  expect_null(skill_check_requirements(skill)$required_providers)
+  agent <- Agent$new(create_mock_chat())
+  expect_no_warning(agent$load_skill(skill))
+
+  fields <- S7::props(skill)
+  fields$requires$packages <- "base"
+  fields$requires$providers <- "openai"
+  declared <- do.call(Skill, fields)
+  expect_identical(skill_check_requirements(declared, "OpenAI")$ok, TRUE)
+  expect_identical(
+    skill_check_requirements(declared, "anthropic")$provider_mismatch,
+    TRUE
+  )
+})
+
+test_that("Skill summaries tolerate unexpected tool entries without executing them", {
+  withr::local_options(cli.width = 120, cli.num_colors = 1L)
+  skill <- Skill(
+    "mixed",
+    tools = list(
+      tool_read_file,
+      function() stop("Do not execute while printing"),
+      list(name = "unexpected"),
+      NULL
+    )
+  )
+  output <- capture.output(result <- withVisible(print(skill)))
+  expect_match(paste(output, collapse = "\n"), "tools: 4", fixed = TRUE)
+  expect_match(
+    paste(output, collapse = "\n"),
+    "read_file, <unnamed>, <unnamed>, <unnamed>",
+    fixed = TRUE
+  )
+  expect_identical(result$visible, FALSE)
+  expect_identical(result$value, skill)
+})
