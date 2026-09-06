@@ -4,21 +4,9 @@ This example builds a pipeline that extracts structured metadata from an
 R package’s source files. Each step is a separate agent call, with the
 output of one step feeding into the next.
 
-This follows the **Prompt Chaining** pattern: sequential agents where
-each step has a focused task and produces structured output for the
-next.
-
-## When to Use Prompt Chaining
-
-Prompt chaining works well when:
-
-- The task has distinct phases (extract, transform, report)
-- Each phase benefits from a different system prompt or focus
-- You need validated structured data between steps
-- A single monolithic prompt would be too complex or unreliable
-
-For open-ended exploration, an autonomous agent is better (see
-[`vignette("example-data-analysis")`](https://jameshwade.github.io/deputy/articles/example-data-analysis.md)).
+Use separate steps when you need to inspect or validate an intermediate
+result before continuing. Here, you can review the extracted metadata
+before asking for categories and a report.
 
 ## The Pipeline
 
@@ -28,8 +16,8 @@ Our pipeline has three steps:
 2.  **Enrich** – Categorise and annotate the extracted metadata
 3.  **Report** – Produce a human-readable summary
 
-Each step supplies an ellmer `type` to extract a structured result after
-its tool work.
+The first two steps use ellmer types for structured results. The final
+step returns a report as text.
 
 ## Step 1: Extract Package Metadata
 
@@ -97,8 +85,9 @@ step1 <- extractor$run_sync(
   type = ellmer::type_from_schema(jsonlite::toJSON(extract_schema, auto_unbox = TRUE))
 )
 
-# Validate the output before proceeding
-stopifnot(step1$is_success())
+if (!step1$is_success()) {
+  cli::cli_abort("Extraction stopped early: {step1$stop_reason}.")
+}
 
 pkg_metadata <- step1$structured_output
 pkg_metadata$name
@@ -174,7 +163,9 @@ step2 <- enricher$run_sync(
   type = ellmer::type_from_schema(jsonlite::toJSON(enrich_schema, auto_unbox = TRUE))
 )
 
-stopifnot(step2$is_success())
+if (!step2$is_success()) {
+  cli::cli_abort("Enrichment stopped early: {step2$stop_reason}.")
+}
 enriched <- step2$structured_output
 enriched$category_tags
 enriched$complexity
@@ -230,7 +221,7 @@ extraction_pipeline <- function(package_dir = ".") {
   )
 
   if (!step1$is_success()) {
-    stop("Extraction failed: ", step1$stop_reason)
+    cli::cli_abort("Extraction stopped early: {step1$stop_reason}.")
   }
 
   # Step 2: Enrich
@@ -253,7 +244,7 @@ extraction_pipeline <- function(package_dir = ".") {
   )
 
   if (!step2$is_success()) {
-    stop("Enrichment failed: ", step2$stop_reason)
+    cli::cli_abort("Enrichment stopped early: {step2$stop_reason}.")
   }
 
   # Step 3: Report

@@ -5,7 +5,7 @@
 - [Getting Started with
   Deputy](https://jameshwade.github.io/deputy/articles/getting-started.md):
 
-### Concepts
+### Guides
 
 - [Tools and Tool
   Bundles](https://jameshwade.github.io/deputy/articles/tools.md):
@@ -13,7 +13,7 @@
   Safety](https://jameshwade.github.io/deputy/articles/permissions.md):
 - [Hooks](https://jameshwade.github.io/deputy/articles/hooks.md):
 
-### Hosts
+### Apps
 
 - [Example: Shiny Chat with
   shinychat](https://jameshwade.github.io/deputy/articles/example-shiny-chat.md):

@@ -34,19 +34,16 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../articles/getting-started.html">Get started</a></li>
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Intro</h6></li>
-    <li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Concepts</h6></li>
+<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
     <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
     <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Hosts</h6></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
     <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
@@ -60,6 +57,7 @@
     <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
   </ul>
 </li>
+<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -87,19 +85,19 @@
 
     
     
-<p>Deputy uses ellmer’s types, provider schema transport, JSON
-extraction, and R conversion. A structured result is the value ellmer
-returns, available directly in
-<code>AgentResult$structured_output</code>. There is no separate Deputy
-schema format.</p>
+<p>Use ellmer types to ask for a list or data frame with specified
+fields. Deputy stores the converted R value in
+<code>result$structured_output</code> so you can use it in the next step
+of your analysis.</p>
 <div class="section level2">
 <h2 id="extract-directly">Extract directly<a class="anchor" aria-label="anchor" href="#extract-directly"></a>
 </h2>
 <p>Use <code>chat_structured()</code> when the conversation already
-contains the information to extract. It makes a governed structured
-request and suppresses ordinary tools, as ellmer does.
+contains the information to extract. It requests structured output
+without calling ordinary tools, as ellmer does.
 <code>chat_structured_async()</code> returns a promise with the same
-value.</p>
+value. Automatic compaction and optional validation corrections can add
+model requests; all count toward the run’s usage limits.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">review_type</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_object</a></span><span class="op">(</span></span>
@@ -109,8 +107,8 @@ value.</p>
 <span><span class="va">data</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">chat_structured</span><span class="op">(</span><span class="st">"The review found no problems."</span>, type <span class="op">=</span> <span class="va">review_type</span><span class="op">)</span></span>
 <span><span class="va">agent</span><span class="op">$</span><span class="fu">last_run</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">usage</span></span></code></pre></div>
 <p>Existing JSON Schema can enter through
-<code>ellmer::type_from_schema(text = ...)</code>. Schema support and
-conversion remain ellmer’s contract.</p>
+<code>ellmer::type_from_schema(text = ...)</code>. ellmer handles schema
+support and conversion to R values.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">status_type</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_from_schema</a></span><span class="op">(</span></span>
 <span>  <span class="st">'{"type":"object","properties":{"status":{"type":"string"}},"required":["status"],"additionalProperties":false}'</span></span>
@@ -127,8 +125,8 @@ phases share one run ID, hook lifecycle, permission policy, and
 request/token/cost budget. The extraction never repeats tool work. The
 <code>response</code> is the task’s text; <code>structured_output</code>
 is the extracted value. Even a task without tools uses these two
-explicit phases; use <code>chat_structured()</code> for direct
-extraction in one request.</p>
+explicit phases; use <code>chat_structured()</code> to extract directly
+without the initial task phase.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
@@ -137,7 +135,9 @@ extraction in one request.</p>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">8</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Review the README"</span>, type <span class="op">=</span> <span class="va">status_type</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="fu">is_success</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="va">result</span><span class="op">$</span><span class="fu">is_success</span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli_abort</a></span><span class="op">(</span><span class="st">"Review stopped early: {result$stop_reason}."</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">structured_output</span></span></code></pre></div>
 </div>
 <div class="section level2">

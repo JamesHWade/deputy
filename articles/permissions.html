@@ -34,19 +34,16 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../articles/getting-started.html">Get started</a></li>
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Intro</h6></li>
-    <li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Concepts</h6></li>
+<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
     <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
     <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Hosts</h6></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
     <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
@@ -60,6 +57,7 @@
     <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
   </ul>
 </li>
+<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -87,10 +85,10 @@
 
     
     
-<p>Permissions control what an agent is allowed to do. They sit between
-the LLM and tool execution, checking every tool call before it runs.
-deputy ships with sensible presets and makes it easy to build custom
-policies.</p>
+<p>Permissions control which tool calls an agent can run. Use a preset
+for common read or write tasks, or a <code>Permissions</code> object to
+allow specific capabilities. Deputy checks the policy before running a
+tool.</p>
 <div class="section level2">
 <h2 id="permission-presets">Permission Presets<a class="anchor" aria-label="anchor" href="#permission-presets"></a>
 </h2>

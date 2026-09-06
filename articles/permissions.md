@@ -1,8 +1,8 @@
 # Permissions and Safety
 
-Permissions control what an agent is allowed to do. They sit between the
-LLM and tool execution, checking every tool call before it runs. deputy
-ships with sensible presets and makes it easy to build custom policies.
+Permissions control which tool calls an agent can run. Use a preset for
+common read or write tasks, or a `Permissions` object to allow specific
+capabilities. Deputy checks the policy before running a tool.
 
 ## Permission Presets
 

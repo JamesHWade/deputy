@@ -1,29 +1,15 @@
 # Example: Autonomous Data Analysis Agent
 
-This example builds an autonomous agent that performs exploratory data
-analysis on a dataset. The agent decides what to investigate, writes and
-runs R code in an explicitly trusted local subprocess, and iterates
-until it understands the data. For untrusted inputs or prompts, replace
-[`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md)
-with an mcp-repl tool loaded by
+This example asks an agent to explore a dataset, run R calculations, and
+report what it finds. The agent chooses its next calculation from the
+results of earlier ones. For a fixed sequence of steps, see the
+[extraction
+pipeline](https://jameshwade.github.io/deputy/articles/example-extraction-pipeline.md).
+
+The example permits R code to run in a separate process with your user
+account’s access. For untrusted inputs or prompts, use an OS sandbox
+such as mcp-repl through
 [`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md).
-
-This follows the **Autonomous Agent** pattern: a single agent with
-tools, given a goal and left to iterate through analysis steps on its
-own.
-
-## When to Use an Autonomous Agent
-
-An autonomous agent works well when:
-
-- The task is open-ended (you don’t know the exact steps in advance)
-- The agent needs to react to intermediate results (e.g., spotting
-  outliers and then investigating them)
-- You want the LLM to drive the analysis methodology
-
-For tasks with a fixed sequence of steps, consider prompt chaining
-instead (see
-[`vignette("example-extraction-pipeline")`](https://jameshwade.github.io/deputy/articles/example-extraction-pipeline.md)).
 
 ## Setup
 

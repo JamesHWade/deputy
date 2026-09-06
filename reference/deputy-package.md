@@ -1,18 +1,10 @@
-# deputy: Governed Agentic Artificial Intelligence Workflows
+# deputy: Run Tasks with Language Models and R Tools
 
-Run provider-agnostic, agentic artificial intelligence (AI) workflows
-with explicit boundaries for tools, permissions, budgets, and filesystem
-access. Builds on 'ellmer' to provide multi-step reasoning, lifecycle
-hooks, structured events, human input, session persistence, and
-delegation. Returns inspectable results and supports synchronous,
-asynchronous, terminal, and 'Shiny' hosts. Designed for applications
-that need governance and observability around tool-using language models
-in 'R'.
-
-A provider-agnostic framework for building agentic AI workflows in R.
-Built on ellmer, it enables multi-step reasoning with tool use,
-permissions, hooks, human-in-the-loop capabilities, and multi-agent
-delegation.
+Run tasks with language models and R tools using 'ellmer'. Control tool
+access with permissions, set limits on requests and usage, and inspect
+responses, tool calls, and the reason each run stopped. Supports
+streaming output, 'Shiny' applications, saved conversations, file
+checkpoints, and delegation to other agents.
 
 ## Main Functions
 
@@ -23,10 +15,10 @@ delegation.
   Coordinate specialized delegated agents
 
 - [`tools_preset()`](https://jameshwade.github.io/deputy/reference/tools_preset.md) -
-  Curated built-in tool collections
+  Choose a set of built-in tools
 
 - [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md) -
-  Run-scoped request, tool, token, and cost limits
+  Set request, tool, token, and cost limits
 
 - [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md) -
   Standard permission policy
@@ -41,19 +33,17 @@ delegation.
 
     library(deputy)
 
-    # Create an agent with file tools
     agent <- Agent$new(
       chat = ellmer::chat("openai/gpt-5.6-luna"),
-      tools = tools_preset("standard")
+      tools = tools_preset("minimal"),
+      permissions = permissions_readonly(),
+      usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),
+      working_dir = getwd()
     )
 
-    # Run a task with streaming output
-    events <- agent$run("List files in current directory")
-    repeat {
-      event <- events()
-      if (coro::is_exhausted(event)) break
-      if (event$type == "text") cat(event$text)
-    }
+    result <- agent$run_sync("Read DESCRIPTION and explain what this package does.")
+    result$response
+    result$stop_reason
 
 ## See also
 

@@ -2,11 +2,11 @@
 
 Deputy Agents implement the ellmer chat methods used by
 [shinychat](https://posit-dev.github.io/shinychat/). Pass an Agent
-directly to `chat_server()`; there is no separate Shiny bridge and no
-path that bypasses Deputy’s governance.
+directly to `chat_server()` to stream responses and tool activity while
+Deputy checks permissions and tracks usage.
 
 ``` text
-shinychat input -> Agent$stream_async() -> one governed run kernel -> ellmer
+shinychat input -> Agent$stream_async() -> ellmer
                                       \-> AgentResult + hooks + usage
 ```
 
@@ -36,7 +36,7 @@ server <- function(input, output, session) {
 
   agent <- Agent$new(
     chat = chat,
-    tools = c(tools_file(), tools_data()),
+    tools = tools_data(),
     permissions = permissions_readonly(),
     usage_limits = UsageLimits(
       max_requests = 10,
@@ -58,11 +58,11 @@ shinyApp(ui, server)
 
 `chat_server()` passes both plain text and attachment-enabled ellmer
 content to the Agent unchanged. It also supplies shinychat history and
-cancellation around Deputy’s governed stream.
+cancellation around Deputy’s stream.
 
 ## What the Agent Adds
 
-Every public chat and run method uses the same kernel:
+Choose a method by the result your application needs:
 
 | Method | Native return | Typical host |
 |----|----|----|

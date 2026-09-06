@@ -34,19 +34,16 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../articles/getting-started.html">Get started</a></li>
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Intro</h6></li>
-    <li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Concepts</h6></li>
+<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
     <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
     <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Hosts</h6></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
     <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
@@ -60,6 +57,7 @@
     <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
   </ul>
 </li>
+<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -87,9 +85,10 @@
 
     
     
-<p>Tools are how agents interact with the world. deputy provides
-built-in tools for common tasks and makes it easy to create your
-own.</p>
+<p>Tools let a model call R functions: read a file, fetch a page, or run
+a calculation. Choose built-in tools or register functions with
+<code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code>. Permissions determine which calls can
+run.</p>
 <div class="section level2">
 <h2 id="built-in-tools">Built-in Tools<a class="anchor" aria-label="anchor" href="#built-in-tools"></a>
 </h2>
@@ -185,11 +184,71 @@ system uses to decide whether the agent is allowed to use it. See
 <div class="section level2">
 <h2 id="tool-bundles">Tool Bundles<a class="anchor" aria-label="anchor" href="#tool-bundles"></a>
 </h2>
-<p>Use <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code> for local functions, package exports,
-and service call wrappers, then register those objects through the same
-Agent API. Registration does not load packages or infer a function’s
-effects. Describe them explicitly:</p>
+<p>Bundles group related tools together:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># read_file, read_markdown, write_file, list_files</span></span>
+<span><span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># run_r_code, run_bash</span></span>
+<span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># read_csv, read_file, read_markdown</span></span>
+<span><span class="fu"><a href="../reference/tools_web.html">tools_web</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># universal web_fetch and web_search</span></span>
+<span><span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># everything</span></span></code></pre></div>
+<p>Registration is not authorization: <code><a href="../reference/tools_code.html">tools_code()</a></code> makes
+the two trusted-code tools available to the model, while the Agent’s
+<code>Permissions</code> still decides whether either call may run.
+<code><a href="../reference/permissions_standard.html">permissions_standard()</a></code> denies both.</p>
+<p>Combine bundles by concatenating:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span>, tools <span class="op">=</span> <span class="va">tools</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="tool-presets">Tool Presets<a class="anchor" aria-label="anchor" href="#tool-presets"></a>
+</h2>
+<p>Presets are named collections with opinionated defaults:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"standard"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"dev"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"data"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"full"</span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<thead><tr class="header">
+<th>Preset</th>
+<th>Included capabilities</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>minimal</code></td>
+<td>file and document reads</td>
+</tr>
+<tr class="even">
+<td><code>standard</code></td>
+<td>reads plus native file writes; no code execution</td>
+</tr>
+<tr class="odd">
+<td><code>data</code></td>
+<td>data reads plus trusted R execution</td>
+</tr>
+<tr class="even">
+<td><code>dev</code></td>
+<td>native files plus trusted R and shell execution</td>
+</tr>
+<tr class="odd">
+<td><code>full</code></td>
+<td>every built-in tool</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level2">
+<h2 id="create-a-tool-from-an-r-function">Create a tool from an R function<a class="anchor" aria-label="anchor" href="#create-a-tool-from-an-r-function"></a>
+</h2>
+<p>A tool wraps an R function with a name, a description, and argument
+types that the model can use. Start with a function you can call
+directly. This example wraps <code><a href="https://rdrr.io/r/base/chartr.html" class="external-link">toupper()</a></code>; a package function
+or your own function works the same way.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span><span class="va">uppercase</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
 <span>  <span class="fu">base</span><span class="fu">::</span><span class="va"><a href="https://rdrr.io/r/base/chartr.html" class="external-link">toupper</a></span>,</span>
@@ -197,16 +256,59 @@ effects. Describe them explicitly:</p>
 <span>  description <span class="op">=</span> <span class="st">"Uppercase local text."</span>,</span>
 <span>  arguments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  annotations <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool_annotations.html" class="external-link">tool_annotations</a></span><span class="op">(</span></span>
-<span>    read_only_hint <span class="op">=</span> <span class="cn">TRUE</span>, destructive_hint <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>    open_world_hint <span class="op">=</span> <span class="cn">FALSE</span>, idempotent_hint <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>    read_only_hint <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>    destructive_hint <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    open_world_hint <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    idempotent_hint <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co"># Constructing this Chat does not make a model request.</span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>credentials <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="st">"example"</span>, model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="va">chat</span>, tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">uppercase</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">agent</span><span class="op">$</span><span class="fu">get_tools</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="fu">uppercase</span><span class="op">(</span><span class="st">"hello"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "HELLO"</span></span>
-<span><span class="va">agent</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="va">uppercase</span>, replace <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">uppercase</span><span class="op">(</span><span class="st">"hello"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "HELLO"</span></span></code></pre></div>
+<p>Register the tool when constructing the agent:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">uppercase</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="va"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>file_write <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Use uppercase to convert 'hello' to capitals."</span><span class="op">)</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">response</span></span></code></pre></div>
+<p>The annotations describe the function’s effects. Here the tool
+changes no files, uses no network, and returns the same answer for the
+same input. Deputy uses these declarations when checking permissions; it
+does not inspect the function body to verify them.</p>
+<table class="table">
+<thead><tr class="header">
+<th>Annotation</th>
+<th>Meaning when <code>TRUE</code>
+</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>read_only_hint</code></td>
+<td>Does not change state</td>
+</tr>
+<tr class="even">
+<td><code>destructive_hint</code></td>
+<td>May delete or overwrite data</td>
+</tr>
+<tr class="odd">
+<td><code>open_world_hint</code></td>
+<td>Accesses external systems</td>
+</tr>
+<tr class="even">
+<td><code>idempotent_hint</code></td>
+<td>Repeated calls have the same effect</td>
+</tr>
+</tbody>
+</table>
+<div class="section level3">
+<h3 id="replace-or-inspect-registered-tools">Replace or inspect registered tools<a class="anchor" aria-label="anchor" href="#replace-or-inspect-registered-tools"></a>
+</h3>
+<p>Use <code>agent$register_tool(tool)</code> to add a tool to an
+existing agent, or
+<code>agent$register_tool(tool, replace = TRUE)</code> to replace a tool
+with the same name.</p>
 <p>Existing names are errors unless <code>replace = TRUE</code> is
 explicit. Repeated names inside one batch always fail, including with
 replacement enabled. List names do not rename a tool.
@@ -228,8 +330,8 @@ trustworthiness. See <code>PermissionMode</code> for callback and mode
 behavior.</p>
 <p>Inspect the supplied fields and defaults without executing the
 tool:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/tool_metadata.html">tool_metadata</a></span><span class="op">(</span><span class="va">agent</span><span class="op">$</span><span class="fu">get_tools</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">uppercase</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/tool_metadata.html">tool_metadata</a></span><span class="op">(</span><span class="va">uppercase</span><span class="op">)</span></span>
 <span><span class="co">#&gt; $name</span></span>
 <span><span class="co">#&gt; [1] "uppercase"</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -270,153 +372,6 @@ tool:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $effective_annotations$open_world_hint</span></span>
 <span><span class="co">#&gt; [1] FALSE</span></span></code></pre></div>
-<p>For service tools,
-<code>tools_mcp(config, servers = "evidence")</code> selects an exact
-configured server name before connecting. The qualified mcptools 1.0.2
-bridge retains annotations from the server and records
-<code>source$type = "mcp"</code>, its server name, and tool name. It
-reports missing metadata rather than inventing safe effects. Other
-mcptools versions fail explicitly pending qualification. The caller must
-trust the configured service; metadata does not establish trust.</p>
-<p>Pass these objects to <code>Agent$new(tools = ...)</code>,
-<code>register_tools()</code>, or an explicit tool registry used by
-<code><a href="../reference/agent_definition_read.html">agent_definition_read()</a></code>. The same metadata survives YAML
-selection, Agent wrapping, cloning, and delegation. Permission callbacks
-receive it as <code>context$tool_metadata</code>, alongside the supplied
-<code>context$tool_annotations</code>. A service called
-<code>read_file</code> still uses its service annotations and
-capabilities; its name does not confer native file access. Local file
-checkpointing excludes MCP calls, so rewinding files never treats a
-remote service write as a change to the local workspace.</p>
-<p>Reconnecting a server invalidates tools from its old connection.
-Reload and replace explicitly with
-<code>agent$load_mcp(config, servers = "evidence", replace = TRUE)</code>.
-This refresh removes obsolete tools from the selected servers, including
-when discovery succeeds with an empty tool set. Unrelated tools remain
-registered. A load failure records a failed attempt in
-<code>mcp_status()</code>. Tools that still have working connections
-remain registered. If mcptools already closed an old connection, its
-invalidated handles are removed even when discovery or registration
-fails. Malformed metadata never silently becomes an unannotated
-executable.</p>
-<p>Bundles group related tools together:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># read_file, read_markdown, write_file, list_files</span></span>
-<span><span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># run_r_code, run_bash</span></span>
-<span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># read_csv, read_file, read_markdown</span></span>
-<span><span class="fu"><a href="../reference/tools_web.html">tools_web</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># universal web_fetch and web_search</span></span>
-<span><span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># everything</span></span></code></pre></div>
-<p>Registration is not authorization: <code><a href="../reference/tools_code.html">tools_code()</a></code> makes
-the two trusted-code tools available to the model, while the Agent’s
-<code>Permissions</code> still decides whether either call may run.
-<code><a href="../reference/permissions_standard.html">permissions_standard()</a></code> denies both.</p>
-<p>Combine bundles by concatenating:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span>, tools <span class="op">=</span> <span class="va">tools</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="tool-presets">Tool Presets<a class="anchor" aria-label="anchor" href="#tool-presets"></a>
-</h2>
-<p>Presets are named collections with opinionated defaults:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"standard"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"dev"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"data"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"full"</span><span class="op">)</span></span></code></pre></div>
-<table class="table">
-<thead><tr class="header">
-<th>Preset</th>
-<th>Included capabilities</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code>minimal</code></td>
-<td>file and document reads</td>
-</tr>
-<tr class="even">
-<td><code>standard</code></td>
-<td>reads plus native file writes; no code execution</td>
-</tr>
-<tr class="odd">
-<td><code>data</code></td>
-<td>data reads plus trusted R execution</td>
-</tr>
-<tr class="even">
-<td><code>dev</code></td>
-<td>native files plus trusted R and shell execution</td>
-</tr>
-<tr class="odd">
-<td><code>full</code></td>
-<td>every built-in tool</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="section level2">
-<h2 id="creating-custom-tools">Creating Custom Tools<a class="anchor" aria-label="anchor" href="#creating-custom-tools"></a>
-</h2>
-<p>Use <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code> to define custom tools with type-safe
-arguments and annotations:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">tool_lookup_user</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
-<span>  fun <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">user_id</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="co"># your implementation</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>name <span class="op">=</span> <span class="st">"Alice"</span>, email <span class="op">=</span> <span class="st">"alice@example.com"</span><span class="op">)</span></span>
-<span>  <span class="op">}</span>,</span>
-<span>  name <span class="op">=</span> <span class="st">"lookup_user"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Look up a user by their ID"</span>,</span>
-<span>  arguments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    user_id <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="st">"The user ID to look up"</span><span class="op">)</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  annotations <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool_annotations.html" class="external-link">tool_annotations</a></span><span class="op">(</span></span>
-<span>    read_only_hint <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>    destructive_hint <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>    open_world_hint <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>    idempotent_hint <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>The <code>annotations</code> are optional but recommended. They tell
-the permission system about the tool’s behaviour:</p>
-<ul>
-<li>
-<code>read_only_hint</code> – Tool does not change state</li>
-<li>
-<code>destructive_hint</code> – Tool may delete or overwrite
-data</li>
-<li>
-<code>open_world_hint</code> – Tool accesses external systems
-(network, APIs)</li>
-<li>
-<code>idempotent_hint</code> – Safe to call multiple times with same
-input</li>
-</ul>
-<div class="section level3">
-<h3 id="using-a-custom-tool">Using a Custom Tool<a class="anchor" aria-label="anchor" href="#using-a-custom-tool"></a>
-</h3>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">tool_dice</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
-<span>  fun <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">n</span> <span class="op">=</span> <span class="fl">1</span>, <span class="va">sides</span> <span class="op">=</span> <span class="fl">6</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">rolls</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="va">sides</span>, <span class="va">n</span>, replace <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Rolled:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">rolls</span>, collapse <span class="op">=</span> <span class="st">", "</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="op">}</span>,</span>
-<span>  name <span class="op">=</span> <span class="st">"roll_dice"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Roll one or more dice"</span>,</span>
-<span>  arguments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    n <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_integer</a></span><span class="op">(</span><span class="st">"Number of dice to roll"</span><span class="op">)</span>,</span>
-<span>    sides <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_integer</a></span><span class="op">(</span><span class="st">"Number of sides per die"</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="va">chat</span>, tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">tool_dice</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Roll 2d20 for me"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -426,7 +381,7 @@ input</li>
 Pass the chat to <code><a href="../reference/tools_web.html">tools_web()</a></code> to select provider-native web
 tools when available. Calling it without a chat returns Deputy’s
 universal web tools:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
@@ -456,7 +411,7 @@ becomes active.</p>
 </h2>
 <p>deputy can load tools from <a href="https://modelcontextprotocol.io/" class="external-link">Model Context Protocol</a>
 servers via the <a href="https://github.com/posit-dev/mcptools" class="external-link">mcptools</a> package:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Load tools from selected configured servers</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -467,11 +422,44 @@ servers via the <a href="https://github.com/posit-dev/mcptools" class="external-
 servers are configured in <code>~/.config/mcptools/config.json</code>;
 see the mcptools documentation for setup.</p>
 <div class="section level3">
+<h3 id="server-metadata-and-reconnection">Server metadata and reconnection<a class="anchor" aria-label="anchor" href="#server-metadata-and-reconnection"></a>
+</h3>
+<p>For service tools,
+<code>tools_mcp(config, servers = "evidence")</code> selects an exact
+configured server name before connecting. The qualified mcptools 1.0.2
+bridge retains annotations from the server and records
+<code>source$type = "mcp"</code>, its server name, and tool name. It
+reports missing metadata rather than inventing safe effects. Other
+mcptools versions fail explicitly pending qualification. The caller must
+trust the configured service; metadata does not establish trust.</p>
+<p>Pass these objects to <code>Agent$new(tools = ...)</code>,
+<code>register_tools()</code>, or an explicit tool registry used by
+<code><a href="../reference/agent_definition_read.html">agent_definition_read()</a></code>. The same metadata survives YAML
+selection, Agent wrapping, cloning, and delegation. Permission callbacks
+receive it as <code>context$tool_metadata</code>, alongside the supplied
+<code>context$tool_annotations</code>. A service called
+<code>read_file</code> still uses its service annotations and
+capabilities; its name does not confer native file access. Local file
+checkpointing excludes MCP calls, so rewinding files never treats a
+remote service write as a change to the local workspace.</p>
+<p>Reconnecting a server invalidates tools from its old connection.
+Reload and replace explicitly with
+<code>agent$load_mcp(config, servers = "evidence", replace = TRUE)</code>.
+This refresh removes obsolete tools from the selected servers, including
+when discovery succeeds with an empty tool set. Unrelated tools remain
+registered. A load failure records a failed attempt in
+<code>mcp_status()</code>. Tools that still have working connections
+remain registered. If mcptools already closed an old connection, its
+invalidated handles are removed even when discovery or registration
+fails. Malformed metadata never silently becomes an unannotated
+executable.</p>
+</div>
+<div class="section level3">
 <h3 id="sandboxed-r-with-mcp-repl">Sandboxed R with mcp-repl<a class="anchor" aria-label="anchor" href="#sandboxed-r-with-mcp-repl"></a>
 </h3>
 <p>Use <code><a href="../reference/tools_mcp_repl.html">tools_mcp_repl()</a></code> when model-generated R needs an OS
 sandbox rather than the current user’s authority:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repl_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tools_mcp_repl.html">tools_mcp_repl</a></span><span class="op">(</span></span>
 <span>  config <span class="op">=</span> <span class="st">"~/.config/mcptools/config.json"</span>,</span>
 <span>  server <span class="op">=</span> <span class="st">"r"</span>,</span>
@@ -497,7 +485,7 @@ confinement, including fail-closed startup on unsupported hosts. See
 <p>The <code>tool_ask_user</code> tool lets an agent ask the user a
 question during execution. This is useful for confirmations,
 clarifications, or collecting input:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent_id</span> <span class="op">&lt;-</span> <span class="st">"agent-analysis"</span></span>
 <span><span class="va">session_id</span> <span class="op">&lt;-</span> <span class="st">"session-analysis"</span></span>
 <span></span>

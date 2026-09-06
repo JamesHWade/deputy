@@ -1,16 +1,17 @@
 # Structured output
 
-Deputy uses ellmer’s types, provider schema transport, JSON extraction,
-and R conversion. A structured result is the value ellmer returns,
-available directly in `AgentResult$structured_output`. There is no
-separate Deputy schema format.
+Use ellmer types to ask for a list or data frame with specified fields.
+Deputy stores the converted R value in `result$structured_output` so you
+can use it in the next step of your analysis.
 
 ## Extract directly
 
 Use `chat_structured()` when the conversation already contains the
-information to extract. It makes a governed structured request and
-suppresses ordinary tools, as ellmer does. `chat_structured_async()`
-returns a promise with the same value.
+information to extract. It requests structured output without calling
+ordinary tools, as ellmer does. `chat_structured_async()` returns a
+promise with the same value. Automatic compaction and optional
+validation corrections can add model requests; all count toward the
+run’s usage limits.
 
 ``` r
 
@@ -24,8 +25,8 @@ agent$last_run()$usage
 ```
 
 Existing JSON Schema can enter through
-`ellmer::type_from_schema(text = ...)`. Schema support and conversion
-remain ellmer’s contract.
+`ellmer::type_from_schema(text = ...)`. ellmer handles schema support
+and conversion to R values.
 
 ``` r
 
@@ -42,8 +43,8 @@ then ask ellmer to extract from that conversation. Both phases share one
 run ID, hook lifecycle, permission policy, and request/token/cost
 budget. The extraction never repeats tool work. The `response` is the
 task’s text; `structured_output` is the extracted value. Even a task
-without tools uses these two explicit phases; use `chat_structured()`
-for direct extraction in one request.
+without tools uses these two explicit phases; use `chat_structured()` to
+extract directly without the initial task phase.
 
 ``` r
 
@@ -54,7 +55,9 @@ agent <- Agent$new(
   usage_limits = UsageLimits(max_requests = 8)
 )
 result <- agent$run_sync("Review the README", type = status_type)
-stopifnot(result$is_success())
+if (!result$is_success()) {
+  cli::cli_abort("Review stopped early: {result$stop_reason}.")
+}
 result$structured_output
 ```
 

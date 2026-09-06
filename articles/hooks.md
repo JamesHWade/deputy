@@ -1,8 +1,8 @@
 # Hooks
 
-Hooks let you intercept agent behaviour at key points in the execution
-lifecycle. Use them for logging, auditing, blocking dangerous actions,
-or injecting custom logic.
+Hooks run R callbacks before or after an agent action. Use them to
+report tool activity with cli, reject a tool call, or record results for
+your app.
 
 ## Hook Events
 
@@ -111,12 +111,11 @@ agent$add_hook(hook_block_dangerous_bash(
 
 ### Limiting File Writes
 
-Configure the Agent’s `Permissions` when a directory is an authority
-boundary.
+Set `Permissions$new(file_write = output_dir)` to restrict native file
+writes to a directory.
 [`hook_limit_file_writes()`](https://jameshwade.github.io/deputy/reference/hook_limit_file_writes.md)
-is a defense-in-depth convenience hook that delegates to the same
-canonical path policy for `write_file`, `edit_file`, and `multi_edit`.
-The directory must already exist:
+adds a second check using the same path rules for `write_file`,
+`edit_file`, and `multi_edit`. The directory must already exist:
 
 ``` r
 
@@ -203,7 +202,7 @@ Session hooks fire at the start and end of a session:
 HookMatcher$new(
   event = "SessionStart",
   callback = function(context) {
-    message("Session started at ", Sys.time())
+    cli::cli_inform("Session started at {Sys.time()}")
     NULL
   }
 )

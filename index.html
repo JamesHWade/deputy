@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Governed Agentic Artificial Intelligence Workflows • deputy</title>
+<title>Run Tasks with Language Models and R Tools • deputy</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -15,9 +15,9 @@
 <link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Governed Agentic Artificial Intelligence Workflows">
-<meta name="description" content="Run provider-agnostic, agentic artificial intelligence (AI) workflows with explicit boundaries for tools, permissions, budgets, and filesystem access. Builds on ellmer to provide multi-step reasoning, lifecycle hooks, structured events, human input, session persistence, and delegation. Returns inspectable results and supports synchronous, asynchronous, terminal, and Shiny hosts. Designed for applications that need governance and observability around tool-using language models in R.">
-<meta property="og:description" content="Run provider-agnostic, agentic artificial intelligence (AI) workflows with explicit boundaries for tools, permissions, budgets, and filesystem access. Builds on ellmer to provide multi-step reasoning, lifecycle hooks, structured events, human input, session persistence, and delegation. Returns inspectable results and supports synchronous, asynchronous, terminal, and Shiny hosts. Designed for applications that need governance and observability around tool-using language models in R.">
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Run Tasks with Language Models and R Tools">
+<meta name="description" content="Run tasks with language models and R tools using ellmer. Control tool access with permissions, set limits on requests and usage, and inspect responses, tool calls, and the reason each run stopped. Supports streaming output, Shiny applications, saved conversations, file checkpoints, and delegation to other agents.">
+<meta property="og:description" content="Run tasks with language models and R tools using ellmer. Control tool access with permissions, set limits on requests and usage, and inspect responses, tool calls, and the reason each run stopped. Supports streaming output, Shiny applications, saved conversations, file checkpoints, and delegation to other agents.">
 <meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg">
 </head>
 <body>
@@ -37,19 +37,16 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="articles/getting-started.html">Get started</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Intro</h6></li>
-    <li><a class="dropdown-item" href="articles/getting-started.html">Getting Started</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Concepts</h6></li>
+<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
     <li><a class="dropdown-item" href="articles/tools.html">Tools and Tool Bundles</a></li>
     <li><a class="dropdown-item" href="articles/permissions.html">Permissions and Safety</a></li>
     <li><a class="dropdown-item" href="articles/hooks.html">Hooks</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Hosts</h6></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
     <li><a class="dropdown-item" href="articles/example-shiny-chat.html">Shiny Chat</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
@@ -63,6 +60,7 @@
     <li><a class="dropdown-item" href="articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
   </ul>
 </li>
+<li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -84,128 +82,58 @@
 </div>
 <!-- badges: start -->
 
-<p>Deputy turns an <a href="https://ellmer.tidyverse.org/" class="external-link">ellmer</a> chat into a governed R Agent. Give it tools, a workspace, and explicit limits; get back an observable run you can inspect, stream into Shiny, save, or delegate.</p>
-<div class="section level2">
-<h2 id="why-deputy">Why Deputy?<a class="anchor" aria-label="anchor" href="#why-deputy"></a>
-</h2>
-<p>ellmer gives R a provider-independent chat interface and tools. Deputy adds the runtime around that chat when a tool-using conversation becomes a real job:</p>
-<table class="table">
-<colgroup>
-<col width="50%">
-<col width="50%">
-</colgroup>
-<thead><tr>
-<th>Start with ellmer</th>
-<th>Add Deputy when you need</th>
-</tr></thead>
-<tbody>
-<tr>
-<td>Chats and provider APIs</td>
-<td>Explicit tool permissions and run limits</td>
-</tr>
-<tr>
-<td>Tool registration</td>
-<td>Hooks, semantic events, and inspectable results</td>
-</tr>
-<tr>
-<td>Streaming model output</td>
-<td>A stable stream for terminals and Shiny hosts</td>
-</tr>
-<tr>
-<td>Conversation state</td>
-<td>Automatic compaction, persistence, and checkpoints</td>
-</tr>
-<tr>
-<td>One tool-using chat</td>
-<td>Correlated delegation to specialist Agents</td>
-</tr>
-</tbody>
-</table>
-<p>The core object model stays small:</p>
-<pre class="text"><code>ellmer Chat + Tools + Permissions + Limits
-                     |
-                  Deputy Agent
-                     |
-        AgentResult + Events + Checkpoints</code></pre>
-<p>Deputy requires released ellmer 0.5.0 or later. Structured output uses ellmer types, with bounded application corrections under the same run budget. Explicit fallback Chats and OpenTelemetry governance compose with ellmer’s provider transport and tracing. See <a href="articles/runtime-integration.html">runtime integration</a> and <a href="articles/structured-output.html">structured output</a>.</p>
-<p>The Agent itself implements ellmer’s Chat protocol. Use <code>agent$chat()</code> and <code>agent$stream()</code> in synchronous code, or pass the Agent directly to <code>shinychat::chat_server()</code>. Those paths use the same governed kernel as <code>run_sync()</code> and <code>run_async()</code>; the latter pair return richer <code>AgentResult</code> metadata when the host needs to inspect the run. Product hosts may attach per-run correlation with the optional <code>run_context</code> argument on every chat, stream, and run method.</p>
-</div>
+<p>Deputy runs tasks with an <a href="https://ellmer.tidyverse.org/" class="external-link">ellmer</a> chat and R tools. Use it to review source files, analyse data, or extract information, with permissions that control tool access and limits on each run.</p>
+<p>ellmer handles the model connection and tool calls. Deputy checks permissions, tracks usage, and records why the run stopped. You can inspect the result in R, stream it into Shiny, or save the conversation for later.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>Before Deputy’s first CRAN release, install the development version from GitHub:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<p>Install the development version from GitHub:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"JamesHWade/deputy"</span><span class="op">)</span></span></code></pre></div>
-<p>After the release is available from CRAN, install the released package with:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"deputy"</span><span class="op">)</span></span></code></pre></div>
-<p>For the optional Shiny host, also install shinychat:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"shinychat"</span><span class="op">)</span></span></code></pre></div>
+<p>Deputy requires ellmer 0.5.0 or later. It is not yet on CRAN.</p>
 </div>
 <div class="section level2">
-<h2 id="a-safe-first-run">A safe first run<a class="anchor" aria-label="anchor" href="#a-safe-first-run"></a>
+<h2 id="review-an-r-package">Review an R package<a class="anchor" aria-label="anchor" href="#review-an-r-package"></a>
 </h2>
-<p>Start with a small, read-only toolset and a bounded run. This setup is provider-independent and is executed whenever the README is rendered:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<p>Run this from an R package directory. Set <code>OPENAI_API_KEY</code> before creating the chat, or use another <a href="https://ellmer.tidyverse.org/reference/index.html" class="external-link">ellmer provider</a>. The example uses the same model as Deputy’s terminal app.</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">workspace</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/normalizePath.html" class="external-link">normalizePath</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>, winslash <span class="op">=</span> <span class="st">"/"</span><span class="op">)</span></span>
-<span><span class="va">first_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span></span>
-<span><span class="va">first_permissions</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">first_limits</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span></span>
-<span><span class="va">first_context</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/ContextPolicy.html">ContextPolicy</a></span><span class="op">(</span>max_tokens <span class="op">=</span> <span class="fl">32000</span>, fallback <span class="op">=</span> <span class="st">"error"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">first_tools</span><span class="op">)</span> <span class="op">==</span> <span class="fl">3L</span>,</span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">first_permissions</span><span class="op">$</span><span class="va">mode</span>, <span class="st">"readonly"</span><span class="op">)</span>,</span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">first_limits</span><span class="op">$</span><span class="va">max_requests</span>, <span class="fl">6L</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>The examples use <code>gpt-5.6-luna</code>, the inexpensive GPT-5.6 model. Choose any provider supported by ellmer when creating your own Chat. The model call is not executed while building the documentation:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span></span>
-<span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>  tools <span class="op">=</span> <span class="va">first_tools</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="va">first_permissions</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="va">first_limits</span>,</span>
-<span>  context_policy <span class="op">=</span> <span class="va">first_context</span>,</span>
-<span>  working_dir <span class="op">=</span> <span class="va">workspace</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span>
+<span>  working_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
-<span>  <span class="st">"Explain what this R package does. Support the answer with file paths."</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>Set <code>OPENAI_API_KEY</code> for these examples. To use a larger GPT-5.6 model, replace <code>gpt-5.6-luna</code> with <code>gpt-5.6-terra</code> (balanced) or <code>gpt-5.6-sol</code> (flagship). Use the explicit tier name: <code>gpt-5.6</code> is an alias for Sol. See OpenAI’s <a href="https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6" class="external-link">model guide</a> for the tier tradeoffs. Deputy preserves the model and parameters of the Chat you supply, including when it creates inherited child Chats.</p>
-<p><code>run_sync()</code> returns an <code>AgentResult</code>, not just text:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">usage</span></span>
+<span>  <span class="st">"Read DESCRIPTION and list R/. Explain what this package does and cite the files you used."</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">response</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span></span></code></pre></div>
+<p>The agent can read files and list directories. It cannot write files or run R or shell code. <code>working_dir</code> sets the base for relative paths; reads can still reach other files accessible to your R process.</p>
+<p><code>run_sync()</code> waits for the run to finish and returns an <code>AgentResult</code>. A <code>stop_reason</code> of <code>"complete"</code> means the agent finished; a limit or error may leave a partial response. Inspect the work behind the answer with:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result</span><span class="op">$</span><span class="va">usage</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="fu">tool_calls</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="fu">tool_results</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Read <a href="https://jameshwade.github.io/deputy/articles/getting-started.html">Getting Started</a> to turn on a workspace-scoped write permission deliberately, create a file checkpoint, and recover from common failures.</p>
+<p>The <a href="https://jameshwade.github.io/deputy/articles/getting-started.html">getting-started guide</a> explains these settings, shows how to allow file writes, and covers common errors.</p>
 </div>
 <div class="section level2">
-<h2 id="the-safety-boundary">The safety boundary<a class="anchor" aria-label="anchor" href="#the-safety-boundary"></a>
+<h2 id="work-with-familiar-r-tools">Work with familiar R tools<a class="anchor" aria-label="anchor" href="#work-with-familiar-r-tools"></a>
 </h2>
-<p>Deputy enforces application-level policy at tool boundaries. It does not turn model-generated code into untrusted code you can execute safely:</p>
 <ul>
-<li>
-<code><a href="reference/permissions_readonly.html">permissions_readonly()</a></code> denies Deputy’s write, shell, R execution, web, and package-install capabilities.</li>
-<li>
-<code><a href="reference/permissions_standard.html">permissions_standard()</a></code> permits accessible reads and workspace-scoped native file writes, but denies arbitrary R and shell execution by default.</li>
-<li>A directory-valued <code>file_write</code> permission confines Deputy’s native file writes to that canonical root. File reads remain limited by the R process, not by an operating-system sandbox.</li>
-<li>
-<code>run_r_code</code> uses a separate R process; that process separation is not an OS security sandbox. <code>run_bash</code> executes with the current user’s privileges.</li>
-<li>File checkpoints cover Deputy’s native write, edit, and multi-edit tools. They are recovery machinery, not a substitute for version control or backups.</li>
+<li>Define a tool from an R function with <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code>. Deputy uses ellmer’s argument types and tool annotations. See <a href="https://jameshwade.github.io/deputy/articles/tools.html">Tools</a>.</li>
+<li>Extract lists and data frames with ellmer’s <code>type_object()</code> and <code>type_array()</code>. See <a href="https://jameshwade.github.io/deputy/articles/structured-output.html">Structured output</a>.</li>
+<li>Report tool activity with <code><a href="reference/hook_log_tools.html">hook_log_tools()</a></code>, or write a hook that uses <code><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli::cli_inform()</a></code>. See <a href="https://jameshwade.github.io/deputy/articles/hooks.html">Hooks</a>.</li>
+<li>Pass an Agent to <code>shinychat::chat_server()</code> to build a chat app. See <a href="https://jameshwade.github.io/deputy/articles/example-shiny-chat.html">Shiny chat</a>.</li>
 </ul>
-<p>Start read-only, grant the narrowest capability that completes the job, and use a real isolation boundary for untrusted code. <code><a href="reference/tools_mcp_repl.html">tools_mcp_repl()</a></code> loads an explicitly configured <a href="https://github.com/posit-dev/mcp-repl" class="external-link">mcp-repl</a> R session only after verifying that its <code>read-only</code> or <code>workspace-write</code> OS sandbox matches the requested policy; a missing or weaker policy is an error.</p>
 </div>
 <div class="section level2">
-<h2 id="choose-your-path">Choose your path<a class="anchor" aria-label="anchor" href="#choose-your-path"></a>
+<h2 id="choose-a-guide">Choose a guide<a class="anchor" aria-label="anchor" href="#choose-a-guide"></a>
 </h2>
 <table class="table">
 <colgroup>
@@ -213,55 +141,50 @@
 <col width="50%">
 </colgroup>
 <thead><tr>
-<th>Goal</th>
-<th>Read next</th>
+<th>Task</th>
+<th>Guide</th>
 </tr></thead>
 <tbody>
 <tr>
-<td>Understand tools and presets</td>
-<td><a href="https://jameshwade.github.io/deputy/articles/tools.html">Tools</a></td>
+<td>Choose which files and tools an agent can use</td>
+<td><a href="https://jameshwade.github.io/deputy/articles/permissions.html">Permissions</a></td>
 </tr>
 <tr>
-<td>Design a least-authority policy</td>
-<td><a href="https://jameshwade.github.io/deputy/articles/permissions.html">Permissions and Safety</a></td>
+<td>Explore a dataset with R</td>
+<td><a href="https://jameshwade.github.io/deputy/articles/example-data-analysis.html">Data analysis</a></td>
 </tr>
 <tr>
-<td>Observe or intervene in a run</td>
-<td><a href="https://jameshwade.github.io/deputy/articles/hooks.html">Hooks</a></td>
+<td>Pass structured results between steps</td>
+<td><a href="https://jameshwade.github.io/deputy/articles/example-extraction-pipeline.html">Extraction pipeline</a></td>
 </tr>
 <tr>
-<td>Embed an Agent in an app</td>
-<td><a href="https://jameshwade.github.io/deputy/articles/example-shiny-chat.html">Shiny Chat</a></td>
+<td>Assign parts of a task to separate agents</td>
+<td><a href="https://jameshwade.github.io/deputy/articles/multi-agent.html">Multiple agents</a></td>
 </tr>
 <tr>
-<td>Delegate to specialist Agents</td>
-<td><a href="https://jameshwade.github.io/deputy/articles/multi-agent.html">Multi-Agent Orchestration</a></td>
-</tr>
-<tr>
-<td>Build a concrete workflow</td>
-<td><a href="https://jameshwade.github.io/deputy/articles/example-data-analysis.html">Recipes</a></td>
+<td>Configure fallback models, context limits, or tracing</td>
+<td><a href="https://jameshwade.github.io/deputy/articles/runtime-integration.html">Runtime integration</a></td>
 </tr>
 </tbody>
 </table>
 </div>
 <div class="section level2">
-<h2 id="terminal-use">Terminal use<a class="anchor" aria-label="anchor" href="#terminal-use"></a>
+<h2 id="run-from-a-terminal">Run from a terminal<a class="anchor" aria-label="anchor" href="#run-from-a-terminal"></a>
 </h2>
-<p>Deputy also ships a <a href="https://github.com/r-lib/Rapp" class="external-link">Rapp</a> package executable. Run it without a global Deputy installation, or install a persistent launcher:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="ex">uv</span> tool install r-lib-ir</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="ex">rx</span> <span class="at">--from</span> github::JamesHWade/deputy deputy <span class="at">--help</span></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="ex">rx</span> <span class="at">--from</span> github::JamesHWade/deputy deputy <span class="dt">\</span></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">--provider</span> openai <span class="st">"Summarize the R files in this project"</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="ex">ir</span> tool install github::JamesHWade/deputy</span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--tools</span> minimal</span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--model</span> gpt-5.6-terra <span class="at">--tools</span> minimal</span></code></pre></div>
-<p>The CLI defaults to OpenAI with <code>gpt-5.6-luna</code>. Use <code>--model</code> to select another model or <code>--provider</code> to select another provider, such as <code>--provider anthropic</code>. Other providers retain their own model defaults when <code>--model</code> is omitted.</p>
+<p>Deputy includes a command-line app built with <a href="https://github.com/r-lib/Rapp" class="external-link">Rapp</a>. Use <a href="https://github.com/r-lib/ir" class="external-link">ir</a> to run it or install a launcher:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="ex">uv</span> tool install r-lib-ir</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="ex">rx</span> <span class="at">--from</span> github::JamesHWade/deputy deputy <span class="at">--help</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="ex">rx</span> <span class="at">--from</span> github::JamesHWade/deputy deputy <span class="at">--tools</span> minimal <span class="dt">\</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="st">"Summarize the R files in this project"</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="ex">ir</span> tool install github::JamesHWade/deputy</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--tools</span> minimal</span></code></pre></div>
+<p>The CLI defaults to OpenAI with <code>gpt-5.6-luna</code>. Use <code>--model</code> to choose a model or <code>--provider</code> to choose a provider, such as <code>--provider anthropic</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="status">Status<a class="anchor" aria-label="anchor" href="#status"></a>
 </h2>
-<p>Deputy is experimental. Its contracts are being sharpened through real package, CLI, and Shiny integrations. Please report problems and design gaps in <a href="https://github.com/JamesHWade/deputy/issues" class="external-link">GitHub Issues</a>.</p>
+<p>Deputy is experimental: its API may change. Report bugs or suggest improvements in <a href="https://github.com/JamesHWade/deputy/issues" class="external-link">GitHub Issues</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>

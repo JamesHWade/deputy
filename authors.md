@@ -10,12 +10,11 @@
 Source:
 [`DESCRIPTION`](https://github.com/JamesHWade/deputy/blob/main/DESCRIPTION)
 
-Wade J (2026). *deputy: Governed Agentic Artificial Intelligence
-Workflows*. R package version 0.0.0.9000,
-<https://github.com/JamesHWade/deputy>.
+Wade J (2026). *deputy: Run Tasks with Language Models and R Tools*. R
+package version 0.0.0.9000, <https://github.com/JamesHWade/deputy>.
 
     @Manual{,
-      title = {deputy: Governed Agentic Artificial Intelligence Workflows},
+      title = {deputy: Run Tasks with Language Models and R Tools},
       author = {James Wade},
       year = {2026},
       note = {R package version 0.0.0.9000},

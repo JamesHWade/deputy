@@ -2,7 +2,7 @@
 
 ## Agent
 
-Core agent class for agentic AI workflows
+Run a task and inspect its response, tool calls, and usage.
 
 - [`Agent`](https://jameshwade.github.io/deputy/reference/Agent.md) :
   Agent R6 Class
@@ -116,7 +116,7 @@ Intercept and customize agent behavior
 
 ## Skills
 
-Extend agents with specialized capabilities
+Load reusable instructions for an agent.
 
 - [`Skill`](https://jameshwade.github.io/deputy/reference/Skill.md) :
   Skill R6 Class
@@ -142,7 +142,7 @@ Coordinate multiple specialized agents
 
 ## Errors
 
-Identify structured Deputy conditions
+Catch errors by class and inspect their details.
 
 - [`deputy-errors`](https://jameshwade.github.io/deputy/reference/deputy-errors.md)
   [`DeputyError`](https://jameshwade.github.io/deputy/reference/deputy-errors.md)
