@@ -2,172 +2,40 @@
 % Please edit documentation in R/hooks.R
 \name{HookMatcher}
 \alias{HookMatcher}
-\title{HookMatcher R6 Class}
-\description{
-Defines when a hook callback should be triggered. Hooks can be filtered
-by event type and optionally by tool name pattern.
+\title{Match a lifecycle hook}
+\usage{
+HookMatcher(event, callback, pattern = NULL, timeout = 0)
+}
+\arguments{
+\item{event}{One of \link{HookEvent}.}
 
-\strong{Security Note:} Hook matcher configuration is read-only from the public
-API after construction so callbacks and matching rules cannot be swapped out
-accidentally at runtime.
+\item{callback}{Function accepting the arguments documented for the event
+in \link{HookEvent}, or \code{...}.}
+
+\item{pattern}{Optional regular expression filtering tool names.}
+
+\item{timeout}{Maximum callback time in seconds. Zero runs in the caller's
+process. Positive values use a clean \code{\link[callr:r]{callr::r()}} subprocess, where
+caller-process state and side effects are not available.}
+}
+\value{
+A \code{HookMatcher} S7 object.
+}
+\description{
+An S7 value defining when a callback runs. Configuration is read-only after
+construction; callback closures retain their caller-owned environments.
 }
 \examples{
-
-## ------------------------------------------------
-## Method `HookMatcher$new()`
-## ------------------------------------------------
-
-\dontrun{
-# Block dangerous bash commands
-HookMatcher$new(
-  event = "PreToolUse",
-  pattern = "^(run_bash|bash)$",
+hook <- HookMatcher(
+  "PreToolUse",
   callback = function(tool_name, tool_input, context) {
-    if (grepl("rm -rf", tool_input$command)) {
-      HookResultPreToolUse(permission = "deny", reason = "Dangerous!")
-    } else {
-      HookResultPreToolUse(permission = "allow")
-    }
-  }
+    HookResultPreToolUse(permission = "deny", reason = "Read only")
+  },
+  pattern = "^write_"
 )
+hook_matches(hook, "write_file")
+S7::prop(hook, "event")
 }
-}
-\section{Active bindings}{
-  \if{html}{\out{<div class="r6-active-bindings">}}
-  \describe{
-    \item{\code{event}}{The hook event type (see \link{HookEvent}). Read-only after construction.}
-
-    \item{\code{pattern}}{Optional regex pattern for tool name filtering. Read-only after construction.}
-
-    \item{\code{callback}}{The function to call when the hook fires. Read-only after construction.}
-
-    \item{\code{timeout}}{Maximum execution time for the callback in seconds. Zero
-runs in the caller's process; a positive value uses a clean subprocess.
-Read-only after construction.}
-  }
-  \if{html}{\out{</div>}}
-}
-\section{Methods}{
-\subsection{Public methods}{
-  \itemize{
-    \item \href{#method-HookMatcher-initialize}{\code{HookMatcher$new()}}
-    \item \href{#method-HookMatcher-matches}{\code{HookMatcher$matches()}}
-    \item \href{#method-HookMatcher-print}{\code{HookMatcher$print()}}
-    \item \href{#method-HookMatcher-clone}{\code{HookMatcher$clone()}}
-  }
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-HookMatcher-initialize"></a>}}
-\if{latex}{\out{\hypertarget{method-HookMatcher-initialize}{}}}
-\subsection{\code{HookMatcher$new()}}{
-  Create a new HookMatcher.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{HookMatcher$new(event, callback, pattern = NULL, timeout = 0)}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Arguments}{
-    \if{html}{\out{<div class="arguments">}}
-    \describe{
-      \item{\code{event}}{The event type (must be one of \link{HookEvent})}
-      \item{\code{callback}}{Function to call. Signature depends on event type:
-\itemize{
-\item PreToolUse: \verb{function(tool_name, tool_input, context)}
-\item PostToolUse: \verb{function(tool_name, tool_result, tool_error, context)}
-\item PostToolUseFailure: \verb{function(tool_name, tool_result, tool_error, context)}
-\item Stop: \verb{function(reason, context)}
-\item SubagentStart: \verb{function(agent_name, task, context)}
-\item SubagentStop: \verb{function(agent_name, task, result, context)}
-\item UserPromptSubmit: \verb{function(prompt, context)}
-\item Notification: \verb{function(message, context)}
-\item PermissionRequest: \verb{function(tool_name, tool_input, permission_result, context)}
-\item ConfigChange: \verb{function(key, old_value, new_value, context)}
-\item PreCompact: \verb{function(turns_to_compact, turns_to_keep, context)}
-\item SessionStart: \verb{function(context)}
-\item SessionEnd: \verb{function(reason, context)}
-}}
-      \item{\code{pattern}}{Optional regex pattern to filter by tool name.
-Only applies to PreToolUse and PostToolUse events.}
-      \item{\code{timeout}}{Maximum callback execution time in seconds. The default,
-\code{0}, runs the callback in the caller's process. Positive values run the
-callback in a clean \code{\link[callr:r]{callr::r()}} subprocess, where caller-process state
-and side effects are not available.}
-    }
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Returns}{
-    A new \code{HookMatcher} object
-  }
-  \subsection{Examples}{
-    \if{html}{\out{<div class="r example copy">}}
-    \preformatted{# Block dangerous bash commands
-HookMatcher$new(
-  event = "PreToolUse",
-  pattern = "^(run_bash|bash)$",
-  callback = function(tool_name, tool_input, context) {
-    if (grepl("rm -rf", tool_input$command)) {
-      HookResultPreToolUse(permission = "deny", reason = "Dangerous!")
-    } else {
-      HookResultPreToolUse(permission = "allow")
-    }
-  }
-)
-}
-    \if{html}{\out{</div>}}
-  }
-}
-
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-HookMatcher-matches"></a>}}
-\if{latex}{\out{\hypertarget{method-HookMatcher-matches}{}}}
-\subsection{\code{HookMatcher$matches()}}{
-  Check if this hook matches a given tool name.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{HookMatcher$matches(tool_name = NULL)}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Arguments}{
-    \if{html}{\out{<div class="arguments">}}
-    \describe{
-      \item{\code{tool_name}}{The tool name to check (can be NULL)}
-    }
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Returns}{
-    Logical indicating if the hook matches
-  }
-}
-
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-HookMatcher-print"></a>}}
-\if{latex}{\out{\hypertarget{method-HookMatcher-print}{}}}
-\subsection{\code{HookMatcher$print()}}{
-  Print the hook matcher.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{HookMatcher$print()}
-    \if{html}{\out{</div>}}
-  }
-}
-
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-HookMatcher-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-HookMatcher-clone}{}}}
-\subsection{\code{HookMatcher$clone()}}{
-  The objects of this class are cloneable with this method.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{HookMatcher$clone(deep = FALSE)}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Arguments}{
-    \if{html}{\out{<div class="arguments">}}
-    \describe{
-      \item{\code{deep}}{Whether to make a deep clone.}
-    }
-    \if{html}{\out{</div>}}
-  }
-}
-
+\seealso{
+\code{\link[=hook_matches]{hook_matches()}}
 }

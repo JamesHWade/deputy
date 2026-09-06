@@ -169,7 +169,16 @@ minimum version or adopting an unreleased API.
 
 - **Formatter**: Air (configuration in `air.toml`)
 - **Documentation**: roxygen2 with markdown support
-- **Classes**: R6 for complex objects (Agent, Permissions, HookRegistry, Skill)
+- **Classes**: Use S7 for value contracts and R6 for mutable runtime owners.
+  `HookMatcher(...)` and `AgentEvent(...)` are S7 values; use
+  `hook_matches(hook, tool_name)` and S7 property access for matcher behavior.
+  Existing value types await scoped migration; do not introduce new S3 value
+  classes. ADR-0009 records validation, read-only storage, and composition
+  with ellmer classes.
+- **Printing**: Format summaries with `cli::cli_format_method()` and write the
+  resulting lines with `cli::cat_line()` so printing remains on stdout. Pass
+  user strings as interpolated values, never as cli templates, and return the
+  object invisibly.
 - **Errors**: Signal with the `abort_*()` constructors in `R/errors.R` (e.g. `abort_permission_denied()`), never bare `stop()`
 - **Messages**: All user-facing output goes through cli — `cli_abort()`, `cli_warn()`, `cli_inform()`, never `stop()`/`warning()`/`message()`
 

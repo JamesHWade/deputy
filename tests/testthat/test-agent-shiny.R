@@ -225,7 +225,7 @@ test_that("stream_async fires Stop and SessionEnd hooks on completion", {
   stop_reason <- NULL
   session_end_reason <- NULL
 
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {
@@ -233,7 +233,7 @@ test_that("stream_async fires Stop and SessionEnd hooks on completion", {
       NULL
     }
   ))
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "SessionEnd",
     timeout = 0,
     callback = function(reason, context) {
@@ -269,7 +269,7 @@ test_that("stream_async cleans up and reports stream errors", {
   stop_reason <- NULL
   session_end_reason <- NULL
 
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {
@@ -277,7 +277,7 @@ test_that("stream_async cleans up and reports stream errors", {
       NULL
     }
   ))
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "SessionEnd",
     timeout = 0,
     callback = function(reason, context) {
@@ -412,7 +412,7 @@ test_that("stream_async reports clean cancellation instead of completion", {
     })()
   }
   agent <- Agent$new(chat = chat)
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {
@@ -450,7 +450,7 @@ test_that("stream_async reports terminal cost limits without tool calls", {
     chat = chat,
     usage_limits = UsageLimits(max_cost_usd = 0.001)
   )
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {
@@ -499,7 +499,7 @@ test_that("stream_async enforces Agent usage_limits", {
       on_exceed = "stop"
     )
   )
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {
@@ -538,7 +538,7 @@ test_that("stream_async stops when a cost limit cannot be measured", {
     chat = chat,
     usage_limits = UsageLimits(max_cost_usd = 1)
   )
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {
@@ -571,7 +571,7 @@ test_that("stream_async does not start with no request budget", {
     chat = chat,
     usage_limits = UsageLimits(max_requests = 0)
   )
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {
@@ -598,7 +598,7 @@ test_that("stream_async reports incomplete tool calls as provider errors", {
     })()
   }
   agent <- Agent$new(chat = chat)
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {

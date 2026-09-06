@@ -618,7 +618,7 @@ test_that("text recovery preserves failed dispatch accounting without exposing a
   )
 
   notification <- NULL
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Notification",
     timeout = 0,
     callback = function(message, context) {
@@ -639,7 +639,11 @@ test_that("text recovery preserves failed dispatch accounting without exposing a
   )
   expect_identical(
     paste(
-      vapply(runtime_events(agent, "text"), `[[`, character(1), "text"),
+      vapply(
+        runtime_events(agent, "text"),
+        function(event) event@data$text,
+        character(1)
+      ),
       collapse = ""
     ),
     result$response
@@ -816,7 +820,7 @@ test_that("compaction hooks can cancel, replace, or fail without losing the run"
     chat <- runtime_compaction_chat(server)
     before <- chat$get_turns()
     agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
-    agent$add_hook(HookMatcher$new(
+    agent$add_hook(HookMatcher(
       event = "PreCompact",
       timeout = 0,
       callback = function(turns_to_compact, turns_to_keep, context) {

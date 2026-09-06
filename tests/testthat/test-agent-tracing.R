@@ -52,14 +52,14 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
           )
         }
         if (mode %in% c("override", "override_deny")) {
-          agent$add_hook(HookMatcher$new(
+          agent$add_hook(HookMatcher(
             "PermissionRequest",
             function(...) PermissionResultAllow(),
             timeout = 0
           ))
         }
         if (mode %in% c("hook_deny", "override_deny")) {
-          agent$add_hook(HookMatcher$new(
+          agent$add_hook(HookMatcher(
             "PreToolUse",
             function(...) {
               HookResultPreToolUse(

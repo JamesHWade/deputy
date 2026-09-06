@@ -7,7 +7,7 @@ approval_gate <- function(
   callback = NULL,
   pattern = "^(run_bash|write_file)$"
 ) {
-  HookMatcher$new(
+  HookMatcher(
     event = "PreToolUse",
     pattern = pattern,
     timeout = 0,
@@ -46,7 +46,7 @@ approval_after_install <- function(callback = NULL) {
   installed_runs <- new.env(parent = emptyenv())
   gate <- approval_gate(callback, pattern = "^push_changes$")
   list(
-    HookMatcher$new(
+    HookMatcher(
       event = "PostToolUse",
       pattern = "^install_dependency$",
       timeout = 0,
@@ -61,18 +61,18 @@ approval_after_install <- function(callback = NULL) {
         NULL
       }
     ),
-    HookMatcher$new(
+    HookMatcher(
       event = "PreToolUse",
       pattern = "^push_changes$",
       timeout = 0,
       callback = function(tool_name, tool_input, context) {
         if (isTRUE(installed_runs[[context$run_id]])) {
-          return(gate$callback(tool_name, tool_input, context))
+          return(S7::prop(gate, "callback")(tool_name, tool_input, context))
         }
         NULL
       }
     ),
-    HookMatcher$new(
+    HookMatcher(
       event = "Stop",
       timeout = 0,
       callback = function(reason, context) {

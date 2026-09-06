@@ -177,7 +177,7 @@ collect_agent_events <- function(generator) {
       break
     }
     events[[length(events) + 1L]] <- event
-    if (inherits(event, "AgentEvent") && identical(event$type, "stop")) {
+    if (S7::S7_inherits(event, AgentEvent) && identical(event$type, "stop")) {
       break
     }
   }

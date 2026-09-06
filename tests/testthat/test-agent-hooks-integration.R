@@ -53,7 +53,7 @@ test_that("Agent rejects tool when PreToolUse hook denies", {
     tools = list(tool_read_file)
   )
 
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(tool_name, tool_input, context) {
@@ -89,7 +89,7 @@ test_that("Agent runs default PreToolUse hooks in the caller process", {
     tools = list(tool_read_file)
   )
 
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "PreToolUse",
     callback = function(tool_name, tool_input, context) {
       hook_called <<- TRUE
@@ -105,7 +105,7 @@ test_that("Agent runs default PreToolUse hooks in the caller process", {
 
 test_that("Agent preserves isolated hook failure details", {
   agent <- Agent$new(chat = create_mock_chat())
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "PreToolUse",
     timeout = 5,
     callback = function(...) stop("isolated hook failed")
@@ -149,7 +149,7 @@ test_that("Hook denial takes precedence over permission allow", {
     permissions = Permissions$new(file_read = TRUE)
   )
 
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(tool_name, tool_input, context) {
@@ -184,7 +184,7 @@ test_that("Hook denial with continue=FALSE sets should_stop", {
     tools = list(tool_read_file)
   )
 
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(tool_name, tool_input, context) {
@@ -228,7 +228,7 @@ test_that("Hook returning NULL allows tool to proceed", {
     tools = list(tool_read_file)
   )
 
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(tool_name, tool_input, context) {
@@ -361,7 +361,7 @@ test_that("Agent stops when PostToolUse hook returns continue=FALSE", {
   )
 
   # Add PostToolUse hook that returns continue=FALSE
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(tool_name, tool_result, tool_error, context) {
@@ -467,7 +467,7 @@ test_that("PostToolUse continue=FALSE takes precedence with multiple hooks", {
   )
 
   # Add first hook that returns continue=TRUE
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(tool_name, tool_result, tool_error, context) {
@@ -477,7 +477,7 @@ test_that("PostToolUse continue=FALSE takes precedence with multiple hooks", {
   ))
 
   # Add second hook that returns continue=FALSE
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(tool_name, tool_result, tool_error, context) {
@@ -586,7 +586,7 @@ test_that("PostToolUse continue=FALSE stops agent even when tool fails", {
   # Add PostToolUse hook that inspects tool result and returns continue=FALSE
   # Note: In this mock setup, tool_error extraction doesn't work correctly due
   # to S7 class name mismatch, so we inspect tool_result instead
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(tool_name, tool_result, tool_error, context) {
@@ -695,7 +695,7 @@ test_that("PostToolUse continue=FALSE stops streaming agent", {
   )
 
   # Add PostToolUse hook that returns continue=FALSE
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(tool_name, tool_result, tool_error, context) {

@@ -96,7 +96,7 @@ test_that("Agent add_hook works", {
 
   expect_equal(agent$hooks$count(), 0)
 
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "PreToolUse",
     callback = function(...) NULL
   ))

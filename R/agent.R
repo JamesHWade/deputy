@@ -803,7 +803,7 @@ Agent <- R6::R6Class(
     #' agent$add_hook(hook_block_dangerous_bash())
     #'
     #' # Add a custom PreToolUse hook
-    #' agent$add_hook(HookMatcher$new(
+    #' agent$add_hook(HookMatcher(
     #'   event = "PreToolUse",
     #'   pattern = "^write_file$",
     #'   callback = function(tool_name, tool_input, context) {
@@ -813,7 +813,7 @@ Agent <- R6::R6Class(
     #' ))
     #' }
     add_hook = function(hook) {
-      if (!inherits(hook, "HookMatcher")) {
+      if (!S7::S7_inherits(hook, HookMatcher)) {
         cli_abort("{.arg hook} must be a HookMatcher object")
       }
       self$hooks$add(hook)
@@ -1227,27 +1227,30 @@ Agent <- R6::R6Class(
     #' @description
     #' Print the agent configuration.
     print = function() {
-      provider_info <- self$provider()
-      tools <- private$.chat$get_tools()
+      cli::cat_line(cli::cli_format_method({
+        provider_info <- self$provider()
+        tools <- private$.chat$get_tools()
 
-      cat("<Agent>\n")
-      cat("  agent_id:", self$agent_id, "\n")
-      if (!is.null(self$agent_name)) {
-        cat("  agent_name:", self$agent_name, "\n")
-      }
-      cat("  provider:", provider_info$name, "\n")
-      cat("  model:", provider_info$model, "\n")
-      cat("  tools:", length(tools), "registered\n")
-      if (length(tools) > 0) {
-        tool_names <- names(tools)
-        if (length(tool_names) > 5) {
-          tool_names <- c(tool_names[1:5], "...")
+        cli::cli_text("<Agent>")
+        cli::cli_div(theme = list(div = list("margin-left" = 2)))
+        cli::cli_text("agent_id: {self$agent_id}")
+        if (!is.null(self$agent_name)) {
+          cli::cli_text("agent_name: {self$agent_name}")
         }
-        cat("    ", paste(tool_names, collapse = ", "), "\n")
-      }
-      cat("  working_dir:", self$working_dir, "\n")
-      cat("  permissions:\n")
-      cat("    mode:", self$permissions$mode, "\n")
+        cli::cli_text("provider: {provider_info$name}")
+        cli::cli_text("model: {provider_info$model}")
+        cli::cli_text("tools: {length(tools)} registered")
+        if (length(tools) > 0) {
+          tool_names <- names(tools)
+          if (length(tool_names) > 5) {
+            tool_names <- c(tool_names[1:5], "...")
+          }
+          cli::cli_text("{paste(tool_names, collapse = \", \")}")
+        }
+        cli::cli_text("working_dir: {self$working_dir}")
+        cli::cli_text("permissions:")
+        cli::cli_text("mode: {self$permissions$mode}")
+      }))
       invisible(self)
     },
 

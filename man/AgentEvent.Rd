@@ -9,14 +9,22 @@ AgentEvent(type, ...)
 \arguments{
 \item{type}{Event type (see Event Types section)}
 
-\item{...}{Additional event data}
+\item{...}{Named event data with unique names. The envelope names \code{type},
+\code{timestamp}, and \code{data} are reserved.}
 }
 \value{
 An \code{AgentEvent} object
 }
 \description{
 Agent events are yielded by the \code{run()} generator to provide streaming
-updates on agent progress.
+updates on agent progress. Events are S7 values with read-only \code{type},
+\code{timestamp}, and \code{data} properties. Use \code{S7::prop(event, "data")} to obtain
+the named payload; \code{event$text} and other \code{$} reads are conveniences for
+looking up payload fields. Missing fields return \code{NULL}.
+
+Select an event with its \code{type} property, not an S3 subtype class. Read-only
+properties protect the record, but environments, provider objects, and
+conditions inside the payload retain their own reference semantics.
 }
 \section{Event Types}{
 
@@ -64,3 +72,10 @@ AgentEvent("text", text = "Hello", is_complete = FALSE
 )
 
 }
+\section{Additional properties}{
+
+\describe{
+\item{\code{@timestamp}}{Construction time as a \code{POSIXct} value. Read-only.}
+
+\item{\code{@data}}{Named list of event-specific data. Read-only.}
+}}

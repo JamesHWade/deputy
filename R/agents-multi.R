@@ -209,14 +209,17 @@ agent_definition <- function(
 
 #' @export
 print.AgentDefinition <- function(x, ...) {
-  cat("<AgentDefinition:", x$name, ">\n")
-  cat("  description:", truncate_string(x$description, 60), "\n")
-  cat("  tools:", length(x$tools), "\n")
-  cat("  skills:", length(x$skills), "\n")
-  cat("  model:", x$model, "\n")
-  if (!is.null(x$permission_mode)) {
-    cat("  permission_mode:", x$permission_mode, "\n")
-  }
+  cli::cat_line(cli::cli_format_method({
+    cli::cli_text("<AgentDefinition: {x$name} >")
+    cli::cli_div(theme = list(div = list("margin-left" = 2)))
+    cli::cli_text("description: {truncate_string(x$description, 60)}")
+    cli::cli_text("tools: {length(x$tools)}")
+    cli::cli_text("skills: {length(x$skills)}")
+    cli::cli_text("model: {x$model}")
+    if (!is.null(x$permission_mode)) {
+      cli::cli_text("permission_mode: {x$permission_mode}")
+    }
+  }))
   invisible(x)
 }
 
@@ -531,12 +534,14 @@ LeadAgent <- R6::R6Class(
     #' @description
     #' Print the lead agent.
     print = function() {
-      super$print()
-      cat("  sub_agents:", length(private$.sub_agent_defs), "\n")
-      if (length(private$.sub_agent_defs) > 0) {
-        names <- self$available_sub_agents()
-        cat("    ", paste(names, collapse = ", "), "\n")
-      }
+      cli::cat_line(cli::cli_format_method({
+        super$print()
+        cli::cli_text("sub_agents: {length(private$.sub_agent_defs)}")
+        if (length(private$.sub_agent_defs) > 0) {
+          names <- self$available_sub_agents()
+          cli::cli_text("{paste(names, collapse = \", \")}")
+        }
+      }))
       invisible(self)
     }
   ),

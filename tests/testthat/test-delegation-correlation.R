@@ -441,7 +441,7 @@ test_that("denied delegation requests do not leave stale correlation", {
     permissions = permissions_standard(root),
     working_dir = root
   )
-  lead$add_hook(HookMatcher$new(
+  lead$add_hook(HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(tool_name, tool_input, context) {

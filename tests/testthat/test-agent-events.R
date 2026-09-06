@@ -50,7 +50,7 @@ test_that("post-tool hooks can redact emitted tool results", {
     permissions = permissions_standard(root),
     working_dir = root
   )
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(tool_name, tool_result, tool_error, context) {
@@ -112,7 +112,7 @@ test_that("cancellation during run initialization makes no provider request", {
   chat <- create_mock_chat("unused")
   chat$stream_async <- function(...) cli::cli_abort("unexpected dispatch")
   agent <- Agent$new(chat = chat)
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "SessionStart",
     timeout = 0,
     callback = function(...) {
@@ -461,7 +461,7 @@ test_that("pre-tool effects are applied before a real hook rejection", {
     permissions = permissions_standard(root),
     working_dir = root
   )
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(tool_name, tool_input, context) {

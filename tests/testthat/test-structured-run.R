@@ -44,7 +44,7 @@ test_that("tool work, extraction, and corrections share one run without replay",
     permissions = permissions_full()
   )
   starts <- 0L
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     "SessionStart",
     function(...) {
       starts <<- starts + 1L
@@ -69,10 +69,17 @@ test_that("tool work, extraction, and corrections share one run without replay",
   expect_null(requests[[3]]$tools)
   expect_null(requests[[4]]$tools)
   attempts <- runtime_events(agent, "structured_attempt")
-  expect_identical(vapply(attempts, `[[`, logical(1), "valid"), c(FALSE, TRUE))
+  expect_identical(
+    vapply(attempts, function(event) event@data$valid, logical(1)),
+    c(FALSE, TRUE)
+  )
   expect_identical(attempts[[1]]$value, list(count = 0L))
   expect_identical(
-    unique(vapply(result$events, `[[`, character(1), "run_id")),
+    unique(vapply(
+      result$events,
+      function(event) event@data$run_id,
+      character(1)
+    )),
     result$run_id
   )
 })

@@ -318,7 +318,7 @@ history_prepare <- function(
     )
   )
   compactions <- list()
-  agent$add_hook(deputy::HookMatcher$new(
+  agent$add_hook(deputy::HookMatcher(
     event = "PostCompact",
     timeout = 0,
     callback = function(context, result, ...) {

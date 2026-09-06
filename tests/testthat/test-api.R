@@ -21,6 +21,7 @@ test_that("public API is deliberate", {
     "permissions_full",
     "HookEvent",
     "HookMatcher",
+    "hook_matches",
     "HookResultPreToolUse",
     "HookResultPostToolUse",
     "HookResultPreCompact",

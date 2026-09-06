@@ -18,7 +18,7 @@ agent <- Agent$new(
   working_dir = workspace,
   usage_limits = UsageLimits(max_requests = 3, max_tool_calls = 2)
 )
-agent$add_hook(HookMatcher$new(
+agent$add_hook(HookMatcher(
   event = "PostToolUse",
   timeout = 0,
   callback = function(tool_name, tool_result, tool_error, context) {

@@ -39,23 +39,23 @@ test_that("stateful recipe isolates runs and clears completed state", {
   run <- list(run_id = "one")
   other <- list(run_id = "two")
   before_push <- function(context) {
-    hooks[[2]]$callback("push_changes", list(), context)
+    hooks[[2]]@callback("push_changes", list(), context)
   }
   expect_null(before_push(run))
-  hooks[[1]]$callback(
+  hooks[[1]]@callback(
     "install_dependency",
     list(installed = TRUE),
     "failed",
     run
   )
   expect_null(before_push(run))
-  hooks[[1]]$callback("install_dependency", list(installed = FALSE), NULL, run)
+  hooks[[1]]@callback("install_dependency", list(installed = FALSE), NULL, run)
   expect_null(before_push(run))
-  hooks[[1]]$callback("install_dependency", list(installed = TRUE), NULL, run)
+  hooks[[1]]@callback("install_dependency", list(installed = TRUE), NULL, run)
   expect_identical(before_push(run)$permission, "deny")
   expect_null(before_push(other))
   expect_identical(asks, 1L)
-  hooks[[3]]$callback("end_turn", run)
+  hooks[[3]]@callback("end_turn", run)
   expect_null(before_push(run))
 })
 
@@ -71,14 +71,14 @@ test_that("approval hooks preserve later denials and audit hooks", {
       agent$add_hook(hook)
     }
     audited <- 0L
-    agent$add_hook(HookMatcher$new(
+    agent$add_hook(HookMatcher(
       event = "PostToolUse",
       callback = function(tool_name, tool_result, tool_error, context) {
         audited <<- audited + 1L
         NULL
       }
     ))
-    agent$add_hook(HookMatcher$new(
+    agent$add_hook(HookMatcher(
       event = "PreToolUse",
       callback = function(tool_name, tool_input, context) {
         HookResultPreToolUse(permission = "deny", reason = "Later policy")

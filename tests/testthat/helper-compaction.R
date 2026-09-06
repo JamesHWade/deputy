@@ -28,7 +28,7 @@ compaction_hook_log <- function(agent) {
     "Stop",
     "SessionEnd"
   )) {
-    agent$add_hook(HookMatcher$new(
+    agent$add_hook(HookMatcher(
       event = event,
       timeout = 0,
       callback = local({

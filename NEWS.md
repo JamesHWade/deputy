@@ -1,5 +1,13 @@
 # deputy (development version)
 
+* `AgentEvent()` and `HookMatcher()` are S7 values with read-only properties.
+  Construct matchers with `HookMatcher(...)` and test names with
+  `hook_matches()`. Event types use `event$type` instead of S3 subtype classes;
+  `event$data` exposes the payload and flat `$` reads remain available (#59).
+
+* Object summaries use cli formatting, wrap at the configured terminal width,
+  and preserve literal braces in user values and stdout capture (#58).
+
 * Compaction summaries now include tool evidence through ellmer's public content
   formatter, preserving field names and relationships in structured results
   while excluding tool-result display metadata. Previously a source returned by

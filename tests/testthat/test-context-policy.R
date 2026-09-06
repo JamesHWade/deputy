@@ -81,7 +81,7 @@ test_that("the run kernel compacts automatically before the provider call", {
       fallback = "text"
     )
   )
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "PostCompact",
     timeout = 0,
     callback = function(result, context) {
@@ -299,7 +299,7 @@ test_that("post-tool hooks inspect original offloaded results", {
       offload_dir = directory
     )
   )
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(tool_name, tool_result, tool_error, context) {

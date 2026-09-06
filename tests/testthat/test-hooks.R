@@ -1,31 +1,31 @@
 test_that("SessionStart is a valid hook event", {
   # Should not error when creating a SessionStart hook
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "SessionStart",
     callback = function(context) {
       NULL
     }
   )
-  expect_s3_class(hook, "HookMatcher")
-  expect_equal(hook$event, "SessionStart")
+  expect_s7_class(hook, HookMatcher)
+  expect_equal(hook@event, "SessionStart")
 })
 
 test_that("SessionEnd is a valid hook event", {
   # Should not error when creating a SessionEnd hook
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "SessionEnd",
     callback = function(reason, context) {
       NULL
     }
   )
-  expect_s3_class(hook, "HookMatcher")
-  expect_equal(hook$event, "SessionEnd")
+  expect_s7_class(hook, HookMatcher)
+  expect_equal(hook@event, "SessionEnd")
 })
 
 test_that("SessionStart hook fires with correct context", {
   received_context <- NULL
 
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "SessionStart",
     timeout = 0,
     callback = function(context) {
@@ -57,7 +57,7 @@ test_that("SessionEnd hook fires with correct reason and context", {
   received_reason <- NULL
   received_context <- NULL
 
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "SessionEnd",
     timeout = 0,
     callback = function(reason, context) {
@@ -88,7 +88,7 @@ test_that("SessionEnd hook fires with correct reason and context", {
 test_that("SessionEnd receives different stop reasons", {
   reasons_received <- c()
 
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "SessionEnd",
     timeout = 0,
     callback = function(reason, context) {

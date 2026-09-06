@@ -172,22 +172,25 @@ Skill <- R6::R6Class(
     #' @description
     #' Print the skill.
     print = function() {
-      cat("<Skill:", self$name, ">\n")
-      cat("  version:", self$version, "\n")
-      if (!is.null(self$description)) {
-        cat("  description:", truncate_string(self$description, 60), "\n")
-      }
-      cat("  tools:", length(self$tools), "\n")
-      if (length(self$tools) > 0) {
-        tool_names <- sapply(self$tools, function(t) t@name)
-        cat("    ", paste(tool_names, collapse = ", "), "\n")
-      }
-      if (!is.null(self$prompt)) {
-        cat("  prompt:", nchar(self$prompt), "chars\n")
-      }
-      if (!is.null(self$path)) {
-        cat("  path:", self$path, "\n")
-      }
+      cli::cat_line(cli::cli_format_method({
+        cli::cli_text("<Skill: {self$name} >")
+        cli::cli_div(theme = list(div = list("margin-left" = 2)))
+        cli::cli_text("version: {self$version}")
+        if (!is.null(self$description)) {
+          cli::cli_text("description: {truncate_string(self$description, 60)}")
+        }
+        cli::cli_text("tools: {length(self$tools)}")
+        if (length(self$tools) > 0) {
+          tool_names <- sapply(self$tools, function(t) t@name)
+          cli::cli_text("{paste(tool_names, collapse = \", \")}")
+        }
+        if (!is.null(self$prompt)) {
+          cli::cli_text("prompt: {nchar(self$prompt)} chars")
+        }
+        if (!is.null(self$path)) {
+          cli::cli_text("path: {self$path}")
+        }
+      }))
       invisible(self)
     }
   )

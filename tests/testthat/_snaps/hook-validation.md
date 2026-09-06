@@ -1,7 +1,7 @@
 # HookMatcher rejects callbacks that cannot accept an event
 
     Code
-      HookMatcher$new(event = "PreToolUse", callback = function(tool_name) NULL)
+      HookMatcher(event = "PreToolUse", callback = function(tool_name) NULL)
     Condition
       Error in `validate_hook_callback()`:
       ! Invalid callback for "PreToolUse" hook.
@@ -10,8 +10,7 @@
 ---
 
     Code
-      HookMatcher$new(event = "SessionStart", callback = function(context, required)
-        NULL)
+      HookMatcher(event = "SessionStart", callback = function(context, required) NULL)
     Condition
       Error in `validate_hook_callback()`:
       ! Invalid callback for "SessionStart" hook.
@@ -20,7 +19,7 @@
 ---
 
     Code
-      HookMatcher$new(event = "SessionStart", callback = function(..., required) NULL)
+      HookMatcher(event = "SessionStart", callback = function(..., required) NULL)
     Condition
       Error in `validate_hook_callback()`:
       ! Invalid callback for "SessionStart" hook.
@@ -29,8 +28,7 @@
 # HookMatcher rejects invalid regex patterns at construction
 
     Code
-      HookMatcher$new(event = "PreToolUse", pattern = "[", callback = function(...)
-        NULL)
+      HookMatcher(event = "PreToolUse", pattern = "[", callback = function(...) NULL)
     Condition
       Error in `validate_hook_pattern()`:
       ! Invalid hook pattern: "["
@@ -38,7 +36,7 @@
 ---
 
     Code
-      HookMatcher$new(event = "PreToolUse", pattern = c("read", "write"), callback = function(
+      HookMatcher(event = "PreToolUse", pattern = c("read", "write"), callback = function(
         ...) NULL)
     Condition
       Error in `validate_hook_pattern()`:
@@ -47,7 +45,7 @@
 # HookMatcher rejects invalid timeouts at construction
 
     Code
-      HookMatcher$new("PreToolUse", callback, timeout = -1)
+      HookMatcher("PreToolUse", callback, timeout = -1)
     Condition
       Error in `validate_hook_timeout()`:
       ! `timeout` must be one finite non-negative number
@@ -55,7 +53,7 @@
 ---
 
     Code
-      HookMatcher$new("PreToolUse", callback, timeout = Inf)
+      HookMatcher("PreToolUse", callback, timeout = Inf)
     Condition
       Error in `validate_hook_timeout()`:
       ! `timeout` must be one finite non-negative number
@@ -63,7 +61,7 @@
 ---
 
     Code
-      HookMatcher$new("PreToolUse", callback, timeout = c(1, 2))
+      HookMatcher("PreToolUse", callback, timeout = c(1, 2))
     Condition
       Error in `validate_hook_timeout()`:
       ! `timeout` must be one finite non-negative number
@@ -71,8 +69,7 @@
 ---
 
     Code
-      HookMatcher$new("PreToolUse", callback, timeout = "5")
+      HookMatcher("PreToolUse", callback, timeout = "5")
     Condition
       Error in `validate_hook_timeout()`:
       ! `timeout` must be one finite non-negative number
-
