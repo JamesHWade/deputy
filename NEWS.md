@@ -1,10 +1,5 @@
 # deputy (development version)
 
-* `ContextPolicy()` and `DeputyCompaction()` now create read-only S7 values.
-  Read properties with `$` or `S7::prop()` and use `S7::props()` for explicit
-  reporting. Summary Chat isolation, fallback destinations, and original
-  provider conditions are preserved (#123).
-
 * `AgentUsage()` and `UsageLimits()` now construct read-only S7 values.
   Constructors and `$` property reads retain their existing names; use
   `S7::props()` for plain reporting records instead of list indexing or
@@ -23,6 +18,11 @@
   Construct matchers with `HookMatcher(...)` and test names with
   `hook_matches()`. Event types use `event$type` instead of S3 subtype classes;
   `event$data` exposes the payload and flat `$` reads remain available (#59).
+
+* `ContextPolicy()` and `DeputyCompaction()` now create read-only S7 values.
+  Read properties with `$` or `S7::prop()` and use `S7::props()` for explicit
+  reporting. Summary Chat isolation, fallback destinations, and original
+  provider conditions are preserved (#123).
 
 * Object summaries use cli formatting, wrap at the configured terminal width,
   and preserve literal braces in user values and stdout capture (#58).
