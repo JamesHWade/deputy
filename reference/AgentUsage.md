@@ -5,6 +5,13 @@ and run `usage`/`stop` events are scoped to that run, while
 [Agent](https://jameshwade.github.io/deputy/reference/Agent.md)`$usage()`
 describes the complete in-memory conversation at the time it is called.
 
+This is a read-only S7 value. Its `total_tokens` property is calculated
+from input plus output tokens at construction. Read properties with `$`
+or [`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html);
+[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+returns a plain named-list snapshot for reporting or serialization.
+Construct a new value for different usage.
+
 ## Usage
 
 ``` r
@@ -49,7 +56,14 @@ AgentUsage(
 
 ## Value
 
-An `AgentUsage` object.
+A read-only `AgentUsage` S7 object.
+
+## Additional properties
+
+- `@total_tokens`:
+
+  Input plus output tokens, without adding cached input again.
+  Read-only.
 
 ## Examples
 
@@ -61,11 +75,21 @@ AgentUsage(
   output_tokens = 30,
   cost_usd = 0.002
 )
+#> <AgentUsage>
+#>   requests: 2
+#>   tool_calls: 1
+#>   tokens: 150
+#>   cached_tokens: 0
+#>   cost_usd: $0.0020
+usage <- AgentUsage(input_tokens = 120, output_tokens = 30, cost_usd = NA_real_)
+usage$total_tokens
+#> [1] 150
+S7::props(usage)
 #> $requests
-#> [1] 2
+#> [1] 0
 #> 
 #> $tool_calls
-#> [1] 1
+#> [1] 0
 #> 
 #> $input_tokens
 #> [1] 120
@@ -80,8 +104,6 @@ AgentUsage(
 #> [1] 150
 #> 
 #> $cost_usd
-#> [1] 0.002
+#> [1] NA
 #> 
-#> attr(,"class")
-#> [1] "AgentUsage" "list"      
 ```

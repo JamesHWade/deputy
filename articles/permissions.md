@@ -260,6 +260,31 @@ agent <- Agent$new(
 )
 ```
 
+[`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+and
+[`AgentUsage()`](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+create read-only S7 values. Their constructors and `$` reads keep the
+same spelling; list indexing and field assignment are replaced by
+property access and construction of a new value. Use
+[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+to obtain a plain reporting record:
+
+``` r
+
+limits <- UsageLimits(max_requests = 3, max_cost_usd = 0.25)
+usage <- AgentUsage(requests = 1, input_tokens = 100, output_tokens = 20,
+                    cached_tokens = 80, cost_usd = NA_real_)
+limits$max_requests
+usage$total_tokens # Cached input is already included in input_tokens
+S7::props(usage)   # A plain list; editing it does not change usage
+```
+
+`NULL` leaves a limit unset; zero is an explicit limit. Run overrides
+inherit unset fields from the Agent’s defaults, while delegated agents
+receive the lead’s remaining allowance intersected with the child
+definition’s limits. Constructing or serializing a value does not change
+an active Agent’s defaults.
+
 When a limit is reached, the agent stops and the
 `AgentResult$stop_reason` identifies the limit, such as
 `"request_limit"`, `"tool_call_limit"`, or `"cost_limit"`. If

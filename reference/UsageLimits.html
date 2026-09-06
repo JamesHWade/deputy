@@ -8,7 +8,11 @@ and cost limits depend on usage reported after a model response, so the run
 stops after an overage is observed and can exceed a threshold by one
 response. A NULL field leaves that limit unset on this object; when the
 object configures or overrides an Agent, Deputy may fill unset fields from
-the agent's defaults."><meta property="og:description" content="UsageLimits() defines run-scoped stop conditions for one call to Agent
+the agent's defaults.
+This is a read-only S7 value. Read fields with $ or S7::prop(); use
+S7::props() for a plain named-list snapshot. Construct a new value to
+change limits. Per-run overrides fill unset fields from the Agent defaults;
+delegated budgets are intersected with the lead's remaining allowance."><meta property="og:description" content="UsageLimits() defines run-scoped stop conditions for one call to Agent
 $run() or $run_sync(). Limits are evaluated against usage added by that
 run, not the complete persisted conversation. This keeps resumed sessions
 from inheriting a spent budget.
@@ -17,7 +21,11 @@ and cost limits depend on usage reported after a model response, so the run
 stops after an overage is observed and can exceed a threshold by one
 response. A NULL field leaves that limit unset on this object; when the
 object configures or overrides an Agent, Deputy may fill unset fields from
-the agent's defaults."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
+the agent's defaults.
+This is a read-only S7 value. Read fields with $ or S7::prop(); use
+S7::props() for a plain named-list snapshot. Construct a new value to
+change limits. Per-run overrides fill unset fields from the Agent defaults;
+delegated budgets are intersected with the lead's remaining allowance."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -81,6 +89,10 @@ stops after an overage is observed and can exceed a threshold by one
 response. A <code>NULL</code> field leaves that limit unset on this object; when the
 object configures or overrides an <a href="Agent.html">Agent</a>, Deputy may fill unset fields from
 the agent's defaults.</p>
+<p>This is a read-only S7 value. Read fields with <code>$</code> or <code><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">S7::prop()</a></code>; use
+<code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> for a plain named-list snapshot. Construct a new value to
+change limits. Per-run overrides fill unset fields from the Agent defaults;
+delegated budgets are intersected with the lead's remaining allowance.</p>
     </div>
 
     <div class="section level2">
@@ -142,59 +154,29 @@ event and then signals a structured Deputy limit error.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code>UsageLimits</code> object.</p>
+    <p>A read-only <code>UsageLimits</code> S7 object.</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">UsageLimits</span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">5</span>, max_tool_calls <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_requests</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_tool_calls</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_input_tokens</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_output_tokens</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_total_tokens</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_cost_usd</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $on_exceed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "stop"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "UsageLimits" "list"       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;UsageLimits&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_requests: 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_tool_calls: 10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_input_tokens: unlimited</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_output_tokens: unlimited</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_total_tokens: unlimited</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_cost_usd: unlimited</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   on_exceed: stop</span>
 <span class="r-in"><span><span class="fu">UsageLimits</span><span class="op">(</span>max_cost_usd <span class="op">=</span> <span class="fl">0.25</span>, on_exceed <span class="op">=</span> <span class="st">"error"</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_requests</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_tool_calls</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_input_tokens</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_output_tokens</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_total_tokens</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $max_cost_usd</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.25</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $on_exceed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "error"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "UsageLimits" "list"       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;UsageLimits&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_requests: unlimited</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_tool_calls: unlimited</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_input_tokens: unlimited</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_output_tokens: unlimited</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_total_tokens: unlimited</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   max_cost_usd: 0.25</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   on_exceed: error</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

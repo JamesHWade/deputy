@@ -418,6 +418,23 @@ run:</p>
 <span>    max_cost_usd <span class="op">=</span> <span class="fl">1</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/UsageLimits.html">UsageLimits()</a></code> and <code><a href="../reference/AgentUsage.html">AgentUsage()</a></code> create
+read-only S7 values. Their constructors and <code>$</code> reads keep
+the same spelling; list indexing and field assignment are replaced by
+property access and construction of a new value. Use
+<code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> to obtain a plain reporting record:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">limits</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">3</span>, max_cost_usd <span class="op">=</span> <span class="fl">0.25</span><span class="op">)</span></span>
+<span><span class="va">usage</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/AgentUsage.html">AgentUsage</a></span><span class="op">(</span>requests <span class="op">=</span> <span class="fl">1</span>, input_tokens <span class="op">=</span> <span class="fl">100</span>, output_tokens <span class="op">=</span> <span class="fl">20</span>,</span>
+<span>                    cached_tokens <span class="op">=</span> <span class="fl">80</span>, cost_usd <span class="op">=</span> <span class="cn">NA_real_</span><span class="op">)</span></span>
+<span><span class="va">limits</span><span class="op">$</span><span class="va">max_requests</span></span>
+<span><span class="va">usage</span><span class="op">$</span><span class="va">total_tokens</span> <span class="co"># Cached input is already included in input_tokens</span></span>
+<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">props</a></span><span class="op">(</span><span class="va">usage</span><span class="op">)</span>   <span class="co"># A plain list; editing it does not change usage</span></span></code></pre></div>
+<p><code>NULL</code> leaves a limit unset; zero is an explicit limit.
+Run overrides inherit unset fields from the Agent’s defaults, while
+delegated agents receive the lead’s remaining allowance intersected with
+the child definition’s limits. Constructing or serializing a value does
+not change an active Agent’s defaults.</p>
 <p>When a limit is reached, the agent stops and the
 <code>AgentResult$stop_reason</code> identifies the limit, such as
 <code>"request_limit"</code>, <code>"tool_call_limit"</code>, or
@@ -447,18 +464,18 @@ from both the standard permission policy and the standard tool
 preset.</p>
 <p>For model-generated R that needs confinement, use mcp-repl as the
 execution backend. Its server entry must name the policy explicitly:</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  <span class="dt">"mcpServers"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>    <span class="dt">"r"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>      <span class="dt">"command"</span><span class="fu">:</span> <span class="st">"/absolute/path/to/mcp-repl"</span><span class="fu">,</span></span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>      <span class="dt">"args"</span><span class="fu">:</span> <span class="ot">[</span></span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>        <span class="st">"--sandbox"</span><span class="ot">,</span> <span class="st">"workspace-write"</span><span class="ot">,</span></span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>        <span class="st">"--interpreter"</span><span class="ot">,</span> <span class="st">"r"</span></span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>      <span class="ot">]</span></span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>    <span class="fu">}</span></span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>  <span class="fu">}</span></span>
-<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  <span class="dt">"mcpServers"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>    <span class="dt">"r"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>      <span class="dt">"command"</span><span class="fu">:</span> <span class="st">"/absolute/path/to/mcp-repl"</span><span class="fu">,</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>      <span class="dt">"args"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>        <span class="st">"--sandbox"</span><span class="ot">,</span> <span class="st">"workspace-write"</span><span class="ot">,</span></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>        <span class="st">"--interpreter"</span><span class="ot">,</span> <span class="st">"r"</span></span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>      <span class="ot">]</span></span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repl_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tools_mcp_repl.html">tools_mcp_repl</a></span><span class="op">(</span></span>
 <span>  server <span class="op">=</span> <span class="st">"r"</span>,</span>
 <span>  sandbox <span class="op">=</span> <span class="st">"workspace-write"</span></span>

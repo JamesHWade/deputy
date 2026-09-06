@@ -14,6 +14,14 @@ when the object configures or overrides an
 [Agent](https://jameshwade.github.io/deputy/reference/Agent.md), Deputy
 may fill unset fields from the agent's defaults.
 
+This is a read-only S7 value. Read fields with `$` or
+[`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html);
+use
+[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+for a plain named-list snapshot. Construct a new value to change limits.
+Per-run overrides fill unset fields from the Agent defaults; delegated
+budgets are intersected with the lead's remaining allowance.
+
 ## Usage
 
 ``` r
@@ -71,57 +79,27 @@ UsageLimits(
 
 ## Value
 
-A `UsageLimits` object.
+A read-only `UsageLimits` S7 object.
 
 ## Examples
 
 ``` r
 UsageLimits(max_requests = 5, max_tool_calls = 10)
-#> $max_requests
-#> [1] 5
-#> 
-#> $max_tool_calls
-#> [1] 10
-#> 
-#> $max_input_tokens
-#> NULL
-#> 
-#> $max_output_tokens
-#> NULL
-#> 
-#> $max_total_tokens
-#> NULL
-#> 
-#> $max_cost_usd
-#> NULL
-#> 
-#> $on_exceed
-#> [1] "stop"
-#> 
-#> attr(,"class")
-#> [1] "UsageLimits" "list"       
+#> <UsageLimits>
+#>   max_requests: 5
+#>   max_tool_calls: 10
+#>   max_input_tokens: unlimited
+#>   max_output_tokens: unlimited
+#>   max_total_tokens: unlimited
+#>   max_cost_usd: unlimited
+#>   on_exceed: stop
 UsageLimits(max_cost_usd = 0.25, on_exceed = "error")
-#> $max_requests
-#> NULL
-#> 
-#> $max_tool_calls
-#> NULL
-#> 
-#> $max_input_tokens
-#> NULL
-#> 
-#> $max_output_tokens
-#> NULL
-#> 
-#> $max_total_tokens
-#> NULL
-#> 
-#> $max_cost_usd
-#> [1] 0.25
-#> 
-#> $on_exceed
-#> [1] "error"
-#> 
-#> attr(,"class")
-#> [1] "UsageLimits" "list"       
+#> <UsageLimits>
+#>   max_requests: unlimited
+#>   max_tool_calls: unlimited
+#>   max_input_tokens: unlimited
+#>   max_output_tokens: unlimited
+#>   max_total_tokens: unlimited
+#>   max_cost_usd: 0.25
+#>   on_exceed: error
 ```

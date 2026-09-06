@@ -2,6 +2,18 @@
 
 ## deputy (development version)
 
+- [`AgentUsage()`](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+  and
+  [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  now construct read-only S7 values. Constructors and `$` property reads
+  retain their existing names; use
+  [`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+  for plain reporting records instead of list indexing or
+  [`unclass()`](https://rdrr.io/r/base/class.html). Accounting,
+  missing-cost behavior, and delegated budget intersections retain their
+  existing semantics
+  ([\#121](https://github.com/JamesHWade/deputy/issues/121)).
+
 - [`AgentResult()`](https://jameshwade.github.io/deputy/reference/AgentResult.md)
   and
   [`Permissions()`](https://jameshwade.github.io/deputy/reference/Permissions.md)
