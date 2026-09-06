@@ -45,6 +45,10 @@ services, or caller-owned environments. Those objects retain their original
 semantics and remain the host's responsibility. The record's read-only fields
 do not promise deep immutability for executable dependencies.
 
+Skill configuration subsequently became read-only under
+[ADR-0014](0014-s7-skills.md). Executable dependencies nested in those Skill
+values retain the ownership semantics described above.
+
 ## YAML and RDS
 
 Deputy YAML remains version 1. The writer projects S7 properties explicitly,

@@ -38,7 +38,8 @@ deputy/
 │   ├── permissions.R       # S7 permission configuration and public evaluation
 │   ├── permission-evaluation.R # Internal tool gating and capability evaluation
 │   ├── hooks.R             # HookRegistry for lifecycle events
-│   ├── skills.R            # Skill loading system
+│   ├── skill.R             # S7 Skill values and requirement inspection
+│   ├── skills.R            # Explicit Skill file and tool loading
 │   ├── tools-files.R       # Native filesystem tools
 │   ├── tools-documents.R   # Document conversion
 │   ├── tools-execution.R   # Trusted one-shot R and shell tools
@@ -173,10 +174,12 @@ minimum version or adopting an unreleased API.
 - **Documentation**: roxygen2 with markdown support
 - **Classes**: Use S7 for value contracts and R6 for mutable runtime owners.
   `HookMatcher(...)`, `AgentEvent(...)`, `AgentResult(...)`, `Permissions(...)`,
-  `AgentUsage(...)`, `UsageLimits(...)`, `ContextPolicy(...)`, and
-  `DeputyCompaction(...)`, and `AgentDefinition(...)` are read-only S7 values.
+  `AgentUsage(...)`, `UsageLimits(...)`, `ContextPolicy(...)`,
+  `DeputyCompaction(...)`, `AgentDefinition(...)`, and `Skill(...)` are read-only
+  S7 values.
   `agent_definition()` is the same S7 constructor as `AgentDefinition()`. Use
-  `hook_matches()`, `permissions_check()`, and `result_*()` inspection functions.
+  `hook_matches()`, `permissions_check()`, `skill_check_requirements()`, and
+  `result_*()` inspection functions.
   `$` reads on events, results, policies, usage, and limits are property
   conveniences; there are no R6 constructor or method facades for these values.
   Existing value types await scoped migration; do not introduce new S3 value
@@ -189,7 +192,9 @@ minimum version or adopting an unreleased API.
   reporting projections. Nested summary Chats and provider conditions retain
   reference semantics; policy construction and Agent getters clone templates.
   ADR-0013 records definition routing, executable-object composition, and
-  version-1 YAML serialization through explicit host registries.
+  version-1 YAML serialization through explicit host registries. ADR-0014
+  records frozen Skill configuration, standalone requirement checks, and
+  explicit source loading. Tools nested in Skills retain caller-owned state.
 - **Printing**: Format summaries with `cli::cli_format_method()` and write the
   resulting lines with `cli::cat_line()` so printing remains on stdout. Pass
   user strings as interpolated values, never as cli templates, and return the

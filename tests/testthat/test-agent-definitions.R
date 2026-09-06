@@ -317,7 +317,7 @@ test_that("both definition constructors expose the same S7 contract", {
   expect_null(definition$max_requests)
 })
 
-test_that("definition values compose original tools and caller-owned skill state", {
+test_that("definition values compose original tools and frozen skills", {
   state <- new.env(parent = emptyenv())
   state$count <- 0L
   tool <- ellmer::tool(
@@ -328,7 +328,11 @@ test_that("definition values compose original tools and caller-owned skill state
     name = "counter",
     description = "Count calls"
   )
-  skill <- Skill$new("concise", "Be concise", "Keep it short")
+  skill <- Skill(
+    "concise",
+    description = "Be concise",
+    prompt = "Keep it short"
+  )
   definition <- agent_definition(
     "helper",
     "Helps",
@@ -343,8 +347,8 @@ test_that("definition values compose original tools and caller-owned skill state
   expect_identical(snapshot$skills[[1L]], skill)
   expect_identical(snapshot$tools[[1L]](), 1L)
   expect_identical(state$count, 1L)
-  skill$prompt <- "Use one sentence"
-  expect_identical(snapshot$skills[[1L]]$prompt, "Use one sentence")
+  expect_snapshot(error = TRUE, skill@prompt <- "Use one sentence")
+  expect_identical(snapshot$skills[[1L]]$prompt, "Keep it short")
   expect_snapshot(error = TRUE, definition@tools <- list())
   expect_snapshot(error = TRUE, definition@skills <- list())
   fields <- S7::props(definition)

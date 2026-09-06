@@ -18,7 +18,7 @@ minimal_definition_yaml <- c(
 test_that("every AgentDefinition field round-trips through YAML", {
   skip_if_not_installed("yaml")
   tool_registry <- list(read = tool_read_file, list = tool_list_files)
-  skill <- Skill$new(
+  skill <- Skill(
     name = "concise",
     description = "Be concise",
     prompt = "Keep it short"

@@ -13,7 +13,11 @@ test_that("definition values preserve RDS identity and explicit YAML rebinding i
     name = "counter",
     description = "Count calls"
   )
-  skill <- Skill$new("concise", "Be concise", "Keep it short")
+  skill <- Skill(
+    "concise",
+    description = "Be concise",
+    prompt = "Keep it short"
+  )
   tools <- list(count = counter)
   skills <- list(concise = skill)
   definition <- agent_definition(

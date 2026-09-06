@@ -37,6 +37,7 @@ test_that("public API is deliberate", {
     "hook_block_dangerous_bash",
     "hook_limit_file_writes",
     "Skill",
+    "skill_check_requirements",
     "skill_create",
     "skill_load",
     "skills_list",

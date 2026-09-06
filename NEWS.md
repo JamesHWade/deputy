@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* `Skill()` now constructs a read-only S7 configuration value. Use
+  `skill_check_requirements(skill)` instead of the former instance method,
+  and `S7::props()` to prepare revised configuration. `skill_create()` and
+  `skill_load()` retain their defaults and loading behavior; executable tool
+  closures and services remain caller-owned (#127).
+
 * `agent_definition()` and `AgentDefinition()` now construct the same read-only
   S7 value. Use `S7::props()` to prepare a revised definition. Routing names,
   tool and skill registry identity, YAML version 1, and delegated permission

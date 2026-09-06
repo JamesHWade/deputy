@@ -79,10 +79,10 @@ This is a read-only S7 value. \code{agent_definition()} is an alias of
 constructing a revised value. Canonical names, limits, and other fields
 cannot be changed after construction, including through LeadAgent snapshots.
 
-Tools and Skill objects are composed directly, without cloning executable
-code or caller-owned state. Their closures, services, and reference objects
-retain their own semantics. A read-only definition freezes the configuration
-record, not state inside those objects. Use \code{\link[=agent_definition_write]{agent_definition_write()}} and
+Tools and read-only Skill values are composed directly. Executable tools
+nested in either value retain their closures, services, and caller-owned
+state without cloning. Read-only configuration does not freeze tool state.
+Use \code{\link[=agent_definition_write]{agent_definition_write()}} and
 \code{\link[=agent_definition_read]{agent_definition_read()}} with explicit host registries for portable YAML;
 \code{S7::props()} alone is not a portable serializer for executable objects.
 }

@@ -83,5 +83,7 @@ The named lifecycle point a hook is registered against.
 _Avoid_: trigger, lifecycle stage
 
 **Skill**:
-A bundle of prompt text, tools, and metadata that can be loaded into an Agent to specialize it.
+A read-only configuration value bundling prompt text, tools, and metadata that
+can be loaded into an Agent to specialize it. Executable tools retain their
+caller-owned state.
 _Avoid_: plugin, extension, module, capability pack

@@ -30,7 +30,15 @@
       Error:
       ! Cannot modify `prompt`: property is read-only after construction
 
-# definition values compose original tools and caller-owned skill state
+# definition values compose original tools and frozen skills
+
+    Code
+      skill@prompt <- "Use one sentence"
+    Condition
+      Error:
+      ! Cannot modify `prompt`: property is read-only after construction
+
+---
 
     Code
       definition@tools <- list()

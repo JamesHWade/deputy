@@ -126,10 +126,10 @@ normalize_agent_definitions <- function(definitions, arg = "sub_agents") {
 #' constructing a revised value. Canonical names, limits, and other fields
 #' cannot be changed after construction, including through LeadAgent snapshots.
 #'
-#' Tools and Skill objects are composed directly, without cloning executable
-#' code or caller-owned state. Their closures, services, and reference objects
-#' retain their own semantics. A read-only definition freezes the configuration
-#' record, not state inside those objects. Use [agent_definition_write()] and
+#' Tools and read-only Skill values are composed directly. Executable tools
+#' nested in either value retain their closures, services, and caller-owned
+#' state without cloning. Read-only configuration does not freeze tool state.
+#' Use [agent_definition_write()] and
 #' [agent_definition_read()] with explicit host registries for portable YAML;
 #' `S7::props()` alone is not a portable serializer for executable objects.
 #' @name agent_definition

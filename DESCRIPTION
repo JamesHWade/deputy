@@ -86,6 +86,7 @@ Collate:
     'permission-policy.R'
     'permissions.R'
     'run-context.R'
+    'skill.R'
     'skills.R'
     'stall-detection.R'
     'structured-run.R'
