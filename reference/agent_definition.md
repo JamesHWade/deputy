@@ -7,6 +7,21 @@ metadata about what the agent can do.
 ## Usage
 
 ``` r
+AgentDefinition(
+  name,
+  description,
+  prompt,
+  tools = list(),
+  model = "inherit",
+  skills = list(),
+  disallowed_tools = NULL,
+  memory = NULL,
+  mcp_servers = NULL,
+  initial_prompt = NULL,
+  max_requests = NULL,
+  permission_mode = NULL
+)
+
 agent_definition(
   name,
   description,
@@ -79,12 +94,34 @@ agent_definition(
 
 ## Value
 
-An `AgentDefinition` object
+A read-only `AgentDefinition` S7 object
+
+## Details
+
+This is a read-only S7 value. `agent_definition()` is an alias of
+`AgentDefinition()`; both construct the same class. Read fields with
+`$`,
+[`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html), or
+`@`.
+[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+returns a plain property list for constructing a revised value.
+Canonical names, limits, and other fields cannot be changed after
+construction, including through LeadAgent snapshots.
+
+Tools and Skill objects are composed directly, without cloning
+executable code or caller-owned state. Their closures, services, and
+reference objects retain their own semantics. A read-only definition
+freezes the configuration record, not state inside those objects. Use
+[`agent_definition_write()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md)
+and
+[`agent_definition_read()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md)
+with explicit host registries for portable YAML;
+[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+alone is not a portable serializer for executable objects.
 
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
 # Define a code review agent
 code_reviewer <- agent_definition(
   name = "code_reviewer",
@@ -93,6 +130,18 @@ code_reviewer <- agent_definition(
   tools = list(tool_read_file, tool_list_files)
 )
 
+code_reviewer$name
+#> [1] "code_reviewer"
+fields <- S7::props(code_reviewer)
+fields$max_requests <- 3L
+do.call(agent_definition, fields)
+#> <AgentDefinition: code_reviewer >
+#>   description: Reviews code for bugs, style issues, and best practices
+#>   tools: 2
+#>   skills: 0
+#>   model: inherit
+
+if (FALSE) { # \dontrun{
 # Use with a lead agent
 lead <- LeadAgent$new(
   chat = ellmer::chat("openai/gpt-5.6-luna"),

@@ -115,7 +115,8 @@ and skill must match exactly one entry in its supplied registry.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p><code>agent_definition_read()</code> returns an <code>AgentDefinition</code>.
+    <p><code>agent_definition_read()</code> returns a read-only <code>AgentDefinition</code>
+S7 value.
 <code>agent_definition_write()</code> invisibly returns <code>path</code>.
 <code>agent_definitions()</code> returns a named list of definitions keyed by their
 canonical routing names, ready for <code>LeadAgent$new(sub_agents = ...)</code>.

@@ -59,8 +59,8 @@ agent_definitions(
 
 ## Value
 
-`agent_definition_read()` returns an `AgentDefinition`.
-`agent_definition_write()` invisibly returns `path`.
+`agent_definition_read()` returns a read-only `AgentDefinition` S7
+value. `agent_definition_write()` invisibly returns `path`.
 `agent_definitions()` returns a named list of definitions keyed by their
 canonical routing names, ready for `LeadAgent$new(sub_agents = ...)`. A
 missing discovery directory returns an empty list. Invalid files or

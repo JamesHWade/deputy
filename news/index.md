@@ -2,6 +2,16 @@
 
 ## deputy (development version)
 
+- [`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
+  and
+  [`AgentDefinition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
+  now construct the same read-only S7 value. Use
+  [`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+  to prepare a revised definition. Routing names, tool and skill
+  registry identity, YAML version 1, and delegated permission and
+  request limits retain their existing behavior
+  ([\#125](https://github.com/JamesHWade/deputy/issues/125)).
+
 - [`AgentUsage()`](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
   and
   [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)

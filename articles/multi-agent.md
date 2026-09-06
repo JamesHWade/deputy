@@ -116,9 +116,40 @@ lead$available_sub_agents()
 Names are trimmed and converted to lowercase by
 [`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md).
 A `LeadAgent` rejects duplicate normalized names at construction and
-registration. Its `sub_agent_defs` field returns a read-only snapshot;
-use `register_sub_agent()` so the registry and lead prompt stay
-synchronized.
+registration. Its `sub_agent_defs` field returns a list of read-only S7
+`AgentDefinition` values; use `register_sub_agent()` so the registry and
+lead prompt stay synchronized.
+[`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
+and
+[`AgentDefinition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
+are the same S7 constructor. To revise a definition, edit a plain
+property record and construct a new value:
+
+``` r
+
+library(deputy)
+reviewer <- agent_definition("Reviewer", "Reviews text", "Read carefully.")
+fields <- S7::props(reviewer)
+fields$name <- "limited-reviewer"
+fields$max_requests <- 2L
+limited_reviewer <- do.call(agent_definition, fields)
+limited_reviewer$name
+#> [1] "limited-reviewer"
+limited_reviewer$max_requests
+#> [1] 2
+# The original definition still has no request limit.
+reviewer$max_requests
+#> NULL
+```
+
+Read properties with `$`,
+[`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html), or
+`@`. Definitions compose original ellmer tools and caller-supplied Skill
+objects. Their closures, services, and mutable reference state remain
+caller-owned; a frozen definition does not make those objects immutable.
+[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+retains these objects, so use the YAML helpers and explicit registries
+below when you need a portable definition.
 
 ## Running a Delegation Task
 

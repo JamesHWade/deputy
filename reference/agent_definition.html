@@ -52,7 +52,7 @@ metadata about what the agent can do."><meta property="og:image" content="https:
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Create an Agent Definition</h1>
-      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/agents-multi.R" class="external-link"><code>R/agents-multi.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/agent-definition.R" class="external-link"><code>R/agent-definition.R</code></a></small>
       <div class="d-none name"><code>agent_definition.Rd</code></div>
     </div>
 
@@ -64,7 +64,22 @@ metadata about what the agent can do.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">agent_definition</span><span class="op">(</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">AgentDefinition</span><span class="op">(</span></span>
+<span>  <span class="va">name</span>,</span>
+<span>  <span class="va">description</span>,</span>
+<span>  <span class="va">prompt</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  model <span class="op">=</span> <span class="st">"inherit"</span>,</span>
+<span>  skills <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  disallowed_tools <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  memory <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  mcp_servers <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  initial_prompt <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  max_requests <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  permission_mode <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">agent_definition</span><span class="op">(</span></span>
 <span>  <span class="va">name</span>,</span>
 <span>  <span class="va">description</span>,</span>
 <span>  <span class="va">prompt</span>,</span>
@@ -138,13 +153,26 @@ Use <code>disallowed_tools</code> and <code>max_requests</code> for additional l
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>An <code>AgentDefinition</code> object</p>
+    <p>A read-only <code>AgentDefinition</code> S7 object</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>This is a read-only S7 value. <code>agent_definition()</code> is an alias of
+<code>AgentDefinition()</code>; both construct the same class. Read fields with <code>$</code>,
+<code><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">S7::prop()</a></code>, or <code>@</code>. <code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> returns a plain property list for
+constructing a revised value. Canonical names, limits, and other fields
+cannot be changed after construction, including through LeadAgent snapshots.</p>
+<p>Tools and Skill objects are composed directly, without cloning executable
+code or caller-owned state. Their closures, services, and reference objects
+retain their own semantics. A read-only definition freezes the configuration
+record, not state inside those objects. Use <code><a href="agent_definition_read.html">agent_definition_write()</a></code> and
+<code><a href="agent_definition_read.html">agent_definition_read()</a></code> with explicit host registries for portable YAML;
+<code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> alone is not a portable serializer for executable objects.</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
-<span class="r-in"><span><span class="co"># Define a code review agent</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Define a code review agent</span></span></span>
 <span class="r-in"><span><span class="va">code_reviewer</span> <span class="op">&lt;-</span> <span class="fu">agent_definition</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  name <span class="op">=</span> <span class="st">"code_reviewer"</span>,</span></span>
 <span class="r-in"><span>  description <span class="op">=</span> <span class="st">"Reviews code for bugs, style issues, and best practices"</span>,</span></span>
@@ -152,6 +180,18 @@ Use <code>disallowed_tools</code> and <code>max_requests</code> for additional l
 <span class="r-in"><span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">tool_read_file</span>, <span class="va">tool_list_files</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="va">code_reviewer</span><span class="op">$</span><span class="va">name</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "code_reviewer"</span>
+<span class="r-in"><span><span class="va">fields</span> <span class="op">&lt;-</span> <span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">props</a></span><span class="op">(</span><span class="va">code_reviewer</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">fields</span><span class="op">$</span><span class="va">max_requests</span> <span class="op">&lt;-</span> <span class="fl">3L</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">agent_definition</span>, <span class="va">fields</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;AgentDefinition: code_reviewer &gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   description: Reviews code for bugs, style issues, and best practices</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   tools: 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   skills: 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   model: inherit</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="co"># Use with a lead agent</span></span></span>
 <span class="r-in"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span></span>
