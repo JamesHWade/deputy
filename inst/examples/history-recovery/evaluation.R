@@ -62,6 +62,10 @@ history_score <- function(answer, fixture) {
   )
 }
 
+history_usage_record <- function(usage) {
+  if (is.null(usage)) NULL else S7::props(usage)
+}
+
 history_budget <- function(
   max_cost_usd = NULL,
   max_requests = 100L,
@@ -94,6 +98,7 @@ history_budget <- function(
         class(attempt$condition)
       }
       attempt$condition <- NULL
+      attempt$usage <- history_usage_record(attempt$usage)
       attempt
     })
   }
@@ -177,7 +182,7 @@ history_budget <- function(
           method = event$method,
           turns_compacted = event$turns_compacted,
           turns_kept = event$turns_kept,
-          usage = event$usage,
+          usage = history_usage_record(event$usage),
           attempts = clean_attempts(event$attempts),
           condition_class = if (is.null(event$condition)) {
             NULL
@@ -193,6 +198,7 @@ history_budget <- function(
     }
     if (!is.null(compaction)) {
       compaction$attempts <- clean_attempts(compaction$attempts)
+      compaction$usage <- history_usage_record(compaction$usage)
     }
     state$records[[length(state$records) + 1L]] <- list(
       label = label,
@@ -200,7 +206,7 @@ history_budget <- function(
       run_id = result$run_id,
       session_id = result$session_id,
       stop_reason = result$stop_reason,
-      usage = result$usage,
+      usage = history_usage_record(result$usage),
       duration_seconds = result$duration,
       error_class = failure,
       response = result$response,
@@ -478,7 +484,7 @@ history_continue <- function(
     attempted_exports = attempts,
     history_audit = access$audit(),
     history_usage = access$usage(),
-    usage = result$usage,
+    usage = history_usage_record(result$usage),
     duration_seconds = result$duration,
     stop_reason = result$stop_reason,
     error_class = outcome$error_class

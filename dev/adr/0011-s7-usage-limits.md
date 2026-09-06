@@ -79,6 +79,12 @@ Session schema version 2 is unchanged: it persists conversation and evidence,
 not usage limits or an active run's spent budget. Restoring a session keeps the
 receiver's limits and obtains usage from the restored provider turns.
 
+The external history-recovery experiment projects usage in run records, trial
+rows, events, compactions, and summary attempts to plain properties before
+writing JSON. Its manifest remains serializable without registering a global
+jsonlite method or persisting internal provider evidence attributes. JSON
+round-trip tests retain metric values and unknown costs as null rather than zero.
+
 Regression tests cover read-only and bulk assignment, plain projections,
 rejection of S3 lookalikes, unknown and zero costs, compaction accounting,
 default inheritance, parallel allocation, and delegated reservations. Existing

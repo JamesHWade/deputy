@@ -331,10 +331,16 @@ for (scenario in c("original", "changed-constraint")) {
     }
     expect_gt(evaluation$usage$requests, 16L)
     expect_gt(evaluation$usage$cost_usd, 0)
-    expect_type(
-      jsonlite::toJSON(evaluation, auto_unbox = TRUE, null = "null"),
-      "character"
+    json <- jsonlite::toJSON(
+      evaluation,
+      auto_unbox = TRUE,
+      null = "null",
+      na = "null"
     )
+    expect_type(json, "character")
+    saved <- jsonlite::fromJSON(json, simplifyVector = FALSE)
+    expect_equal(saved$runs[[1L]]$usage, evaluation$runs[[1L]]$usage)
+    expect_equal(saved$trials[[1L]]$usage, evaluation$trials[[1L]]$usage)
   })
 }
 
@@ -414,6 +420,16 @@ test_that("experiment interruption retains evidence and prevents later dispatch"
   expect_identical(unknown$usage$cost_usd, NA_real_)
   expect_length(unknown$runs, 1L)
   expect_length(server$requests(), 2L)
+  saved <- jsonlite::fromJSON(
+    jsonlite::toJSON(unknown, auto_unbox = TRUE, null = "null", na = "null"),
+    simplifyVector = FALSE
+  )
+  expect_identical(saved$runs[[1L]]$usage$cost_usd, NULL)
+  expect_contains(names(saved$runs[[1L]]$usage), "cost_usd")
+  expect_equal(
+    saved$runs[[1L]]$usage$requests,
+    unknown$runs[[1L]]$usage$requests
+  )
 })
 
 
