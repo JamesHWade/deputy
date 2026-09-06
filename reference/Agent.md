@@ -762,7 +762,9 @@ Return the most recent compaction outcome.
 
 #### Returns
 
-A `DeputyCompaction`, or `NULL` before compaction occurs.
+A read-only
+[DeputyCompaction](https://jameshwade.github.io/deputy/reference/DeputyCompaction.md)
+S7 value, or `NULL` before compaction occurs.
 
 ------------------------------------------------------------------------
 
@@ -1548,7 +1550,9 @@ explicitly configured. The returned object records that degraded method.
 
 #### Returns
 
-A `DeputyCompaction` describing the method and usage.
+A read-only
+[DeputyCompaction](https://jameshwade.github.io/deputy/reference/DeputyCompaction.md)
+S7 value describing the method and usage.
 
 ------------------------------------------------------------------------
 

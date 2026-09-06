@@ -137,7 +137,7 @@ its active Chat and <code>fallback</code> policy. Templates are cloned at constr
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code>ContextPolicy</code> object.</p>
+    <p>A read-only <code>ContextPolicy</code> S7 object.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -154,8 +154,32 @@ An accepted summary remains installed when the budget prevents task dispatch.
 usage, and original condition. Summaries are internal context, not task output.
 This policy does not archive removed turns or restore runtime permissions
 from a summary.</p>
+<p>This is a read-only S7 value. Use <code>$</code> or <code><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">S7::prop()</a></code> to read properties,
+and construct a new policy to change configuration. <code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> returns
+a plain property list, but nested Chats retain reference semantics. The
+constructor and an Agent's policy getter clone templates; changing a caller's
+Chat or a returned policy's Chat does not change the Agent's destinations.
+Summary dispatch clears tools, history, prompts, and callbacks on its clone.
+Policies containing Chats are runtime configuration, not portable credentials
+or session state. Session restore keeps the receiving Agent's policy.</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu">ContextPolicy</span><span class="op">(</span>max_tokens <span class="op">=</span> <span class="fl">16000</span>, fallback <span class="op">=</span> <span class="st">"text"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">policy</span><span class="op">$</span><span class="va">max_tokens</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 16000</span>
+<span class="r-in"><span><span class="va">settings</span> <span class="op">&lt;-</span> <span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">props</a></span><span class="op">(</span><span class="va">policy</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">settings</span><span class="op">$</span><span class="va">max_tokens</span> <span class="op">&lt;-</span> <span class="fl">24000L</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">ContextPolicy</span>, <span class="va">settings</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;ContextPolicy&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   compact at: 24000 tokens</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   compact to: 50%</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   fallback: text</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   summary fallback Chats: 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   offload above: 65536 bytes</span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 

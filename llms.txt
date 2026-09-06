@@ -155,6 +155,8 @@ Run a task and inspect its response, tool calls, and usage.
   : Configure run-scoped usage limits
 - [`ContextPolicy()`](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
   : Configure automatic context management
+- [`DeputyCompaction()`](https://jameshwade.github.io/deputy/reference/DeputyCompaction.md)
+  : Record a conversation compaction outcome
 
 ## Tools
 

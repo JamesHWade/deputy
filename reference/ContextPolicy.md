@@ -80,7 +80,7 @@ ContextPolicy(
 
 ## Value
 
-A `ContextPolicy` object.
+A read-only `ContextPolicy` S7 object.
 
 ## Details
 
@@ -99,3 +99,32 @@ prevents task dispatch. `$last_compaction()` includes `run_id` and
 summary `attempts` with destination, usage, and original condition.
 Summaries are internal context, not task output. This policy does not
 archive removed turns or restore runtime permissions from a summary.
+
+This is a read-only S7 value. Use `$` or
+[`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html) to
+read properties, and construct a new policy to change configuration.
+[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+returns a plain property list, but nested Chats retain reference
+semantics. The constructor and an Agent's policy getter clone templates;
+changing a caller's Chat or a returned policy's Chat does not change the
+Agent's destinations. Summary dispatch clears tools, history, prompts,
+and callbacks on its clone. Policies containing Chats are runtime
+configuration, not portable credentials or session state. Session
+restore keeps the receiving Agent's policy.
+
+## Examples
+
+``` r
+policy <- ContextPolicy(max_tokens = 16000, fallback = "text")
+policy$max_tokens
+#> [1] 16000
+settings <- S7::props(policy)
+settings$max_tokens <- 24000L
+do.call(ContextPolicy, settings)
+#> <ContextPolicy>
+#>   compact at: 24000 tokens
+#>   compact to: 50%
+#>   fallback: text
+#>   summary fallback Chats: 0
+#>   offload above: 65536 bytes
+```

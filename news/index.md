@@ -42,6 +42,17 @@
   `event$data` exposes the payload and flat `$` reads remain available
   ([\#59](https://github.com/JamesHWade/deputy/issues/59)).
 
+- [`ContextPolicy()`](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
+  and
+  [`DeputyCompaction()`](https://jameshwade.github.io/deputy/reference/DeputyCompaction.md)
+  now create read-only S7 values. Read properties with `$` or
+  [`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html)
+  and use
+  [`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+  for explicit reporting. Summary Chat isolation, fallback destinations,
+  and original provider conditions are preserved
+  ([\#123](https://github.com/JamesHWade/deputy/issues/123)).
+
 - Object summaries use cli formatting, wrap at the configured terminal
   width, and preserve literal braces in user values and stdout capture
   ([\#58](https://github.com/JamesHWade/deputy/issues/58)).
