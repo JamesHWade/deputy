@@ -1,4 +1,4 @@
-#' @include value-properties.R
+#' @include value-properties.R run-usage.R
 NULL
 
 # Agent result and event types for deputy
@@ -126,7 +126,7 @@ S7::method(print, AgentEvent) <- function(x, ...) {
     fields <- names(x@data)
     for (field in fields) {
       value <- x@data[[field]]
-      if (inherits(value, "AgentUsage")) {
+      if (S7::S7_inherits(value, AgentUsage)) {
         value <- paste0(
           "requests=",
           value$requests,
@@ -137,10 +137,10 @@ S7::method(print, AgentEvent) <- function(x, ...) {
           ", cost_usd=",
           format_cost(value$cost_usd)
         )
-      } else if (inherits(value, "UsageLimits")) {
+      } else if (S7::S7_inherits(value, UsageLimits)) {
         configured <- Filter(
           Negate(is.null),
-          value[setdiff(names(value), "on_exceed")]
+          S7::props(value)[setdiff(names(S7::props(value)), "on_exceed")]
         )
         value <- paste0(
           paste(
@@ -230,7 +230,7 @@ AgentResult <- S7::new_class(
     ),
     usage = readonly_property(
       "usage",
-      S7::new_union(NULL, S7::new_S3_class("AgentUsage"))
+      S7::new_union(NULL, AgentUsage)
     ),
     agent_id = readonly_property(
       "agent_id",

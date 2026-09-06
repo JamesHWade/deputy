@@ -188,3 +188,119 @@ test_that("serialized S7 values dispatch after loading Deputy in a fresh process
   expect_identical(result$matches, TRUE)
   expect_identical(result$frozen, TRUE)
 })
+
+test_that("serialized usage values retain incomplete-cost evidence and limits", {
+  path <- withr::local_tempfile(fileext = ".rds")
+  turns <- list(create_mock_assistant_turn(cost = NA_real_))
+  costs <- NA_real_
+  chat <- create_mock_chat()
+  chat$get_turns <- function() turns
+  chat$get_tokens <- function() {
+    data.frame(input = 8, output = 2, cached_input = 0, cost = costs)
+  }
+  baseline <- agent_usage_snapshot(chat)
+  turns <- c(turns, list(create_mock_assistant_turn(cost = 0)))
+  costs <- c(costs, 0)
+  current <- agent_usage_snapshot(chat)
+  limits <- UsageLimits(max_requests = 0, max_cost_usd = 1, on_exceed = "error")
+  saveRDS(
+    list(
+      baseline = baseline,
+      current = current,
+      limits = limits,
+      result = AgentResult(
+        usage = current,
+        events = list(AgentEvent("usage", usage = current, limits = limits))
+      )
+    ),
+    path
+  )
+  restored <- callr::r(
+    function(path, package_path) {
+      if (file.exists(file.path(package_path, "R", "agent.R"))) {
+        pkgload::load_all(package_path, quiet = TRUE)
+      } else {
+        library(deputy, lib.loc = dirname(package_path))
+      }
+      values <- readRDS(path)
+      difference <- getFromNamespace("agent_usage_difference", "deputy")
+      status <- getFromNamespace("usage_limit_status", "deputy")
+      frozen <- function(value, field, replacement) {
+        tryCatch(
+          {
+            S7::prop(value, field) <- replacement
+            FALSE
+          },
+          error = function(error) grepl("read-only", conditionMessage(error))
+        )
+      }
+      list(
+        usage_class = S7::S7_inherits(values$current, AgentUsage),
+        limits_class = S7::S7_inherits(values$limits, UsageLimits),
+        properties = S7::props(values$current),
+        limits = S7::props(values$limits),
+        delta = S7::props(difference(values$current, values$baseline)),
+        provider_cost_records = attr(values$current, "provider_cost_records"),
+        provider_usage_totals = attr(values$current, "provider_usage_totals"),
+        cost_status = status(
+          values$current,
+          UsageLimits(max_cost_usd = 1)
+        )$reason,
+        result_usage = S7::props(values$result$usage),
+        event_usage = S7::props(values$result$events[[1L]]$usage),
+        event_output = capture.output(print(values$result$events[[1L]])),
+        usage_output = capture.output(print(values$current)),
+        limits_output = capture.output(print(values$limits)),
+        usage_frozen = frozen(values$current, "cost_usd", 0),
+        limits_frozen = frozen(values$limits, "max_tool_calls", 1L)
+      )
+    },
+    args = list(
+      path = path,
+      package_path = getNamespaceInfo(asNamespace("deputy"), "path")
+    )
+  )
+  expect_identical(restored$usage_class, TRUE)
+  expect_identical(restored$limits_class, TRUE)
+  expect_identical(restored$properties, S7::props(current))
+  expect_identical(restored$limits, S7::props(limits))
+  expect_equal(
+    restored$delta,
+    S7::props(AgentUsage(
+      requests = 1,
+      input_tokens = 8,
+      output_tokens = 2,
+      cost_usd = 0
+    ))
+  )
+  expect_identical(restored$provider_cost_records, c(NA_real_, 0))
+  expect_equal(
+    restored$provider_usage_totals,
+    c(input = 16, output = 4, cached = 0)
+  )
+  expect_identical(restored$cost_status, "cost_unavailable")
+  expect_identical(restored$result_usage, S7::props(current))
+  expect_identical(restored$event_usage, S7::props(current))
+  expect_match(
+    paste(restored$event_output, collapse = "\n"),
+    "requests=2",
+    fixed = TRUE
+  )
+  expect_match(
+    paste(restored$event_output, collapse = "\n"),
+    "max_requests=0",
+    fixed = TRUE
+  )
+  expect_match(
+    paste(restored$usage_output, collapse = "\n"),
+    "<AgentUsage>",
+    fixed = TRUE
+  )
+  expect_match(
+    paste(restored$limits_output, collapse = "\n"),
+    "max_requests: 0",
+    fixed = TRUE
+  )
+  expect_identical(restored$usage_frozen, TRUE)
+  expect_identical(restored$limits_frozen, TRUE)
+})

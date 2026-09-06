@@ -74,7 +74,7 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
         list(
           run_id = result$run_id,
           session_id = result$session_id,
-          usage = unclass(result$usage),
+          usage = S7::props(result$usage),
           events = result$events
         )
       })

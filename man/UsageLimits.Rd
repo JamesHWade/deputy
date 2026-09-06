@@ -42,7 +42,7 @@ stops the run with \code{"cost_unavailable"} rather than undercounting.}
 event and then signals a structured Deputy limit error.}
 }
 \value{
-A \code{UsageLimits} object.
+A read-only \code{UsageLimits} S7 object.
 }
 \description{
 \code{UsageLimits()} defines run-scoped stop conditions for one call to \link{Agent}
@@ -56,6 +56,11 @@ stops after an overage is observed and can exceed a threshold by one
 response. A \code{NULL} field leaves that limit unset on this object; when the
 object configures or overrides an \link{Agent}, Deputy may fill unset fields from
 the agent's defaults.
+
+This is a read-only S7 value. Read fields with \code{$} or \code{S7::prop()}; use
+\code{S7::props()} for a plain named-list snapshot. Construct a new value to
+change limits. Per-run overrides fill unset fields from the Agent defaults;
+delegated budgets are intersected with the lead's remaining allowance.
 }
 \examples{
 UsageLimits(max_requests = 5, max_tool_calls = 10)

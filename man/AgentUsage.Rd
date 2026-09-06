@@ -30,12 +30,17 @@ reported separately and are not added again to \code{total_tokens}.}
 when the provider did not report complete cost information.}
 }
 \value{
-An \code{AgentUsage} object.
+A read-only \code{AgentUsage} S7 object.
 }
 \description{
 \code{AgentUsage()} creates a normalized usage record. \code{AgentResult$usage} and
 run \code{usage}/\code{stop} events are scoped to that run, while \link{Agent}\verb{$usage()}
 describes the complete in-memory conversation at the time it is called.
+
+This is a read-only S7 value. Its \code{total_tokens} property is calculated from
+input plus output tokens at construction. Read properties
+with \code{$} or \code{S7::prop()}; \code{S7::props()} returns a plain named-list snapshot
+for reporting or serialization. Construct a new value for different usage.
 }
 \examples{
 AgentUsage(
@@ -45,4 +50,13 @@ AgentUsage(
   output_tokens = 30,
   cost_usd = 0.002
 )
+usage <- AgentUsage(input_tokens = 120, output_tokens = 30, cost_usd = NA_real_)
+usage$total_tokens
+S7::props(usage)
 }
+\section{Additional properties}{
+
+\describe{
+\item{\code{@total_tokens}}{Input plus output tokens, without adding cached input
+again. Read-only.}
+}}

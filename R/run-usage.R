@@ -1,3 +1,6 @@
+#' @include value-properties.R
+NULL
+
 # Run-scoped usage accounting and limits.
 
 #' Configure run-scoped usage limits
@@ -14,6 +17,11 @@
 #' response. A `NULL` field leaves that limit unset on this object; when the
 #' object configures or overrides an [Agent], Deputy may fill unset fields from
 #' the agent's defaults.
+#'
+#' This is a read-only S7 value. Read fields with `$` or `S7::prop()`; use
+#' `S7::props()` for a plain named-list snapshot. Construct a new value to
+#' change limits. Per-run overrides fill unset fields from the Agent defaults;
+#' delegated budgets are intersected with the lead's remaining allowance.
 #'
 #' @param max_requests Maximum governed model dispatches, including failed
 #'   calls, automatic compaction, structured extraction, and corrections. Retries
@@ -35,69 +43,92 @@
 #'   [AgentResult] with a typed stop reason; `"error"` emits the final usage
 #'   event and then signals a structured Deputy limit error.
 #'
-#' @return A `UsageLimits` object.
+#' @return A read-only `UsageLimits` S7 object.
 #' @examples
 #' UsageLimits(max_requests = 5, max_tool_calls = 10)
 #' UsageLimits(max_cost_usd = 0.25, on_exceed = "error")
 #' @export
-UsageLimits <- function(
-  max_requests = NULL,
-  max_tool_calls = NULL,
-  max_input_tokens = NULL,
-  max_output_tokens = NULL,
-  max_total_tokens = NULL,
-  max_cost_usd = NULL,
-  on_exceed = c("stop", "error")
-) {
-  on_exceed <- match.arg(on_exceed)
-
-  integer_limits <- list(
-    max_requests = max_requests,
-    max_tool_calls = max_tool_calls,
-    max_input_tokens = max_input_tokens,
-    max_output_tokens = max_output_tokens,
-    max_total_tokens = max_total_tokens
-  )
-  integer_limits <- lapply(
-    names(integer_limits),
-    function(name) {
-      validate_usage_limit(integer_limits[[name]], name, integer = TRUE)
-    }
-  )
-  names(integer_limits) <- c(
-    "max_requests",
-    "max_tool_calls",
-    "max_input_tokens",
-    "max_output_tokens",
-    "max_total_tokens"
-  )
-
-  max_cost_usd <- validate_usage_limit(
-    max_cost_usd,
-    "max_cost_usd",
-    integer = FALSE
-  )
-
-  structure(
-    c(
-      integer_limits,
-      list(max_cost_usd = max_cost_usd, on_exceed = on_exceed)
+UsageLimits <- S7::new_class(
+  "UsageLimits",
+  package = "deputy",
+  properties = list(
+    max_requests = readonly_property(
+      "max_requests",
+      S7::new_union(NULL, S7::class_integer)
     ),
-    class = c("UsageLimits", "list")
-  )
-}
+    max_tool_calls = readonly_property(
+      "max_tool_calls",
+      S7::new_union(NULL, S7::class_integer)
+    ),
+    max_input_tokens = readonly_property(
+      "max_input_tokens",
+      S7::new_union(NULL, S7::class_integer)
+    ),
+    max_output_tokens = readonly_property(
+      "max_output_tokens",
+      S7::new_union(NULL, S7::class_integer)
+    ),
+    max_total_tokens = readonly_property(
+      "max_total_tokens",
+      S7::new_union(NULL, S7::class_integer)
+    ),
+    max_cost_usd = readonly_property(
+      "max_cost_usd",
+      S7::new_union(NULL, S7::class_double)
+    ),
+    on_exceed = readonly_property("on_exceed", S7::class_character)
+  ),
+  constructor = function(
+    max_requests = NULL,
+    max_tool_calls = NULL,
+    max_input_tokens = NULL,
+    max_output_tokens = NULL,
+    max_total_tokens = NULL,
+    max_cost_usd = NULL,
+    on_exceed = c("stop", "error")
+  ) {
+    on_exceed <- match.arg(on_exceed)
+    value <- S7::new_object(
+      S7::S7_object(),
+      max_requests = validate_usage_limit(max_requests, "max_requests"),
+      max_tool_calls = validate_usage_limit(max_tool_calls, "max_tool_calls"),
+      max_input_tokens = validate_usage_limit(
+        max_input_tokens,
+        "max_input_tokens"
+      ),
+      max_output_tokens = validate_usage_limit(
+        max_output_tokens,
+        "max_output_tokens"
+      ),
+      max_total_tokens = validate_usage_limit(
+        max_total_tokens,
+        "max_total_tokens"
+      ),
+      max_cost_usd = validate_usage_limit(
+        max_cost_usd,
+        "max_cost_usd",
+        integer = FALSE
+      ),
+      on_exceed = on_exceed
+    )
+    freeze_value(value)
+  }
+)
 
-#' @export
-print.UsageLimits <- function(x, ...) {
+local({
+  S7::method(`$`, UsageLimits) <- function(x, name) S7::prop(x, name)
+})
+
+S7::method(print, UsageLimits) <- function(x, ...) {
   cli::cat_line(cli::cli_format_method({
     cli::cli_text("<UsageLimits>")
     cli::cli_div(theme = list(div = list("margin-left" = 2)))
-    fields <- setdiff(names(x), "on_exceed")
+    fields <- setdiff(names(S7::props(x)), "on_exceed")
     for (field in fields) {
-      value <- x[[field]]
+      value <- S7::prop(x, field)
       cli::cli_text("{field}: {value %||% \"unlimited\"}")
     }
-    cli::cli_text("on_exceed: {x$on_exceed}")
+    cli::cli_text("on_exceed: {x@on_exceed}")
   }))
   invisible(x)
 }
@@ -109,6 +140,11 @@ print.UsageLimits <- function(x, ...) {
 #' run `usage`/`stop` events are scoped to that run, while [Agent]`$usage()`
 #' describes the complete in-memory conversation at the time it is called.
 #'
+#' This is a read-only S7 value. Its `total_tokens` property is calculated from
+#' input plus output tokens at construction. Read properties
+#' with `$` or `S7::prop()`; `S7::props()` returns a plain named-list snapshot
+#' for reporting or serialization. Construct a new value for different usage.
+#'
 #' @param requests Number of model requests attributed to the run.
 #' @param tool_calls Number of requested tool calls, including calls rejected
 #'   before execution.
@@ -119,7 +155,9 @@ print.UsageLimits <- function(x, ...) {
 #' @param cost_usd Provider-reported estimated cost in US dollars, or `NA_real_`
 #'   when the provider did not report complete cost information.
 #'
-#' @return An `AgentUsage` object.
+#' @prop total_tokens Input plus output tokens, without adding cached input
+#'   again. Read-only.
+#' @return A read-only `AgentUsage` S7 object.
 #' @examples
 #' AgentUsage(
 #'   requests = 2,
@@ -128,35 +166,46 @@ print.UsageLimits <- function(x, ...) {
 #'   output_tokens = 30,
 #'   cost_usd = 0.002
 #' )
+#' usage <- AgentUsage(input_tokens = 120, output_tokens = 30, cost_usd = NA_real_)
+#' usage$total_tokens
+#' S7::props(usage)
 #' @export
-AgentUsage <- function(
-  requests = 0L,
-  tool_calls = 0L,
-  input_tokens = 0,
-  output_tokens = 0,
-  cached_tokens = 0,
-  cost_usd = 0
-) {
-  requests <- validate_agent_usage_value(requests, "requests", integer = TRUE)
-  tool_calls <- validate_agent_usage_value(
-    tool_calls,
-    "tool_calls",
-    integer = TRUE
-  )
-  input_tokens <- validate_agent_usage_value(input_tokens, "input_tokens")
-  output_tokens <- validate_agent_usage_value(output_tokens, "output_tokens")
-  cached_tokens <- validate_agent_usage_value(
-    cached_tokens,
-    "cached_tokens"
-  )
-  cost_usd <- validate_agent_usage_value(
-    cost_usd,
-    "cost_usd",
-    allow_unknown = TRUE
-  )
-
-  structure(
-    list(
+AgentUsage <- S7::new_class(
+  "AgentUsage",
+  package = "deputy",
+  properties = list(
+    requests = readonly_property("requests", S7::class_integer),
+    tool_calls = readonly_property("tool_calls", S7::class_integer),
+    input_tokens = readonly_property("input_tokens", S7::class_double),
+    output_tokens = readonly_property("output_tokens", S7::class_double),
+    cached_tokens = readonly_property("cached_tokens", S7::class_double),
+    total_tokens = readonly_property("total_tokens", S7::class_double),
+    cost_usd = readonly_property("cost_usd", S7::class_double)
+  ),
+  constructor = function(
+    requests = 0L,
+    tool_calls = 0L,
+    input_tokens = 0,
+    output_tokens = 0,
+    cached_tokens = 0,
+    cost_usd = 0
+  ) {
+    requests <- validate_agent_usage_value(requests, "requests", integer = TRUE)
+    tool_calls <- validate_agent_usage_value(
+      tool_calls,
+      "tool_calls",
+      integer = TRUE
+    )
+    input_tokens <- validate_agent_usage_value(input_tokens, "input_tokens")
+    output_tokens <- validate_agent_usage_value(output_tokens, "output_tokens")
+    cached_tokens <- validate_agent_usage_value(cached_tokens, "cached_tokens")
+    cost_usd <- validate_agent_usage_value(
+      cost_usd,
+      "cost_usd",
+      allow_unknown = TRUE
+    )
+    value <- S7::new_object(
+      S7::S7_object(),
       requests = requests,
       tool_calls = tool_calls,
       input_tokens = input_tokens,
@@ -164,10 +213,14 @@ AgentUsage <- function(
       cached_tokens = cached_tokens,
       total_tokens = input_tokens + output_tokens,
       cost_usd = cost_usd
-    ),
-    class = c("AgentUsage", "list")
-  )
-}
+    )
+    freeze_value(value)
+  }
+)
+
+local({
+  S7::method(`$`, AgentUsage) <- function(x, name) S7::prop(x, name)
+})
 
 validate_agent_usage_value <- function(
   value,
@@ -286,16 +339,15 @@ assistant_turn_tokens <- function(turns) {
   )
 }
 
-#' @export
-print.AgentUsage <- function(x, ...) {
+S7::method(print, AgentUsage) <- function(x, ...) {
   cli::cat_line(cli::cli_format_method({
     cli::cli_text("<AgentUsage>")
     cli::cli_div(theme = list(div = list("margin-left" = 2)))
-    cli::cli_text("requests: {x$requests}")
-    cli::cli_text("tool_calls: {x$tool_calls}")
-    cli::cli_text("tokens: {x$total_tokens}")
-    cli::cli_text("cached_tokens: {x$cached_tokens}")
-    cli::cli_text("cost_usd: {format_cost(x$cost_usd)}")
+    cli::cli_text("requests: {x@requests}")
+    cli::cli_text("tool_calls: {x@tool_calls}")
+    cli::cli_text("tokens: {x@total_tokens}")
+    cli::cli_text("cached_tokens: {x@cached_tokens}")
+    cli::cli_text("cost_usd: {format_cost(x@cost_usd)}")
   }))
   invisible(x)
 }
@@ -328,28 +380,28 @@ validate_usage_limit <- function(value, name, integer = TRUE) {
 }
 
 merge_usage_limits <- function(override, defaults) {
-  if (!inherits(override, "UsageLimits")) {
+  if (!S7::S7_inherits(override, UsageLimits)) {
     cli::cli_abort("{.arg usage_limits} must be created with UsageLimits()")
   }
-  if (!inherits(defaults, "UsageLimits")) {
+  if (!S7::S7_inherits(defaults, UsageLimits)) {
     cli::cli_abort("{.arg defaults} must be created with UsageLimits()")
   }
 
-  resolved <- override
-  limit_fields <- setdiff(names(defaults), "on_exceed")
+  resolved <- S7::props(override)
+  limit_fields <- setdiff(names(resolved), "on_exceed")
   for (field in limit_fields) {
     if (is.null(resolved[[field]])) {
-      resolved[[field]] <- defaults[[field]]
+      resolved[field] <- list(S7::prop(defaults, field))
     }
   }
-  resolved
+  do.call(UsageLimits, resolved)
 }
 
 normalize_usage_limits <- function(limits) {
   if (is.null(limits)) {
     return(UsageLimits(max_requests = 25))
   }
-  if (!inherits(limits, "UsageLimits")) {
+  if (!S7::S7_inherits(limits, UsageLimits)) {
     cli::cli_abort("{.arg usage_limits} must be created with UsageLimits()")
   }
   limits
@@ -459,8 +511,14 @@ preserve_run_usage <- function(agent, usage) {
     return(invisible(NULL))
   }
   private <- agent$.__enclos_env__$private
-  usage$tool_calls <- usage$tool_calls - private$current_tool_calls
-  private$current_external_usage <- usage
+  private$current_external_usage <- AgentUsage(
+    requests = usage@requests,
+    tool_calls = usage@tool_calls - private$current_tool_calls,
+    input_tokens = usage@input_tokens,
+    output_tokens = usage@output_tokens,
+    cached_tokens = usage@cached_tokens,
+    cost_usd = usage@cost_usd
+  )
   private$current_outer_requests <- 0L
   private$current_usage_baseline <- agent_usage_snapshot(private$.chat)
   invisible(NULL)
@@ -513,7 +571,7 @@ usage_limit_status <- function(usage, limits, require_followup = FALSE) {
   )
 
   for (check in checks) {
-    limit <- limits[[check$field]]
+    limit <- S7::prop(limits, check$field)
     if (is.null(limit)) {
       next
     }

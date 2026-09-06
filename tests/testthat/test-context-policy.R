@@ -161,7 +161,7 @@ test_that("LLM compaction reports its own usage", {
   compaction <- agent$compact(keep_last = 1L)
 
   expect_identical(compaction$method, "llm")
-  expect_s3_class(compaction$usage, "AgentUsage")
+  expect_s7_class(compaction$usage, AgentUsage)
   expect_equal(compaction$usage$total_tokens, 150)
   expect_equal(compaction$usage$cost_usd, 0.001)
 })

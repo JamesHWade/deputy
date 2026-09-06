@@ -97,7 +97,8 @@ Validation uses released ellmer 0.5.0 and S7 0.2.2. The PR records full suite,
 installed-package, documentation, and remote CI results for its exact head.
 The declared R 4.1 floor is unchanged; the local gates do not directly test R 4.1.
 
-Skill, AgentUsage, UsageLimits, ContextPolicy, definitions, and other result
-records remain separate migration work under ADR-0009, tracked in
+AgentUsage and UsageLimits subsequently migrated under
+[ADR-0011](0011-s7-usage-limits.md). Skill, ContextPolicy, definitions, and other
+result records remain separate migration work under ADR-0009, tracked in
 [issue #119](https://github.com/JamesHWade/deputy/issues/119). Mutable runtime
 owners remain R6.
