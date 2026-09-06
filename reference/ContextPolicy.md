@@ -41,7 +41,25 @@ ContextPolicy(
 - max_tool_result_bytes:
 
   Serialized size above which a tool result is stored outside the model
-  context. Use `NULL` to disable result offloading.
+  context. Use `NULL` to disable result offloading. Compaction applies
+  this limit to the public evidence in explicit
+  [`ellmer::ContentToolResult`](https://ellmer.tidyverse.org/reference/Content.html)
+  payloads too, retaining a preview and recoverable reference. Large
+  tool-request arguments use the same bound and retain a recoverable
+  argument record. Content objects and error conditions use their public
+  text. A conservative rendered-size bound also covers compact sequences
+  and shared strings before JSON expansion. Generated summaries retain
+  up to eight direct recovery references; larger sets use one durable,
+  chunk-readable catalog. Catalogs preserve earlier entries across
+  compactions and session restores, including existing references when
+  new result offloading is disabled. Superseded internal catalogs are
+  reclaimed after replacement, except those referenced by retained turns
+  or the installed prompt of a live Agent sharing that session directory
+  in the current R process, including independent Agents and clones.
+  Earlier saved sessions keep their own catalog snapshots. Original
+  result artifacts are retained. New evidence artifacts from aborted
+  compactions are removed unless another compaction or tool caller has
+  claimed them.
 
 - offload_dir:
 

@@ -711,7 +711,10 @@ emitted into model context.</p></dd>
 </dl><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-11">Returns<a class="anchor" aria-label="anchor" href="#returns-11"></a></h4>
-<p>The complete original R value.</p>
+<p>The complete stored R value. Content evidence offloaded during
+compaction uses its public text representation.
+Compaction may retire superseded internal catalog URIs after installing
+their replacement; saved sessions retain their catalog snapshots.</p>
 </div>
 
 </div>
