@@ -137,6 +137,8 @@ fields$name <- "limited-reviewer"
 fields$max_requests <- 2L
 limited_reviewer <- do.call(agent_definition, fields)
 limited_reviewer$name
+limited_reviewer$max_requests
+# The original definition still has no request limit.
 reviewer$max_requests
 ```
 
