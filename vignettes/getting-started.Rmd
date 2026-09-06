@@ -63,8 +63,9 @@ Each setting has one job:
   requests.
 - `usage_limits` stops the run after at most six model requests or eight tool
   calls.
-- `working_dir` sets the base for relative file paths. Replace `getwd()` with
-  your package's path if it is elsewhere.
+- `working_dir = workspace` sets the base for relative file paths. To inspect
+  a package elsewhere, replace `getwd()` in the `workspace <- normalizePath(...)`
+  line with that package's path.
 
 The read-only policy still allows access to files outside `working_dir` when
 the R process can read them. It is not a filesystem sandbox.

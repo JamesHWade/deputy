@@ -19,8 +19,10 @@ in the next step of your analysis.
 ## Extract directly
 
 Use `chat_structured()` when the conversation already contains the information
-to extract. It makes one structured request without calling ordinary tools,
+to extract. It requests structured output without calling ordinary tools,
 as ellmer does. `chat_structured_async()` returns a promise with the same value.
+Automatic compaction and optional validation corrections can add model requests;
+all count toward the run's usage limits.
 
 ```{r direct}
 agent <- Agent$new(ellmer::chat("openai/gpt-5.6-luna"))
@@ -49,7 +51,7 @@ from that conversation. Both phases share one run ID, hook lifecycle, permission
 policy, and request/token/cost budget. The extraction never repeats tool work.
 The `response` is the task's text; `structured_output` is the extracted value.
 Even a task without tools uses these two explicit phases; use
-`chat_structured()` for direct extraction in one request.
+`chat_structured()` to extract directly without the initial task phase.
 
 ```{r task}
 agent <- Agent$new(
