@@ -112,6 +112,31 @@ test_that("AgentResult text_chunks extracts correct events", {
   expect_equal(chunks[2], "world!")
 })
 
+test_that("result_text_chunks handles optional and non-scalar text payloads", {
+  missing <- list(
+    AgentEvent("text"),
+    AgentEvent("text", text = NULL),
+    AgentEvent("text", text = character()),
+    AgentEvent("text", text = 1),
+    AgentEvent("text", text = list("not a text vector"))
+  )
+  expect_identical(
+    result_text_chunks(AgentResult(events = missing)),
+    character()
+  )
+  result <- AgentResult(
+    events = c(
+      list(AgentEvent("text", text = "first")),
+      missing,
+      list(
+        AgentEvent("text", text = ""),
+        AgentEvent("text", text = c(a = "middle", b = "last"))
+      )
+    )
+  )
+  expect_identical(result_text_chunks(result), c("first", "", "middle", "last"))
+})
+
 test_that("AgentResult defaults are sensible", {
   result <- AgentResult()
 

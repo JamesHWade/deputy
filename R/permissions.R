@@ -368,14 +368,18 @@ S7::method(print, Permissions) <- function(x, ...) {
     cli::cli_text("bash: {x@bash}")
     cli::cli_text("r_code: {x@r_code}")
     cli::cli_text("web: {x@web}")
-    tool_allowlist <- if (length(x@tool_allowlist) == 0L) {
+    tool_allowlist <- if (is.null(x@tool_allowlist)) {
       "NULL"
+    } else if (length(x@tool_allowlist) == 0L) {
+      "character(0)"
     } else {
       paste(x@tool_allowlist, collapse = ", ")
     }
     cli::cli_text("tool_allowlist: {tool_allowlist}")
-    tool_denylist <- if (length(x@tool_denylist) == 0L) {
+    tool_denylist <- if (is.null(x@tool_denylist)) {
       "NULL"
+    } else if (length(x@tool_denylist) == 0L) {
+      "character(0)"
     } else {
       paste(x@tool_denylist, collapse = ", ")
     }

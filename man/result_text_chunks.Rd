@@ -11,6 +11,8 @@ result_text_chunks(result)
 }
 \value{
 Character vector of text chunks; empty when none were emitted.
+Missing and non-character text payloads are ignored. Character-vector
+payloads are flattened in event order.
 }
 \description{
 Inspect streamed text

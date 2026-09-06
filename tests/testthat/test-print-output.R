@@ -19,6 +19,39 @@ test_that("object summaries print user braces literally and return invisibly", {
   }
 })
 
+test_that("Permissions summaries distinguish absent and empty tool gates", {
+  withr::local_options(cli.width = 120, cli.num_colors = 1L)
+  unrestricted <- Permissions(tool_allowlist = NULL, tool_denylist = NULL)
+  empty <- Permissions(
+    tool_allowlist = character(),
+    tool_denylist = character()
+  )
+  for (gate in c("tool_allowlist", "tool_denylist")) {
+    expect_match(
+      paste(capture.output(print(unrestricted)), collapse = "\n"),
+      paste0(gate, ": NULL"),
+      fixed = TRUE
+    )
+    expect_match(
+      paste(capture.output(print(empty)), collapse = "\n"),
+      paste0(gate, ": character(0)"),
+      fixed = TRUE
+    )
+  }
+  expect_identical(
+    permissions_check(
+      unrestricted,
+      "read_file",
+      list(path = "test.txt")
+    )$decision,
+    "allow"
+  )
+  expect_identical(
+    permissions_check(empty, "read_file", list(path = "test.txt"))$decision,
+    "deny"
+  )
+})
+
 test_that("cli summaries wrap at the configured width and close their containers", {
   withr::local_options(cli.width = 36, cli.num_colors = 1L)
   result <- AgentResult(response = paste(rep("word", 10), collapse = " "))

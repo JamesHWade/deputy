@@ -396,6 +396,8 @@ S7::method(result_tool_results, AgentResult) <- function(result) {
 #'
 #' @param result An [AgentResult] S7 value.
 #' @return Character vector of text chunks; empty when none were emitted.
+#'   Missing and non-character text payloads are ignored. Character-vector
+#'   payloads are flattened in event order.
 #' @export
 result_text_chunks <- S7::new_generic(
   "result_text_chunks",
@@ -406,8 +408,12 @@ result_text_chunks <- S7::new_generic(
 )
 
 S7::method(result_text_chunks, AgentResult) <- function(result) {
-  text_events <- Filter(function(e) e$type == "text", result@events)
-  vapply(text_events, function(e) e$text, character(1))
+  text_events <- Filter(
+    function(e) e$type == "text" && is.character(e$text),
+    result@events
+  )
+  unlist(lapply(text_events, function(e) e$text), use.names = FALSE) %||%
+    character()
 }
 
 #' Inspect run success
