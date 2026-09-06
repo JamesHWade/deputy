@@ -534,8 +534,9 @@ LeadAgent <- R6::R6Class(
     #' @description
     #' Print the lead agent.
     print = function() {
+      super$print()
       cli::cat_line(cli::cli_format_method({
-        super$print()
+        cli::cli_div(theme = list(div = list("margin-left" = 2)))
         cli::cli_text("sub_agents: {length(private$.sub_agent_defs)}")
         if (length(private$.sub_agent_defs) > 0) {
           names <- self$available_sub_agents()

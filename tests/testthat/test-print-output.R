@@ -46,5 +46,8 @@ test_that("other summaries keep stdout and invisible return contracts", {
     expect_gt(length(output), 0L)
     expect_identical(result$visible, FALSE)
     expect_identical(result$value, object)
+    if (inherits(object, "LeadAgent")) {
+      expect_match(paste(output, collapse = "\n"), "\n  sub_agents: 0")
+    }
   }
 })
