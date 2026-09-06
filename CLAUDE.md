@@ -172,7 +172,8 @@ minimum version or adopting an unreleased API.
 - **Documentation**: roxygen2 with markdown support
 - **Classes**: Use S7 for value contracts and R6 for mutable runtime owners.
   `HookMatcher(...)`, `AgentEvent(...)`, `AgentResult(...)`, `Permissions(...)`,
-  `AgentUsage(...)`, and `UsageLimits(...)` are read-only S7 values. Use
+  `AgentUsage(...)`, `UsageLimits(...)`, `ContextPolicy(...)`, and
+  `DeputyCompaction(...)` are read-only S7 values. Use
   `hook_matches()`, `permissions_check()`, and `result_*()` inspection functions.
   `$` reads on events, results, policies, usage, and limits are property
   conveniences; there are no R6 constructor or method facades for these values.
@@ -182,6 +183,9 @@ minimum version or adopting an unreleased API.
   and the AgentResult/Permissions migration. ADR-0011 records accounting,
   budget construction, and persistence for usage and limits; use `S7::props()`
   for plain property records and construct new values when accounting changes.
+  ADR-0012 records ContextPolicy template isolation, compaction evidence, and
+  reporting projections. Nested summary Chats and provider conditions retain
+  reference semantics; policy construction and Agent getters clone templates.
 - **Printing**: Format summaries with `cli::cli_format_method()` and write the
   resulting lines with `cli::cat_line()` so printing remains on stdout. Pass
   user strings as interpolated values, never as cli templates, and return the

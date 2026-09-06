@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* `ContextPolicy()` and `DeputyCompaction()` now create read-only S7 values.
+  Read properties with `$` or `S7::prop()` and use `S7::props()` for explicit
+  reporting. Summary Chat isolation, fallback destinations, and original
+  provider conditions are preserved (#123).
+
 * `AgentUsage()` and `UsageLimits()` now construct read-only S7 values.
   Constructors and `$` property reads retain their existing names; use
   `S7::props()` for plain reporting records instead of list indexing or

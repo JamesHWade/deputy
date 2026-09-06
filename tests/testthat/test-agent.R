@@ -233,9 +233,11 @@ test_that("Agent load_session restores chat state but preserves authority", {
 
   receiver_chat <- create_mock_chat()
   receiver_permissions <- permissions_standard(receiver_working_dir)
+  receiver_policy <- ContextPolicy(max_tokens = NULL, fallback = "text")
   receiver <- Agent$new(
     chat = receiver_chat,
     permissions = receiver_permissions,
+    context_policy = receiver_policy,
     working_dir = receiver_working_dir
   )
   configured_working_dir <- receiver$working_dir
@@ -244,6 +246,7 @@ test_that("Agent load_session restores chat state but preserves authority", {
   expect_equal(receiver_chat$get_system_prompt(), "Test prompt")
   expect_equal(receiver_chat$get_turns(), saved_turns)
   expect_identical(receiver$permissions, receiver_permissions)
+  expect_identical(receiver$context_policy, receiver_policy)
   expect_identical(receiver$working_dir, configured_working_dir)
 })
 
@@ -372,7 +375,7 @@ test_that("compact does nothing when not enough turns", {
     type = "message"
   )
 
-  expect_s3_class(result, "DeputyCompaction")
+  expect_s7_class(result, DeputyCompaction)
   expect_identical(result$method, "none")
 })
 

@@ -78,6 +78,28 @@ later task fallback before task output or effects occur.
 
 Every summary dispatch shares the run's request/token/cost budget, including
 failed dispatches. Unknown cost stays unknown and stops a cost-limited run.
+`ContextPolicy()` and compaction outcomes are read-only S7 values. Construct
+another policy to change configuration; Agent policy getters return snapshots
+with cloned summary templates. Chats inside a standalone policy remain reference
+objects. `compact()` and `last_compaction()` return `DeputyCompaction` values,
+whose attempt records preserve original provider conditions.
+
+```{r}
+policy <- ContextPolicy(max_tokens = 16000, fallback = "text")
+settings <- S7::props(policy)
+settings$max_tokens <- 24000L
+revised_policy <- do.call(ContextPolicy, settings)
+revised_policy$max_tokens
+outcome <- DeputyCompaction("custom", FALSE, 4, 2, summary = "Earlier work")
+outcome$turns_compacted
+```
+
+For JSON reports, project the outcome and its nested `AgentUsage` values to
+plain lists, and select condition classes or other intended diagnostics.
+`S7::props()` alone does not recursively convert nested values or remove
+sensitive provider evidence. Session save/load retains conversation and summary
+evidence; it keeps the receiving Agent's context policy.
+
 `ContextPolicy(fallback = "text")` permits deterministic degraded recovery when
 summary generation fails and the run can still continue; it is opt-in and emits
 a `Notification` with code `compact_fallback`. Cancellation leaves the active

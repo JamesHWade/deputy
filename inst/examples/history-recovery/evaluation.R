@@ -197,6 +197,7 @@ history_budget <- function(
       compaction <- NULL
     }
     if (!is.null(compaction)) {
+      compaction <- S7::props(compaction)
       compaction$attempts <- clean_attempts(compaction$attempts)
       compaction$usage <- history_usage_record(compaction$usage)
     }

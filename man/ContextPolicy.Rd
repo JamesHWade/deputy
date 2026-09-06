@@ -57,7 +57,7 @@ destination does not change the task Chat. Manual \verb{$compact()} uses only
 its active Chat and \code{fallback} policy. Templates are cloned at construction.}
 }
 \value{
-A \code{ContextPolicy} object.
+A read-only \code{ContextPolicy} S7 object.
 }
 \description{
 Defines when an \link{Agent} compacts its conversation and when large tool
@@ -80,4 +80,20 @@ An accepted summary remains installed when the budget prevents task dispatch.
 usage, and original condition. Summaries are internal context, not task output.
 This policy does not archive removed turns or restore runtime permissions
 from a summary.
+
+This is a read-only S7 value. Use \code{$} or \code{S7::prop()} to read properties,
+and construct a new policy to change configuration. \code{S7::props()} returns
+a plain property list, but nested Chats retain reference semantics. The
+constructor and an Agent's policy getter clone templates; changing a caller's
+Chat or a returned policy's Chat does not change the Agent's destinations.
+Summary dispatch clears tools, history, prompts, and callbacks on its clone.
+Policies containing Chats are runtime configuration, not portable credentials
+or session state. Session restore keeps the receiving Agent's policy.
+}
+\examples{
+policy <- ContextPolicy(max_tokens = 16000, fallback = "text")
+policy$max_tokens
+settings <- S7::props(policy)
+settings$max_tokens <- 24000L
+do.call(ContextPolicy, settings)
 }

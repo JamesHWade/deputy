@@ -71,7 +71,7 @@ test_that("other summaries keep stdout and invisible return contracts", {
     AgentUsage(),
     ContextPolicy(),
     registry,
-    new_compaction_result("summary", FALSE, 1L, 1L, 10),
+    DeputyCompaction("llm", FALSE, 1L, 1L, 10),
     LeadAgent$new(chat = create_mock_chat())
   )
   for (object in objects) {

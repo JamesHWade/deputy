@@ -579,7 +579,8 @@ Providers requiring schema-tool fallback must use \code{chat_structured()}.}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A \code{DeputyCompaction}, or \code{NULL} before compaction occurs.
+    A read-only \link{DeputyCompaction} S7 value, or \code{NULL} before
+compaction occurs.
   }
 }
 
@@ -1376,7 +1377,8 @@ truncated-text summary is used only when \code{fallback = "text"} is
 explicitly configured. The returned object records that degraded method.
   }
   \subsection{Returns}{
-    A \code{DeputyCompaction} describing the method and usage.
+    A read-only \link{DeputyCompaction} S7 value describing the method
+and usage.
   }
 }
 
