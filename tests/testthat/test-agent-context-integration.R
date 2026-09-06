@@ -270,7 +270,7 @@ test_that("tool events and major hooks share run correlation", {
       scientific = list(policy = list(domain = "chemistry"))
     )
   )
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "SessionStart",
     timeout = 0,
     callback = function(context) {
@@ -278,7 +278,7 @@ test_that("tool events and major hooks share run correlation", {
       NULL
     }
   ))
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "UserPromptSubmit",
     timeout = 0,
     callback = function(prompt, context) {
@@ -286,7 +286,7 @@ test_that("tool events and major hooks share run correlation", {
       NULL
     }
   ))
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(tool_name, tool_input, context) {
@@ -294,7 +294,7 @@ test_that("tool events and major hooks share run correlation", {
       HookResultPreToolUse(permission = "allow")
     }
   ))
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(tool_name, tool_result, tool_error, context) {
@@ -302,7 +302,7 @@ test_that("tool events and major hooks share run correlation", {
       HookResultPostToolUse()
     }
   ))
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {
@@ -310,7 +310,7 @@ test_that("tool events and major hooks share run correlation", {
       NULL
     }
   ))
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "SessionEnd",
     timeout = 0,
     callback = function(reason, context) {

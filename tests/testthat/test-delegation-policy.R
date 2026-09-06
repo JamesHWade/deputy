@@ -328,7 +328,7 @@ test_that("SubagentStop hook receives working_dir in context", {
   )
 
   captured_context <- NULL
-  lead$add_hook(HookMatcher$new(
+  lead$add_hook(HookMatcher(
     event = "SubagentStop",
     timeout = 0, # Run synchronously to avoid subprocess closure issues
     callback = function(agent_name, task, result, context) {

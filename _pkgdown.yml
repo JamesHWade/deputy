@@ -102,6 +102,7 @@ reference:
   contents:
   - HookEvent
   - HookMatcher
+  - hook_matches
   - HookResultPreToolUse
   - HookResultPostToolUse
   - HookResultPreCompact

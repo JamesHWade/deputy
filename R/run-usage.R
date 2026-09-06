@@ -89,13 +89,16 @@ UsageLimits <- function(
 
 #' @export
 print.UsageLimits <- function(x, ...) {
-  cat("<UsageLimits>\n")
-  fields <- setdiff(names(x), "on_exceed")
-  for (field in fields) {
-    value <- x[[field]]
-    cat("  ", field, ": ", value %||% "unlimited", "\n", sep = "")
-  }
-  cat("  on_exceed: ", x$on_exceed, "\n", sep = "")
+  cli::cat_line(cli::cli_format_method({
+    cli::cli_text("<UsageLimits>")
+    cli::cli_div(theme = list(div = list("margin-left" = 2)))
+    fields <- setdiff(names(x), "on_exceed")
+    for (field in fields) {
+      value <- x[[field]]
+      cli::cli_text("{field}: {value %||% \"unlimited\"}")
+    }
+    cli::cli_text("on_exceed: {x$on_exceed}")
+  }))
   invisible(x)
 }
 
@@ -285,12 +288,15 @@ assistant_turn_tokens <- function(turns) {
 
 #' @export
 print.AgentUsage <- function(x, ...) {
-  cat("<AgentUsage>\n")
-  cat("  requests: ", x$requests, "\n", sep = "")
-  cat("  tool_calls: ", x$tool_calls, "\n", sep = "")
-  cat("  tokens: ", x$total_tokens, "\n", sep = "")
-  cat("  cached_tokens: ", x$cached_tokens, "\n", sep = "")
-  cat("  cost_usd: ", format_cost(x$cost_usd), "\n", sep = "")
+  cli::cat_line(cli::cli_format_method({
+    cli::cli_text("<AgentUsage>")
+    cli::cli_div(theme = list(div = list("margin-left" = 2)))
+    cli::cli_text("requests: {x$requests}")
+    cli::cli_text("tool_calls: {x$tool_calls}")
+    cli::cli_text("tokens: {x$total_tokens}")
+    cli::cli_text("cached_tokens: {x$cached_tokens}")
+    cli::cli_text("cost_usd: {format_cost(x$cost_usd)}")
+  }))
   invisible(x)
 }
 

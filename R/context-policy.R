@@ -169,14 +169,17 @@ normalize_context_policy <- function(policy) {
 
 #' @export
 print.ContextPolicy <- function(x, ...) {
-  cli::cli_text("<ContextPolicy>")
-  cli::cli_text("  compact at: {x$max_tokens %||% 'disabled'} tokens")
-  cli::cli_text("  compact to: {format(x$compact_to * 100)}%")
-  cli::cli_text("  fallback: {x$fallback}")
-  cli::cli_text("  summary fallback Chats: {length(x$summary_fallback_chats)}")
-  cli::cli_text(
-    "  offload above: {x$max_tool_result_bytes %||% 'disabled'} bytes"
-  )
+  cli::cat_line(cli::cli_format_method({
+    cli::cli_text("<ContextPolicy>")
+    cli::cli_div(theme = list(div = list("margin-left" = 2)))
+    cli::cli_text("compact at: {x$max_tokens %||% 'disabled'} tokens")
+    cli::cli_text("compact to: {format(x$compact_to * 100)}%")
+    cli::cli_text("fallback: {x$fallback}")
+    cli::cli_text("summary fallback Chats: {length(x$summary_fallback_chats)}")
+    cli::cli_text(
+      "offload above: {x$max_tool_result_bytes %||% 'disabled'} bytes"
+    )
+  }))
   invisible(x)
 }
 
@@ -210,10 +213,13 @@ new_compaction_result <- function(
 
 #' @export
 print.DeputyCompaction <- function(x, ...) {
-  cli::cli_text("<DeputyCompaction>")
-  cli::cli_text("  method: {x$method}")
-  cli::cli_text("  automatic: {x$automatic}")
-  cli::cli_text("  compacted: {x$turns_compacted} turns")
-  cli::cli_text("  kept: {x$turns_kept} turns")
+  cli::cat_line(cli::cli_format_method({
+    cli::cli_text("<DeputyCompaction>")
+    cli::cli_div(theme = list(div = list("margin-left" = 2)))
+    cli::cli_text("method: {x$method}")
+    cli::cli_text("automatic: {x$automatic}")
+    cli::cli_text("compacted: {x$turns_compacted} turns")
+    cli::cli_text("kept: {x$turns_kept} turns")
+  }))
   invisible(x)
 }

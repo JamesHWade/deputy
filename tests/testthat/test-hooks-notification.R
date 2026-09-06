@@ -19,12 +19,12 @@ create_mock_chat_with_notification_capture <- function() {
 test_that("HookEvent includes Notification", {
   expect_true("Notification" %in% HookEvent)
 
-  matcher <- HookMatcher$new(
+  matcher <- HookMatcher(
     event = "Notification",
     callback = function(message, context) NULL
   )
 
-  expect_equal(matcher$event, "Notification")
+  expect_equal(matcher@event, "Notification")
 })
 
 test_that("Notification hook fires on permission denial", {
@@ -45,7 +45,7 @@ test_that("Notification hook fires on permission denial", {
     permissions = permissions_plan()
   )
 
-  agent$add_hook(HookMatcher$new(
+  agent$add_hook(HookMatcher(
     event = "Notification",
     timeout = 0,
     callback = function(message, context) {

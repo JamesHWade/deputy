@@ -6,7 +6,7 @@ test_that("stateless responders overlap with isolated conversations and ordered 
   before <- lead$turns()
   hooks <- list()
   for (event in c("SubagentStart", "SubagentStop")) {
-    lead$add_hook(HookMatcher$new(
+    lead$add_hook(HookMatcher(
       event = event,
       timeout = 0,
       callback = function(agent_name, context, ...) {
@@ -270,7 +270,7 @@ test_that("cancellation from SubagentStart balances hooks without dispatching", 
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
   stopped <- list()
-  lead$add_hook(HookMatcher$new(
+  lead$add_hook(HookMatcher(
     event = "SubagentStart",
     timeout = 0,
     callback = function(...) {
@@ -278,7 +278,7 @@ test_that("cancellation from SubagentStart balances hooks without dispatching", 
       NULL
     }
   ))
-  lead$add_hook(HookMatcher$new(
+  lead$add_hook(HookMatcher(
     event = "SubagentStop",
     timeout = 0,
     callback = function(agent_name, context, ...) {

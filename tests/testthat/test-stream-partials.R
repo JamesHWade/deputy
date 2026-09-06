@@ -11,7 +11,7 @@ test_that("include_partial_messages suppresses text events", {
       break
     }
     events <- c(events, list(event))
-    if (inherits(event, "AgentEvent") && event$type == "stop") {
+    if (S7::S7_inherits(event, AgentEvent) && event$type == "stop") {
       break
     }
   }

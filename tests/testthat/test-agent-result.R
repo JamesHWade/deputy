@@ -3,8 +3,8 @@
 test_that("AgentEvent creates correct structure", {
   event <- AgentEvent("start", task = "Test task")
 
-  expect_s3_class(event, "AgentEvent")
-  expect_s3_class(event, "AgentEventStart")
+  expect_s7_class(event, AgentEvent)
+  expect_identical(event@type, "start")
   expect_equal(event$type, "start")
   expect_equal(event$task, "Test task")
   expect_s3_class(event$timestamp, "POSIXct")
@@ -13,19 +13,19 @@ test_that("AgentEvent creates correct structure", {
 test_that("AgentEvent supports different types", {
   # Text event
   text_event <- AgentEvent("text", text = "Hello", is_complete = TRUE)
-  expect_s3_class(text_event, "AgentEventText")
+  expect_identical(text_event@type, "text")
   expect_equal(text_event$text, "Hello")
   expect_true(text_event$is_complete)
 
   # Stop event
   stop_event <- AgentEvent("stop", reason = "complete", total_turns = 3)
-  expect_s3_class(stop_event, "AgentEventStop")
+  expect_identical(stop_event@type, "stop")
   expect_equal(stop_event$reason, "complete")
   expect_equal(stop_event$total_turns, 3)
 
   # Turn event
   turn_event <- AgentEvent("turn", turn_number = 1)
-  expect_s3_class(turn_event, "AgentEventTurn")
+  expect_identical(turn_event@type, "turn")
   expect_equal(turn_event$turn_number, 1)
 })
 

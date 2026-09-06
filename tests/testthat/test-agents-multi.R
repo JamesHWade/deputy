@@ -345,7 +345,7 @@ test_that("LeadAgent can add SubagentStop hook", {
   captured_agent_name <- NULL
   captured_task <- NULL
 
-  lead$add_hook(HookMatcher$new(
+  lead$add_hook(HookMatcher(
     event = "SubagentStop",
     callback = function(agent_name, task, result, context) {
       hook_fired <<- TRUE
@@ -737,7 +737,7 @@ test_that("SubagentStop hook fires after successful delegation", {
   captured_task <- NULL
   captured_result <- NULL
 
-  lead$add_hook(HookMatcher$new(
+  lead$add_hook(HookMatcher(
     event = "SubagentStop",
     timeout = 0, # Run synchronously to avoid subprocess closure issues
     callback = function(agent_name, task, result, context) {

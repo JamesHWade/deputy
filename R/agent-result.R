@@ -1,13 +1,26 @@
+#' @include value-properties.R
+NULL
+
 # Agent result and event types for deputy
 
 #' Create an agent event
 #'
 #' @description
 #' Agent events are yielded by the `run()` generator to provide streaming
-#' updates on agent progress.
+#' updates on agent progress. Events are S7 values with read-only `type`,
+#' `timestamp`, and `data` properties. Use `S7::prop(event, "data")` to obtain
+#' the named payload; `event$text` and other `$` reads are conveniences for
+#' looking up payload fields. Missing fields return `NULL`.
+#'
+#' Select an event with its `type` property, not an S3 subtype class. Read-only
+#' properties protect the record, but environments, provider objects, and
+#' conditions inside the payload retain their own reference semantics.
 #'
 #' @param type Event type (see Event Types section)
-#' @param ... Additional event data
+#' @param ... Named event data with unique names. The envelope names `type`,
+#'   `timestamp`, and `data` are reserved.
+#' @prop timestamp Construction time as a `POSIXct` value. Read-only.
+#' @prop data Named list of event-specific data. Read-only.
 #' @return An `AgentEvent` object
 #'
 #' @section Event Types:
@@ -52,68 +65,103 @@
 #' )
 #'
 #' @export
-AgentEvent <- function(type, ...) {
-  data <- list(...)
-  structure(
-    c(
-      list(
-        type = type,
-        timestamp = Sys.time()
-      ),
-      data
-    ),
-    class = c(
-      paste0("AgentEvent", tools::toTitleCase(type)),
-      "AgentEvent",
-      "list"
+AgentEvent <- S7::new_class(
+  "AgentEvent",
+  package = "deputy",
+  properties = list(
+    type = readonly_property("type", S7::class_character),
+    timestamp = readonly_property("timestamp", S7::new_S3_class("POSIXct")),
+    data = readonly_property("data", S7::class_list)
+  ),
+  constructor = function(type, ...) {
+    if (!is_nonempty_string(type)) {
+      cli_abort("{.arg type} must be one non-empty string")
+    }
+    data <- list(...)
+    fields <- names(data)
+    if (
+      length(data) > 0L &&
+        (is.null(fields) ||
+          anyNA(fields) ||
+          !all(nzchar(fields)) ||
+          anyDuplicated(fields) > 0L)
+    ) {
+      cli_abort("Event data must have unique, non-empty names")
+    }
+    if (any(fields %in% c("type", "timestamp", "data"))) {
+      cli_abort(
+        "Event data cannot replace {.arg type}, {.arg timestamp}, or {.arg data}"
+      )
+    }
+    value <- S7::new_object(
+      S7::S7_object(),
+      type = type,
+      timestamp = Sys.time(),
+      data = data
     )
-  )
-}
-
-#' @export
-print.AgentEvent <- function(x, ...) {
-  cat("<AgentEvent:", x$type, ">\n")
-  cat("  timestamp:", format(x$timestamp, "%Y-%m-%d %H:%M:%S"), "\n")
-
-  # Print type-specific fields
-  fields <- setdiff(names(x), c("type", "timestamp"))
-  for (field in fields) {
-    value <- x[[field]]
-    if (inherits(value, "AgentUsage")) {
-      value <- paste0(
-        "requests=",
-        value$requests,
-        ", tool_calls=",
-        value$tool_calls,
-        ", tokens=",
-        value$total_tokens,
-        ", cost_usd=",
-        format_cost(value$cost_usd)
-      )
-    } else if (inherits(value, "UsageLimits")) {
-      configured <- Filter(
-        Negate(is.null),
-        value[setdiff(names(value), "on_exceed")]
-      )
-      value <- paste0(
-        paste(
-          paste0(names(configured), "=", unlist(configured)),
-          collapse = ", "
-        ),
-        if (length(configured) > 0L) ", " else "",
-        "on_exceed=",
-        value$on_exceed
-      )
-    } else if (is.list(value)) {
-      value <- paste0("<", class(value)[[1L]] %||% "list", ">")
-    } else {
-      value <- paste(as.character(value), collapse = ", ")
-    }
-    if (is.character(value) && length(value) == 1L && nchar(value) > 80) {
-      value <- truncate_string(value, 80)
-    }
-    cat("  ", field, ": ", value, "\n", sep = "")
+    freeze_value(value)
   }
+)
+
+# Read convenience for streaming consumers. Assignment uses S7 properties and
+# remains read-only; this does not restore the old list or subtype classes.
+# Scope replacement registration so it does not bind `$` in Deputy's
+# namespace, which makes codetools treat every field name as a variable.
+local({
+  S7::method(`$`, AgentEvent) <- function(x, name) {
+    if (name %in% c("type", "timestamp", "data")) {
+      return(S7::prop(x, name))
+    }
+    x@data[[name]]
+  }
+})
+
+S7::method(print, AgentEvent) <- function(x, ...) {
+  cli::cat_line(cli::cli_format_method({
+    cli::cli_text("<AgentEvent: {x$type} >")
+    cli::cli_div(theme = list(div = list("margin-left" = 2)))
+    cli::cli_text("timestamp: {format(x$timestamp, \"%Y-%m-%d %H:%M:%S\")}")
+
+    # Print type-specific fields
+    fields <- names(x@data)
+    for (field in fields) {
+      value <- x@data[[field]]
+      if (inherits(value, "AgentUsage")) {
+        value <- paste0(
+          "requests=",
+          value$requests,
+          ", tool_calls=",
+          value$tool_calls,
+          ", tokens=",
+          value$total_tokens,
+          ", cost_usd=",
+          format_cost(value$cost_usd)
+        )
+      } else if (inherits(value, "UsageLimits")) {
+        configured <- Filter(
+          Negate(is.null),
+          value[setdiff(names(value), "on_exceed")]
+        )
+        value <- paste0(
+          paste(
+            paste0(names(configured), "=", unlist(configured)),
+            collapse = ", "
+          ),
+          if (length(configured) > 0L) ", " else "",
+          "on_exceed=",
+          value$on_exceed
+        )
+      } else if (!is.atomic(value)) {
+        value <- paste0("<", class(value)[[1L]] %||% "list", ">")
+      } else {
+        value <- paste(as.character(value), collapse = ", ")
+      }
+      if (is.character(value) && length(value) == 1L && nchar(value) > 80) {
+        value <- truncate_string(value, 80)
+      }
+      cli::cli_text("{field}: {value}")
+    }
+  }))
   invisible(x)
 }
 
@@ -277,44 +325,46 @@ AgentResult <- R6::R6Class(
     #' @description
     #' Print the result summary.
     print = function() {
-      cat("<AgentResult>\n")
-      cat("  status:", self$stop_reason, "\n")
-      cat("  turns:", self$n_turns(), "\n")
-      cat("  tool_calls:", length(self$tool_calls()), "\n")
+      cli::cat_line(cli::cli_format_method({
+        cli::cli_text("<AgentResult>")
+        cli::cli_div(theme = list(div = list("margin-left" = 2)))
+        cli::cli_text("status: {self$stop_reason}")
+        cli::cli_text("turns: {self$n_turns()}")
+        cli::cli_text("tool_calls: {length(self$tool_calls())}")
 
-      if (!is.null(self$duration)) {
-        cat("  duration:", round(self$duration, 2), "seconds\n")
-      }
+        if (!is.null(self$duration)) {
+          cli::cli_text("duration: {round(self$duration, 2)} seconds")
+        }
 
-      if (!is.null(self$cost) && !is.null(self$cost$total)) {
-        cat("  cost:", format_cost(self$cost$total), "\n")
-      }
+        if (!is.null(self$cost) && !is.null(self$cost$total)) {
+          cli::cli_text("cost: {format_cost(self$cost$total)}")
+        }
 
-      if (!is.null(self$response)) {
-        cat("  response:", truncate_string(self$response, 60), "\n")
-      }
-      if (!is.null(self$session_id)) {
-        cat("  session_id:", self$session_id, "\n")
-      }
-      if (!is.null(self$run_id)) {
-        cat("  run_id:", self$run_id, "\n")
-      }
-      if (!is.null(self$agent_id)) {
-        cat("  agent_id:", self$agent_id, "\n")
-      }
-      if (!is.null(self$delegation_id)) {
-        cat("  delegation_id:", self$delegation_id, "\n")
-      }
-      if (!is.null(self$usage)) {
-        cat("  requests:", self$usage$requests, "\n")
-        cat("  tokens:", self$usage$total_tokens, "\n")
-      }
-      if (!is.null(self$structured_output)) {
-        cli::cli_text(
-          "  structured_output: <{class(self$structured_output)[[1L]]}>"
-        )
-      }
-
+        if (!is.null(self$response)) {
+          cli::cli_text("response: {truncate_string(self$response, 60)}")
+        }
+        if (!is.null(self$session_id)) {
+          cli::cli_text("session_id: {self$session_id}")
+        }
+        if (!is.null(self$run_id)) {
+          cli::cli_text("run_id: {self$run_id}")
+        }
+        if (!is.null(self$agent_id)) {
+          cli::cli_text("agent_id: {self$agent_id}")
+        }
+        if (!is.null(self$delegation_id)) {
+          cli::cli_text("delegation_id: {self$delegation_id}")
+        }
+        if (!is.null(self$usage)) {
+          cli::cli_text("requests: {self$usage$requests}")
+          cli::cli_text("tokens: {self$usage$total_tokens}")
+        }
+        if (!is.null(self$structured_output)) {
+          cli::cli_text(
+            "  structured_output: <{class(self$structured_output)[[1L]]}>"
+          )
+        }
+      }))
       invisible(self)
     }
   ),

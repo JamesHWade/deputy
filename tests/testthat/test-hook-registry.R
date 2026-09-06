@@ -1,6 +1,6 @@
 test_that("HookMatcher validates event type", {
   expect_error(
-    HookMatcher$new(
+    HookMatcher(
       event = "InvalidEvent",
       callback = function(...) NULL
     ),
@@ -10,7 +10,7 @@ test_that("HookMatcher validates event type", {
 
 test_that("HookMatcher validates callback is function", {
   expect_error(
-    HookMatcher$new(
+    HookMatcher(
       event = "PreToolUse",
       callback = "not a function"
     ),
@@ -20,7 +20,7 @@ test_that("HookMatcher validates callback is function", {
 
 test_that("HookMatcher fields are immutable after construction", {
   callback <- function(...) NULL
-  matcher <- HookMatcher$new(
+  matcher <- HookMatcher(
     event = "PreToolUse",
     pattern = "^write",
     callback = callback,
@@ -28,56 +28,56 @@ test_that("HookMatcher fields are immutable after construction", {
   )
 
   expect_error(
-    matcher$event <- "PostToolUse",
-    "immutable after construction"
+    matcher@event <- "PostToolUse",
+    "read-only after construction"
   )
   expect_error(
-    matcher$pattern <- "^read",
-    "immutable after construction"
+    matcher@pattern <- "^read",
+    "read-only after construction"
   )
   expect_error(
-    matcher$callback <- function(...) TRUE,
-    "immutable after construction"
+    matcher@callback <- function(...) TRUE,
+    "read-only after construction"
   )
   expect_error(
-    matcher$timeout <- 0,
-    "immutable after construction"
+    matcher@timeout <- 0,
+    "read-only after construction"
   )
 
-  expect_equal(matcher$event, "PreToolUse")
-  expect_equal(matcher$pattern, "^write")
-  expect_identical(matcher$callback, callback)
-  expect_equal(matcher$timeout, 5)
+  expect_equal(matcher@event, "PreToolUse")
+  expect_equal(matcher@pattern, "^write")
+  expect_identical(matcher@callback, callback)
+  expect_equal(matcher@timeout, 5)
 })
 
 test_that("HookMatcher matches without pattern", {
-  matcher <- HookMatcher$new(
+  matcher <- HookMatcher(
     event = "PreToolUse",
     callback = function(...) NULL
   )
 
   # Should match any tool name when no pattern specified
-  expect_true(matcher$matches("read_file"))
-  expect_true(matcher$matches("write_file"))
-  expect_true(matcher$matches("anything"))
-  expect_true(matcher$matches(NULL))
+  expect_true(hook_matches(matcher, "read_file"))
+  expect_true(hook_matches(matcher, "write_file"))
+  expect_true(hook_matches(matcher, "anything"))
+  expect_true(hook_matches(matcher, NULL))
 })
 
 test_that("HookMatcher matches with pattern", {
-  matcher <- HookMatcher$new(
+  matcher <- HookMatcher(
     event = "PreToolUse",
     pattern = "^write",
     callback = function(...) NULL
   )
 
   # Should match tools starting with "write"
-  expect_true(matcher$matches("write_file"))
-  expect_true(matcher$matches("write_csv"))
+  expect_true(hook_matches(matcher, "write_file"))
+  expect_true(hook_matches(matcher, "write_csv"))
 
   # Should not match other tools
-  expect_false(matcher$matches("read_file"))
-  expect_false(matcher$matches("list_files"))
-  expect_false(matcher$matches(NULL))
+  expect_false(hook_matches(matcher, "read_file"))
+  expect_false(hook_matches(matcher, "list_files"))
+  expect_false(hook_matches(matcher, NULL))
 })
 
 test_that("HookRegistry adds and retrieves hooks", {
@@ -85,7 +85,7 @@ test_that("HookRegistry adds and retrieves hooks", {
 
   expect_equal(registry$count(), 0)
 
-  hook1 <- HookMatcher$new(
+  hook1 <- HookMatcher(
     event = "PreToolUse",
     callback = function(...) NULL
   )
@@ -93,7 +93,7 @@ test_that("HookRegistry adds and retrieves hooks", {
 
   expect_equal(registry$count(), 1)
 
-  hook2 <- HookMatcher$new(
+  hook2 <- HookMatcher(
     event = "PostToolUse",
     callback = function(...) NULL
   )
@@ -105,11 +105,11 @@ test_that("HookRegistry adds and retrieves hooks", {
 test_that("HookRegistry filters by event", {
   registry <- HookRegistry$new()
 
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PreToolUse",
     callback = function(...) NULL
   ))
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PostToolUse",
     callback = function(...) NULL
   ))
@@ -127,17 +127,17 @@ test_that("HookRegistry filters by event", {
 test_that("HookRegistry filters by tool name", {
   registry <- HookRegistry$new()
 
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PreToolUse",
     pattern = "^write",
     callback = function(...) NULL
   ))
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PreToolUse",
     pattern = "^read",
     callback = function(...) NULL
   ))
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PreToolUse",
     callback = function(...) NULL # No pattern - matches all
   ))
@@ -158,12 +158,12 @@ test_that("HookRegistry filters by tool name", {
 test_that("HookRegistry fire returns first non-NULL result", {
   registry <- HookRegistry$new()
 
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(...) NULL # Returns NULL
   ))
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(...) {
@@ -177,20 +177,20 @@ test_that("HookRegistry fire returns first non-NULL result", {
 })
 
 test_that("HookMatcher stores timeout value", {
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "PreToolUse",
     callback = function(...) NULL,
     timeout = 10
   )
 
-  expect_equal(hook$timeout, 10)
+  expect_equal(hook@timeout, 10)
 
   # Default timeout
-  hook_default <- HookMatcher$new(
+  hook_default <- HookMatcher(
     event = "PreToolUse",
     callback = function(...) NULL
   )
-  expect_equal(hook_default$timeout, 0)
+  expect_equal(hook_default@timeout, 0)
 })
 
 test_that("HookMatcher with timeout=0 runs in main process", {
@@ -198,7 +198,7 @@ test_that("HookMatcher with timeout=0 runs in main process", {
   # We test this by checking that side effects work
   side_effect <- NULL
 
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(tool_name, tool_input, context) {
@@ -221,7 +221,7 @@ test_that("HookMatcher with timeout=0 runs in main process", {
 })
 
 test_that("Hook callback error returns deny for PreToolUse", {
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(...) {
@@ -250,7 +250,7 @@ test_that("Hook callback error returns deny for PreToolUse", {
 })
 
 test_that("Hook callback error returns NULL for PostToolUse", {
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(...) {
@@ -278,7 +278,7 @@ test_that("Hook callback error returns NULL for PostToolUse", {
 })
 
 test_that("Hook callback error returns NULL for Stop event", {
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(...) {
@@ -302,7 +302,7 @@ test_that("Hook callback error returns NULL for Stop event", {
 test_that("Multiple hooks are called in order until non-NULL result", {
   call_order <- c()
 
-  hook1 <- HookMatcher$new(
+  hook1 <- HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(...) {
@@ -311,7 +311,7 @@ test_that("Multiple hooks are called in order until non-NULL result", {
     }
   )
 
-  hook2 <- HookMatcher$new(
+  hook2 <- HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(...) {
@@ -320,7 +320,7 @@ test_that("Multiple hooks are called in order until non-NULL result", {
     }
   )
 
-  hook3 <- HookMatcher$new(
+  hook3 <- HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(...) {
@@ -349,15 +349,15 @@ test_that("Multiple hooks are called in order until non-NULL result", {
 test_that("HookRegistry print method works", {
   registry <- HookRegistry$new()
 
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PreToolUse",
     callback = function(...) NULL
   ))
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PreToolUse",
     callback = function(...) NULL
   ))
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PostToolUse",
     callback = function(...) NULL
   ))
@@ -373,7 +373,7 @@ test_that("HookRegistry print method works", {
 })
 
 test_that("HookMatcher print method works", {
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "PreToolUse",
     pattern = "^write",
     callback = function(...) NULL,
@@ -394,15 +394,15 @@ test_that("HookMatcher print method works", {
 test_that("HookRegistry filters SessionStart and SessionEnd events", {
   registry <- HookRegistry$new()
 
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "SessionStart",
     callback = function(context) NULL
   ))
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "SessionEnd",
     callback = function(reason, context) NULL
   ))
-  registry$add(HookMatcher$new(
+  registry$add(HookMatcher(
     event = "PreToolUse",
     callback = function(...) NULL
   ))
@@ -418,7 +418,7 @@ test_that("HookRegistry filters SessionStart and SessionEnd events", {
 })
 
 test_that("Hook callback error returns NULL for SessionStart", {
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "SessionStart",
     timeout = 0,
     callback = function(context) {
@@ -440,7 +440,7 @@ test_that("Hook callback error returns NULL for SessionStart", {
 })
 
 test_that("Hook callback error returns NULL for SessionEnd", {
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "SessionEnd",
     timeout = 0,
     callback = function(reason, context) {
@@ -468,7 +468,7 @@ test_that("Hook callback error returns NULL for SessionEnd", {
 # Tests for hook error tracking
 
 test_that("HookRegistry tracks errors in last_errors()", {
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(tool_name, tool_result, tool_error, context) {
@@ -504,7 +504,7 @@ test_that("HookRegistry tracks errors in last_errors()", {
 })
 
 test_that("HookRegistry clear_errors removes tracked errors", {
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "SessionStart",
     timeout = 0,
     callback = function(context) {
@@ -528,7 +528,7 @@ test_that("HookRegistry clear_errors removes tracked errors", {
 
 test_that("Hook errors show context-specific messages", {
   # PostToolUse error message
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "PostToolUse",
     timeout = 0,
     callback = function(...) stop("error")
@@ -549,7 +549,7 @@ test_that("Hook errors show context-specific messages", {
 })
 
 test_that("PreToolUse errors still deny and use cli_alert_danger", {
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "PreToolUse",
     timeout = 0,
     callback = function(tool_name, tool_input, context) {
@@ -590,7 +590,7 @@ test_that("Hook timeout warns once when callr not installed", {
     .package = "rlang"
   )
 
-  hook <- HookMatcher$new(
+  hook <- HookMatcher(
     event = "PostToolUse",
     timeout = 5, # timeout > 0 triggers the check
     callback = function(...) NULL

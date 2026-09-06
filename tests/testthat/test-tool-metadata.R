@@ -274,7 +274,7 @@ test_that("released MCP transport preserves origin, annotations and connection i
             permissions = Permissions$new(web = FALSE, file_write = FALSE)
           )
           child <- lead$.__enclos_env__$private$create_sub_agent(loaded)
-          child$add_hook(HookMatcher$new(
+          child$add_hook(HookMatcher(
             event = "PreToolUse",
             timeout = 0,
             callback = function(tool_name, tool_input, context) {

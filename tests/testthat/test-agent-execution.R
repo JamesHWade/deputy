@@ -84,9 +84,8 @@ test_that("Agent with cost limit stores limit correctly", {
 test_that("AgentEvent creates events with correct structure", {
   event <- AgentEvent("start", task = "test task")
 
-  expect_s3_class(event, "AgentEvent")
-  # Class name uses capitalized type: AgentEventStart not AgentEventstart
-  expect_s3_class(event, "AgentEventStart")
+  expect_s7_class(event, AgentEvent)
+  expect_identical(event@type, "start")
   expect_equal(event$type, "start")
   expect_equal(event$task, "test task")
   expect_true(!is.null(event$timestamp))
@@ -303,8 +302,8 @@ test_that("AgentEvent warning type has correct structure", {
     details = "Some details"
   )
 
-  expect_s3_class(event, "AgentEvent")
-  expect_s3_class(event, "AgentEventWarning")
+  expect_s7_class(event, AgentEvent)
+  expect_identical(event@type, "warning")
   expect_equal(event$type, "warning")
   expect_equal(event$message, "Test warning")
   expect_equal(event$details, "Some details")
@@ -378,7 +377,7 @@ test_that("run_sync fires SessionStart hook before first turn", {
   agent <- Agent$new(chat = mock_chat)
 
   # Add SessionStart hook
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "SessionStart",
     timeout = 0,
     callback = function(context) {
@@ -426,7 +425,7 @@ test_that("run_sync fires Stop and SessionEnd hooks after completion", {
   agent <- Agent$new(chat = mock_chat)
 
   # Add Stop hook
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "Stop",
     timeout = 0,
     callback = function(reason, context) {
@@ -437,7 +436,7 @@ test_that("run_sync fires Stop and SessionEnd hooks after completion", {
   ))
 
   # Add SessionEnd hook
-  agent$hooks$add(HookMatcher$new(
+  agent$hooks$add(HookMatcher(
     event = "SessionEnd",
     timeout = 0,
     callback = function(reason, context) {

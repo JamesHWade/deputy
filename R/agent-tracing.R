@@ -51,7 +51,7 @@ trace_governance_event <- function(span, event) {
   # Deliberate allowlist: no prompt, tool arguments, result, run_context,
   # condition messages, filesystem paths, or validation feedback is exported.
   fields <- intersect(
-    names(event),
+    names(event@data),
     c(
       "run_id",
       "tool_call_id",
@@ -67,7 +67,7 @@ trace_governance_event <- function(span, event) {
   )
   attributes <- Filter(
     function(value) is.atomic(value) && length(value) == 1L && !is.na(value),
-    event[fields]
+    event@data[fields]
   )
   span$add_event(paste0("deputy.", event$type), attributes = attributes)
   invisible(NULL)

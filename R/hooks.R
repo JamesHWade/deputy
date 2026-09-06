@@ -1,3 +1,6 @@
+#' @include value-properties.R
+NULL
+
 # Hook system for deputy agents
 
 #' Hook events supported by deputy
@@ -142,7 +145,7 @@
 #' @examples
 #' \dontrun{
 #' # PreToolUse callback example
-#' agent$add_hook(HookMatcher$new(
+#' agent$add_hook(HookMatcher(
 #'   event = "PreToolUse",
 #'   callback = function(tool_name, tool_input, context) {
 #'     message("Tool: ", tool_name, " in ", context$working_dir)
@@ -151,7 +154,7 @@
 #' ))
 #'
 #' # PostToolUse callback example
-#' agent$add_hook(HookMatcher$new(
+#' agent$add_hook(HookMatcher(
 #'   event = "PostToolUse",
 #'   callback = function(tool_name, tool_result, tool_error, context) {
 #'     if (!is.null(tool_error)) {
@@ -299,170 +302,106 @@ HookResultPreCompact <- function(continue = TRUE, summary = NULL) {
   )
 }
 
-#' HookMatcher R6 Class
+#' Match a lifecycle hook
 #'
 #' @description
-#' Defines when a hook callback should be triggered. Hooks can be filtered
-#' by event type and optionally by tool name pattern.
+#' An S7 value defining when a callback runs. Configuration is read-only after
+#' construction; callback closures retain their caller-owned environments.
 #'
-#' **Security Note:** Hook matcher configuration is read-only from the public
-#' API after construction so callbacks and matching rules cannot be swapped out
-#' accidentally at runtime.
-#'
+#' @param event One of [HookEvent].
+#' @param callback Function accepting the arguments documented for the event
+#'   in [HookEvent], or `...`.
+#' @param pattern Optional regular expression filtering tool names.
+#' @param timeout Maximum callback time in seconds. Zero runs in the caller's
+#'   process. Positive values use a clean [callr::r()] subprocess, where
+#'   caller-process state and side effects are not available.
+#' @return A `HookMatcher` S7 object.
+#' @seealso [hook_matches()]
+#' @examples
+#' hook <- HookMatcher(
+#'   "PreToolUse",
+#'   callback = function(tool_name, tool_input, context) {
+#'     HookResultPreToolUse(permission = "deny", reason = "Read only")
+#'   },
+#'   pattern = "^write_"
+#' )
+#' hook_matches(hook, "write_file")
+#' S7::prop(hook, "event")
 #' @export
-HookMatcher <- R6::R6Class(
+HookMatcher <- S7::new_class(
   "HookMatcher",
-
-  public = list(
-    #' @description
-    #' Create a new HookMatcher.
-    #'
-    #' @param event The event type (must be one of [HookEvent])
-    #' @param callback Function to call. Signature depends on event type:
-    #'   * PreToolUse: `function(tool_name, tool_input, context)`
-    #'   * PostToolUse: `function(tool_name, tool_result, tool_error, context)`
-    #'   * PostToolUseFailure: `function(tool_name, tool_result, tool_error, context)`
-    #'   * Stop: `function(reason, context)`
-    #'   * SubagentStart: `function(agent_name, task, context)`
-    #'   * SubagentStop: `function(agent_name, task, result, context)`
-    #'   * UserPromptSubmit: `function(prompt, context)`
-    #'   * Notification: `function(message, context)`
-    #'   * PermissionRequest: `function(tool_name, tool_input, permission_result, context)`
-    #'   * ConfigChange: `function(key, old_value, new_value, context)`
-    #'   * PreCompact: `function(turns_to_compact, turns_to_keep, context)`
-    #'   * SessionStart: `function(context)`
-    #'   * SessionEnd: `function(reason, context)`
-    #' @param pattern Optional regex pattern to filter by tool name.
-    #'   Only applies to PreToolUse and PostToolUse events.
-    #' @param timeout Maximum callback execution time in seconds. The default,
-    #'   `0`, runs the callback in the caller's process. Positive values run the
-    #'   callback in a clean [callr::r()] subprocess, where caller-process state
-    #'   and side effects are not available.
-    #' @return A new `HookMatcher` object
-    #'
-    #' @examples
-    #' \dontrun{
-    #' # Block dangerous bash commands
-    #' HookMatcher$new(
-    #'   event = "PreToolUse",
-    #'   pattern = "^(run_bash|bash)$",
-    #'   callback = function(tool_name, tool_input, context) {
-    #'     if (grepl("rm -rf", tool_input$command)) {
-    #'       HookResultPreToolUse(permission = "deny", reason = "Dangerous!")
-    #'     } else {
-    #'       HookResultPreToolUse(permission = "allow")
-    #'     }
-    #'   }
-    #' )
-    #' }
-    initialize = function(event, callback, pattern = NULL, timeout = 0) {
-      if (!event %in% HookEvent) {
-        cli_abort(c(
-          "Invalid hook event: {.val {event}}",
-          "i" = "Valid events are: {.val {HookEvent}}"
-        ))
-      }
-
-      if (!is.function(callback)) {
-        cli_abort("{.arg callback} must be a function")
-      }
-
-      validate_hook_callback(event, callback)
-      validate_hook_pattern(pattern)
-      timeout <- validate_hook_timeout(timeout)
-
-      private$.event <- event
-      private$.callback <- callback
-      private$.pattern <- pattern
-      private$.timeout <- timeout
-    },
-
-    #' @description
-    #' Check if this hook matches a given tool name.
-    #'
-    #' @param tool_name The tool name to check (can be NULL)
-    #' @return Logical indicating if the hook matches
-    matches = function(tool_name = NULL) {
-      # No pattern means match all
-      if (is.null(self$pattern)) {
-        return(TRUE)
-      }
-
-      # Can't match if no tool name provided
-      if (is.null(tool_name)) {
-        return(FALSE)
-      }
-
-      # Check regex pattern
-      grepl(self$pattern, tool_name)
-    },
-
-    #' @description
-    #' Print the hook matcher.
-    print = function() {
-      cat("<HookMatcher>\n")
-      cat("  event:", self$event, "\n")
-      cat(
-        "  pattern:",
-        if (is.null(self$pattern)) "<any>" else self$pattern,
-        "\n"
-      )
-      cat("  timeout:", self$timeout, "seconds\n")
-      invisible(self)
-    }
+  package = "deputy",
+  properties = list(
+    event = readonly_property("event", S7::class_character),
+    callback = readonly_property("callback", S7::class_function),
+    pattern = readonly_property(
+      "pattern",
+      S7::new_union(S7::class_character, NULL)
+    ),
+    timeout = readonly_property("timeout", S7::class_numeric)
   ),
-
-  active = list(
-    #' @field event The hook event type (see [HookEvent]). Read-only after construction.
-    event = function(value) {
-      if (missing(value)) {
-        return(private$.event)
-      }
-      cli_abort(
-        "Cannot modify hook matcher: event is immutable after construction"
-      )
-    },
-
-    #' @field pattern Optional regex pattern for tool name filtering. Read-only after construction.
-    pattern = function(value) {
-      if (missing(value)) {
-        return(private$.pattern)
-      }
-      cli_abort(
-        "Cannot modify hook matcher: pattern is immutable after construction"
-      )
-    },
-
-    #' @field callback The function to call when the hook fires. Read-only after construction.
-    callback = function(value) {
-      if (missing(value)) {
-        return(private$.callback)
-      }
-      cli_abort(
-        "Cannot modify hook matcher: callback is immutable after construction"
-      )
-    },
-
-    #' @field timeout Maximum execution time for the callback in seconds. Zero
-    #'   runs in the caller's process; a positive value uses a clean subprocess.
-    #'   Read-only after construction.
-    timeout = function(value) {
-      if (missing(value)) {
-        return(private$.timeout)
-      }
-      cli_abort(
-        "Cannot modify hook matcher: timeout is immutable after construction"
-      )
+  constructor = function(event, callback, pattern = NULL, timeout = 0) {
+    if (!is_nonempty_string(event) || !event %in% HookEvent) {
+      cli_abort(c(
+        "Invalid hook event: {.val {event}}",
+        "i" = "Valid events are: {.val {HookEvent}}"
+      ))
     }
-  ),
-
-  private = list(
-    .event = NULL,
-    .pattern = NULL,
-    .callback = NULL,
-    .timeout = NULL
-  )
+    if (!is.function(callback)) {
+      cli_abort("{.arg callback} must be a function")
+    }
+    validate_hook_callback(event, callback)
+    validate_hook_pattern(pattern)
+    timeout <- validate_hook_timeout(timeout)
+    value <- S7::new_object(
+      S7::S7_object(),
+      event = event,
+      callback = callback,
+      pattern = pattern,
+      timeout = timeout
+    )
+    freeze_value(value)
+  }
 )
+
+#' Test whether a hook matches a tool name
+#'
+#' @param hook A [HookMatcher].
+#' @param tool_name One tool name, or `NULL`. A hook without a pattern matches
+#'   every name, including `NULL`; a pattern requires a non-NULL name.
+#' @return One logical value.
+#' @export
+hook_matches <- S7::new_generic(
+  "hook_matches",
+  "hook",
+  function(hook, tool_name = NULL) {
+    S7::S7_dispatch()
+  }
+)
+
+S7::method(hook_matches, HookMatcher) <- function(hook, tool_name = NULL) {
+  if (!is.null(tool_name) && !is_nonempty_string(tool_name)) {
+    cli_abort("{.arg tool_name} must be NULL or one non-empty string")
+  }
+  if (is.null(hook@pattern)) {
+    return(TRUE)
+  }
+  if (is.null(tool_name)) {
+    return(FALSE)
+  }
+  grepl(hook@pattern, tool_name)
+}
+
+S7::method(print, HookMatcher) <- function(x, ...) {
+  cli::cat_line(cli::cli_format_method({
+    cli::cli_text("<HookMatcher>")
+    cli::cli_div(theme = list(div = list("margin-left" = 2)))
+    cli::cli_text("event: {x@event}")
+    cli::cli_text("pattern: {if (is.null(x@pattern)) '<any>' else x@pattern}")
+    cli::cli_text("timeout: {x@timeout} seconds")
+  }))
+  invisible(x)
+}
 
 #' HookRegistry R6 Class
 #'
@@ -487,7 +426,7 @@ HookRegistry <- R6::R6Class(
     #' @param hook A [HookMatcher] object
     #' @return Invisible self for chaining
     add = function(hook) {
-      if (!inherits(hook, "HookMatcher")) {
+      if (!S7::S7_inherits(hook, HookMatcher)) {
         cli_abort("{.arg hook} must be a HookMatcher object")
       }
       private$hooks <- c(private$hooks, list(hook))
@@ -503,7 +442,7 @@ HookRegistry <- R6::R6Class(
     get_hooks = function(event, tool_name = NULL) {
       matching <- list()
       for (hook in private$hooks) {
-        if (hook$event == event && hook$matches(tool_name)) {
+        if (hook@event == event && hook_matches(hook, tool_name)) {
           matching <- c(matching, list(hook))
         }
       }
@@ -536,16 +475,16 @@ HookRegistry <- R6::R6Class(
         result <- tryCatch(
           {
             # Call with timeout if callr is available
-            if (hook$timeout > 0 && rlang::is_installed("callr")) {
+            if (hook@timeout > 0 && rlang::is_installed("callr")) {
               callr::r(
                 function(callback, args) do.call(callback, args),
-                args = list(callback = hook$callback, args = args),
-                timeout = hook$timeout
+                args = list(callback = hook@callback, args = args),
+                timeout = hook@timeout
               )
             } else {
               # Warn once if timeout requested but callr not installed
               if (
-                hook$timeout > 0 &&
+                hook@timeout > 0 &&
                   !rlang::is_installed("callr") &&
                   !isTRUE(private$callr_warned)
               ) {
@@ -556,7 +495,7 @@ HookRegistry <- R6::R6Class(
                   "i" = "Or set {.code timeout = 0} to suppress this warning"
                 ))
               }
-              do.call(hook$callback, args)
+              do.call(hook@callback, args)
             }
           },
           error = function(e) {
@@ -642,25 +581,27 @@ HookRegistry <- R6::R6Class(
     #' @description
     #' Print the registry.
     print = function() {
-      cat("<HookRegistry>\n")
-      cat("  hooks:", self$count(), "registered\n")
+      cli::cat_line(cli::cli_format_method({
+        cli::cli_text("<HookRegistry>")
+        cli::cli_div(theme = list(div = list("margin-left" = 2)))
+        cli::cli_text("hooks: {self$count()} registered")
 
-      if (self$count() > 0) {
-        # Group by event
-        by_event <- list()
-        for (hook in private$hooks) {
-          event <- hook$event
-          if (is.null(by_event[[event]])) {
-            by_event[[event]] <- 0
+        if (self$count() > 0) {
+          # Group by event
+          by_event <- list()
+          for (hook in private$hooks) {
+            event <- hook@event
+            if (is.null(by_event[[event]])) {
+              by_event[[event]] <- 0
+            }
+            by_event[[event]] <- by_event[[event]] + 1
           }
-          by_event[[event]] <- by_event[[event]] + 1
-        }
 
-        for (event in names(by_event)) {
-          cat("    ", event, ":", by_event[[event]], "\n")
+          for (event in names(by_event)) {
+            cli::cli_text("{event} : {by_event[[event]]}")
+          }
         }
-      }
-
+      }))
       invisible(self)
     }
   ),
@@ -688,7 +629,7 @@ HookRegistry <- R6::R6Class(
 #'
 #' @export
 hook_log_tools <- function(verbose = FALSE) {
-  HookMatcher$new(
+  HookMatcher(
     event = "PostToolUse",
     timeout = 0, # Run in main process for cli output
     callback = function(tool_name, tool_result, tool_error, context) {
@@ -916,7 +857,7 @@ hook_block_dangerous_bash <- function(
 
   combined_pattern <- paste(patterns, collapse = "|")
 
-  HookMatcher$new(
+  HookMatcher(
     event = "PreToolUse",
     pattern = "^(run_bash|bash|tool_run_bash)$",
     timeout = 0, # Run in main process
@@ -965,7 +906,7 @@ hook_limit_file_writes <- function(allowed_dir) {
     install_packages = FALSE
   )
 
-  HookMatcher$new(
+  HookMatcher(
     event = "PreToolUse",
     pattern = "^(write_file|edit_file|multi_edit)$",
     timeout = 0, # Run in main process

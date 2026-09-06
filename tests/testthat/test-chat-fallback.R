@@ -261,7 +261,7 @@ test_that("request-end callback errors are run failures regardless of callback o
     }
     agent <- Agent$new(chat, fallback_chats = list(runtime_chat(backup)))
     if (order == "after") {
-      agent$add_hook(HookMatcher$new(
+      agent$add_hook(HookMatcher(
         "SessionStart",
         function(...) {
           chat$on_request_end(callback)
@@ -334,7 +334,7 @@ test_that("HTTP failures in application callbacks do not become model failures",
       }
       agent <- Agent$new(chat, fallback_chats = list(runtime_chat(backup)))
       if (order == "after") {
-        agent$add_hook(HookMatcher$new(
+        agent$add_hook(HookMatcher(
           "SessionStart",
           function(...) {
             register(callback)

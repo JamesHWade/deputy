@@ -192,7 +192,7 @@ test_that("run_async fires lifecycle hooks and records usage on the result", {
   for (event in c("SessionStart", "UserPromptSubmit", "Stop", "SessionEnd")) {
     local({
       name <- event
-      agent$add_hook(HookMatcher$new(
+      agent$add_hook(HookMatcher(
         event = name,
         timeout = 0,
         callback = function(...) {

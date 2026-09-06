@@ -258,46 +258,33 @@ Permissions <- R6::R6Class(
     #' @description
     #' Print the permissions configuration.
     print = function() {
-      cat("<Permissions>\n")
-      cat("  mode:", self$mode, "\n")
-      cat("  file_read:", self$file_read, "\n")
-      cat(
-        "  file_write:",
-        if (is.null(self$file_write)) "NULL" else self$file_write,
-        "\n"
-      )
-      cat("  bash:", self$bash, "\n")
-      cat("  r_code:", self$r_code, "\n")
-      cat("  web:", self$web, "\n")
-      cat(
-        "  tool_allowlist:",
-        if (
-          is.null(self$tool_allowlist) ||
-            length(self$tool_allowlist) == 0
-        ) {
+      cli::cat_line(cli::cli_format_method({
+        cli::cli_text("<Permissions>")
+        cli::cli_div(theme = list(div = list("margin-left" = 2)))
+        cli::cli_text("mode: {self$mode}")
+        cli::cli_text("file_read: {self$file_read}")
+        cli::cli_text(
+          "file_write: {if (is.null(self$file_write)) \"NULL\" else self$file_write}"
+        )
+        cli::cli_text("bash: {self$bash}")
+        cli::cli_text("r_code: {self$r_code}")
+        cli::cli_text("web: {self$web}")
+        tool_allowlist <- if (length(self$tool_allowlist) == 0L) {
           "NULL"
         } else {
           paste(self$tool_allowlist, collapse = ", ")
-        },
-        "\n"
-      )
-      cat(
-        "  tool_denylist:",
-        if (
-          is.null(self$tool_denylist) ||
-            length(self$tool_denylist) == 0
-        ) {
+        }
+        cli::cli_text("tool_allowlist: {tool_allowlist}")
+        tool_denylist <- if (length(self$tool_denylist) == 0L) {
           "NULL"
         } else {
           paste(self$tool_denylist, collapse = ", ")
-        },
-        "\n"
-      )
-      cat(
-        "  permission_prompt_tool_name:",
-        self$permission_prompt_tool_name %||% "NULL",
-        "\n"
-      )
+        }
+        cli::cli_text("tool_denylist: {tool_denylist}")
+        cli::cli_text(
+          "permission_prompt_tool_name: {self$permission_prompt_tool_name %||% \"NULL\"}"
+        )
+      }))
       invisible(self)
     }
   ),

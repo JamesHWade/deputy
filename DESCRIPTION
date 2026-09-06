@@ -31,7 +31,7 @@ Suggests:
     rvest,
     shiny,
     shinychat,
-    testthat (>= 3.0.0),
+    testthat (>= 3.2.2),
     withr,
     xml2,
     yaml
@@ -49,13 +49,14 @@ Imports:
     R6,
     Rapp (>= 0.4.0),
     rlang,
-    S7,
+    S7 (>= 0.2.2),
     utils
 Config/roxygen2/version: 8.1.0
 Collate:
     'agent-context.R'
     'agent-definition-files.R'
     'agent-requests.R'
+    'value-properties.R'
     'agent-result.R'
     'agent-run-state.R'
     'agent-session.R'
