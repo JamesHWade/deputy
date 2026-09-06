@@ -441,8 +441,13 @@ test_that("LeadAgent registry is a read-only snapshot", {
   )
 
   snapshot <- lead$sub_agent_defs
-  snapshot[[1]]$name <- "changed"
-  definition$name <- "also-changed"
+  expect_snapshot(error = TRUE, snapshot[[1]]@name <- "changed")
+  expect_snapshot(error = TRUE, definition@name <- "also-changed")
+  snapshot[[1]] <- agent_definition(
+    "changed",
+    "Changed helper",
+    "Changed prompt"
+  )
 
   expect_identical(lead$available_sub_agents(), "helper")
   expect_identical(lead$sub_agent_defs[[1]]$name, "helper")

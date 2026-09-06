@@ -8,6 +8,9 @@ formats remain unchanged by the moves.
 | Responsibility | Source |
 | --- | --- |
 | Public Agent API, construction, runtime wiring and policy | `R/agent.R` |
+| S7 AgentDefinition values and routing normalization | `R/agent-definition.R` |
+| Portable YAML definition format and explicit registry resolution | `R/agent-definition-files.R` |
+| Mutable LeadAgent registry and delegation lifecycle | `R/agents-multi.R` |
 | Shared governed stream, adapters and finalization | `R/agent-stream.R` |
 | Session payload construction and restoration | `R/agent-session.R` |
 | Context estimation and compaction | `R/agent-context.R` |

@@ -55,8 +55,9 @@ Config/roxygen2/version: 8.1.0
 Collate:
     'agent-context.R'
     'agent-definition-files.R'
-    'agent-requests.R'
     'value-properties.R'
+    'agent-definition.R'
+    'agent-requests.R'
     'run-usage.R'
     'agent-result.R'
     'agent-run-state.R'

@@ -17,7 +17,8 @@
 #'   and skill must match exactly one entry in its supplied registry.
 #' @param overwrite Whether to replace an existing file. Defaults to `FALSE`.
 #'
-#' @return `agent_definition_read()` returns an `AgentDefinition`.
+#' @return `agent_definition_read()` returns a read-only `AgentDefinition`
+#'   S7 value.
 #'   `agent_definition_write()` invisibly returns `path`.
 #'   `agent_definitions()` returns a named list of definitions keyed by their
 #'   canonical routing names, ready for `LeadAgent$new(sub_agents = ...)`.
@@ -117,7 +118,7 @@ agent_definition_write <- function(
     abort_definition_file("{.arg overwrite} must be TRUE or FALSE", path)
   }
   definition <- copy_agent_definition(definition)
-  spec <- c(list(version = 1L), unclass(definition))
+  spec <- c(list(version = 1L), S7::props(definition))
   spec$tools <- definition_reference_names(
     definition$tools,
     tools,

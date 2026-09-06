@@ -36,9 +36,10 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
     "cannot change under the lead policy"
   )
 
-  restricted <- widening
-  restricted$name <- "restricted"
-  restricted$permission_mode <- "readonly"
+  fields <- S7::props(widening)
+  fields$name <- "restricted"
+  fields$permission_mode <- "readonly"
+  restricted <- do.call(agent_definition, fields)
   child <- lead$.__enclos_env__$private$create_sub_agent(restricted)
   expect_identical(child$permissions$mode, "readonly")
   expect_s3_class(
@@ -50,9 +51,10 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
     "PermissionResultDeny"
   )
 
-  plan_definition <- widening
-  plan_definition$name <- "plan-to-readonly"
-  plan_definition$permission_mode <- "readonly"
+  fields <- S7::props(widening)
+  fields$name <- "plan-to-readonly"
+  fields$permission_mode <- "readonly"
+  plan_definition <- do.call(agent_definition, fields)
   plan_lead <- LeadAgent$new(
     chat = create_mock_chat(),
     sub_agents = list(plan_definition),

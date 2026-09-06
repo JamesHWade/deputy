@@ -39,7 +39,8 @@ and skill must match exactly one entry in its supplied registry.}
 \item{overwrite}{Whether to replace an existing file. Defaults to \code{FALSE}.}
 }
 \value{
-\code{agent_definition_read()} returns an \code{AgentDefinition}.
+\code{agent_definition_read()} returns a read-only \code{AgentDefinition}
+S7 value.
 \code{agent_definition_write()} invisibly returns \code{path}.
 \code{agent_definitions()} returns a named list of definitions keyed by their
 canonical routing names, ready for \code{LeadAgent$new(sub_agents = ...)}.
