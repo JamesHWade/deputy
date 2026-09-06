@@ -9,6 +9,22 @@
       i Tool object class: <environment>.
       x no applicable method for `@` applied to an object of class "environment"
 
+# sub-agents inherit remaining lead run budgets
+
+    Code
+      child$usage_limits@max_requests <- 100L
+    Condition
+      Error:
+      ! Cannot modify `max_requests`: property is read-only after construction
+
+---
+
+    Code
+      child$usage_limits <- UsageLimits()
+    Condition
+      Error:
+      ! Cannot modify agent: usage_limits are immutable after construction
+
 # delegated S7 policies preserve ceilings after serialization
 
     Code

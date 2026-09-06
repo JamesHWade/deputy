@@ -49,7 +49,7 @@ validate_parallel_tasks <- function(lead, tasks, max_active, mode) {
 }
 
 parallel_child_limits <- function(remaining, definition, count, index) {
-  allocation <- remaining
+  allocation <- S7::props(remaining)
   fields <- c(
     "max_input_tokens",
     "max_output_tokens",
@@ -57,7 +57,7 @@ parallel_child_limits <- function(remaining, definition, count, index) {
     "max_cost_usd"
   )
   for (field in fields) {
-    available <- remaining[[field]]
+    available <- S7::prop(remaining, field)
     if (is.null(available)) {
       next
     }
@@ -70,7 +70,7 @@ parallel_child_limits <- function(remaining, definition, count, index) {
   allocation$max_requests <- min(1L, definition$max_requests %||% 1L)
   allocation$max_tool_calls <- 0L
   allocation$on_exceed <- "stop"
-  allocation
+  do.call(UsageLimits, allocation)
 }
 
 parallel_responder <- function(

@@ -2122,7 +2122,7 @@ Agent <- R6::R6Class(
       },
 
       add_external_usage = function(usage) {
-        if (!inherits(usage, "AgentUsage")) {
+        if (!S7::S7_inherits(usage, AgentUsage)) {
           return(invisible(FALSE))
         }
         private$current_external_usage <- agent_usage_add(

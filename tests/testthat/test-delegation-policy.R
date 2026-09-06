@@ -195,6 +195,10 @@ test_that("sub-agents inherit remaining lead run budgets", {
   expect_identical(child$usage_limits$max_tool_calls, 3L)
   expect_equal(child$usage_limits$max_total_tokens, 550)
   expect_equal(child$usage_limits$max_cost_usd, 0.20)
+  expect_s7_class(child$usage_limits, UsageLimits)
+  expect_snapshot(error = TRUE, child$usage_limits@max_requests <- 100L)
+  expect_snapshot(error = TRUE, child$usage_limits <- UsageLimits())
+  expect_identical(private$current_usage_limits$max_requests, 6L)
 
   private$reserve_delegation_usage("delegation-one", child$usage_limits)
   sibling_limits <- private$derive_subagent_usage_limits(definition)

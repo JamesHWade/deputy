@@ -1007,14 +1007,14 @@ LeadAgent <- R6::R6Class(
       )
       reserved <- private$reserved_delegation_usage()
       remaining <- lapply(names(usage_fields), function(limit_field) {
-        limit <- limits[[limit_field]]
+        limit <- S7::prop(limits, limit_field)
         if (is.null(limit)) {
           return(NULL)
         }
         max(
           0,
           limit -
-            current[[usage_fields[[limit_field]]]] -
+            S7::prop(current, usage_fields[[limit_field]]) -
             reserved[[limit_field]]
         )
       })
@@ -1044,7 +1044,7 @@ LeadAgent <- R6::R6Class(
       )
       private$delegation_usage_reservations[[delegation_id]] <- vapply(
         fields,
-        function(field) limits[[field]] %||% 0,
+        function(field) S7::prop(limits, field) %||% 0,
         numeric(1)
       )
       invisible(NULL)

@@ -517,7 +517,7 @@ test_that("compaction summary clone is isolated, callback-free, and silent", {
 
   expect_equal(summary$summary, "A summary.")
   expect_identical(summary$method, "llm")
-  expect_s3_class(summary$usage, "AgentUsage")
+  expect_s7_class(summary$usage, AgentUsage)
   expect_identical(probe$clone_calls, 1L)
   expect_identical(probe$clone_deep, TRUE)
   expect_length(probe$summary_call$turns, 0L)

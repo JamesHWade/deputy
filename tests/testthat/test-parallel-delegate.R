@@ -1,3 +1,30 @@
+test_that("parallel budget allocation constructs independent S7 limits", {
+  remaining <- UsageLimits(
+    max_requests = 3,
+    max_tool_calls = 4,
+    max_input_tokens = 5,
+    max_output_tokens = 4,
+    max_total_tokens = 9,
+    max_cost_usd = 0.3,
+    on_exceed = "error"
+  )
+  definition <- agent_definition("worker", "Work", "Work", max_requests = 3)
+  first <- parallel_child_limits(remaining, definition, count = 2, index = 1)
+  second <- parallel_child_limits(remaining, definition, count = 2, index = 2)
+  expect_s7_class(first, UsageLimits)
+  expect_identical(first$max_requests, 1L)
+  expect_identical(first$max_tool_calls, 0L)
+  expect_identical(first$max_input_tokens, 3L)
+  expect_identical(second$max_input_tokens, 2L)
+  expect_identical(first$max_total_tokens + second$max_total_tokens, 9L)
+  expect_equal(first$max_cost_usd + second$max_cost_usd, 0.3)
+  expect_identical(first$on_exceed, "stop")
+  expect_identical(remaining$max_requests, 3L)
+  expect_identical(remaining$max_tool_calls, 4L)
+  expect_identical(remaining$on_exceed, "error")
+  expect_snapshot(error = TRUE, first@max_requests <- 2L)
+})
+
 test_that("stateless responders overlap with isolated conversations and ordered results", {
   state <- new.env(parent = emptyenv())
   state$hold_a_until_b <- TRUE

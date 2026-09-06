@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* `AgentUsage()` and `UsageLimits()` now construct read-only S7 values.
+  Constructors and `$` property reads retain their existing names; use
+  `S7::props()` for plain reporting records instead of list indexing or
+  `unclass()`. Accounting, missing-cost behavior, and delegated budget
+  intersections retain their existing semantics (#121).
+
 * `AgentResult()` and `Permissions()` now construct read-only S7 values. Use
   `result_n_turns()`, `result_tool_calls()`, `result_tool_results()`,
   `result_text_chunks()`, and `result_is_success()` to inspect results, and

@@ -70,4 +70,4 @@
     Condition
       Error:
       ! <deputy::AgentResult> object properties are invalid:
-      - @usage must be <NULL> or S3<AgentUsage>, not <list>
+      - @usage must be <NULL> or <deputy::AgentUsage>, not <list>

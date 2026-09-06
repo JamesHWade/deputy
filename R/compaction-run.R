@@ -274,8 +274,15 @@ compaction_summary_attempt <- function(
     } else {
       usage <- AgentUsage()
     }
-    settled <- usage
-    settled$requests <- 0L
+    # Dispatch already counted requests; settlement adds the reported resources.
+    settled <- AgentUsage(
+      requests = 0L,
+      tool_calls = usage@tool_calls,
+      input_tokens = usage@input_tokens,
+      output_tokens = usage@output_tokens,
+      cached_tokens = usage@cached_tokens,
+      cost_usd = usage@cost_usd
+    )
     private$current_external_usage <- agent_usage_add(
       private$current_external_usage,
       settled

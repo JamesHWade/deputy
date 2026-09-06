@@ -156,7 +156,7 @@ test_that("stream_async isolates and clears run-scoped state", {
   expect_equal(collect_async_stream(stream), list("done"))
   expect_true(observed$run_active)
   expect_false(observed$current_stream_content)
-  expect_s3_class(observed$current_usage_limits, "UsageLimits")
+  expect_s7_class(observed$current_usage_limits, UsageLimits)
   expect_null(observed$current_usage_limits$max_requests)
   expect_equal(observed$current_usage_limits$max_tool_calls, 3L)
   expect_length(observed$pending_events, 0L)

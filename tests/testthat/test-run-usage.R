@@ -9,7 +9,7 @@ test_that("UsageLimits validates and normalizes limits", {
     on_exceed = "error"
   )
 
-  expect_s3_class(limits, "UsageLimits")
+  expect_s7_class(limits, UsageLimits)
   expect_identical(limits$max_requests, 3L)
   expect_identical(limits$max_tool_calls, 4L)
   expect_equal(limits$max_cost_usd, 0.25)
@@ -43,6 +43,65 @@ test_that("per-run limits inherit unspecified agent defaults", {
   expect_identical(merged$max_output_tokens, 200L)
   expect_equal(merged$max_cost_usd, 0.25)
   expect_identical(merged$on_exceed, "stop")
+  expect_identical(defaults$max_tool_calls, NULL)
+  expect_identical(override$max_requests, NULL)
+  expect_identical(
+    merge_usage_limits(UsageLimits(), UsageLimits()),
+    UsageLimits()
+  )
+})
+
+test_that("usage values freeze stored and initially unset properties", {
+  usage <- AgentUsage(input_tokens = 10, output_tokens = 5, cost_usd = NA_real_)
+  limits <- UsageLimits()
+  expect_snapshot(error = TRUE, usage@requests <- 2L)
+  expect_snapshot(error = TRUE, usage$total_tokens <- 999)
+  expect_snapshot(error = TRUE, usage@total_tokens <- 999)
+  expect_snapshot(error = TRUE, usage@cost_usd <- 0)
+  expect_snapshot(error = TRUE, limits@max_requests <- 2L)
+  expect_snapshot(error = TRUE, limits$on_exceed <- "error")
+  expect_snapshot(error = TRUE, S7::props(limits) <- list(max_cost_usd = 1))
+  expect_snapshot(error = TRUE, S7::props(usage) <- list(input_tokens = 999))
+  expect_identical(usage$total_tokens, 15)
+  expect_identical(usage$cost_usd, NA_real_)
+  expect_identical(limits$max_requests, NULL)
+})
+
+test_that("usage property projections are independent plain records", {
+  usage <- AgentUsage(input_tokens = 10, output_tokens = 5, cached_tokens = 8)
+  fields <- S7::props(usage)
+  expect_identical(class(fields), "list")
+  expect_named(
+    fields,
+    c(
+      "requests",
+      "tool_calls",
+      "input_tokens",
+      "output_tokens",
+      "cached_tokens",
+      "total_tokens",
+      "cost_usd"
+    )
+  )
+  fields$total_tokens <- 1000
+  expect_identical(usage$total_tokens, 15)
+  limits <- UsageLimits(max_requests = 3, max_cost_usd = 0)
+  saved <- S7::props(limits)
+  expect_identical(do.call(UsageLimits, saved), limits)
+  saved$max_requests <- 8L
+  expect_identical(limits$max_requests, 3L)
+})
+
+test_that("runtime limits and results require genuine S7 values", {
+  fake_limits <- structure(
+    list(max_requests = 1L),
+    class = c("UsageLimits", "list")
+  )
+  fake_usage <- structure(list(requests = 1L), class = c("AgentUsage", "list"))
+  expect_snapshot(error = TRUE, normalize_usage_limits(fake_limits))
+  expect_snapshot(error = TRUE, merge_usage_limits(fake_limits, UsageLimits()))
+  expect_snapshot(error = TRUE, merge_usage_limits(UsageLimits(), fake_limits))
+  expect_snapshot(error = TRUE, AgentResult(usage = fake_usage))
 })
 
 test_that("AgentUsage reports total tokens without double counting cache", {
@@ -55,7 +114,7 @@ test_that("AgentUsage reports total tokens without double counting cache", {
     cost_usd = 0.02
   )
 
-  expect_s3_class(usage, "AgentUsage")
+  expect_s7_class(usage, AgentUsage)
   expect_identical(usage$requests, 2L)
   expect_identical(usage$tool_calls, 3L)
   expect_equal(usage$total_tokens, 140)
@@ -130,6 +189,33 @@ test_that("usage differences are scoped to the current run", {
   expect_equal(usage$output_tokens, 25)
   expect_equal(usage$cached_tokens, 20)
   expect_equal(usage$cost_usd, 0.06, tolerance = 1e-12)
+  expect_identical(before$requests, 4L)
+  expect_identical(after$requests, 6L)
+})
+
+test_that("preserving run accounting constructs a separate usage value", {
+  agent <- Agent$new(chat = create_mock_chat())
+  private <- agent$.__enclos_env__$private
+  private$current_tool_calls <- 2L
+  usage <- AgentUsage(
+    requests = 3,
+    tool_calls = 5,
+    input_tokens = 10,
+    cost_usd = NA_real_
+  )
+  preserve_run_usage(agent, usage)
+  expect_identical(usage$tool_calls, 5L)
+  expect_equal(
+    private$current_external_usage,
+    AgentUsage(
+      requests = 3,
+      tool_calls = 3,
+      input_tokens = 10,
+      cost_usd = NA_real_
+    )
+  )
+  expect_identical(private$current_outer_requests, 0L)
+  expect_s7_class(private$current_usage_baseline, AgentUsage)
 })
 
 test_that("run cost ignores incomplete records from earlier turns", {

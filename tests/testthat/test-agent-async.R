@@ -32,7 +32,7 @@ test_that("run_async resolves to an AgentResult with the final turn's text", {
   expect_identical(result$session_id, agent$session_id())
   expect_match(result$run_id, "^run_")
   expect_identical(result$run_context$role, "worker")
-  expect_s3_class(result$usage, "AgentUsage")
+  expect_s7_class(result$usage, AgentUsage)
   expect_true(is.numeric(result$duration))
   expect_false(agent$.__enclos_env__$private$run_active)
 })
@@ -208,7 +208,7 @@ test_that("run_async fires lifecycle hooks and records usage on the result", {
     fired,
     c("SessionStart", "UserPromptSubmit", "Stop", "SessionEnd")
   )
-  expect_s3_class(result$usage, "AgentUsage")
+  expect_s7_class(result$usage, AgentUsage)
   expect_identical(agent$.__enclos_env__$private$last_run_usage, result$usage)
 })
 
@@ -308,5 +308,5 @@ test_that("stream_async records usage on the shared callback state", {
   }
   agent <- Agent$new(chat = chat)
   expect_equal(collect_async_stream(agent$stream_async("x")), list("done"))
-  expect_s3_class(agent$.__enclos_env__$private$last_run_usage, "AgentUsage")
+  expect_s7_class(agent$.__enclos_env__$private$last_run_usage, AgentUsage)
 })
