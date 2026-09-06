@@ -2,8 +2,8 @@ test_that("object summaries print user braces literally and return invisibly", {
   literal <- "{stop('must stay text')}"
   objects <- list(
     AgentEvent("text", text = literal),
-    AgentResult$new(response = literal),
-    Permissions$new(tool_allowlist = literal),
+    AgentResult(response = literal),
+    Permissions(tool_allowlist = literal),
     HookMatcher("Stop", function(reason, context) NULL, pattern = "a{1}"),
     Skill$new(name = literal, prompt = literal),
     agent_definition("print_probe", description = literal, prompt = "test"),
@@ -21,7 +21,7 @@ test_that("object summaries print user braces literally and return invisibly", {
 
 test_that("cli summaries wrap at the configured width and close their containers", {
   withr::local_options(cli.width = 36, cli.num_colors = 1L)
-  result <- AgentResult$new(response = paste(rep("word", 10), collapse = " "))
+  result <- AgentResult(response = paste(rep("word", 10), collapse = " "))
   output <- cli::cli_format_method({
     print(result)
     cli::cli_text("after")

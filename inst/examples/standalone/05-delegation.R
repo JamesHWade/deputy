@@ -15,7 +15,7 @@ reviewer <- agent_definition(
 lead <- LeadAgent$new(
   chat = chat,
   sub_agents = list(reviewer),
-  permissions = Permissions$new(
+  permissions = Permissions(
     mode = "standard",
     bash = FALSE,
     r_code = FALSE,

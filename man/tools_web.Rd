@@ -37,7 +37,7 @@ Without a \code{chat} argument, returns universal tools that work with any provi
 agent <- Agent$new(
   chat = ellmer::chat_ollama(),
   tools = tools_web(),
-  permissions = Permissions$new(web = TRUE)
+  permissions = Permissions(web = TRUE)
 )
 
 # Provider-specific tools (auto-detected)
@@ -45,7 +45,7 @@ chat <- ellmer::chat_claude()
 agent <- Agent$new(
   chat = chat,
   tools = tools_web(chat),  # Uses Claude's native web tools
-  permissions = Permissions$new(
+  permissions = Permissions(
     web = TRUE,
     tool_allowlist = c("web_search", "web_fetch")
   )
@@ -55,7 +55,7 @@ agent <- Agent$new(
 agent <- Agent$new(
   chat = chat,
   tools = tools_web(chat, use_native = FALSE),
-  permissions = Permissions$new(web = TRUE)
+  permissions = Permissions(web = TRUE)
 )
 }
 

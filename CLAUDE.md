@@ -34,7 +34,8 @@ deputy/
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
 │   ├── run-usage.R         # Run accounting and fail-closed limits
 │   ├── stall-detection.R   # Canonical repeated-tool progress signal
-│   ├── permissions.R       # Permission system and tool annotations
+│   ├── permissions.R       # S7 permission configuration and public evaluation
+│   ├── permission-evaluation.R # Internal tool gating and capability evaluation
 │   ├── hooks.R             # HookRegistry for lifecycle events
 │   ├── skills.R            # Skill loading system
 │   ├── tools-files.R       # Native filesystem tools
@@ -170,11 +171,15 @@ minimum version or adopting an unreleased API.
 - **Formatter**: Air (configuration in `air.toml`)
 - **Documentation**: roxygen2 with markdown support
 - **Classes**: Use S7 for value contracts and R6 for mutable runtime owners.
-  `HookMatcher(...)` and `AgentEvent(...)` are S7 values; use
-  `hook_matches(hook, tool_name)` and S7 property access for matcher behavior.
+  `HookMatcher(...)`, `AgentEvent(...)`, `AgentResult(...)`, and
+  `Permissions(...)` are read-only S7 values. Use `hook_matches()`,
+  `permissions_check()`, and `result_*()` inspection functions. `$` reads on
+  events, results, and policies are property conveniences; there are no R6
+  constructor or method facades for these values.
   Existing value types await scoped migration; do not introduce new S3 value
   classes. ADR-0009 records validation, read-only storage, and composition
-  with ellmer classes.
+  with ellmer classes. ADR-0010 records result inspection, policy evaluation,
+  and the AgentResult/Permissions migration.
 - **Printing**: Format summaries with `cli::cli_format_method()` and write the
   resulting lines with `cli::cat_line()` so printing remains on stdout. Pass
   user strings as interpolated values, never as cli templates, and return the
@@ -270,7 +275,7 @@ test_that("descriptive test name", {
 
   # Verify
 
-  expect_s3_class(result, "AgentResult")
+  expect_s7_class(result, AgentResult)
   expect_equal(result$stop_reason, "end_turn")
 })
 ```

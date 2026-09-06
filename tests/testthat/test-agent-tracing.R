@@ -41,7 +41,7 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
             description = "effect"
           )
           permissions <- if (mode %in% c("deny", "override", "override_deny")) {
-            Permissions$new(mode = "readonly", tool_denylist = "effect")
+            Permissions(mode = "readonly", tool_denylist = "effect")
           } else {
             permissions_full()
           }

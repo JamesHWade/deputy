@@ -32,7 +32,7 @@ consider using a dedicated search API.
 agent <- Agent$new(
   chat = ellmer::chat("openai/gpt-5.6-luna"),
   tools = list(tool_web_search),
-  permissions = Permissions$new(web = TRUE)
+  permissions = Permissions(web = TRUE)
 )
 }
 

@@ -118,7 +118,7 @@ test_that("fallback retains the permission ceiling and unknown cost fails closed
   agent <- Agent$new(
     runtime_chat(server),
     tools = list(tool),
-    permissions = Permissions$new(mode = "readonly", tool_denylist = "effect"),
+    permissions = Permissions(mode = "readonly", tool_denylist = "effect"),
     fallback_chats = list(runtime_chat(server))
   )
   suppressWarnings(agent$run_sync("task"))

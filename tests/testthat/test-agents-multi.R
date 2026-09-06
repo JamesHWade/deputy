@@ -265,7 +265,7 @@ test_that("readonly sub-agents retain custom lead read restrictions", {
   )
 
   for (lead_mode in c("standard", "plan")) {
-    permissions <- Permissions$new(
+    permissions <- Permissions(
       mode = lead_mode,
       file_read = FALSE,
       file_write = FALSE,
@@ -284,7 +284,11 @@ test_that("readonly sub-agents retain custom lead read restrictions", {
     expect_identical(child$permissions$mode, "readonly")
     expect_false(child$permissions$file_read)
     expect_s3_class(
-      child$permissions$check("read_file", list(path = "blocked.txt")),
+      permissions_check(
+        child$permissions,
+        "read_file",
+        list(path = "blocked.txt")
+      ),
       "PermissionResultDeny"
     )
   }
@@ -306,7 +310,7 @@ test_that("readonly sub-agents retain custom callback denials", {
   lead <- LeadAgent$new(
     chat = create_mock_chat(),
     sub_agents = list(definition),
-    permissions = Permissions$new(
+    permissions = Permissions(
       mode = "standard",
       can_use_tool = callback
     )
@@ -314,11 +318,15 @@ test_that("readonly sub-agents retain custom callback denials", {
   child <- lead$.__enclos_env__$private$create_sub_agent(definition)
 
   expect_s3_class(
-    child$permissions$check("read_file", list(path = "blocked.txt")),
+    permissions_check(
+      child$permissions,
+      "read_file",
+      list(path = "blocked.txt")
+    ),
     "PermissionResultDeny"
   )
   expect_s3_class(
-    child$permissions$check("run_bash", list(command = "pwd")),
+    permissions_check(child$permissions, "run_bash", list(command = "pwd")),
     "PermissionResultDeny"
   )
 })

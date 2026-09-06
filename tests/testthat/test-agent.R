@@ -6,7 +6,7 @@ test_that("Agent initializes correctly", {
   agent <- Agent$new(chat = mock_chat)
 
   expect_s3_class(agent, "Agent")
-  expect_s3_class(agent$permissions, "Permissions")
+  expect_s7_class(agent$permissions, Permissions)
   expect_s3_class(agent$hooks, "HookRegistry")
   expect_equal(agent$working_dir, getwd())
 })

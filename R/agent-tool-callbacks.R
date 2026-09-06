@@ -69,7 +69,8 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       # denylist, callback, mode, and capability checks still apply.
       permission_context <- context
       permission_context$.deputy_internal_tool <- extracted$internal_tool
-      perm_result <- self$permissions$check(
+      perm_result <- permissions_check(
+        self$permissions,
         tool_name,
         tool_input,
         permission_context

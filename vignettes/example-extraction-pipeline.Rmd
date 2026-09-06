@@ -98,7 +98,7 @@ step1 <- extractor$run_sync(
   type = ellmer::type_from_schema(jsonlite::toJSON(extract_schema, auto_unbox = TRUE))
 )
 
-if (!step1$is_success()) {
+if (!result_is_success(step1)) {
   cli::cli_abort("Extraction stopped early: {step1$stop_reason}.")
 }
 
@@ -174,7 +174,7 @@ step2 <- enricher$run_sync(
   type = ellmer::type_from_schema(jsonlite::toJSON(enrich_schema, auto_unbox = TRUE))
 )
 
-if (!step2$is_success()) {
+if (!result_is_success(step2)) {
   cli::cli_abort("Enrichment stopped early: {step2$stop_reason}.")
 }
 enriched <- step2$structured_output
@@ -229,7 +229,7 @@ extraction_pipeline <- function(package_dir = ".") {
     type = ellmer::type_from_schema(jsonlite::toJSON(extract_schema, auto_unbox = TRUE))
   )
 
-  if (!step1$is_success()) {
+  if (!result_is_success(step1)) {
     cli::cli_abort("Extraction stopped early: {step1$stop_reason}.")
   }
 
@@ -252,7 +252,7 @@ extraction_pipeline <- function(package_dir = ".") {
     type = ellmer::type_from_schema(jsonlite::toJSON(enrich_schema, auto_unbox = TRUE))
   )
 
-  if (!step2$is_success()) {
+  if (!result_is_success(step2)) {
     cli::cli_abort("Enrichment stopped early: {step2$stop_reason}.")
   }
 
@@ -294,7 +294,7 @@ step <- extractor$run_sync(
   type = ellmer::type_from_schema(jsonlite::toJSON(extract_schema, auto_unbox = TRUE))
 )
 
-if (!step$is_success()) {
+if (!result_is_success(step)) {
   cli::cli_abort("Agent stopped early: {step$stop_reason}")
 }
 

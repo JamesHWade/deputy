@@ -306,7 +306,7 @@ test_that("a loaded definition delegates with its tools, limits and permissions"
   lead <- LeadAgent$new(
     chat = create_mock_chat("Reviewed"),
     sub_agents = list(definition),
-    permissions = Permissions$new(mode = "standard", file_write = FALSE),
+    permissions = Permissions(mode = "standard", file_write = FALSE),
     usage_limits = UsageLimits(max_requests = 5)
   )
   result <- resolve_async_value(lead$get_tools()[["delegate_to_agent"]](

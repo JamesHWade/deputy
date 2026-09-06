@@ -2,76 +2,9 @@
 % Please edit documentation in R/agent-result.R
 \name{AgentResult}
 \alias{AgentResult}
-\title{Agent Result R6 Class}
-\description{
-Contains the result of an agent task execution, including the final response,
-conversation history, cost information, and all events that occurred during
-execution.
-}
-\section{Public fields}{
-  \if{html}{\out{<div class="r6-fields">}}
-  \describe{
-    \item{\code{response}}{The final text response from the agent}
-
-    \item{\code{turns}}{List of conversation turns}
-
-    \item{\code{cost}}{Cost information with input, output, cached, total,
-complete, and missing fields. An incomplete total is \code{NA_real_}.}
-
-    \item{\code{events}}{List of all AgentEvent objects from execution}
-
-    \item{\code{duration}}{Execution duration in seconds}
-
-    \item{\code{stop_reason}}{Reason the agent stopped}
-
-    \item{\code{structured_output}}{Data converted by ellmer using the requested type (if any)}
-
-    \item{\code{session_id}}{Stable session identifier for run correlation}
-
-    \item{\code{run_id}}{Unique identifier shared by events from this run}
-
-    \item{\code{agent_id}}{Immutable identifier for the Agent instance}
-
-    \item{\code{agent_name}}{Optional human-readable Agent name}
-
-    \item{\code{parent_agent_id}}{Parent Agent identifier for delegated runs}
-
-    \item{\code{parent_run_id}}{Parent run identifier for delegated runs}
-
-    \item{\code{delegation_id}}{Delegation identifier for delegated runs}
-
-    \item{\code{usage}}{Run-scoped \link{AgentUsage}}
-  }
-  \if{html}{\out{</div>}}
-}
-\section{Active bindings}{
-  \if{html}{\out{<div class="r6-active-bindings">}}
-  \describe{
-    \item{\code{run_context}}{Canonical product context for the run. Read-only.}
-  }
-  \if{html}{\out{</div>}}
-}
-\section{Methods}{
-\subsection{Public methods}{
-  \itemize{
-    \item \href{#method-AgentResult-initialize}{\code{AgentResult$new()}}
-    \item \href{#method-AgentResult-n_turns}{\code{AgentResult$n_turns()}}
-    \item \href{#method-AgentResult-tool_calls}{\code{AgentResult$tool_calls()}}
-    \item \href{#method-AgentResult-tool_results}{\code{AgentResult$tool_results()}}
-    \item \href{#method-AgentResult-text_chunks}{\code{AgentResult$text_chunks()}}
-    \item \href{#method-AgentResult-is_success}{\code{AgentResult$is_success()}}
-    \item \href{#method-AgentResult-print}{\code{AgentResult$print()}}
-    \item \href{#method-AgentResult-clone}{\code{AgentResult$clone()}}
-  }
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AgentResult-initialize"></a>}}
-\if{latex}{\out{\hypertarget{method-AgentResult-initialize}{}}}
-\subsection{\code{AgentResult$new()}}{
-  Create a new AgentResult object.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{AgentResult$new(
+\title{Create a completed agent result}
+\usage{
+AgentResult(
   response = NULL,
   turns = list(),
   cost = list(input = 0, output = 0, cached = 0, total = 0, complete = TRUE, missing =
@@ -89,140 +22,50 @@ complete, and missing fields. An incomplete total is \code{NA_real_}.}
   parent_run_id = NULL,
   delegation_id = NULL,
   run_context = list()
-)}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Arguments}{
-    \if{html}{\out{<div class="arguments">}}
-    \describe{
-      \item{\code{response}}{Final text response}
-      \item{\code{turns}}{List of conversation turns}
-      \item{\code{cost}}{Cost information, including provider coverage metadata}
-      \item{\code{events}}{List of AgentEvent objects}
-      \item{\code{duration}}{Execution duration in seconds}
-      \item{\code{stop_reason}}{Reason for stopping}
-      \item{\code{structured_output}}{Parsed structured output (if any)}
-      \item{\code{session_id}}{Stable session identifier (if any)}
-      \item{\code{run_id}}{Unique run identifier (if any)}
-      \item{\code{usage}}{Run-scoped \link{AgentUsage}}
-      \item{\code{agent_id}}{Agent instance identifier (if any)}
-      \item{\code{agent_name}}{Optional human-readable Agent name}
-      \item{\code{parent_agent_id}}{Parent Agent identifier for delegated runs}
-      \item{\code{parent_run_id}}{Parent run identifier for delegated runs}
-      \item{\code{delegation_id}}{Delegation identifier for delegated runs}
-      \item{\code{run_context}}{Immutable product context for this run}
-    }
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Returns}{
-    A new \code{AgentResult} object
-  }
+)
 }
+\arguments{
+\item{response}{Final text response, or \code{NULL}.}
 
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AgentResult-n_turns"></a>}}
-\if{latex}{\out{\hypertarget{method-AgentResult-n_turns}{}}}
-\subsection{\code{AgentResult$n_turns()}}{
-  Get the number of turns in the conversation.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{AgentResult$n_turns()}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Returns}{
-    Integer count of turns
-  }
+\item{turns}{List of original conversation turns.}
+
+\item{cost}{Cost information, including provider coverage metadata, or
+\code{NULL}. An incomplete total is \code{NA_real_}.}
+
+\item{events}{List of \link{AgentEvent} objects.}
+
+\item{duration}{Finite, nonnegative duration in seconds, or \code{NULL}.}
+
+\item{stop_reason}{One nonempty stop-reason string.}
+
+\item{structured_output}{Parsed structured output, if any.}
+
+\item{session_id, run_id, agent_id, agent_name, parent_agent_id, parent_run_id, delegation_id}{Optional nonempty correlation and identity strings.}
+
+\item{usage}{Run-scoped \link{AgentUsage}, or \code{NULL}.}
+
+\item{run_context}{Canonical product context for the run.}
 }
-
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AgentResult-tool_calls"></a>}}
-\if{latex}{\out{\hypertarget{method-AgentResult-tool_calls}{}}}
-\subsection{\code{AgentResult$tool_calls()}}{
-  Get all tool calls made during execution.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{AgentResult$tool_calls()}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Returns}{
-    List of tool_start events
-  }
+\value{
+An \code{AgentResult} S7 object.
 }
+\description{
+A read-only S7 snapshot of a governed run. It contains original ellmer turns,
+Deputy events, usage, and correlation metadata. Read properties with
+\code{S7::prop(result, "response")} or \code{$}; use \code{\link[=result_n_turns]{result_n_turns()}},
+\code{\link[=result_tool_calls]{result_tool_calls()}}, \code{\link[=result_tool_results]{result_tool_results()}}, \code{\link[=result_text_chunks]{result_text_chunks()}}, and
+\code{\link[=result_is_success]{result_is_success()}} for inspection.
 
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AgentResult-tool_results"></a>}}
-\if{latex}{\out{\hypertarget{method-AgentResult-tool_results}{}}}
-\subsection{\code{AgentResult$tool_results()}}{
-  Get all completed tool events from execution.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{AgentResult$tool_results()}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Returns}{
-    List of \code{tool_end} events
-  }
+All properties are read-only, including previously writable R6 fields.
+Ordinary nested lists use R value semantics. Embedded provider objects,
+conditions, environments, and closures retain their own reference semantics;
+the result does not deep-copy or sanitize their contents. Run context is
+separately normalized to canonical JSON-compatible values.
 }
-
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AgentResult-text_chunks"></a>}}
-\if{latex}{\out{\hypertarget{method-AgentResult-text_chunks}{}}}
-\subsection{\code{AgentResult$text_chunks()}}{
-  Get all text chunks from the response.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{AgentResult$text_chunks()}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Returns}{
-    Character vector of text chunks
-  }
-}
-
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AgentResult-is_success"></a>}}
-\if{latex}{\out{\hypertarget{method-AgentResult-is_success}{}}}
-\subsection{\code{AgentResult$is_success()}}{
-  Check if the agent completed successfully.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{AgentResult$is_success()}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Returns}{
-    Logical indicating success
-  }
-}
-
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AgentResult-print"></a>}}
-\if{latex}{\out{\hypertarget{method-AgentResult-print}{}}}
-\subsection{\code{AgentResult$print()}}{
-  Print the result summary.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{AgentResult$print()}
-    \if{html}{\out{</div>}}
-  }
-}
-
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AgentResult-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-AgentResult-clone}{}}}
-\subsection{\code{AgentResult$clone()}}{
-  The objects of this class are cloneable with this method.
-  \subsection{Usage}{
-    \if{html}{\out{<div class="r">}}
-    \preformatted{AgentResult$clone(deep = FALSE)}
-    \if{html}{\out{</div>}}
-  }
-  \subsection{Arguments}{
-    \if{html}{\out{<div class="arguments">}}
-    \describe{
-      \item{\code{deep}}{Whether to make a deep clone.}
-    }
-    \if{html}{\out{</div>}}
-  }
-}
-
+\examples{
+result <- AgentResult(response = "Done", events = list(
+  AgentEvent("text", text = "Done")
+))
+result_is_success(result)
+result_text_chunks(result)
 }

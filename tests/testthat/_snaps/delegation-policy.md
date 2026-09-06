@@ -9,3 +9,28 @@
       i Tool object class: <environment>.
       x no applicable method for `@` applied to an object of class "environment"
 
+# delegated S7 policies preserve ceilings after serialization
+
+    Code
+      child$permissions@tool_denylist <- NULL
+    Condition
+      Error:
+      ! Cannot modify `tool_denylist`: property is read-only after construction
+
+---
+
+    Code
+      child$permissions <- permissions_full()
+    Condition
+      Error:
+      ! Cannot modify agent: permissions are immutable after construction
+
+---
+
+    Code
+      child$set_permission_mode("full")
+    Condition
+      Error in `child$set_permission_mode()`:
+      ! Permission mode cannot widen or replace the current policy
+      x Mode readonly cannot change to full.
+      i Create a new Agent with explicitly broader Permissions to make this change.

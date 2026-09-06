@@ -93,7 +93,7 @@ test_that("the run kernel compacts automatically before the provider call", {
   result <- suppressWarnings(agent$run_sync("Continue"))
   compaction <- agent$last_compaction()
 
-  expect_s3_class(result, "AgentResult")
+  expect_s7_class(result, AgentResult)
   expect_s3_class(compaction, "DeputyCompaction")
   expect_true(compaction$automatic)
   expect_identical(compaction$method, "text")
@@ -379,7 +379,7 @@ test_that("the internal result reader remains available behind an allowlist", {
     description = "Return another value.",
     arguments = list()
   )
-  permissions <- Permissions$new(
+  permissions <- Permissions(
     mode = "standard",
     file_read = FALSE,
     file_write = FALSE,
@@ -459,7 +459,7 @@ test_that("the internal result reader preserves explicit permission vetoes", {
   }
 
   denied <- make_reader_request(
-    Permissions$new(
+    Permissions(
       tool_allowlist = "large_result",
       tool_denylist = "DEPUTY_READ_TOOL_RESULT"
     ),
@@ -472,7 +472,7 @@ test_that("the internal result reader preserves explicit permission vetoes", {
   )
 
   vetoed <- make_reader_request(
-    Permissions$new(
+    Permissions(
       tool_allowlist = "large_result",
       can_use_tool = function(tool_name, tool_input, context) {
         if (identical(tool_name, "deputy_read_tool_result")) {

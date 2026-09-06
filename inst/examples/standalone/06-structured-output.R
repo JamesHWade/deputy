@@ -17,5 +17,5 @@ result <- agent$run_sync(
   },
   max_corrections = 1L
 )
-stopifnot(result$is_success())
+stopifnot(result_is_success(result))
 print(result$structured_output)

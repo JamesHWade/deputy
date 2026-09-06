@@ -42,7 +42,11 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
   child <- lead$.__enclos_env__$private$create_sub_agent(restricted)
   expect_identical(child$permissions$mode, "readonly")
   expect_s3_class(
-    child$permissions$check("write_file", list(path = "blocked.txt")),
+    permissions_check(
+      child$permissions,
+      "write_file",
+      list(path = "blocked.txt")
+    ),
     "PermissionResultDeny"
   )
 
@@ -52,7 +56,7 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
   plan_lead <- LeadAgent$new(
     chat = create_mock_chat(),
     sub_agents = list(plan_definition),
-    permissions = Permissions$new(
+    permissions = Permissions(
       mode = "plan",
       file_read = TRUE,
       file_write = FALSE,
@@ -85,7 +89,7 @@ test_that("sub-agent disallowed tools override permission prompts", {
   )
   child <- lead$.__enclos_env__$private$create_sub_agent(definition)
 
-  result <- child$permissions$check("ask_user", list())
+  result <- permissions_check(child$permissions, "ask_user", list())
   expect_s3_class(result, "PermissionResultDeny")
   expect_false(grepl("Use ask_user", result$reason, fixed = TRUE))
 })
@@ -115,7 +119,7 @@ test_that("sub-agents retain inherited prompt-tool gates", {
     permission_mode = "plan"
   )
   policies <- list(
-    Permissions$new(
+    Permissions(
       mode = "full",
       file_read = TRUE,
       file_write = TRUE,
@@ -125,7 +129,7 @@ test_that("sub-agents retain inherited prompt-tool gates", {
       install_packages = TRUE,
       tool_denylist = "ask_user"
     ),
-    Permissions$new(
+    Permissions(
       mode = "full",
       file_read = TRUE,
       file_write = TRUE,
@@ -144,7 +148,7 @@ test_that("sub-agents retain inherited prompt-tool gates", {
       permissions = permissions
     )
     child <- lead$.__enclos_env__$private$create_sub_agent(definition)
-    result <- child$permissions$check("ask_user", list())
+    result <- permissions_check(child$permissions, "ask_user", list())
 
     expect_s3_class(result, "PermissionResultDeny")
     expect_false(grepl("Use ask_user", result$reason, fixed = TRUE))
@@ -345,4 +349,33 @@ test_that("SubagentStop hook receives working_dir in context", {
     captured_context$working_dir,
     normalizePath(temp_dir, mustWork = TRUE, winslash = "/")
   )
+})
+
+test_that("delegated S7 policies preserve ceilings after serialization", {
+  definition <- agent_definition(
+    "worker",
+    "Work",
+    "Help",
+    permission_mode = "readonly"
+  )
+  policy <- unserialize(serialize(
+    Permissions(
+      file_write = FALSE,
+      r_code = FALSE,
+      tool_denylist = "read_file"
+    ),
+    NULL
+  ))
+  lead <- LeadAgent$new(chat = create_mock_chat(), permissions = policy)
+  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+  expect_s7_class(child$permissions, Permissions)
+  expect_identical(lead$permissions@mode, "standard")
+  expect_identical(child$permissions@mode, "readonly")
+  expect_s3_class(
+    permissions_check(child$permissions, "read_file", list(path = "x")),
+    "PermissionResultDeny"
+  )
+  expect_snapshot(error = TRUE, child$permissions@tool_denylist <- NULL)
+  expect_snapshot(error = TRUE, child$permissions <- permissions_full())
+  expect_snapshot(error = TRUE, child$set_permission_mode("full"))
 })

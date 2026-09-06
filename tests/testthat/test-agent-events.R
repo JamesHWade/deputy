@@ -60,10 +60,10 @@ test_that("post-tool hooks can redact emitted tool results", {
 
   result <- agent$run_sync("Read input.txt")
 
-  expect_length(result$tool_calls(), 1L)
-  expect_length(result$tool_results(), 1L)
-  expect_identical(result$tool_results()[[1]]$tool_result, "[redacted]")
-  expect_false(result$tool_results()[[1]]$suppressed)
+  expect_length(result_tool_calls(result), 1L)
+  expect_length(result_tool_results(result), 1L)
+  expect_identical(result_tool_results(result)[[1]]$tool_result, "[redacted]")
+  expect_false(result_tool_results(result)[[1]]$suppressed)
 })
 
 test_that("interrupt cooperatively stops an active run", {
@@ -183,9 +183,9 @@ test_that("tool-call limits reject execution and return a typed stop", {
   expect_false(mock$state$tool_executed)
   expect_true(mock$state$tool_rejected)
   expect_identical(result$usage$tool_calls, 1L)
-  expect_length(result$tool_calls(), 1L)
-  expect_length(result$tool_results(), 1L)
-  expect_match(result$tool_results()[[1]]$tool_error, "Run limit reached")
+  expect_length(result_tool_calls(result), 1L)
+  expect_length(result_tool_results(result), 1L)
+  expect_match(result_tool_results(result)[[1]]$tool_error, "Run limit reached")
 })
 
 test_that("error mode signals structured limit conditions", {
@@ -498,7 +498,7 @@ test_that("pre-tool effects are applied before a real hook rejection", {
 test_that("malformed tool identity is rejected before permission checks", {
   checked <- new.env(parent = emptyenv())
   checked$value <- FALSE
-  permissions <- Permissions$new(
+  permissions <- Permissions(
     mode = "standard",
     can_use_tool = function(tool_name, tool_input, context) {
       checked$value <- TRUE

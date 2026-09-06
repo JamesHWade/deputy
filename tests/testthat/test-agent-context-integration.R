@@ -42,13 +42,13 @@ test_that("constructor run context is canonical and read-only", {
 
   result_error <- tryCatch(
     {
-      result$run_context <- list()
+      result@run_context <- list()
       NULL
     },
     error = identity
   )
   expect_s3_class(result_error, "error")
-  expect_match(conditionMessage(result_error), "run_context is immutable")
+  expect_match(conditionMessage(result_error), "read-only")
 })
 
 test_that("correlation identifiers do not change the caller RNG stream", {

@@ -19,4 +19,4 @@ agent <- Agent$new(
 )
 result <- agent$run_sync("Use read_file to read input.txt, then summarize it.")
 cli::cli_text("{result$response}")
-print(result$tool_calls())
+print(result_tool_calls(result))

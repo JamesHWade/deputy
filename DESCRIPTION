@@ -80,6 +80,7 @@ Collate:
     'ids.R'
     'mcp-metadata.R'
     'parallel-delegate.R'
+    'permission-evaluation.R'
     'permission-policy.R'
     'permissions.R'
     'run-context.R'

@@ -17,7 +17,7 @@ server <- function(input, output, session) {
   agent <- Agent$new(
     chat = chat,
     tools = c(tools_file(), tools_data()),
-    permissions = Permissions$new(
+    permissions = Permissions(
       file_read = TRUE,
       file_write = FALSE,
       r_code = FALSE,

@@ -23,6 +23,6 @@ model and task are trusted; process separation is not an OS sandbox.
 }
 \examples{
 perms <- permissions_standard()
-perms$check("write_file", list(path = "output.txt"))
+permissions_check(perms, "write_file", list(path = "output.txt"))
 
 }

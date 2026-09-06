@@ -76,8 +76,8 @@ leave a partial response. Inspect the work behind the answer with:
 
 ```{r inspect-result, eval = FALSE}
 result$usage
-result$tool_calls()
-result$tool_results()
+result_tool_calls(result)
+result_tool_results(result)
 ```
 
 The [getting-started guide](https://jameshwade.github.io/deputy/articles/getting-started.html)

@@ -74,7 +74,22 @@ test_that("serialized S7 values dispatch after loading Deputy in a fresh process
   saveRDS(
     list(
       event = AgentEvent("text", text = "restored"),
-      hook = HookMatcher("Stop", function(...) NULL)
+      hook = HookMatcher("Stop", function(...) NULL),
+      result = AgentResult(
+        response = "restored result",
+        turns = list(ellmer::AssistantTurn(list(ellmer::ContentText(
+          "source"
+        )))),
+        events = list(AgentEvent("text", text = "restored chunk")),
+        run_context = list(revision = "v1")
+      ),
+      policy = Permissions(
+        file_write = normalizePath(tempdir(), winslash = "/"),
+        tool_denylist = "run_bash",
+        can_use_tool = function(...) {
+          deputy::PermissionResultDeny(reason = "restored veto")
+        }
+      )
     ),
     path
   )
@@ -87,6 +102,38 @@ test_that("serialized S7 values dispatch after loading Deputy in a fresh process
       }
       values <- readRDS(path)
       list(
+        result_class = S7::S7_inherits(values$result, AgentResult),
+        policy_class = S7::S7_inherits(values$policy, Permissions),
+        turn_class = S7::S7_inherits(values$result$turns[[1L]], ellmer::Turn),
+        chunks = result_text_chunks(values$result),
+        run_context = values$result$run_context,
+        result_output = capture.output(print(values$result)),
+        policy_output = capture.output(print(values$policy)),
+        callback_reason = permissions_check(
+          values$policy,
+          "read_file",
+          list()
+        )$reason,
+        gating_reason = permissions_check(
+          values$policy,
+          "run_bash",
+          list()
+        )$reason,
+        grant = values$policy$file_write,
+        result_frozen = tryCatch(
+          {
+            S7::prop(values$result, "structured_output") <- "changed"
+            FALSE
+          },
+          error = function(error) grepl("read-only", conditionMessage(error))
+        ),
+        policy_frozen = tryCatch(
+          {
+            S7::prop(values$policy, "tool_allowlist") <- "read_file"
+            FALSE
+          },
+          error = function(error) grepl("read-only", conditionMessage(error))
+        ),
         event_class = S7::S7_inherits(values$event, AgentEvent),
         hook_class = S7::S7_inherits(values$hook, HookMatcher),
         event_output = capture.output(print(values$event)),
@@ -106,6 +153,26 @@ test_that("serialized S7 values dispatch after loading Deputy in a fresh process
       package_path = getNamespaceInfo(asNamespace("deputy"), "path")
     )
   )
+  expect_identical(result$result_class, TRUE)
+  expect_identical(result$policy_class, TRUE)
+  expect_identical(result$turn_class, TRUE)
+  expect_identical(result$chunks, "restored chunk")
+  expect_identical(result$run_context, list(revision = "v1"))
+  expect_match(
+    paste(result$result_output, collapse = "\n"),
+    "restored result",
+    fixed = TRUE
+  )
+  expect_match(
+    paste(result$policy_output, collapse = "\n"),
+    "<Permissions>",
+    fixed = TRUE
+  )
+  expect_identical(result$callback_reason, "restored veto")
+  expect_match(result$gating_reason, "denylist", fixed = TRUE)
+  expect_identical(result$grant, normalizePath(tempdir(), winslash = "/"))
+  expect_identical(result$result_frozen, TRUE)
+  expect_identical(result$policy_frozen, TRUE)
   expect_identical(result$event_class, TRUE)
   expect_identical(result$hook_class, TRUE)
   expect_match(

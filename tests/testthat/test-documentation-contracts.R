@@ -10,7 +10,7 @@ test_that("first-success documentation policies stay executable", {
   expect_identical(first_limits$max_requests, 6L)
   expect_identical(first_context$max_tokens, 32000L)
 
-  write_permissions <- Permissions$new(
+  write_permissions <- Permissions(
     mode = "standard",
     file_read = TRUE,
     file_write = workspace,

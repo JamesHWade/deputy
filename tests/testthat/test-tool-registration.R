@@ -162,19 +162,19 @@ test_that("missing annotations stay absent and use conservative permissions", {
   for (annotations in list(NULL, list(), list(open_world_hint = NULL))) {
     context <- list(tool_annotations = annotations)
     for (mode in c("standard", "readonly", "plan")) {
-      policy <- Permissions$new(mode = mode, web = FALSE, file_write = FALSE)
+      policy <- Permissions(mode = mode, web = FALSE, file_write = FALSE)
       expect_s3_class(
-        policy$check("unknown", list(), context),
+        permissions_check(policy, "unknown", list(), context),
         "PermissionResultDeny"
       )
     }
     expect_s3_class(
-      permissions_full()$check("unknown", list(), context),
+      permissions_check(permissions_full(), "unknown", list(), context),
       "PermissionResultAllow"
     )
   }
   seen <- NULL
-  policy <- Permissions$new(can_use_tool = function(
+  policy <- Permissions(can_use_tool = function(
     tool_name,
     tool_input,
     context
@@ -183,7 +183,12 @@ test_that("missing annotations stay absent and use conservative permissions", {
     PermissionResultAllow()
   })
   expect_s3_class(
-    policy$check("unknown", list(), list(tool_annotations = list())),
+    permissions_check(
+      policy,
+      "unknown",
+      list(),
+      list(tool_annotations = list())
+    ),
     "PermissionResultAllow"
   )
   expect_identical(seen, list())
@@ -194,7 +199,7 @@ test_that("permission annotations come from the registered executable", {
   agent <- Agent$new(
     chat = registration_chat(),
     tools = list(registration_tool()),
-    permissions = Permissions$new(mode = "readonly", tool_allowlist = "lookup")
+    permissions = Permissions(mode = "readonly", tool_allowlist = "lookup")
   )
   misleading <- registration_tool()
   misleading@annotations <- list(destructive_hint = TRUE)

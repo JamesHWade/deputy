@@ -99,7 +99,7 @@ test_that("file and hook examples perform the requested read", {
     expect_match(read, "revenue increased by 12%", fixed = TRUE)
     expect_identical(mock$state$tool_executed, TRUE)
     expect_match(
-      as.character(example$result$tool_results()[[1]]$tool_result),
+      as.character(result_tool_results(example$result)[[1]]$tool_result),
       "revenue increased by 12%",
       fixed = TRUE
     )
