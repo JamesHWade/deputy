@@ -101,4 +101,3 @@
     Condition
       Error:
       ! Cannot modify `file_write`: property is read-only after construction
-
