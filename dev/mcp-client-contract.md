@@ -33,6 +33,9 @@ to one Agent ID, session ID and run context. The host supplies authenticated
 identity and owns end-of-conversation cleanup. Reusing matching identifiers is
 not authentication. Related Agent clones with the same owner values can share
 the connection deliberately; unrelated owners cannot register its tools.
+Every Agent invocation rechecks the executing Agent's effective run context
+before transport dispatch. Loading a different context into a clone or passing
+a per-run context override cannot reuse the original connection's authority.
 
 Selection happens before any server starts. The client worker receives only
 the selected configuration, with a private temporary configuration file, the

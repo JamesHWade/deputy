@@ -1968,6 +1968,7 @@ Agent <- R6::R6Class(
       },
 
       execute_tool = function(tool, arguments) {
+        validate_mcp_tool_owner(tool, self, private$effective_run_context())
         workspace_runner <- attr(
           tool,
           "deputy_workspace_runner",

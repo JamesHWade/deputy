@@ -307,3 +307,71 @@ test_that("server exit is reported as state loss and old handles stay invalid", 
   expect_identical(connection$status()$reason, "server_exited")
   expect_error(tool(operation = "get"), "closed")
 })
+
+test_that("a clone cannot dispatch after loading a different owner context", {
+  config <- mcp_test_config()
+  agent <- Agent$new(chat = create_mock_chat())
+  connection <- McpConnection$new(
+    config$path,
+    "fixture",
+    agent,
+    tools = "state"
+  )
+  withr::defer(connection$close())
+  agent$register_tools(connection$tools())
+  clone <- agent$clone()
+  saved <- Agent$new(
+    chat = create_mock_chat(),
+    run_context = list(reader_id = "other-reader")
+  )
+  path <- tempfile(fileext = ".rds")
+  saved$save_session(path)
+  clone$load_session(path)
+  before <- readLines(config$log)
+  expect_error(
+    clone$get_tools()$state(operation = "set", value = "wrong-owner"),
+    "different Agent",
+    class = "deputy_tool_registration"
+  )
+  expect_identical(readLines(config$log), before)
+  expect_match(
+    paste(mcp_test_await(connection$tools()$state(operation = "get"))),
+    "empty"
+  )
+})
+
+test_that("a run context override cannot dispatch through another owner binding", {
+  config <- mcp_test_config()
+  agent <- NULL
+  denial <- NULL
+  fixture <- create_shiny_tool_chat(
+    "state",
+    list(operation = "get"),
+    execute = function(request) {
+      denial <<- tryCatch(
+        do.call(agent$get_tools()$state, request@arguments),
+        error = identity
+      )
+    }
+  )
+  agent <- Agent$new(chat = fixture$chat, permissions = permissions_full())
+  connection <- McpConnection$new(
+    config$path,
+    "fixture",
+    agent,
+    tools = "state"
+  )
+  withr::defer(connection$close())
+  agent$register_tools(connection$tools())
+  before <- readLines(config$log)
+  agent$run_sync(
+    "Read fixture state.",
+    run_context = list(reader_id = "other-reader")
+  )
+  expect_s3_class(denial, "deputy_tool_registration")
+  expect_identical(readLines(config$log), before)
+  expect_match(
+    paste(mcp_test_await(connection$tools()$state(operation = "get"))),
+    "empty"
+  )
+})

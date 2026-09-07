@@ -153,21 +153,28 @@ mcp_connection_allowlist <- function(value, argument) {
   value
 }
 
-mcp_connection_owner <- function(agent) {
+mcp_connection_owner <- function(agent, run_context = agent$run_context) {
   if (!inherits(agent, "Agent")) {
     abort_deputy("{.arg agent} must be an Agent.", class = "mcp_connection")
   }
   list(
     agent_id = agent$agent_id,
     session_id = agent$session_id(),
-    run_context = agent$run_context
+    run_context = run_context
   )
 }
 
-validate_mcp_tool_owner <- function(tool, agent) {
+validate_mcp_tool_owner <- function(
+  tool,
+  agent,
+  run_context = agent$run_context
+) {
   source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
   owner <- attr(source, "deputy_mcp_owner", exact = TRUE)
-  if (!is.null(owner) && !identical(owner, mcp_connection_owner(agent))) {
+  if (
+    !is.null(owner) &&
+      !identical(owner, mcp_connection_owner(agent, run_context))
+  ) {
     tool_registration_error(
       "The MCP connection belongs to a different Agent, session or run context."
     )
