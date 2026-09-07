@@ -645,8 +645,9 @@ also require exact-commit inline comments linking the same workflow run and atte
 (the upstream sanitizer strips HTML comments from inline bodies). Missing evidence
 fails the review job; recovered tool denials remain visible diagnostics when
 completion is verified. Cancelled runs remain cancelled. The only uploaded diagnostic is `claude-review-outcome.json`: fixed
-outcome/reason values, the reviewed SHA, a denial count, and allowlisted operation
-names. Never upload the raw SDK execution file or enable full-output logging.
+outcome/reason values, the reviewed SHA, a denial count, allowlisted operation
+names, and the reviewer's enum-only outcome/reason report. The report never
+substitutes for verified GitHub evidence. Never upload the raw SDK execution file or enable full-output logging.
 The verifier is copied out of the model workspace before review and its digest is
 checked before execution. This protects against model-workspace changes; it is not
 an immutable security boundary against repository writers, who can also edit the

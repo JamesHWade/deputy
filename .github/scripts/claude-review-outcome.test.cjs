@@ -37,7 +37,7 @@ test('clean and findings outcomes require current-run bot evidence', () => {
 test('diagnostics never emit free-form names, command arguments, or SDK text', () => {
   const secret = 'CANARY_PRIVATE_VALUE';
   const diagnostic = diagnostics([{ type: 'result', subtype: 'success', is_error: false,
-    result: secret, permission_denials: [
+    result: secret, structured_output: { outcome: secret, reason: secret }, permission_denials: [
       { tool_name: 'Bash', tool_input: { command: `gh pr comment 123 --body ${secret} | head -10 > ${secret}` } },
       { tool_name: secret, tool_input: { command: secret } },
       { tool_name: 'Skill', tool_input: { skill: secret } },

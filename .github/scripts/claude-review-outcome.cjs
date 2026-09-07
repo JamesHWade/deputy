@@ -7,6 +7,8 @@ const knownTools = new Set([
   'TaskGet', 'TaskStop', 'SendMessage', 'EnterPlanMode', 'ExitPlanMode',
   'mcp__github_inline_comment__create_inline_comment',
 ]);
+const reportedOutcomes = new Set(['completed-with-findings', 'completed-without-findings', 'skipped', 'blocked']);
+const reportedReasons = new Set(['reviewed', 'draft', 'closed', 'trivial', 'already-reviewed', 'permission-denied', 'other']);
 const commands = [
   'gh pr view', 'gh pr diff', 'gh pr list', 'gh pr comment',
   'gh issue view', 'gh issue list', 'gh search', 'gh api',
@@ -20,6 +22,8 @@ function diagnostics(messages) {
   const denials = Array.isArray(result?.permission_denials) ? result.permission_denials : [];
   return {
     sdk_success: result?.subtype === 'success' && result?.is_error === false,
+    reported_outcome: reportedOutcomes.has(result?.structured_output?.outcome) ? result.structured_output.outcome : 'unreported',
+    reported_reason: reportedReasons.has(result?.structured_output?.reason) ? result.structured_output.reason : 'unreported',
     permission_denials_count: denials.length,
     denied_operations: [...new Set(denials.flatMap((denial) => {
       const tool = knownTools.has(denial.tool_name) ? denial.tool_name : 'other-tool';
@@ -102,6 +106,7 @@ async function main() {
   fs.writeFileSync(`${env.RUNNER_TEMP}/claude-review-outcome.json`, JSON.stringify(safe, null, 2));
   fs.appendFileSync(env.GITHUB_STEP_SUMMARY,
     `### Claude review: ${safe.outcome}\n\nCommit: \`${sha}\`\n\n${safe.reason}.\n\n` +
+    `Reviewer report: ${safe.reported_outcome} (${safe.reported_reason}).\n\n` +
     `Permission denials: ${safe.permission_denials_count}. ` +
     `Operations: ${safe.denied_operations.join(', ') || 'none'}.\n`);
   console.log(JSON.stringify(safe));
