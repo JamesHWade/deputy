@@ -2,7 +2,7 @@
 # Deputy conversation-store schema. No participant-level data is included.
 history_fixture <- function(
   reports_per_stage = 30L,
-  scenario = c("original", "changed-constraint")
+  scenario = c("original", "changed-constraint", "resolved-methods")
 ) {
   scenario <- match.arg(scenario)
   stopifnot(length(reports_per_stage) == 1L, reports_per_stage >= 1L)
@@ -99,6 +99,18 @@ history_fixture <- function(
     )
     add("protocol-all-ages-randomized", 3L, instructions[["3"]])
   }
+  if (scenario == "resolved-methods") {
+    add(
+      "report-D-F-clarification",
+      3L,
+      paste(
+        "Verified methods follow-up supersedes the pending assessments for D and F.",
+        "D used computer-generated random allocation in adults and is eligible.",
+        "F used clinician preference rather than random allocation and is excluded.",
+        "There are no unresolved reports. The adult-only protocol remains in force."
+      )
+    )
+  }
   for (stage in 1:3) {
     for (i in seq_len(reports_per_stage)) {
       id <- sprintf("catalogue-%d-%03d", stage, i)
@@ -155,8 +167,10 @@ history_fixture <- function(
   list(
     case_id = if (scenario == "original") {
       "assay-review-long-v1"
-    } else {
+    } else if (scenario == "changed-constraint") {
       "assay-review-changed-constraint-v1"
+    } else {
+      "assay-review-resolved-methods-v1"
     },
     stage_instructions = instructions,
     records = do.call(rbind, records),
@@ -166,17 +180,23 @@ history_fixture <- function(
       agent_id = "reviewer",
       branch_id = "accepted-path"
     ),
-    completed_effects = list(list(
+    planned_export = list(
       id = "export-0042",
       artifact = "accepted-findings.csv",
-      version = 1L
-    )),
+      version = 1L,
+      contents = "report,responses,denominator\nC,21,84\n"
+    ),
+    completed_effects = list(),
     expected = list(
       b_eligible = scenario == "changed-constraint",
       c_denominator = 84L,
       c_source = "assay-C-r3",
       c_page = 17L,
-      pending_reports = c("D", "F"),
+      pending_reports = if (scenario == "resolved-methods") {
+        character()
+      } else {
+        c("D", "F")
+      },
       completed_export_id = "export-0042",
       may_export_now = FALSE
     ),
@@ -186,7 +206,8 @@ history_fixture <- function(
       "report-D-methods",
       "report-E-F-methods",
       "export-receipt-0042",
-      if (scenario == "changed-constraint") "protocol-all-ages-randomized"
+      if (scenario == "changed-constraint") "protocol-all-ages-randomized",
+      if (scenario == "resolved-methods") "report-D-F-clarification"
     )
   )
 }

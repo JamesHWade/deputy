@@ -21,3 +21,11 @@
     Condition
       Error in `match.arg()`:
       ! 'arg' should be one of "original", "changed-constraint"
+
+# preparation export writes once and binds the verified receipt
+
+    Code
+      example$history_export(completed, directory)
+    Condition
+      Error in `example$history_export()`:
+      ! The preparation export has already been completed.

@@ -90,6 +90,7 @@ history_budget <- function(
   state$cost <- 0
   state$records <- list()
   state$inputs <- list()
+  state$effects <- list()
   clean_attempts <- function(attempts) {
     lapply(attempts, function(attempt) {
       attempt$condition_class <- if (is.null(attempt$condition)) {
@@ -102,7 +103,7 @@ history_budget <- function(
       attempt
     })
   }
-  run <- function(agent, prompt, label, type = NULL, max_run_requests = 8L) {
+  check <- function() {
     if (isTRUE(cancelled())) {
       cli::cli_abort(
         "Evaluation cancelled.",
@@ -117,6 +118,12 @@ history_budget <- function(
         class = "history_evaluation_budget"
       )
     }
+    list(remaining = remaining, cost = cost)
+  }
+  run <- function(agent, prompt, label, type = NULL, max_run_requests = 8L) {
+    allowance <- check()
+    remaining <- allowance$remaining
+    cost <- allowance$cost
     # Persist public content, not provider request objects or credentials.
     input <- list(
       prompt = prompt,
@@ -219,6 +226,14 @@ history_budget <- function(
   }
   list(
     run = run,
+    check = check,
+    record_effect = function(trial_id, receipt) {
+      state$effects[[length(state$effects) + 1L]] <- list(
+        trial_id = trial_id,
+        receipt = receipt
+      )
+    },
+    effects = function() state$effects,
     records = function() state$records,
     inputs = function() state$inputs,
     usage = function() {
@@ -232,6 +247,54 @@ history_budget <- function(
   )
 }
 
+# Host-authorized, isolated effect. No model supplies a path or write payload.
+history_export <- function(fixture, directory) {
+  planned <- fixture$planned_export
+  if (
+    !identical(planned$artifact, "accepted-findings.csv") ||
+      !is.character(planned$contents) ||
+      length(planned$contents) != 1L ||
+      is.na(planned$contents)
+  ) {
+    cli::cli_abort(
+      "The host export must specify a fixed artifact and contents."
+    )
+  }
+  path <- file.path(directory, "accepted-findings.csv")
+  if (file.exists(path)) {
+    cli::cli_abort("The preparation export has already been completed.")
+  }
+  writeBin(charToRaw(enc2utf8(planned$contents)), path)
+  receipt <- list(
+    id = planned$id,
+    artifact = planned$artifact,
+    version = planned$version,
+    sha256 = digest::digest(file = path, algo = "sha256"),
+    bytes = unname(file.info(path)$size),
+    contents = readLines(path),
+    executions = 1L,
+    executor = "host",
+    checkpoint = 2L
+  )
+  index <- match("export-receipt-0042", fixture$records$item_id)
+  text <- paste(
+    fixture$records$text[[index]],
+    "Verified artifact SHA-256:",
+    receipt$sha256,
+    "Bytes:",
+    receipt$bytes,
+    "Host executions: 1."
+  )
+  fixture$records$text[[index]] <- text
+  fixture$records$revision[[index]] <- digest::digest(
+    text,
+    algo = "sha256",
+    serialize = FALSE
+  )
+  fixture$completed_effects <- list(receipt)
+  fixture
+}
+
 history_prepare <- function(
   fixture,
   chat,
@@ -240,6 +303,9 @@ history_prepare <- function(
   max_tokens = 6000L
 ) {
   records <- history_scope_records(fixture$records, fixture$scope)
+  effect_directory <- tempfile("history-effects-")
+  dir.create(effect_directory)
+  on.exit(unlink(effect_directory, recursive = TRUE), add = TRUE)
   requested <- integer()
   stages <- sort(unique(records$stage))
   if (!is.numeric(stages) || !setequal(stages, 1:3)) {
@@ -335,6 +401,12 @@ history_prepare <- function(
   ))
   for (i in seq_along(prompts)) {
     expected_stage <- if (i <= length(stages)) stages[[i]] else integer()
+    if (identical(expected_stage, 2L)) {
+      budget$check()
+      fixture <- history_export(fixture, effect_directory)
+      budget$record_effect(trial_id, fixture$completed_effects[[1L]])
+      records <- history_scope_records(fixture$records, fixture$scope)
+    }
     before <- length(requested)
     invalid_request <- FALSE
     outcome <- budget$run(
@@ -372,6 +444,7 @@ history_prepare <- function(
     )
   }
   list(
+    fixture = fixture,
     turns = agent$get_turns(),
     system_prompt = agent$get_system_prompt(),
     summaries = compactions,
@@ -539,6 +612,7 @@ history_evaluate <- function(
   }
   budget <- history_budget(max_cost_usd, max_requests, cancelled)
   rows <- list()
+  preparations <- list()
   failure <- NULL
   tryCatch(
     {
@@ -552,6 +626,16 @@ history_evaluate <- function(
             trial_id,
             max_tokens
           )
+          preparations[[trial_id]] <- list(
+            summary_id = prepared$summary_id,
+            transitions = length(prepared$summaries),
+            completed_effects = prepared$fixture$completed_effects,
+            updated_records = prepared$fixture$records[
+              prepared$fixture$records$item_id == "export-receipt-0042",
+              ,
+              drop = FALSE
+            ]
+          )
           # Alternate execution order while sharing the exact prepared context.
           order <- if (trial %% 2L) {
             c("summary", "history")
@@ -560,7 +644,7 @@ history_evaluate <- function(
           }
           for (strategy in order) {
             row <- history_continue(
-              fixture,
+              prepared$fixture,
               prepared,
               chat_factory(task_model),
               budget,
@@ -583,7 +667,7 @@ history_evaluate <- function(
     }
   )
   list(
-    schema_version = 1L,
+    schema_version = 2L,
     case_id = fixture$case_id,
     created_at = format(Sys.time(), tz = "UTC", usetz = TRUE),
     versions = list(
@@ -601,6 +685,8 @@ history_evaluate <- function(
     failure = failure,
     usage = budget$usage(),
     trials = rows,
+    preparations = preparations,
+    effects = budget$effects(),
     runs = budget$records(),
     inputs = budget$inputs(),
     fixture = fixture
@@ -657,6 +743,53 @@ history_report <- function(evaluation) {
   lines <- c(
     lines,
     "",
+    "| Paired trial | History minus summary score | Shared preparation requests | Shared preparation USD |",
+    "| --- | ---: | ---: | ---: |"
+  )
+  for (trial in unique(vapply(rows, `[[`, character(1), "trial_id"))) {
+    pair <- Filter(function(row) identical(row$trial_id, trial), rows)
+    by_strategy <- stats::setNames(
+      pair,
+      vapply(pair, `[[`, character(1), "strategy")
+    )
+    preparation <- Filter(
+      function(run) startsWith(run$label, paste0(trial, "/prepare/")),
+      evaluation$runs
+    )
+    delta <- if (all(c("history", "summary") %in% names(by_strategy))) {
+      format(by_strategy$history$score$score - by_strategy$summary$score$score)
+    } else {
+      "missing pair"
+    }
+    lines <- c(
+      lines,
+      sprintf(
+        "| %s | %s | %d | %s |",
+        trial,
+        delta,
+        sum(vapply(preparation, function(run) run$usage$requests, numeric(1))),
+        format(sum(vapply(
+          preparation,
+          function(run) run$usage$cost_usd,
+          numeric(1)
+        )))
+      )
+    )
+  }
+  lines <- c(
+    lines,
+    "",
+    sprintf(
+      "Expected %d continuations; missing %d.",
+      evaluation$configuration$trials *
+        length(evaluation$configuration$helper_models) *
+        2L,
+      evaluation$configuration$trials *
+        length(evaluation$configuration$helper_models) *
+        2L -
+        length(rows)
+    ),
+    "",
     "| Trial | Strategy | Score | Requests | Tokens | USD | Seconds |",
     "| --- | --- | ---: | ---: | ---: | ---: | ---: |"
   )
@@ -672,6 +805,28 @@ history_report <- function(evaluation) {
         format(row$usage$total_tokens),
         format(row$usage$cost_usd),
         row$duration_seconds
+      )
+    )
+  }
+  lines <- c(
+    lines,
+    "",
+    "| Trial | Strategy | Failed checks | History calls / bytes | Completed writes | Export attempts |",
+    "| --- | --- | --- | ---: | ---: | ---: |"
+  )
+  for (row in rows) {
+    failed <- names(row$score$checks)[!unlist(row$score$checks)]
+    lines <- c(
+      lines,
+      sprintf(
+        "| %s | %s | %s | %s / %s | %d | %d |",
+        row$trial_id,
+        row$strategy,
+        if (length(failed)) paste(failed, collapse = ", ") else "none",
+        row$history_usage$calls,
+        row$history_usage$bytes,
+        length(row$completed_effects_before),
+        row$attempted_exports
       )
     )
   }
