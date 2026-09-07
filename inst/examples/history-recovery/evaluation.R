@@ -598,9 +598,21 @@ history_continue <- function(
     outcome
   }
   if (budget_aware) {
-    allowance <- budget$check()
-    retrieval_requests <- min(6L, max(0L, allowance$remaining - 2L))
-    outcome <- NULL
+    allowance <- tryCatch(budget$check(), error = identity)
+    if (inherits(allowance, "error")) {
+      outcome <- list(
+        result = NULL,
+        error_class = class(allowance)[[1L]],
+        phase = "preflight",
+        request_limit = 0L,
+        tool_call_limit = 0L
+      )
+      outcomes[[length(outcomes) + 1L]] <- outcome
+      retrieval_requests <- 0L
+    } else {
+      retrieval_requests <- min(6L, max(0L, allowance$remaining - 2L))
+      outcome <- NULL
+    }
     if (retrieval_requests > 0L) {
       outcome <- run_phase(
         "retrieve",

@@ -1141,28 +1141,55 @@ test_that("a blocked final dispatch retains an explicit incomplete continuation"
   expect_true(row$attempted)
 })
 
-test_that("cancellation before the first request retains an undispatched arm", {
+test_that("preflight cancellation or exhaustion retains every reached arm", {
   example <- history_example()
   fixture <- example$history_fixture(1L)
-  server <- local_runtime_server(list())
-  row <- example$history_continue(
-    fixture,
-    list(
-      system_prompt = "Read-only host policy.",
-      turns = list(),
-      summary_id = "fixture"
-    ),
-    runtime_chat(server),
-    example$history_budget(cancelled = function() TRUE),
-    "cancelled-start",
-    "summary"
+  prepared <- list(
+    system_prompt = "Read-only host policy.",
+    turns = list(),
+    summary_id = "fixture"
   )
-  expect_false(row$attempted)
-  expect_identical(row$usage$requests, 0L)
-  expect_null(row$answer)
-  expect_identical(row$stop_reason, "history_evaluation_cancelled")
-  expect_identical(row$phase_runs[[1L]]$dispatched, FALSE)
-  expect_length(server$requests(), 0L)
+  for (blocked in c("cancelled", "budget")) {
+    server <- local_runtime_server(list(runtime_reply(
+      "Consume the shared request allowance."
+    )))
+    budget <- example$history_budget(max_requests = 1L, cancelled = function() {
+      blocked == "cancelled"
+    })
+    if (blocked == "budget") {
+      budget$run(
+        Agent$new(chat = runtime_chat(server)),
+        "Use the remaining request.",
+        "prior-arm"
+      )
+    }
+    prior <- length(server$requests())
+    for (arm in list(
+      c("summary", "baseline"),
+      c("history", "baseline"),
+      c("history", "budget-aware")
+    )) {
+      row <- example$history_continue(
+        fixture,
+        prepared,
+        runtime_chat(server),
+        budget,
+        "blocked-start",
+        arm[[1L]],
+        protocol = arm[[2L]]
+      )
+      expect_false(row$attempted)
+      expect_identical(row$usage$requests, 0L)
+      expect_null(row$answer)
+      expect_identical(row$stop_reason, paste0("history_evaluation_", blocked))
+      expect_identical(row$phase_runs[[1L]]$dispatched, FALSE)
+      expect_identical(
+        row$phase_runs[[1L]]$phase,
+        if (arm[[2L]] == "budget-aware") "preflight" else "answer"
+      )
+      expect_length(server$requests(), prior)
+    }
+  }
 })
 
 test_that("an oversized provider batch cannot consume the reserved answer phase", {
