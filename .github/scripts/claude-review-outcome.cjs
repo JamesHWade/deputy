@@ -9,6 +9,7 @@ const knownTools = new Set([
 ]);
 const reportedOutcomes = new Set(['completed-with-findings', 'completed-without-findings', 'skipped', 'blocked']);
 const reportedReasons = new Set(['reviewed', 'draft', 'closed', 'trivial', 'already-reviewed', 'permission-denied', 'diff-unavailable', 'plugin-unavailable', 'subagent-unavailable', 'provider-limit', 'publication-failed', 'policy-conflict', 'other']);
+const eligibilities = new Set(['eligible', 'draft', 'closed', 'prior-comment', 'trivial', 'plugin-unavailable', 'input-unavailable', 'other']);
 const commands = [
   'gh pr view', 'gh pr diff', 'gh pr list', 'gh pr comment',
   'gh issue view', 'gh issue list', 'gh search', 'gh api',
@@ -20,7 +21,14 @@ function diagnostics(messages) {
   const result = Array.isArray(messages)
     ? messages.findLast((message) => message.type === 'result') : undefined;
   const denials = Array.isArray(result?.permission_denials) ? result.permission_denials : [];
+  const calls = Array.isArray(messages) ? messages.flatMap((message) => message.type === 'assistant' && Array.isArray(message.message?.content)
+    ? message.message.content.filter((item) => item.type === 'tool_use') : []) : [];
+  const pluginCalls = calls.filter((call) => call.name === 'Skill' && call.input?.skill === 'code-review:code-review');
   return {
+    plugin_calls: pluginCalls.length,
+    plugin_comment_argument_seen: pluginCalls.some((call) => typeof call.input?.args === 'string' && /(?:^|\s)--comment(?:\s|$)/.test(call.input.args)),
+    review_agent_calls: calls.filter((call) => ['Agent', 'Task'].includes(call.name)).length,
+    reported_eligibility: eligibilities.has(result?.structured_output?.eligibility) ? result.structured_output.eligibility : 'unreported',
     sdk_success: result?.subtype === 'success' && result?.is_error === false,
     reported_outcome: reportedOutcomes.has(result?.structured_output?.outcome) ? result.structured_output.outcome : 'unreported',
     reported_reason: reportedReasons.has(result?.structured_output?.reason) ? result.structured_output.reason : 'unreported',
