@@ -640,14 +640,20 @@ The same-repository job passes the action its supported `github_token` input wit
 `contents: read`, `issues: read`, and `pull-requests: write`; it does not request
 OIDC or an App token. Reviews post as `github-actions[bot]`.
 Draft PRs explicitly skip automatic review until ready. Ready reviews check out the
-exact PR head and require a current-run `github-actions[bot]` summary tied to that SHA; findings
+exact PR head and preserve the upstream plugin's skip policy. Its successful,
+denial-free invocation can explicitly skip a trivial change, a now-closed/draft PR,
+or a PR with a prior Claude review. Closed/draft state and prior bot review summaries
+are checked against GitHub. A skip explicitly states that this run did not review
+the current head; an older review never counts as current-run completion.
+Completed reviews require a current-run `github-actions[bot]` summary tied to that SHA; findings
 also require exact-commit inline comments linking the same workflow run and attempt
 (the upstream sanitizer strips HTML comments from inline bodies). Missing evidence
 fails the review job; recovered tool denials remain visible diagnostics when
 completion is verified. Cancelled runs remain cancelled. The only uploaded diagnostic is `claude-review-outcome.json`: fixed
-outcome/reason values, the reviewed SHA, a denial count, allowlisted operation
-names, and the reviewer's enum-only outcome/reason report. The report never
-substitutes for verified GitHub evidence. Never upload the raw SDK execution file or enable full-output logging.
+outcome/reason values, the target SHA, a denial count, allowlisted operation
+names, plugin/agent invocation counts, whether the plugin received `--comment`,
+and the reviewer's enum-only outcome/reason report. The report never substitutes
+for verified completion evidence. Never upload the raw SDK execution file or enable full-output logging.
 The verifier is copied out of the model workspace before review and its digest is
 checked before execution. This protects against model-workspace changes; it is not
 an immutable security boundary against repository writers, who can also edit the

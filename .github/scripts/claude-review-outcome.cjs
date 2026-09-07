@@ -9,7 +9,6 @@ const knownTools = new Set([
 ]);
 const reportedOutcomes = new Set(['completed-with-findings', 'completed-without-findings', 'skipped', 'blocked']);
 const reportedReasons = new Set(['reviewed', 'draft', 'closed', 'trivial', 'already-reviewed', 'permission-denied', 'diff-unavailable', 'plugin-unavailable', 'subagent-unavailable', 'provider-limit', 'publication-failed', 'policy-conflict', 'other']);
-const eligibilities = new Set(['eligible', 'draft', 'closed', 'prior-comment', 'trivial', 'plugin-unavailable', 'input-unavailable', 'other']);
 const commands = [
   'gh pr view', 'gh pr diff', 'gh pr list', 'gh pr comment',
   'gh issue view', 'gh issue list', 'gh search', 'gh api',
@@ -28,7 +27,6 @@ function diagnostics(messages) {
     plugin_calls: pluginCalls.length,
     plugin_comment_argument_seen: pluginCalls.some((call) => typeof call.input?.args === 'string' && /(?:^|\s)--comment(?:\s|$)/.test(call.input.args)),
     review_agent_calls: calls.filter((call) => ['Agent', 'Task'].includes(call.name)).length,
-    reported_eligibility: eligibilities.has(result?.structured_output?.eligibility) ? result.structured_output.eligibility : 'unreported',
     sdk_success: result?.subtype === 'success' && result?.is_error === false,
     reported_outcome: reportedOutcomes.has(result?.structured_output?.outcome) ? result.structured_output.outcome : 'unreported',
     reported_reason: reportedReasons.has(result?.structured_output?.reason) ? result.structured_output.reason : 'unreported',
@@ -52,7 +50,7 @@ function diagnostics(messages) {
   };
 }
 
-function classify({ diagnostic, sha, currentSha, comments, inline, marker, findingMarker, started, actionOutcome }) {
+function classify({ diagnostic, sha, currentSha, comments, inline, marker, findingMarker, started, actionOutcome, draft = false, state = 'open' }) {
   const blocked = (reason) => ({ outcome: 'blocked/failed', reason });
   if (sha !== currentSha) return blocked('PR head changed during review');
   if (actionOutcome !== 'success' || !diagnostic.sdk_success) return blocked('Claude did not complete successfully');
@@ -70,6 +68,25 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, findi
     return { outcome: 'completed without findings', reason: 'Current-run exact-commit clean summary verified' };
   }
   if (diagnostic.permission_denials_count) return blocked('Denied tools and no verified review evidence');
+  if (!withFindings && !withoutFindings && !findings.length &&
+      diagnostic.plugin_calls > 0 && diagnostic.reported_outcome === 'skipped') {
+    const skipped = (reason) => ({ outcome: 'intentionally skipped', reason });
+    if (diagnostic.reported_reason === 'draft' && draft) {
+      return skipped('PR is now a draft; this run did not review the current head');
+    }
+    if (diagnostic.reported_reason === 'closed' && state === 'closed') {
+      return skipped('PR is now closed; this run did not review the current head');
+    }
+    if (diagnostic.reported_reason === 'trivial') {
+      return skipped('Upstream plugin classified the change as trivial; this run did not review the current head');
+    }
+    const priorReview = comments.some((comment) => comment.user?.login === 'github-actions[bot]' &&
+      Date.parse(comment.created_at) < Date.parse(started) &&
+      /<!-- deputy-claude-review:[a-f0-9]{40}:\d+:\d+:(?:with|without)-findings -->/.test(comment.body || ''));
+    if (diagnostic.reported_reason === 'already-reviewed' && priorReview) {
+      return skipped('Upstream plugin found a prior Claude review; this run did not review the current head');
+    }
+  }
   return blocked('No consistent current-run exact-commit review evidence');
 }
 
@@ -105,12 +122,12 @@ async function main() {
     result = classify({ diagnostic, sha, currentSha: pr.head.sha, comments, inline,
       marker: `<!-- deputy-claude-review:${sha}:${env.GITHUB_RUN_ID}:${env.GITHUB_RUN_ATTEMPT}`,
       findingMarker: `[Review run](https://github.com/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}/attempts/${env.GITHUB_RUN_ATTEMPT})`,
-      started: env.REVIEW_STARTED, actionOutcome: env.ACTION_OUTCOME });
+      started: env.REVIEW_STARTED, actionOutcome: env.ACTION_OUTCOME, draft: pr.draft, state: pr.state });
   } catch {
     // Errors can include server responses, file contents, or token-bearing URLs.
     // Keep the public failure categorical; never print the caught value.
   }
-  const safe = { ...result, reviewed_sha: sha, ...diagnostic };
+  const safe = { ...result, target_sha: sha, ...diagnostic };
   fs.writeFileSync(`${env.RUNNER_TEMP}/claude-review-outcome.json`, JSON.stringify(safe, null, 2));
   fs.appendFileSync(env.GITHUB_STEP_SUMMARY,
     `### Claude review: ${safe.outcome}\n\nCommit: \`${sha}\`\n\n${safe.reason}.\n\n` +
