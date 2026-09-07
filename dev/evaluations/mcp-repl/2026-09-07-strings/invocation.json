@@ -1,0 +1,31 @@
+{
+  "source_commit": "f0c39f41695158b30cc6139b1d93059cca526aa6",
+  "started_at": "2026-09-07 15:46:37 UTC",
+  "command": "Rscript dev/evaluations/mcp-repl/qualify.R",
+  "test_filter": "api|mcp-connection|mcp-repl-lifecycle",
+  "platform": "aarch64-apple-darwin23",
+  "r_version": "4.6.1",
+  "packages": [
+    {
+      "package": "mcptools",
+      "version": "1.0.2"
+    },
+    {
+      "package": "ellmer",
+      "version": "0.5.0"
+    },
+    {
+      "package": "callr",
+      "version": "3.8.0"
+    },
+    {
+      "package": "testthat",
+      "version": "3.3.2"
+    }
+  ],
+  "mcp_repl": {
+    "qualified_release": "0.3.0",
+    "binary_sha256": "5302fd85bc69dba0988f0b280187b5e3d6bb8b1934ec22b394b3dad95925e0dd"
+  },
+  "model_requests": 0
+}
