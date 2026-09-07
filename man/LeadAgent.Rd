@@ -65,10 +65,12 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_tools"><a href='../../deputy/html/Agent.html#method-Agent-mcp_tools'><code>Agent$mcp_tools()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="on_tool_request"><a href='../../deputy/html/Agent.html#method-Agent-on_tool_request'><code>Agent$on_tool_request()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="on_tool_result"><a href='../../deputy/html/Agent.html#method-Agent-on_tool_result'><code>Agent$on_tool_result()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="pending_approval"><a href='../../deputy/html/Agent.html#method-Agent-pending_approval'><code>Agent$pending_approval()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="provider"><a href='../../deputy/html/Agent.html#method-Agent-provider'><code>Agent$provider()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tool"><a href='../../deputy/html/Agent.html#method-Agent-register_tool'><code>Agent$register_tool()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tools"><a href='../../deputy/html/Agent.html#method-Agent-register_tools'><code>Agent$register_tools()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resolve_tool_result"><a href='../../deputy/html/Agent.html#method-Agent-resolve_tool_result'><code>Agent$resolve_tool_result()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resume_approval"><a href='../../deputy/html/Agent.html#method-Agent-resume_approval'><code>Agent$resume_approval()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="rewind_files"><a href='../../deputy/html/Agent.html#method-Agent-rewind_files'><code>Agent$rewind_files()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run"><a href='../../deputy/html/Agent.html#method-Agent-run'><code>Agent$run()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_async"><a href='../../deputy/html/Agent.html#method-Agent-run_async'><code>Agent$run_async()</code></a></span></li>

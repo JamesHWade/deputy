@@ -47,7 +47,7 @@
 #'     invalidate later file history. Conversation history is not changed.}
 #' }
 #'
-#' @include agent-stream.R agent-session.R agent-context.R agent-tool-callbacks.R agent-tool-records.R
+#' @include agent-approval.R agent-stream.R agent-session.R agent-context.R agent-tool-callbacks.R agent-tool-records.R
 #' @importFrom later run_now
 #' @importFrom utils tail
 #' @export
@@ -116,6 +116,9 @@ Agent <- R6::R6Class(
     #'   the Agent's. The selected Chat remains active for subsequent runs.
     #'   Applies to governed task and structured requests. Pre-run automatic
     #'   compaction retains the separate [ContextPolicy] summary-failure policy.
+    #' @param approval_dir Optional existing host-owned directory for durable tool
+    #'   approvals. Enables sequential tool execution and an execution journal.
+    #'   See [approval_read()] and `$resume_approval()`.
     #' @return A new `Agent` object
     initialize = function(
       chat,
@@ -132,7 +135,8 @@ Agent <- R6::R6Class(
       run_context = list(),
       agent_id = NULL,
       agent_name = NULL,
-      fallback_chats = list()
+      fallback_chats = list(),
+      approval_dir = NULL
     ) {
       validate_chat(chat)
       private$.fallback_chats <- normalize_fallback_chats(fallback_chats, chat)
@@ -174,6 +178,9 @@ Agent <- R6::R6Class(
       private$.usage_limits <- normalize_usage_limits(usage_limits)
       private$.context_policy <- normalize_context_policy(context_policy)
       private$.working_dir <- working_dir
+      if (!is.null(approval_dir)) {
+        private$.approval_dir <- approval_store_path(approval_dir)
+      }
       private$.hooks <- HookRegistry$new()
       private$.run_context <- normalize_run_context(run_context)
       private$.agent_id <- agent_id
@@ -1101,6 +1108,38 @@ Agent <- R6::R6Class(
     },
 
     #' @description
+    #' Inspect the approval that suspended this Agent, or NULL.
+    #' @return An [ApprovalContinuation] or NULL. Its source includes the path.
+    pending_approval = function() {
+      if (is.null(private$.pending_approval_path)) {
+        return(NULL)
+      }
+      approval_read(private$.pending_approval_path)
+    },
+
+    #' @description
+    #' Resume a persisted pending tool approval under current and saved policy.
+    #' Reattach a Chat, the same raw-argument tool definition, permission callback,
+    #' session_id, agent_id, working_dir, and approval_dir after process restart.
+    #' Existing completed effects are never replayed; duplicate decisions fail.
+    #' @param path Approval directory supplied by the approval event or snapshot.
+    #' @param decision Either "approve" or "deny".
+    #' @param tool_input Optional edited raw JSON argument list for approval.
+    #' @param usage_limits Optional explicit [UsageLimits] for the continuation.
+    #'   Escalation is bounded by the saved and current Agent limits. Previously
+    #'   observed usage is retained. NULL keeps the suspended run's limits.
+    #' @return An [AgentResult], including usage observed before suspension.
+    resume_approval = function(
+      path,
+      decision = c("approve", "deny"),
+      tool_input = NULL,
+      usage_limits = NULL
+    ) {
+      decision <- match.arg(decision)
+      approval_resume(self, path, decision, tool_input, usage_limits)
+    },
+
+    #' @description
     #' Create a reversible file checkpoint.
     #'
     #' @param name Optional checkpoint label.
@@ -1844,6 +1883,11 @@ Agent <- R6::R6Class(
 
       adapt_tool = function(tool) {
         if (inherits(tool, "ellmer::ToolBuiltIn")) {
+          if (!is.null(private$.approval_dir)) {
+            approval_abort(
+              "Durable approvals require function tools; provider-native effects cannot be journaled."
+            )
+          }
           tool_name <- tryCatch(tool@name, error = function(error) NULL)
           tool_id <- normalize_native_tool_id(tool_name %||% "")
           if (!tool_id %in% c("web_search", "web_fetch")) {
@@ -2252,6 +2296,14 @@ Agent <- R6::R6Class(
 
       # Storage for loaded skills
       loaded_skills = list(),
+      .approval_dir = NULL,
+      .pending_approval_path = NULL,
+      .approval_requests = list(),
+      .approval_journal = list(),
+      .approval_resume = NULL,
+      .approval_ceilings = list(),
+      .approval_tools = NULL,
+      .approval_grant = NULL,
 
       # Storage for loaded MCP tool names
       loaded_mcp_tools = character(),
@@ -2263,6 +2315,7 @@ Agent <- R6::R6Class(
       # Active tool call limit; NULL means unbounded.
       tool_call_limit = NULL
     ),
+    deputy_agent_approval_methods(),
     deputy_agent_stream_methods(),
     deputy_agent_session_methods(),
     deputy_agent_context_methods(),

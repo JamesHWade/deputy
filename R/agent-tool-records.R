@@ -119,6 +119,7 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       }
 
       index <- matches[[1L]]
+      private$approval_execution_start(tool_name, records[[index]]$tool_call_id)
       records[[index]]$execution_started <- TRUE
       private$tool_call_records <- records
       records[[index]]$tool_call_id

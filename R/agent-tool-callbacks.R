@@ -14,7 +14,13 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       tool_annotations <- extracted$tool_annotations
       provider_tool_call_id <- extracted$provider_tool_call_id
 
-      private$current_tool_calls <- private$current_tool_calls + 1L
+      restored_approval <- identical(
+        tool_request_signature(tool_name, tool_input),
+        private$.approval_grant
+      )
+      if (!restored_approval) {
+        private$current_tool_calls <- private$current_tool_calls + 1L
+      }
       record <- private$tool_call_record(extracted, "request")
       extracted$tool_call_id <- record$tool_call_id
       private$tool_call_records[[record$record_index]]$request_signature <-
@@ -22,6 +28,8 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       if (!isTRUE(record$start_seen)) {
         private$record_run_event(private$tool_start_event(extracted))
       }
+
+      private$approval_request_check(request, record$tool_call_id)
 
       usage <- private$current_run_usage()
       limits <- private$current_usage_limits %||% self$usage_limits
@@ -31,13 +39,20 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         require_followup = TRUE
       )
       if (!is.null(limit_status)) {
+        if (!is.null(private$.approval_dir) && !restored_approval) {
+          private$pause_for_approval(
+            request,
+            usage_limit_message(limit_status),
+            kind = "budget"
+          )
+        }
         private$mark_usage_limit(limit_status)
         ellmer::tool_reject(usage_limit_message(limit_status))
       }
 
       # Retain the adapter-specific counter for callers that configure it
       # directly. The governed run limit above counts all requests.
-      if (!is.null(private$tool_call_limit)) {
+      if (!is.null(private$tool_call_limit) && !restored_approval) {
         private$tool_call_count <- private$tool_call_count + 1L
         if (private$tool_call_count > private$tool_call_limit) {
           private$request_stream_stop("tool_call_limit")
@@ -69,12 +84,32 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       # denylist, callback, mode, and capability checks still apply.
       permission_context <- context
       permission_context$.deputy_internal_tool <- extracted$internal_tool
+      private$approval_permission_check(
+        tool_name,
+        tool_input,
+        permission_context
+      )
       perm_result <- permissions_check(
         self$permissions,
         tool_name,
         tool_input,
         permission_context
       )
+
+      if (S7::S7_inherits(perm_result, PermissionResultPending)) {
+        signature <- tool_request_signature(tool_name, tool_input)
+        if (
+          identical(signature, private$.approval_grant) &&
+            identical(
+              perm_result$reason,
+              private$.approval_resume$record$pending$reason
+            )
+        ) {
+          perm_result <- PermissionResultAllow()
+        } else {
+          private$pause_for_approval(request, perm_result$reason)
+        }
+      }
 
       if (S7::S7_inherits(perm_result, PermissionResultDeny)) {
         request_result <- private$fire_hook(
@@ -202,6 +237,8 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         record$tool_call_id,
         extracted$tool_result
       )
+
+      private$approval_execution_result(result, record)
 
       # Finalize only captures started by this request. Remote tools never
       # enter the local journal, even when their names resemble file tools.

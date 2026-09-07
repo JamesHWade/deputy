@@ -25,6 +25,9 @@ deputy/
 ├── R/                      # Source code (R6 classes and functions)
 │   ├── agent.R             # Public Agent API and runtime wiring
 │   ├── agent-stream.R      # Shared governed stream and finalization
+│   ├── agent-approval.R     # Durable pending-tool suspension and governed resume
+│   ├── approval-record.R    # S7 approval inspection and portable control records
+│   ├── approval-store.R     # Locked immutable approval revisions
 │   ├── agent-requests.R    # Public ellmer callbacks and explicit fallback
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
 │   ├── parallel-delegate.R # Bounded stateless responder batches
@@ -367,6 +370,36 @@ provide versioned Deputy YAML files, conventionally in `.deputy/agents/`.
 Tools and skills resolve through explicit host registries; file loading never
 sources R code, loads skills, or connects services. See ADR-0006 and the
 Multi-Agent vignette for the format and authoring examples.
+
+### Durable approvals
+
+`PermissionResultPending(reason)` from `can_use_tool` suspends a complete
+assistant tool-request turn before the pending tool executes. Configure an
+existing private `approval_dir` and register resumable tools with `convert =
+FALSE`; do not flip conversion on an existing tool because that changes argument
+semantics. Deputy uses ellmer's public content recording/replay and the existing
+session payload. Tool functions, callbacks, and Chat clients are rebound by the
+host. Source function body/formals, schema, conversion, and metadata fingerprints
+must match; closure state remains caller-owned.
+
+`approval_read(path)` returns a read-only `ApprovalContinuation` without loading
+a Chat. `agent$resume_approval(path, "approve"|"deny", tool_input = ...,
+usage_limits = ...)` locks and consumes only pending records. It retains prior
+usage and effect journals, applies saved and current permission ceilings, and
+requires the permission callback again. Explicit usage escalation stays within
+the original and current Agent limits. Budget suspension applies at tool
+boundaries; a model-request limit without a pending tool retains normal stop
+behavior. Execution is sequential while durable approvals are enabled.
+
+The host associates approval ID/path with its owner, conversation and selected
+branch using canonical run_context fields. Saved correlation is checked, never
+used as authorization. Session/delegation/Agent identity and workspace must
+match. Delegated job scheduling and host conversation adapters remain separate.
+OS locks and immutable revision commits prevent concurrent consumption and
+replay after process interruption; they do not promise exactly-once effects or
+power-loss durability. Indeterminate records require host reconciliation and
+cannot resume. See ADR-0016 and the Permissions vignette for ownership and
+limits. File storage uses the `filelock` package.
 
 ### Human Input
 

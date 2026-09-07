@@ -340,3 +340,133 @@ provide. mcp-repl owns the platform-specific enforcement and fails rather than
 downgrading when it cannot establish the requested OS boundary. See mcp-repl's
 [sandbox contract](https://github.com/posit-dev/mcp-repl/blob/main/docs/sandbox.md)
 for its filesystem, network, and platform guarantees.
+
+## Durable approval after process exit
+
+For a decision that may outlive the R process, configure a private existing
+`approval_dir` and return `PermissionResultPending()` from the permission
+callback. Deputy suspends before that tool executes. It journals tools completed
+before the pause and retains their results when a fresh Agent resumes.
+
+```{r}
+approval_dir <- file.path(tempdir(), "approvals")
+dir.create(approval_dir, showWarnings = FALSE)
+
+# Raw argument tools validate their own inputs. Keep convert = FALSE from the
+# original registration; changing it on an existing tool changes its semantics.
+export_report <- ellmer::tool(
+  function(name) {
+    if (!is.character(name) || length(name) != 1L || is.na(name)) {
+      cli::cli_abort("name must be one string")
+    }
+    # A host would perform its effect here and return an external receipt.
+    paste("Prepared", name)
+  },
+  name = "export_report",
+  description = "Prepare a named report",
+  arguments = list(name = ellmer::type_string()),
+  convert = FALSE,
+  annotations = ellmer::tool_annotations(
+    read_only_hint = FALSE,
+    destructive_hint = FALSE,
+    open_world_hint = FALSE
+  )
+)
+
+make_agent <- function(chat) {
+  Agent$new(
+    chat = chat,
+    tools = list(export_report),
+    permissions = Permissions(can_use_tool = function(...) {
+      PermissionResultPending("Host review required for report preparation")
+    }),
+    approval_dir = approval_dir,
+    working_dir = approval_dir,
+    session_id = "report_session",
+    agent_id = "report_agent",
+    run_context = list(owner_id = "owner_1", conversation_id = "conversation_1")
+  )
+}
+
+agent <- make_agent(ellmer::chat_openai())
+result <- agent$run_sync("Prepare the annual report")
+if (identical(result$stop_reason, "approval_pending")) {
+  pending <- agent$pending_approval()
+  approval_path <- pending$source$path
+  pending$request
+  pending$usage
+}
+
+# This inspection needs no Chat and executes no tools, including after restart.
+pending <- approval_read(approval_path)
+
+# The host authorizes its caller, restores its own conversation association,
+# and reattaches the same tool definition, scope, and permission callback.
+resumed <- make_agent(ellmer::chat_openai())
+result <- resumed$resume_approval(
+  approval_path,
+  "approve",
+  tool_input = list(name = "reviewed annual report")
+)
+# Alternatively: resumed$resume_approval(approval_path, "deny")
+```
+
+`ApprovalContinuation` is a read-only inspection value. It exposes the pending
+request and tool-call ID, source correlation, decision, usage, budget and static
+permission ceilings, and completed-effect journal. The approval event supplies
+an ID and path that the host can associate with its owner, conversation, selected
+branch and revision. These associations belong in the host's store; Deputy does
+not provide a second conversation database. Do not treat correlation IDs as
+credentials. Only expose a private record after authenticating its owner.
+
+Only a `pending` record can resume. The receiving Agent's session ID, Agent ID,
+working directory, context and delegation correlation must match. It checks
+saved and current static permission ceilings before the current callback and
+hooks. A host edit cannot authorize a forbidden path or tool. Rebinding checks
+source body/formals, schema, conversion and metadata; the host remains
+responsible for captured closure state and external resource identity.
+
+When a batch contains three tool calls and the second needs approval, the first
+result is retained and the third is marked unexecuted. Resume supplies one result
+for every original ID. A later model request cannot replay an already executed
+or denied operation in that continuation. Use a separate, explicitly authorized
+workflow if repeating the same operation is intended.
+
+A tool-boundary budget limit can also create a pending decision. Resume normally
+keeps the suspended limits and all prior usage. To grant more allowance, pass
+`usage_limits = UsageLimits(...)` explicitly; Deputy caps it by both the original
+and current Agent ceilings. Inspect `pending$budget_ceiling` before presenting
+choices. Model boundaries with no pending tool retain ordinary limit stops.
+
+```{r}
+resumed$resume_approval(
+  approval_path,
+  "approve",
+  usage_limits = UsageLimits(max_requests = 10)
+)
+```
+
+Consumption holds an OS lock and commits state before each effect. If a worker
+exits while a tool is executing, the record remains `executing`; no automatic
+retry is allowed. An interrupted `resuming` or `continuing` record, or a terminal
+`indeterminate` record, also requires the host to inspect external receipts and
+reconcile the outcome. Duplicate approval delivery is rejected. This protocol
+does not claim exactly-once effects or power-loss durability.
+
+The latest stored revision retains the complete effect journal. Superseded
+revisions are removed after a successful commit, so repeated lifecycle updates
+do not accumulate copies of the session. Each serialized revision is limited to
+25 MiB within a 50 MiB store budget, leaving room for an atomic replacement.
+Snapshots that cannot fit are rejected before publishing a pending approval;
+later growth of the journal or session remains bounded by the same limit.
+
+The stored transcript support uses ellmer's public content record/replay and the
+same session payload as `save_session()` / `load_session()`. Loading a separate
+session snapshot does not consume an approval. Tools, callbacks and provider
+clients are never serialized. Offloaded data frames and serializable S3 checkpoint
+metadata retain their values, classes and attributes. Runtime objects inside
+metadata or attributes remain unsupported. The host owns access, retention and backups for
+these trusted local R records. An optional shinychat adapter must use its
+released public contract; it is not required for this headless workflow. See
+[ADR-0016](https://github.com/JamesHWade/deputy/blob/main/dev/adr/0016-durable-approval-continuations.md)
+for the control-state contract.

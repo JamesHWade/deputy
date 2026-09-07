@@ -53,6 +53,17 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           class = c("deputy_run_active", "deputy_error")
         )
       }
+      if (
+        !is.null(private$.pending_approval_path) &&
+          is.null(private$.approval_resume)
+      ) {
+        approval_abort(
+          "This Agent has a pending approval; resume or deny it before starting another run."
+        )
+      }
+      if (!is.null(private$.approval_dir)) {
+        tool_mode <- "sequential"
+      }
       force(structured)
       force(extraction)
       limits <- normalize_usage_limits(limits)
@@ -326,6 +337,22 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             rlang::cnd_signal(error)
           }
         )
+        if (
+          !agent$.__enclos_env__$private$should_stop ||
+            identical(
+              agent$.__enclos_env__$private$.approval_resume$record$decision$decision,
+              "deny"
+            )
+        ) {
+          tryCatch(
+            agent$.__enclos_env__$private$execute_approval_resume(),
+            error = function(error) {
+              stream_state$reason <- "error"
+              record_run_failure(agent, "approval_resume", error)
+              rlang::cnd_signal(error)
+            }
+          )
+        }
         tryCatch(
           coro::await(agent$.__enclos_env__$private$maybe_auto_compact(
             messages
@@ -680,6 +707,10 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             usage = usage,
             limit = private$last_limit_status
           ))
+          private$commit_approval_state(
+            if (identical(state$reason, "complete")) "completed" else "stopped",
+            reason = state$reason
+          )
           state$result <- private$callback_run_result(state)
           private$.last_run_result <- state$result
 

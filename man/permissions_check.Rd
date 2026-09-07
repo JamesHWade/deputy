@@ -17,7 +17,8 @@ permissions_check(permissions, tool_name, tool_input, context = list())
 and annotations.}
 }
 \value{
-A \link{PermissionResultAllow} or \link{PermissionResultDeny}.
+A \link{PermissionResultAllow}, \link{PermissionResultDeny}, or
+\link{PermissionResultPending}.
 }
 \description{
 Evaluate a tool call against a permission policy

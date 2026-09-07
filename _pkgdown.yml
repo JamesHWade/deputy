@@ -99,6 +99,9 @@ reference:
   - PermissionMode
   - PermissionResultAllow
   - PermissionResultDeny
+  - PermissionResultPending
+  - ApprovalContinuation
+  - approval_read
   - permissions_standard
   - permissions_readonly
   - permissions_plan
