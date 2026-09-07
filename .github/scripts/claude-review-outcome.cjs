@@ -64,7 +64,7 @@ function priorReviewSkip({ sha, currentSha, comments, started }) {
     Date.parse(comment.created_at) < Date.parse(started) &&
     /<!-- deputy-claude-review:[a-f0-9]{40}:\d+:\d+:(?:with|without)-findings -->/.test(comment.body || ''));
   return sha === currentSha && priorReview
-    ? { outcome: 'intentionally skipped', reason: 'Upstream policy skips a prior Claude review; this run did not review the current head' }
+    ? { outcome: 'intentionally skipped', reason: 'Upstream policy skips a prior Claude review comment; this run did not review the current head or validate the earlier run' }
     : undefined;
 }
 

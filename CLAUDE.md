@@ -642,13 +642,16 @@ OIDC or an App token. Reviews post as `github-actions[bot]`.
 Draft PRs explicitly skip automatic review until ready. Ready reviews check out the
 exact PR head and preserve the upstream plugin's skip policy. Its successful,
 denial-free invocation can explicitly skip a trivial change, a now-closed/draft PR,
-or a PR with a prior Claude review. Closed/draft state and prior bot review summaries
+or a PR with a prior Claude review comment. Closed/draft state and prior bot review comments
 are checked against GitHub. A skip explicitly states that this run did not review
 the current head; an older review never counts as current-run completion.
-Before starting the SDK, the workflow checks for a prior bot review summary with
+Before starting the SDK, the workflow checks for a prior bot review comment with
 the established provenance marker. That confirmed upstream skip needs no model
 call and emits an eligibility-stage result. PRs without that evidence invoke the
 existing plugin normally; GitHub eligibility lookup failures fail the job.
+This eligibility decision follows the upstream comment-presence rule. It does
+not validate the earlier run's conclusion or certify it as a completed review.
+Current-run completion remains subject to all SDK and GitHub evidence checks.
 Completed reviews require a current-run `github-actions[bot]` summary tied to that SHA; findings
 also require exact-commit inline comments linking the same workflow run and attempt
 (the upstream sanitizer strips HTML comments from inline bodies). Missing evidence
