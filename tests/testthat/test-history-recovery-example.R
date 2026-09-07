@@ -706,6 +706,10 @@ test_that("preparation export writes once and binds the verified receipt", {
     fixed = TRUE
   )
   expect_snapshot(error = TRUE, example$history_export(completed, directory))
+  other <- withr::local_tempdir()
+  error <- tryCatch(example$history_export(completed, other), error = identity)
+  expect_s3_class(error, "rlang_error")
+  expect_length(list.files(other), 0L)
 })
 
 

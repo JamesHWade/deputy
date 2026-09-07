@@ -261,7 +261,7 @@ history_export <- function(fixture, directory) {
     )
   }
   path <- file.path(directory, "accepted-findings.csv")
-  if (file.exists(path)) {
+  if (length(fixture$completed_effects) > 0L || file.exists(path)) {
     cli::cli_abort("The preparation export has already been completed.")
   }
   writeBin(charToRaw(enc2utf8(planned$contents)), path)
