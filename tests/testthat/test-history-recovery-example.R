@@ -352,6 +352,15 @@ for (scenario in c("original", "changed-constraint", "resolved-methods")) {
       expect_identical(evaluation$case_id, "assay-review-changed-constraint-v1")
     }
     if (scenario == "resolved-methods") {
+      expect_setequal(
+        fixture$required_sources,
+        c(
+          "protocol-adult-randomized",
+          "assay-C-r3",
+          "export-receipt-0042",
+          "report-D-F-clarification"
+        )
+      )
       stale_answer <- answer
       stale_answer$pending_reports <- c("D", "F")
       expect_identical(

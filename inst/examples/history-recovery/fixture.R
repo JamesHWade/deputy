@@ -203,8 +203,8 @@ history_fixture <- function(
     required_sources = c(
       "protocol-adult-randomized",
       "assay-C-r3",
-      "report-D-methods",
-      "report-E-F-methods",
+      if (scenario != "resolved-methods") "report-D-methods",
+      if (scenario != "resolved-methods") "report-E-F-methods",
       "export-receipt-0042",
       if (scenario == "changed-constraint") "protocol-all-ages-randomized",
       if (scenario == "resolved-methods") "report-D-F-clarification"
