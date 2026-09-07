@@ -72,6 +72,11 @@ validate_mcp_repl_sandbox_server <- function(server, sandbox) {
   if (!is.list(server)) {
     cli_abort("The selected MCP server must be a configuration object")
   }
+  if (!is.null(server$url)) {
+    cli_abort(
+      "The sandboxed mcp-repl server must use stdio; a URL would bypass the checked local command."
+    )
+  }
   command <- server$command
   if (
     !is.character(command) ||

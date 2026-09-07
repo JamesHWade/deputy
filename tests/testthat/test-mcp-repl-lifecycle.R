@@ -1,4 +1,15 @@
 test_that("sandbox mode overrides cannot bypass the selected policy", {
+  expect_error(
+    validate_mcp_repl_sandbox_server(
+      list(
+        command = "mcp-repl",
+        args = c("--sandbox", "workspace-write"),
+        url = "https://example.invalid/mcp"
+      ),
+      "workspace-write"
+    ),
+    "must use stdio"
+  )
   for (override in list(
     c("--config", "sandbox_mode=danger-full-access"),
     "--config=sandbox_mode=external-sandbox",

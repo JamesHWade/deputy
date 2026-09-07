@@ -91,6 +91,8 @@ tracked in #48 and #99; a small producer is not evidence for catalogue scaling.
 connecting it. It requires an explicit supported `--sandbox` policy and the
 `repl(input, timeout_ms)` tool contract. A `--config sandbox_mode` override is
 rejected, including when it occurs after an otherwise valid sandbox flag.
+URL entries are rejected because mcptools would choose HTTP instead of the
+validated local executable even when both fields appear in the configuration.
 Other transport/authentication configuration stays with mcptools; upstream
 sandbox configuration remains the host's responsibility.
 
