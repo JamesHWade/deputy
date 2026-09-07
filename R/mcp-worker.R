@@ -27,7 +27,7 @@ mcp_worker_start <- function(config, server, working_dir) {
     tools <- list()
   }
   names(tools) <- vapply(tools, function(tool) tool@name, character(1))
-  state <- getFromNamespace("the", "mcptools")
+  state <- utils::getFromNamespace("the", "mcptools")
   entry <- state$mcp_servers[[server]]
   if (!is.environment(entry$transport) || !is.list(entry$tools$tools)) {
     cli::cli_abort("The mcptools connection descriptor contract has changed.")
@@ -37,11 +37,7 @@ mcp_worker_start <- function(config, server, working_dir) {
   if (anyDuplicated(names(descriptors))) {
     cli::cli_abort("The server returned duplicate tool descriptors.")
   }
-  assign(
-    ".deputy_mcp_client",
-    list(server = server, tools = tools),
-    globalenv()
-  )
+  options(deputy.mcp_client = list(server = server, tools = tools))
   list(
     tools = lapply(tools, function(tool) {
       list(
@@ -58,9 +54,11 @@ mcp_worker_start <- function(config, server, working_dir) {
 }
 
 mcp_worker_request <- function(operation, arguments) {
-  client <- get(".deputy_mcp_client", globalenv(), inherits = FALSE)
+  client <- getOption("deputy.mcp_client")
   check_alive <- function() {
-    entry <- getFromNamespace("the", "mcptools")$mcp_servers[[client$server]]
+    entry <- utils::getFromNamespace("the", "mcptools")$mcp_servers[[
+      client$server
+    ]]
     if (
       identical(entry$transport$type, "stdio") &&
         !isTRUE(entry$transport$process$is_alive())
@@ -84,24 +82,31 @@ mcp_worker_request <- function(operation, arguments) {
     return(do.call(tool, arguments$arguments))
   }
   if (identical(operation, "close")) {
-    entry <- getFromNamespace("the", "mcptools")$mcp_servers[[client$server]]
-    getFromNamespace("mcp_transport_close", "mcptools")(entry$transport)
+    entry <- utils::getFromNamespace("the", "mcptools")$mcp_servers[[
+      client$server
+    ]]
+    utils::getFromNamespace("mcp_transport_close", "mcptools")(entry$transport)
     return(invisible(NULL))
   }
   # One protocol request. Cursor traversal remains explicit in the host;
   # this adapter does not implement a second discovery or pagination engine.
   request <- list(
     jsonrpc = "2.0",
-    id = getFromNamespace("jsonrpc_id", "mcptools")(client$server),
+    id = utils::getFromNamespace("jsonrpc_id", "mcptools")(client$server),
     method = operation,
     params = arguments
   )
-  response <- getFromNamespace("mcp_server_request_cancellable", "mcptools")(
+  response <- utils::getFromNamespace(
+    "mcp_server_request_cancellable",
+    "mcptools"
+  )(
     client$server,
     request
   )
   if (!is.null(response$error)) {
-    getFromNamespace("mcp_abort_jsonrpc_error", "mcptools")(response$error)
+    utils::getFromNamespace("mcp_abort_jsonrpc_error", "mcptools")(
+      response$error
+    )
   }
   if (!is.list(response$result)) {
     cli::cli_abort("MCP returned no result object.")
