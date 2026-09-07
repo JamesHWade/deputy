@@ -986,6 +986,19 @@ test_that("budget feedback counts attempts and fits inside the byte ceiling", {
   )
   expect_identical(tail(access$audit(), 1L)[[1L]]$bytes, 0L)
   expect_match(access$tools[[1L]]@description, "share 2 calls", fixed = TRUE)
+  exhausted <- example$history_access(
+    fixture$records,
+    fixture$scope,
+    max_calls = 6L,
+    max_total_bytes = 0L,
+    budget_feedback = TRUE
+  )
+  expect_condition(
+    exhausted$read("assay-C-r3"),
+    "5 calls and 0 bytes remain",
+    class = "ellmer_tool_reject"
+  )
+  expect_identical(exhausted$usage()$bytes, 0L)
 })
 
 test_that("a batch beyond remaining history access still reaches the reserved answer", {
@@ -1241,7 +1254,8 @@ test_that("history reporting separates completion latency and source payloads", 
       )
     ),
     completed_effects_before = list(),
-    attempted_exports = 0L
+    attempted_exports = 2L,
+    repeated_effects = 1L
   )
   incomplete <- row
   incomplete$trial_id <- "fixture/2"
@@ -1272,7 +1286,7 @@ test_that("history reporting separates completion latency and source payloads", 
   )
   expect_match(
     report,
-    "| fixture/1 | history/budget-aware | none | 3 | 0 | 1 | 220 | 0 | 0 |",
+    "| fixture/1 | history/budget-aware | none | 3 | 0 | 1 | 220 | 0 | 2 | 1 |",
     fixed = TRUE
   )
   expect_match(report, "Expected 2 continuations; missing 0.", fixed = TRUE)

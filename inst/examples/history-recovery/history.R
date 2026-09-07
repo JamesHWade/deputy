@@ -82,8 +82,9 @@ history_access <- function(
           status,
           if (isTRUE(budget_feedback)) {
             sprintf(
-              "(%d calls remain). Finish from the evidence already available.",
-              max(0L, max_calls - state$calls)
+              "(%d calls and %d bytes remain). Finish from the evidence already available.",
+              max(0L, max_calls - state$calls),
+              max(0L, max_total_bytes - state$bytes)
             )
           }
         ),

@@ -1027,15 +1027,15 @@ history_report <- function(evaluation) {
   lines <- c(
     lines,
     "",
-    "| Trial | Strategy / protocol | Failed checks | History attempts | Searches with source payload | Reads with source payload | History bytes | Completed writes | Export attempts |",
-    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"
+    "| Trial | Strategy / protocol | Failed checks | History attempts | Searches with source payload | Reads with source payload | History bytes | Completed writes | Export attempts | Repeated exports |",
+    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
   )
   for (row in rows) {
     failed <- names(row$score$checks)[!unlist(row$score$checks)]
     lines <- c(
       lines,
       sprintf(
-        "| %s | %s | %s | %d | %d | %d | %d | %d | %d |",
+        "| %s | %s | %s | %d | %d | %d | %d | %d | %d | %d |",
         row$trial_id,
         arm(row),
         if (length(failed)) paste(failed, collapse = ", ") else "none",
@@ -1044,7 +1044,8 @@ history_report <- function(evaluation) {
         payloads(row, "read"),
         row$history_usage$bytes,
         length(row$completed_effects_before),
-        row$attempted_exports
+        row$attempted_exports,
+        row$repeated_effects
       )
     )
   }
