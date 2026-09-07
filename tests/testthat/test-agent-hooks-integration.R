@@ -133,7 +133,7 @@ test_that("Agent denies execution when an isolated hook times out", {
     event = "PreToolUse",
     timeout = 0.1,
     callback = function(...) {
-      Sys.sleep(60)
+      Sys.sleep(1)
       HookResultPreToolUse(permission = "allow")
     }
   ))
