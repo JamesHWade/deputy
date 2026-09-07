@@ -1,0 +1,71 @@
+{
+  "source_commit": "c1dad52f76af6ac8df21f238a4ccd24bd9f145b6",
+  "authorized_allowance_usd": 5,
+  "aggregate_estimated_cost_threshold_usd": 3.5,
+  "aggregate_request_limit": 250,
+  "trials_per_scenario": 3,
+  "helper_model": "gpt-5.6-luna",
+  "task_model": "gpt-5.6-luna",
+  "reasoning_effort": "low",
+  "max_output_tokens": 1024,
+  "max_context_tokens": 6000,
+  "max_run_tool_calls": 8,
+  "max_history_calls": 6,
+  "max_history_response_bytes": 4096,
+  "max_history_total_bytes": 16384,
+  "numeric_precision": "Original JSON writer rounded floating point values to four decimal places. Unmodified Markdown reports retain formatted cost estimates generated before JSON serialization.",
+  "files": {
+    "original.json.gz": {
+      "sha256": "e54c7469605c0c016c5f534fcdd3b44542ccff62d1d6771306f81e7cbc6cc482",
+      "uncompressed_sha256": "a7770c08d3e8e9b174cd7e587eeaa4d41435477cb72b6c89b6eee877565cc99b",
+      "uncompressed_bytes": 1784290,
+      "compressed_bytes": 67475,
+      "created_at": "2026-09-07 11:07:45 UTC",
+      "case_id": "assay-review-long-v1",
+      "versions": {
+        "deputy": "0.0.0.9000",
+        "ellmer": "0.5.0",
+        "R": "4.6.1",
+        "source_commit": "c1dad52f76af6ac8df21f238a4ccd24bd9f145b6"
+      },
+      "requests": 46,
+      "estimated_cost_usd_from_report": "0.09300296"
+    },
+    "changed-constraint.json.gz": {
+      "sha256": "39d6d14b4e6a2e8aaf92e05bd8049cef409ccc55f267260d8db0f8147cd7a2a3",
+      "uncompressed_sha256": "ab4da8c40de43f6cbb359883877ec7d3798e840741928c63a8167a85e1e061a6",
+      "uncompressed_bytes": 1795853,
+      "compressed_bytes": 70826,
+      "created_at": "2026-09-07 11:10:23 UTC",
+      "case_id": "assay-review-changed-constraint-v1",
+      "versions": {
+        "deputy": "0.0.0.9000",
+        "ellmer": "0.5.0",
+        "R": "4.6.1",
+        "source_commit": "c1dad52f76af6ac8df21f238a4ccd24bd9f145b6"
+      },
+      "requests": 44,
+      "estimated_cost_usd_from_report": "0.08900706"
+    },
+    "resolved-methods.json.gz": {
+      "sha256": "ac9f01d5b97834361407d407a4f90f5d26cd645ad12703153c702ba953adf773",
+      "uncompressed_sha256": "4d9408dcb5dc3c0b9ab9489f80e350215184e52730300642fda7b8d40e47bbe3",
+      "uncompressed_bytes": 1794174,
+      "compressed_bytes": 68784,
+      "created_at": "2026-09-07 11:12:43 UTC",
+      "case_id": "assay-review-resolved-methods-v1",
+      "versions": {
+        "deputy": "0.0.0.9000",
+        "ellmer": "0.5.0",
+        "R": "4.6.1",
+        "source_commit": "c1dad52f76af6ac8df21f238a4ccd24bd9f145b6"
+      },
+      "requests": 46,
+      "estimated_cost_usd_from_report": "0.08855886"
+    }
+  },
+  "estimated_total_cost_usd_from_reports": "0.27056888",
+  "total_governed_requests": 136,
+  "answer_count": 15,
+  "attempted_continuations": 18
+}

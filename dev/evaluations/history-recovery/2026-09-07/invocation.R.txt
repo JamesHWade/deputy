@@ -1,0 +1,41 @@
+# Invoke only after the user explicitly sets a paid-run allowance.
+stopifnot(identical(Sys.getenv("DEPUTY_HISTORY_LIVE"), "yes"))
+allowance <- as.numeric(Sys.getenv("DEPUTY_HISTORY_ALLOWANCE_USD", "NA"))
+stopifnot(length(allowance) == 1L, is.finite(allowance), allowance > 0)
+devtools::load_all("/private/tmp/deputy-history-trials", quiet = TRUE)
+for (file in c("fixture.R", "history.R", "evaluation.R")) {
+  source(file.path("/private/tmp/deputy-history-trials/inst/examples/history-recovery", file))
+}
+output <- Sys.getenv("DEPUTY_HISTORY_OUTPUT")
+stopifnot(nzchar(output), !dir.exists(output))
+dir.create(output, recursive = TRUE)
+used <- 0
+requests <- 0L
+for (scenario in c("original", "changed-constraint", "resolved-methods")) {
+  remaining <- allowance * 0.7 - used
+  if (!is.finite(remaining) || remaining <= 0 || requests >= 250L) break
+  factory <- function(model) ellmer::chat_openai(
+    model = model,
+    params = ellmer::params(max_tokens = 1024L, reasoning_effort = "low"),
+    echo = "none"
+  )
+  evaluation <- history_evaluate(
+    factory, fixture = history_fixture(scenario = scenario), trials = 3L,
+    helper_models = "gpt-5.6-luna", task_model = "gpt-5.6-luna",
+    max_cost_usd = remaining, max_requests = min(100L, 250L - requests)
+  )
+  evaluation$versions$source_commit <- system2(
+    "git", c("-C", "/private/tmp/deputy-history-trials", "rev-parse", "HEAD"), stdout = TRUE
+  )
+  jsonlite::write_json(evaluation, file.path(output, paste0(scenario, ".json")),
+    auto_unbox = TRUE, pretty = TRUE, null = "null", na = "null")
+  writeLines(history_report(evaluation), file.path(output, paste0(scenario, ".md")))
+  used <- used + evaluation$usage$cost_usd
+  requests <- requests + evaluation$usage$requests
+  cat(scenario, "continuations:", length(evaluation$trials),
+    "total observed USD:", used, "requests:", requests, "\n")
+  if (!is.null(evaluation$failure)) {
+    cat("Stopped:", evaluation$failure$class, "\n")
+    break
+  }
+}

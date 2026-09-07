@@ -76,6 +76,12 @@ recall quality**.
 
 ## Live pilot
 
+The [7 September 2026 results](../../../dev/evaluations/history-recovery/2026-09-07/README.md)
+record nine paired trials across all three scenarios. Retrieval improved
+grounding when it finished, but three continuations stopped at the tool-call
+limit. The report retains these failures, costs, matched contexts and effect
+receipts; it does not establish production quality.
+
 Install this Deputy branch first. Configure OpenAI credentials through ellmer's
 normal mechanism. Run the following only after choosing a spending allowance:
 
