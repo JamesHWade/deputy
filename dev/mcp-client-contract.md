@@ -84,3 +84,48 @@ cancellation, timeout, server crash, and invalid handles. Existing producer
 coverage retains the YAML registry and delegation journey. Qualification against
 a large external catalogue and replacement with released public APIs remain
 tracked in #48 and #99; a small producer is not evidence for catalogue scaling.
+
+## Persistent execution with mcp-repl
+
+`mcp_repl_connection()` freezes the selected configuration before checking and
+connecting it. It requires an explicit supported `--sandbox` policy and the
+`repl(input, timeout_ms)` tool contract. A `--config sandbox_mode` override is
+rejected, including when it occurs after an otherwise valid sandbox flag.
+URL entries are rejected because mcptools would choose HTTP instead of the
+validated local executable even when both fields appear in the configuration.
+Other transport/authentication configuration stays with mcptools; upstream
+sandbox configuration remains the host's responsibility.
+
+The qualified producer is mcp-repl 0.3.0 with mcptools 1.0.2. The convenience
+function validates the tool shape, not the binary version. Its R journey on
+macOS demonstrates persistent values, isolation across two Agents using the
+same server name, ellmer image content, bounded output with a full transcript
+artifact, busy-interpreter output, a successful state-preserving Ctrl-C,
+Ctrl-D reset, interpreter exit/state loss, and cleanup with invalid old handles.
+`tests/testthat/test-mcp-repl-lifecycle.R` runs that journey when
+`DEPUTY_MCP_REPL_BIN` names the qualified executable. Ordinary CI retains the
+deterministic real MCP producer without requiring an installed REPL binary.
+
+`mcp_repl_control()` sends the documented Ctrl-C or Ctrl-D input and returns
+the actual upstream result. It does not infer success from dispatch, invent a
+generic lifecycle API, or run a second interpreter. Controls require an idle
+client connection, although the upstream interpreter may still be executing
+after a busy result. A control request is a direct host operation; model-issued
+control input goes through the registered `repl` tool's normal governance.
+
+Agent interruption and internal stream stops cancel that Agent's active owned
+MCP requests. Pending executions retain their cancellation binding when the host
+removes or replaces registered tools; those bindings are released when the call
+settles. Cloning an Agent does not copy its pending executions. Cancellation
+checks the stopping Agent's effective ownership, closes matching busy connections
+and discards their state. Idle connections remain available. A server process exit also invalidates the
+connection. An interpreter exit can instead be reported by a surviving
+mcp-repl server, followed by a fresh interpreter on the next request. Preserve
+that state-loss message; a stable connection ID is not an interpreter-state
+receipt.
+
+The R client worker only runs mcptools. mcp-repl owns execution, interruption,
+reset, OS confinement, preview truncation and spill artifacts. ellmer owns
+ordered text/image content. Deputy's usual offloading can bound a resulting
+Agent context without copying the upstream artifact store. The host owns any
+durable artifact retention before the upstream session is closed.

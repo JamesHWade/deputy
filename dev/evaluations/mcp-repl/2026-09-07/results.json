@@ -1,0 +1,131 @@
+{
+  "source_commit": "c4a232341c82a538b816d63bb5a25d708da95d16",
+  "assertions": 86,
+  "failed": 0,
+  "errors": 0,
+  "warnings": 0,
+  "skipped": 0,
+  "tests": [
+    {
+      "file": "test-api.R",
+      "test": "public API is deliberate",
+      "nb": 1,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 1,
+      "real": 0.00900000000000001
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "independent connections preserve exact selection, state and ownership",
+      "nb": 13,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 13,
+      "real": 4.552
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "catalogue discovery does not authorize resource or prompt access",
+      "nb": 16,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 16,
+      "real": 2.407
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "active calls keep the host responsive and cancellation invalidates handles",
+      "nb": 8,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 8,
+      "real": 0.881
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "request timeout discards the session instead of silently reconnecting",
+      "nb": 4,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 4,
+      "real": 1.054
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "connection validation fails before starting an unselected server",
+      "nb": 5,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 5,
+      "real": 0.882000000000001
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "resource tools traverse Agent permission and hook boundaries",
+      "nb": 7,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 7,
+      "real": 2.83
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "server exit is reported as state loss and old handles stay invalid",
+      "nb": 3,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 3,
+      "real": 5.111
+    },
+    {
+      "file": "test-mcp-repl-lifecycle.R",
+      "test": "sandbox mode overrides cannot bypass the selected policy",
+      "nb": 5,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 5,
+      "real": 0.0760000000000005
+    },
+    {
+      "file": "test-mcp-repl-lifecycle.R",
+      "test": "Agent interruption terminates its active owned MCP request",
+      "nb": 5,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 5,
+      "real": 0.905999999999999
+    },
+    {
+      "file": "test-mcp-repl-lifecycle.R",
+      "test": "released mcp-repl preserves state, content, isolation and explicit controls",
+      "nb": 19,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 19,
+      "real": 16.163
+    }
+  ]
+}

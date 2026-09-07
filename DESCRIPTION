@@ -87,6 +87,7 @@ Collate:
     'ids.R'
     'mcp-connection.R'
     'mcp-metadata.R'
+    'mcp-repl.R'
     'mcp-worker.R'
     'parallel-delegate.R'
     'permission-evaluation.R'

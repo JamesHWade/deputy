@@ -357,6 +357,55 @@ do not establish a Deputy-verifiable boundary are errors. mcp-repl then owns
 OS-specific confinement, including fail-closed startup on unsupported hosts.
 See `vignette("permissions")` for the complete trust model.
 
+For a persistent session owned by a particular Agent, use
+`mcp_repl_connection()`:
+
+```{r, eval = FALSE}
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  permissions = Permissions(web = FALSE)
+)
+connection <- mcp_repl_connection(
+  config = "~/.config/mcptools/config.json",
+  agent = agent,
+  server = "r",
+  sandbox = "workspace-write"
+)
+agent$register_tools(connection$tools())
+```
+
+Each connection starts a separate upstream REPL, even when its configured
+server name matches another conversation's. Registering its tools with an
+unrelated Agent fails. The connection ID and selected sandbox appear in tool
+metadata for permission callbacks and hooks. The host must call
+`connection$close()` when the conversation ends.
+
+After mcp-repl returns a busy-interpreter response, the host can request an
+interrupt with `mcp_repl_control(connection, "interrupt")`. To discard interpreter
+state and request a fresh session, use `mcp_repl_control(connection, "reset")`.
+Both return promises for the upstream result; inspect that result before
+assuming the control succeeded. An interpreter can restart inside the same
+MCP connection, so the connection ID alone does not prove its state survived.
+
+An active client request cannot accept an overlapping control request.
+`connection$cancel()` or interruption of the owning Agent terminates that
+connection and discards its state. mcp-repl's `timeout_ms` can instead return
+control while interpreter work continues; the client's `timeout` closes the
+connection when the MCP request itself takes too long.
+
+Plots retain ellmer image content. Oversized transcripts retain mcp-repl's
+bounded previews and artifact references, and ordinary Deputy result offloading
+still applies when configured. These paths are upstream-owned session artifacts;
+the host must preserve anything it needs durably before closing the session.
+Deputy does not create another spill store or automatically read every linked
+artifact.
+
+The tested producer combination is mcptools 1.0.2 with mcp-repl 0.3.0 on macOS.
+The executable name does not establish its version. Install the qualified
+runtime explicitly; unsupported host sandboxing remains an upstream startup
+error. Put the sandbox mode in `--sandbox`; a `--config sandbox_mode=...`
+override is rejected so it cannot change the policy Deputy checked.
+
 ## Human-in-the-Loop
 
 The `tool_ask_user` tool lets an agent ask the user a question during

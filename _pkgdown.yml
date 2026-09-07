@@ -89,6 +89,8 @@ reference:
   - McpConnection
   - tool_metadata
   - tools_mcp_repl
+  - mcp_repl_connection
+  - mcp_repl_control
   - set_ask_user_callback
 
 - title: Permissions

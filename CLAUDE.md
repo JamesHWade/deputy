@@ -318,6 +318,10 @@ only the mcptools registry, not an interpreter or transport implementation.
 Admission lists and Agent/session/run-context ownership are fixed. Discovery
 does not authorize access. Read `dev/mcp-client-contract.md` before changing the
 bridge or making lifecycle claims. #99 remains the public-API replacement work.
+`mcp_repl_connection()` uses that owner boundary for persistent execution.
+Set `DEPUTY_MCP_REPL_BIN` to a qualified mcp-repl 0.3.0 executable to run the
+real lifecycle test. Agent interruption closes active owned MCP connections;
+the explicit upstream control helper reports the actual interrupt/reset result.
 
 ### Core Flow
 

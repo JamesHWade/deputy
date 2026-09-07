@@ -988,7 +988,8 @@ Agent <- R6::R6Class(
     #' Request cancellation of the active stream.
     #'
     #' Cancellation is cooperative and takes effect at the next provider or tool
-    #' boundary supported by ellmer.
+    #' boundary supported by ellmer. Active [McpConnection] calls terminate their
+    #' owned connections and discard server session state.
     #'
     #' @param reason Stable reason stored on the terminal event
     #' @return Invisible logical indicating whether a run was active
@@ -996,15 +997,7 @@ Agent <- R6::R6Class(
       if (!isTRUE(private$run_active)) {
         return(invisible(FALSE))
       }
-      private$should_stop <- TRUE
-      private$stop_reason_from_hook <- as.character(reason[[1]])
-      controller <- private$current_stream_controller
-      if (!is.null(controller)) {
-        tryCatch(
-          controller$cancel(reason = private$stop_reason_from_hook),
-          error = function(e) controller$cancel()
-        )
-      }
+      private$request_stream_stop(as.character(reason[[1]]))
       invisible(TRUE)
     },
 
@@ -1769,6 +1762,9 @@ Agent <- R6::R6Class(
       should_stop = FALSE,
       stop_reason_from_hook = NULL,
 
+      # Pending executions retain cancellation even if registered tools change.
+      active_mcp_tools = list(),
+
       # Run-scoped tracing and usage state.
       run_active = FALSE,
       current_run_id = NULL,
@@ -1809,6 +1805,7 @@ Agent <- R6::R6Class(
       clone_client = function(deep = FALSE) {
         invisible(deep)
         cloned <- private$.r6_clone(deep = TRUE)
+        cloned$.__enclos_env__$private$active_mcp_tools <- list()
         cloned$.__enclos_env__$private$rewire_chat_runtime()
         cloned$.__enclos_env__$private$.compaction_artifacts <- NULL
         register_compaction_catalog_owner(
@@ -1977,7 +1974,29 @@ Agent <- R6::R6Class(
         if (is.function(workspace_runner)) {
           return(workspace_runner(arguments, private$.working_dir))
         }
-        do.call(tool, arguments)
+        source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||%
+          tool
+        cancel <- attr(source, "deputy_mcp_cancel_active", exact = TRUE)
+        if (!is.function(cancel)) {
+          return(do.call(tool, arguments))
+        }
+        id <- new_deputy_id("mcp_call_")
+        private$active_mcp_tools[[id]] <- source
+        pending <- FALSE
+        on.exit({
+          if (!pending) {
+            private$active_mcp_tools[[id]] <- NULL
+          }
+        })
+        value <- do.call(tool, arguments)
+        if (!promises::is.promising(value)) {
+          return(value)
+        }
+        result <- promises::finally(value, function() {
+          private$active_mcp_tools[[id]] <- NULL
+        })
+        pending <- TRUE
+        result
       },
 
       offload_tool_result = function(tool_name, value, execution_id = NULL) {

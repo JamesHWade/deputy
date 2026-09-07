@@ -32,6 +32,22 @@ mcp_repl_sandbox_setting <- function(arguments) {
   values <- character()
   for (index in seq_along(arguments)) {
     argument <- arguments[[index]]
+    if (identical(argument, "--config") || startsWith(argument, "--config=")) {
+      override <- if (
+        identical(argument, "--config") && index < length(arguments)
+      ) {
+        arguments[[index + 1L]]
+      } else {
+        sub("^--config=", "", argument)
+      }
+      key <- trimws(strsplit(override, "=", fixed = TRUE)[[1L]][[1L]])
+      if (identical(key, "sandbox_mode")) {
+        cli_abort(c(
+          "Set the sandbox mode with {.code --sandbox}, not {.code --config sandbox_mode}.",
+          "i" = "Deputy cannot qualify an overriding sandbox mode through this adapter."
+        ))
+      }
+    }
     if (identical(argument, "--sandbox")) {
       if (
         index == length(arguments) || startsWith(arguments[[index + 1L]], "--")
@@ -55,6 +71,11 @@ mcp_repl_sandbox_setting <- function(arguments) {
 validate_mcp_repl_sandbox_server <- function(server, sandbox) {
   if (!is.list(server)) {
     cli_abort("The selected MCP server must be a configuration object")
+  }
+  if (!is.null(server$url)) {
+    cli_abort(
+      "The sandboxed mcp-repl server must use stdio; a URL would bypass the checked local command."
+    )
   }
   command <- server$command
   if (
