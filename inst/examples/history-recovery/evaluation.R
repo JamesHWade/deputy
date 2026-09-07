@@ -255,16 +255,13 @@ history_budget <- function(
 # Host-authorized, isolated effect. No model supplies a path or write payload.
 history_export <- function(fixture, directory) {
   planned <- fixture$planned_export
-  valid_id <- is.character(planned$id) &&
-    length(planned$id) == 1L &&
-    !is.na(planned$id) &&
-    nzchar(trimws(planned$id))
+  valid_id <- identical(planned$id, "export-0042") &&
+    identical(fixture$expected$completed_export_id, planned$id)
   valid_version <- is.numeric(planned$version) &&
     length(planned$version) == 1L &&
     !is.na(planned$version) &&
     is.finite(planned$version) &&
-    planned$version >= 1 &&
-    planned$version == floor(planned$version)
+    planned$version == 1
   if (
     !valid_id ||
       !valid_version ||
@@ -274,7 +271,7 @@ history_export <- function(fixture, directory) {
       is.na(planned$contents)
   ) {
     cli::cli_abort(
-      "The host export must specify an ID, a positive whole version, a fixed artifact and contents."
+      "The host export must match the expected export-0042 ID, version 1, fixed artifact and contents."
     )
   }
   path <- file.path(directory, "accepted-findings.csv")

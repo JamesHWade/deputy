@@ -824,8 +824,15 @@ test_that("malformed planned export metadata is rejected before writing", {
   example <- history_example()
   fixture <- example$history_fixture(1L)
   invalid_values <- list(
-    id = list(NULL, NA_character_, "", " ", c("first", "second")),
-    version = list(NULL, NA_real_, Inf, 0, 1.5, "1", c(1L, 2L))
+    id = list(
+      NULL,
+      NA_character_,
+      "",
+      " ",
+      "another-export",
+      c("first", "second")
+    ),
+    version = list(NULL, NA_real_, Inf, 0, 1.5, 2L, "1", c(1L, 2L))
   )
   for (field in names(invalid_values)) {
     for (value in invalid_values[[field]]) {
@@ -840,4 +847,16 @@ test_that("malformed planned export metadata is rejected before writing", {
       expect_length(list.files(directory, all.files = TRUE, no.. = TRUE), 0L)
     }
   }
+})
+
+test_that("preparation rejects a conflicting expected export before writing", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  fixture$expected$completed_export_id <- "another-export"
+  directory <- withr::local_tempdir()
+  expect_error(
+    example$history_export(fixture, directory),
+    "expected export-0042 ID"
+  )
+  expect_length(list.files(directory, all.files = TRUE, no.. = TRUE), 0L)
 })
