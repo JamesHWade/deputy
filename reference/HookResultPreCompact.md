@@ -13,7 +13,7 @@ HookResultPreCompact(continue = TRUE, summary = NULL)
 
 - continue:
 
-  If FALSE, cancels the compaction
+  One non-missing logical value. If FALSE, cancels the compaction
 
 - summary:
 
@@ -21,41 +21,31 @@ HookResultPreCompact(continue = TRUE, summary = NULL)
 
 ## Value
 
-A `HookResultPreCompact` object
+A `HookResultPreCompact` S7 object
+
+## See also
+
+[CallbackResult](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
+for read-only properties and S7 inspection.
 
 ## Examples
 
 ``` r
 # Allow compaction
 HookResultPreCompact()
-#> $continue
-#> [1] TRUE
-#> 
-#> $summary
-#> NULL
-#> 
-#> attr(,"class")
-#> [1] "HookResultPreCompact" "HookResult"           "list"                
+#> <deputy::HookResultPreCompact>
+#>  @ continue: logi TRUE
+#>  @ summary : NULL
 
 # Cancel compaction
 HookResultPreCompact(continue = FALSE)
-#> $continue
-#> [1] FALSE
-#> 
-#> $summary
-#> NULL
-#> 
-#> attr(,"class")
-#> [1] "HookResultPreCompact" "HookResult"           "list"                
+#> <deputy::HookResultPreCompact>
+#>  @ continue: logi FALSE
+#>  @ summary : NULL
 
 # Provide custom summary
 HookResultPreCompact(summary = "Previous conversation discussed X, Y, Z.")
-#> $continue
-#> [1] TRUE
-#> 
-#> $summary
-#> [1] "Previous conversation discussed X, Y, Z."
-#> 
-#> attr(,"class")
-#> [1] "HookResultPreCompact" "HookResult"           "list"                
+#> <deputy::HookResultPreCompact>
+#>  @ continue: logi TRUE
+#>  @ summary : chr "Previous conversation discussed X, Y, Z."
 ```

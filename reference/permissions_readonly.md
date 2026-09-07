@@ -20,12 +20,7 @@ object
 ``` r
 perms <- permissions_readonly()
 permissions_check(perms, "read_file", list(path = "test.txt"))
-#> $decision
-#> [1] "allow"
-#> 
-#> $message
-#> NULL
-#> 
-#> attr(,"class")
-#> [1] "PermissionResultAllow" "PermissionResult"      "list"                 
+#> <deputy::PermissionResultAllow>
+#>  @ decision: chr "allow"
+#>  @ message : NULL
 ```

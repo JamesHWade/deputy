@@ -92,17 +92,10 @@ A read-only `Permissions` S7 object.
 ``` r
 policy <- Permissions(file_write = FALSE)
 permissions_check(policy, "write_file", list(path = "output.txt"))
-#> $decision
-#> [1] "deny"
-#> 
-#> $reason
-#> [1] "File writing is not allowed"
-#> 
-#> $interrupt
-#> [1] FALSE
-#> 
-#> attr(,"class")
-#> [1] "PermissionResultDeny" "PermissionResult"     "list"                
+#> <deputy::PermissionResultDeny>
+#>  @ decision : chr "deny"
+#>  @ reason   : chr "File writing is not allowed"
+#>  @ interrupt: logi FALSE
 S7::prop(policy, "file_write")
 #> [1] FALSE
 ```

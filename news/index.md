@@ -2,6 +2,17 @@
 
 ## deputy (development version)
 
+- Hook and permission result constructors now return read-only S7
+  values. Use
+  [`S7::S7_inherits()`](https://rconsortium.github.io/S7/reference/S7_inherits.html)
+  for concrete or family membership and
+  [`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+  for plain records. Continuation/interruption flags and text are
+  validated; `suppress_output` keeps its
+  [`isTRUE()`](https://rdrr.io/r/base/Logic.html) coercion. Lifecycle
+  decisions and original tool-output object references are preserved
+  ([\#129](https://github.com/JamesHWade/deputy/issues/129)).
+
 - [`Skill()`](https://jameshwade.github.io/deputy/reference/Skill.md)
   now constructs a read-only S7 configuration value. Use
   `skill_check_requirements(skill)` instead of the former instance

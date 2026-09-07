@@ -30,12 +30,7 @@ object
 ``` r
 perms <- permissions_standard()
 permissions_check(perms, "write_file", list(path = "output.txt"))
-#> $decision
-#> [1] "allow"
-#> 
-#> $message
-#> NULL
-#> 
-#> attr(,"class")
-#> [1] "PermissionResultAllow" "PermissionResult"      "list"                 
+#> <deputy::PermissionResultAllow>
+#>  @ decision: chr "allow"
+#>  @ message : NULL
 ```

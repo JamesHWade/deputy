@@ -16,30 +16,25 @@ PermissionResultAllow(message = NULL)
 
 ## Value
 
-A `PermissionResultAllow` object
+A `PermissionResultAllow` S7 object
+
+## See also
+
+[CallbackResult](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
+for read-only properties and S7 inspection.
 
 ## Examples
 
 ``` r
 # Allow a tool call
 PermissionResultAllow()
-#> $decision
-#> [1] "allow"
-#> 
-#> $message
-#> NULL
-#> 
-#> attr(,"class")
-#> [1] "PermissionResultAllow" "PermissionResult"      "list"                 
+#> <deputy::PermissionResultAllow>
+#>  @ decision: chr "allow"
+#>  @ message : NULL
 
 # Allow with a message
 PermissionResultAllow(message = "Tool approved by custom callback")
-#> $decision
-#> [1] "allow"
-#> 
-#> $message
-#> [1] "Tool approved by custom callback"
-#> 
-#> attr(,"class")
-#> [1] "PermissionResultAllow" "PermissionResult"      "list"                 
+#> <deputy::PermissionResultAllow>
+#>  @ decision: chr "allow"
+#>  @ message : chr "Tool approved by custom callback"
 ```

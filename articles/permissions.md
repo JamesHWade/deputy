@@ -218,7 +218,30 @@ on request arguments or run context.
 
 It must return
 [`PermissionResultAllow()`](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md)
-or `PermissionResultDeny(reason)`.
+or `PermissionResultDeny(reason)`. These are read-only S7 values.
+Untyped lists and legacy S3 class tags do not satisfy this callback
+contract and produce the existing invalid-result denial. `interrupt`
+must be one non-missing logical value, and `reason` must be one
+non-missing string. Construct a new result to revise a decision.
+
+``` r
+
+library(deputy)
+decision <- PermissionResultDeny("Host veto", interrupt = TRUE)
+S7::S7_inherits(decision, PermissionResult)
+#> [1] TRUE
+decision$decision
+#> [1] "deny"
+S7::props(decision)
+#> $decision
+#> [1] "deny"
+#> 
+#> $reason
+#> [1] "Host veto"
+#> 
+#> $interrupt
+#> [1] TRUE
+```
 
 ## Example: Read-Only Agent
 

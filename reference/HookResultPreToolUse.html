@@ -48,7 +48,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Create a PreToolUse hook result</h1>
-      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/hooks.R" class="external-link"><code>R/hooks.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/callback-result.R" class="external-link"><code>R/callback-result.R</code></a></small>
       <div class="d-none name"><code>HookResultPreToolUse.Rd</code></div>
     </div>
 
@@ -80,7 +80,7 @@
 
 
 <dt id="arg-continue">continue<a class="anchor" aria-label="anchor" href="#arg-continue"></a></dt>
-<dd><p>If FALSE, stop the agent after this hook</p></dd>
+<dd><p>One non-missing logical value. If FALSE, stop the agent after this hook</p></dd>
 
 
 <dt id="arg-additional-context">additional_context<a class="anchor" aria-label="anchor" href="#arg-additional-context"></a></dt>
@@ -93,53 +93,35 @@
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code>HookResultPreToolUse</code> object</p>
+    <p>A <code>HookResultPreToolUse</code> S7 object</p>
+    </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><a href="CallbackResult.html">CallbackResult</a> for read-only properties and S7 inspection.</p></div>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Allow a tool call</span></span></span>
 <span class="r-in"><span><span class="fu">HookResultPreToolUse</span><span class="op">(</span>permission <span class="op">=</span> <span class="st">"allow"</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $permission</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "allow"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $reason</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $continue</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $additional_context</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $stop_reason</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "HookResultPreToolUse" "HookResult"           "list"                </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::HookResultPreToolUse&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ permission        : chr "allow"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ reason            : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ continue          : logi TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ additional_context: NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ stop_reason       : NULL</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Deny a dangerous command</span></span></span>
 <span class="r-in"><span><span class="fu">HookResultPreToolUse</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  permission <span class="op">=</span> <span class="st">"deny"</span>,</span></span>
 <span class="r-in"><span>  reason <span class="op">=</span> <span class="st">"Dangerous command pattern detected"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $permission</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "deny"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $reason</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Dangerous command pattern detected"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $continue</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $additional_context</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $stop_reason</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "HookResultPreToolUse" "HookResult"           "list"                </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::HookResultPreToolUse&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ permission        : chr "deny"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ reason            : chr "Dangerous command pattern detected"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ continue          : logi TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ additional_context: NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ stop_reason       : NULL</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

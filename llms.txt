@@ -246,6 +246,9 @@ Intercept and customize agent behavior
   : Match a lifecycle hook
 - [`hook_matches()`](https://jameshwade.github.io/deputy/reference/hook_matches.md)
   : Test whether a hook matches a tool name
+- [`HookResult()`](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
+  [`PermissionResult()`](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
+  : Callback result value families
 - [`HookResultPreToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.md)
   : Create a PreToolUse hook result
 - [`HookResultPostToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.md)

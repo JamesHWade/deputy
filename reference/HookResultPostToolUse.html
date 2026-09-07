@@ -48,7 +48,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Create a PostToolUse hook result</h1>
-      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/hooks.R" class="external-link"><code>R/hooks.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/callback-result.R" class="external-link"><code>R/callback-result.R</code></a></small>
       <div class="d-none name"><code>HookResultPostToolUse.Rd</code></div>
     </div>
 
@@ -72,11 +72,11 @@
 
 
 <dl><dt id="arg-continue">continue<a class="anchor" aria-label="anchor" href="#arg-continue"></a></dt>
-<dd><p>If FALSE, stop the agent after this hook</p></dd>
+<dd><p>One non-missing logical value. If FALSE, stop the agent after this hook</p></dd>
 
 
 <dt id="arg-suppress-output">suppress_output<a class="anchor" aria-label="anchor" href="#arg-suppress-output"></a></dt>
-<dd><p>Whether to suppress the result on Deputy's emitted
+<dd><p>Coerced with <code><a href="https://rdrr.io/r/base/Logic.html" class="external-link">isTRUE()</a></code>. Whether to suppress the result on Deputy's emitted
 <code>tool_end</code> event. This does not remove the result from model context.</p></dd>
 
 
@@ -96,50 +96,32 @@ in-flight result from this callback.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code>HookResultPostToolUse</code> object</p>
+    <p>A <code>HookResultPostToolUse</code> S7 object</p>
+    </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><a href="CallbackResult.html">CallbackResult</a> for read-only properties and S7 inspection.</p></div>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Continue execution</span></span></span>
 <span class="r-in"><span><span class="fu">HookResultPostToolUse</span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $continue</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $suppress_output</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $updated_tool_output</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $additional_context</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $stop_reason</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "HookResultPostToolUse" "HookResult"            "list"                 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::HookResultPostToolUse&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ continue           : logi TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ suppress_output    : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ updated_tool_output: NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ additional_context : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ stop_reason        : NULL</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Stop after this tool</span></span></span>
 <span class="r-in"><span><span class="fu">HookResultPostToolUse</span><span class="op">(</span>continue <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $continue</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $suppress_output</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $updated_tool_output</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $additional_context</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $stop_reason</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "HookResultPostToolUse" "HookResult"            "list"                 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::HookResultPostToolUse&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ continue           : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ suppress_output    : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ updated_tool_output: NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ additional_context : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ stop_reason        : NULL</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

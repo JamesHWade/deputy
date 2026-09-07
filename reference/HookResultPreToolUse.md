@@ -26,7 +26,8 @@ HookResultPreToolUse(
 
 - continue:
 
-  If FALSE, stop the agent after this hook
+  One non-missing logical value. If FALSE, stop the agent after this
+  hook
 
 - additional_context:
 
@@ -38,51 +39,34 @@ HookResultPreToolUse(
 
 ## Value
 
-A `HookResultPreToolUse` object
+A `HookResultPreToolUse` S7 object
+
+## See also
+
+[CallbackResult](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
+for read-only properties and S7 inspection.
 
 ## Examples
 
 ``` r
 # Allow a tool call
 HookResultPreToolUse(permission = "allow")
-#> $permission
-#> [1] "allow"
-#> 
-#> $reason
-#> NULL
-#> 
-#> $continue
-#> [1] TRUE
-#> 
-#> $additional_context
-#> NULL
-#> 
-#> $stop_reason
-#> NULL
-#> 
-#> attr(,"class")
-#> [1] "HookResultPreToolUse" "HookResult"           "list"                
+#> <deputy::HookResultPreToolUse>
+#>  @ permission        : chr "allow"
+#>  @ reason            : NULL
+#>  @ continue          : logi TRUE
+#>  @ additional_context: NULL
+#>  @ stop_reason       : NULL
 
 # Deny a dangerous command
 HookResultPreToolUse(
   permission = "deny",
   reason = "Dangerous command pattern detected"
 )
-#> $permission
-#> [1] "deny"
-#> 
-#> $reason
-#> [1] "Dangerous command pattern detected"
-#> 
-#> $continue
-#> [1] TRUE
-#> 
-#> $additional_context
-#> NULL
-#> 
-#> $stop_reason
-#> NULL
-#> 
-#> attr(,"class")
-#> [1] "HookResultPreToolUse" "HookResult"           "list"                
+#> <deputy::HookResultPreToolUse>
+#>  @ permission        : chr "deny"
+#>  @ reason            : chr "Dangerous command pattern detected"
+#>  @ continue          : logi TRUE
+#>  @ additional_context: NULL
+#>  @ stop_reason       : NULL
 ```

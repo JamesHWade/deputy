@@ -60,6 +60,36 @@ package functions such as
 [`deputy::HookResultPostToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.md)
 when using that mode.
 
+Hook result constructors return read-only S7 values. Inspect properties
+with `@`, `$`, or
+[`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html) and
+use
+[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+for a plain record. To change a decision, construct a new result. Nested
+output objects retain their identity.
+
+``` r
+
+library(deputy)
+blocked <- HookResultPreToolUse("deny", reason = "Read only")
+S7::S7_inherits(blocked, HookResult)
+#> [1] TRUE
+blocked$permission
+#> [1] "deny"
+S7::props(HookResultPreCompact(continue = FALSE))
+#> $continue
+#> [1] FALSE
+#> 
+#> $summary
+#> NULL
+```
+
+`continue` must be one non-missing logical value; optional text must be
+NULL or one non-missing string. `suppress_output` keeps its
+[`isTRUE()`](https://rdrr.io/r/base/Logic.html) coercion. Errors raised
+while constructing results inside callbacks follow the existing hook
+error path: PreToolUse fails closed; other events log and continue.
+
 ### Filtering by Tool Name
 
 The optional `pattern` argument is a regex that filters which tools the

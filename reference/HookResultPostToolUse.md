@@ -18,12 +18,14 @@ HookResultPostToolUse(
 
 - continue:
 
-  If FALSE, stop the agent after this hook
+  One non-missing logical value. If FALSE, stop the agent after this
+  hook
 
 - suppress_output:
 
-  Whether to suppress the result on Deputy's emitted `tool_end` event.
-  This does not remove the result from model context.
+  Coerced with [`isTRUE()`](https://rdrr.io/r/base/Logic.html). Whether
+  to suppress the result on Deputy's emitted `tool_end` event. This does
+  not remove the result from model context.
 
 - updated_tool_output:
 
@@ -41,48 +43,31 @@ HookResultPostToolUse(
 
 ## Value
 
-A `HookResultPostToolUse` object
+A `HookResultPostToolUse` S7 object
+
+## See also
+
+[CallbackResult](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
+for read-only properties and S7 inspection.
 
 ## Examples
 
 ``` r
 # Continue execution
 HookResultPostToolUse()
-#> $continue
-#> [1] TRUE
-#> 
-#> $suppress_output
-#> [1] FALSE
-#> 
-#> $updated_tool_output
-#> NULL
-#> 
-#> $additional_context
-#> NULL
-#> 
-#> $stop_reason
-#> NULL
-#> 
-#> attr(,"class")
-#> [1] "HookResultPostToolUse" "HookResult"            "list"                 
+#> <deputy::HookResultPostToolUse>
+#>  @ continue           : logi TRUE
+#>  @ suppress_output    : logi FALSE
+#>  @ updated_tool_output: NULL
+#>  @ additional_context : NULL
+#>  @ stop_reason        : NULL
 
 # Stop after this tool
 HookResultPostToolUse(continue = FALSE)
-#> $continue
-#> [1] FALSE
-#> 
-#> $suppress_output
-#> [1] FALSE
-#> 
-#> $updated_tool_output
-#> NULL
-#> 
-#> $additional_context
-#> NULL
-#> 
-#> $stop_reason
-#> NULL
-#> 
-#> attr(,"class")
-#> [1] "HookResultPostToolUse" "HookResult"            "list"                 
+#> <deputy::HookResultPostToolUse>
+#>  @ continue           : logi FALSE
+#>  @ suppress_output    : logi FALSE
+#>  @ updated_tool_output: NULL
+#>  @ additional_context : NULL
+#>  @ stop_reason        : NULL
 ```

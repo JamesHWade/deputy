@@ -48,7 +48,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Create an allow permission result</h1>
-      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/permission-policy.R" class="external-link"><code>R/permission-policy.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/callback-result.R" class="external-link"><code>R/callback-result.R</code></a></small>
       <div class="d-none name"><code>PermissionResultAllow.Rd</code></div>
     </div>
 
@@ -71,32 +71,26 @@
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code>PermissionResultAllow</code> object</p>
+    <p>A <code>PermissionResultAllow</code> S7 object</p>
+    </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><a href="CallbackResult.html">CallbackResult</a> for read-only properties and S7 inspection.</p></div>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Allow a tool call</span></span></span>
 <span class="r-in"><span><span class="fu">PermissionResultAllow</span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $decision</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "allow"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "PermissionResultAllow" "PermissionResult"      "list"                 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::PermissionResultAllow&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ decision: chr "allow"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ message : NULL</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Allow with a message</span></span></span>
 <span class="r-in"><span><span class="fu">PermissionResultAllow</span><span class="op">(</span>message <span class="op">=</span> <span class="st">"Tool approved by custom callback"</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $decision</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "allow"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Tool approved by custom callback"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "PermissionResultAllow" "PermissionResult"      "list"                 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::PermissionResultAllow&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ decision: chr "allow"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ message : chr "Tool approved by custom callback"</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

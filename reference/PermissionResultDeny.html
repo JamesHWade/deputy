@@ -48,7 +48,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Create a deny permission result</h1>
-      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/permission-policy.R" class="external-link"><code>R/permission-policy.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/callback-result.R" class="external-link"><code>R/callback-result.R</code></a></small>
       <div class="d-none name"><code>PermissionResultDeny.Rd</code></div>
     </div>
 
@@ -70,43 +70,33 @@
 
 
 <dt id="arg-interrupt">interrupt<a class="anchor" aria-label="anchor" href="#arg-interrupt"></a></dt>
-<dd><p>If TRUE, stop the entire conversation (default FALSE)</p></dd>
+<dd><p>One non-missing logical value. If TRUE, stop the entire conversation (default FALSE)</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code>PermissionResultDeny</code> object</p>
+    <p>A <code>PermissionResultDeny</code> S7 object</p>
+    </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><a href="CallbackResult.html">CallbackResult</a> for read-only properties and S7 inspection.</p></div>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Deny a tool call</span></span></span>
 <span class="r-in"><span><span class="fu">PermissionResultDeny</span><span class="op">(</span>reason <span class="op">=</span> <span class="st">"File write not allowed"</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $decision</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "deny"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $reason</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "File write not allowed"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $interrupt</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "PermissionResultDeny" "PermissionResult"     "list"                </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::PermissionResultDeny&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ decision : chr "deny"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ reason   : chr "File write not allowed"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ interrupt: logi FALSE</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Deny and interrupt the conversation</span></span></span>
 <span class="r-in"><span><span class="fu">PermissionResultDeny</span><span class="op">(</span>reason <span class="op">=</span> <span class="st">"Critical security violation"</span>, interrupt <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $decision</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "deny"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $reason</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Critical security violation"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $interrupt</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "PermissionResultDeny" "PermissionResult"     "list"                </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::PermissionResultDeny&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ decision : chr "deny"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ reason   : chr "Critical security violation"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ interrupt: logi TRUE</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

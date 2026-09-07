@@ -50,7 +50,7 @@ should proceed."><meta property="og:image" content="https://jameshwade.github.io
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Create a PreCompact hook result</h1>
-      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/hooks.R" class="external-link"><code>R/hooks.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/R/callback-result.R" class="external-link"><code>R/callback-result.R</code></a></small>
       <div class="d-none name"><code>HookResultPreCompact.Rd</code></div>
     </div>
 
@@ -69,7 +69,7 @@ should proceed.</p>
 
 
 <dl><dt id="arg-continue">continue<a class="anchor" aria-label="anchor" href="#arg-continue"></a></dt>
-<dd><p>If FALSE, cancels the compaction</p></dd>
+<dd><p>One non-missing logical value. If FALSE, cancels the compaction</p></dd>
 
 
 <dt id="arg-summary">summary<a class="anchor" aria-label="anchor" href="#arg-summary"></a></dt>
@@ -78,43 +78,32 @@ should proceed.</p>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code>HookResultPreCompact</code> object</p>
+    <p>A <code>HookResultPreCompact</code> S7 object</p>
+    </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><a href="CallbackResult.html">CallbackResult</a> for read-only properties and S7 inspection.</p></div>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Allow compaction</span></span></span>
 <span class="r-in"><span><span class="fu">HookResultPreCompact</span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $continue</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $summary</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "HookResultPreCompact" "HookResult"           "list"                </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::HookResultPreCompact&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ continue: logi TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ summary : NULL</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Cancel compaction</span></span></span>
 <span class="r-in"><span><span class="fu">HookResultPreCompact</span><span class="op">(</span>continue <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $continue</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $summary</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "HookResultPreCompact" "HookResult"           "list"                </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::HookResultPreCompact&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ continue: logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ summary : NULL</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Provide custom summary</span></span></span>
 <span class="r-in"><span><span class="fu">HookResultPreCompact</span><span class="op">(</span>summary <span class="op">=</span> <span class="st">"Previous conversation discussed X, Y, Z."</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $continue</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $summary</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Previous conversation discussed X, Y, Z."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "HookResultPreCompact" "HookResult"           "list"                </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;deputy::HookResultPreCompact&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ continue: logi TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  @ summary : chr "Previous conversation discussed X, Y, Z."</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>
