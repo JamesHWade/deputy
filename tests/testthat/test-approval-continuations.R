@@ -608,6 +608,26 @@ test_that("completed and denied operations cannot be replayed by a subsequent mo
   )))
 })
 
+test_that("a refused reused tool ID preserves the original effect receipt", {
+  fixture <- local_approval_runtime(
+    responses = list(
+      approval_batch_reply(),
+      approval_batch_reply("a"),
+      runtime_reply(text = "finished")
+    )
+  )
+  receipt <- approval_read(fixture$path)$effects$call_a
+  expect_error(
+    fixture$make_agent()$resume_approval(fixture$path, "approve"),
+    "tool-call ID was reused",
+    class = "deputy_approval_error"
+  )
+  expect_identical(fixture$effects$values, c("a", "b"))
+  expect_identical(approval_read(fixture$path)$effects$call_a, receipt)
+  expect_identical(receipt$status, "completed")
+  expect_identical(receipt$result$props$value, "result_a")
+})
+
 test_that("permission denials before suspension survive a later callback allowance", {
   attempts <- 0L
   fixture <- local_approval_runtime(
