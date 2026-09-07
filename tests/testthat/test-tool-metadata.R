@@ -34,9 +34,9 @@ test_that("absent MCP metadata is safe in permission contexts", {
     list(tool_metadata = list(source = NULL))
   )) {
     expect_false(is_mcp_tool_context(context))
-    expect_s3_class(
+    expect_s7_class(
       permissions_check(permissions_standard(), "read_file", list(), context),
-      "PermissionResultAllow"
+      PermissionResultAllow
     )
   }
 })
@@ -91,33 +91,33 @@ test_that("MCP names do not acquire native capability restrictions", {
       tool_allowlist = names
     )
     for (name in names) {
-      expect_s3_class(
+      expect_s7_class(
         permissions_check(permissions, name, list(), context),
-        "PermissionResultAllow"
+        PermissionResultAllow
       )
       native <- context
       native$tool_metadata <- NULL
-      expect_s3_class(
+      expect_s7_class(
         permissions_check(permissions, name, list(), native),
-        "PermissionResultDeny"
+        PermissionResultDeny
       )
       external <- context
       external$tool_annotations$open_world_hint <- TRUE
-      expect_s3_class(
+      expect_s7_class(
         permissions_check(permissions, name, list(), external),
-        "PermissionResultDeny"
+        PermissionResultDeny
       )
       destructive <- context
       destructive$tool_annotations$destructive_hint <- TRUE
-      expect_s3_class(
+      expect_s7_class(
         permissions_check(permissions, name, list(), destructive),
-        "PermissionResultDeny"
+        PermissionResultDeny
       )
       unannotated <- context
       unannotated$tool_annotations <- NULL
-      expect_s3_class(
+      expect_s7_class(
         permissions_check(permissions, name, list(), unannotated),
-        "PermissionResultDeny"
+        PermissionResultDeny
       )
     }
   }

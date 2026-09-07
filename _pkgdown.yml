@@ -110,6 +110,7 @@ reference:
   - HookEvent
   - HookMatcher
   - hook_matches
+  - CallbackResult
   - HookResultPreToolUse
   - HookResultPostToolUse
   - HookResultPreCompact

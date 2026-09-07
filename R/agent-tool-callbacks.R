@@ -76,7 +76,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         permission_context
       )
 
-      if (inherits(perm_result, "PermissionResultDeny")) {
+      if (S7::S7_inherits(perm_result, PermissionResultDeny)) {
         request_result <- private$fire_hook(
           "PermissionRequest",
           tool_name = tool_name,
@@ -85,19 +85,19 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           context = context
         )
 
-        if (inherits(request_result, "PermissionResultAllow")) {
+        if (S7::S7_inherits(request_result, PermissionResultAllow)) {
           perm_result <- request_result
-        } else if (inherits(request_result, "PermissionResultDeny")) {
+        } else if (S7::S7_inherits(request_result, PermissionResultDeny)) {
           perm_result <- request_result
         } else if (
-          inherits(request_result, "HookResultPreToolUse") &&
+          S7::S7_inherits(request_result, HookResultPreToolUse) &&
             identical(request_result$permission, "allow")
         ) {
           perm_result <- PermissionResultAllow()
         }
       }
 
-      if (inherits(perm_result, "PermissionResultDeny")) {
+      if (S7::S7_inherits(perm_result, PermissionResultDeny)) {
         private$record_run_event(private$agent_event(
           "permission",
           tool_call_id = record$tool_call_id,
@@ -125,7 +125,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       )
 
       # Check hook result
-      if (inherits(hook_result, "HookResultPreToolUse")) {
+      if (S7::S7_inherits(hook_result, HookResultPreToolUse)) {
         if (!is.null(hook_result$additional_context)) {
           private$append_hook_context(hook_result$additional_context)
         }
@@ -251,7 +251,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       )
 
       # Check continue field in PostToolUse result
-      if (inherits(hook_result, "HookResultPostToolUse")) {
+      if (S7::S7_inherits(hook_result, HookResultPostToolUse)) {
         private$tool_event_overrides[[record$tool_call_id]] <- list(
           suppress_output = hook_result$suppress_output,
           updated_tool_output = hook_result$updated_tool_output

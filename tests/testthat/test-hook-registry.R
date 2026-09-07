@@ -172,7 +172,7 @@ test_that("HookRegistry fire returns first non-NULL result", {
   ))
 
   result <- registry$fire("PreToolUse", tool_name = "test")
-  expect_s3_class(result, "HookResultPreToolUse")
+  expect_s7_class(result, HookResultPreToolUse)
   expect_equal(result$permission, "deny")
 })
 
@@ -244,7 +244,7 @@ test_that("Hook callback error returns deny for PreToolUse", {
     "PreToolUse hook failed"
   )
 
-  expect_s3_class(result, "HookResultPreToolUse")
+  expect_s7_class(result, HookResultPreToolUse)
   expect_equal(result$permission, "deny")
   expect_true(grepl("Callback error", result$reason))
 })
