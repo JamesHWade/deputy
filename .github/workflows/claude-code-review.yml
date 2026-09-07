@@ -42,7 +42,18 @@ jobs:
           echo "digest=$(sha256sum "$RUNNER_TEMP/claude-review-verifier.cjs" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
           echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
+      - name: Check upstream prior-review eligibility
+        id: eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_SHA: ${{ github.event.pull_request.head.sha }}
+          REVIEW_STARTED: ${{ steps.start.outputs.time }}
+          REVIEW_PREFLIGHT: 'true'
+        run: node "$RUNNER_TEMP/claude-review-verifier.cjs"
+
       - name: Run Claude Code Review
+        if: steps.eligibility.outputs.should_review == 'true'
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
@@ -88,7 +99,7 @@ jobs:
             only when none of the reason categories apply. Do not modify repository files.
 
       - name: Verify review outcome and sanitize diagnostics
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.eligibility.outputs.should_review == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

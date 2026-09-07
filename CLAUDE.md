@@ -645,6 +645,10 @@ denial-free invocation can explicitly skip a trivial change, a now-closed/draft 
 or a PR with a prior Claude review. Closed/draft state and prior bot review summaries
 are checked against GitHub. A skip explicitly states that this run did not review
 the current head; an older review never counts as current-run completion.
+Before starting the SDK, the workflow checks for a prior bot review summary with
+the established provenance marker. That confirmed upstream skip needs no model
+call and emits an eligibility-stage result. PRs without that evidence invoke the
+existing plugin normally; GitHub eligibility lookup failures fail the job.
 Completed reviews require a current-run `github-actions[bot]` summary tied to that SHA; findings
 also require exact-commit inline comments linking the same workflow run and attempt
 (the upstream sanitizer strips HTML comments from inline bodies). Missing evidence

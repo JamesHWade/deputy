@@ -50,6 +50,15 @@ function diagnostics(messages) {
   };
 }
 
+function priorReviewSkip({ sha, currentSha, comments, started }) {
+  const priorReview = comments.some((comment) => comment.user?.login === 'github-actions[bot]' &&
+    Date.parse(comment.created_at) < Date.parse(started) &&
+    /<!-- deputy-claude-review:[a-f0-9]{40}:\d+:\d+:(?:with|without)-findings -->/.test(comment.body || ''));
+  return sha === currentSha && priorReview
+    ? { outcome: 'intentionally skipped', reason: 'Upstream policy skips a prior Claude review; this run did not review the current head' }
+    : undefined;
+}
+
 function classify({ diagnostic, sha, currentSha, comments, inline, marker, findingMarker, started, actionOutcome, draft = false, state = 'open' }) {
   const blocked = (reason) => ({ outcome: 'blocked/failed', reason });
   if (sha !== currentSha) return blocked('PR head changed during review');
@@ -80,11 +89,9 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, findi
     if (diagnostic.reported_reason === 'trivial') {
       return skipped('Upstream plugin classified the change as trivial; this run did not review the current head');
     }
-    const priorReview = comments.some((comment) => comment.user?.login === 'github-actions[bot]' &&
-      Date.parse(comment.created_at) < Date.parse(started) &&
-      /<!-- deputy-claude-review:[a-f0-9]{40}:\d+:\d+:(?:with|without)-findings -->/.test(comment.body || ''));
-    if (diagnostic.reported_reason === 'already-reviewed' && priorReview) {
-      return skipped('Upstream plugin found a prior Claude review; this run did not review the current head');
+    const priorSkip = priorReviewSkip({ sha, currentSha, comments, started });
+    if (diagnostic.reported_reason === 'already-reviewed' && priorSkip) {
+      return priorSkip;
     }
   }
   return blocked('No consistent current-run exact-commit review evidence');
@@ -93,12 +100,15 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, findi
 async function main() {
   const env = process.env;
   const sha = env.REVIEW_SHA;
+  const preflight = env.REVIEW_PREFLIGHT === 'true';
   if (!/^[a-f0-9]{40}$/.test(sha || '')) throw new Error('Invalid review SHA');
   let diagnostic = diagnostics([]);
   let result = { outcome: 'blocked/failed', reason: 'Claude execution evidence unavailable' };
   try {
-    const execution = env.EXECUTION_FILE || `${env.RUNNER_TEMP}/claude-execution-output.json`;
-    diagnostic = diagnostics(JSON.parse(fs.readFileSync(execution, 'utf8')));
+    if (!preflight) {
+      const execution = env.EXECUTION_FILE || `${env.RUNNER_TEMP}/claude-execution-output.json`;
+      diagnostic = diagnostics(JSON.parse(fs.readFileSync(execution, 'utf8')));
+    }
     result.reason = 'GitHub review evidence unavailable';
     async function get(path) {
       const response = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/${path}`, {
@@ -117,9 +127,18 @@ async function main() {
     }
     const [pr, comments, inline] = await Promise.all([
       get(`pulls/${env.PR_NUMBER}`), pages(`issues/${env.PR_NUMBER}/comments`),
-      pages(`pulls/${env.PR_NUMBER}/comments`),
+      preflight ? [] : pages(`pulls/${env.PR_NUMBER}/comments`),
     ]);
-    result = classify({ diagnostic, sha, currentSha: pr.head.sha, comments, inline,
+    if (preflight) {
+      if (sha !== pr.head.sha) {
+        result = { outcome: 'blocked/failed', reason: 'PR head changed before review' };
+      } else {
+        const skip = priorReviewSkip({ sha, currentSha: pr.head.sha, comments, started: env.REVIEW_STARTED });
+        fs.appendFileSync(env.GITHUB_OUTPUT, `should_review=${!skip}\n`);
+        if (!skip) return;
+        result = skip;
+      }
+    } else result = classify({ diagnostic, sha, currentSha: pr.head.sha, comments, inline,
       marker: `<!-- deputy-claude-review:${sha}:${env.GITHUB_RUN_ID}:${env.GITHUB_RUN_ATTEMPT}`,
       findingMarker: `[Review run](https://github.com/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}/attempts/${env.GITHUB_RUN_ATTEMPT})`,
       started: env.REVIEW_STARTED, actionOutcome: env.ACTION_OUTCOME, draft: pr.draft, state: pr.state });
@@ -127,7 +146,7 @@ async function main() {
     // Errors can include server responses, file contents, or token-bearing URLs.
     // Keep the public failure categorical; never print the caught value.
   }
-  const safe = { ...result, target_sha: sha, ...diagnostic };
+  const safe = { ...result, target_sha: sha, stage: preflight ? 'eligibility' : 'review', ...diagnostic };
   fs.writeFileSync(`${env.RUNNER_TEMP}/claude-review-outcome.json`, JSON.stringify(safe, null, 2));
   fs.appendFileSync(env.GITHUB_STEP_SUMMARY,
     `### Claude review: ${safe.outcome}\n\nCommit: \`${sha}\`\n\n${safe.reason}.\n\n` +
@@ -138,7 +157,7 @@ async function main() {
   if (safe.outcome === 'blocked/failed') process.exitCode = 1;
 }
 
-module.exports = { diagnostics, classify };
+module.exports = { diagnostics, classify, priorReviewSkip };
 if (require.main === module) main().catch(() => {
   console.error('Claude review outcome verification failed');
   process.exitCode = 1;
