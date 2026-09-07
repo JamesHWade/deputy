@@ -486,10 +486,35 @@ test_that("experiment interruption retains evidence and prevents later dispatch"
   cancelled <- example$history_evaluate(
     factory,
     fixture,
-    cancelled = function() TRUE
+    cancelled = function() TRUE,
+    helper_models = "fixture",
+    protocols = c("baseline", "budget-aware")
   )
   expect_identical(cancelled$failure$class, "history_evaluation_cancelled")
   expect_identical(cancelled$usage$requests, 0L)
+  expect_length(cancelled$schedule, 9L)
+  cancelled_report <- paste(example$history_report(cancelled), collapse = "\n")
+  expect_match(
+    cancelled_report,
+    "| fixture/1 | summary/baseline | 1 | not recorded |",
+    fixed = TRUE
+  )
+  expect_match(
+    cancelled_report,
+    "| fixture/2 | history/baseline | 1 | not recorded |",
+    fixed = TRUE
+  )
+  expect_match(
+    cancelled_report,
+    "| fixture/3 | history/budget-aware | 1 | not recorded |",
+    fixed = TRUE
+  )
+  expect_match(
+    cancelled_report,
+    "Expected 9 continuations; attempted 0; missing 9 (0 undispatched, 9 not recorded).",
+    fixed = TRUE
+  )
+
   expect_length(server$requests(), 0L)
   exhausted <- example$history_evaluate(factory, fixture, max_requests = 1L)
   expect_length(server$requests(), 1L)
@@ -1375,6 +1400,7 @@ test_that("history reporting separates completion latency and source payloads", 
     configuration = list(
       trials = 1L,
       helper_models = "fixture",
+      protocols = "budget-aware",
       continuation_arms = 2L
     ),
     usage = list(requests = 4L, cost_usd = 0.02),
@@ -1464,7 +1490,29 @@ test_that("history reporting separates completion latency and source payloads", 
   )
   evaluation$configuration$trials <- 3L
   evaluation$configuration$continuation_arms <- 3L
+  evaluation$configuration$protocols <- c("baseline", "budget-aware")
   partial <- paste(example$history_report(evaluation), collapse = "\n")
+  expect_match(
+    partial,
+    "| fixture/1 | history/baseline | 2 | not recorded |",
+    fixed = TRUE
+  )
+  expect_match(
+    partial,
+    "| fixture/3 | summary/baseline | 2 | not recorded |",
+    fixed = TRUE
+  )
+  expect_match(
+    partial,
+    "| fixture/3 | history/baseline | 3 | not recorded |",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "| fixture/3 | history/budget-aware | 1 | not recorded |",
+    partial,
+    fixed = TRUE
+  ))
+
   expect_match(
     partial,
     "| fixture/3 | history/budget-aware | preflight | FALSE | history_evaluation_cancelled | 0 | 0 | 0 |",

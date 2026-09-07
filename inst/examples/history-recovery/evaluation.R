@@ -797,6 +797,33 @@ history_validate_protocols <- function(protocols) {
   invisible(NULL)
 }
 
+history_schedule <- function(trials, helper_models, protocols) {
+  arms <- c(
+    list(list(strategy = "summary", protocol = "baseline")),
+    lapply(protocols, function(protocol) {
+      list(strategy = "history", protocol = protocol)
+    })
+  )
+  schedule <- list()
+  for (helper in helper_models) {
+    for (trial in seq_len(trials)) {
+      # Rotate the first arm; three trials balance all three positions.
+      order <- ((seq_along(arms) + trial - 2L) %% length(arms)) + 1L
+      for (position in seq_along(order)) {
+        schedule[[length(schedule) + 1L]] <- c(
+          list(
+            trial_id = paste(helper, trial, sep = "/"),
+            helper_model = helper,
+            position = position
+          ),
+          arms[[order[[position]]]]
+        )
+      }
+    }
+  }
+  schedule
+}
+
 history_evaluate <- function(
   chat_factory,
   fixture = history_fixture(),
@@ -817,6 +844,7 @@ history_evaluate <- function(
     )
   }
   budget <- history_budget(max_cost_usd, max_requests, cancelled)
+  schedule <- history_schedule(trials, helper_models, protocols)
   rows <- list()
   preparations <- list()
   failure <- NULL
@@ -842,16 +870,11 @@ history_evaluate <- function(
               drop = FALSE
             ]
           )
-          arms <- c(
-            list(list(strategy = "summary", protocol = "baseline")),
-            lapply(protocols, function(protocol) {
-              list(strategy = "history", protocol = protocol)
-            })
+          arms <- Filter(
+            function(arm) identical(arm$trial_id, trial_id),
+            schedule
           )
-          # Rotate the first arm; three trials balance all three positions.
-          order <- ((seq_along(arms) + trial - 2L) %% length(arms)) + 1L
-          for (index in order) {
-            arm <- arms[[index]]
+          for (arm in arms) {
             row <- history_continue(
               prepared$fixture,
               prepared,
@@ -878,6 +901,7 @@ history_evaluate <- function(
   )
   list(
     schema_version = 3L,
+    schedule = schedule,
     case_id = fixture$case_id,
     created_at = format(Sys.time(), tz = "UTC", usetz = TRUE),
     versions = list(
@@ -1036,6 +1060,23 @@ history_report <- function(evaluation) {
   if (is.null(arms)) {
     arms <- 2L
   }
+  schedule <- evaluation$schedule
+  if (is.null(schedule)) {
+    protocols <- evaluation$configuration$protocols
+    if (is.null(protocols) && arms == 2L) {
+      protocols <- "baseline"
+    }
+    if (!is.null(protocols)) {
+      schedule <- history_schedule(
+        evaluation$configuration$trials,
+        evaluation$configuration$helper_models,
+        protocols
+      )
+    }
+  }
+  identity <- function(row) paste(row$trial_id, arm(row), sep = "/")
+  recorded <- vapply(rows, identity, character(1))
+  missing <- Filter(function(row) !identity(row) %in% recorded, schedule)
   expected <- evaluation$configuration$trials *
     length(evaluation$configuration$helper_models) *
     arms
@@ -1052,6 +1093,32 @@ history_report <- function(evaluation) {
     ),
     "Shared preparation is counted once per trial, even when displayed beside multiple comparisons.",
     "",
+    if (is.null(schedule)) {
+      "The legacy record does not identify its planned protocols; missing continuation identities are unknown."
+    }
+  )
+  if (length(missing)) {
+    lines <- c(
+      lines,
+      "| Planned trial | Strategy / protocol | Position within trial | Outcome |",
+      "| --- | --- | ---: | --- |",
+      vapply(
+        missing,
+        function(row) {
+          sprintf(
+            "| %s | %s | %d | not recorded |",
+            row$trial_id,
+            arm(row),
+            row$position
+          )
+        },
+        character(1)
+      ),
+      ""
+    )
+  }
+  lines <- c(
+    lines,
     "| Trial | Strategy / protocol | Dispatched | Answer | Score | Requests | Governed tool requests | Tokens | USD | Seconds | Stop reason |",
     "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
   )
