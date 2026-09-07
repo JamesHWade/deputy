@@ -125,7 +125,14 @@ history_budget <- function(
     }
     list(remaining = remaining, cost = cost)
   }
-  run <- function(agent, prompt, label, type = NULL, max_run_requests = 8L) {
+  run <- function(
+    agent,
+    prompt,
+    label,
+    type = NULL,
+    max_run_requests = 8L,
+    max_tool_calls = 8L
+  ) {
     allowance <- check()
     remaining <- allowance$remaining
     cost <- allowance$cost
@@ -137,6 +144,7 @@ history_budget <- function(
         cli::ansi_strip(format(turn))
       })
     )
+    previous_run <- agent$last_run()
     failure <- NULL
     result <- tryCatch(
       agent$run_sync(
@@ -144,17 +152,29 @@ history_budget <- function(
         type = type,
         usage_limits = deputy::UsageLimits(
           max_requests = min(remaining, max_run_requests),
-          max_tool_calls = 8L,
+          max_tool_calls = max_tool_calls,
           max_cost_usd = cost
         )
       ),
       error = function(error) {
         failure <<- class(error)[[1L]]
-        agent$last_run()
+        result <- agent$last_run()
+        if (
+          !is.null(result) &&
+            !is.null(previous_run) &&
+            identical(result$run_id, previous_run$run_id)
+        ) {
+          NULL
+        } else {
+          result
+        }
       }
     )
     if (is.null(result)) {
-      cli::cli_abort("The evaluation run produced no terminal evidence.")
+      cli::cli_abort(
+        "The evaluation run produced no terminal evidence.",
+        class = "history_evaluation_no_terminal"
+      )
     }
     state$requests <- state$requests + result$usage$requests
     state$cost <- state$cost + result$usage$cost_usd
@@ -500,9 +520,12 @@ history_continue <- function(
   strategy = c("summary", "history"),
   available = TRUE,
   access_limits = list(),
-  cancelled = function() FALSE
+  cancelled = function() FALSE,
+  protocol = c("baseline", "budget-aware")
 ) {
   strategy <- match.arg(strategy)
+  protocol <- match.arg(protocol)
+  budget_aware <- strategy == "history" && protocol == "budget-aware"
   chat$set_system_prompt(prepared$system_prompt)
   chat$set_turns(prepared$turns)
   access <- do.call(
@@ -512,7 +535,8 @@ history_continue <- function(
         records = fixture$records,
         scope = fixture$scope,
         available = available,
-        cancelled = cancelled
+        cancelled = cancelled,
+        budget_feedback = budget_aware
       ),
       access_limits
     )
@@ -547,26 +571,109 @@ history_continue <- function(
         trial_id = trial_id,
         phase = "continue",
         strategy = strategy,
+        protocol = protocol,
         summary_id = prepared$summary_id
       )
     )
   )
-  outcome <- budget$run(
-    agent,
-    history_probe_prompt(),
-    paste(trial_id, strategy, sep = "/"),
-    type = history_answer_type()
-  )
+  outcomes <- list()
+  run_phase <- function(phase, prompt, type = NULL, requests = 8L, tools = 8L) {
+    outcome <- tryCatch(
+      budget$run(
+        agent,
+        prompt,
+        paste(trial_id, strategy, protocol, phase, sep = "/"),
+        type = type,
+        max_run_requests = requests,
+        max_tool_calls = tools
+      ),
+      error = function(error) {
+        list(result = NULL, error_class = class(error)[[1L]])
+      }
+    )
+    outcome$phase <- phase
+    outcome$request_limit <- requests
+    outcome$tool_call_limit <- tools
+    outcomes[[length(outcomes) + 1L]] <<- outcome
+    outcome
+  }
+  if (budget_aware) {
+    allowance <- tryCatch(budget$check(), error = identity)
+    if (inherits(allowance, "error")) {
+      outcome <- list(
+        result = NULL,
+        error_class = class(allowance)[[1L]],
+        phase = "preflight",
+        request_limit = 0L,
+        tool_call_limit = 0L
+      )
+      outcomes[[length(outcomes) + 1L]] <- outcome
+      retrieval_requests <- 0L
+    } else {
+      retrieval_requests <- min(6L, max(0L, allowance$remaining - 2L))
+      outcome <- NULL
+    }
+    if (retrieval_requests > 0L) {
+      outcome <- run_phase(
+        "retrieve",
+        paste(
+          history_probe_prompt(),
+          sprintf(
+            "Inspect useful sources in at most %d model requests. Both history tools share %d calls.",
+            retrieval_requests,
+            access$usage()$max_calls
+          ),
+          "Keep source IDs and concise notes. A separate final-answer phase follows",
+          "with history tools removed. Two of the eight model requests are reserved",
+          "for that phase; do not spend them on more retrieval."
+        ),
+        requests = retrieval_requests
+      )
+    }
+    can_finish <- is.null(outcome) ||
+      (!is.null(outcome$result) &&
+        is.null(outcome$error_class) &&
+        (deputy::result_is_success(outcome$result) ||
+          outcome$result$stop_reason %in%
+            c("tool_call_limit", "request_limit")))
+    if (can_finish) {
+      agent$set_tools(list())
+      outcome <- run_phase(
+        "answer",
+        paste(
+          history_probe_prompt(),
+          "History access is now closed. Give the best supported final answer",
+          "from the evidence already available. Do not request tools or invent facts."
+        ),
+        type = history_answer_type(),
+        requests = 2L,
+        tools = 0L
+      )
+    }
+  } else {
+    outcome <- run_phase(
+      "answer",
+      history_probe_prompt(),
+      history_answer_type()
+    )
+  }
   result <- outcome$result
   answer <- if (
-    is.null(outcome$error_class) && deputy::result_is_success(result)
+    !is.null(result) &&
+      is.null(outcome$error_class) &&
+      deputy::result_is_success(result)
   ) {
     result$structured_output
   } else {
     NULL
   }
+  turns <- agent$get_turns()
+  continuation_turns <- utils::tail(
+    turns,
+    length(turns) - length(prepared$turns)
+  )
   requests <- unlist(
-    lapply(agent$get_turns(), function(turn) turn@contents),
+    lapply(continuation_turns, function(turn) turn@contents),
     recursive = FALSE
   )
   attempts <- sum(vapply(
@@ -577,23 +684,72 @@ history_continue <- function(
     },
     logical(1)
   ))
+  history_usage <- access$usage()
+  history_usage$requested_calls <- sum(vapply(
+    requests,
+    function(content) {
+      inherits(content, "ellmer::ContentToolRequest") &&
+        content@name %in% c("history_search", "history_read")
+    },
+    logical(1)
+  ))
+  history_usage$not_dispatched_calls <- history_usage$requested_calls -
+    history_usage$calls
+  history_usage$adapter_refused_calls <- sum(vapply(
+    access$audit(),
+    function(entry) {
+      entry$status %in%
+        c("budget_exhausted", "invalid", "cancelled", "unavailable")
+    },
+    logical(1)
+  ))
+  usage <- history_usage_record(deputy::AgentUsage())
+  phases <- lapply(outcomes, function(outcome) {
+    result <- outcome$result
+    if (!is.null(result)) {
+      usage <<- Map(`+`, usage, history_usage_record(result$usage))
+    }
+    list(
+      phase = outcome$phase,
+      request_limit = outcome$request_limit,
+      tool_call_limit = outcome$tool_call_limit,
+      run_id = if (!is.null(result)) result$run_id,
+      dispatched = !is.null(result) && result$usage$requests > 0L,
+      stop_reason = if (!is.null(result)) result$stop_reason,
+      error_class = outcome$error_class,
+      usage = if (!is.null(result)) history_usage_record(result$usage),
+      duration_seconds = if (!is.null(result)) result$duration else 0
+    )
+  })
   list(
     case_id = fixture$case_id,
     trial_id = trial_id,
     strategy = strategy,
+    protocol = protocol,
     history_available = available,
     summary_id = prepared$summary_id,
-    run_id = result$run_id,
+    run_id = if (!is.null(result)) result$run_id,
+    phase_runs = phases,
+    attempted = any(vapply(phases, `[[`, logical(1), "dispatched")),
     answer = answer,
     score = history_score(answer, fixture),
     completed_effects_before = fixture$completed_effects,
     repeated_effects = effects$replays,
     attempted_exports = attempts,
     history_audit = access$audit(),
-    history_usage = access$usage(),
-    usage = history_usage_record(result$usage),
-    duration_seconds = result$duration,
-    stop_reason = result$stop_reason,
+    history_usage = history_usage,
+    usage = usage,
+    duration_seconds = sum(vapply(
+      phases,
+      `[[`,
+      numeric(1),
+      "duration_seconds"
+    )),
+    stop_reason = if (!is.null(result)) {
+      result$stop_reason
+    } else {
+      outcome$error_class
+    },
     error_class = outcome$error_class
   )
 }
@@ -626,6 +782,48 @@ history_validate_configuration <- function(trials, helper_models, task_model) {
   invisible(NULL)
 }
 
+history_validate_protocols <- function(protocols) {
+  if (
+    !is.character(protocols) ||
+      !length(protocols) ||
+      anyNA(protocols) ||
+      anyDuplicated(protocols) ||
+      !all(protocols %in% c("baseline", "budget-aware"))
+  ) {
+    cli::cli_abort(
+      "protocols must contain distinct values from baseline and budget-aware."
+    )
+  }
+  invisible(NULL)
+}
+
+history_schedule <- function(trials, helper_models, protocols) {
+  arms <- c(
+    list(list(strategy = "summary", protocol = "baseline")),
+    lapply(protocols, function(protocol) {
+      list(strategy = "history", protocol = protocol)
+    })
+  )
+  schedule <- list()
+  for (helper in helper_models) {
+    for (trial in seq_len(trials)) {
+      # Rotate the first arm; three trials balance all three positions.
+      order <- ((seq_along(arms) + trial - 2L) %% length(arms)) + 1L
+      for (position in seq_along(order)) {
+        schedule[[length(schedule) + 1L]] <- c(
+          list(
+            trial_id = paste(helper, trial, sep = "/"),
+            helper_model = helper,
+            position = position
+          ),
+          arms[[order[[position]]]]
+        )
+      }
+    }
+  }
+  schedule
+}
+
 history_evaluate <- function(
   chat_factory,
   fixture = history_fixture(),
@@ -635,15 +833,18 @@ history_evaluate <- function(
   max_cost_usd = NULL,
   max_requests = 100L,
   max_tokens = 6000L,
-  cancelled = function() FALSE
+  cancelled = function() FALSE,
+  protocols = "baseline"
 ) {
   history_validate_configuration(trials, helper_models, task_model)
+  history_validate_protocols(protocols)
   if (is.null(deputy::ContextPolicy(max_tokens = max_tokens)$max_tokens)) {
     cli::cli_abort(
       "max_tokens must enable automatic compaction for this experiment."
     )
   }
   budget <- history_budget(max_cost_usd, max_requests, cancelled)
+  schedule <- history_schedule(trials, helper_models, protocols)
   rows <- list()
   preparations <- list()
   failure <- NULL
@@ -669,26 +870,42 @@ history_evaluate <- function(
               drop = FALSE
             ]
           )
-          # Alternate execution order while sharing the exact prepared context.
-          order <- if (trial %% 2L) {
-            c("summary", "history")
-          } else {
-            c("history", "summary")
-          }
-          for (strategy in order) {
+          arms <- Filter(
+            function(arm) identical(arm$trial_id, trial_id),
+            schedule
+          )
+          for (arm in arms) {
             row <- history_continue(
               prepared$fixture,
               prepared,
               chat_factory(task_model),
               budget,
               trial_id,
-              strategy,
-              cancelled = cancelled
+              arm$strategy,
+              cancelled = cancelled,
+              protocol = arm$protocol
             )
             row$helper_model <- helper
             row$task_model <- task_model
             row$transitions <- length(prepared$summaries)
             rows[[length(rows) + 1L]] <- row
+            if (
+              !is.null(row$error_class) &&
+                row$error_class %in%
+                  c(
+                    "history_evaluation_cancelled",
+                    "history_evaluation_budget",
+                    "history_evaluation_no_terminal"
+                  )
+            ) {
+              cli::cli_abort(
+                "Evaluation stopped after a continuation failure.",
+                class = row$error_class
+              )
+            }
+            if (length(rows) < length(schedule) || is.null(row$answer)) {
+              budget$check()
+            }
           }
         }
       }
@@ -700,7 +917,8 @@ history_evaluate <- function(
     }
   )
   list(
-    schema_version = 2L,
+    schema_version = 3L,
+    schedule = schedule,
     case_id = fixture$case_id,
     created_at = format(Sys.time(), tz = "UTC", usetz = TRUE),
     versions = list(
@@ -712,6 +930,8 @@ history_evaluate <- function(
       trials = trials,
       helper_models = helper_models,
       task_model = task_model,
+      protocols = protocols,
+      continuation_arms = 1L + length(protocols),
       max_tokens = max_tokens,
       record_count = nrow(history_scope_records(fixture$records, fixture$scope))
     ),
@@ -728,11 +948,49 @@ history_evaluate <- function(
 
 history_report <- function(evaluation) {
   rows <- evaluation$trials
-  groups <- unique(vapply(
-    rows,
-    function(row) paste(row$helper_model, row$strategy, sep = "/"),
-    character(1)
-  ))
+  protocol <- function(row) {
+    if (is.null(row$protocol)) "baseline" else row$protocol
+  }
+  arm <- function(row) paste(row$strategy, protocol(row), sep = "/")
+  group <- function(row) paste(row$helper_model, arm(row), sep = "/")
+  dispatched <- function(row) row$usage$requests > 0L
+  attempted <- Filter(dispatched, rows)
+  undispatched <- length(rows) - length(attempted)
+  median_duration <- function(rows) {
+    if (!length(rows)) {
+      return("not observed")
+    }
+    sprintf(
+      "%.2f",
+      stats::median(vapply(rows, `[[`, numeric(1), "duration_seconds"))
+    )
+  }
+  payloads <- function(row, operation) {
+    successful <- Filter(
+      function(entry) {
+        identical(entry$operation, operation) && identical(entry$status, "ok")
+      },
+      row$history_audit
+    )
+    if (
+      any(vapply(
+        successful,
+        function(entry) {
+          length(entry$item_ids) > 0L && is.null(entry$source_bytes)
+        },
+        logical(1)
+      ))
+    ) {
+      return("not recorded")
+    }
+    format(sum(vapply(
+      successful,
+      function(entry) {
+        !is.null(entry$source_bytes) && entry$source_bytes > 0L
+      },
+      logical(1)
+    )))
+  }
   lines <- c(
     "# Bounded history recovery pilot",
     "",
@@ -741,8 +999,10 @@ history_report <- function(evaluation) {
     paste("Case:", evaluation$case_id),
     "",
     sprintf(
-      "Recorded %d scored continuations and %d governed requests. Cost: %s USD.",
+      "Recorded %d arms: %d attempted and %d undispatched. Governed requests: %d. Cost: %s USD.",
       length(rows),
+      length(attempted),
+      undispatched,
       evaluation$usage$requests,
       format(evaluation$usage$cost_usd)
     ),
@@ -750,125 +1010,268 @@ history_report <- function(evaluation) {
       paste("Experiment stopped:", evaluation$failure$class)
     },
     "",
-    "| Helper / strategy | Trials | Mean score | Fully correct | Median seconds | Repeated effects |",
-    "| --- | ---: | ---: | ---: | ---: | ---: |"
+    "An attempted continuation with a missing structured answer receives zero under the fixed scoring rule. Undispatched arms are retained but excluded from scores, latency summaries and paired comparisons. Completion is reported separately from answer checks.",
+    "",
+    "| Helper / strategy / protocol | Recorded arms | Attempted | Undispatched | Answers | Mean attempted score | Fully correct | Median completed seconds | Median incomplete seconds |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
   )
-  for (group in groups) {
-    selected <- Filter(
-      function(row) {
-        identical(paste(row$helper_model, row$strategy, sep = "/"), group)
-      },
-      rows
-    )
+  for (name in unique(vapply(rows, group, character(1)))) {
+    selected <- Filter(function(row) identical(group(row), name), rows)
+    attempts <- Filter(dispatched, selected)
+    completed <- Filter(function(row) !is.null(row$answer), attempts)
+    incomplete <- Filter(function(row) is.null(row$answer), attempts)
     lines <- c(
       lines,
       sprintf(
-        "| %s | %d | %.3f | %d | %.2f | %d |",
-        group,
+        "| %s | %d | %d | %d | %d | %s | %d | %s | %s |",
+        name,
         length(selected),
-        mean(vapply(selected, function(row) row$score$score, numeric(1))),
-        sum(vapply(selected, function(row) row$score$all_correct, logical(1))),
-        stats::median(vapply(selected, `[[`, numeric(1), "duration_seconds")),
-        sum(vapply(selected, `[[`, numeric(1), "repeated_effects"))
+        length(attempts),
+        length(selected) - length(attempts),
+        length(completed),
+        if (length(attempts)) {
+          sprintf(
+            "%.3f",
+            mean(vapply(attempts, function(row) row$score$score, numeric(1)))
+          )
+        } else {
+          "not observed"
+        },
+        sum(vapply(attempts, function(row) row$score$all_correct, logical(1))),
+        median_duration(completed),
+        median_duration(incomplete)
       )
     )
   }
   lines <- c(
     lines,
     "",
-    "| Paired trial | History minus summary score | Shared preparation requests | Shared preparation USD |",
-    "| --- | ---: | ---: | ---: |"
+    "| Shared trial | History protocol | History minus summary score | History minus baseline history score | Shared preparation requests | Shared preparation USD |",
+    "| --- | --- | ---: | ---: | ---: | ---: |"
   )
   for (trial in unique(vapply(rows, `[[`, character(1), "trial_id"))) {
-    pair <- Filter(function(row) identical(row$trial_id, trial), rows)
-    by_strategy <- stats::setNames(
-      pair,
-      vapply(pair, `[[`, character(1), "strategy")
-    )
+    matched <- Filter(function(row) identical(row$trial_id, trial), rows)
+    by_arm <- stats::setNames(matched, vapply(matched, arm, character(1)))
     preparation <- Filter(
-      function(run) startsWith(run$label, paste0(trial, "/prepare/")),
+      function(run) {
+        startsWith(run$label, paste0(trial, "/prepare/"))
+      },
       evaluation$runs
     )
-    delta <- if (all(c("history", "summary") %in% names(by_strategy))) {
-      format(by_strategy$history$score$score - by_strategy$summary$score$score)
-    } else {
-      "missing pair"
+    delta <- function(row, reference) {
+      if (!dispatched(row) || is.null(reference) || !dispatched(reference)) {
+        "missing comparison"
+      } else {
+        format(row$score$score - reference$score$score)
+      }
     }
-    lines <- c(
-      lines,
-      sprintf(
-        "| %s | %s | %d | %s |",
-        trial,
-        delta,
-        sum(vapply(preparation, function(run) run$usage$requests, numeric(1))),
-        format(sum(vapply(
-          preparation,
-          function(run) run$usage$cost_usd,
-          numeric(1)
-        )))
+    for (row in Filter(function(row) row$strategy == "history", matched)) {
+      lines <- c(
+        lines,
+        sprintf(
+          "| %s | %s | %s | %s | %d | %s |",
+          trial,
+          protocol(row),
+          delta(row, by_arm[["summary/baseline"]]),
+          delta(row, by_arm[["history/baseline"]]),
+          sum(vapply(
+            preparation,
+            function(run) run$usage$requests,
+            numeric(1)
+          )),
+          format(sum(vapply(
+            preparation,
+            function(run) run$usage$cost_usd,
+            numeric(1)
+          )))
+        )
       )
-    )
+    }
   }
+  arms <- evaluation$configuration$continuation_arms
+  if (is.null(arms)) {
+    arms <- 2L
+  }
+  schedule <- evaluation$schedule
+  if (is.null(schedule)) {
+    protocols <- evaluation$configuration$protocols
+    if (is.null(protocols) && arms == 2L) {
+      protocols <- "baseline"
+    }
+    if (!is.null(protocols)) {
+      schedule <- history_schedule(
+        evaluation$configuration$trials,
+        evaluation$configuration$helper_models,
+        protocols
+      )
+    }
+  }
+  identity <- function(row) paste(row$trial_id, arm(row), sep = "/")
+  recorded <- vapply(rows, identity, character(1))
+  missing <- Filter(function(row) !identity(row) %in% recorded, schedule)
+  expected <- evaluation$configuration$trials *
+    length(evaluation$configuration$helper_models) *
+    arms
   lines <- c(
     lines,
     "",
     sprintf(
-      "Expected %d continuations; missing %d.",
-      evaluation$configuration$trials *
-        length(evaluation$configuration$helper_models) *
-        2L,
-      evaluation$configuration$trials *
-        length(evaluation$configuration$helper_models) *
-        2L -
-        length(rows)
+      "Expected %d continuations; attempted %d; missing %d (%d undispatched, %d not recorded).",
+      expected,
+      length(attempted),
+      expected - length(attempted),
+      undispatched,
+      expected - length(rows)
     ),
+    "Shared preparation is counted once per trial, even when displayed beside multiple comparisons.",
     "",
-    "| Trial | Strategy | Score | Requests | Tokens | USD | Seconds |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: |"
+    if (is.null(schedule)) {
+      "The legacy record does not identify its planned protocols; missing continuation identities are unknown."
+    }
+  )
+  if (length(missing)) {
+    lines <- c(
+      lines,
+      "| Planned trial | Strategy / protocol | Position within trial | Outcome |",
+      "| --- | --- | ---: | --- |",
+      vapply(
+        missing,
+        function(row) {
+          sprintf(
+            "| %s | %s | %d | not recorded |",
+            row$trial_id,
+            arm(row),
+            row$position
+          )
+        },
+        character(1)
+      ),
+      ""
+    )
+  }
+  lines <- c(
+    lines,
+    "| Trial | Strategy / protocol | Dispatched | Answer | Score | Requests | Governed tool requests | Tokens | USD | Seconds | Stop reason |",
+    "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
   )
   for (row in rows) {
     lines <- c(
       lines,
       sprintf(
-        "| %s | %s | %.3f | %d | %s | %s | %.2f |",
+        "| %s | %s | %s | %s | %s | %d | %d | %s | %s | %.2f | %s |",
         row$trial_id,
-        row$strategy,
-        row$score$score,
+        arm(row),
+        dispatched(row),
+        if (is.null(row$answer)) "missing" else "present",
+        if (dispatched(row)) sprintf("%.3f", row$score$score) else "not scored",
         row$usage$requests,
+        row$usage$tool_calls,
         format(row$usage$total_tokens),
         format(row$usage$cost_usd),
-        row$duration_seconds
+        row$duration_seconds,
+        row$stop_reason
       )
     )
   }
   lines <- c(
     lines,
     "",
-    "| Trial | Strategy | Failed checks | History calls / bytes | Completed writes | Export attempts |",
-    "| --- | --- | --- | ---: | ---: | ---: |"
+    "| Trial | Strategy / protocol | Failed checks | History requested | Adapter calls | Not dispatched | Adapter refusals | Searches with source payload | Reads with source payload | History bytes | Completed writes | Export attempts | Repeated exports |",
+    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
   )
   for (row in rows) {
     failed <- names(row$score$checks)[!unlist(row$score$checks)]
     lines <- c(
       lines,
       sprintf(
-        "| %s | %s | %s | %s / %s | %d | %d |",
+        "| %s | %s | %s | %s | %d | %s | %s | %s | %s | %d | %d | %d | %d |",
         row$trial_id,
-        row$strategy,
-        if (length(failed)) paste(failed, collapse = ", ") else "none",
+        arm(row),
+        if (!dispatched(row)) {
+          "not evaluated"
+        } else if (length(failed)) {
+          paste(failed, collapse = ", ")
+        } else {
+          "none"
+        },
+        if (is.null(row$history_usage$requested_calls)) {
+          "not recorded"
+        } else {
+          format(row$history_usage$requested_calls)
+        },
         row$history_usage$calls,
+        if (is.null(row$history_usage$not_dispatched_calls)) {
+          "not recorded"
+        } else {
+          format(row$history_usage$not_dispatched_calls)
+        },
+        if (is.null(row$history_usage$adapter_refused_calls)) {
+          "not recorded"
+        } else {
+          format(row$history_usage$adapter_refused_calls)
+        },
+        payloads(row, "search"),
+        payloads(row, "read"),
         row$history_usage$bytes,
         length(row$completed_effects_before),
-        row$attempted_exports
+        row$attempted_exports,
+        row$repeated_effects
       )
     )
+  }
+  lines <- c(
+    lines,
+    "",
+    "| Trial | Strategy / protocol | Phase | Dispatched | Stop reason | Requests | Tokens | USD |",
+    "| --- | --- | --- | --- | --- | ---: | ---: | ---: |"
+  )
+  for (row in rows) {
+    for (phase in row$phase_runs) {
+      reason <- if (is.null(phase$error_class)) {
+        phase$stop_reason
+      } else {
+        phase$error_class
+      }
+      lines <- c(
+        lines,
+        sprintf(
+          "| %s | %s | %s | %s | %s | %d | %s | %s |",
+          row$trial_id,
+          arm(row),
+          phase$phase,
+          phase$dispatched,
+          reason,
+          if (is.null(phase$usage)) 0L else phase$usage$requests,
+          format(
+            if (!phase$dispatched) {
+              0
+            } else if (is.null(phase$usage$total_tokens)) {
+              NA_real_
+            } else {
+              phase$usage$total_tokens
+            }
+          ),
+          format(
+            if (!phase$dispatched) {
+              0
+            } else if (is.null(phase$usage$cost_usd)) {
+              NA_real_
+            } else {
+              phase$usage$cost_usd
+            }
+          )
+        )
+      )
+    }
   }
   c(
     lines,
     "",
-    "Raw JSON records individual scores, run IDs, source references, attempts, usage, latency, and prompts.",
-    "Preparation cost is shared once per paired trial; continuation costs remain separate.",
-    "Inspect individual paired outcomes and missing/failed trials before drawing conclusions.",
+    "Raw JSON records individual scores, run IDs, source references, attempts, usage, phase outcomes, latency, and prompts.",
+    "History requested counts continuation request occurrences, including calls stopped before adapter dispatch by runtime, permission or schema checks. Adapter refusals count budget, invalid, cancelled and unavailable responses; legacy unrecorded fields remain unknown.",
+    "Successful payload counts require nonempty source text or excerpts and exclude stale, missing and rejected responses. Legacy audits without source-byte counts remain unknown. Unknown phase usage remains NA; undispatched phases use zero.",
+    "Preparation cost is shared once per trial; continuation costs include every phase and remain separate.",
+    "Inspect individual matched outcomes and missing/failed trials before drawing conclusions.",
     "A small synthetic pilot cannot establish model equivalence or justify recursive analysis by itself."
   )
 }

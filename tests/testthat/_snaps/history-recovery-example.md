@@ -29,3 +29,35 @@
     Condition
       Error in `example$history_export()`:
       ! The preparation export has already been completed.
+
+# unknown or duplicate protocols are rejected before model dispatch
+
+    Code
+      example$history_evaluate(factory, fixture, protocols = protocols)
+    Condition
+      Error in `history_validate_protocols()`:
+      ! protocols must contain distinct values from baseline and budget-aware.
+
+---
+
+    Code
+      example$history_evaluate(factory, fixture, protocols = protocols)
+    Condition
+      Error in `history_validate_protocols()`:
+      ! protocols must contain distinct values from baseline and budget-aware.
+
+---
+
+    Code
+      example$history_evaluate(factory, fixture, protocols = protocols)
+    Condition
+      Error in `history_validate_protocols()`:
+      ! protocols must contain distinct values from baseline and budget-aware.
+
+---
+
+    Code
+      example$history_evaluate(factory, fixture, protocols = protocols)
+    Condition
+      Error in `history_validate_protocols()`:
+      ! protocols must contain distinct values from baseline and budget-aware.
