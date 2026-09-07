@@ -73,6 +73,7 @@ local_approval_runtime <- function(
   run_usage_limits = NULL,
   pause_on_b = TRUE,
   fallback_chats = list(),
+  callback = NULL,
   .local_envir = parent.frame()
 ) {
   directory <- withr::local_tempdir(.local_envir = .local_envir)
@@ -94,13 +95,14 @@ local_approval_runtime <- function(
       open_world_hint = FALSE
     )
   )
-  callback <- function(tool_name, tool_input, context) {
-    if (pause_on_b && identical(tool_input$value, "b")) {
-      PermissionResultPending("Approve the middle operation")
-    } else {
-      PermissionResultAllow()
+  callback <- callback %||%
+    function(tool_name, tool_input, context) {
+      if (pause_on_b && identical(tool_input$value, "b")) {
+        PermissionResultPending("Approve the middle operation")
+      } else {
+        PermissionResultAllow()
+      }
     }
-  }
   make_agent <- function(
     permissions = Permissions(can_use_tool = callback),
     tools = list(tool)
@@ -604,6 +606,75 @@ test_that("completed and denied operations cannot be replayed by a subsequent mo
     function(result) grepl("already executed or denied", result$content),
     logical(1)
   )))
+})
+
+test_that("permission denials before suspension survive a later callback allowance", {
+  attempts <- 0L
+  fixture <- local_approval_runtime(
+    responses = list(
+      approval_batch_reply(),
+      approval_batch_reply("a", id_prefix = "retry_"),
+      runtime_reply(text = "finished")
+    ),
+    callback = function(tool_name, tool_input, context) {
+      if (identical(tool_input$value, "a")) {
+        attempts <<- attempts + 1L
+        if (attempts == 1L) return(PermissionResultDeny("Refuse a"))
+      }
+      if (identical(tool_input$value, "b")) {
+        PermissionResultPending("Approve b")
+      } else {
+        PermissionResultAllow()
+      }
+    }
+  )
+  signature <- tool_request_signature("effect", list(value = "a"))
+  expect_true(
+    signature %in% approval_store_read(fixture$path)$denied_signatures
+  )
+  expect_warning(
+    fixture$make_agent()$resume_approval(fixture$path, "approve"),
+    "Failed to evaluate 1 tool call"
+  )
+  expect_identical(fixture$effects$values, "b")
+  expect_identical(attempts, 1L)
+  result <- tail(approval_wire_results(fixture$server$requests()[[3L]]), 1L)
+  expect_match(result[[1L]]$content, "already executed or denied")
+})
+
+test_that("permission denials during resume are persisted before a model retry", {
+  fixture <- local_approval_runtime(
+    responses = list(
+      approval_batch_reply(),
+      approval_batch_reply("b", id_prefix = "retry_"),
+      runtime_reply(text = "finished")
+    )
+  )
+  attempts <- 0L
+  resumed <- fixture$make_agent(
+    permissions = Permissions(
+      can_use_tool = function(tool_name, tool_input, context) {
+        attempts <<- attempts + 1L
+        if (attempts == 1L) {
+          PermissionResultDeny("Refuse the approved operation")
+        } else {
+          PermissionResultAllow()
+        }
+      }
+    )
+  )
+  expect_warning(
+    resumed$resume_approval(fixture$path, "approve"),
+    "Failed to evaluate 1 tool call"
+  )
+  expect_identical(fixture$effects$values, "a")
+  expect_identical(attempts, 1L)
+  signature <- tool_request_signature("effect", list(value = "b"))
+  expect_true(
+    signature %in% approval_store_read(fixture$path)$denied_signatures
+  )
+  result <- tail(approval_wire_results(fixture$server$requests()[[3L]]), 1L)
+  expect_match(result[[1L]]$content, "already executed or denied")
 })
 
 check_interrupted_approval <- function(abrupt = FALSE) {

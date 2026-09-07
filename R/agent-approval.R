@@ -53,8 +53,10 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
           fingerprint = approval_tool_fingerprint(request@tool)
         ),
         effects = private$.approval_journal,
-        denied_signatures = private$.approval_resume$record$denied_signatures %||%
-          character(),
+        denied_signatures = union(
+          private$.approval_resume$record$denied_signatures %||% character(),
+          approval_denied_signatures(private$.approval_journal)
+        ),
         source = list(
           session_id = self$session_id(),
           agent_id = self$agent_id,
@@ -119,8 +121,10 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
         },
         logical(1)
       )
-      denied <- private$.approval_resume$record$denied_signatures %||%
-        character()
+      denied <- union(
+        private$.approval_resume$record$denied_signatures %||% character(),
+        approval_denied_signatures(private$.approval_journal)
+      )
       if (any(executed) || signature %in% denied) {
         ellmer::tool_reject(
           "This operation was already executed or denied in the continuation; it will not be replayed."
@@ -246,6 +250,10 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
       }
       record$status <- status
       record$effects <- private$.approval_journal
+      record$denied_signatures <- union(
+        record$denied_signatures %||% character(),
+        approval_denied_signatures(private$.approval_journal)
+      )
       record$usage <- S7::props(private$current_run_usage())
       record$outcome <- list(
         reason = reason,
@@ -531,6 +539,16 @@ approval_validate_inputs <- function(inputs) {
     )
   }
   invisible(inputs)
+}
+
+approval_denied_signatures <- function(effects) {
+  denied <- Filter(
+    function(entry) {
+      !isTRUE(entry$executed) && identical(entry$status, "failed")
+    },
+    effects
+  )
+  unique(vapply(denied, function(entry) entry$signature, character(1)))
 }
 
 # Raw ellmer tools retain responsibility for their domain and schema validation.

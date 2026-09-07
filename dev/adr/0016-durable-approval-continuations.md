@@ -78,6 +78,8 @@ preserves every original tool-call ID before a new model request starts.
 
 Only `pending` can resume. Duplicate delivery, concurrent consumption, reused
 tool-call IDs and repeated executed/denied operation signatures are rejected.
+Denied signatures include admission failures before suspension and during resume,
+so a later callback allowance cannot revive an operation already refused.
 A new host edit is rechecked before execution. A changed pending gate produces a
 new approval; the previous record points to it. No approval grants future model
 operations automatically.
