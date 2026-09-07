@@ -1,7 +1,7 @@
 # Tests for skill system
 
 test_that("Skill creates correct structure", {
-  skill <- Skill$new(
+  skill <- Skill(
     name = "test_skill",
     version = "1.0.0",
     description = "A test skill",
@@ -10,7 +10,7 @@ test_that("Skill creates correct structure", {
     requires = list(packages = c("dplyr"))
   )
 
-  expect_s3_class(skill, "Skill")
+  expect_s7_class(skill, Skill)
   expect_equal(skill$name, "test_skill")
   expect_equal(skill$version, "1.0.0")
   expect_equal(skill$description, "A test skill")
@@ -20,20 +20,20 @@ test_that("Skill creates correct structure", {
 
 test_that("Skill check_requirements works", {
   # Skill with installed package
-  skill_ok <- Skill$new(
+  skill_ok <- Skill(
     name = "test",
     requires = list(packages = c("base", "stats"))
   )
-  check_ok <- skill_ok$check_requirements()
+  check_ok <- skill_check_requirements(skill_ok)
   expect_true(check_ok$ok)
   expect_length(check_ok$missing, 0)
 
   # Skill with missing package
-  skill_missing <- Skill$new(
+  skill_missing <- Skill(
     name = "test",
     requires = list(packages = c("nonexistent_package_12345"))
   )
-  check_missing <- skill_missing$check_requirements()
+  check_missing <- skill_check_requirements(skill_missing)
   expect_false(check_missing$ok)
   expect_true(grepl("nonexistent_package", check_missing$missing[1]))
 })
@@ -46,7 +46,7 @@ test_that("skill_create creates skill programmatically", {
     version = "2.0.0"
   )
 
-  expect_s3_class(skill, "Skill")
+  expect_s7_class(skill, Skill)
   expect_equal(skill$name, "my_skill")
   expect_equal(skill$version, "2.0.0")
   expect_equal(skill$description, "My skill")
@@ -169,7 +169,7 @@ test_that("skills_list finds skills in directory", {
 })
 
 test_that("skill defaults are sensible", {
-  skill <- Skill$new(name = "minimal")
+  skill <- Skill(name = "minimal")
 
   expect_equal(skill$name, "minimal")
   expect_equal(skill$version, "0.0.0")
@@ -208,41 +208,41 @@ test_that("normalize_provider_name handles chat_* prefixes", {
 })
 
 test_that("check_requirements validates provider without provider arg", {
-  skill <- Skill$new(
+  skill <- Skill(
     name = "test",
     requires = list(providers = c("openai", "anthropic"))
   )
 
   # Without provider arg, should pass (can't validate)
-  check <- skill$check_requirements()
+  check <- skill_check_requirements(skill)
   expect_true(check$ok)
   expect_false(check$provider_mismatch)
 })
 
 test_that("check_requirements validates matching provider", {
-  skill <- Skill$new(
+  skill <- Skill(
     name = "test",
     requires = list(providers = c("openai", "anthropic"))
   )
 
   # With matching provider
-  check <- skill$check_requirements(current_provider = "openai")
+  check <- skill_check_requirements(skill, current_provider = "openai")
   expect_true(check$ok)
   expect_false(check$provider_mismatch)
 
-  check2 <- skill$check_requirements(current_provider = "anthropic")
+  check2 <- skill_check_requirements(skill, current_provider = "anthropic")
   expect_true(check2$ok)
   expect_false(check2$provider_mismatch)
 })
 
 test_that("check_requirements detects provider mismatch", {
-  skill <- Skill$new(
+  skill <- Skill(
     name = "test",
     requires = list(providers = c("openai"))
   )
 
   # With mismatched provider
-  check <- skill$check_requirements(current_provider = "anthropic")
+  check <- skill_check_requirements(skill, current_provider = "anthropic")
   expect_false(check$ok)
   expect_true(check$provider_mismatch)
   expect_equal(check$current_provider, "anthropic")
@@ -250,12 +250,12 @@ test_that("check_requirements detects provider mismatch", {
 })
 
 test_that("check_requirements rejects unknown provider names", {
-  skill <- Skill$new(
+  skill <- Skill(
     name = "test",
     requires = list(providers = "openai")
   )
 
-  check <- skill$check_requirements(current_provider = "anthropc")
+  check <- skill_check_requirements(skill, current_provider = "anthropc")
 
   expect_false(check$ok)
   expect_true(check$provider_mismatch)
@@ -263,13 +263,13 @@ test_that("check_requirements rejects unknown provider names", {
 })
 
 test_that("check_requirements matches generic provider identities", {
-  skill <- Skill$new(
+  skill <- Skill(
     name = "test",
     requires = list(providers = "deepseek")
   )
 
-  matching <- skill$check_requirements(current_provider = "deepseek")
-  misspelled <- skill$check_requirements(current_provider = "deepseak")
+  matching <- skill_check_requirements(skill, current_provider = "deepseek")
+  misspelled <- skill_check_requirements(skill, current_provider = "deepseak")
 
   expect_identical(matching$ok, TRUE)
   expect_identical(matching$provider_mismatch, FALSE)
@@ -278,30 +278,30 @@ test_that("check_requirements matches generic provider identities", {
 })
 
 test_that("check_requirements handles normalized provider names", {
-  skill <- Skill$new(
+  skill <- Skill(
     name = "test",
     requires = list(providers = c("anthropic"))
   )
 
   # "claude" should normalize to "anthropic"
-  check <- skill$check_requirements(current_provider = "claude")
+  check <- skill_check_requirements(skill, current_provider = "claude")
   expect_true(check$ok)
   expect_false(check$provider_mismatch)
 })
 
 test_that("check_requirements handles empty providers list", {
-  skill <- Skill$new(
+  skill <- Skill(
     name = "test",
     requires = list(providers = list())
   )
 
-  check <- skill$check_requirements(current_provider = "openai")
+  check <- skill_check_requirements(skill, current_provider = "openai")
   expect_true(check$ok)
   expect_false(check$provider_mismatch)
 })
 
 test_that("check_requirements combines package and provider checks", {
-  skill <- Skill$new(
+  skill <- Skill(
     name = "test",
     requires = list(
       packages = c("base"),
@@ -310,24 +310,24 @@ test_that("check_requirements combines package and provider checks", {
   )
 
   # Package ok, provider ok
-  check1 <- skill$check_requirements(current_provider = "openai")
+  check1 <- skill_check_requirements(skill, current_provider = "openai")
   expect_true(check1$ok)
 
   # Package ok, provider mismatch
-  check2 <- skill$check_requirements(current_provider = "anthropic")
+  check2 <- skill_check_requirements(skill, current_provider = "anthropic")
   expect_false(check2$ok)
   expect_true(check2$provider_mismatch)
   expect_length(check2$missing, 0)
 
   # Missing package (even with matching provider)
-  skill_missing <- Skill$new(
+  skill_missing <- Skill(
     name = "test",
     requires = list(
       packages = c("nonexistent_pkg_xyz"),
       providers = c("openai")
     )
   )
-  check3 <- skill_missing$check_requirements(current_provider = "openai")
+  check3 <- skill_check_requirements(skill_missing, current_provider = "openai")
   expect_false(check3$ok)
   expect_false(check3$provider_mismatch)
   expect_length(check3$missing, 1)
@@ -366,7 +366,7 @@ test_that("Agent load_skill succeeds without provider requirements", {
 })
 
 test_that("Skill print includes provider info when present", {
-  skill <- Skill$new(
+  skill <- Skill(
     name = "test_skill",
     requires = list(
       packages = c("dplyr"),
@@ -602,4 +602,67 @@ test_that("skill discovery preserves basename fallbacks without yaml", {
   listed <- skills_list(root)
   expect_setequal(listed$name, c("directory-skill", "standalone"))
   expect_equal(nrow(listed), 2L)
+})
+
+test_that("skill_load composes sourced tools once and preserves metadata precedence", {
+  skip_if_not_installed("yaml")
+  root <- withr::local_tempdir()
+  writeLines(
+    c(
+      "name: counter",
+      "version: '1.0.0'",
+      "requires:",
+      "  packages: [base]",
+      "  providers: [anthropic]",
+      "tools:",
+      "  - name: counter",
+      "    file: tools.R",
+      "    function: counter"
+    ),
+    file.path(root, "SKILL.yaml")
+  )
+  writeLines(
+    c(
+      "---",
+      "version: '2.0.0'",
+      "requires:",
+      "  providers: [openai]",
+      "---",
+      "Count carefully."
+    ),
+    file.path(root, "SKILL.md")
+  )
+  writeLines(
+    c(
+      "state <- new.env(parent = emptyenv())",
+      "state$count <- 0L",
+      "counter <- ellmer::tool(function() {",
+      "  state$count <- state$count + 1L",
+      "  state$count",
+      "}, name = 'counter', description = 'Count calls')"
+    ),
+    file.path(root, "tools.R")
+  )
+  skill <- skill_load(root)
+  expect_s7_class(skill, Skill)
+  expect_identical(skill$version, "2.0.0")
+  expect_identical(
+    skill$requires,
+    list(packages = "base", providers = "openai")
+  )
+  expect_identical(skill$prompt, "Count carefully.")
+  expect_identical(skill_check_requirements(skill, "OpenAI")$ok, TRUE)
+  fields <- S7::props(skill)
+  fields$prompt <- "Count again."
+  revised <- do.call(Skill, fields)
+  expect_identical(revised$tools[[1L]], skill$tools[[1L]])
+  expect_identical(skill$tools[[1L]](), 1L)
+  expect_identical(revised$tools[[1L]](), 2L)
+  expect_identical(skill$prompt, "Count carefully.")
+
+  markdown <- skill_load(file.path(root, "SKILL.md"))
+  expect_s7_class(markdown, Skill)
+  expect_identical(markdown$version, "2.0.0")
+  expect_identical(markdown$tools, list())
+  expect_identical(markdown$requires, list(providers = "openai"))
 })

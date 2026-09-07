@@ -1273,7 +1273,7 @@ Agent <- R6::R6Class(
         skill <- skill_load(skill)
       }
 
-      if (!inherits(skill, "Skill")) {
+      if (!S7::S7_inherits(skill, Skill)) {
         cli_abort(
           "{.arg skill} must be a Skill object or path to a skill directory"
         )
@@ -1302,7 +1302,7 @@ Agent <- R6::R6Class(
       )
 
       # Check requirements with provider
-      req_check <- skill$check_requirements(current_provider)
+      req_check <- skill_check_requirements(skill, current_provider)
 
       # Report missing packages
       if (length(req_check$missing) > 0) {

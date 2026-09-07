@@ -11,6 +11,8 @@ formats remain unchanged by the moves.
 | S7 AgentDefinition values and routing normalization | `R/agent-definition.R` |
 | Portable YAML definition format and explicit registry resolution | `R/agent-definition-files.R` |
 | Mutable LeadAgent registry and delegation lifecycle | `R/agents-multi.R` |
+| S7 Skill configuration and requirement inspection | `R/skill.R` |
+| Skill directory discovery, metadata, and explicit tool loading | `R/skills.R` |
 | Shared governed stream, adapters and finalization | `R/agent-stream.R` |
 | Session payload construction and restoration | `R/agent-session.R` |
 | Context estimation and compaction | `R/agent-context.R` |

@@ -123,6 +123,7 @@ reference:
   - Skill
   - skill_load
   - skill_create
+  - skill_check_requirements
   - skills_list
 
 - title: Multi-Agent

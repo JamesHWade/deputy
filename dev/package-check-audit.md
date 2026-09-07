@@ -26,7 +26,7 @@ These paths use `rlang::check_installed()` with a feature-specific reason:
 | `run_bash_impl()` | callr | Existing system-command fallback |
 | CSV tool | readr | Base R CSV reader |
 | `HookRegistry` timeout selection and warning | callr (two sites) | Existing in-process callback with explicit timeout warning |
-| `Skill$check_requirements()` | declared packages | Return an availability report rather than interrupt it |
+| `skill_check_requirements()` | declared packages | Return an availability report rather than interrupt it |
 | `skills_list()` | yaml | Directory basename when optional YAML name lookup is unavailable |
 | `format_schema_json()` | jsonlite | Text representation for display |
 | `extract_web_content()` | rvest, xml2 | Basic HTML extraction |

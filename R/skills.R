@@ -1,200 +1,7 @@
+#' @include skill.R
+NULL
+
 # Skill loading system for deputy agents
-
-#' Normalize provider name for comparison
-#'
-#' @param provider Provider name (e.g., "openai", "OpenAI", "anthropic")
-#' @return Lowercase normalized provider name, or NA_character_ if invalid
-#' @keywords internal
-normalize_provider_name <- function(provider) {
-  if (is.null(provider) || !is.character(provider) || length(provider) != 1) {
-    return(NA_character_)
-  }
-
-  # Convert to lowercase
-  provider <- tolower(provider)
-
-  # Handle common variations
-  switch(
-    provider,
-    "openai" = "openai",
-    "chat_openai" = "openai",
-    "gpt" = "openai",
-    "gpt-4" = "openai",
-    "gpt-4o" = "openai",
-    "anthropic" = "anthropic",
-    "chat_anthropic" = "anthropic",
-    "claude" = "anthropic",
-    "google" = "google",
-    "chat_google" = "google",
-    "gemini" = "google",
-    "ollama" = "ollama",
-    "chat_ollama" = "ollama",
-    "azure" = "azure",
-    "chat_azure" = "azure",
-    "bedrock" = "bedrock",
-    "chat_bedrock" = "bedrock",
-    "vllm" = "vllm",
-    "chat_vllm" = "vllm",
-    "openrouter" = "openrouter",
-    "chat_openrouter" = "openrouter",
-    "groq" = "groq",
-    "chat_groq" = "groq",
-    NA_character_
-  )
-}
-
-# Compare known provider aliases while preserving exact matching for generic
-# providers supported by ellmer::chat().
-provider_requirement_key <- function(provider) {
-  normalized <- normalize_provider_name(provider)
-  if (!is.na(normalized)) {
-    return(paste0("known:", normalized))
-  }
-  if (!is_nonempty_string(provider)) {
-    return(NA_character_)
-  }
-
-  paste0("generic:", tolower(provider))
-}
-
-#' Skill R6 Class
-#'
-#' @description
-#' Represents a skill that can be loaded into an agent. Skills bundle together
-#' a system prompt extension, tools, and metadata about requirements.
-#'
-#' @export
-Skill <- R6::R6Class(
-  "Skill",
-
-  public = list(
-    #' @field name Skill name
-    name = NULL,
-
-    #' @field version Skill version
-    version = NULL,
-
-    #' @field description Brief description of the skill
-    description = NULL,
-
-    #' @field prompt System prompt extension (from SKILL.md)
-    prompt = NULL,
-
-    #' @field tools List of tools provided by this skill
-    tools = NULL,
-
-    #' @field requires Requirements (packages, providers)
-    requires = NULL,
-
-    #' @field path Path to the skill directory
-    path = NULL,
-
-    #' @description
-    #' Create a new Skill object.
-    #'
-    #' @param name Skill name
-    #' @param version Skill version (default: "0.0.0")
-    #' @param description Brief description
-    #' @param prompt System prompt extension
-    #' @param tools List of tools
-    #' @param requires List of requirements
-    #' @param path Path to skill directory
-    #' @return A new `Skill` object
-    initialize = function(
-      name,
-      version = "0.0.0",
-      description = NULL,
-      prompt = NULL,
-      tools = list(),
-      requires = list(),
-      path = NULL
-    ) {
-      self$name <- name
-      self$version <- version
-      self$description <- description
-      self$prompt <- prompt
-      self$tools <- tools
-      self$requires <- requires
-      self$path <- path
-    },
-
-    #' @description
-    #' Check if skill requirements are met.
-    #'
-    #' @param current_provider Optional current provider name for validation
-    #' @return List with `ok` (logical), `missing` (character vector), and
-    #'   `provider_mismatch` (logical)
-    check_requirements = function(current_provider = NULL) {
-      missing <- character()
-      provider_mismatch <- FALSE
-
-      # Check required packages
-      if (!is.null(self$requires$packages)) {
-        for (pkg in self$requires$packages) {
-          if (!rlang::is_installed(pkg)) {
-            missing <- c(missing, paste0("package:", pkg))
-          }
-        }
-      }
-
-      # Check provider requirements if current_provider is specified
-      if (!is.null(current_provider) && !is.null(self$requires$providers)) {
-        required_providers <- self$requires$providers
-        if (length(required_providers) > 0) {
-          provider_key <- provider_requirement_key(current_provider)
-          required_keys <- vapply(
-            required_providers,
-            provider_requirement_key,
-            character(1),
-            USE.NAMES = FALSE
-          )
-          required_keys <- required_keys[!is.na(required_keys)]
-
-          if (
-            is.na(provider_key) ||
-              length(required_keys) == 0L ||
-              !provider_key %in% required_keys
-          ) {
-            provider_mismatch <- TRUE
-          }
-        }
-      }
-
-      list(
-        ok = length(missing) == 0 && !provider_mismatch,
-        missing = missing,
-        provider_mismatch = provider_mismatch,
-        current_provider = current_provider,
-        required_providers = self$requires$providers
-      )
-    },
-
-    #' @description
-    #' Print the skill.
-    print = function() {
-      cli::cat_line(cli::cli_format_method({
-        cli::cli_text("<Skill: {self$name} >")
-        cli::cli_div(theme = list(div = list("margin-left" = 2)))
-        cli::cli_text("version: {self$version}")
-        if (!is.null(self$description)) {
-          cli::cli_text("description: {truncate_string(self$description, 60)}")
-        }
-        cli::cli_text("tools: {length(self$tools)}")
-        if (length(self$tools) > 0) {
-          tool_names <- sapply(self$tools, function(t) t@name)
-          cli::cli_text("{paste(tool_names, collapse = \", \")}")
-        }
-        if (!is.null(self$prompt)) {
-          cli::cli_text("prompt: {nchar(self$prompt)} chars")
-        }
-        if (!is.null(self$path)) {
-          cli::cli_text("path: {self$path}")
-        }
-      }))
-      invisible(self)
-    }
-  )
-)
 
 #' Load a skill from a directory
 #'
@@ -264,7 +71,7 @@ skill_load <- function(path, check_requirements = TRUE) {
     }
     skill <- load_skill_from_markdown(path)
     if (check_requirements) {
-      req_check <- skill$check_requirements()
+      req_check <- skill_check_requirements(skill)
       if (!req_check$ok) {
         cli_warn(c(
           "Skill {.val {skill$name}} has unmet requirements",
@@ -320,7 +127,7 @@ skill_load <- function(path, check_requirements = TRUE) {
   }
 
   # Create skill object
-  skill <- Skill$new(
+  skill <- Skill(
     name = meta$name %||% basename(path),
     version = meta$version %||% "0.0.0",
     description = meta$description,
@@ -332,7 +139,7 @@ skill_load <- function(path, check_requirements = TRUE) {
 
   # Check requirements if requested
   if (check_requirements) {
-    req_check <- skill$check_requirements()
+    req_check <- skill_check_requirements(skill)
     if (!req_check$ok) {
       cli_warn(c(
         "Skill {.val {skill$name}} has unmet requirements",
@@ -350,7 +157,7 @@ load_skill_from_markdown <- function(path) {
   meta <- parsed$meta %||% list()
   prompt <- parsed$body
 
-  skill <- Skill$new(
+  skill <- Skill(
     name = meta$name %||% tools::file_path_sans_ext(basename(path)),
     version = meta$version %||% "0.0.0",
     description = meta$description,
@@ -471,7 +278,7 @@ skill_create <- function(
   version = "1.0.0",
   requires = list()
 ) {
-  Skill$new(
+  Skill(
     name = name,
     version = version,
     description = description,

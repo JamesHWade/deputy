@@ -253,7 +253,7 @@ validate_definition_registry <- function(registry, field) {
       inherits(value, "ellmer::ToolDef") ||
         inherits(value, "ellmer::ToolBuiltIn")
     } else {
-      inherits(value, "Skill") || is_nonempty_string(value)
+      S7::S7_inherits(value, Skill) || is_nonempty_string(value)
     }
     if (!valid) {
       abort_definition_file("Invalid object in {.arg {field}} registry")

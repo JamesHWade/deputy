@@ -5,7 +5,7 @@ test_that("object summaries print user braces literally and return invisibly", {
     AgentResult(response = literal),
     Permissions(tool_allowlist = literal),
     HookMatcher("Stop", function(reason, context) NULL, pattern = "a{1}"),
-    Skill$new(name = literal, prompt = literal),
+    Skill(name = literal, prompt = literal),
     agent_definition("print_probe", description = literal, prompt = "test"),
     Agent$new(chat = create_mock_chat(), agent_name = literal)
   )
