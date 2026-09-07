@@ -283,7 +283,10 @@ calls, or resource and prompt access. Create the Agent first, then allow exact
 items from one configured server:
 
 ```{r, eval = FALSE}
-agent <- Agent$new(chat = ellmer::chat("openai/gpt-5.6-luna"))
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  permissions = Permissions(web = TRUE)
+)
 connection <- McpConnection$new(
   config = "~/.config/mcptools/config.json",
   server = "evidence",
