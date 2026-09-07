@@ -646,7 +646,9 @@ or a PR with a prior Claude review comment. Closed/draft state and prior bot rev
 are checked against GitHub. A skip explicitly states that this run did not review
 the current head; an older review never counts as current-run completion.
 Before starting the SDK, the workflow checks for a prior bot review comment with
-the established provenance marker. That confirmed upstream skip needs no model
+the established provenance marker from a different run or attempt. A prior run
+can publish while this run starts; the current run's own marker never qualifies.
+That confirmed upstream skip needs no model
 call and emits an eligibility-stage result. PRs without that evidence invoke the
 existing plugin normally; GitHub eligibility lookup failures fail the job.
 This eligibility decision follows the upstream comment-presence rule. It does

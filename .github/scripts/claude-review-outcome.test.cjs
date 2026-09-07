@@ -18,7 +18,7 @@ const context = () => ({ diagnostic: diagnostics([{ type: 'assistant', message: 
   { type: 'tool_result', tool_use_id: 'agent-1', content: 'Review result' },
 ] } }, { type: 'result', subtype: 'success',
   is_error: false, permission_denials: [] }]), sha, currentSha: sha, comments: [], inline: [],
-  marker, findingMarker, started: '2026-09-06T12:00:00Z', actionOutcome: 'success' });
+  marker, findingMarker, started: '2026-09-06T12:00:00Z', actionOutcome: 'success', runId: '123', runAttempt: '1' });
 
 test('SDK success alone cannot claim a clean review', () => {
   assert.equal(classify(context()).outcome, 'blocked/failed');
@@ -35,6 +35,12 @@ test('upstream skips remain distinct from current-head completion', () => {
   assert.equal(priorReviewSkip({ ...prior, currentSha: 'b'.repeat(40) }), undefined);
   assert.equal(priorReviewSkip({ ...prior, comments: [] }), undefined);
   assert.equal(priorReviewSkip({ ...prior, comments: [{ ...priorReview, user: { login: 'someone' } }] }), undefined);
+  const raced = { ...prior, comments: [{ ...priorReview, created_at: '2026-09-06T12:01:00Z' }] };
+  assert.equal(priorReviewSkip(raced).outcome, 'intentionally skipped');
+  assert.equal(classify(raced).outcome, 'intentionally skipped');
+  assert.equal(priorReviewSkip({ ...prior, runId: '122', runAttempt: '2' }).outcome, 'intentionally skipped');
+  assert.equal(priorReviewSkip({ ...prior, runId: '122', runAttempt: '1' }), undefined);
+  assert.equal(priorReviewSkip({ ...prior, runId: undefined }), undefined);
   assert.equal(classify(prior).outcome, 'intentionally skipped');
   assert.match(classify(prior).reason, /this run did not review the current head/);
   for (const replacement of [
@@ -43,7 +49,7 @@ test('upstream skips remain distinct from current-head completion', () => {
     { diagnostic: { ...diagnostic, plugin_calls: 0 } },
     { diagnostic: { ...diagnostic, permission_denials_count: 1 } },
     { comments: [{ ...priorReview, user: { login: 'someone' } }] },
-    { comments: [{ ...priorReview, created_at: '2026-09-06T12:01:00Z' }] },
+    { runId: '122', runAttempt: '1' },
     { comments: [{ ...priorReview, body: 'An unrelated older bot comment' }] },
   ]) assert.equal(classify({ ...prior, ...replacement }).outcome, 'blocked/failed');
   for (const [reason, evidence] of [['draft', { draft: true }], ['closed', { state: 'closed' }], ['trivial', {}]]) {
@@ -63,7 +69,8 @@ test('preflight skips SDK only with prior-review evidence and fails closed on AP
         ? { head: { sha: process.env.TEST_CURRENT_SHA } }
         : JSON.parse(process.env.TEST_COMMENTS),
     });`);
-    const prior = { ...comment('without-findings'), created_at: '2026-09-05T12:00:00Z' };
+    const prior = { ...comment('without-findings'), created_at: '2026-09-05T12:00:00Z',
+      body: `<!-- deputy-claude-review:${sha}:122:1:without-findings -->` };
     for (const [scenario, overrides, expected] of [
       ['prior', {}, 'intentionally skipped'],
       ['new', { TEST_COMMENTS: '[]' }, undefined],
@@ -76,6 +83,7 @@ test('preflight skips SDK only with prior-review evidence and fails closed on AP
       const result = spawnSync(process.execPath, ['--require', preload, path.join(__dirname, 'claude-review-outcome.cjs')], {
         encoding: 'utf8', env: { ...process.env, REVIEW_PREFLIGHT: 'true', REVIEW_SHA: sha,
           REVIEW_STARTED: context().started, PR_NUMBER: '131', GITHUB_REPOSITORY: 'example/deputy',
+          GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '1',
           GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: path.join(runDirectory, 'summary'), RUNNER_TEMP: runDirectory,
           TEST_CURRENT_SHA: sha, TEST_COMMENTS: JSON.stringify([prior]), ...overrides },
       });

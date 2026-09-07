@@ -59,16 +59,21 @@ function diagnostics(messages) {
   };
 }
 
-function priorReviewSkip({ sha, currentSha, comments, started }) {
-  const priorReview = comments.some((comment) => comment.user?.login === 'github-actions[bot]' &&
-    Date.parse(comment.created_at) < Date.parse(started) &&
-    /<!-- deputy-claude-review:[a-f0-9]{40}:\d+:\d+:(?:with|without)-findings -->/.test(comment.body || ''));
+function priorReviewSkip({ sha, currentSha, comments, runId, runAttempt }) {
+  if (!/^\d+$/.test(runId || '') || !/^\d+$/.test(runAttempt || '')) return undefined;
+  const priorReview = comments.some((comment) => {
+    if (comment.user?.login !== 'github-actions[bot]') return false;
+    const markers = [...(comment.body || '').matchAll(/<!-- deputy-claude-review:[a-f0-9]{40}:(\d+):(\d+):(?:with|without)-findings -->/g)];
+    // A previous run can publish after this run starts. Identity, not timestamps,
+    // separates an upstream prior-comment skip from this run's own publication.
+    return markers.length > 0 && !markers.some((match) => match[1] === runId && match[2] === runAttempt);
+  });
   return sha === currentSha && priorReview
     ? { outcome: 'intentionally skipped', reason: 'Upstream policy skips a prior Claude review comment; this run did not review the current head or validate the earlier run' }
     : undefined;
 }
 
-function classify({ diagnostic, sha, currentSha, comments, inline, marker, findingMarker, started, actionOutcome, draft = false, state = 'open' }) {
+function classify({ diagnostic, sha, currentSha, comments, inline, marker, findingMarker, started, actionOutcome, draft = false, state = 'open', runId, runAttempt }) {
   const blocked = (reason) => ({ outcome: 'blocked/failed', reason });
   if (sha !== currentSha) return blocked('PR head changed during review');
   if (actionOutcome !== 'success' || !diagnostic.sdk_success) return blocked('Claude did not complete successfully');
@@ -104,7 +109,7 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, findi
     if (diagnostic.reported_reason === 'trivial') {
       return skipped('Upstream plugin classified the change as trivial; this run did not review the current head');
     }
-    const priorSkip = priorReviewSkip({ sha, currentSha, comments, started });
+    const priorSkip = priorReviewSkip({ sha, currentSha, comments, runId, runAttempt });
     if (diagnostic.reported_reason === 'already-reviewed' && priorSkip) {
       return priorSkip;
     }
@@ -148,7 +153,7 @@ async function main() {
       if (sha !== pr.head.sha) {
         result = { outcome: 'blocked/failed', reason: 'PR head changed before review' };
       } else {
-        const skip = priorReviewSkip({ sha, currentSha: pr.head.sha, comments, started: env.REVIEW_STARTED });
+        const skip = priorReviewSkip({ sha, currentSha: pr.head.sha, comments, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT });
         fs.appendFileSync(env.GITHUB_OUTPUT, `should_review=${!skip}\n`);
         if (!skip) return;
         result = skip;
@@ -156,7 +161,8 @@ async function main() {
     } else result = classify({ diagnostic, sha, currentSha: pr.head.sha, comments, inline,
       marker: `<!-- deputy-claude-review:${sha}:${env.GITHUB_RUN_ID}:${env.GITHUB_RUN_ATTEMPT}`,
       findingMarker: `[Review run](https://github.com/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}/attempts/${env.GITHUB_RUN_ATTEMPT})`,
-      started: env.REVIEW_STARTED, actionOutcome: env.ACTION_OUTCOME, draft: pr.draft, state: pr.state });
+      started: env.REVIEW_STARTED, actionOutcome: env.ACTION_OUTCOME, draft: pr.draft, state: pr.state,
+      runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT });
   } catch {
     // Errors can include server responses, file contents, or token-bearing URLs.
     // Keep the public failure categorical; never print the caught value.
