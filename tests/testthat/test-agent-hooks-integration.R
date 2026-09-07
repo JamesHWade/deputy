@@ -107,7 +107,8 @@ test_that("Agent preserves isolated hook failure details", {
   agent <- Agent$new(chat = create_mock_chat())
   agent$add_hook(HookMatcher(
     event = "PreToolUse",
-    timeout = 5,
+    # Allow instrumented process startup; this test checks error preservation.
+    timeout = 60,
     callback = function(...) stop("isolated hook failed")
   ))
 
@@ -124,6 +125,29 @@ test_that("Agent preserves isolated hook failure details", {
     "isolated hook failed",
     fixed = TRUE
   )
+})
+
+test_that("Agent denies execution when an isolated hook times out", {
+  agent <- Agent$new(chat = create_mock_chat())
+  agent$add_hook(HookMatcher(
+    event = "PreToolUse",
+    timeout = 0.1,
+    callback = function(...) {
+      Sys.sleep(60)
+      HookResultPreToolUse(permission = "allow")
+    }
+  ))
+
+  result <- suppressMessages(agent$hooks$fire(
+    "PreToolUse",
+    tool_name = "read_file",
+    tool_input = list(path = "DESCRIPTION"),
+    context = list()
+  ))
+
+  expect_equal(result$permission, "deny")
+  expect_match(result$reason, "timed out", fixed = TRUE)
+  expect_match(agent$hooks$last_errors()[[1]]$error, "timed out", fixed = TRUE)
 })
 
 test_that("Hook denial takes precedence over permission allow", {
