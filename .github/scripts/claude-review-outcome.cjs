@@ -63,6 +63,9 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, findi
   const blocked = (reason) => ({ outcome: 'blocked/failed', reason });
   if (sha !== currentSha) return blocked('PR head changed during review');
   if (actionOutcome !== 'success' || !diagnostic.sdk_success) return blocked('Claude did not complete successfully');
+  if (!diagnostic.plugin_calls || !diagnostic.plugin_comment_argument_seen) {
+    return blocked('Upstream review plugin was not invoked with --comment');
+  }
   const fresh = (comment) => comment.user?.login === 'github-actions[bot]' &&
     Date.parse(comment.created_at) >= Date.parse(started) - 5000;
   const summaries = comments.filter(fresh);

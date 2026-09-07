@@ -10,7 +10,9 @@ const marker = `<!-- deputy-claude-review:${sha}:123:1`;
 const findingMarker = "[Review run](https://github.com/example/deputy/actions/runs/123/attempts/1)";
 const comment = (outcome) => ({ user: { login: 'github-actions[bot]' },
   created_at: '2026-09-06T12:01:00Z', body: `${marker}:${outcome} -->` });
-const context = () => ({ diagnostic: diagnostics([{ type: 'result', subtype: 'success',
+const context = () => ({ diagnostic: diagnostics([{ type: 'assistant', message: { content: [
+  { type: 'tool_use', name: 'Skill', input: { skill: 'code-review:code-review', args: 'example/deputy/pull/131 --comment' } },
+] } }, { type: 'result', subtype: 'success',
   is_error: false, permission_denials: [] }]), sha, currentSha: sha, comments: [], inline: [],
   marker, findingMarker, started: '2026-09-06T12:00:00Z', actionOutcome: 'success' });
 
@@ -94,10 +96,13 @@ test('preflight skips SDK only with prior-review evidence and fails closed on AP
 test('clean and findings outcomes require current-run bot evidence', () => {
   const clean = { ...context(), comments: [comment('without-findings')] };
   assert.equal(classify(clean).outcome, 'completed without findings');
+  assert.equal(classify({ ...clean, diagnostic: { ...clean.diagnostic, plugin_calls: 0 } }).outcome, 'blocked/failed');
+  assert.equal(classify({ ...clean, diagnostic: { ...clean.diagnostic, plugin_comment_argument_seen: false } }).outcome, 'blocked/failed');
   assert.equal(classify({ ...clean, comments: [{ ...clean.comments[0], created_at: '2026-09-06T11:59:58Z' }] }).outcome, 'completed without findings');
   const findings = { ...context(), comments: [comment('with-findings')],
     inline: [{ ...comment('finding'), body: findingMarker, commit_id: sha }] };
   assert.equal(classify(findings).outcome, 'completed with findings');
+  assert.equal(classify({ ...findings, diagnostic: { ...findings.diagnostic, plugin_calls: 0 } }).outcome, 'blocked/failed');
   assert.equal(classify({ ...findings, inline: [] }).outcome, 'blocked/failed');
   assert.equal(classify({ ...findings, inline: [{ ...findings.inline[0], body: 'Unrelated concurrent bot finding' }] }).outcome, 'blocked/failed');
   assert.equal(classify({ ...findings, inline: [{ ...findings.inline[0], commit_id: 'b'.repeat(40) }] }).outcome, 'blocked/failed');
