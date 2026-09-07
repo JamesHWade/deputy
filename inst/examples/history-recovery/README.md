@@ -14,8 +14,17 @@ early eligibility constraints, a superseded denominator, unresolved methods, a
 historical export receipt, and quoted malicious instructions. Ninety synthetic
 catalogue records add approximately 400 KB of deliberately repetitive distractor
 text. This stresses repeated transitions; it is not representative clinical data
-or evidence of performance on real conversations. The historical export is a
-fixture receipt, not a write executed during preparation.
+or evidence of performance on real conversations. Each trial executes one host-authorized CSV export before checkpoint 2. The
+receipt records the artifact SHA-256, bytes and contents; both continuations
+inherit that verified completed effect. The temporary file is removed after
+preparation, while its receipt remains in the saved evidence.
+
+This producer uses a fixed C-only export contract: `export-0042`, version 1,
+and the exact CSV payload defined by `history_export_contract()`. Planned
+metadata, payload digest and the scoped receipt row are checked before writing.
+The completed receipt description comes from the same contract. Changing the
+fixture's planned export does not authorize an alternative artifact; a different
+effect requires a separate producer and matching evaluation protocol.
 
 The `changed-constraint` scenario adds a host instruction at checkpoint 3 that
 supersedes the adult-only rule with an all-ages randomized-study rule. B becomes
@@ -23,8 +32,10 @@ eligible; D and F still await allocation details. The amendment is submitted as
 a user instruction and retained as a source record with its own ID and revision.
 The final question asks for the current rule without repeating the amendment.
 The original rule and quoted malicious instructions remain in the history, so
-the new scenario checks supersession as well as recall. Both scenarios use a
-historical export receipt; neither executes that earlier export.
+the new scenario checks supersession as well as recall. All scenarios execute the same isolated host export during preparation. The
+`resolved-methods` scenario instead adds later verified allocation details: D
+is eligible, F is excluded, and no reports remain pending. This tests resolution
+of earlier open work while keeping the original host constraint.
 
 `evaluation.R` loads each checkpoint through an actual ellmer tool round under a
 Deputy read-only allowlist. Large-result offloading is disabled for this experiment
@@ -65,12 +76,18 @@ Tests use real ellmer producers against a local HTTP server, with canned answers
 and a character-count estimator that shrinks after compaction to force transitions. They cover paired preparation,
 structured scoring, real retrieval, scope isolation, stale/missing references,
 UTF-8 and payload limits, denied exports, cancellation and exhausted/unknown-cost
-budgets. Both scenarios exercise repeated compaction and paired continuations;
+budgets. All three scenarios exercise repeated compaction and paired continuations;
 the changed-rule case also retrieves the amendment and rejects an answer that
 keeps the superseded rule. Canned answer scores test the wiring, **not model
 recall quality**.
 
 ## Live pilot
+
+The [7 September 2026 results](../../../dev/evaluations/history-recovery/2026-09-07/README.md)
+record nine paired trials across all three scenarios. Retrieval improved
+grounding when it finished, but three continuations stopped at the tool-call
+limit. The report retains these failures, costs, matched contexts and effect
+receipts; it does not establish production quality.
 
 Install this Deputy branch first. Configure OpenAI credentials through ellmer's
 normal mechanism. Run the following only after choosing a spending allowance:
@@ -96,6 +113,7 @@ Optional environment variables are `DEPUTY_HISTORY_TRIALS` (default `3`),
 the task model fixed and include Luna and Terra in `DEPUTY_HISTORY_HELPERS`.
 Choose `DEPUTY_HISTORY_SCENARIO=changed-constraint` for the amendment case
 (default `original`), using a separate output directory for each scenario.
+Use `resolved-methods` for the allocation-clarification case.
 Each invocation has its own spending threshold; account for their combined
 cost within the authorized allowance.
 The aggregate request budget can stop a larger experiment early; use
@@ -109,12 +127,13 @@ are not persisted. Inputs are synthetic; a consented-data adaptation must treat
 its outputs as private host data. Recoverable run failures preserve partial
 evidence. A process kill or interactive interrupt before saving does not.
 
-Eight explicit structured checks score the answer, including the current host
-constraint; no model judge is used.
+Ten explicit structured checks score the answer, including the current host
+constraint and the individual D/F classifications; no model judge is used.
 Report individual paired outcomes, failed/missing trials and score/latency
-distributions. Fully correct means all eight checks pass; it does not measure
+distributions. Fully correct means all ten checks pass; it does not measure
 every claim in the free-text answer. Preparation costs are shared once per pair;
-continuation costs remain separate. Do not infer Luna/Terra equivalence, production
+continuation costs remain separate. Reports include failed checks, missing
+continuations, retrieval calls/bytes, verified completed writes and export attempts. Do not infer Luna/Terra equivalence, production
 retrieval quality, or a need for recursive analysis from a small synthetic pilot.
 
 The optional `cancelled` callback is cooperative: checked before runs and history

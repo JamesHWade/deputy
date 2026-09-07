@@ -175,7 +175,7 @@ test_that("history chunks preserve UTF-8 and enforce whole-payload budgets", {
   }
 })
 
-for (scenario in c("original", "changed-constraint")) {
+for (scenario in c("original", "changed-constraint", "resolved-methods")) {
   test_that(paste("paired continuations preserve the", scenario, "protocol"), {
     example <- history_example()
     fixture <- example$history_fixture(1L, scenario = scenario)
@@ -185,8 +185,10 @@ for (scenario in c("original", "changed-constraint")) {
     answer <- c(fixture$expected, list(source_ids = fixture$required_sources))
     source_id <- if (scenario == "original") {
       "assay-C-r3"
-    } else {
+    } else if (scenario == "changed-constraint") {
       "protocol-all-ages-randomized"
+    } else {
+      "report-D-F-clarification"
     }
     wire <- local({
       reply <- runtime_reply
@@ -258,6 +260,7 @@ for (scenario in c("original", "changed-constraint")) {
       max_tokens = 500L
     )
     expect_null(evaluation$failure)
+    expect_length(evaluation$effects, 2L)
     expect_length(evaluation$trials, 4L)
     expect_identical(
       vapply(evaluation$trials, `[[`, character(1), "strategy"),
@@ -265,6 +268,25 @@ for (scenario in c("original", "changed-constraint")) {
     )
     for (rows in split(evaluation$trials, rep(1:2, each = 2L))) {
       expect_identical(rows[[1L]]$summary_id, rows[[2L]]$summary_id)
+      receipt <- rows[[1L]]$completed_effects_before[[1L]]
+      expect_identical(receipt$executions, 1L)
+      expect_identical(receipt$executor, "host")
+      expect_identical(
+        receipt$contents,
+        c("report,responses,denominator", "C,21,84")
+      )
+      expect_identical(
+        receipt$sha256,
+        digest::digest(
+          fixture$planned_export$contents,
+          algo = "sha256",
+          serialize = FALSE
+        )
+      )
+      expect_identical(
+        rows[[1L]]$completed_effects_before,
+        rows[[2L]]$completed_effects_before
+      )
       expect_equal(rows[[1L]]$transitions, 3L)
       expect_identical(
         vapply(rows, function(row) row$score$all_correct, logical(1)),
@@ -328,6 +350,37 @@ for (scenario in c("original", "changed-constraint")) {
         FALSE
       )
       expect_identical(evaluation$case_id, "assay-review-changed-constraint-v1")
+    }
+    if (scenario == "resolved-methods") {
+      expect_setequal(
+        fixture$required_sources,
+        c(
+          "protocol-adult-randomized",
+          "assay-C-r3",
+          "export-receipt-0042",
+          "report-D-F-clarification"
+        )
+      )
+      reversed <- answer
+      reversed$d_status <- "excluded"
+      reversed$f_status <- "eligible"
+      reversed_score <- example$history_score(reversed, fixture)
+      expect_identical(reversed_score$checks$d_classification, FALSE)
+      expect_identical(reversed_score$checks$f_classification, FALSE)
+      expect_identical(reversed_score$all_correct, FALSE)
+      omitted <- answer
+      omitted$d_status <- NULL
+      omitted$f_status <- NULL
+      expect_identical(
+        example$history_score(omitted, fixture)$all_correct,
+        FALSE
+      )
+      stale_answer <- answer
+      stale_answer$pending_reports <- c("D", "F")
+      expect_identical(
+        example$history_score(stale_answer, fixture)$checks$unresolved_work,
+        FALSE
+      )
     }
     expect_gt(evaluation$usage$requests, 16L)
     expect_gt(evaluation$usage$cost_usd, 0)
@@ -654,4 +707,202 @@ test_that("invalid live configuration leaves the requested output path available
       expect_false(dir.exists(output))
     }
   )
+})
+
+
+test_that("preparation export writes once and binds the verified receipt", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  directory <- withr::local_tempdir()
+  expect_length(fixture$completed_effects, 0L)
+  completed <- example$history_export(fixture, directory)
+  expect_identical(
+    readLines(file.path(directory, "accepted-findings.csv")),
+    c("report,responses,denominator", "C,21,84")
+  )
+  expect_length(completed$completed_effects, 1L)
+  receipt <- completed$completed_effects[[1L]]
+  records <- example$history_scope_records(completed$records, completed$scope)
+  expect_match(
+    records$text[records$item_id == "export-receipt-0042"],
+    receipt$sha256,
+    fixed = TRUE
+  )
+  expect_snapshot(error = TRUE, example$history_export(completed, directory))
+  other <- withr::local_tempdir()
+  error <- tryCatch(example$history_export(completed, other), error = identity)
+  expect_s3_class(error, "rlang_error")
+  expect_length(list.files(other), 0L)
+})
+
+
+test_that("completed preparation effects survive a later failed checkpoint", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "load_checkpoint", arguments = list(stage = 1L)),
+    runtime_reply("First checkpoint loaded."),
+    runtime_failure(401L)
+  ))
+  evaluation <- example$history_evaluate(
+    function(model) runtime_chat(server),
+    fixture,
+    trials = 1L,
+    max_tokens = 100000L
+  )
+  expect_length(evaluation$trials, 0L)
+  expect_length(evaluation$effects, 1L)
+  expect_identical(evaluation$effects[[1L]]$receipt$executions, 1L)
+  expect_identical(evaluation$effects[[1L]]$receipt$executor, "host")
+  expect_identical(evaluation$failure$class, "history_evaluation_incomplete")
+})
+
+
+test_that("preparation rejects invalid scoped receipts before writing", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  index <- match("export-receipt-0042", fixture$records$item_id)
+  missing <- fixture
+  missing$records <- missing$records[-index, , drop = FALSE]
+  duplicate <- fixture
+  duplicate$records <- rbind(duplicate$records, duplicate$records[index, ])
+  stale <- fixture
+  stale$records$text[[index]] <- "Changed without a matching revision."
+  wrong_stage <- fixture
+  wrong_stage$records$stage[[index]] <- 3L
+  for (invalid in list(missing, duplicate, stale, wrong_stage)) {
+    directory <- withr::local_tempdir()
+    expect_setequal(invalid$records$stage, 1:3)
+    error <- tryCatch(
+      example$history_export(invalid, directory),
+      error = identity
+    )
+    expect_s3_class(error, "rlang_error")
+    expect_length(list.files(directory, all.files = TRUE, no.. = TRUE), 0L)
+  }
+})
+
+test_that("out-of-scope receipt IDs cannot shadow the authorized receipt", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  index <- match("export-receipt-0042", fixture$records$item_id)
+  for (field in names(fixture$scope)) {
+    outside <- fixture$records[index, , drop = FALSE]
+    outside[[field]] <- paste0("outside-", fixture$scope[[field]])
+    outside$text <- "An unrelated export receipt from another scope."
+    outside$revision <- digest::digest(
+      outside$text,
+      algo = "sha256",
+      serialize = FALSE
+    )
+    mixed <- fixture
+    mixed$records <- rbind(outside, fixture$records)
+    directory <- withr::local_tempdir()
+    completed <- example$history_export(mixed, directory)
+    expect_identical(completed$records[1L, ], mixed$records[1L, ])
+    expect_identical(names(completed$records), names(mixed$records))
+    authorized <- example$history_scope_records(
+      completed$records,
+      completed$scope
+    )
+    receipt <- authorized[authorized$item_id == "export-receipt-0042", ]
+    expect_equal(nrow(receipt), 1L)
+    expect_match(
+      receipt$text,
+      completed$completed_effects[[1L]]$sha256,
+      fixed = TRUE
+    )
+    expect_identical(
+      readLines(file.path(directory, "accepted-findings.csv")),
+      c("report,responses,denominator", "C,21,84")
+    )
+  }
+})
+
+
+test_that("malformed planned export metadata is rejected before writing", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  invalid_values <- list(
+    id = list(
+      NULL,
+      NA_character_,
+      "",
+      " ",
+      "another-export",
+      c("first", "second")
+    ),
+    version = list(NULL, NA_real_, Inf, 0, 1.5, 2L, "1", c(1L, 2L))
+  )
+  for (field in names(invalid_values)) {
+    for (value in invalid_values[[field]]) {
+      invalid <- fixture
+      invalid$planned_export[[field]] <- value
+      directory <- withr::local_tempdir()
+      error <- tryCatch(
+        example$history_export(invalid, directory),
+        error = identity
+      )
+      expect_s3_class(error, "rlang_error")
+      expect_length(list.files(directory, all.files = TRUE, no.. = TRUE), 0L)
+    }
+  }
+})
+
+test_that("preparation rejects a conflicting expected export before writing", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  fixture$expected$completed_export_id <- "another-export"
+  directory <- withr::local_tempdir()
+  expect_error(
+    example$history_export(fixture, directory),
+    "expected export-0042 ID"
+  )
+  expect_length(list.files(directory, all.files = TRUE, no.. = TRUE), 0L)
+})
+
+test_that("preparation rejects a contradictory export payload before writing", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  for (contents in c(
+    "",
+    "report,responses,denominator\nD,21,84\n",
+    "report,responses,denominator\nC,21,85\n",
+    "report,responses,denominator\r\nC,21,84\r\n"
+  )) {
+    invalid <- fixture
+    invalid$planned_export$contents <- contents
+    directory <- withr::local_tempdir()
+    expect_error(
+      example$history_export(invalid, directory),
+      "fixed export receipt digest"
+    )
+    expect_length(list.files(directory, all.files = TRUE, no.. = TRUE), 0L)
+  }
+})
+
+test_that("the completed source receipt describes the verified export", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  index <- match("export-receipt-0042", fixture$records$item_id)
+  fixture$records$text[[
+    index
+  ]] <- "Unverified placeholder: this export contains D."
+  fixture$records$revision[[index]] <- digest::digest(
+    fixture$records$text[[index]],
+    algo = "sha256",
+    serialize = FALSE
+  )
+  directory <- withr::local_tempdir()
+  completed <- example$history_export(fixture, directory)
+  expect_match(completed$records$text[[index]], "C only", fixed = TRUE)
+  expect_false(grepl("Unverified placeholder", completed$records$text[[index]]))
+  expect_identical(
+    completed$completed_effects[[1L]]$contents,
+    c("report,responses,denominator", "C,21,84")
+  )
+  expect_no_error(example$history_scope_records(
+    completed$records,
+    completed$scope
+  ))
 })

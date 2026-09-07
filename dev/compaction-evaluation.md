@@ -59,18 +59,22 @@ tool-evidence regression also verifies that the summary request contains tool
 results without their private display metadata.
 
 Deterministic scores establish the experiment's wiring, not model quality.
-#112 remains open for authorized live repeated trials and an evidence-based
-decision. The initial catalogue is repetitive synthetic padding; supplement it
-with diverse or consented trajectories, actual completed effects and changed
-constraints before making a production claim. The live runner requires explicit
-opt-in, preserves recoverable partial results, and documents observed-cost
-limitations. No recursive implementation is justified by the fixture tests.
+The [7 September 2026 live pilot](evaluations/history-recovery/2026-09-07/README.md)
+records nine paired preparations and 18 attempted continuations for an estimated
+$0.271. Retrieval improved grounding in completed answers, but three retrieval
+continuations hit the tool-call limit and produced no answer. #112 remains open
+for reliable completion under bounded retrieval and more diverse or consented
+trajectories. The live runner requires explicit opt-in, preserves recoverable
+partial results, and documents observed-cost limitations. Neither the fixture
+tests nor this small pilot justify a recursive implementation.
 
 The optional `changed-constraint` scenario now supplies a later host amendment
 and retains it by source ID and revision. Its deterministic producer checks
 paired contexts, retrieval of the amendment, and rejection of the superseded
-eligibility answer. Actual completed effects and more diverse trajectories
-remain follow-up work; the export receipt in both scenarios is synthetic.
+eligibility answer. The `resolved-methods` scenario supplies later allocation
+evidence for D and F. All three scenarios now execute a real isolated CSV export
+during preparation, preserve its verified receipt, and prohibit another export
+during continuation. More diverse trajectories remain follow-up work.
 
 Evaluate these strategies on the same host-owned trajectories and probes:
 

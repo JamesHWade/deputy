@@ -1,0 +1,22 @@
+original continuations: 6 total observed USD: 0.09300296 requests: 46 
+changed-constraint continuations: 6 total observed USD: 0.18201 requests: 90 
+resolved-methods continuations: 6 total observed USD: 0.2705689 requests: 136 
+Warning messages:
+1: Failed to evaluate 2 tool calls.
+✖ [history_search (fc_0ad0fa2cea7f0b25016a9e9ac2766c87d196ba0d0591cb47ee)]:
+  Tool call rejected. History access budget_exhausted
+✖ [history_search (fc_0ad0fa2cea7f0b25016a9e9ac2767487d19db6ffb0f162be00)]:
+  Tool call rejected. History access budget_exhausted 
+2: Failed to evaluate 2 tool calls.
+✖ [history_search (fc_09dd5835b44dddc5016a9e9b58be7087d187afdaf03eeb4550)]:
+  Tool call rejected. History access budget_exhausted
+✖ [history_search (fc_09dd5835b44dddc5016a9e9b58be7887d191963b054f35513c)]:
+  Tool call rejected. History access budget_exhausted 
+3: Failed to evaluate 1 tool call.
+✖ [history_search (fc_0faeebb8384c5b05016a9e9bc993b887d19e7ba5259bb3bfc9)]:
+  Tool call rejected. History access budget_exhausted 
+4: Failed to evaluate 2 tool calls.
+✖ [history_search (fc_0b6948b92d8cff34016a9e9befee5487d19934a3a7f8584799)]:
+  Tool call rejected. History access budget_exhausted
+✖ [history_search (fc_0b6948b92d8cff34016a9e9befee5c87d1a88396418a4c1feb)]:
+  Tool call rejected. History access budget_exhausted 
