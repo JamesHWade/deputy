@@ -756,3 +756,88 @@ test_that("completed preparation effects survive a later failed checkpoint", {
   expect_identical(evaluation$effects[[1L]]$receipt$executor, "host")
   expect_identical(evaluation$failure$class, "history_evaluation_incomplete")
 })
+
+
+test_that("preparation rejects invalid scoped receipts before writing", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  index <- match("export-receipt-0042", fixture$records$item_id)
+  missing <- fixture
+  missing$records <- missing$records[-index, , drop = FALSE]
+  duplicate <- fixture
+  duplicate$records <- rbind(duplicate$records, duplicate$records[index, ])
+  stale <- fixture
+  stale$records$text[[index]] <- "Changed without a matching revision."
+  wrong_stage <- fixture
+  wrong_stage$records$stage[[index]] <- 3L
+  for (invalid in list(missing, duplicate, stale, wrong_stage)) {
+    directory <- withr::local_tempdir()
+    expect_setequal(invalid$records$stage, 1:3)
+    error <- tryCatch(
+      example$history_export(invalid, directory),
+      error = identity
+    )
+    expect_s3_class(error, "rlang_error")
+    expect_length(list.files(directory, all.files = TRUE, no.. = TRUE), 0L)
+  }
+})
+
+test_that("out-of-scope receipt IDs cannot shadow the authorized receipt", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  index <- match("export-receipt-0042", fixture$records$item_id)
+  for (field in names(fixture$scope)) {
+    outside <- fixture$records[index, , drop = FALSE]
+    outside[[field]] <- paste0("outside-", fixture$scope[[field]])
+    outside$text <- "An unrelated export receipt from another scope."
+    outside$revision <- digest::digest(
+      outside$text,
+      algo = "sha256",
+      serialize = FALSE
+    )
+    mixed <- fixture
+    mixed$records <- rbind(outside, fixture$records)
+    directory <- withr::local_tempdir()
+    completed <- example$history_export(mixed, directory)
+    expect_identical(completed$records[1L, ], mixed$records[1L, ])
+    expect_identical(names(completed$records), names(mixed$records))
+    authorized <- example$history_scope_records(
+      completed$records,
+      completed$scope
+    )
+    receipt <- authorized[authorized$item_id == "export-receipt-0042", ]
+    expect_equal(nrow(receipt), 1L)
+    expect_match(
+      receipt$text,
+      completed$completed_effects[[1L]]$sha256,
+      fixed = TRUE
+    )
+    expect_identical(
+      readLines(file.path(directory, "accepted-findings.csv")),
+      c("report,responses,denominator", "C,21,84")
+    )
+  }
+})
+
+
+test_that("malformed planned export metadata is rejected before writing", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  invalid_values <- list(
+    id = list(NULL, NA_character_, "", " ", c("first", "second")),
+    version = list(NULL, NA_real_, Inf, 0, 1.5, "1", c(1L, 2L))
+  )
+  for (field in names(invalid_values)) {
+    for (value in invalid_values[[field]]) {
+      invalid <- fixture
+      invalid$planned_export[[field]] <- value
+      directory <- withr::local_tempdir()
+      error <- tryCatch(
+        example$history_export(invalid, directory),
+        error = identity
+      )
+      expect_s3_class(error, "rlang_error")
+      expect_length(list.files(directory, all.files = TRUE, no.. = TRUE), 0L)
+    }
+  }
+})

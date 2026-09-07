@@ -255,20 +255,42 @@ history_budget <- function(
 # Host-authorized, isolated effect. No model supplies a path or write payload.
 history_export <- function(fixture, directory) {
   planned <- fixture$planned_export
+  valid_id <- is.character(planned$id) &&
+    length(planned$id) == 1L &&
+    !is.na(planned$id) &&
+    nzchar(trimws(planned$id))
+  valid_version <- is.numeric(planned$version) &&
+    length(planned$version) == 1L &&
+    !is.na(planned$version) &&
+    is.finite(planned$version) &&
+    planned$version >= 1 &&
+    planned$version == floor(planned$version)
   if (
-    !identical(planned$artifact, "accepted-findings.csv") ||
+    !valid_id ||
+      !valid_version ||
+      !identical(planned$artifact, "accepted-findings.csv") ||
       !is.character(planned$contents) ||
       length(planned$contents) != 1L ||
       is.na(planned$contents)
   ) {
     cli::cli_abort(
-      "The host export must specify a fixed artifact and contents."
+      "The host export must specify an ID, a positive whole version, a fixed artifact and contents."
     )
   }
   path <- file.path(directory, "accepted-findings.csv")
   if (length(fixture$completed_effects) > 0L || file.exists(path)) {
     cli::cli_abort("The preparation export has already been completed.")
   }
+  records <- fixture$records
+  records$.export_row <- seq_len(nrow(records))
+  records <- history_scope_records(records, fixture$scope)
+  source <- records[records$item_id == "export-receipt-0042", , drop = FALSE]
+  if (nrow(source) != 1L || source$stage[[1L]] != 2L) {
+    cli::cli_abort(
+      "The host export requires exactly one authorized checkpoint 2 receipt."
+    )
+  }
+  index <- source$.export_row[[1L]]
   writeBin(charToRaw(enc2utf8(planned$contents)), path)
   receipt <- list(
     id = planned$id,
@@ -281,7 +303,6 @@ history_export <- function(fixture, directory) {
     executor = "host",
     checkpoint = 2L
   )
-  index <- match("export-receipt-0042", fixture$records$item_id)
   text <- paste(
     fixture$records$text[[index]],
     "Verified artifact SHA-256:",
