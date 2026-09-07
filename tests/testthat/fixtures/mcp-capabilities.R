@@ -70,7 +70,12 @@ repeat {
         if (identical(arguments$operation, "crash")) {
           quit(save = "no", status = 7)
         }
-        list(content = list(list(type = "text", text = value)))
+        result_value <- if (identical(arguments$operation, "has_value")) {
+          as.character("value" %in% names(arguments))
+        } else {
+          value
+        }
+        list(content = list(list(type = "text", text = result_value)))
       },
       `resources/list` = if (is.null(request$params$cursor)) {
         list(

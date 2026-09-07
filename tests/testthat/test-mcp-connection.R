@@ -342,6 +342,103 @@ test_that("resource-only and prompt-only servers need no tool catalogue", {
   }
 })
 
+test_that("host tool calls bind caller values and omit unsupplied arguments", {
+  config <- mcp_test_config()
+  agent <- Agent$new(chat = create_mock_chat())
+  connection <- McpConnection$new(
+    config$path,
+    "fixture",
+    agent,
+    tools = "state"
+  )
+  withr::defer(connection$close())
+  tool <- connection$tools()$state
+  received <- local({
+    operation <- "set"
+    descriptor <- "caller value"
+    forced <- 0L
+    result <- mcp_test_await(tool(operation = operation, value = {
+      forced <- forced + 1L
+      descriptor
+    }))
+    expect_identical(forced, 1L)
+    result
+  })
+  expect_match(paste(received), "caller value")
+  expect_match(paste(mcp_test_await(tool(operation = "has_value"))), "FALSE")
+  expect_match(
+    paste(mcp_test_await(tool(operation = "has_value", value = "supplied"))),
+    "TRUE"
+  )
+})
+
+test_that("an intermediate startup condition does not replace initialization results", {
+  noisy <- mcp_worker_start
+  body(noisy) <- bquote({
+    signalCondition(structure(
+      list(message = "fixture startup message"),
+      class = c("callr_message", "message", "condition")
+    ))
+    Sys.sleep(0.05)
+    .(body(noisy))
+  })
+  local_mocked_bindings(mcp_worker_start = noisy)
+  config <- mcp_test_config()
+  agent <- Agent$new(chat = create_mock_chat())
+  expect_message(
+    connection <- McpConnection$new(
+      config$path,
+      "fixture",
+      agent,
+      tools = "state"
+    ),
+    "fixture startup message"
+  )
+  withr::defer(connection$close())
+  expect_identical(connection$status()$state, "idle")
+  expect_match(
+    paste(mcp_test_await(connection$tools()$state(operation = "get"))),
+    "empty"
+  )
+})
+
+test_that("intermediate worker conditions do not settle or desynchronize requests", {
+  noisy <- mcp_worker_request
+  body(noisy) <- bquote({
+    if (operation != "close") {
+      signalCondition(structure(
+        list(message = "fixture worker message"),
+        class = c("callr_message", "message", "condition")
+      ))
+      Sys.sleep(0.05)
+    }
+    .(body(noisy))
+  })
+  local_mocked_bindings(mcp_worker_request = noisy)
+  config <- mcp_test_config()
+  agent <- Agent$new(chat = create_mock_chat())
+  connection <- McpConnection$new(
+    config$path,
+    "fixture",
+    agent,
+    tools = "state"
+  )
+  withr::defer(connection$close())
+  tool <- connection$tools()$state
+  expect_message(
+    result <- mcp_test_await(tool(operation = "set", value = "retained")),
+    "fixture worker message"
+  )
+  expect_match(paste(result), "retained")
+  expect_identical(connection$status()$state, "idle")
+  expect_message(
+    next_result <- mcp_test_await(tool(operation = "get")),
+    "fixture worker message"
+  )
+  expect_match(paste(next_result), "retained")
+  expect_identical(connection$status()$state, "idle")
+})
+
 test_that("one Agent can register resource and prompt tools from two connections", {
   first_config <- mcp_test_config()
   second_config <- mcp_test_config()

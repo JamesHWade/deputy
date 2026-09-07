@@ -7,6 +7,23 @@ mcp_worker_function <- function(fun) {
   fun
 }
 
+# callr can deliver conditions and progress before the terminal result.
+# Keep the operation pending until its completion or worker termination event.
+mcp_worker_read_result <- function(worker) {
+  response <- worker$read()
+  if (is.null(response)) {
+    return(NULL)
+  }
+  if (response$code == 301L) {
+    rlang::cnd_signal(response$message)
+    return(NULL)
+  }
+  if (response$code == 200L || response$code >= 500L && response$code < 600L) {
+    return(response)
+  }
+  NULL
+}
+
 mcp_worker_start <- function(config, server, working_dir, load_tools) {
   setwd(working_dir)
   if (!identical(as.character(utils::packageVersion("mcptools")), "1.0.2")) {

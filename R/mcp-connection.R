@@ -122,7 +122,8 @@ McpConnection <- R6::R6Class(
           load_tools = length(tools) > 0L
         )
       )
-      while (!identical(private$worker$poll_process(20), "ready")) {
+      startup <- NULL
+      while (is.null(startup)) {
         if (
           !private$worker$is_alive() ||
             as.numeric(difftime(Sys.time(), started, units = "secs")) >
@@ -133,8 +134,16 @@ McpConnection <- R6::R6Class(
             class = "mcp_connection"
           )
         }
+        if (identical(private$worker$poll_process(20), "ready")) {
+          startup <- mcp_worker_read_result(private$worker)
+        }
       }
-      startup <- private$worker$read()
+      if (startup$code != 200L) {
+        abort_deputy(
+          "MCP client worker exited during initialization.",
+          class = "mcp_connection"
+        )
+      }
       if (!is.null(startup$error)) {
         rlang::cnd_signal(startup$error)
       }
@@ -270,10 +279,12 @@ McpConnection <- R6::R6Class(
         }
         fun <- rlang::new_function(
           descriptor$formals,
-          rlang::expr((!!invoke)(base::lapply(
-            base::as.list(base::match.call())[-1L],
-            base::eval,
-            envir = base::environment()
+          rlang::expr((!!invoke)(base::mget(
+            base::as.character(base::names(base::as.list(base::match.call())[
+              -1L
+            ])),
+            envir = base::environment(),
+            inherits = FALSE
           )))
         )
         tool <- ellmer::tool(
@@ -361,10 +372,12 @@ McpConnection <- R6::R6Class(
               list(operation = "close", arguments = list())
             )
             deadline <- Sys.time() + min(private$timeout, 2)
-            while (
-              !identical(private$worker$poll_process(10), "ready") &&
-                Sys.time() < deadline
-            ) {}
+            response <- NULL
+            while (is.null(response) && Sys.time() < deadline) {
+              if (identical(private$worker$poll_process(10), "ready")) {
+                response <- mcp_worker_read_result(private$worker)
+              }
+            }
           },
           error = function(e) NULL
         )
@@ -474,11 +487,19 @@ McpConnection <- R6::R6Class(
           } else if (Sys.time() >= deadline) {
             private$terminate("timeout")
           } else if (identical(private$worker$poll_process(0), "ready")) {
-            private$pending_reject <- NULL
-            private$state <- "idle"
             tryCatch(
               {
-                response <- private$worker$read()
+                response <- mcp_worker_read_result(private$worker)
+                if (is.null(response)) {
+                  later::later(poll, 0.01)
+                  return(invisible(NULL))
+                }
+                if (response$code != 200L) {
+                  private$terminate("worker_exited")
+                  return(invisible(NULL))
+                }
+                private$pending_reject <- NULL
+                private$state <- "idle"
                 if (!is.null(response$error)) {
                   rlang::cnd_signal(response$error)
                 }
@@ -497,7 +518,10 @@ McpConnection <- R6::R6Class(
                 resolve(value)
               },
               error = function(e) {
-                if (mcp_connection_server_exited(e)) {
+                if (identical(private$state, "busy")) {
+                  private$pending_reject <- NULL
+                  private$terminate("response_failed")
+                } else if (mcp_connection_server_exited(e)) {
                   private$terminate("server_exited")
                 }
                 reject(e)
