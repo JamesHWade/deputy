@@ -45,7 +45,17 @@ initialize_agent_run <- function(
   private$current_tool_calls <- 0L
   private$current_tool_results <- 0L
   private$current_outer_requests <- 0L
-  private$current_external_usage <- initial_usage
+  private$current_external_usage <- if (is.null(private$.approval_resume)) {
+    initial_usage
+  } else {
+    approval_usage(private$.approval_resume$record$usage)
+  }
+  private$.approval_requests <- list()
+  private$.approval_journal <- if (is.null(private$.approval_resume)) {
+    list()
+  } else {
+    private$.approval_resume$record$effects
+  }
   private$current_stream_controller <-
     controller %||%
     tryCatch(

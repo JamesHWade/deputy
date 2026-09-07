@@ -25,7 +25,8 @@ NULL
 #' @param install_packages Allow package installation. One non-missing logical
 #'   value.
 #' @param can_use_tool A function accepting tool name, input, and context,
-#'   returning a [PermissionResultAllow] or [PermissionResultDeny], or `NULL`.
+#'   returning a [PermissionResultAllow], [PermissionResultDeny],
+#'   [PermissionResultPending], or `NULL`.
 #' @param tool_allowlist Character vector of allowed tool names, or `NULL`.
 #'   An empty vector denies all tools; `NULL` disables this gate.
 #' @param tool_denylist Character vector of denied tool names, or `NULL`.
@@ -170,7 +171,8 @@ local({
 #' @param tool_input Arguments passed to the tool.
 #' @param context Additional context such as working directory, tool origin,
 #'   and annotations.
-#' @return A [PermissionResultAllow] or [PermissionResultDeny].
+#' @return A [PermissionResultAllow], [PermissionResultDeny], or
+#'   [PermissionResultPending].
 #' @examples
 #' permissions_check(permissions_readonly(), "read_file", list(path = "x.txt"))
 #' @export
@@ -211,7 +213,10 @@ S7::method(permissions_check, Permissions) <- function(
       context
     )
     callback_checked <- TRUE
-    if (S7::S7_inherits(callback_result, PermissionResultDeny)) {
+    if (
+      !is.null(callback_result) &&
+        !S7::S7_inherits(callback_result, PermissionResultAllow)
+    ) {
       return(callback_result)
     }
   }

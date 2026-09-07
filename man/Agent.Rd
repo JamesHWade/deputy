@@ -160,6 +160,8 @@ agent$add_hook(HookMatcher(
     \item \href{#method-Agent-provider}{\code{Agent$provider()}}
     \item \href{#method-Agent-save_session}{\code{Agent$save_session()}}
     \item \href{#method-Agent-load_session}{\code{Agent$load_session()}}
+    \item \href{#method-Agent-pending_approval}{\code{Agent$pending_approval()}}
+    \item \href{#method-Agent-resume_approval}{\code{Agent$resume_approval()}}
     \item \href{#method-Agent-checkpoint}{\code{Agent$checkpoint()}}
     \item \href{#method-Agent-list_checkpoints}{\code{Agent$list_checkpoints()}}
     \item \href{#method-Agent-rewind_files}{\code{Agent$rewind_files()}}
@@ -196,7 +198,8 @@ agent$add_hook(HookMatcher(
   run_context = list(),
   agent_id = NULL,
   agent_name = NULL,
-  fallback_chats = list()
+  fallback_chats = list(),
+  approval_dir = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -240,6 +243,9 @@ preserved and their history, system prompt, and tools are replaced by
 the Agent's. The selected Chat remains active for subsequent runs.
 Applies to governed task and structured requests. Pre-run automatic
 compaction retains the separate \link{ContextPolicy} summary-failure policy.}
+      \item{\code{approval_dir}}{Optional existing host-owned directory for durable tool
+approvals. Enables sequential tool execution and an execution journal.
+See \code{\link[=approval_read]{approval_read()}} and \verb{$resume_approval()}.}
     }
     \if{html}{\out{</div>}}
   }
@@ -1263,6 +1269,56 @@ state under the receiving Agent's session identity.
   }
   \subsection{Returns}{
     Invisible self
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-pending_approval"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-pending_approval}{}}}
+\subsection{\code{Agent$pending_approval()}}{
+  Inspect the approval that suspended this Agent, or NULL.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$pending_approval()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    An \link{ApprovalContinuation} or NULL. Its source includes the path.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-resume_approval"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-resume_approval}{}}}
+\subsection{\code{Agent$resume_approval()}}{
+  Resume a persisted pending tool approval under current and saved policy.
+Reattach a Chat, the same raw-argument tool definition, permission callback,
+session_id, agent_id, working_dir, and approval_dir after process restart.
+Existing completed effects are never replayed; duplicate decisions fail.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$resume_approval(
+  path,
+  decision = c("approve", "deny"),
+  tool_input = NULL,
+  usage_limits = NULL
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{path}}{Approval directory supplied by the approval event or snapshot.}
+      \item{\code{decision}}{Either "approve" or "deny".}
+      \item{\code{tool_input}}{Optional edited raw JSON argument list for approval.}
+      \item{\code{usage_limits}}{Optional explicit \link{UsageLimits} for the continuation.
+Escalation is bounded by the saved and current Agent limits. Previously
+observed usage is retained. NULL keeps the suspended run's limits.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    An \link{AgentResult}, including usage observed before suspension.
   }
 }
 

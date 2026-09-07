@@ -14,6 +14,9 @@ formats remain unchanged by the moves.
 | S7 Skill configuration and requirement inspection | `R/skill.R` |
 | Skill directory discovery, metadata, and explicit tool loading | `R/skills.R` |
 | Shared governed stream, adapters and finalization | `R/agent-stream.R` |
+| Durable approval suspension and governed resume | `R/agent-approval.R` |
+| Portable approval control records and S7 inspection | `R/approval-record.R` |
+| Locked immutable approval storage revisions | `R/approval-store.R` |
 | Session payload construction and restoration | `R/agent-session.R` |
 | Context estimation and compaction | `R/agent-context.R` |
 | Governed asynchronous compaction requests and recovery | `R/compaction-run.R` |

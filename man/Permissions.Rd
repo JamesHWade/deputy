@@ -36,7 +36,8 @@ defaults to \code{FALSE}.}
 value.}
 
 \item{can_use_tool}{A function accepting tool name, input, and context,
-returning a \link{PermissionResultAllow} or \link{PermissionResultDeny}, or \code{NULL}.}
+returning a \link{PermissionResultAllow}, \link{PermissionResultDeny},
+\link{PermissionResultPending}, or \code{NULL}.}
 
 \item{tool_allowlist}{Character vector of allowed tool names, or \code{NULL}.
 An empty vector denies all tools; \code{NULL} disables this gate.}

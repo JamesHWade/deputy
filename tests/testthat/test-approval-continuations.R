@@ -1,0 +1,634 @@
+approval_batch_reply <- function(
+  values = c("a", "b", "c"),
+  id_prefix = "call_"
+) {
+  calls <- lapply(seq_along(values), function(index) {
+    list(
+      index = index - 1L,
+      id = paste0(id_prefix, values[[index]]),
+      type = "function",
+      `function` = list(
+        name = "effect",
+        arguments = as.character(jsonlite::toJSON(
+          list(value = values[[index]]),
+          auto_unbox = TRUE
+        ))
+      )
+    )
+  })
+  chunks <- list(
+    list(
+      id = "approval_fixture",
+      model = "gpt-4o-mini",
+      choices = list(list(
+        index = 0L,
+        delta = list(
+          role = "assistant",
+          content = NULL,
+          tool_calls = calls
+        )
+      ))
+    ),
+    list(
+      id = "approval_fixture",
+      model = "gpt-4o-mini",
+      choices = list(list(
+        index = 0L,
+        delta = list(),
+        finish_reason = "tool_calls"
+      )),
+      usage = list(
+        prompt_tokens = 10L,
+        completion_tokens = 5L,
+        total_tokens = 15L
+      )
+    )
+  )
+  list(
+    status = 200L,
+    headers = list("Content-Type" = "text/event-stream"),
+    body = paste0(
+      paste0(
+        vapply(
+          chunks,
+          function(chunk) {
+            paste0(
+              "data: ",
+              jsonlite::toJSON(chunk, auto_unbox = TRUE, null = "null"),
+              "\n\n"
+            )
+          },
+          character(1)
+        ),
+        collapse = ""
+      ),
+      "data: [DONE]\n\n"
+    )
+  )
+}
+
+local_approval_runtime <- function(
+  responses = list(approval_batch_reply(), runtime_reply(text = "finished")),
+  agent_usage_limits = UsageLimits(),
+  run_usage_limits = NULL,
+  pause_on_b = TRUE,
+  .local_envir = parent.frame()
+) {
+  directory <- withr::local_tempdir(.local_envir = .local_envir)
+  server <- local_runtime_server(responses, .local_envir = .local_envir)
+  effects <- new.env(parent = emptyenv())
+  effects$values <- character()
+  tool <- ellmer::tool(
+    function(value) {
+      effects$values <- c(effects$values, value)
+      paste0("result_", value)
+    },
+    name = "effect",
+    description = "Record an observable effect",
+    arguments = list(value = ellmer::type_string()),
+    convert = FALSE,
+    annotations = ellmer::tool_annotations(
+      read_only_hint = FALSE,
+      destructive_hint = FALSE,
+      open_world_hint = FALSE
+    )
+  )
+  callback <- function(tool_name, tool_input, context) {
+    if (pause_on_b && identical(tool_input$value, "b")) {
+      PermissionResultPending("Approve the middle operation")
+    } else {
+      PermissionResultAllow()
+    }
+  }
+  make_agent <- function(
+    permissions = Permissions(can_use_tool = callback),
+    tools = list(tool)
+  ) {
+    Agent$new(
+      chat = runtime_chat(server),
+      tools = tools,
+      permissions = permissions,
+      approval_dir = directory,
+      working_dir = directory,
+      usage_limits = agent_usage_limits,
+      session_id = "approval_session",
+      agent_id = "approval_agent"
+    )
+  }
+  agent <- make_agent()
+  result <- agent$run_sync("Perform the batch", usage_limits = run_usage_limits)
+  pending <- agent$pending_approval()
+  list(
+    agent = agent,
+    result = result,
+    pending = pending,
+    path = pending$source$path,
+    make_agent = make_agent,
+    effects = effects,
+    server = server,
+    tool = tool
+  )
+}
+
+approval_wire_results <- function(request) {
+  Filter(
+    function(message) identical(message$role, "tool"),
+    request$body$messages
+  )
+}
+
+test_that("approval suspension preserves a complete batch without running later siblings", {
+  fixture <- local_approval_runtime()
+  expect_identical(fixture$result$stop_reason, "approval_pending")
+  expect_identical(fixture$effects$values, "a")
+  expect_s7_class(fixture$pending, ApprovalContinuation)
+  expect_identical(fixture$pending$status, "pending")
+  expect_identical(fixture$pending$request$tool_input, list(value = "b"))
+  expect_identical(
+    fixture$pending$effects$call_a$result$props$value,
+    "result_a"
+  )
+  expect_null(fixture$pending$effects$call_c)
+  expect_length(fixture$server$requests(), 1L)
+
+  # Recreate the Agent from the public host configuration, without sharing Chat
+  # or runtime state with the suspended instance.
+  resumed <- fixture$make_agent()
+  result <- resumed$resume_approval(fixture$path, "approve")
+  expect_identical(trimws(result$response), "finished")
+  expect_identical(fixture$effects$values, c("a", "b"))
+  expect_identical(approval_read(fixture$path)$status, "completed")
+  expect_identical(
+    approval_read(fixture$path)$source$session_id,
+    "approval_session"
+  )
+
+  requests <- fixture$server$requests()
+  expect_length(requests, 2L)
+  results <- approval_wire_results(requests[[2L]])
+  expect_identical(
+    vapply(results, `[[`, character(1), "tool_call_id"),
+    c("call_a", "call_b", "call_c")
+  )
+  expect_match(results[[1L]]$content, "result_a")
+  expect_match(results[[2L]]$content, "result_b")
+  expect_match(results[[3L]]$content, "Not executed")
+  requests_with_tools <- Filter(
+    function(message) !is.null(message$tool_calls),
+    requests[[2L]]$body$messages
+  )
+  expect_length(requests_with_tools, 1L)
+  expect_identical(
+    vapply(requests_with_tools[[1L]]$tool_calls, `[[`, character(1), "id"),
+    c("call_a", "call_b", "call_c")
+  )
+  expect_error(
+    resumed$resume_approval(fixture$path, "approve"),
+    class = "deputy_approval_consumed"
+  )
+  expect_identical(fixture$effects$values, c("a", "b"))
+  expect_length(fixture$server$requests(), 2L)
+})
+
+test_that("denial resumes with a correlated result and executes no pending operation", {
+  fixture <- local_approval_runtime()
+  resumed <- fixture$make_agent()
+  result <- resumed$resume_approval(fixture$path, "deny")
+  expect_identical(trimws(result$response), "finished")
+  expect_identical(fixture$effects$values, "a")
+  snapshot <- approval_read(fixture$path)
+  expect_identical(snapshot$decision$decision, "deny")
+  expect_identical(snapshot$status, "completed")
+  expect_false(snapshot$effects$call_b$executed)
+  results <- approval_wire_results(fixture$server$requests()[[2L]])
+  expect_identical(results[[2L]]$tool_call_id, "call_b")
+  expect_match(results[[2L]]$content, "denied")
+  expect_match(results[[3L]]$content, "Not executed")
+})
+
+test_that("host edits are rechecked and used consistently in the restored request and effect", {
+  fixture <- local_approval_runtime()
+  checked <- new.env(parent = emptyenv())
+  checked$inputs <- list()
+  resumed <- fixture$make_agent(
+    permissions = Permissions(can_use_tool = function(
+      tool_name,
+      tool_input,
+      context
+    ) {
+      checked$inputs[[length(checked$inputs) + 1L]] <- tool_input
+      PermissionResultAllow()
+    })
+  )
+  result <- resumed$resume_approval(
+    fixture$path,
+    "approve",
+    tool_input = list(value = "edited")
+  )
+  expect_identical(trimws(result$response), "finished")
+  expect_identical(fixture$effects$values, c("a", "edited"))
+  expect_true(any(vapply(
+    checked$inputs,
+    identical,
+    logical(1),
+    list(value = "edited")
+  )))
+  expect_identical(
+    approval_read(fixture$path)$decision$tool_input,
+    list(value = "edited")
+  )
+  wire <- fixture$server$requests()[[2L]]
+  requests <- Filter(
+    function(message) !is.null(message$tool_calls),
+    wire$body$messages
+  )
+  expect_identical(
+    jsonlite::fromJSON(requests[[1L]]$tool_calls[[2L]]$`function`$arguments),
+    list(value = "edited")
+  )
+  expect_match(approval_wire_results(wire)[[2L]]$content, "result_edited")
+})
+
+test_that("current static authority and callback denials still govern host-approved inputs", {
+  fixture <- local_approval_runtime()
+  resumed <- fixture$make_agent(
+    permissions = Permissions(
+      tool_denylist = "effect",
+      can_use_tool = function(...) PermissionResultAllow()
+    )
+  )
+  result <- resumed$resume_approval(fixture$path, "approve")
+  expect_identical(trimws(result$response), "finished")
+  expect_identical(fixture$effects$values, "a")
+  results <- approval_wire_results(fixture$server$requests()[[2L]])
+  expect_match(
+    results[[2L]]$content,
+    "denied|deny|allow|authority",
+    ignore.case = TRUE
+  )
+  expect_false(approval_read(fixture$path)$effects$call_b$executed)
+
+  fixture2 <- local_approval_runtime()
+  resumed2 <- fixture2$make_agent(
+    permissions = Permissions(
+      can_use_tool = function(...) {
+        PermissionResultDeny("Current host refuses this operation")
+      }
+    )
+  )
+  resumed2$resume_approval(
+    fixture2$path,
+    "approve",
+    tool_input = list(value = "edited")
+  )
+  expect_identical(fixture2$effects$values, "a")
+  expect_match(
+    approval_wire_results(fixture2$server$requests()[[2L]])[[2L]]$content,
+    "Current host refuses"
+  )
+})
+
+test_that("missing callbacks and changed or missing tool definitions cannot consume approvals", {
+  fixture <- local_approval_runtime()
+  no_callback <- fixture$make_agent(permissions = Permissions())
+  expect_error(
+    no_callback$resume_approval(fixture$path, "approve"),
+    "callback",
+    class = "deputy_approval_error"
+  )
+  expect_identical(approval_read(fixture$path)$status, "pending")
+  no_tool <- fixture$make_agent(tools = list())
+  expect_error(
+    no_tool$resume_approval(fixture$path, "approve"),
+    "tool definition",
+    class = "deputy_approval_error"
+  )
+  expect_identical(approval_read(fixture$path)$status, "pending")
+  changed <- ellmer::tool(
+    function(value) value,
+    name = "effect",
+    description = "A different definition",
+    arguments = list(value = ellmer::type_string()),
+    convert = FALSE
+  )
+  changed_tool <- fixture$make_agent(tools = list(changed))
+  expect_error(
+    changed_tool$resume_approval(fixture$path, "approve"),
+    "tool definition",
+    class = "deputy_approval_error"
+  )
+  expect_identical(approval_read(fixture$path)$status, "pending")
+  expect_identical(fixture$effects$values, "a")
+  expect_length(fixture$server$requests(), 1L)
+  expect_no_error(fixture$make_agent()$resume_approval(fixture$path, "approve"))
+  expect_identical(fixture$effects$values, c("a", "b"))
+})
+
+test_that("completed and denied operations cannot be replayed by a subsequent model request", {
+  fixture <- local_approval_runtime(
+    responses = list(
+      approval_batch_reply(),
+      approval_batch_reply(c("a", "b"), id_prefix = "retry_"),
+      runtime_reply(text = "finished")
+    )
+  )
+  expect_warning(
+    fixture$make_agent()$resume_approval(fixture$path, "deny"),
+    "Failed to evaluate 2 tool calls"
+  )
+  expect_identical(fixture$effects$values, "a")
+  requests <- fixture$server$requests()
+  expect_length(requests, 3L)
+  results <- tail(approval_wire_results(requests[[3L]]), 2L)
+  expect_true(all(vapply(
+    results,
+    function(result) grepl("already executed or denied", result$content),
+    logical(1)
+  )))
+})
+
+check_interrupted_approval <- function(abrupt = FALSE) {
+  directory <- withr::local_tempdir()
+  receipt <- file.path(directory, "effect-receipt.txt")
+  server <- local_runtime_server(list(
+    approval_batch_reply("b"),
+    runtime_reply(text = "finished")
+  ))
+  exit_after_effect <- FALSE
+  abrupt_exit <- FALSE
+  tool <- ellmer::tool(
+    function(value) {
+      cat(value, "\n", file = receipt, append = TRUE, sep = "")
+      if (abrupt_exit) {
+        tools::pskill(Sys.getpid(), signal = 9L)
+      }
+      if (exit_after_effect) {
+        quit(save = "no", status = 0, runLast = FALSE)
+      }
+      value
+    },
+    name = "effect",
+    description = "Write an effect receipt",
+    arguments = list(value = ellmer::type_string()),
+    convert = FALSE,
+    annotations = ellmer::tool_annotations(
+      read_only_hint = FALSE,
+      destructive_hint = FALSE,
+      open_world_hint = FALSE
+    )
+  )
+  agent <- Agent$new(
+    chat = runtime_chat(server),
+    tools = list(tool),
+    permissions = Permissions(can_use_tool = function(...) {
+      PermissionResultPending()
+    }),
+    approval_dir = directory,
+    working_dir = directory,
+    session_id = "approval_crash_session",
+    agent_id = "approval_crash_agent"
+  )
+  agent$run_sync("Write the receipt")
+  path <- agent$pending_approval()$source$path
+  expect_false(file.exists(receipt))
+
+  # The child gets only the store path and the host's configuration. It has no
+  # access to the suspended Chat, closures, or execution journal in memory.
+  child <- callr::r_bg(
+    function(package_path, path, directory, receipt, url, abrupt) {
+      if (file.exists(file.path(package_path, "R", "agent.R"))) {
+        pkgload::load_all(package_path, quiet = TRUE)
+      } else {
+        library(deputy, lib.loc = dirname(package_path))
+      }
+      exit_after_effect <- TRUE
+      abrupt_exit <- abrupt
+      tool <- ellmer::tool(
+        function(value) {
+          cat(value, "\n", file = receipt, append = TRUE, sep = "")
+          if (abrupt_exit) {
+            tools::pskill(Sys.getpid(), signal = 9L)
+          }
+          if (exit_after_effect) {
+            quit(save = "no", status = 0, runLast = FALSE)
+          }
+          value
+        },
+        name = "effect",
+        description = "Write an effect receipt",
+        arguments = list(value = ellmer::type_string()),
+        convert = FALSE,
+        annotations = ellmer::tool_annotations(
+          read_only_hint = FALSE,
+          destructive_hint = FALSE,
+          open_world_hint = FALSE
+        )
+      )
+      restored <- Agent$new(
+        chat = ellmer::chat_openai_compatible(
+          base_url = url,
+          credentials = function() "fixture",
+          model = "gpt-4o-mini",
+          echo = "none"
+        ),
+        tools = list(tool),
+        permissions = Permissions(can_use_tool = function(...) {
+          PermissionResultPending()
+        }),
+        approval_dir = directory,
+        working_dir = directory,
+        session_id = "approval_crash_session",
+        agent_id = "approval_crash_agent"
+      )
+      restored$resume_approval(path, "approve")
+    },
+    args = list(
+      getNamespaceInfo(asNamespace("deputy"), "path"),
+      path,
+      directory,
+      receipt,
+      server$url,
+      abrupt
+    ),
+    libpath = .libPaths()
+  )
+  withr::defer(child$kill())
+  child$wait(timeout = 10000)
+  expect_false(child$is_alive())
+  if (!child$get_exit_status() %in% c(0L, -9L)) {
+    child$get_result()
+  }
+  expect_identical(child$get_exit_status(), if (abrupt) -9L else 0L)
+  expect_true(file.exists(receipt))
+  expect_identical(readLines(receipt), "b")
+  snapshot <- approval_read(path)
+  expect_identical(
+    snapshot$status,
+    if (abrupt) "executing" else "indeterminate"
+  )
+  expect_identical(snapshot$effects$call_b$status, "executing")
+  expect_true(snapshot$effects$call_b$executed)
+  expect_null(snapshot$effects$call_b$result)
+  expect_error(
+    agent$resume_approval(path, "approve"),
+    class = "deputy_approval_consumed"
+  )
+  expect_identical(readLines(receipt), "b")
+  expect_length(server$requests(), 1L)
+}
+
+test_that("graceful process exit during an effect leaves an indeterminate record", {
+  check_interrupted_approval()
+})
+
+test_that("abrupt process death preserves the executing journal and cannot replay", {
+  skip_on_os("windows")
+  check_interrupted_approval(abrupt = TRUE)
+})
+
+test_that("budget approval requires an explicit allowance bounded by the saved Agent ceiling", {
+  fixture <- local_approval_runtime(
+    responses = list(
+      approval_batch_reply("b"),
+      runtime_reply(text = "finished")
+    ),
+    agent_usage_limits = UsageLimits(max_tool_calls = 5),
+    run_usage_limits = UsageLimits(max_tool_calls = 0),
+    pause_on_b = FALSE
+  )
+  expect_identical(fixture$result$stop_reason, "approval_pending")
+  expect_identical(fixture$effects$values, character())
+  expect_equal(fixture$pending$usage$tool_calls, 1)
+  resumed <- fixture$make_agent()
+  expect_error(
+    resumed$resume_approval(fixture$path, "approve"),
+    class = "deputy_approval_budget_exhausted"
+  )
+  expect_identical(approval_read(fixture$path)$status, "pending")
+  expect_length(fixture$server$requests(), 1L)
+  result <- resumed$resume_approval(
+    fixture$path,
+    "approve",
+    usage_limits = UsageLimits(max_tool_calls = 2)
+  )
+  expect_identical(trimws(result$response), "finished")
+  expect_identical(fixture$effects$values, "b")
+  expect_equal(result$usage$tool_calls, 1)
+  snapshot <- approval_read(fixture$path)
+  expect_equal(snapshot$usage$tool_calls, 1)
+  expect_equal(snapshot$usage_limits$max_tool_calls, 2)
+
+  wider <- local_approval_runtime(
+    responses = list(
+      approval_batch_reply("b"),
+      runtime_reply(text = "finished")
+    ),
+    agent_usage_limits = UsageLimits(max_tool_calls = 5),
+    run_usage_limits = UsageLimits(max_tool_calls = 0),
+    pause_on_b = FALSE
+  )
+  wider$make_agent()$resume_approval(
+    wider$path,
+    "approve",
+    usage_limits = UsageLimits(max_tool_calls = 99)
+  )
+  expect_equal(approval_read(wider$path)$usage_limits$max_tool_calls, 5)
+  expect_identical(wider$effects$values, "b")
+})
+
+test_that("denials remain effective across subsequent approval continuations", {
+  fixture <- local_approval_runtime(
+    responses = list(
+      approval_batch_reply(),
+      approval_batch_reply("d"),
+      approval_batch_reply("b", id_prefix = "retry_"),
+      runtime_reply(text = "finished")
+    )
+  )
+  policy <- Permissions(can_use_tool = function(
+    tool_name,
+    tool_input,
+    context
+  ) {
+    PermissionResultPending("Review this next operation")
+  })
+  first <- fixture$make_agent(permissions = policy)
+  result <- first$resume_approval(fixture$path, "deny")
+  expect_identical(result$stop_reason, "approval_pending")
+  next_pending <- first$pending_approval()
+  expect_identical(next_pending$request$tool_input, list(value = "d"))
+  expect_identical(fixture$effects$values, "a")
+  next_agent <- fixture$make_agent(permissions = policy)
+  expect_warning(
+    completed <- next_agent$resume_approval(
+      next_pending$source$path,
+      "approve"
+    ),
+    "already executed or denied"
+  )
+  expect_identical(trimws(completed$response), "finished")
+  expect_identical(fixture$effects$values, c("a", "d"))
+  expect_match(
+    tail(approval_wire_results(fixture$server$requests()[[4L]]), 1L)[[
+      1L
+    ]]$content,
+    "already executed or denied"
+  )
+})
+
+test_that("approval inspection is read-only and edited inputs must be finite JSON", {
+  fixture <- local_approval_runtime()
+  snapshot <- approval_read(fixture$path)
+  expect_error(snapshot@status <- "completed", "read.only|read only")
+  expect_identical(snapshot$request$tool_call_id, "call_b")
+  expect_true(snapshot$permissions$callback_required)
+  expect_s7_class(snapshot$budget_ceiling, UsageLimits)
+  for (value in list(NA_character_, Inf, function() NULL, new.env())) {
+    expect_error(
+      fixture$make_agent()$resume_approval(
+        fixture$path,
+        "approve",
+        tool_input = list(value = value)
+      ),
+      class = "deputy_approval_error"
+    )
+    expect_identical(approval_read(fixture$path)$status, "pending")
+  }
+  expect_identical(fixture$effects$values, "a")
+  expect_length(fixture$server$requests(), 1L)
+})
+
+test_that("resumed approvals retain current host context and current hook denials", {
+  fixture <- local_approval_runtime()
+  seen <- new.env(parent = emptyenv())
+  seen$context <- NULL
+  seen$hook <- FALSE
+  resumed <- Agent$new(
+    chat = runtime_chat(fixture$server),
+    tools = list(fixture$tool),
+    permissions = Permissions(can_use_tool = function(
+      tool_name,
+      tool_input,
+      context
+    ) {
+      seen$context <- context$run_context
+      PermissionResultAllow()
+    }),
+    approval_dir = dirname(fixture$path),
+    working_dir = dirname(fixture$path),
+    session_id = "approval_session",
+    agent_id = "approval_agent",
+    run_context = list(host_marker = "current")
+  )
+  resumed$add_hook(HookMatcher(event = "PreToolUse", callback = function(...) {
+    seen$hook <- TRUE
+    HookResultPreToolUse(permission = "deny", reason = "Current hook refuses")
+  }))
+  resumed$resume_approval(fixture$path, "approve")
+  expect_identical(seen$context$host_marker, "current")
+  expect_true(seen$hook)
+  expect_identical(fixture$effects$values, "a")
+  result <- approval_wire_results(fixture$server$requests()[[2L]])[[2L]]
+  expect_identical(result$tool_call_id, "call_b")
+  expect_match(result$content, "Current hook refuses")
+})

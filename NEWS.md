@@ -1,5 +1,12 @@
 # deputy (development version)
 
+* `PermissionResultPending()` suspends raw-argument tool calls in Agents with
+  an `approval_dir`. `approval_read()` inspects the durable state and
+  `Agent$resume_approval()` consumes an approval, denial, edited input, or
+  explicit budget decision under saved and current authority. Completed
+  effects are journaled and interrupted executions require host reconciliation.
+  The host owns conversation associations and private storage (#43).
+
 * Hook and permission result constructors now return read-only S7 values.
   Use `S7::S7_inherits()` for concrete or family membership and `S7::props()`
   for plain records. Continuation/interruption flags and text are validated;
