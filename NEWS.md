@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* `McpConnection` binds an independent MCP client worker to one Agent and
+  session. Hosts can inspect catalogue pages and explicitly allow tools,
+  resource URIs and prompts. Calls return promises; cancellation, timeout and
+  closure invalidate the connection's tools. This temporary adapter is
+  qualified for mcptools 1.0.2 while public client APIs are developed (#48, #99).
+
 * `PermissionResultPending()` suspends raw-argument tool calls in Agents with
   an `approval_dir`. `approval_read()` inspects the durable state and
   `Agent$resume_approval()` consumes an approval, denial, edited input, or

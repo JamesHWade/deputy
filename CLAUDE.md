@@ -312,6 +312,13 @@ test_that("descriptive test name", {
 
 ## Architecture
 
+`McpConnection` is the temporary mcptools 1.0.2 client integration for independent
+host-owned connections and resource/prompt access. Its isolated R process owns
+only the mcptools registry, not an interpreter or transport implementation.
+Admission lists and Agent/session/run-context ownership are fixed. Discovery
+does not authorize access. Read `dev/mcp-client-contract.md` before changing the
+bridge or making lifecycle claims. #99 remains the public-API replacement work.
+
 ### Core Flow
 
 1. **Agent** wraps an ellmer Chat object

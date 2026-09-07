@@ -276,6 +276,52 @@ old connection, its invalidated handles are removed even when discovery or
 registration fails. Malformed metadata never silently becomes an unannotated
 executable.
 
+### Connections owned by a conversation
+
+Use `McpConnection` when a host needs independent connections, asynchronous
+calls, or resource and prompt access. Create the Agent first, then allow exact
+items from one configured server:
+
+```{r, eval = FALSE}
+agent <- Agent$new(chat = ellmer::chat("openai/gpt-5.6-luna"))
+connection <- McpConnection$new(
+  config = "~/.config/mcptools/config.json",
+  server = "evidence",
+  agent = agent,
+  tools = "inspect_evidence",
+  resources = "evidence://report/current",
+  prompts = "summarize"
+)
+agent$register_tools(c(connection$tools(), connection$capability_tools()))
+```
+
+The allowlists are fixed. `$discover("resources")` returns a promise for one
+catalogue page; its result may include a cursor for the next page. Discovery
+does not fetch resource contents, retrieve prompts, register tools or expand
+the Agent's permissions. Resource and prompt tools still require the Agent's
+web capability. The host can use `$get_prompt(name, arguments)` for prompts
+that require arguments; retrieving a prompt never inserts it into a Chat.
+
+Each connection has its own mcptools registry. Two conversations can therefore
+use the same configured server name without replacing each other's connection.
+Tools carry the connection ID into permission callbacks and hooks. They reject
+registration with a different Agent, session or run context. The host assigns
+those identities and remains responsible for authentication.
+
+Calls return promises and permit one active request per connection. Overlapping
+requests fail with a busy error; other connections and the host event loop can
+continue. Construction waits for startup. Call `$close()` when the conversation
+ends, for example from a Shiny session's end callback. `$cancel()` terminates
+the connection and discards its server session state. A timeout does the same;
+old tool handles never start a replacement connection implicitly.
+
+This is a temporary, version-checked mcptools 1.0.2 adapter. It uses upstream
+transport, authentication, tool conversion and shutdown with a small internal
+request bridge. Public replacements are requested in
+[mcptools #129](https://github.com/posit-dev/mcptools/issues/129),
+[#130](https://github.com/posit-dev/mcptools/issues/130), and
+[#109](https://github.com/posit-dev/mcptools/issues/109).
+
 ### Sandboxed R with mcp-repl
 
 Use `tools_mcp_repl()` when model-generated R needs an OS sandbox rather than

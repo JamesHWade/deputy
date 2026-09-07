@@ -1882,6 +1882,7 @@ Agent <- R6::R6Class(
       },
 
       adapt_tool = function(tool) {
+        validate_mcp_tool_owner(tool, self)
         if (inherits(tool, "ellmer::ToolBuiltIn")) {
           if (!is.null(private$.approval_dir)) {
             approval_abort(
