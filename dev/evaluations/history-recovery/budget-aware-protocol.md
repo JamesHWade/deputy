@@ -69,6 +69,12 @@ versus baseline history across all nine matched trials. Report completion and
 missing answers separately from the ten fixed answer checks. Missing answers
 receive zero in all-attempt mean scores, as in the original comparison; this is
 not a claim that the model asserted ten incorrect facts.
+An arm blocked before its first model request is undispatched, not an attempted
+continuation. Retain it in the raw evidence and report it separately from arms
+with no recorded row. Exclude undispatched arms from score and latency summaries
+and require both arms to have dispatched before computing a paired difference.
+If retrieval starts but final-answer dispatch is blocked, the continuation was
+attempted and its missing answer still receives zero.
 
 Also report individual matched scores and differences, summary-only scores,
 source grounding, exact export identification, attempted retrieval calls,

@@ -877,6 +877,8 @@ history_report <- function(evaluation) {
   arm <- function(row) paste(row$strategy, protocol(row), sep = "/")
   group <- function(row) paste(row$helper_model, arm(row), sep = "/")
   dispatched <- function(row) row$usage$requests > 0L
+  attempted <- Filter(dispatched, rows)
+  undispatched <- length(rows) - length(attempted)
   median_duration <- function(rows) {
     if (!length(rows)) {
       return("not observed")
@@ -905,8 +907,10 @@ history_report <- function(evaluation) {
     paste("Case:", evaluation$case_id),
     "",
     sprintf(
-      "Recorded %d continuations and %d governed requests. Cost: %s USD.",
+      "Recorded %d arms: %d attempted and %d undispatched. Governed requests: %d. Cost: %s USD.",
       length(rows),
+      length(attempted),
+      undispatched,
       evaluation$usage$requests,
       format(evaluation$usage$cost_usd)
     ),
@@ -914,28 +918,34 @@ history_report <- function(evaluation) {
       paste("Experiment stopped:", evaluation$failure$class)
     },
     "",
-    "A missing structured answer receives zero under the fixed scoring rule. Completion is reported separately from answer checks.",
+    "An attempted continuation with a missing structured answer receives zero under the fixed scoring rule. Undispatched arms are retained but excluded from scores, latency summaries and paired comparisons. Completion is reported separately from answer checks.",
     "",
-    "| Helper / strategy / protocol | Continuations | Dispatched | Answers | Mean score | Fully correct | Median completed seconds | Median incomplete seconds |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+    "| Helper / strategy / protocol | Recorded arms | Attempted | Undispatched | Answers | Mean attempted score | Fully correct | Median completed seconds | Median incomplete seconds |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
   )
   for (name in unique(vapply(rows, group, character(1)))) {
     selected <- Filter(function(row) identical(group(row), name), rows)
-    completed <- Filter(function(row) !is.null(row$answer), selected)
-    incomplete <- Filter(
-      function(row) is.null(row$answer) && dispatched(row),
-      selected
-    )
+    attempts <- Filter(dispatched, selected)
+    completed <- Filter(function(row) !is.null(row$answer), attempts)
+    incomplete <- Filter(function(row) is.null(row$answer), attempts)
     lines <- c(
       lines,
       sprintf(
-        "| %s | %d | %d | %d | %.3f | %d | %s | %s |",
+        "| %s | %d | %d | %d | %d | %s | %d | %s | %s |",
         name,
         length(selected),
-        sum(vapply(selected, dispatched, logical(1))),
+        length(attempts),
+        length(selected) - length(attempts),
         length(completed),
-        mean(vapply(selected, function(row) row$score$score, numeric(1))),
-        sum(vapply(selected, function(row) row$score$all_correct, logical(1))),
+        if (length(attempts)) {
+          sprintf(
+            "%.3f",
+            mean(vapply(attempts, function(row) row$score$score, numeric(1)))
+          )
+        } else {
+          "not observed"
+        },
+        sum(vapply(attempts, function(row) row$score$all_correct, logical(1))),
         median_duration(completed),
         median_duration(incomplete)
       )
@@ -957,7 +967,7 @@ history_report <- function(evaluation) {
       evaluation$runs
     )
     delta <- function(row, reference) {
-      if (is.null(reference)) {
+      if (!dispatched(row) || is.null(reference) || !dispatched(reference)) {
         "missing comparison"
       } else {
         format(row$score$score - reference$score$score)
@@ -997,24 +1007,28 @@ history_report <- function(evaluation) {
     lines,
     "",
     sprintf(
-      "Expected %d continuations; missing %d.",
+      "Expected %d continuations; attempted %d; missing %d (%d undispatched, %d not recorded).",
       expected,
+      length(attempted),
+      expected - length(attempted),
+      undispatched,
       expected - length(rows)
     ),
     "Shared preparation is counted once per trial, even when displayed beside multiple comparisons.",
     "",
-    "| Trial | Strategy / protocol | Answer | Score | Requests | Tool requests | Tokens | USD | Seconds | Stop reason |",
-    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+    "| Trial | Strategy / protocol | Dispatched | Answer | Score | Requests | Tool requests | Tokens | USD | Seconds | Stop reason |",
+    "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
   )
   for (row in rows) {
     lines <- c(
       lines,
       sprintf(
-        "| %s | %s | %s | %.3f | %d | %d | %s | %s | %.2f | %s |",
+        "| %s | %s | %s | %s | %s | %d | %d | %s | %s | %.2f | %s |",
         row$trial_id,
         arm(row),
+        dispatched(row),
         if (is.null(row$answer)) "missing" else "present",
-        row$score$score,
+        if (dispatched(row)) sprintf("%.3f", row$score$score) else "not scored",
         row$usage$requests,
         row$usage$tool_calls,
         format(row$usage$total_tokens),
@@ -1038,7 +1052,13 @@ history_report <- function(evaluation) {
         "| %s | %s | %s | %d | %d | %d | %d | %d | %d | %d |",
         row$trial_id,
         arm(row),
-        if (length(failed)) paste(failed, collapse = ", ") else "none",
+        if (!dispatched(row)) {
+          "not evaluated"
+        } else if (length(failed)) {
+          paste(failed, collapse = ", ")
+        } else {
+          "none"
+        },
         row$history_usage$calls,
         payloads(row, "search"),
         payloads(row, "read"),

@@ -1138,6 +1138,31 @@ test_that("a blocked final dispatch retains an explicit incomplete continuation"
   expect_identical(row$phase_runs[[2L]]$dispatched, FALSE)
   expect_length(server$requests(), 2L)
   expect_identical(row$usage$requests, 2L)
+  expect_true(row$attempted)
+})
+
+test_that("cancellation before the first request retains an undispatched arm", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  server <- local_runtime_server(list())
+  row <- example$history_continue(
+    fixture,
+    list(
+      system_prompt = "Read-only host policy.",
+      turns = list(),
+      summary_id = "fixture"
+    ),
+    runtime_chat(server),
+    example$history_budget(cancelled = function() TRUE),
+    "cancelled-start",
+    "summary"
+  )
+  expect_false(row$attempted)
+  expect_identical(row$usage$requests, 0L)
+  expect_null(row$answer)
+  expect_identical(row$stop_reason, "history_evaluation_cancelled")
+  expect_identical(row$phase_runs[[1L]]$dispatched, FALSE)
+  expect_length(server$requests(), 0L)
 })
 
 test_that("an oversized provider batch cannot consume the reserved answer phase", {
@@ -1281,7 +1306,7 @@ test_that("history reporting separates completion latency and source payloads", 
   report <- paste(example$history_report(evaluation), collapse = "\n")
   expect_match(
     report,
-    "| fixture/history/budget-aware | 2 | 2 | 1 | 0.500 | 1 | 8.00 | 0.20 |",
+    "| fixture/history/budget-aware | 2 | 2 | 0 | 1 | 0.500 | 1 | 8.00 | 0.20 |",
     fixed = TRUE
   )
   expect_match(
@@ -1289,5 +1314,68 @@ test_that("history reporting separates completion latency and source payloads", 
     "| fixture/1 | history/budget-aware | none | 3 | 0 | 1 | 220 | 0 | 2 | 1 |",
     fixed = TRUE
   )
-  expect_match(report, "Expected 2 continuations; missing 0.", fixed = TRUE)
+  expect_match(
+    report,
+    "Expected 2 continuations; attempted 2; missing 0 (0 undispatched, 0 not recorded).",
+    fixed = TRUE
+  )
+
+  never <- incomplete
+  never$trial_id <- "fixture/3"
+  never$attempted <- FALSE
+  never$usage$requests <- 0L
+  never$duration_seconds <- 0
+  never$stop_reason <- "history_evaluation_cancelled"
+  blocked_reference <- never
+  blocked_reference$trial_id <- row$trial_id
+  blocked_reference$strategy <- "summary"
+  blocked_reference$protocol <- "baseline"
+  blocked_baseline <- never
+  blocked_baseline$trial_id <- incomplete$trial_id
+  blocked_baseline$protocol <- "baseline"
+  started_reference <- row
+  started_reference$trial_id <- incomplete$trial_id
+  started_reference$strategy <- "summary"
+  started_reference$protocol <- "baseline"
+  evaluation$trials <- list(
+    row,
+    incomplete,
+    never,
+    blocked_reference,
+    blocked_baseline,
+    started_reference
+  )
+  evaluation$configuration$trials <- 3L
+  evaluation$configuration$continuation_arms <- 3L
+  partial <- paste(example$history_report(evaluation), collapse = "\n")
+  expect_match(
+    partial,
+    "| fixture/history/budget-aware | 3 | 2 | 1 | 1 | 0.500 | 1 | 8.00 | 0.20 |",
+    fixed = TRUE
+  )
+  expect_match(
+    partial,
+    "| fixture/history/baseline | 1 | 0 | 1 | 0 | not observed | 0 | not observed | not observed |",
+    fixed = TRUE
+  )
+  expect_match(
+    partial,
+    "| fixture/1 | budget-aware | missing comparison | missing comparison |",
+    fixed = TRUE
+  )
+  expect_match(
+    partial,
+    "| fixture/2 | baseline | missing comparison | missing comparison |",
+    fixed = TRUE
+  )
+  expect_match(
+    partial,
+    "| fixture/3 | history/budget-aware | FALSE | missing | not scored | 0 |",
+    fixed = TRUE
+  )
+  expect_match(
+    partial,
+    "Expected 9 continuations; attempted 3; missing 6 (3 undispatched, 3 not recorded).",
+    fixed = TRUE
+  )
 })
