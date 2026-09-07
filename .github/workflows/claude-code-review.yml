@@ -80,7 +80,9 @@ jobs:
             closed, trivial, or already-reviewed. Do not post a completion marker
             or claim this run reviewed the current head when it intentionally skips.
             Use the upstream plugin via Skill(code-review:code-review), including its
-            review agents. Use gh pr view/diff and Read/Glob/Grep for inspection;
+            review agents. Run agent calls synchronously (parallel calls are fine);
+            do not use run_in_background. Wait for their returned review results.
+            Use gh pr view/diff and Read/Glob/Grep for inspection;
             gh api and arbitrary shell commands are not enabled. A complete diff is
             already available at ${{ runner.temp }}/deputy-review-input/diff; use Read to
             inspect it. Tell every review agent this path and tool policy. Do not

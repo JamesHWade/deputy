@@ -11,8 +11,11 @@ const findingMarker = "[Review run](https://github.com/example/deputy/actions/ru
 const comment = (outcome) => ({ user: { login: 'github-actions[bot]' },
   created_at: '2026-09-06T12:01:00Z', body: `${marker}:${outcome} -->` });
 const context = () => ({ diagnostic: diagnostics([{ type: 'assistant', message: { content: [
-  { type: 'tool_use', name: 'Skill', input: { skill: 'code-review:code-review', args: 'example/deputy/pull/131 --comment' } },
-  { type: 'tool_use', name: 'Agent', input: { prompt: 'Review the current PR diff' } },
+  { type: 'tool_use', id: 'skill-1', name: 'Skill', input: { skill: 'code-review:code-review', args: 'example/deputy/pull/131 --comment' } },
+  { type: 'tool_use', id: 'agent-1', name: 'Agent', input: { prompt: 'Review the current PR diff' } },
+] } }, { type: 'user', message: { content: [
+  { type: 'tool_result', tool_use_id: 'skill-1', content: 'Plugin instructions' },
+  { type: 'tool_result', tool_use_id: 'agent-1', content: 'Review result' },
 ] } }, { type: 'result', subtype: 'success',
   is_error: false, permission_denials: [] }]), sha, currentSha: sha, comments: [], inline: [],
   marker, findingMarker, started: '2026-09-06T12:00:00Z', actionOutcome: 'success' });
@@ -23,7 +26,7 @@ test('SDK success alone cannot claim a clean review', () => {
 });
 
 test('upstream skips remain distinct from current-head completion', () => {
-  const diagnostic = { ...context().diagnostic, plugin_calls: 1, review_agent_calls: 0,
+  const diagnostic = { ...context().diagnostic, plugin_calls: 1, review_agent_calls: 0, review_agent_successes: 0,
     reported_outcome: 'skipped', reported_reason: 'already-reviewed' };
   const priorReview = { ...comment('without-findings'), created_at: '2026-09-05T12:00:00Z',
     body: `<!-- deputy-claude-review:${'b'.repeat(40)}:122:1:without-findings -->` };
@@ -100,6 +103,8 @@ test('clean and findings outcomes require current-run bot evidence', () => {
   assert.equal(classify({ ...clean, diagnostic: { ...clean.diagnostic, plugin_calls: 0 } }).outcome, 'blocked/failed');
   assert.equal(classify({ ...clean, diagnostic: { ...clean.diagnostic, plugin_comment_argument_seen: false } }).outcome, 'blocked/failed');
   assert.equal(classify({ ...clean, diagnostic: { ...clean.diagnostic, review_agent_calls: 0 } }).outcome, 'blocked/failed');
+  assert.equal(classify({ ...clean, diagnostic: { ...clean.diagnostic, review_agent_successes: 0 } }).outcome, 'blocked/failed');
+  assert.equal(classify({ ...clean, diagnostic: { ...clean.diagnostic, plugin_successes: 0 } }).outcome, 'blocked/failed');
   assert.equal(classify({ ...clean, comments: [{ ...clean.comments[0], created_at: '2026-09-06T11:59:58Z' }] }).outcome, 'completed without findings');
   const findings = { ...context(), comments: [comment('with-findings')],
     inline: [{ ...comment('finding'), body: findingMarker, commit_id: sha }] };
@@ -121,8 +126,11 @@ test('clean and findings outcomes require current-run bot evidence', () => {
 test('diagnostics never emit free-form names, command arguments, or SDK text', () => {
   const secret = 'CANARY_PRIVATE_VALUE';
   const diagnostic = diagnostics([{ type: 'assistant', message: { content: [
-    { type: 'tool_use', name: 'Skill', input: { skill: 'code-review:code-review', args: `${secret} --comment` } },
-    { type: 'tool_use', name: 'Agent', input: { prompt: secret } },
+    { type: 'tool_use', id: 'skill-1', name: 'Skill', input: { skill: 'code-review:code-review', args: `${secret} --comment` } },
+    { type: 'tool_use', id: 'agent-1', name: 'Agent', input: { prompt: secret } },
+  ] } }, { type: 'user', message: { content: [
+    { type: 'tool_result', tool_use_id: 'skill-1', content: secret },
+    { type: 'tool_result', tool_use_id: 'agent-1', content: secret },
   ] } }, { type: 'result', subtype: 'success', is_error: false,
     result: secret, structured_output: { outcome: secret, reason: secret }, permission_denials: [
       { tool_name: 'Bash', tool_input: { command: `gh pr comment 123 --body ${secret} | head -10 > ${secret}` } },
@@ -132,9 +140,39 @@ test('diagnostics never emit free-form names, command arguments, or SDK text', (
     ] }]);
   assert.equal(JSON.stringify(diagnostic).includes(secret), false);
   assert.equal(diagnostic.plugin_calls, 1);
+  assert.equal(diagnostic.plugin_successes, 1);
   assert.equal(diagnostic.plugin_comment_argument_seen, true);
   assert.equal(diagnostic.review_agent_calls, 1);
+  assert.equal(diagnostic.review_agent_successes, 1);
   assert.deepEqual(diagnostic.denied_operations, ['Bash(gh pr comment)', 'Bash(head)', 'Bash(other-command)', 'Bash(shell-redirection)', 'Skill(other-skill)', 'other-tool']);
   assert.equal(classify({ ...context(), diagnostic }).outcome, 'blocked/failed');
   assert.equal(classify({ ...context(), diagnostic, comments: [comment('without-findings')] }).outcome, 'completed without findings');
+});
+
+test('denied and failed tool attempts do not count as upstream execution', () => {
+  for (const name of ['Skill', 'Agent', 'Task']) {
+    const call = { type: 'tool_use', id: 'attempt-1', name,
+      input: name === 'Skill' ? { skill: 'code-review:code-review', args: '--comment' } : {} };
+    const attempt = [{ type: 'assistant', message: { content: [call] } }];
+    const successResult = { type: 'result', subtype: 'success', is_error: false, permission_denials: [] };
+    const failed = { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: call.id, is_error: true }] } };
+    const successful = { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: call.id, is_error: false }] } };
+    for (const messages of [
+      [...attempt, successResult], [...attempt, failed, successResult],
+      [...attempt, successful, { ...successResult, permission_denials: [{ tool_name: name, tool_use_id: call.id }] }],
+    ]) {
+      const diagnostic = diagnostics(messages);
+      assert.equal(diagnostic.plugin_successes, 0);
+      assert.equal(diagnostic.review_agent_successes, 0);
+      assert.equal(diagnostic.plugin_comment_argument_seen, false);
+    }
+    const diagnostic = diagnostics([...attempt, successful, successResult]);
+    assert.equal(name === 'Skill' ? diagnostic.plugin_successes : diagnostic.review_agent_successes, 1);
+    if (name !== 'Skill') {
+      const background = diagnostics([{ type: 'assistant', message: { content: [
+        { ...call, input: { run_in_background: true } },
+      ] } }, successful, successResult]);
+      assert.equal(background.review_agent_successes, 0);
+    }
+  }
 });

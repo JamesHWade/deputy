@@ -22,11 +22,20 @@ function diagnostics(messages) {
   const denials = Array.isArray(result?.permission_denials) ? result.permission_denials : [];
   const calls = Array.isArray(messages) ? messages.flatMap((message) => message.type === 'assistant' && Array.isArray(message.message?.content)
     ? message.message.content.filter((item) => item.type === 'tool_use') : []) : [];
+  const deniedIds = new Set(denials.map((denial) => denial.tool_use_id));
+  const completedIds = new Set(Array.isArray(messages) ? messages.flatMap((message) => message.type === 'user' && Array.isArray(message.message?.content)
+    ? message.message.content.filter((item) => item.type === 'tool_result' && item.is_error !== true && !deniedIds.has(item.tool_use_id)).map((item) => item.tool_use_id) : []) : []);
   const pluginCalls = calls.filter((call) => call.name === 'Skill' && call.input?.skill === 'code-review:code-review');
+  const successfulPlugins = pluginCalls.filter((call) => typeof call.id === 'string' && completedIds.has(call.id));
+  const agentCalls = calls.filter((call) => ['Agent', 'Task'].includes(call.name));
   return {
     plugin_calls: pluginCalls.length,
-    plugin_comment_argument_seen: pluginCalls.some((call) => typeof call.input?.args === 'string' && /(?:^|\s)--comment(?:\s|$)/.test(call.input.args)),
-    review_agent_calls: calls.filter((call) => ['Agent', 'Task'].includes(call.name)).length,
+    plugin_successes: successfulPlugins.length,
+    plugin_comment_argument_seen: successfulPlugins.some((call) => typeof call.input?.args === 'string' && /(?:^|\s)--comment(?:\s|$)/.test(call.input.args)),
+    review_agent_calls: agentCalls.length,
+    // A background launch acknowledgment does not prove that the agent finished.
+    review_agent_successes: agentCalls.filter((call) => call.input?.run_in_background !== true &&
+      typeof call.id === 'string' && completedIds.has(call.id)).length,
     sdk_success: result?.subtype === 'success' && result?.is_error === false,
     reported_outcome: reportedOutcomes.has(result?.structured_output?.outcome) ? result.structured_output.outcome : 'unreported',
     reported_reason: reportedReasons.has(result?.structured_output?.reason) ? result.structured_output.reason : 'unreported',
@@ -63,7 +72,7 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, findi
   const blocked = (reason) => ({ outcome: 'blocked/failed', reason });
   if (sha !== currentSha) return blocked('PR head changed during review');
   if (actionOutcome !== 'success' || !diagnostic.sdk_success) return blocked('Claude did not complete successfully');
-  if (!diagnostic.plugin_calls || !diagnostic.plugin_comment_argument_seen) {
+  if (!diagnostic.plugin_calls || !diagnostic.plugin_successes || !diagnostic.plugin_comment_argument_seen) {
     return blocked('Upstream review plugin was not invoked with --comment');
   }
   const fresh = (comment) => comment.user?.login === 'github-actions[bot]' &&
@@ -73,7 +82,7 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, findi
     comment.body?.includes(findingMarker));
   const withFindings = summaries.some((comment) => comment.body?.includes(`${marker}:with-findings -->`));
   const withoutFindings = summaries.some((comment) => comment.body?.includes(`${marker}:without-findings -->`));
-  if ((withFindings || withoutFindings) && !diagnostic.review_agent_calls) {
+  if ((withFindings || withoutFindings) && (!diagnostic.review_agent_calls || !diagnostic.review_agent_successes)) {
     return blocked('Upstream review agents did not run');
   }
   if (withFindings && !withoutFindings && findings.length) {

@@ -655,9 +655,11 @@ also require exact-commit inline comments linking the same workflow run and atte
 fails the review job; recovered tool denials remain visible diagnostics when
 completion is verified. Cancelled runs remain cancelled. The only uploaded diagnostic is `claude-review-outcome.json`: fixed
 outcome/reason values, the target SHA, a denial count, allowlisted operation
-names, plugin/agent invocation counts, whether the plugin received `--comment`,
+names, plugin/agent attempt and success counts, whether the successful plugin received `--comment`,
 and the reviewer's enum-only outcome/reason report. The report never substitutes
 for verified completion evidence. Never upload the raw SDK execution file or enable full-output logging.
+Completed outcomes require a successful plugin invocation with `--comment` and
+agent execution, matched to non-error SDK tool results and excluding denied calls.
 The verifier is copied out of the model workspace before review and its digest is
 checked before execution. This protects against model-workspace changes; it is not
 an immutable security boundary against repository writers, who can also edit the
