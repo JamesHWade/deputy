@@ -10,7 +10,7 @@ const commands = [
   'gh pr view', 'gh pr diff', 'gh pr list', 'gh pr comment',
   'gh issue view', 'gh issue list', 'gh search', 'gh api',
   'git diff', 'git show', 'git log', 'git rev-parse',
-  'cat', 'ls', 'find', 'sed', 'head', 'tail', 'wc', 'rg', 'grep', 'pwd',
+  'cat', 'ls', 'find', 'sed', 'head', 'tail', 'wc', 'rg', 'grep', 'pwd', 'cd', 'echo', 'printf',
 ];
 
 function diagnostics(messages) {
@@ -20,15 +20,21 @@ function diagnostics(messages) {
   return {
     sdk_success: result?.subtype === 'success' && result?.is_error === false,
     permission_denials_count: denials.length,
-    denied_operations: [...new Set(denials.map((denial) => {
+    denied_operations: [...new Set(denials.flatMap((denial) => {
       const tool = knownTools.has(denial.tool_name) ? denial.tool_name : 'other-tool';
       if (tool === 'Skill') return denial.tool_input?.skill === 'code-review:code-review'
         ? 'Skill(code-review:code-review)' : 'Skill(other-skill)';
       if (tool !== 'Bash') return tool;
       const command = denial.tool_input?.command;
-      const prefix = typeof command === 'string' && commands.find((candidate) =>
-        command === candidate || command.startsWith(candidate + ' '));
-      return prefix ? `Bash(${prefix})` : 'Bash(other-command)';
+      if (typeof command !== 'string') return ['Bash(other-command)'];
+      // This is a safe diagnostic projection, not a shell parser or permission rule.
+      const operations = command.split(/&&|\|\||[;|]/).slice(0, 8).map((part) => {
+        const text = part.trim();
+        const prefix = commands.find((candidate) => text === candidate || text.startsWith(candidate + ' '));
+        return prefix ? `Bash(${prefix})` : 'Bash(other-command)';
+      });
+      if (/[<>]/.test(command)) operations.push('Bash(shell-redirection)');
+      return operations;
     }))].sort(),
   };
 }
@@ -39,7 +45,7 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, start
   if (actionOutcome !== 'success' || !diagnostic.sdk_success) return blocked('Claude did not complete successfully');
   if (diagnostic.permission_denials_count) return blocked('Claude tool permission denied');
   const fresh = (comment) => comment.user?.login === 'github-actions[bot]' &&
-    Date.parse(comment.created_at) >= Date.parse(started);
+    Date.parse(comment.created_at) >= Date.parse(started) - 5000;
   const summaries = comments.filter(fresh);
   const findings = inline.filter((comment) => fresh(comment) && comment.commit_id === sha &&
     comment.body?.includes(`${marker}:finding -->`));
@@ -59,10 +65,11 @@ async function main() {
   const sha = env.REVIEW_SHA;
   if (!/^[a-f0-9]{40}$/.test(sha || '')) throw new Error('Invalid review SHA');
   let diagnostic = diagnostics([]);
-  let result = { outcome: 'blocked/failed', reason: 'Review evidence unavailable' };
+  let result = { outcome: 'blocked/failed', reason: 'Claude execution evidence unavailable' };
   try {
     const execution = env.EXECUTION_FILE || `${env.RUNNER_TEMP}/claude-execution-output.json`;
     diagnostic = diagnostics(JSON.parse(fs.readFileSync(execution, 'utf8')));
+    result.reason = 'GitHub review evidence unavailable';
     async function get(path) {
       const response = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/${path}`, {
         headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: 'application/vnd.github+json' },

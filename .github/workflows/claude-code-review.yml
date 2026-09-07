@@ -32,7 +32,11 @@ jobs:
 
       - name: Freeze verifier and record review start
         id: start
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > "$RUNNER_TEMP/deputy-review.diff"
           install -m 0444 .github/scripts/claude-review-outcome.cjs "$RUNNER_TEMP/claude-review-verifier.cjs"
           echo "digest=$(sha256sum "$RUNNER_TEMP/claude-review-verifier.cjs" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
           echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
@@ -52,13 +56,18 @@ jobs:
           show_full_output: false
           display_report: false
           prompt: |
-            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment
+            Invoke the installed code-review:code-review Skill for
+            ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+            with the --comment argument. Follow that upstream review procedure.
 
             Review exactly commit ${{ github.event.pull_request.head.sha }}.
             Prior Claude comments on older commits do not satisfy this review.
             Use the upstream plugin via Skill(code-review:code-review), including its
             review agents. Use gh pr view/diff and Read/Glob/Grep for inspection;
-            gh api and arbitrary shell commands are not enabled.
+            gh api and arbitrary shell commands are not enabled. A complete diff is
+            already available at ${{ runner.temp }}/deputy-review.diff; use Read to
+            inspect it. Tell every review agent this path and tool policy. Do not
+            use shell pipes, redirection, or shell commands to read or buffer files.
             Every inline finding must include this provenance marker in its body:
             <!-- deputy-claude-review:${{ github.event.pull_request.head.sha }}:${{ github.run_id }}:${{ github.run_attempt }}:finding -->
             After the upstream plugin completes, post a summary with gh pr comment.
