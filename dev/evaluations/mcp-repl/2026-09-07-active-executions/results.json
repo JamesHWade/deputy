@@ -1,0 +1,241 @@
+{
+  "source_commit": "dda9add596d3bab2cc8606b23b8b1bc9adc8ce7f",
+  "assertions": 171,
+  "failed": 0,
+  "errors": 0,
+  "warnings": 0,
+  "skipped": 0,
+  "tests": [
+    {
+      "file": "test-api.R",
+      "test": "public API is deliberate",
+      "nb": 1,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 1,
+      "real": 0.011
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "independent connections preserve exact selection, state and ownership",
+      "nb": 13,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 13,
+      "real": 4.891
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "catalogue discovery does not authorize resource or prompt access",
+      "nb": 26,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 26,
+      "real": 3.314
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "active calls keep the host responsive and cancellation invalidates handles",
+      "nb": 8,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 8,
+      "real": 0.882
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "request timeout discards the session instead of silently reconnecting",
+      "nb": 4,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 4,
+      "real": 1.106
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "connection validation fails before starting an unselected server",
+      "nb": 5,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 5,
+      "real": 1.115
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "resource tools traverse Agent permission and hook boundaries",
+      "nb": 7,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 7,
+      "real": 3.035
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "server exit is reported as state loss and old handles stay invalid",
+      "nb": 3,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 3,
+      "real": 5.695
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "resource-only and prompt-only servers need no tool catalogue",
+      "nb": 12,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 12,
+      "real": 2.463
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "host tool calls bind caller values and omit unsupplied arguments",
+      "nb": 4,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 4,
+      "real": 2.595
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "an intermediate startup condition does not replace initialization results",
+      "nb": 3,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 3,
+      "real": 1.536
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "intermediate worker conditions do not settle or desynchronize requests",
+      "nb": 6,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 6,
+      "real": 1.601
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "one Agent can register resource and prompt tools from two connections",
+      "nb": 10,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 10,
+      "real": 3.234
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "a clone cannot dispatch after loading a different owner context",
+      "nb": 3,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 3,
+      "real": 1.596
+    },
+    {
+      "file": "test-mcp-connection.R",
+      "test": "a run context override cannot dispatch through another owner binding",
+      "nb": 3,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 3,
+      "real": 2.099
+    },
+    {
+      "file": "test-mcp-repl-lifecycle.R",
+      "test": "sandbox mode overrides cannot bypass the selected policy",
+      "nb": 6,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 6,
+      "real": 0.119
+    },
+    {
+      "file": "test-mcp-repl-lifecycle.R",
+      "test": "Agent interruption terminates its active owned MCP request",
+      "nb": 5,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 5,
+      "real": 1.518
+    },
+    {
+      "file": "test-mcp-repl-lifecycle.R",
+      "test": "registry changes cannot detach an active MCP call from interruption",
+      "nb": 12,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 12,
+      "real": 2.095
+    },
+    {
+      "file": "test-mcp-repl-lifecycle.R",
+      "test": "clones do not retain the original Agent's pending executions",
+      "nb": 7,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 7,
+      "real": 5.68000000000001
+    },
+    {
+      "file": "test-mcp-repl-lifecycle.R",
+      "test": "interruption cannot cancel MCP requests owned by a different context",
+      "nb": 14,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 14,
+      "real": 8.01199999999999
+    },
+    {
+      "file": "test-mcp-repl-lifecycle.R",
+      "test": "released mcp-repl preserves state, content, isolation and explicit controls",
+      "nb": 19,
+      "failed": 0,
+      "error": false,
+      "warning": 0,
+      "skipped": false,
+      "passed": 19,
+      "real": 17.035
+    }
+  ]
+}

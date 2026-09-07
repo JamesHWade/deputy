@@ -1,0 +1,10 @@
+api: .
+mcp-connection: .....................................................................................................v Session saved to '/var/folders/98/rmspnd9s3zj36ncllv0x3n8w0000gn/T//RtmpegCIwX/file10c612f6cd24d.rds'
+v Session loaded from '/var/folders/98/rmspnd9s3zj36ncllv0x3n8w0000gn/T//RtmpegCIwX/file10c612f6cd24d.rds'
+......
+mcp-repl-lifecycle: ..............................v Session saved to '/var/folders/98/rmspnd9s3zj36ncllv0x3n8w0000gn/T//RtmpegCIwX/file10c615ad1f17a.rds'
+v Session loaded from '/var/folders/98/rmspnd9s3zj36ncllv0x3n8w0000gn/T//RtmpegCIwX/file10c615ad1f17a.rds'
+.................................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+Qualified assertions: 171 Source: dda9add596d3bab2cc8606b23b8b1bc9adc8ce7f 
