@@ -82,6 +82,11 @@ A new host edit is rechecked before execution. A changed pending gate produces a
 new approval; the previous record points to it. No approval grants future model
 operations automatically.
 
+Offloading an approved result can install Deputy's session result reader after
+suspension. Its reserved name and private producer marker admit that reader into
+the saved registry; its fingerprint and the current permission gates still apply.
+This exception does not admit newly registered application tools.
+
 `completed` and `stopped` record terminal outcomes. A journal entry left in
 `executing`, or an interrupted `resuming` / `continuing` state, cannot retry.
 Finalization labels unresolved executing entries `indeterminate`. The host must

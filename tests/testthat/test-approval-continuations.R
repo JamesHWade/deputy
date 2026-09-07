@@ -270,6 +270,111 @@ test_that("session metadata cannot conceal runtime objects in attributes", {
   }
 })
 
+test_that("approved large outputs can install and use the session result reader", {
+  directory <- withr::local_tempdir()
+  offload_directory <- withr::local_tempdir()
+  respond <- local({
+    first <- approval_batch_reply("b")
+    second <- runtime_reply(
+      tool = "deputy_read_tool_result",
+      arguments = list(
+        reference = "RESULT_REFERENCE",
+        offset = 0,
+        max_chars = 100
+      )
+    )
+    final <- runtime_reply(text = "finished reading")
+    function(request, count) {
+      if (count == 1L) {
+        return(first)
+      }
+      if (count == 2L) {
+        results <- Filter(
+          function(x) identical(x$role, "tool"),
+          request$messages
+        )
+        lines <- strsplit(results[[1L]]$content, "\n", fixed = TRUE)[[1L]]
+        reference <- sub(
+          "^reference: ",
+          "",
+          lines[startsWith(lines, "reference: ")][[1L]]
+        )
+        second$body <- gsub(
+          "RESULT_REFERENCE",
+          reference,
+          second$body,
+          fixed = TRUE
+        )
+        return(second)
+      }
+      final
+    }
+  })
+  server <- local_runtime_server(respond)
+  effects <- new.env(parent = emptyenv())
+  effects$count <- 0L
+  payload <- paste(rep("approved output receipt", 4000), collapse = "\n")
+  tool <- ellmer::tool(
+    function(value) {
+      effects$count <- effects$count + 1L
+      payload
+    },
+    name = "effect",
+    description = "Return the large approved output",
+    arguments = list(value = ellmer::type_string()),
+    convert = FALSE,
+    annotations = ellmer::tool_annotations(
+      read_only_hint = FALSE,
+      destructive_hint = FALSE,
+      open_world_hint = FALSE
+    )
+  )
+  make_agent <- function() {
+    Agent$new(
+      chat = runtime_chat(server),
+      tools = list(tool),
+      permissions = Permissions(
+        tool_allowlist = "effect",
+        can_use_tool = function(name, input, context) {
+          if (name == "effect") {
+            PermissionResultPending("Review the output")
+          } else {
+            PermissionResultAllow()
+          }
+        }
+      ),
+      context_policy = ContextPolicy(offload_dir = offload_directory),
+      approval_dir = directory,
+      working_dir = directory,
+      session_id = "large_approval_session",
+      agent_id = "large_approval_agent"
+    )
+  }
+  agent <- make_agent()
+  expect_identical(
+    agent$run_sync("Prepare the output")$stop_reason,
+    "approval_pending"
+  )
+  path <- agent$pending_approval()$source$path
+  expect_false(
+    "deputy_read_tool_result" %in% names(approval_store_read(path)$tools)
+  )
+  resumed <- make_agent()
+  result <- resumed$resume_approval(path, "approve")
+  expect_identical(trimws(result$response), "finished reading")
+  expect_identical(effects$count, 1L)
+  expect_length(server$requests(), 3L)
+  reader_result <- tail(approval_wire_results(server$requests()[[3L]]), 1L)[[
+    1L
+  ]]
+  expect_identical(reader_result$tool_call_id, "call_fixture")
+  expect_match(reader_result$content, "approved output receipt")
+  expect_true(
+    "deputy_read_tool_result" %in% names(approval_store_read(path)$tools)
+  )
+  expect_identical(approval_read(path)$status, "completed")
+})
+
 test_that("resumed effects prevent fallback from discarding the completed result", {
   withr::local_options(ellmer_max_tries = 1)
   backup <- local_runtime_server(list(runtime_reply("unexpected fallback")))

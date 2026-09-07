@@ -127,6 +127,22 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
         )
       }
       expected <- private$.approval_tools[[request@name]]
+      # Offloading a newly approved result can install this session-bound
+      # reader after suspension. Only Deputy's private producer marker admits
+      # it into the saved registry; ordinary newly registered tools stay out.
+      registered <- private$.chat$get_tools()[[request@name]]
+      if (
+        is.null(expected) &&
+          identical(request@name, "deputy_read_tool_result") &&
+          identical(
+            attr(registered, "deputy_internal_tool", exact = TRUE),
+            deputy_tool_result_reader_marker
+          )
+      ) {
+        expected <- approval_tool_fingerprint(registered)
+        private$.approval_tools[[request@name]] <- expected
+        private$.approval_resume$record$tools[[request@name]] <- expected
+      }
       if (
         is.null(expected) ||
           is.null(request@tool) ||
