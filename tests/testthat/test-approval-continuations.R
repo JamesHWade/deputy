@@ -137,6 +137,42 @@ approval_wire_results <- function(request) {
   )
 }
 
+test_that("approval journals retain Deputy correlation without valid provider IDs", {
+  for (provider_id in list(NULL, list("invalid"))) {
+    directory <- withr::local_tempdir()
+    agent <- Agent$new(
+      chat = create_mock_chat(),
+      permissions = Permissions(mode = "full"),
+      approval_dir = directory
+    )
+    private <- agent$.__enclos_env__$private
+    request <- create_mock_tool_request()
+    attr(request, "id") <- provider_id
+    if (is.null(provider_id)) {
+      expect_no_error(private$handle_tool_request(request))
+    } else {
+      expect_warning(private$handle_tool_request(request), "invalid provider")
+    }
+    call_id <- private$tool_call_records[[1L]]$tool_call_id
+    expect_match(call_id, "^tool_")
+    expect_identical(private$begin_tool_execution("test_tool"), call_id)
+    result <- ellmer::ContentToolResult(value = "done", request = request)
+    if (is.null(provider_id)) {
+      expect_no_error(private$handle_tool_result(result))
+    } else {
+      expect_warning(private$handle_tool_result(result), "invalid provider")
+    }
+    expect_named(private$.approval_journal, call_id)
+    expect_identical(private$.approval_journal[[call_id]]$status, "completed")
+    expect_true(private$.approval_journal[[call_id]]$executed)
+    expect_identical(
+      private$.approval_journal[[call_id]]$result$props$value,
+      "done"
+    )
+    expect_null(agent$pending_approval())
+  }
+})
+
 test_that("approval suspension preserves a complete batch without running later siblings", {
   fixture <- local_approval_runtime()
   expect_identical(fixture$result$stop_reason, "approval_pending")

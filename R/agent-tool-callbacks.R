@@ -29,7 +29,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         private$record_run_event(private$tool_start_event(extracted))
       }
 
-      private$approval_request_check(request)
+      private$approval_request_check(request, record$tool_call_id)
 
       usage <- private$current_run_usage()
       limits <- private$current_usage_limits %||% self$usage_limits

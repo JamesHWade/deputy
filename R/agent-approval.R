@@ -100,14 +100,14 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
       )
     },
 
-    approval_request_check = function(request) {
+    approval_request_check = function(request, tool_call_id) {
       if (is.null(private$.approval_dir)) {
         return(invisible(NULL))
       }
-      if (!is.null(private$.approval_journal[[request@id]])) {
+      if (!is.null(private$.approval_journal[[tool_call_id]])) {
         approval_abort("A tool-call ID was reused within this continuation.")
       }
-      private$.approval_requests[[request@id]] <- request
+      private$.approval_requests[[tool_call_id]] <- request
       if (is.null(private$.approval_resume)) {
         return(invisible(NULL))
       }
