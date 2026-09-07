@@ -20,7 +20,7 @@
       sys.source(path, envir = new.env())
     Condition
       Error in `match.arg()`:
-      ! 'arg' should be one of "original", "changed-constraint"
+      ! 'arg' should be one of "original", "changed-constraint", "resolved-methods"
 
 # preparation export writes once and binds the verified receipt
 
