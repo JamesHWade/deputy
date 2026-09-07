@@ -98,6 +98,12 @@ Control what agents can do
   : Create an allow permission result
 - [`PermissionResultDeny()`](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md)
   : Create a deny permission result
+- [`PermissionResultPending()`](https://jameshwade.github.io/deputy/reference/PermissionResultPending.md)
+  : Request a durable tool approval
+- [`ApprovalContinuation()`](https://jameshwade.github.io/deputy/reference/ApprovalContinuation.md)
+  : Durable approval inspection value
+- [`approval_read()`](https://jameshwade.github.io/deputy/reference/approval_read.md)
+  : Inspect a durable approval continuation
 - [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md)
   : Create a standard permission policy
 - [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md)

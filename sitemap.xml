@@ -22,6 +22,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/AgentEvent.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/AgentResult.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/AgentUsage.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/ApprovalContinuation.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/CallbackResult.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/ContextPolicy.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/DeputyCompaction.html</loc></url>
@@ -35,11 +36,13 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/PermissionMode.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/PermissionResultAllow.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/PermissionResultDeny.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/PermissionResultPending.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/Permissions.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/Skill.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/UsageLimits.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/agent_definition.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/agent_definition_read.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/approval_read.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/ask_user_impl.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/deputy-errors.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/deputy-package.html</loc></url>

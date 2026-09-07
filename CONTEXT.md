@@ -87,6 +87,15 @@ carry continuation, denial, context, and presentation fields. The Agent
 and HookRegistry interpret these values; nested output objects retain
 their own reference semantics (ADR-0015).
 
+**Approval continuation**: A durable Deputy control record for one
+pending tool operation. It carries the source correlation, saved
+authority, observed usage, host decision, and completed effect journal.
+Inspection does not execute tools; only a pending record can be consumed
+under current authority. Its supporting transcript uses the existing
+session payload and ellmer content records. The host owns conversation
+associations and reconciliation of indeterminate effects (ADR-0016).
+*Avoid*: saved coroutine, conversation database, exactly-once execution
+
 **Hook event**: The named lifecycle point a hook is registered against.
 *Avoid*: trigger, lifecycle stage
 

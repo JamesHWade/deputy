@@ -2,6 +2,16 @@
 
 ## deputy (development version)
 
+- [`PermissionResultPending()`](https://jameshwade.github.io/deputy/reference/PermissionResultPending.md)
+  suspends raw-argument tool calls in Agents with an `approval_dir`.
+  [`approval_read()`](https://jameshwade.github.io/deputy/reference/approval_read.md)
+  inspects the durable state and `Agent$resume_approval()` consumes an
+  approval, denial, edited input, or explicit budget decision under
+  saved and current authority. Completed effects are journaled and
+  interrupted executions require host reconciliation. The host owns
+  conversation associations and private storage
+  ([\#43](https://github.com/JamesHWade/deputy/issues/43)).
+
 - Hook and permission result constructors now return read-only S7
   values. Use
   [`S7::S7_inherits()`](https://rconsortium.github.io/S7/reference/S7_inherits.html)

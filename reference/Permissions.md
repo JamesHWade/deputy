@@ -64,9 +64,9 @@ Permissions(
 - can_use_tool:
 
   A function accepting tool name, input, and context, returning a
-  [PermissionResultAllow](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md)
-  or
+  [PermissionResultAllow](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md),
   [PermissionResultDeny](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md),
+  [PermissionResultPending](https://jameshwade.github.io/deputy/reference/PermissionResultPending.md),
   or `NULL`.
 
 - tool_allowlist:

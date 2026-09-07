@@ -184,6 +184,10 @@ for writes made through its native file tools.
 
 - [`Agent$load_session()`](#method-Agent-load_session)
 
+- [`Agent$pending_approval()`](#method-Agent-pending_approval)
+
+- [`Agent$resume_approval()`](#method-Agent-resume_approval)
+
 - [`Agent$checkpoint()`](#method-Agent-checkpoint)
 
 - [`Agent$list_checkpoints()`](#method-Agent-list_checkpoints)
@@ -231,7 +235,8 @@ Create a new Agent.
       run_context = list(),
       agent_id = NULL,
       agent_name = NULL,
-      fallback_chats = list()
+      fallback_chats = list(),
+      approval_dir = NULL
     )
 
 #### Arguments
@@ -328,6 +333,13 @@ Create a new Agent.
   separate
   [ContextPolicy](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
   summary-failure policy.
+
+- `approval_dir`:
+
+  Optional existing host-owned directory for durable tool approvals.
+  Enables sequential tool execution and an execution journal. See
+  [`approval_read()`](https://jameshwade.github.io/deputy/reference/approval_read.md)
+  and `$resume_approval()`.
 
 #### Returns
 
@@ -1425,6 +1437,69 @@ conversational state under the receiving Agent's session identity.
 #### Returns
 
 Invisible self
+
+------------------------------------------------------------------------
+
+### `Agent$pending_approval()`
+
+Inspect the approval that suspended this Agent, or NULL.
+
+#### Usage
+
+    Agent$pending_approval()
+
+#### Returns
+
+An
+[ApprovalContinuation](https://jameshwade.github.io/deputy/reference/ApprovalContinuation.md)
+or NULL. Its source includes the path.
+
+------------------------------------------------------------------------
+
+### `Agent$resume_approval()`
+
+Resume a persisted pending tool approval under current and saved policy.
+Reattach a Chat, the same raw-argument tool definition, permission
+callback, session_id, agent_id, working_dir, and approval_dir after
+process restart. Existing completed effects are never replayed;
+duplicate decisions fail.
+
+#### Usage
+
+    Agent$resume_approval(
+      path,
+      decision = c("approve", "deny"),
+      tool_input = NULL,
+      usage_limits = NULL
+    )
+
+#### Arguments
+
+- `path`:
+
+  Approval directory supplied by the approval event or snapshot.
+
+- `decision`:
+
+  Either "approve" or "deny".
+
+- `tool_input`:
+
+  Optional edited raw JSON argument list for approval.
+
+- `usage_limits`:
+
+  Optional explicit
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  for the continuation. Escalation is bounded by the saved and current
+  Agent limits. Previously observed usage is retained. NULL keeps the
+  suspended run's limits.
+
+#### Returns
+
+An
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md),
+including usage observed before suspension.
 
 ------------------------------------------------------------------------
 

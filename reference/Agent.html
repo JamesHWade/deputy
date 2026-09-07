@@ -208,6 +208,8 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <li><p><a href="#method-Agent-provider"><code>Agent$provider()</code></a></p></li>
 <li><p><a href="#method-Agent-save_session"><code>Agent$save_session()</code></a></p></li>
 <li><p><a href="#method-Agent-load_session"><code>Agent$load_session()</code></a></p></li>
+<li><p><a href="#method-Agent-pending_approval"><code>Agent$pending_approval()</code></a></p></li>
+<li><p><a href="#method-Agent-resume_approval"><code>Agent$resume_approval()</code></a></p></li>
 <li><p><a href="#method-Agent-checkpoint"><code>Agent$checkpoint()</code></a></p></li>
 <li><p><a href="#method-Agent-list_checkpoints"><code>Agent$list_checkpoints()</code></a></p></li>
 <li><p><a href="#method-Agent-rewind_files"><code>Agent$rewind_files()</code></a></p></li>
@@ -239,7 +241,8 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  agent_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  agent_name <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  approval_dir <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h4>
@@ -309,6 +312,11 @@ preserved and their history, system prompt, and tools are replaced by
 the Agent's. The selected Chat remains active for subsequent runs.
 Applies to governed task and structured requests. Pre-run automatic
 compaction retains the separate <a href="ContextPolicy.html">ContextPolicy</a> summary-failure policy.</p></dd>
+
+      <dt><code>approval_dir</code></dt>
+<dd><p>Optional existing host-owned directory for durable tool
+approvals. Enables sequential tool execution and an execution journal.
+See <code><a href="approval_read.html">approval_read()</a></code> and <code>$resume_approval()</code>.</p></dd>
 
 
 </dl><p></p></div>
@@ -1287,13 +1295,63 @@ state under the receiving Agent's session identity.</p>
 
 </div>
 
+<p></p><hr><a id="method-Agent-pending_approval"></a><div class="section">
+<h3 id="agent-pending-approval-"><code>Agent$pending_approval()</code><a class="anchor" aria-label="anchor" href="#agent-pending-approval-"></a></h3>
+<p>Inspect the approval that suspended this Agent, or NULL.</p><div class="section">
+<h4 id="usage-42">Usage<a class="anchor" aria-label="anchor" href="#usage-42"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">pending_approval</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-42">Returns<a class="anchor" aria-label="anchor" href="#returns-42"></a></h4>
+<p>An <a href="ApprovalContinuation.html">ApprovalContinuation</a> or NULL. Its source includes the path.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-Agent-resume_approval"></a><div class="section">
+<h3 id="agent-resume-approval-"><code>Agent$resume_approval()</code><a class="anchor" aria-label="anchor" href="#agent-resume-approval-"></a></h3>
+<p>Resume a persisted pending tool approval under current and saved policy.
+Reattach a Chat, the same raw-argument tool definition, permission callback,
+session_id, agent_id, working_dir, and approval_dir after process restart.
+Existing completed effects are never replayed; duplicate decisions fail.</p><div class="section">
+<h4 id="usage-43">Usage<a class="anchor" aria-label="anchor" href="#usage-43"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">resume_approval</span><span class="op">(</span></span>
+<span>  <span class="va">path</span>,</span>
+<span>  decision <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"approve"</span>, <span class="st">"deny"</span><span class="op">)</span>,</span>
+<span>  tool_input <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-29">Arguments<a class="anchor" aria-label="anchor" href="#arguments-29"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>path</code></dt>
+<dd><p>Approval directory supplied by the approval event or snapshot.</p></dd>
+
+      <dt><code>decision</code></dt>
+<dd><p>Either "approve" or "deny".</p></dd>
+
+      <dt><code>tool_input</code></dt>
+<dd><p>Optional edited raw JSON argument list for approval.</p></dd>
+
+      <dt><code>usage_limits</code></dt>
+<dd><p>Optional explicit <a href="UsageLimits.html">UsageLimits</a> for the continuation.
+Escalation is bounded by the saved and current Agent limits. Previously
+observed usage is retained. NULL keeps the suspended run's limits.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-43">Returns<a class="anchor" aria-label="anchor" href="#returns-43"></a></h4>
+<p>An <a href="AgentResult.html">AgentResult</a>, including usage observed before suspension.</p>
+</div>
+
+</div>
+
 <p></p><hr><a id="method-Agent-checkpoint"></a><div class="section">
 <h3 id="agent-checkpoint-"><code>Agent$checkpoint()</code><a class="anchor" aria-label="anchor" href="#agent-checkpoint-"></a></h3>
 <p>Create a reversible file checkpoint.</p><div class="section">
-<h4 id="usage-42">Usage<a class="anchor" aria-label="anchor" href="#usage-42"></a></h4>
+<h4 id="usage-44">Usage<a class="anchor" aria-label="anchor" href="#usage-44"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">checkpoint</span><span class="op">(</span>name <span class="op">=</span> <span class="cn">NULL</span>, metadata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-29">Arguments<a class="anchor" aria-label="anchor" href="#arguments-29"></a></h4>
+<h4 id="arguments-30">Arguments<a class="anchor" aria-label="anchor" href="#arguments-30"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>name</code></dt>
 <dd><p>Optional checkpoint label.</p></dd>
 
@@ -1303,7 +1361,7 @@ state under the receiving Agent's session identity.</p>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-42">Returns<a class="anchor" aria-label="anchor" href="#returns-42"></a></h4>
+<h4 id="returns-44">Returns<a class="anchor" aria-label="anchor" href="#returns-44"></a></h4>
 <p>The checkpoint ID.</p>
 </div>
 
@@ -1312,10 +1370,10 @@ state under the receiving Agent's session identity.</p>
 <p></p><hr><a id="method-Agent-list_checkpoints"></a><div class="section">
 <h3 id="agent-list-checkpoints-"><code>Agent$list_checkpoints()</code><a class="anchor" aria-label="anchor" href="#agent-list-checkpoints-"></a></h3>
 <p>List reversible file checkpoints.</p><div class="section">
-<h4 id="usage-43">Usage<a class="anchor" aria-label="anchor" href="#usage-43"></a></h4>
+<h4 id="usage-45">Usage<a class="anchor" aria-label="anchor" href="#usage-45"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">list_checkpoints</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-43">Returns<a class="anchor" aria-label="anchor" href="#returns-43"></a></h4>
+<h4 id="returns-45">Returns<a class="anchor" aria-label="anchor" href="#returns-45"></a></h4>
 <p>A data frame ordered from oldest to newest.</p>
 </div>
 
@@ -1324,10 +1382,10 @@ state under the receiving Agent's session identity.</p>
 <p></p><hr><a id="method-Agent-rewind_files"></a><div class="section">
 <h3 id="agent-rewind-files-"><code>Agent$rewind_files()</code><a class="anchor" aria-label="anchor" href="#agent-rewind-files-"></a></h3>
 <p>Rewind files to a checkpoint without changing conversation history.</p><div class="section">
-<h4 id="usage-44">Usage<a class="anchor" aria-label="anchor" href="#usage-44"></a></h4>
+<h4 id="usage-46">Usage<a class="anchor" aria-label="anchor" href="#usage-46"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">rewind_files</span><span class="op">(</span><span class="va">checkpoint_id</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-30">Arguments<a class="anchor" aria-label="anchor" href="#arguments-30"></a></h4>
+<h4 id="arguments-31">Arguments<a class="anchor" aria-label="anchor" href="#arguments-31"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>checkpoint_id</code></dt>
 <dd><p>ID returned by <code>$checkpoint()</code> or present in a
 <code>file_checkpoint</code> run event.</p></dd>
@@ -1335,7 +1393,7 @@ state under the receiving Agent's session identity.</p>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-44">Returns<a class="anchor" aria-label="anchor" href="#returns-44"></a></h4>
+<h4 id="returns-46">Returns<a class="anchor" aria-label="anchor" href="#returns-46"></a></h4>
 <p>A list describing the restored checkpoint and change count.</p>
 </div>
 
@@ -1348,7 +1406,7 @@ state under the receiving Agent's session identity.</p>
 conversation turns, then replaces them with the summary appended to
 the system prompt. This preserves important context while reducing
 token usage.</p><div class="section">
-<h4 id="usage-45">Usage<a class="anchor" aria-label="anchor" href="#usage-45"></a></h4>
+<h4 id="usage-47">Usage<a class="anchor" aria-label="anchor" href="#usage-47"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">compact</span><span class="op">(</span></span>
 <span>  keep_last <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  summary <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -1357,7 +1415,7 @@ token usage.</p><div class="section">
 <span>  estimated_tokens <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-31">Arguments<a class="anchor" aria-label="anchor" href="#arguments-31"></a></h4>
+<h4 id="arguments-32">Arguments<a class="anchor" aria-label="anchor" href="#arguments-32"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>keep_last</code></dt>
 <dd><p>Number of recent turns to retain. <code>NULL</code> chooses a
 complete conversational boundary using the context policy's token
@@ -1389,7 +1447,7 @@ findings, files discussed, and task progress.</p></dd>
 truncated-text summary is used only when <code>fallback = "text"</code> is
 explicitly configured. The returned object records that degraded method.</p>
 </div><p></p><div class="section">
-<h4 id="returns-45">Returns<a class="anchor" aria-label="anchor" href="#returns-45"></a></h4>
+<h4 id="returns-47">Returns<a class="anchor" aria-label="anchor" href="#returns-47"></a></h4>
 <p>A read-only <a href="DeputyCompaction.html">DeputyCompaction</a> S7 value describing the method
 and usage.</p>
 </div>
@@ -1399,7 +1457,7 @@ and usage.</p>
 <p></p><hr><a id="method-Agent-print"></a><div class="section">
 <h3 id="agent-print-"><code>Agent$print()</code><a class="anchor" aria-label="anchor" href="#agent-print-"></a></h3>
 <p>Print the agent configuration.</p><div class="section">
-<h4 id="usage-46">Usage<a class="anchor" aria-label="anchor" href="#usage-46"></a></h4>
+<h4 id="usage-48">Usage<a class="anchor" aria-label="anchor" href="#usage-48"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -1408,10 +1466,10 @@ and usage.</p>
 <p></p><hr><a id="method-Agent-load_skill"></a><div class="section">
 <h3 id="agent-load-skill-"><code>Agent$load_skill()</code><a class="anchor" aria-label="anchor" href="#agent-load-skill-"></a></h3>
 <p>Load a <a href="Skill.html">Skill</a> into the agent.</p><div class="section">
-<h4 id="usage-47">Usage<a class="anchor" aria-label="anchor" href="#usage-47"></a></h4>
+<h4 id="usage-49">Usage<a class="anchor" aria-label="anchor" href="#usage-49"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_skill</span><span class="op">(</span><span class="va">skill</span>, allow_conflicts <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-32">Arguments<a class="anchor" aria-label="anchor" href="#arguments-32"></a></h4>
+<h4 id="arguments-33">Arguments<a class="anchor" aria-label="anchor" href="#arguments-33"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>skill</code></dt>
 <dd><p>A <a href="Skill.html">Skill</a> object or path to a skill directory.</p></dd>
 
@@ -1422,7 +1480,7 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-46">Returns<a class="anchor" aria-label="anchor" href="#returns-46"></a></h4>
+<h4 id="returns-48">Returns<a class="anchor" aria-label="anchor" href="#returns-48"></a></h4>
 <p>Invisible self for chaining.</p>
 </div>
 
@@ -1431,10 +1489,10 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 <p></p><hr><a id="method-Agent-skills"></a><div class="section">
 <h3 id="agent-skills-"><code>Agent$skills()</code><a class="anchor" aria-label="anchor" href="#agent-skills-"></a></h3>
 <p>Get loaded skills.</p><div class="section">
-<h4 id="usage-48">Usage<a class="anchor" aria-label="anchor" href="#usage-48"></a></h4>
+<h4 id="usage-50">Usage<a class="anchor" aria-label="anchor" href="#usage-50"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">skills</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-47">Returns<a class="anchor" aria-label="anchor" href="#returns-47"></a></h4>
+<h4 id="returns-49">Returns<a class="anchor" aria-label="anchor" href="#returns-49"></a></h4>
 <p>Named list of loaded <a href="Skill.html">Skill</a> objects.</p>
 </div>
 
@@ -1445,10 +1503,10 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 <p>Load tools from MCP (Model Context Protocol) servers.</p>
 <p>Requires the mcptools package. Issues a warning if not installed or if
 tool fetching fails.</p><div class="section">
-<h4 id="usage-49">Usage<a class="anchor" aria-label="anchor" href="#usage-49"></a></h4>
+<h4 id="usage-51">Usage<a class="anchor" aria-label="anchor" href="#usage-51"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_mcp</span><span class="op">(</span>config <span class="op">=</span> <span class="cn">NULL</span>, servers <span class="op">=</span> <span class="cn">NULL</span>, replace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-33">Arguments<a class="anchor" aria-label="anchor" href="#arguments-33"></a></h4>
+<h4 id="arguments-34">Arguments<a class="anchor" aria-label="anchor" href="#arguments-34"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>config</code></dt>
 <dd><p>Path to MCP configuration file. If NULL (default), uses
 the mcptools default location (<code>~/.config/mcptools/config.json</code>).</p></dd>
@@ -1465,7 +1523,7 @@ tools whose connections were invalidated are removed; working tools remain.</p><
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-48">Returns<a class="anchor" aria-label="anchor" href="#returns-48"></a></h4>
+<h4 id="returns-50">Returns<a class="anchor" aria-label="anchor" href="#returns-50"></a></h4>
 <p>Invisible self for chaining</p>
 </div>
 
@@ -1474,10 +1532,10 @@ tools whose connections were invalidated are removed; working tools remain.</p><
 <p></p><hr><a id="method-Agent-mcp_tools"></a><div class="section">
 <h3 id="agent-mcp-tools-"><code>Agent$mcp_tools()</code><a class="anchor" aria-label="anchor" href="#agent-mcp-tools-"></a></h3>
 <p>Get names of loaded MCP tools.</p><div class="section">
-<h4 id="usage-50">Usage<a class="anchor" aria-label="anchor" href="#usage-50"></a></h4>
+<h4 id="usage-52">Usage<a class="anchor" aria-label="anchor" href="#usage-52"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">mcp_tools</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-49">Returns<a class="anchor" aria-label="anchor" href="#returns-49"></a></h4>
+<h4 id="returns-51">Returns<a class="anchor" aria-label="anchor" href="#returns-51"></a></h4>
 <p>Character vector of MCP tool names</p>
 </div>
 
@@ -1486,10 +1544,10 @@ tools whose connections were invalidated are removed; working tools remain.</p><
 <p></p><hr><a id="method-Agent-mcp_status"></a><div class="section">
 <h3 id="agent-mcp-status-"><code>Agent$mcp_status()</code><a class="anchor" aria-label="anchor" href="#agent-mcp-status-"></a></h3>
 <p>Get MCP runtime status records.</p><div class="section">
-<h4 id="usage-51">Usage<a class="anchor" aria-label="anchor" href="#usage-51"></a></h4>
+<h4 id="usage-53">Usage<a class="anchor" aria-label="anchor" href="#usage-53"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">mcp_status</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-50">Returns<a class="anchor" aria-label="anchor" href="#returns-50"></a></h4>
+<h4 id="returns-52">Returns<a class="anchor" aria-label="anchor" href="#returns-52"></a></h4>
 <p>Data frame describing MCP load attempts and registered tools</p>
 </div>
 
@@ -1505,7 +1563,7 @@ than returning the content stream.</p>
 example a delegated sub-agent executed from the tool of a parent chat
 that is itself streaming. Supply <code>type</code> to extract structured output
 after the tool-using task within the same run budget.</p><div class="section">
-<h4 id="usage-52">Usage<a class="anchor" aria-label="anchor" href="#usage-52"></a></h4>
+<h4 id="usage-54">Usage<a class="anchor" aria-label="anchor" href="#usage-54"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run_async</span><span class="op">(</span></span>
 <span>  <span class="va">task</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -1515,7 +1573,7 @@ after the tool-using task within the same run budget.</p><div class="section">
 <span>  max_corrections <span class="op">=</span> <span class="fl">0L</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-34">Arguments<a class="anchor" aria-label="anchor" href="#arguments-34"></a></h4>
+<h4 id="arguments-35">Arguments<a class="anchor" aria-label="anchor" href="#arguments-35"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>task</code></dt>
 <dd><p>The task for the agent to perform</p></dd>
 
@@ -1545,7 +1603,7 @@ invalid output. Defaults to zero; all attempts share the run budget.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-51">Returns<a class="anchor" aria-label="anchor" href="#returns-51"></a></h4>
+<h4 id="returns-53">Returns<a class="anchor" aria-label="anchor" href="#returns-53"></a></h4>
 <p>A <code><a href="https://rstudio.github.io/promises/reference/promise.html" class="external-link">promises::promise</a></code> resolving to an <a href="AgentResult.html">AgentResult</a>. It is
 rejected if the provider stream fails or a limit configured with
 <code>on_exceed = "error"</code> is reached.</p>
@@ -1556,10 +1614,10 @@ rejected if the provider stream fails or a limit configured with
 <p></p><hr><a id="method-Agent-clone"></a><div class="section">
 <h3 id="agent-clone-"><code>Agent$clone()</code><a class="anchor" aria-label="anchor" href="#agent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-53">Usage<a class="anchor" aria-label="anchor" href="#usage-53"></a></h4>
+<h4 id="usage-55">Usage<a class="anchor" aria-label="anchor" href="#usage-55"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-35">Arguments<a class="anchor" aria-label="anchor" href="#arguments-35"></a></h4>
+<h4 id="arguments-36">Arguments<a class="anchor" aria-label="anchor" href="#arguments-36"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

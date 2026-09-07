@@ -32,9 +32,10 @@ permissions_check(permissions, tool_name, tool_input, context = list())
 ## Value
 
 A
-[PermissionResultAllow](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md)
+[PermissionResultAllow](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md),
+[PermissionResultDeny](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md),
 or
-[PermissionResultDeny](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md).
+[PermissionResultPending](https://jameshwade.github.io/deputy/reference/PermissionResultPending.md).
 
 ## Examples
 

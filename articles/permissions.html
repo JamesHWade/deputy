@@ -511,6 +511,140 @@ owns the platform-specific enforcement and fails rather than downgrading
 when it cannot establish the requested OS boundary. See mcp-repl’s <a href="https://github.com/posit-dev/mcp-repl/blob/main/docs/sandbox.md" class="external-link">sandbox
 contract</a> for its filesystem, network, and platform guarantees.</p>
 </div>
+<div class="section level2">
+<h2 id="durable-approval-after-process-exit">Durable approval after process exit<a class="anchor" aria-label="anchor" href="#durable-approval-after-process-exit"></a>
+</h2>
+<p>For a decision that may outlive the R process, configure a private
+existing <code>approval_dir</code> and return
+<code><a href="../reference/PermissionResultPending.html">PermissionResultPending()</a></code> from the permission callback.
+Deputy suspends before that tool executes. It journals tools completed
+before the pause and retains their results when a fresh Agent
+resumes.</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">approval_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"approvals"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">approval_dir</span>, showWarnings <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Raw argument tools validate their own inputs. Keep convert = FALSE from the</span></span>
+<span><span class="co"># original registration; changing it on an existing tool changes its semantics.</span></span>
+<span><span class="va">export_report</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
+<span>  <span class="kw">function</span><span class="op">(</span><span class="va">name</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">is.character</a></span><span class="op">(</span><span class="va">name</span><span class="op">)</span> <span class="op">||</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">name</span><span class="op">)</span> <span class="op">!=</span> <span class="fl">1L</span> <span class="op">||</span> <span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">name</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli_abort</a></span><span class="op">(</span><span class="st">"name must be one string"</span><span class="op">)</span></span>
+<span>    <span class="op">}</span></span>
+<span>    <span class="co"># A host would perform its effect here and return an external receipt.</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Prepared"</span>, <span class="va">name</span><span class="op">)</span></span>
+<span>  <span class="op">}</span>,</span>
+<span>  name <span class="op">=</span> <span class="st">"export_report"</span>,</span>
+<span>  description <span class="op">=</span> <span class="st">"Prepare a named report"</span>,</span>
+<span>  arguments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>name <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  convert <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  annotations <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool_annotations.html" class="external-link">tool_annotations</a></span><span class="op">(</span></span>
+<span>    read_only_hint <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    destructive_hint <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    open_world_hint <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">make_agent</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">chat</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>    chat <span class="op">=</span> <span class="va">chat</span>,</span>
+<span>    tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">export_report</span><span class="op">)</span>,</span>
+<span>    permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>can_use_tool <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="fu"><a href="../reference/PermissionResultPending.html">PermissionResultPending</a></span><span class="op">(</span><span class="st">"Host review required for report preparation"</span><span class="op">)</span></span>
+<span>    <span class="op">}</span><span class="op">)</span>,</span>
+<span>    approval_dir <span class="op">=</span> <span class="va">approval_dir</span>,</span>
+<span>    working_dir <span class="op">=</span> <span class="va">approval_dir</span>,</span>
+<span>    session_id <span class="op">=</span> <span class="st">"report_session"</span>,</span>
+<span>    agent_id <span class="op">=</span> <span class="st">"report_agent"</span>,</span>
+<span>    run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>owner_id <span class="op">=</span> <span class="st">"owner_1"</span>, conversation_id <span class="op">=</span> <span class="st">"conversation_1"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span></span>
+<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="fu">make_agent</span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Prepare the annual report"</span><span class="op">)</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span>, <span class="st">"approval_pending"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">pending</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">pending_approval</span><span class="op">(</span><span class="op">)</span></span>
+<span>  <span class="va">approval_path</span> <span class="op">&lt;-</span> <span class="va">pending</span><span class="op">$</span><span class="va">source</span><span class="op">$</span><span class="va">path</span></span>
+<span>  <span class="va">pending</span><span class="op">$</span><span class="va">request</span></span>
+<span>  <span class="va">pending</span><span class="op">$</span><span class="va">usage</span></span>
+<span><span class="op">}</span></span>
+<span></span>
+<span><span class="co"># This inspection needs no Chat and executes no tools, including after restart.</span></span>
+<span><span class="va">pending</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/approval_read.html">approval_read</a></span><span class="op">(</span><span class="va">approval_path</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># The host authorizes its caller, restores its own conversation association,</span></span>
+<span><span class="co"># and reattaches the same tool definition, scope, and permission callback.</span></span>
+<span><span class="va">resumed</span> <span class="op">&lt;-</span> <span class="fu">make_agent</span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">resumed</span><span class="op">$</span><span class="fu">resume_approval</span><span class="op">(</span></span>
+<span>  <span class="va">approval_path</span>,</span>
+<span>  <span class="st">"approve"</span>,</span>
+<span>  tool_input <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>name <span class="op">=</span> <span class="st">"reviewed annual report"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co"># Alternatively: resumed$resume_approval(approval_path, "deny")</span></span></code></pre></div>
+<p><code>ApprovalContinuation</code> is a read-only inspection value. It
+exposes the pending request and tool-call ID, source correlation,
+decision, usage, budget and static permission ceilings, and
+completed-effect journal. The approval event supplies an ID and path
+that the host can associate with its owner, conversation, selected
+branch and revision. These associations belong in the host’s store;
+Deputy does not provide a second conversation database. Do not treat
+correlation IDs as credentials. Only expose a private record after
+authenticating its owner.</p>
+<p>Only a <code>pending</code> record can resume. The receiving Agent’s
+session ID, Agent ID, working directory, context and delegation
+correlation must match. It checks saved and current static permission
+ceilings before the current callback and hooks. A host edit cannot
+authorize a forbidden path or tool. Rebinding checks source
+body/formals, schema, conversion and metadata; the host remains
+responsible for captured closure state and external resource
+identity.</p>
+<p>When a batch contains three tool calls and the second needs approval,
+the first result is retained and the third is marked unexecuted. Resume
+supplies one result for every original ID. A later model request cannot
+replay an already executed or denied operation in that continuation. Use
+a separate, explicitly authorized workflow if repeating the same
+operation is intended.</p>
+<p>A tool-boundary budget limit can also create a pending decision.
+Resume normally keeps the suspended limits and all prior usage. To grant
+more allowance, pass <code>usage_limits = UsageLimits(...)</code>
+explicitly; Deputy caps it by both the original and current Agent
+ceilings. Inspect <code>pending$budget_ceiling</code> before presenting
+choices. Model boundaries with no pending tool retain ordinary limit
+stops.</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">resumed</span><span class="op">$</span><span class="fu">resume_approval</span><span class="op">(</span></span>
+<span>  <span class="va">approval_path</span>,</span>
+<span>  <span class="st">"approve"</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Consumption holds an OS lock and commits state before each effect. If
+a worker exits while a tool is executing, the record remains
+<code>executing</code>; no automatic retry is allowed. An interrupted
+<code>resuming</code> or <code>continuing</code> record, or a terminal
+<code>indeterminate</code> record, also requires the host to inspect
+external receipts and reconcile the outcome. Duplicate approval delivery
+is rejected. This protocol does not claim exactly-once effects or
+power-loss durability.</p>
+<p>The latest stored revision retains the complete effect journal.
+Superseded revisions are removed after a successful commit, so repeated
+lifecycle updates do not accumulate copies of the session. Each
+serialized revision is limited to 25 MiB within a 50 MiB store budget,
+leaving room for an atomic replacement. Snapshots that cannot fit are
+rejected before publishing a pending approval; later growth of the
+journal or session remains bounded by the same limit.</p>
+<p>The stored transcript support uses ellmer’s public content
+record/replay and the same session payload as
+<code>save_session()</code> / <code>load_session()</code>. Loading a
+separate session snapshot does not consume an approval. Tools, callbacks
+and provider clients are never serialized. Offloaded data frames and
+serializable S3 checkpoint metadata retain their values, classes and
+attributes. Runtime objects inside metadata or attributes remain
+unsupported. The host owns access, retention and backups for these
+trusted local R records. An optional shinychat adapter must use its
+released public contract; it is not required for this headless workflow.
+See <a href="https://github.com/JamesHWade/deputy/blob/main/dev/adr/0016-durable-approval-continuations.md" class="external-link">ADR-0016</a>
+for the control-state contract.</p>
+</div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>
