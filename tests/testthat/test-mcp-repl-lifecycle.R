@@ -83,6 +83,55 @@ test_that("Agent interruption terminates its active owned MCP request", {
   expect_identical(result$stop_reason, "interrupted")
 })
 
+test_that("interruption cannot cancel MCP requests owned by a different context", {
+  for (scenario in c("loaded", "run")) {
+    config <- mcp_test_config()
+    owner <- Agent$new(chat = create_mock_chat())
+    connection <- McpConnection$new(
+      config$path,
+      "fixture",
+      owner,
+      tools = "state"
+    )
+    withr::defer(connection$close())
+    owner$register_tools(connection$tools())
+    actor <- if (scenario == "loaded") owner$clone() else owner
+    if (scenario == "loaded") {
+      saved <- Agent$new(
+        chat = create_mock_chat(),
+        run_context = list(reader_id = "other")
+      )
+      path <- tempfile(fileext = ".rds")
+      saved$save_session(path)
+      actor$load_session(path)
+    }
+    actor$add_hook(HookMatcher(
+      "UserPromptSubmit",
+      callback = function(...) {
+        actor$interrupt()
+        NULL
+      }
+    ))
+    pending <- connection$tools()$state(operation = "slow")
+    expect_identical(connection$status()$state, "busy")
+    result <- if (scenario == "run") {
+      actor$run_sync("Stop this run.", run_context = list(reader_id = "other"))
+    } else {
+      actor$run_sync("Stop this run.")
+    }
+    expect_identical(result$stop_reason, "interrupted")
+    expect_identical(result$usage$tool_calls, 0L)
+    expect_identical(connection$status()$state, "busy")
+    expect_match(paste(mcp_test_await(pending)), "empty")
+    expect_identical(connection$status()$state, "idle")
+    expect_match(
+      paste(mcp_test_await(connection$tools()$state(operation = "get"))),
+      "empty"
+    )
+    connection$close()
+  }
+})
+
 test_that("released mcp-repl preserves state, content, isolation and explicit controls", {
   executable <- Sys.getenv("DEPUTY_MCP_REPL_BIN")
   skip_if(

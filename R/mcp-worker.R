@@ -233,9 +233,13 @@ mcp_connection_server_exited <- function(condition) {
   FALSE
 }
 
-cancel_active_mcp_tools <- function(tools) {
+cancel_active_mcp_tools <- function(tools, agent, run_context) {
+  owner <- mcp_connection_owner(agent, run_context)
   for (tool in tools) {
     source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+    if (!identical(attr(source, "deputy_mcp_owner", exact = TRUE), owner)) {
+      next
+    }
     cancel <- attr(source, "deputy_mcp_cancel_active", exact = TRUE)
     if (is.function(cancel)) cancel()
   }
