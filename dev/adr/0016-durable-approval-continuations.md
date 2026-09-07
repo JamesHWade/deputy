@@ -31,6 +31,10 @@ accept raw JSON arguments and validate their own schema/domain inputs. The
 durable boundary checks finite JSON-representable inputs, but does not duplicate
 ellmer's private conversion machinery. It never silently changes an existing
 tool's conversion setting. Unsupported runtime objects fail before persistence.
+Record-shaped ordinary JSON (`version`, `class`, `props`) is rejected because
+ellmer replay would otherwise reinterpret it as an S7 constructor. Structured
+tool output should use `jsonlite::toJSON()`; actual ellmer Content values retain
+public record/replay semantics.
 
 ## Envelope and association
 

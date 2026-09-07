@@ -16,6 +16,9 @@ A read-only S7 permission result.
 Return this from a \link{Permissions} \code{can_use_tool} callback to suspend before
 execution. The Agent must have an \code{approval_dir}. Resumable tools must be
 registered with \code{convert = FALSE}; their functions accept raw JSON arguments.
+Tool outputs should be strings, explicit JSON, or ellmer Content values.
+Raw JSON shaped like a content record (\code{version}, \code{class}, \code{props}) is rejected
+because ellmer replay would reinterpret it as an S7 constructor.
 No approval is granted by constructing this value.
 }
 \seealso{

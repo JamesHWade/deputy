@@ -504,6 +504,7 @@ approval_resume <- function(
 approval_validate_inputs <- function(inputs) {
   approval_portable(inputs)
   approval_json_inputs(inputs)
+  approval_no_replay_tags(inputs)
   if (
     !is.list(inputs) ||
       (length(inputs) &&

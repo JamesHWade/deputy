@@ -39,3 +39,30 @@ test_that("restored results preserve ellmer JSON and result content semantics", 
   expect_identical(rebound@request@id, "request_1")
   expect_identical(rebound@value, value)
 })
+
+test_that("ordinary JSON cannot become a constructor during content replay", {
+  tagged <- list(
+    version = 1,
+    class = "deputy::PermissionResultAllow",
+    props = list()
+  )
+  expect_error(
+    approval_validate_inputs(list(value = tagged)),
+    "resembles serialized content",
+    class = "deputy_approval_error"
+  )
+  request <- ellmer::contents_replay(list(
+    version = 1,
+    class = "ellmer::ContentToolRequest",
+    props = list(id = "request_1", name = "effect", arguments = list())
+  ))
+  request@arguments <- list(value = tagged)
+  expect_error(approval_record_content(request), "resembles serialized content")
+  request@arguments <- list()
+  expect_error(
+    approval_result_content(request, tagged),
+    "resembles serialized content"
+  )
+  encoded <- jsonlite::toJSON(tagged, auto_unbox = TRUE)
+  expect_identical(approval_result_content(request, encoded)@value, encoded)
+})

@@ -20,6 +20,9 @@ approval_abort <- function(
 #' Return this from a [Permissions] `can_use_tool` callback to suspend before
 #' execution. The Agent must have an `approval_dir`. Resumable tools must be
 #' registered with `convert = FALSE`; their functions accept raw JSON arguments.
+#' Tool outputs should be strings, explicit JSON, or ellmer Content values.
+#' Raw JSON shaped like a content record (`version`, `class`, `props`) is rejected
+#' because ellmer replay would reinterpret it as an S7 constructor.
 #' No approval is granted by constructing this value.
 #' @param reason One non-missing string explaining the pending decision.
 #' @return A read-only S7 permission result.
@@ -198,6 +201,7 @@ approval_record_content <- function(value) {
   ) {
     value@error <- conditionMessage(value@error)
   }
+  approval_check_content_value(value)
   record <- approval_content_record_values(ellmer::contents_record(value))
   approval_portable(record)
   record
@@ -225,6 +229,7 @@ approval_replay_turns <- function(records, tools) {
 }
 
 approval_result_content <- function(request, value = NULL, error = NULL) {
+  approval_check_content_value(value)
   if (inherits(error, "condition")) {
     error <- conditionMessage(error)
   }
@@ -495,4 +500,45 @@ approval_content_record_values <- function(value) {
 approval_usage <- function(record) {
   record$total_tokens <- NULL
   do.call(AgentUsage, record)
+}
+
+# ellmer replay treats record-shaped lists as constructors. Ordinary JSON data
+# must not accidentally become an S7 object while restoring a tool request.
+approval_no_replay_tags <- function(value) {
+  if (!is.list(value) || S7::S7_inherits(value)) {
+    return(invisible(NULL))
+  }
+  if (all(c("version", "class", "props") %in% names(value))) {
+    approval_abort(c(
+      "Approval JSON data resembles serialized content.",
+      "i" = "Record-shaped raw inputs cannot be resumed. Encode structured tool outputs with jsonlite::toJSON()."
+    ))
+  }
+  for (item in value) {
+    approval_no_replay_tags(item)
+  }
+  invisible(NULL)
+}
+
+approval_check_content_value <- function(value) {
+  if (S7::S7_inherits(value)) {
+    properties <- S7::props(value)
+    if (inherits(value, "ellmer::ContentToolRequest")) {
+      properties$tool <- NULL
+    }
+    for (property in properties) {
+      approval_check_content_value(property)
+    }
+  } else if (
+    is.list(value) &&
+      length(value) &&
+      all(vapply(value, S7::S7_inherits, logical(1)))
+  ) {
+    for (item in value) {
+      approval_check_content_value(item)
+    }
+  } else {
+    approval_no_replay_tags(value)
+  }
+  invisible(NULL)
 }
