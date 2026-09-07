@@ -1,0 +1,185 @@
+// Publish only allowlisted diagnostics; never serialize SDK messages or tool inputs.
+const fs = require('node:fs');
+
+const knownTools = new Set([
+  'Agent', 'Task', 'TaskOutput', 'TaskCreate', 'TaskUpdate', 'TaskList',
+  'TodoWrite', 'Skill', 'Read', 'Glob', 'Grep', 'Bash', 'ToolSearch',
+  'TaskGet', 'TaskStop', 'SendMessage', 'EnterPlanMode', 'ExitPlanMode',
+  'mcp__github_inline_comment__create_inline_comment',
+]);
+const reportedOutcomes = new Set(['completed-with-findings', 'completed-without-findings', 'skipped', 'blocked']);
+const reportedReasons = new Set(['reviewed', 'draft', 'closed', 'trivial', 'already-reviewed', 'permission-denied', 'diff-unavailable', 'plugin-unavailable', 'subagent-unavailable', 'provider-limit', 'publication-failed', 'policy-conflict', 'other']);
+const commands = [
+  'gh pr view', 'gh pr diff', 'gh pr list', 'gh pr comment',
+  'gh issue view', 'gh issue list', 'gh search', 'gh api',
+  'git diff', 'git show', 'git log', 'git rev-parse',
+  'cat', 'ls', 'find', 'sed', 'head', 'tail', 'wc', 'rg', 'grep', 'pwd', 'cd', 'echo', 'printf',
+];
+
+function diagnostics(messages) {
+  const result = Array.isArray(messages)
+    ? messages.findLast((message) => message.type === 'result') : undefined;
+  const denials = Array.isArray(result?.permission_denials) ? result.permission_denials : [];
+  const calls = Array.isArray(messages) ? messages.flatMap((message) => message.type === 'assistant' && Array.isArray(message.message?.content)
+    ? message.message.content.filter((item) => item.type === 'tool_use') : []) : [];
+  const deniedIds = new Set(denials.map((denial) => denial.tool_use_id));
+  const completedIds = new Set(Array.isArray(messages) ? messages.flatMap((message) => message.type === 'user' && Array.isArray(message.message?.content)
+    ? message.message.content.filter((item) => item.type === 'tool_result' && item.is_error !== true && !deniedIds.has(item.tool_use_id)).map((item) => item.tool_use_id) : []) : []);
+  const pluginCalls = calls.filter((call) => call.name === 'Skill' && call.input?.skill === 'code-review:code-review');
+  const successfulPlugins = pluginCalls.filter((call) => typeof call.id === 'string' && completedIds.has(call.id));
+  const agentCalls = calls.filter((call) => ['Agent', 'Task'].includes(call.name));
+  return {
+    plugin_calls: pluginCalls.length,
+    plugin_successes: successfulPlugins.length,
+    plugin_comment_argument_seen: successfulPlugins.some((call) => typeof call.input?.args === 'string' && /(?:^|\s)--comment(?:\s|$)/.test(call.input.args)),
+    review_agent_calls: agentCalls.length,
+    // A background launch acknowledgment does not prove that the agent finished.
+    review_agent_successes: agentCalls.filter((call) => call.input?.run_in_background !== true &&
+      typeof call.id === 'string' && completedIds.has(call.id)).length,
+    sdk_success: result?.subtype === 'success' && result?.is_error === false,
+    reported_outcome: reportedOutcomes.has(result?.structured_output?.outcome) ? result.structured_output.outcome : 'unreported',
+    reported_reason: reportedReasons.has(result?.structured_output?.reason) ? result.structured_output.reason : 'unreported',
+    permission_denials_count: denials.length,
+    denied_operations: [...new Set(denials.flatMap((denial) => {
+      const tool = knownTools.has(denial.tool_name) ? denial.tool_name : 'other-tool';
+      if (tool === 'Skill') return denial.tool_input?.skill === 'code-review:code-review'
+        ? 'Skill(code-review:code-review)' : 'Skill(other-skill)';
+      if (tool !== 'Bash') return tool;
+      const command = denial.tool_input?.command;
+      if (typeof command !== 'string') return ['Bash(other-command)'];
+      // This is a safe diagnostic projection, not a shell parser or permission rule.
+      const operations = command.split(/&&|\|\||[;|]/).slice(0, 8).map((part) => {
+        const text = part.trim();
+        const prefix = commands.find((candidate) => text === candidate || text.startsWith(candidate + ' '));
+        return prefix ? `Bash(${prefix})` : 'Bash(other-command)';
+      });
+      if (/[<>]/.test(command)) operations.push('Bash(shell-redirection)');
+      return operations;
+    }))].sort(),
+  };
+}
+
+function priorReviewSkip({ sha, currentSha, comments, runId, runAttempt }) {
+  if (!/^\d+$/.test(runId || '') || !/^\d+$/.test(runAttempt || '')) return undefined;
+  const priorReview = comments.some((comment) => {
+    if (comment.user?.login !== 'github-actions[bot]') return false;
+    const markers = [...(comment.body || '').matchAll(/<!-- deputy-claude-review:[a-f0-9]{40}:(\d+):(\d+):(?:with|without)-findings -->/g)];
+    // A previous run can publish after this run starts. Identity, not timestamps,
+    // separates an upstream prior-comment skip from this run's own publication.
+    return markers.length > 0 && !markers.some((match) => match[1] === runId && match[2] === runAttempt);
+  });
+  return sha === currentSha && priorReview
+    ? { outcome: 'intentionally skipped', reason: 'Upstream policy skips a prior Claude review comment; this run did not review the current head or validate the earlier run' }
+    : undefined;
+}
+
+function classify({ diagnostic, sha, currentSha, comments, inline, marker, findingMarker, started, actionOutcome, draft = false, state = 'open', runId, runAttempt }) {
+  const blocked = (reason) => ({ outcome: 'blocked/failed', reason });
+  if (sha !== currentSha) return blocked('PR head changed during review');
+  if (actionOutcome !== 'success' || !diagnostic.sdk_success) return blocked('Claude did not complete successfully');
+  if (!diagnostic.plugin_calls || !diagnostic.plugin_successes || !diagnostic.plugin_comment_argument_seen) {
+    return blocked('Upstream review plugin was not invoked with --comment');
+  }
+  const fresh = (comment) => comment.user?.login === 'github-actions[bot]' &&
+    Date.parse(comment.created_at) >= Date.parse(started) - 5000;
+  const summaries = comments.filter(fresh);
+  const findings = inline.filter((comment) => fresh(comment) && comment.commit_id === sha &&
+    comment.body?.includes(findingMarker));
+  const withFindings = summaries.some((comment) => comment.body?.includes(`${marker}:with-findings -->`));
+  const withoutFindings = summaries.some((comment) => comment.body?.includes(`${marker}:without-findings -->`));
+  if ((withFindings || withoutFindings) && (!diagnostic.review_agent_calls || !diagnostic.review_agent_successes)) {
+    return blocked('Upstream review agents did not run');
+  }
+  if (withFindings && !withoutFindings && findings.length) {
+    return { outcome: 'completed with findings', reason: 'Current-run summary and exact-commit inline findings verified' };
+  }
+  if (withoutFindings && !withFindings && !findings.length) {
+    return { outcome: 'completed without findings', reason: 'Current-run exact-commit clean summary verified' };
+  }
+  if (diagnostic.permission_denials_count) return blocked('Denied tools and no verified review evidence');
+  if (!withFindings && !withoutFindings && !findings.length &&
+      diagnostic.plugin_calls > 0 && diagnostic.reported_outcome === 'skipped') {
+    const skipped = (reason) => ({ outcome: 'intentionally skipped', reason });
+    if (diagnostic.reported_reason === 'draft' && draft) {
+      return skipped('PR is now a draft; this run did not review the current head');
+    }
+    if (diagnostic.reported_reason === 'closed' && state === 'closed') {
+      return skipped('PR is now closed; this run did not review the current head');
+    }
+    if (diagnostic.reported_reason === 'trivial') {
+      return skipped('Upstream plugin classified the change as trivial; this run did not review the current head');
+    }
+    const priorSkip = priorReviewSkip({ sha, currentSha, comments, runId, runAttempt });
+    if (diagnostic.reported_reason === 'already-reviewed' && priorSkip) {
+      return priorSkip;
+    }
+  }
+  return blocked('No consistent current-run exact-commit review evidence');
+}
+
+async function main() {
+  const env = process.env;
+  const sha = env.REVIEW_SHA;
+  const preflight = env.REVIEW_PREFLIGHT === 'true';
+  if (!/^[a-f0-9]{40}$/.test(sha || '')) throw new Error('Invalid review SHA');
+  let diagnostic = diagnostics([]);
+  let result = { outcome: 'blocked/failed', reason: 'Claude execution evidence unavailable' };
+  try {
+    if (!preflight) {
+      const execution = env.EXECUTION_FILE || `${env.RUNNER_TEMP}/claude-execution-output.json`;
+      diagnostic = diagnostics(JSON.parse(fs.readFileSync(execution, 'utf8')));
+    }
+    result.reason = 'GitHub review evidence unavailable';
+    async function get(path) {
+      const response = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/${path}`, {
+        headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: 'application/vnd.github+json' },
+      });
+      if (!response.ok) throw new Error('GitHub evidence request failed');
+      return response.json();
+    }
+    async function pages(path) {
+      const values = [];
+      for (let page = 1; ; page++) {
+        const batch = await get(`${path}?per_page=100&page=${page}`);
+        values.push(...batch);
+        if (batch.length < 100) return values;
+      }
+    }
+    const [pr, comments, inline] = await Promise.all([
+      get(`pulls/${env.PR_NUMBER}`), pages(`issues/${env.PR_NUMBER}/comments`),
+      preflight ? [] : pages(`pulls/${env.PR_NUMBER}/comments`),
+    ]);
+    if (preflight) {
+      if (sha !== pr.head.sha) {
+        result = { outcome: 'blocked/failed', reason: 'PR head changed before review' };
+      } else {
+        const skip = priorReviewSkip({ sha, currentSha: pr.head.sha, comments, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT });
+        fs.appendFileSync(env.GITHUB_OUTPUT, `should_review=${!skip}\n`);
+        if (!skip) return;
+        result = skip;
+      }
+    } else result = classify({ diagnostic, sha, currentSha: pr.head.sha, comments, inline,
+      marker: `<!-- deputy-claude-review:${sha}:${env.GITHUB_RUN_ID}:${env.GITHUB_RUN_ATTEMPT}`,
+      findingMarker: `[Review run](https://github.com/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}/attempts/${env.GITHUB_RUN_ATTEMPT})`,
+      started: env.REVIEW_STARTED, actionOutcome: env.ACTION_OUTCOME, draft: pr.draft, state: pr.state,
+      runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT });
+  } catch {
+    // Errors can include server responses, file contents, or token-bearing URLs.
+    // Keep the public failure categorical; never print the caught value.
+  }
+  const safe = { ...result, target_sha: sha, stage: preflight ? 'eligibility' : 'review', ...diagnostic };
+  fs.writeFileSync(`${env.RUNNER_TEMP}/claude-review-outcome.json`, JSON.stringify(safe, null, 2));
+  fs.appendFileSync(env.GITHUB_STEP_SUMMARY,
+    `### Claude review: ${safe.outcome}\n\nCommit: \`${sha}\`\n\n${safe.reason}.\n\n` +
+    `Reviewer report: ${safe.reported_outcome} (${safe.reported_reason}).\n\n` +
+    `Permission denials: ${safe.permission_denials_count}. ` +
+    `Operations: ${safe.denied_operations.join(', ') || 'none'}.\n`);
+  console.log(JSON.stringify(safe));
+  if (safe.outcome === 'blocked/failed') process.exitCode = 1;
+}
+
+module.exports = { diagnostics, classify, priorReviewSkip };
+if (require.main === module) main().catch(() => {
+  console.error('Claude review outcome verification failed');
+  process.exitCode = 1;
+});

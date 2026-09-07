@@ -2,41 +2,143 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    types: [opened, synchronize, ready_for_review, reopened, converted_to_draft]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   claude-review:
-    # Fork pull_request runs cannot supply the credentials/OIDC this action needs.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Repository-owned PRs only; never expose reviewer credentials to forks.
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
       issues: read
-      id-token: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
+          persist-credentials: false
+
+      - name: Test review evidence verifier
+        run: node --test .github/scripts/claude-review-outcome.test.cjs
+
+      - name: Freeze verifier and record review start
+        id: start
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/deputy-review-input"
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > "$RUNNER_TEMP/deputy-review-input/diff"
+          install -m 0444 .github/scripts/claude-review-outcome.cjs "$RUNNER_TEMP/claude-review-verifier.cjs"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/claude-review-verifier.cjs" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Check upstream prior-review eligibility
+        id: eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_SHA: ${{ github.event.pull_request.head.sha }}
+          REVIEW_STARTED: ${{ steps.start.outputs.time }}
+          REVIEW_PREFLIGHT: 'true'
+        run: node "$RUNNER_TEMP/claude-review-verifier.cjs"
 
       - name: Run Claude Code Review
+        if: steps.eligibility.outputs.should_review == 'true'
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
+          # Supported scoped GitHub token auth also permits reviewing workflow PRs.
+          # https://github.com/anthropics/claude-code-action/blob/main/action.yml
+          github_token: ${{ github.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
+          claude_args: >-
+            --add-dir '${{ runner.temp }}/deputy-review-input'
+            --allowedTools "Skill(code-review:code-review),Agent,Task,TaskOutput,TodoWrite,TaskCreate,TaskUpdate,TaskList,Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh search:*),Bash(wc:*),mcp__github_inline_comment__create_inline_comment"
+            --json-schema '{"type":"object","properties":{"outcome":{"type":"string","enum":["completed-with-findings","completed-without-findings","skipped","blocked"]},"reason":{"type":"string","enum":["reviewed","draft","closed","trivial","already-reviewed","permission-denied","diff-unavailable","plugin-unavailable","subagent-unavailable","provider-limit","publication-failed","policy-conflict","other"]}},"required":["outcome","reason"],"additionalProperties":false}'
+          show_full_output: false
+          display_report: false
+          prompt: |
+            Invoke the installed code-review:code-review Skill for
+            ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+            with the --comment argument. Follow that upstream review procedure.
+
+            Review exactly commit ${{ github.event.pull_request.head.sha }}.
+            Preserve the upstream plugin's eligibility and intentional-skip rules.
+            If it skips, return outcome skipped with the specific reason: draft,
+            closed, trivial, or already-reviewed. Do not post a completion marker
+            or claim this run reviewed the current head when it intentionally skips.
+            Use the upstream plugin via Skill(code-review:code-review), including its
+            review agents. Run agent calls synchronously (parallel calls are fine);
+            do not use run_in_background. Wait for their returned review results.
+            Use gh pr view/diff and Read/Glob/Grep for inspection;
+            gh api and arbitrary shell commands are not enabled. A complete diff is
+            already available at ${{ runner.temp }}/deputy-review-input/diff; use Read to
+            inspect it. Tell every review agent this path and tool policy. Do not
+            use shell pipes, redirection, or shell commands to read or buffer files.
+            Every inline finding must include this visible provenance link in its body
+            (the upstream inline-comment sanitizer removes HTML comments):
+            [Review run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }})
+            After the upstream plugin completes a review, post a summary with gh pr comment.
+            Include exactly one of these markers according to the plugin's findings:
+            <!-- deputy-claude-review:${{ github.event.pull_request.head.sha }}:${{ github.run_id }}:${{ github.run_attempt }}:with-findings -->
+            <!-- deputy-claude-review:${{ github.event.pull_request.head.sha }}:${{ github.run_id }}:${{ github.run_attempt }}:without-findings -->
+            Include the full reviewed commit SHA visibly in the summary.
+            Only report completion after reviewing the diff; if blocked, explain the
+            blocker and do not use a completion marker. Return the structured outcome
+            and the most specific available reason after posting the result. Use other
+            only when none of the reason categories apply. Do not modify repository files.
+
+      - name: Verify review outcome and sanitize diagnostics
+        if: ${{ !cancelled() && steps.eligibility.outputs.should_review == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_SHA: ${{ github.event.pull_request.head.sha }}
+          REVIEW_STARTED: ${{ steps.start.outputs.time }}
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+          ACTION_OUTCOME: ${{ steps.claude-review.outcome }}
+          VERIFIER_DIGEST: ${{ steps.start.outputs.digest }}
+        run: |
+          if ! printf '%s  %s\n' "$VERIFIER_DIGEST" "$RUNNER_TEMP/claude-review-verifier.cjs" | sha256sum --check --status; then
+            echo '### Claude review: blocked/failed' >> "$GITHUB_STEP_SUMMARY"
+            echo 'The frozen verification control is missing or changed.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          node "$RUNNER_TEMP/claude-review-verifier.cjs"
+
+      - name: Upload sanitized review outcome
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-review-outcome-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/claude-review-outcome.json
+          retention-days: 14
+          if-no-files-found: warn
+
+  draft-review-notice:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Explain intentional draft skip
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ### Claude review: intentionally skipped
+
+          This PR is a draft. Mark it ready for review to start automatic Claude review.
+          EOF
 
   fork-review-notice:
     if: github.event.pull_request.head.repo.full_name != github.repository
@@ -46,7 +148,7 @@ jobs:
       - name: Explain unsupported automatic fork review
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          ### Claude review skipped for a fork pull request
+          ### Claude review: intentionally skipped (fork pull request)
 
           Automatic Claude review requires credentials unavailable to fork PR workflows.
           A maintainer must review this PR manually. Other configured CI checks still run.
