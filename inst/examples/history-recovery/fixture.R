@@ -197,6 +197,8 @@ history_fixture <- function(
       } else {
         c("D", "F")
       },
+      d_status = if (scenario == "resolved-methods") "eligible" else "pending",
+      f_status = if (scenario == "resolved-methods") "excluded" else "pending",
       completed_export_id = "export-0042",
       may_export_now = FALSE
     ),

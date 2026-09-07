@@ -114,10 +114,10 @@ are not persisted. Inputs are synthetic; a consented-data adaptation must treat
 its outputs as private host data. Recoverable run failures preserve partial
 evidence. A process kill or interactive interrupt before saving does not.
 
-Eight explicit structured checks score the answer, including the current host
-constraint; no model judge is used.
+Ten explicit structured checks score the answer, including the current host
+constraint and the individual D/F classifications; no model judge is used.
 Report individual paired outcomes, failed/missing trials and score/latency
-distributions. Fully correct means all eight checks pass; it does not measure
+distributions. Fully correct means all ten checks pass; it does not measure
 every claim in the free-text answer. Preparation costs are shared once per pair;
 continuation costs remain separate. Reports include failed checks, missing
 continuations, retrieval calls/bytes, verified completed writes and export attempts. Do not infer Luna/Terra equivalence, production

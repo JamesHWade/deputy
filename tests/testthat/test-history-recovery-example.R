@@ -361,6 +361,20 @@ for (scenario in c("original", "changed-constraint", "resolved-methods")) {
           "report-D-F-clarification"
         )
       )
+      reversed <- answer
+      reversed$d_status <- "excluded"
+      reversed$f_status <- "eligible"
+      reversed_score <- example$history_score(reversed, fixture)
+      expect_identical(reversed_score$checks$d_classification, FALSE)
+      expect_identical(reversed_score$checks$f_classification, FALSE)
+      expect_identical(reversed_score$all_correct, FALSE)
+      omitted <- answer
+      omitted$d_status <- NULL
+      omitted$f_status <- NULL
+      expect_identical(
+        example$history_score(omitted, fixture)$all_correct,
+        FALSE
+      )
       stale_answer <- answer
       stale_answer$pending_reports <- c("D", "F")
       expect_identical(
