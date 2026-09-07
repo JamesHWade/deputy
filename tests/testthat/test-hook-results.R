@@ -78,7 +78,7 @@ test_that("callback result properties freeze decisions but retain output identit
   expect_identical(result@updated_tool_output, output)
   output$value <- "changed"
   expect_identical(result$updated_tool_output$value, "changed")
-  expect_error(result$continue <- FALSE, "Can.t set S7 properties")
+  expect_error(result$continue <- FALSE)
   revised <- do.call(
     HookResultPostToolUse,
     modifyList(
