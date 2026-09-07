@@ -1,0 +1,89 @@
+stopifnot(identical(Sys.getenv("DEPUTY_HISTORY_LIVE"), "yes"))
+allowance <- as.numeric(Sys.getenv("DEPUTY_HISTORY_ALLOWANCE_USD", "NA"))
+stopifnot(identical(allowance, 5))
+source_directory <- "/private/tmp/deputy-budget-live-source-20260907"
+source_commit <- "34b9c23415b45a7e2c46663f55e5e7d90aacb95b"
+devtools::load_all(source_directory, quiet = TRUE)
+for (file in c("fixture.R", "history.R", "evaluation.R")) {
+  source(file.path(source_directory, "inst/examples/history-recovery", file))
+}
+output <- Sys.getenv("DEPUTY_HISTORY_OUTPUT")
+stopifnot(nzchar(output), !dir.exists(output))
+stopifnot(dir.create(output, recursive = TRUE))
+write_json <- function(x, path) jsonlite::write_json(x, file.path(output, path),
+  auto_unbox = TRUE, pretty = TRUE, null = "null", na = "null", digits = NA)
+file.copy("/private/tmp/deputy-history-budget-approved-run.R", file.path(output, "invocation.R.txt"))
+scenarios <- c("original", "changed-constraint", "resolved-methods")
+protocols <- c("baseline", "budget-aware")
+write_json(list(source_commit = source_commit, allowance_usd = allowance,
+  observed_stop_usd = 3.5, max_governed_requests = 300L,
+  helper_model = "gpt-5.6-luna", task_model = "gpt-5.6-luna",
+  reasoning_effort = "low", max_output_tokens = 1024L, max_context_tokens = 6000L,
+  trials_per_scenario = 3L, scenarios = scenarios, protocols = protocols,
+  versions = list(deputy = as.character(packageVersion("deputy")),
+    ellmer = as.character(packageVersion("ellmer")), R = as.character(getRversion())),
+  model_availability = list(id = "gpt-5.6-luna", verified = TRUE,
+    input_usd_per_million = 0.2, cached_input_usd_per_million = 0.02,
+    output_usd_per_million = 1.2),
+  started_at = format(Sys.time(), tz = "UTC", usetz = TRUE)), "invocation.json")
+write_json(unlist(lapply(scenarios, function(scenario) {
+  lapply(history_schedule(3L, "gpt-5.6-luna", protocols), function(arm) {
+    c(list(scenario = scenario), arm)
+  })
+}), recursive = FALSE), "planned-schedule.json")
+used <- 0
+requests <- 0L
+completed_scenarios <- character()
+failure <- NULL
+original_budget <- history_budget
+history_budget <- function(...) {
+  budget <- original_budget(...)
+  original_run <- budget$run
+  budget$run <- function(agent, prompt, label, ...) {
+    on.exit({
+      usage <- budget$usage()
+      write_json(list(scenario = scenario, last_run = label,
+        aggregate_requests = requests + usage$requests,
+        aggregate_estimated_cost_usd = used + usage$cost_usd,
+        updated_at = format(Sys.time(), tz = "UTC", usetz = TRUE)), "progress.json")
+      cat(label, "aggregate requests", requests + usage$requests,
+        "estimated USD", format(used + usage$cost_usd, digits = 12), "\n")
+      flush.console()
+    })
+    original_run(agent, prompt, label, ...)
+  }
+  budget
+}
+for (scenario in scenarios) {
+  remaining_cost <- 3.5 - used
+  remaining_requests <- 300L - requests
+  if (!is.finite(remaining_cost) || remaining_cost <= 0 || remaining_requests <= 0L) {
+    failure <- "aggregate_budget_exhausted_before_scenario"
+    break
+  }
+  factory <- function(model) ellmer::chat_openai(model = model,
+    params = ellmer::params(max_tokens = 1024L, reasoning_effort = "low"), echo = "none")
+  evaluation <- history_evaluate(factory,
+    fixture = history_fixture(scenario = scenario), trials = 3L,
+    helper_models = "gpt-5.6-luna", task_model = "gpt-5.6-luna",
+    max_cost_usd = remaining_cost, max_requests = remaining_requests,
+    max_tokens = 6000L, protocols = protocols)
+  evaluation$versions$source_commit <- source_commit
+  write_json(evaluation, paste0(scenario, ".json"))
+  writeLines(history_report(evaluation), file.path(output, paste0(scenario, ".md")))
+  used <- used + evaluation$usage$cost_usd
+  requests <- requests + evaluation$usage$requests
+  completed_scenarios <- c(completed_scenarios, scenario)
+  cat("SAVED", scenario, "continuations", length(evaluation$trials),
+    "aggregate requests", requests, "estimated USD", format(used, digits = 12), "\n")
+  if (!is.null(evaluation$failure)) {
+    failure <- evaluation$failure$class
+    break
+  }
+}
+write_json(list(failure = failure, saved_scenarios = completed_scenarios,
+  unreached_scenarios = setdiff(scenarios, completed_scenarios),
+  aggregate_requests = requests, aggregate_estimated_cost_usd = used,
+  finished_at = format(Sys.time(), tz = "UTC", usetz = TRUE)), "run-summary.json")
+cat("FINISHED", if (is.null(failure)) "complete" else failure,
+  "requests", requests, "estimated USD", format(used, digits = 12), "\n")

@@ -1,0 +1,27 @@
+{
+  "source_commit": "34b9c23415b45a7e2c46663f55e5e7d90aacb95b",
+  "allowance_usd": 5,
+  "observed_stop_usd": 3.5,
+  "max_governed_requests": 300,
+  "helper_model": "gpt-5.6-luna",
+  "task_model": "gpt-5.6-luna",
+  "reasoning_effort": "low",
+  "max_output_tokens": 1024,
+  "max_context_tokens": 6000,
+  "trials_per_scenario": 3,
+  "scenarios": ["original", "changed-constraint", "resolved-methods"],
+  "protocols": ["baseline", "budget-aware"],
+  "versions": {
+    "deputy": "0.0.0.9000",
+    "ellmer": "0.5.0",
+    "R": "4.6.1"
+  },
+  "model_availability": {
+    "id": "gpt-5.6-luna",
+    "verified": true,
+    "input_usd_per_million": 0.2,
+    "cached_input_usd_per_million": 0.02,
+    "output_usd_per_million": 1.2
+  },
+  "started_at": "2026-09-07 19:23:02 UTC"
+}

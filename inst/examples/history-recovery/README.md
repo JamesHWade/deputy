@@ -170,3 +170,10 @@ retrieval quality, or a need for recursive analysis from a small synthetic pilot
 The optional `cancelled` callback is cooperative: checked before runs and history
 access. It does not interrupt an already-running provider request. Deputy's
 runtime cancellation behavior is covered separately in its compaction tests.
+
+The [approved budget-aware follow-up](../../../dev/evaluations/history-recovery/2026-09-07-budget-aware/README.md)
+recorded 9/9 budget-aware answers versus 8/9 baseline-history answers, with 7/9
+fully correct answers in both arms. The one recovered answer accounts for the
+mean-score increase; budget-aware recovery used more requests, estimated cost and time.
+The archive includes all 27 continuations, exact invocation and independent
+checks. This small synthetic comparison does not establish production quality.

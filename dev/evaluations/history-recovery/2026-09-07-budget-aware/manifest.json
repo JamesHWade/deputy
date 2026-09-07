@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "source_commit": "34b9c23415b45a7e2c46663f55e5e7d90aacb95b",
+  "invocation": {
+    "source_commit": "34b9c23415b45a7e2c46663f55e5e7d90aacb95b",
+    "allowance_usd": 5,
+    "observed_stop_usd": 3.5,
+    "max_governed_requests": 300,
+    "helper_model": "gpt-5.6-luna",
+    "task_model": "gpt-5.6-luna",
+    "reasoning_effort": "low",
+    "max_output_tokens": 1024,
+    "max_context_tokens": 6000,
+    "trials_per_scenario": 3,
+    "scenarios": [
+      "original",
+      "changed-constraint",
+      "resolved-methods"
+    ],
+    "protocols": [
+      "baseline",
+      "budget-aware"
+    ],
+    "versions": {
+      "deputy": "0.0.0.9000",
+      "ellmer": "0.5.0",
+      "R": "4.6.1"
+    },
+    "model_availability": {
+      "id": "gpt-5.6-luna",
+      "verified": true,
+      "input_usd_per_million": 0.2,
+      "cached_input_usd_per_million": 0.02,
+      "output_usd_per_million": 1.2
+    },
+    "started_at": "2026-09-07 19:23:02 UTC"
+  },
+  "total_requests": 183,
+  "total_estimated_cost_usd": 0.2985045,
+  "files": {
+    "README.md": {
+      "bytes": 6727,
+      "sha256": "0801e99dbc6028d4def12e0ff17d3acc70a18b4805aa6d8589d4b0c147cda472"
+    },
+    "analysis.json": {
+      "bytes": 7495,
+      "sha256": "9b457a6cca19d093291a60ec04a74ef562840a90c97f6b76e431bbadd294e857"
+    },
+    "analyze.py.txt": {
+      "bytes": 8448,
+      "sha256": "fd8aeb62fc6d8e52517da22533558dbe87463b7f63e2d6354b2067a7fb87211c"
+    },
+    "changed-constraint.json.gz": {
+      "bytes": 80892,
+      "sha256": "6c91c3275c14140c38f87102fc91f4186d9da0a6ea6fc2287dcee242ab89f4f1"
+    },
+    "changed-constraint.md": {
+      "bytes": 6558,
+      "sha256": "aeb3bc6badee1905d5050edfa285c90d554467c5f0c5250504207112d9296f05"
+    },
+    "execution.txt": {
+      "bytes": 7398,
+      "sha256": "e1f9fefacce917611c5314a753632160f5b4824ddd52d1fb81656e686b39a3bc"
+    },
+    "invocation.R.txt": {
+      "bytes": 4507,
+      "sha256": "a6990922fd63a4dd8342c24f2e11d973e2d69a0eeb24b95ac5f55d56401d50c8"
+    },
+    "invocation.json": {
+      "bytes": 767,
+      "sha256": "e843d3fc4c5af7827585030dd4f839e2455a2a8d55c34734ac9dab979cd0e64a"
+    },
+    "original.json.gz": {
+      "bytes": 77475,
+      "sha256": "b04d524f522cbd44bc8fad13c14336ff950b68a14480fda3e9be5de92ab82b13"
+    },
+    "original.md": {
+      "bytes": 6306,
+      "sha256": "3c46702d3949d7bdb0d1d9ce24e37a6bdeddb89bdb1a67f48552ebe375851505"
+    },
+    "pairs.csv": {
+      "bytes": 939,
+      "sha256": "15d6a3927174e4da0a317cdae64610dd5fffc11b9ff1e8aa7c010b320ff6394a"
+    },
+    "planned-schedule.json": {
+      "bytes": 5061,
+      "sha256": "ffe130ae4aa9be084c5b3723063b394c53399897cc24a026693c21fa6ab832c2"
+    },
+    "resolved-methods.json.gz": {
+      "bytes": 78874,
+      "sha256": "b169fbb6eb23a8972396cc51aaa95f3c87de3f0f77066145752d5a9b1495fce3"
+    },
+    "resolved-methods.md": {
+      "bytes": 6302,
+      "sha256": "d1370d2407b15c3a3b43259a3297b2a1fe8c098fb28b0293f0ed798f0709450c"
+    },
+    "run-summary.json": {
+      "bytes": 246,
+      "sha256": "2bafa9280b8e3960f362eabd42cec5b33fadf064019ae3e6f52c28b60965fc8d"
+    },
+    "trials.csv": {
+      "bytes": 4648,
+      "sha256": "398492cac0f1547c848cf6054386a0347fc72849d0d8302206e3a06f69d350de"
+    },
+    ".gitattributes": {
+      "bytes": 130,
+      "sha256": "d6cfbd19d560a8f106127fa829bd94fc1ed8ff867bc19d2d1b913898cee03705"
+    }
+  },
+  "decompressed_raw_json": {
+    "changed-constraint.json": {
+      "bytes": 1936587,
+      "sha256": "43c70f2dc2b361771cba9de6c567dc7dcd8887472effae88eb1f4388b8dff92d"
+    },
+    "original.json": {
+      "bytes": 1898835,
+      "sha256": "54764368576510397ced53059cd4c346863c023917d412e6cdcfdc1386186e87"
+    },
+    "resolved-methods.json": {
+      "bytes": 1918844,
+      "sha256": "e87d9fbfe6faa1ef3eec875b8ee44801e312d122a898a582be68fe8b5cce5604"
+    }
+  }
+}

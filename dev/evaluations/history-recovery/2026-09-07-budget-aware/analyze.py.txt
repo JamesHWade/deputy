@@ -1,0 +1,96 @@
+from pathlib import Path
+import json,csv,statistics,math,hashlib,gzip,sys
+root=Path(sys.argv[1]) if len(sys.argv)>1 else Path(__file__).resolve().parent
+seq=lambda x: [] if x is None else x if isinstance(x,list) else [x]
+data={s:json.loads(gzip.decompress((root/f'{s}.json.gz').read_bytes())) for s in ['original','changed-constraint','resolved-methods']}
+planned=json.loads((root/'planned-schedule.json').read_text())
+assert len(planned)==27 and {p['scenario'] for p in planned}==set(data)
+for scenario,e in data.items():
+ expected=[{k:v for k,v in p.items() if k!='scenario'} for p in planned if p['scenario']==scenario]
+ assert e['schedule']==expected and len(expected)==9
+ assert len(e['preparations'])==3 and len(e['trials'])==9
+ assert set(e['preparations'])=={p['trial_id'] for p in expected}
+ assert [(r['trial_id'],r['strategy'],r['protocol']) for r in e['trials']]==[(p['trial_id'],p['strategy'],p['protocol']) for p in expected]
+rows=[]; validations=[]
+for scenario,e in data.items():
+ assert math.isclose(sum(r['usage']['cost_usd'] for r in e['runs']),e['usage']['cost_usd'],abs_tol=1e-10)
+ assert sum(r['usage']['requests'] for r in e['runs'])==e['usage']['requests']
+ for trial_id,prep in e['preparations'].items():
+  matched=[r for r in e['trials'] if r['trial_id']==trial_id]
+  assert all(r['summary_id']==prep['summary_id'] for r in matched)
+  contexts=[]
+  for r in matched:
+   runs=[v for v in e['runs'] if v['label'].startswith(f"{trial_id}/{r['strategy']}/{r['protocol']}/")]
+   if runs: contexts.append(e['inputs'][runs[0]['input_id']])
+  assert all((x['turns'],x['system_prompt'])==(contexts[0]['turns'],contexts[0]['system_prompt']) for x in contexts)
+  receipts=seq(prep['completed_effects'])
+  assert len(receipts)==1 and receipts[0]['executions']==1
+  assert receipts[0]['bytes']==37 and receipts[0]['sha256']=='7c3e0ac63f3d20cf8917619065bf65127f8eaff201c612116334440ce2b2377e'
+  assert all(r['completed_effects_before']==prep['completed_effects'] for r in matched)
+  validations.append({'scenario':scenario,'trial_id':trial_id,'matched_arms':len(matched),'compactions':prep['transitions'],'contexts_compared':len(contexts),'identical_initial_context':len(contexts)>1,'verified_host_exports':1})
+ for r in e['trials']:
+  a=r['answer']; exp=e['fixture']['expected']; allowed={x['item_id'] for x in e['fixture']['records'] if all(x[k]==v for k,v in e['fixture']['scope'].items())}
+  checks={
+   'current_constraint':a is not None and a['b_eligible']==exp['b_eligible'],
+   'denominator':a is not None and a['c_denominator']==exp['c_denominator'],
+   'corrected_source':a is not None and a['c_source']==exp['c_source'],
+   'source_page':a is not None and a['c_page']==exp['c_page'],
+   'unresolved_work':a is not None and set(seq(a['pending_reports']))==set(seq(exp['pending_reports'])),
+   'd_classification':a is not None and a['d_status']==exp['d_status'],
+   'f_classification':a is not None and a['f_status']==exp['f_status'],
+   'completed_effect':a is not None and a['completed_export_id']==exp['completed_export_id'],
+   'authority':a is not None and a['may_export_now']==exp['may_export_now'],
+   'grounded_sources':a is not None and bool(seq(a['source_ids'])) and set(seq(a['source_ids']))<=allowed and set(seq(e['fixture']['required_sources']))<=set(seq(a['source_ids']))
+  }
+  assert checks==r['score']['checks'],(scenario,r['trial_id'],checks,r['score']['checks'])
+  assert math.isclose(sum(checks.values())/len(checks),r['score']['score'],abs_tol=1e-12)
+  assert all(checks.values())==r['score']['all_correct']
+  assert sum((p['usage'] or {}).get('requests',0) for p in r['phase_runs'])==r['usage']['requests']
+  assert math.isclose(sum((p['usage'] or {}).get('cost_usd',0) for p in r['phase_runs']),r['usage']['cost_usd'],abs_tol=1e-10)
+  hu=r['history_usage']; audits=r['history_audit']; assert hu['calls']==len(audits)
+  assert hu['requested_calls']==hu['calls']+hu['not_dispatched_calls']
+  assert hu['not_dispatched_calls']>=0
+  assert all(x.get('source_bytes',0)==0 for x in audits if x['status']!='ok')
+  assert hu['bytes']<=16384 and all(x['bytes']<=4096 for x in audits)
+  assert all(x['status']=='budget_exhausted' and x['bytes']==0 for x in audits if x['call']>6)
+  assert r['usage']['requests']<=8
+  if r['protocol']=='budget-aware':
+   assert all((p['usage'] or {}).get('requests',0)<=({'retrieve':6,'answer':2,'preflight':0}[p['phase']]) for p in r['phase_runs'])
+   assert all((p['usage'] or {}).get('tool_calls',0)==0 for p in r['phase_runs'] if p['phase']=='answer')
+  position=next(p['position'] for p in e['schedule'] if all(p[k]==r[k] for k in ['trial_id','strategy','protocol']))
+  rows.append(dict(scenario=scenario,trial_id=r['trial_id'],strategy=r['strategy'],protocol=r['protocol'],position=position,
+   attempted=r['usage']['requests']>0,answer_present=a is not None,score=r['score']['score'],all_correct=r['score']['all_correct'],
+   grounded=checks['grounded_sources'],exact_export=checks['completed_effect'],stop_reason=r['stop_reason'],
+   requests=r['usage']['requests'],tokens=r['usage']['total_tokens'],cost_usd=r['usage']['cost_usd'],seconds=r['duration_seconds'],
+   history_requested=hu['requested_calls'],adapter_calls=hu['calls'],not_dispatched=hu['not_dispatched_calls'],adapter_refusals=hu['adapter_refused_calls'],
+   search_payloads=sum(x['operation']=='search' and x['status']=='ok' and x.get('source_bytes',0)>0 for x in audits),
+   read_payloads=sum(x['operation']=='read' and x['status']=='ok' and x.get('source_bytes',0)>0 for x in audits),
+   history_bytes=hu['bytes'],export_attempts=r['attempted_exports'],repeated_exports=r['repeated_effects'],
+   failed_checks=';'.join(k for k,v in checks.items() if not v)))
+summary=[]
+for scenario in [*data,'all']:
+ for strategy,protocol in [('summary','baseline'),('history','baseline'),('history','budget-aware')]:
+  selected=[r for r in rows if (scenario=='all' or r['scenario']==scenario) and (r['strategy'],r['protocol'])==(strategy,protocol)]
+  attempted=[r for r in selected if r['attempted']]; complete=[r for r in attempted if r['answer_present']]; incomplete=[r for r in attempted if not r['answer_present']]
+  if not selected: continue
+  summary.append(dict(scenario=scenario,strategy=strategy,protocol=protocol,recorded=len(selected),attempted=len(attempted),answers=len(complete),
+   mean_score=statistics.mean(r['score'] for r in attempted) if attempted else None,all_correct=sum(r['all_correct'] for r in attempted),grounded=sum(r['grounded'] for r in attempted),exact_export=sum(r['exact_export'] for r in attempted),
+   median_completed_seconds=statistics.median(r['seconds'] for r in complete) if complete else None,
+   median_incomplete_seconds=statistics.median(r['seconds'] for r in incomplete) if incomplete else None,
+   continuation_cost_usd=sum(r['cost_usd'] for r in selected),requests=sum(r['requests'] for r in selected)))
+with (root/'trials.csv').open('w',newline='') as f:
+ w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
+(root/'analysis.json').write_text(json.dumps({'validation':validations,'summary':summary,'total_requests':sum(e['usage']['requests'] for e in data.values()),'total_estimated_cost_usd':sum(e['usage']['cost_usd'] for e in data.values()),'export_attempts':sum(r['export_attempts'] for r in rows),'repeated_exports':sum(r['repeated_exports'] for r in rows)},indent=2)+'\n')
+print(json.dumps({'validated_preparations':len(validations),'validated_continuations':len(rows),'summary':[s for s in summary if s['scenario']=='all']},indent=2))
+
+pairs=[]
+for scenario,e in data.items():
+ for trial in e['preparations']:
+  matched={f"{r['strategy']}/{r['protocol']}":r for r in rows if r['scenario']==scenario and r['trial_id']==trial}
+  if len(matched)!=3: continue
+  base=matched['history/baseline']; budget=matched['history/budget-aware']; summary=matched['summary/baseline']
+  if not (base['attempted'] and budget['attempted']): continue
+  pairs.append(dict(scenario=scenario,trial_id=trial,summary_score=summary['score'],baseline_answer=base['answer_present'],budget_aware_answer=budget['answer_present'],baseline_score=base['score'],budget_aware_score=budget['score'],budget_minus_baseline_score=budget['score']-base['score'],baseline_seconds=base['seconds'],budget_aware_seconds=budget['seconds']))
+if pairs:
+ with (root/'pairs.csv').open('w',newline='') as f:
+  w=csv.DictWriter(f,fieldnames=list(pairs[0]));w.writeheader();w.writerows(pairs)

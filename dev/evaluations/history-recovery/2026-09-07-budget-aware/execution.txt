@@ -1,0 +1,98 @@
+[1] TRUE
+gpt-5.6-luna/1/prepare/1 aggregate requests 2 estimated USD 0.004851 
+gpt-5.6-luna/1/prepare/2 aggregate requests 5 estimated USD 0.0148966 
+gpt-5.6-luna/1/prepare/3 aggregate requests 8 estimated USD 0.0252232 
+gpt-5.6-luna/1/prepare/4 aggregate requests 10 estimated USD 0.0306522 
+gpt-5.6-luna/1/summary/baseline/answer aggregate requests 12 estimated USD 0.0320948 
+gpt-5.6-luna/1/history/baseline/answer aggregate requests 15 estimated USD 0.0337418 
+gpt-5.6-luna/1/history/budget-aware/retrieve aggregate requests 17 estimated USD 0.0349114 
+gpt-5.6-luna/1/history/budget-aware/answer aggregate requests 19 estimated USD 0.0364746 
+gpt-5.6-luna/2/prepare/1 aggregate requests 21 estimated USD 0.03701796 
+gpt-5.6-luna/2/prepare/2 aggregate requests 24 estimated USD 0.04710376 
+gpt-5.6-luna/2/prepare/3 aggregate requests 27 estimated USD 0.05760836 
+gpt-5.6-luna/2/prepare/4 aggregate requests 29 estimated USD 0.06320156 
+gpt-5.6-luna/2/history/baseline/answer aggregate requests 32 estimated USD 0.06494956 
+gpt-5.6-luna/2/history/budget-aware/retrieve aggregate requests 34 estimated USD 0.06593382 
+gpt-5.6-luna/2/history/budget-aware/answer aggregate requests 36 estimated USD 0.06757342 
+gpt-5.6-luna/2/summary/baseline/answer aggregate requests 38 estimated USD 0.06849362 
+gpt-5.6-luna/3/prepare/1 aggregate requests 40 estimated USD 0.06903458 
+gpt-5.6-luna/3/prepare/2 aggregate requests 43 estimated USD 0.07909118 
+gpt-5.6-luna/3/prepare/3 aggregate requests 46 estimated USD 0.08940018 
+gpt-5.6-luna/3/prepare/4 aggregate requests 48 estimated USD 0.09491198 
+gpt-5.6-luna/3/history/budget-aware/retrieve aggregate requests 52 estimated USD 0.09632614 
+gpt-5.6-luna/3/history/budget-aware/answer aggregate requests 54 estimated USD 0.09785414 
+gpt-5.6-luna/3/summary/baseline/answer aggregate requests 56 estimated USD 0.09916074 
+gpt-5.6-luna/3/history/baseline/answer aggregate requests 60 estimated USD 0.10125056 
+SAVED original continuations 9 aggregate requests 60 estimated USD 0.10125056 
+gpt-5.6-luna/1/prepare/1 aggregate requests 62 estimated USD 0.10179992 
+gpt-5.6-luna/1/prepare/2 aggregate requests 65 estimated USD 0.11197872 
+gpt-5.6-luna/1/prepare/3 aggregate requests 68 estimated USD 0.12253412 
+gpt-5.6-luna/1/prepare/4 aggregate requests 70 estimated USD 0.12809952 
+gpt-5.6-luna/1/summary/baseline/answer aggregate requests 72 estimated USD 0.12940212 
+gpt-5.6-luna/1/history/baseline/answer aggregate requests 76 estimated USD 0.13167524 
+gpt-5.6-luna/1/history/budget-aware/retrieve aggregate requests 79 estimated USD 0.13318606 
+gpt-5.6-luna/1/history/budget-aware/answer aggregate requests 81 estimated USD 0.13505846 
+gpt-5.6-luna/2/prepare/1 aggregate requests 83 estimated USD 0.13560422 
+gpt-5.6-luna/2/prepare/2 aggregate requests 86 estimated USD 0.14570682 
+gpt-5.6-luna/2/prepare/3 aggregate requests 89 estimated USD 0.15618282 
+gpt-5.6-luna/2/prepare/4 aggregate requests 91 estimated USD 0.16168682 
+gpt-5.6-luna/2/history/baseline/answer aggregate requests 93 estimated USD 0.16246902 
+gpt-5.6-luna/2/history/budget-aware/retrieve aggregate requests 96 estimated USD 0.16412768 
+gpt-5.6-luna/2/history/budget-aware/answer aggregate requests 98 estimated USD 0.16594628 
+gpt-5.6-luna/2/summary/baseline/answer aggregate requests 100 estimated USD 0.16709628 
+gpt-5.6-luna/3/prepare/1 aggregate requests 102 estimated USD 0.16764324 
+gpt-5.6-luna/3/prepare/2 aggregate requests 105 estimated USD 0.17776964 
+gpt-5.6-luna/3/prepare/3 aggregate requests 108 estimated USD 0.18819924 
+gpt-5.6-luna/3/prepare/4 aggregate requests 110 estimated USD 0.19379084 
+gpt-5.6-luna/3/history/budget-aware/retrieve aggregate requests 113 estimated USD 0.19517796 
+gpt-5.6-luna/3/history/budget-aware/answer aggregate requests 115 estimated USD 0.19702696 
+gpt-5.6-luna/3/summary/baseline/answer aggregate requests 117 estimated USD 0.19811896 
+gpt-5.6-luna/3/history/baseline/answer aggregate requests 121 estimated USD 0.20026854 
+SAVED changed-constraint continuations 9 aggregate requests 121 estimated USD 0.20026854 
+gpt-5.6-luna/1/prepare/1 aggregate requests 123 estimated USD 0.2008119 
+gpt-5.6-luna/1/prepare/2 aggregate requests 126 estimated USD 0.2109229 
+gpt-5.6-luna/1/prepare/3 aggregate requests 129 estimated USD 0.2213533 
+gpt-5.6-luna/1/prepare/4 aggregate requests 131 estimated USD 0.2269441 
+gpt-5.6-luna/1/summary/baseline/answer aggregate requests 133 estimated USD 0.2280795 
+gpt-5.6-luna/1/history/baseline/answer aggregate requests 136 estimated USD 0.2300911 
+gpt-5.6-luna/1/history/budget-aware/retrieve aggregate requests 140 estimated USD 0.23144874 
+gpt-5.6-luna/1/history/budget-aware/answer aggregate requests 142 estimated USD 0.23322434 
+gpt-5.6-luna/2/prepare/1 aggregate requests 144 estimated USD 0.2337689 
+gpt-5.6-luna/2/prepare/2 aggregate requests 147 estimated USD 0.2438201 
+gpt-5.6-luna/2/prepare/3 aggregate requests 150 estimated USD 0.2542041 
+gpt-5.6-luna/2/prepare/4 aggregate requests 152 estimated USD 0.2597989 
+gpt-5.6-luna/2/history/baseline/answer aggregate requests 155 estimated USD 0.2616067 
+gpt-5.6-luna/2/history/budget-aware/retrieve aggregate requests 158 estimated USD 0.26304606 
+gpt-5.6-luna/2/history/budget-aware/answer aggregate requests 160 estimated USD 0.26457726 
+gpt-5.6-luna/2/summary/baseline/answer aggregate requests 162 estimated USD 0.26581366 
+gpt-5.6-luna/3/prepare/1 aggregate requests 164 estimated USD 0.26636302 
+gpt-5.6-luna/3/prepare/2 aggregate requests 167 estimated USD 0.27641702 
+gpt-5.6-luna/3/prepare/3 aggregate requests 170 estimated USD 0.28671062 
+gpt-5.6-luna/3/prepare/4 aggregate requests 172 estimated USD 0.29219702 
+gpt-5.6-luna/3/history/budget-aware/retrieve aggregate requests 175 estimated USD 0.293553 
+gpt-5.6-luna/3/history/budget-aware/answer aggregate requests 177 estimated USD 0.2950558 
+gpt-5.6-luna/3/summary/baseline/answer aggregate requests 179 estimated USD 0.2964438 
+gpt-5.6-luna/3/history/baseline/answer aggregate requests 183 estimated USD 0.2985045 
+SAVED resolved-methods continuations 9 aggregate requests 183 estimated USD 0.2985045 
+Warning messages:
+1: Failed to evaluate 2 tool calls.
+✖ [history_search (fc_006d850edc241d7c016a9f0fe0307487d18d879cfad7f0d119)]:
+  Tool call rejected. History access budget_exhausted
+✖ [history_search (fc_006d850edc241d7c016a9f0fe0308087d19be49000a3d86be4)]:
+  Tool call rejected. History access budget_exhausted 
+2: Failed to evaluate 2 tool calls.
+✖ [history_search (fc_030723f799943c95016a9f1017368087d1a10fd5dd686ca78a)]:
+  Tool call rejected. History access budget_exhausted
+✖ [history_search (fc_030723f799943c95016a9f1017368887d1bdf57a103cd6a7b9)]:
+  Tool call rejected. History access budget_exhausted 
+3: Failed to evaluate 2 tool calls.
+✖ [history_search (fc_06bc8b24cab2b3be016a9f10af811887d19346a2cf2ded2b4d)]:
+  Tool call rejected. History access budget_exhausted
+✖ [history_search (fc_06bc8b24cab2b3be016a9f10af811c87d1af6c534a1833c665)]:
+  Tool call rejected. History access budget_exhausted 
+4: Failed to evaluate 2 tool calls.
+✖ [history_search (fc_0d8bd2ec5c0e1d28016a9f117d1b0487d1b1cc84046d29642f)]:
+  Tool call rejected. History access budget_exhausted
+✖ [history_search (fc_0d8bd2ec5c0e1d28016a9f117d1b1087d1b015843ba1dc495c)]:
+  Tool call rejected. History access budget_exhausted 
+FINISHED complete requests 183 estimated USD 0.2985045 
