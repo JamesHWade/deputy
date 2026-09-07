@@ -8,7 +8,7 @@ const knownTools = new Set([
   'mcp__github_inline_comment__create_inline_comment',
 ]);
 const reportedOutcomes = new Set(['completed-with-findings', 'completed-without-findings', 'skipped', 'blocked']);
-const reportedReasons = new Set(['reviewed', 'draft', 'closed', 'trivial', 'already-reviewed', 'permission-denied', 'other']);
+const reportedReasons = new Set(['reviewed', 'draft', 'closed', 'trivial', 'already-reviewed', 'permission-denied', 'diff-unavailable', 'plugin-unavailable', 'subagent-unavailable', 'provider-limit', 'publication-failed', 'policy-conflict', 'other']);
 const commands = [
   'gh pr view', 'gh pr diff', 'gh pr list', 'gh pr comment',
   'gh issue view', 'gh issue list', 'gh search', 'gh api',
