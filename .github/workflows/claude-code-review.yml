@@ -3,18 +3,17 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   claude-review:
     # Fork pull_request runs cannot supply the credentials/OIDC this action needs.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     permissions:
       contents: read
       pull-requests: read
@@ -25,7 +24,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record review start
+        id: start
+        run: echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude Code Review
         id: claude-review
@@ -34,9 +39,53 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
+          show_full_output: false
+          display_report: false
+          prompt: |
+            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment
+
+            Review exactly commit ${{ github.event.pull_request.head.sha }}.
+            Prior Claude comments on older commits do not satisfy this review.
+            After the upstream plugin completes, post a summary with gh pr comment.
+            Include exactly one of these markers according to the plugin's findings:
+            <!-- deputy-claude-review:${{ github.event.pull_request.head.sha }}:${{ github.run_id }}:${{ github.run_attempt }}:with-findings -->
+            <!-- deputy-claude-review:${{ github.event.pull_request.head.sha }}:${{ github.run_id }}:${{ github.run_attempt }}:without-findings -->
+            Include the full reviewed commit SHA visibly in the summary.
+            Only report completion after reviewing the diff; if blocked, explain the
+            blocker and do not use a completion marker. Do not modify repository files.
+
+      - name: Verify review outcome and sanitize diagnostics
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_SHA: ${{ github.event.pull_request.head.sha }}
+          REVIEW_STARTED: ${{ steps.start.outputs.time }}
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+          ACTION_OUTCOME: ${{ steps.claude-review.outcome }}
+        run: node .github/scripts/claude-review-outcome.cjs
+
+      - name: Upload sanitized review outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-review-outcome-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/claude-review-outcome.json
+          retention-days: 14
+          if-no-files-found: warn
+
+  draft-review-notice:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Explain intentional draft skip
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ### Claude review: intentionally skipped
+
+          This PR is a draft. Mark it ready for review to start automatic Claude review.
+          EOF
 
   fork-review-notice:
     if: github.event.pull_request.head.repo.full_name != github.repository
@@ -46,7 +95,7 @@ jobs:
       - name: Explain unsupported automatic fork review
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          ### Claude review skipped for a fork pull request
+          ### Claude review: intentionally skipped (fork pull request)
 
           Automatic Claude review requires credentials unavailable to fork PR workflows.
           A maintainer must review this PR manually. Other configured CI checks still run.
