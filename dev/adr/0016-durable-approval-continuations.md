@@ -89,11 +89,21 @@ inspect its external effect receipt, reconcile outside Deputy, and explicitly
 start any replacement workflow. The API intentionally offers no reset-to-pending
 operation and makes no exactly-once claim.
 
-Records use private directories and immutable revisions with size bounds and
-SHA256 integrity checks. A corrupt latest revision fails closed. Atomic rename
-protects against partial writes and process interruption; no fsync/power-loss
-durability is claimed. The host owns filesystem access and backups. These are
-trusted local R records, not an untrusted upload interchange format.
+Records use private directories, atomic revision commits and SHA256 integrity
+checks. The latest revision contains the complete cumulative effect journal.
+Superseded revisions are pruned under the writer lock after a successful commit;
+old files can remain temporarily after a crash or while a Windows reader holds
+one open. The store is not a historical revision archive. Each serialized revision must fit
+within half of the aggregate byte limit, reserving capacity for the current and
+replacement revisions together. The default 50 MiB store therefore permits a
+25 MiB revision. Oversized initial snapshots are rejected before publication.
+Actual growth of the journal or session can still exhaust the bound.
+
+A reader whose selected revision was pruned retries the latest revision; a
+corrupt latest revision still fails closed. Atomic rename protects against
+partial writes and process interruption; no fsync/power-loss durability is
+claimed. The host owns filesystem access and backups. These are trusted local R
+records, not an untrusted upload interchange format.
 
 ## Usage and limits
 

@@ -1,6 +1,7 @@
 # Internal persistence for approval continuations. Revisions are immutable so a
-# reader sees either the preceding record or the complete next record. The OS
-# lock protects writers for the entire execution, including its external effects.
+# reader sees either the preceding record or the complete next record. Only the
+# latest complete revision is retained; its cumulative effect journal survives
+# pruning. The OS lock protects writers throughout execution and maintenance.
 approval_store_locks <- new.env(parent = emptyenv())
 
 approval_store_abort <- function(message, reason = "invalid_store") {
@@ -69,21 +70,36 @@ approval_store_files <- function(path) {
 }
 
 approval_store_envelope <- function(path) {
-  files <- approval_store_files(path)
-  if (!length(files)) {
-    approval_store_abort("Approval directory has no committed record.")
-  }
-  sizes <- file.info(files)$size
-  if (anyNA(sizes) || sum(sizes) > 50 * 1024^2) {
-    approval_store_abort("Approval revisions exceed the storage limit.")
-  }
-  latest <- files[[length(files)]]
-  envelope <- tryCatch(
-    readRDS(latest),
-    error = function(e) {
+  read_success <- FALSE
+  for (attempt in seq_len(10L)) {
+    files <- approval_store_files(path)
+    if (!length(files)) {
+      approval_store_abort("Approval directory has no committed record.")
+    }
+    sizes <- file.info(files)$size
+    latest <- files[[length(files)]]
+    if (sum(sizes, na.rm = TRUE) > 50 * 1024^2) {
+      approval_store_abort("Approval revisions exceed the storage limit.")
+    }
+    envelope <- tryCatch(
+      approval_store_read_revision(latest),
+      error = identity
+    )
+    if (inherits(envelope, "error")) {
+      newer <- approval_store_files(path)
+      if (!file.exists(latest) && length(newer) && tail(newer, 1L) > latest) {
+        next
+      }
       approval_store_abort("Cannot read the committed approval record.")
     }
-  )
+    read_success <- TRUE
+    break
+  }
+  if (!read_success) {
+    approval_store_abort(
+      "Approval changed during inspection; try reading again."
+    )
+  }
   revision <- as.numeric(sub(
     "^revision-([0-9]{10})\\.rds$",
     "\\1",
@@ -113,10 +129,30 @@ approval_store_envelope <- function(path) {
     )
   }
   limit <- approval_store_limit(envelope$max_bytes)
-  if (sum(sizes) > limit || length(envelope$payload) > limit) {
+  if (sum(sizes, na.rm = TRUE) > limit || length(envelope$payload) > limit) {
     approval_store_abort("Approval revisions exceed the storage limit.")
   }
   envelope
+}
+
+approval_store_read_revision <- function(path) {
+  # A selected revision can disappear after listing when a writer commits and
+  # prunes. The caller retries only that forward-progress case, never corruption.
+  suppressWarnings(readRDS(path))
+}
+
+approval_store_prune <- function(path, keep = character()) {
+  obsolete <- setdiff(approval_store_files(path), keep)
+  pending <- list.files(
+    path,
+    pattern = "^\\.pending-",
+    all.files = TRUE,
+    full.names = TRUE
+  )
+  unlink(c(obsolete, pending))
+  # Windows readers may temporarily prevent unlinking an open old revision.
+  # Its bytes still count toward admission; a completed commit stays successful.
+  invisible(NULL)
 }
 
 approval_store_decode <- function(envelope, path) {
@@ -228,6 +264,22 @@ approval_store_commit <- function(path, record, revision, max_bytes) {
     checksum = digest::digest(payload, algo = "sha256", serialize = FALSE),
     payload = payload
   )
+  bytes <- serialize(envelope, NULL, version = 3)
+  files <- approval_store_files(path)
+  approval_store_prune(path, tail(files, 1L))
+  files <- list.files(path, all.files = TRUE, full.names = TRUE, no.. = TRUE)
+  sizes <- file.info(files)$size
+  auxiliary <- !files %in% approval_store_files(path)
+  if (
+    anyNA(sizes) ||
+      2 * length(bytes) + sum(sizes[auxiliary]) > max_bytes ||
+      length(bytes) + sum(sizes) > max_bytes
+  ) {
+    approval_store_abort(
+      "Approval snapshot must leave room for an atomic replacement within the storage limit.",
+      "size_limit"
+    )
+  }
   target <- file.path(path, sprintf("revision-%010.0f.rds", revision))
   temporary <- tempfile(".pending-", tmpdir = path)
   on.exit(unlink(temporary), add = TRUE)
@@ -237,10 +289,16 @@ approval_store_commit <- function(path, record, revision, max_bytes) {
       tryCatch(
         {
           Sys.chmod(temporary, mode = "0600")
-          saveRDS(envelope, connection, version = 3)
+          approval_store_write_revision(bytes, connection)
         },
         finally = close(connection)
       )
+      if (!identical(file.info(temporary)$size, as.numeric(length(bytes)))) {
+        approval_store_abort(
+          "Approval revision was not written completely.",
+          "commit_failed"
+        )
+      }
       files <- list.files(
         path,
         all.files = TRUE,
@@ -260,6 +318,7 @@ approval_store_commit <- function(path, record, revision, max_bytes) {
           "commit_failed"
         )
       }
+      approval_store_prune(path, target)
     },
     error = function(e) {
       if (inherits(e, "deputy_approval_error")) {
@@ -276,6 +335,10 @@ approval_store_commit <- function(path, record, revision, max_bytes) {
 
 approval_store_rename <- function(from, to) {
   file.rename(from, to)
+}
+
+approval_store_write_revision <- function(bytes, connection) {
+  writeBin(bytes, connection)
 }
 
 approval_store_create <- function(directory, record, max_bytes = 50 * 1024^2) {

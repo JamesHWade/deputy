@@ -193,6 +193,9 @@ test_that("approval restart preserves classed session results and checkpoint met
       class = "checkpoint_report"
     )
   )
+  # Keeping every lifecycle revision would exceed the default 50 MiB store
+  # during resume even though each individual state fits comfortably.
+  metadata$payload <- rep(as.raw(1), 12 * 1024^2)
   effects <- character()
   tool <- ellmer::tool(
     function(value) {
@@ -782,6 +785,42 @@ test_that("resumed approvals retain current host context and current hook denial
   result <- approval_wire_results(fixture$server$requests()[[2L]])[[2L]]
   expect_identical(result$tool_call_id, "call_b")
   expect_match(result$content, "Current hook refuses")
+})
+
+test_that("resumed approvals honor stop-after-tool hooks without bypassing denials", {
+  for (permission in c("allow", "deny")) {
+    fixture <- local_approval_runtime()
+    resumed <- fixture$make_agent()
+    resumed$add_hook(HookMatcher(
+      event = "PreToolUse",
+      callback = function(...) {
+        HookResultPreToolUse(
+          continue = FALSE,
+          permission = permission,
+          reason = "Current hook decision",
+          stop_reason = "stop_after_approved_tool"
+        )
+      }
+    ))
+    result <- resumed$resume_approval(fixture$path, "approve")
+    expect_identical(result$stop_reason, "stop_after_approved_tool")
+    expect_identical(
+      fixture$effects$values,
+      if (permission == "allow") c("a", "b") else "a"
+    )
+    expect_length(fixture$server$requests(), 1L)
+    snapshot <- approval_read(fixture$path)
+    expect_identical(snapshot$status, "stopped")
+    expect_identical(snapshot$effects$call_b$executed, permission == "allow")
+    if (permission == "allow") {
+      expect_identical(snapshot$effects$call_b$result$props$value, "result_b")
+    } else {
+      expect_match(
+        snapshot$effects$call_b$result$props$error,
+        "Current hook decision"
+      )
+    }
+  }
 })
 
 test_that("an exhausted allowance still permits a correlated denial without another model call", {

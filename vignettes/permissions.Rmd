@@ -453,6 +453,13 @@ retry is allowed. An interrupted `resuming` or `continuing` record, or a termina
 reconcile the outcome. Duplicate approval delivery is rejected. This protocol
 does not claim exactly-once effects or power-loss durability.
 
+The latest stored revision retains the complete effect journal. Superseded
+revisions are removed after a successful commit, so repeated lifecycle updates
+do not accumulate copies of the session. Each serialized revision is limited to
+25 MiB within a 50 MiB store budget, leaving room for an atomic replacement.
+Snapshots that cannot fit are rejected before publishing a pending approval;
+later growth of the journal or session remains bounded by the same limit.
+
 The stored transcript support uses ellmer's public content record/replay and the
 same session payload as `save_session()` / `load_session()`. Loading a separate
 session snapshot does not consume an approval. Tools, callbacks and provider

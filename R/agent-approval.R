@@ -295,11 +295,8 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
         output <- tryCatch(
           {
             private$handle_tool_request(request)
-            if (isTRUE(private$should_stop)) {
-              ellmer::tool_reject(
-                "The continuation was stopped before execution."
-              )
-            }
+            # Returning from admission authorizes this operation. A current
+            # hook may request stopping after it; denials already throw above.
             ellmer::with_tool_context(
               list(request = request, turns = private$.chat$get_turns()),
               private$resolve_promise(do.call(request@tool, request@arguments))
