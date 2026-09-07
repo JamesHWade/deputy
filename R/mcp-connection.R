@@ -202,9 +202,9 @@ McpConnection <- R6::R6Class(
       cursor = NULL
     ) {
       kind <- match.arg(kind)
-      if (!is.null(cursor) && !is_nonempty_string(cursor)) {
+      if (!is.null(cursor) && !rlang::is_string(cursor)) {
         abort_deputy(
-          "{.arg cursor} must be NULL or one non-empty string.",
+          "{.arg cursor} must be NULL or one non-missing string.",
           class = "mcp_connection"
         )
       }
@@ -246,10 +246,10 @@ McpConnection <- R6::R6Class(
               anyNA(names(arguments)) ||
               anyDuplicated(names(arguments)) ||
               !all(nzchar(names(arguments))) ||
-              !all(vapply(arguments, is_nonempty_string, logical(1)))))
+              !all(vapply(arguments, rlang::is_string, logical(1)))))
       ) {
         abort_deputy(
-          "Prompt arguments must be a named list of non-empty strings.",
+          "Prompt arguments must be a named list of scalar, non-missing strings.",
           class = "mcp_connection"
         )
       }

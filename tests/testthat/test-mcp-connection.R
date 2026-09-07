@@ -148,7 +148,27 @@ test_that("catalogue discovery does not authorize resource or prompt access", {
     )
   )
   expect_s7_class(deny, PermissionResultDeny)
-  expect_error(connection$get_prompt("summarize", list(topic = 1)), "argument")
+  for (cursor in c("", "  ")) {
+    page <- mcp_test_await(connection$discover("resources", cursor = cursor))
+    expect_identical(page$source$operation, "resources/list")
+    expect_identical(page$result$resources[[1]]$uri, "fixture://denied")
+  }
+  for (topic in c("", "  ")) {
+    blank <- mcp_test_await(connection$get_prompt(
+      "summarize",
+      list(topic = topic)
+    ))
+    expect_identical(
+      blank$result$messages[[1]]$content$text,
+      paste("Summarize empty", topic)
+    )
+  }
+  for (invalid in list(1, NA_character_, character(), c("one", "two"), NULL)) {
+    expect_error(
+      connection$get_prompt("summarize", list(topic = invalid)),
+      "argument"
+    )
+  }
   expect_error(
     connection$discover("resources", cursor = NA_character_),
     "cursor"
