@@ -30,20 +30,25 @@ jobs:
       - name: Test review evidence verifier
         run: node --test .github/scripts/claude-review-outcome.test.cjs
 
-      - name: Record review start
+      - name: Freeze verifier and record review start
         id: start
-        run: echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+        run: |
+          install -m 0444 .github/scripts/claude-review-outcome.cjs "$RUNNER_TEMP/claude-review-verifier.cjs"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/claude-review-verifier.cjs" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
           # Supported scoped GitHub token auth also permits reviewing workflow PRs.
-          # https://github.com/anthropics/claude-code-action/blob/main/docs/custom-app.md
+          # https://github.com/anthropics/claude-code-action/blob/main/action.yml
           github_token: ${{ github.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
+          claude_args: >-
+            --allowedTools "Skill(code-review:code-review),Agent,Task,TaskOutput,TodoWrite,TaskCreate,TaskUpdate,TaskList,Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh search:*),mcp__github_inline_comment__create_inline_comment"
           show_full_output: false
           display_report: false
           prompt: |
@@ -51,6 +56,11 @@ jobs:
 
             Review exactly commit ${{ github.event.pull_request.head.sha }}.
             Prior Claude comments on older commits do not satisfy this review.
+            Use the upstream plugin via Skill(code-review:code-review), including its
+            review agents. Use gh pr view/diff and Read/Glob/Grep for inspection;
+            gh api and arbitrary shell commands are not enabled.
+            Every inline finding must include this provenance marker in its body:
+            <!-- deputy-claude-review:${{ github.event.pull_request.head.sha }}:${{ github.run_id }}:${{ github.run_attempt }}:finding -->
             After the upstream plugin completes, post a summary with gh pr comment.
             Include exactly one of these markers according to the plugin's findings:
             <!-- deputy-claude-review:${{ github.event.pull_request.head.sha }}:${{ github.run_id }}:${{ github.run_attempt }}:with-findings -->
@@ -68,7 +78,14 @@ jobs:
           REVIEW_STARTED: ${{ steps.start.outputs.time }}
           EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
           ACTION_OUTCOME: ${{ steps.claude-review.outcome }}
-        run: node .github/scripts/claude-review-outcome.cjs
+          VERIFIER_DIGEST: ${{ steps.start.outputs.digest }}
+        run: |
+          if ! printf '%s  %s\n' "$VERIFIER_DIGEST" "$RUNNER_TEMP/claude-review-verifier.cjs" | sha256sum --check --status; then
+            echo '### Claude review: blocked/failed' >> "$GITHUB_STEP_SUMMARY"
+            echo 'The frozen verification control is missing or changed.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          node "$RUNNER_TEMP/claude-review-verifier.cjs"
 
       - name: Upload sanitized review outcome
         if: always()

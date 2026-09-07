@@ -18,9 +18,10 @@ test('clean and findings outcomes require current-run bot evidence', () => {
   const clean = { ...context(), comments: [comment('without-findings')] };
   assert.equal(classify(clean).outcome, 'completed without findings');
   const findings = { ...context(), comments: [comment('with-findings')],
-    inline: [{ ...comment('with-findings'), commit_id: sha }] };
+    inline: [{ ...comment('finding'), commit_id: sha }] };
   assert.equal(classify(findings).outcome, 'completed with findings');
   assert.equal(classify({ ...findings, inline: [] }).outcome, 'blocked/failed');
+  assert.equal(classify({ ...findings, inline: [{ ...findings.inline[0], body: 'Unrelated concurrent bot finding' }] }).outcome, 'blocked/failed');
   assert.equal(classify({ ...findings, inline: [{ ...findings.inline[0], commit_id: 'b'.repeat(40) }] }).outcome, 'blocked/failed');
   for (const replacement of [
     { user: { login: 'someone' } }, { created_at: '2026-09-05T00:00:00Z' },
@@ -41,6 +42,6 @@ test('diagnostics never emit free-form names, command arguments, or SDK text', (
       { tool_name: 'Bash', tool_input: { command: `env ${secret}` } },
     ] }]);
   assert.equal(JSON.stringify(diagnostic).includes(secret), false);
-  assert.deepEqual(diagnostic.denied_operations, ['Bash(gh pr comment)', 'Bash(other-command)', 'Skill', 'other-tool']);
+  assert.deepEqual(diagnostic.denied_operations, ['Bash(gh pr comment)', 'Bash(other-command)', 'Skill(other-skill)', 'other-tool']);
   assert.equal(classify({ ...context(), diagnostic, comments: [comment('without-findings')] }).outcome, 'blocked/failed');
 });

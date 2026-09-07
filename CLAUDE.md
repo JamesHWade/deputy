@@ -641,10 +641,16 @@ The same-repository job passes the action its supported `github_token` input wit
 OIDC or an App token. Reviews post as `github-actions[bot]`.
 Draft PRs explicitly skip automatic review until ready. Ready reviews check out the
 exact PR head and require a current-run `github-actions[bot]` summary tied to that SHA; findings
-also require exact-commit inline comments. Missing evidence or denied tools fail
+also require exact-commit inline comments carrying the same run marker. Missing
+evidence or denied tools fail
 the review job. The only uploaded diagnostic is `claude-review-outcome.json`: fixed
 outcome/reason values, the reviewed SHA, a denial count, and allowlisted operation
 names. Never upload the raw SDK execution file or enable full-output logging.
+The verifier is copied out of the model workspace before review and its digest is
+checked before execution. This protects against model-workspace changes; it is not
+an immutable security boundary against repository writers, who can also edit the
+workflow. This workflow trusts same-repository writers, and the action retains its
+actor write-access check. Fork contributions remain excluded.
 Run workflow evidence tests with `node --test .github/scripts/claude-review-outcome.test.cjs`.
 
 See `dev/runtime-modules.md` for internal module boundaries and the documented

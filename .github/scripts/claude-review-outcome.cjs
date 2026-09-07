@@ -10,6 +10,7 @@ const commands = [
   'gh pr view', 'gh pr diff', 'gh pr list', 'gh pr comment',
   'gh issue view', 'gh issue list', 'gh search', 'gh api',
   'git diff', 'git show', 'git log', 'git rev-parse',
+  'cat', 'ls', 'find', 'sed', 'head', 'tail', 'wc', 'rg', 'grep', 'pwd',
 ];
 
 function diagnostics(messages) {
@@ -21,6 +22,8 @@ function diagnostics(messages) {
     permission_denials_count: denials.length,
     denied_operations: [...new Set(denials.map((denial) => {
       const tool = knownTools.has(denial.tool_name) ? denial.tool_name : 'other-tool';
+      if (tool === 'Skill') return denial.tool_input?.skill === 'code-review:code-review'
+        ? 'Skill(code-review:code-review)' : 'Skill(other-skill)';
       if (tool !== 'Bash') return tool;
       const command = denial.tool_input?.command;
       const prefix = typeof command === 'string' && commands.find((candidate) =>
@@ -38,7 +41,8 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, start
   const fresh = (comment) => comment.user?.login === 'github-actions[bot]' &&
     Date.parse(comment.created_at) >= Date.parse(started);
   const summaries = comments.filter(fresh);
-  const findings = inline.filter((comment) => fresh(comment) && comment.commit_id === sha);
+  const findings = inline.filter((comment) => fresh(comment) && comment.commit_id === sha &&
+    comment.body?.includes(`${marker}:finding -->`));
   const withFindings = summaries.some((comment) => comment.body?.includes(`${marker}:with-findings -->`));
   const withoutFindings = summaries.some((comment) => comment.body?.includes(`${marker}:without-findings -->`));
   if (withFindings && !withoutFindings && findings.length) {
