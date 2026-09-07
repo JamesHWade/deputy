@@ -337,7 +337,13 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             rlang::cnd_signal(error)
           }
         )
-        if (!agent$.__enclos_env__$private$should_stop) {
+        if (
+          !agent$.__enclos_env__$private$should_stop ||
+            identical(
+              agent$.__enclos_env__$private$.approval_resume$record$decision$decision,
+              "deny"
+            )
+        ) {
           tryCatch(
             agent$.__enclos_env__$private$execute_approval_resume(),
             error = function(error) {

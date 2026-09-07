@@ -632,3 +632,24 @@ test_that("resumed approvals retain current host context and current hook denial
   expect_identical(result$tool_call_id, "call_b")
   expect_match(result$content, "Current hook refuses")
 })
+
+test_that("an exhausted allowance still permits a correlated denial without another model call", {
+  fixture <- local_approval_runtime(
+    responses = list(approval_batch_reply("b")),
+    agent_usage_limits = UsageLimits(max_tool_calls = 5),
+    run_usage_limits = UsageLimits(max_tool_calls = 0),
+    pause_on_b = FALSE
+  )
+  resumed <- fixture$make_agent()
+  result <- resumed$resume_approval(fixture$path, "deny")
+  expect_identical(result$stop_reason, "tool_call_limit")
+  expect_identical(fixture$effects$values, character())
+  expect_length(fixture$server$requests(), 1L)
+  snapshot <- approval_read(fixture$path)
+  expect_identical(snapshot$decision$decision, "deny")
+  expect_false(snapshot$effects$call_b$executed)
+  expect_match(snapshot$effects$call_b$result$props$error, "host denied")
+  result_turn <- tail(resumed$get_turns(), 1L)[[1L]]
+  expect_s3_class(result_turn, "ellmer::UserTurn")
+  expect_identical(result_turn@contents[[1L]]@request@id, "call_b")
+})
