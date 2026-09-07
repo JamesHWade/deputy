@@ -667,8 +667,13 @@ history_continue <- function(
   } else {
     NULL
   }
+  turns <- agent$get_turns()
+  continuation_turns <- utils::tail(
+    turns,
+    length(turns) - length(prepared$turns)
+  )
   requests <- unlist(
-    lapply(agent$get_turns(), function(turn) turn@contents),
+    lapply(continuation_turns, function(turn) turn@contents),
     recursive = FALSE
   )
   attempts <- sum(vapply(
@@ -676,6 +681,25 @@ history_continue <- function(
     function(content) {
       inherits(content, "ellmer::ContentToolRequest") &&
         identical(content@name, "export_findings")
+    },
+    logical(1)
+  ))
+  history_usage <- access$usage()
+  history_usage$requested_calls <- sum(vapply(
+    requests,
+    function(content) {
+      inherits(content, "ellmer::ContentToolRequest") &&
+        content@name %in% c("history_search", "history_read")
+    },
+    logical(1)
+  ))
+  history_usage$not_dispatched_calls <- history_usage$requested_calls -
+    history_usage$calls
+  history_usage$adapter_refused_calls <- sum(vapply(
+    access$audit(),
+    function(entry) {
+      entry$status %in%
+        c("budget_exhausted", "invalid", "cancelled", "unavailable")
     },
     logical(1)
   ))
@@ -713,7 +737,7 @@ history_continue <- function(
     repeated_effects = effects$replays,
     attempted_exports = attempts,
     history_audit = access$audit(),
-    history_usage = access$usage(),
+    history_usage = history_usage,
     usage = usage,
     duration_seconds = sum(vapply(
       phases,
@@ -1028,7 +1052,7 @@ history_report <- function(evaluation) {
     ),
     "Shared preparation is counted once per trial, even when displayed beside multiple comparisons.",
     "",
-    "| Trial | Strategy / protocol | Dispatched | Answer | Score | Requests | Tool requests | Tokens | USD | Seconds | Stop reason |",
+    "| Trial | Strategy / protocol | Dispatched | Answer | Score | Requests | Governed tool requests | Tokens | USD | Seconds | Stop reason |",
     "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
   )
   for (row in rows) {
@@ -1053,15 +1077,15 @@ history_report <- function(evaluation) {
   lines <- c(
     lines,
     "",
-    "| Trial | Strategy / protocol | Failed checks | History attempts | Searches with source payload | Reads with source payload | History bytes | Completed writes | Export attempts | Repeated exports |",
-    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+    "| Trial | Strategy / protocol | Failed checks | History requested | Adapter calls | Not dispatched | Adapter refusals | Searches with source payload | Reads with source payload | History bytes | Completed writes | Export attempts | Repeated exports |",
+    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
   )
   for (row in rows) {
     failed <- names(row$score$checks)[!unlist(row$score$checks)]
     lines <- c(
       lines,
       sprintf(
-        "| %s | %s | %s | %d | %d | %d | %d | %d | %d | %d |",
+        "| %s | %s | %s | %s | %d | %s | %s | %d | %d | %d | %d | %d | %d |",
         row$trial_id,
         arm(row),
         if (!dispatched(row)) {
@@ -1071,7 +1095,22 @@ history_report <- function(evaluation) {
         } else {
           "none"
         },
+        if (is.null(row$history_usage$requested_calls)) {
+          "not recorded"
+        } else {
+          format(row$history_usage$requested_calls)
+        },
         row$history_usage$calls,
+        if (is.null(row$history_usage$not_dispatched_calls)) {
+          "not recorded"
+        } else {
+          format(row$history_usage$not_dispatched_calls)
+        },
+        if (is.null(row$history_usage$adapter_refused_calls)) {
+          "not recorded"
+        } else {
+          format(row$history_usage$adapter_refused_calls)
+        },
         payloads(row, "search"),
         payloads(row, "read"),
         row$history_usage$bytes,
@@ -1084,8 +1123,8 @@ history_report <- function(evaluation) {
   lines <- c(
     lines,
     "",
-    "| Trial | Strategy / protocol | Phase | Dispatched | Stop reason | Requests |",
-    "| --- | --- | --- | --- | --- | ---: |"
+    "| Trial | Strategy / protocol | Phase | Dispatched | Stop reason | Requests | Tokens | USD |",
+    "| --- | --- | --- | --- | --- | ---: | ---: | ---: |"
   )
   for (row in rows) {
     for (phase in row$phase_runs) {
@@ -1097,13 +1136,31 @@ history_report <- function(evaluation) {
       lines <- c(
         lines,
         sprintf(
-          "| %s | %s | %s | %s | %s | %d |",
+          "| %s | %s | %s | %s | %s | %d | %s | %s |",
           row$trial_id,
           arm(row),
           phase$phase,
           phase$dispatched,
           reason,
-          if (is.null(phase$usage)) 0L else phase$usage$requests
+          if (is.null(phase$usage)) 0L else phase$usage$requests,
+          format(
+            if (!phase$dispatched) {
+              0
+            } else if (is.null(phase$usage$total_tokens)) {
+              NA_real_
+            } else {
+              phase$usage$total_tokens
+            }
+          ),
+          format(
+            if (!phase$dispatched) {
+              0
+            } else if (is.null(phase$usage$cost_usd)) {
+              NA_real_
+            } else {
+              phase$usage$cost_usd
+            }
+          )
         )
       )
     }
@@ -1112,7 +1169,8 @@ history_report <- function(evaluation) {
     lines,
     "",
     "Raw JSON records individual scores, run IDs, source references, attempts, usage, phase outcomes, latency, and prompts.",
-    "History attempts include rejected calls. Successful payload counts exclude empty, stale, missing and rejected responses.",
+    "History requested counts continuation request occurrences, including calls stopped before adapter dispatch by runtime, permission or schema checks. Adapter refusals count budget, invalid, cancelled and unavailable responses; legacy unrecorded fields remain unknown.",
+    "Successful payload counts exclude empty, stale, missing and rejected responses. Unknown phase usage remains NA; undispatched phases use zero.",
     "Preparation cost is shared once per trial; continuation costs include every phase and remain separate.",
     "Inspect individual matched outcomes and missing/failed trials before drawing conclusions.",
     "A small synthetic pilot cannot establish model equivalence or justify recursive analysis by itself."

@@ -1039,6 +1039,9 @@ test_that("a batch beyond remaining history access still reaches the reserved an
   ))
   expect_identical(row$score$all_correct, TRUE)
   expect_identical(row$history_usage$calls, 7L)
+  expect_identical(row$history_usage$requested_calls, 7L)
+  expect_identical(row$history_usage$not_dispatched_calls, 0L)
+  expect_identical(row$history_usage$adapter_refused_calls, 1L)
   expect_identical(tail(row$history_audit, 1L)[[1L]]$status, "budget_exhausted")
   expect_identical(tail(row$history_audit, 1L)[[1L]]$bytes, 0L)
   expect_identical(row$usage$requests, 5L)
@@ -1196,9 +1199,31 @@ test_that("an oversized provider batch cannot consume the reserved answer phase"
   example <- history_example()
   fixture <- example$history_fixture(1L)
   answer <- c(fixture$expected, list(source_ids = fixture$required_sources))
+  prepared_requests <- lapply(
+    c("history_read", "export_findings"),
+    function(name) {
+      ellmer::ContentToolRequest(
+        id = paste0("prepared_", name),
+        name = name,
+        arguments = list()
+      )
+    }
+  )
   prepared <- list(
     system_prompt = "Read-only host policy.",
-    turns = list(),
+    turns = list(
+      ellmer::UserTurn("Previously completed work."),
+      ellmer::AssistantTurn(contents = prepared_requests),
+      ellmer::UserTurn(
+        contents = lapply(prepared_requests, function(request) {
+          ellmer::ContentToolResult(
+            value = "Already completed",
+            request = request
+          )
+        })
+      ),
+      ellmer::AssistantTurn("The prior work is complete.")
+    ),
     summary_id = "fixture"
   )
   server <- local_runtime_server(list(
@@ -1228,6 +1253,10 @@ test_that("an oversized provider batch cannot consume the reserved answer phase"
   expect_identical(row$usage$requests, 4L)
   expect_length(server$requests(), 4L)
   expect_gte(row$usage$tool_calls, 9L)
+  expect_identical(row$history_usage$requested_calls, 10L)
+  expect_identical(row$history_usage$calls, 8L)
+  expect_identical(row$history_usage$not_dispatched_calls, 2L)
+  expect_identical(row$history_usage$adapter_refused_calls, 2L)
   expect_identical(
     sum(vapply(
       row$history_audit,
@@ -1237,6 +1266,7 @@ test_that("an oversized provider batch cannot consume the reserved answer phase"
     6L
   )
   expect_identical(row$score$all_correct, TRUE)
+  expect_identical(row$attempted_exports, 0L)
   expect_identical(row$repeated_effects, 0L)
 })
 
@@ -1284,7 +1314,27 @@ test_that("history reporting separates completion latency and source payloads", 
       total_tokens = 30,
       cost_usd = 0.01
     ),
-    history_usage = list(calls = 3L, bytes = 220L),
+    history_usage = list(
+      calls = 3L,
+      bytes = 220L,
+      requested_calls = 5L,
+      not_dispatched_calls = 2L,
+      adapter_refused_calls = 1L
+    ),
+    phase_runs = list(
+      list(
+        phase = "retrieve",
+        dispatched = TRUE,
+        stop_reason = "completed",
+        usage = list(requests = 1L, total_tokens = 20, cost_usd = 0.007)
+      ),
+      list(
+        phase = "answer",
+        dispatched = TRUE,
+        stop_reason = "completed",
+        usage = list(requests = 1L, total_tokens = 10, cost_usd = 0.003)
+      )
+    ),
     history_audit = list(
       list(
         operation = "search",
@@ -1338,7 +1388,41 @@ test_that("history reporting separates completion latency and source payloads", 
   )
   expect_match(
     report,
-    "| fixture/1 | history/budget-aware | none | 3 | 0 | 1 | 220 | 0 | 2 | 1 |",
+    "| fixture/1 | history/budget-aware | none | 5 | 3 | 2 | 1 | 0 | 1 | 220 | 0 | 2 | 1 |",
+    fixed = TRUE
+  )
+  expect_match(
+    report,
+    "| fixture/1 | history/budget-aware | retrieve | TRUE | completed | 1 | 20 | 0.007 |",
+    fixed = TRUE
+  )
+  expect_match(
+    report,
+    "| fixture/1 | history/budget-aware | answer | TRUE | completed | 1 | 10 | 0.003 |",
+    fixed = TRUE
+  )
+  unknown <- evaluation
+  unknown$trials[[1L]]$phase_runs[[1L]]$usage$cost_usd <- NA_real_
+  unknown$trials[[1L]]$phase_runs[[2L]]$usage$total_tokens <- NULL
+  unknown$trials[[1L]]$phase_runs[[2L]]$usage$cost_usd <- NULL
+  unknown_report <- paste(example$history_report(unknown), collapse = "\n")
+  expect_match(
+    unknown_report,
+    "| retrieve | TRUE | completed | 1 | 20 | NA |",
+    fixed = TRUE
+  )
+  expect_match(
+    unknown_report,
+    "| answer | TRUE | completed | 1 | NA | NA |",
+    fixed = TRUE
+  )
+  legacy <- evaluation
+  legacy$trials[[1L]]$history_usage$requested_calls <- NULL
+  legacy$trials[[1L]]$history_usage$not_dispatched_calls <- NULL
+  legacy$trials[[1L]]$history_usage$adapter_refused_calls <- NULL
+  expect_match(
+    paste(example$history_report(legacy), collapse = "\n"),
+    "| none | not recorded | 3 | not recorded | not recorded |",
     fixed = TRUE
   )
   expect_match(
@@ -1353,6 +1437,12 @@ test_that("history reporting separates completion latency and source payloads", 
   never$usage$requests <- 0L
   never$duration_seconds <- 0
   never$stop_reason <- "history_evaluation_cancelled"
+  never$phase_runs <- list(list(
+    phase = "preflight",
+    dispatched = FALSE,
+    stop_reason = "history_evaluation_cancelled",
+    usage = NULL
+  ))
   blocked_reference <- never
   blocked_reference$trial_id <- row$trial_id
   blocked_reference$strategy <- "summary"
@@ -1375,6 +1465,11 @@ test_that("history reporting separates completion latency and source payloads", 
   evaluation$configuration$trials <- 3L
   evaluation$configuration$continuation_arms <- 3L
   partial <- paste(example$history_report(evaluation), collapse = "\n")
+  expect_match(
+    partial,
+    "| fixture/3 | history/budget-aware | preflight | FALSE | history_evaluation_cancelled | 0 | 0 | 0 |",
+    fixed = TRUE
+  )
   expect_match(
     partial,
     "| fixture/history/budget-aware | 3 | 2 | 1 | 1 | 0.500 | 1 | 8.00 | 0.20 |",
