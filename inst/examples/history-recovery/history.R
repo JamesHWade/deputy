@@ -52,7 +52,8 @@ history_access <- function(
     status,
     ids = character(),
     revisions = character(),
-    bytes = 0L
+    bytes = 0L,
+    source_bytes = 0L
   ) {
     state$audit[[length(state$audit) + 1L]] <- list(
       operation = operation,
@@ -60,6 +61,7 @@ history_access <- function(
       item_ids = ids,
       revisions = revisions,
       bytes = bytes,
+      source_bytes = source_bytes,
       call = state$calls
     )
   }
@@ -113,7 +115,15 @@ history_access <- function(
     } else {
       character()
     }
-    record(operation, payload$status, ids, revisions, bytes)
+    source_bytes <- sum(vapply(
+      payload$items,
+      function(item) {
+        value <- if (operation == "search") item$excerpt else item$text
+        nchar(value, type = "bytes")
+      },
+      integer(1)
+    ))
+    record(operation, payload$status, ids, revisions, bytes, source_bytes)
     output
   }
   search <- function(query) {

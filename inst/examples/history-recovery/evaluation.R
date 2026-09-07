@@ -889,6 +889,23 @@ history_evaluate <- function(
             row$task_model <- task_model
             row$transitions <- length(prepared$summaries)
             rows[[length(rows) + 1L]] <- row
+            if (
+              !is.null(row$error_class) &&
+                row$error_class %in%
+                  c(
+                    "history_evaluation_cancelled",
+                    "history_evaluation_budget",
+                    "history_evaluation_no_terminal"
+                  )
+            ) {
+              cli::cli_abort(
+                "Evaluation stopped after a continuation failure.",
+                class = row$error_class
+              )
+            }
+            if (length(rows) < length(schedule) || is.null(row$answer)) {
+              budget$check()
+            }
           }
         }
       }
@@ -949,15 +966,30 @@ history_report <- function(evaluation) {
     )
   }
   payloads <- function(row, operation) {
-    sum(vapply(
-      row$history_audit,
+    successful <- Filter(
       function(entry) {
-        identical(entry$operation, operation) &&
-          identical(entry$status, "ok") &&
-          length(entry$item_ids) > 0L
+        identical(entry$operation, operation) && identical(entry$status, "ok")
+      },
+      row$history_audit
+    )
+    if (
+      any(vapply(
+        successful,
+        function(entry) {
+          length(entry$item_ids) > 0L && is.null(entry$source_bytes)
+        },
+        logical(1)
+      ))
+    ) {
+      return("not recorded")
+    }
+    format(sum(vapply(
+      successful,
+      function(entry) {
+        !is.null(entry$source_bytes) && entry$source_bytes > 0L
       },
       logical(1)
-    ))
+    )))
   }
   lines <- c(
     "# Bounded history recovery pilot",
@@ -1152,7 +1184,7 @@ history_report <- function(evaluation) {
     lines <- c(
       lines,
       sprintf(
-        "| %s | %s | %s | %s | %d | %s | %s | %d | %d | %d | %d | %d | %d |",
+        "| %s | %s | %s | %s | %d | %s | %s | %s | %s | %d | %d | %d | %d |",
         row$trial_id,
         arm(row),
         if (!dispatched(row)) {
@@ -1237,7 +1269,7 @@ history_report <- function(evaluation) {
     "",
     "Raw JSON records individual scores, run IDs, source references, attempts, usage, phase outcomes, latency, and prompts.",
     "History requested counts continuation request occurrences, including calls stopped before adapter dispatch by runtime, permission or schema checks. Adapter refusals count budget, invalid, cancelled and unavailable responses; legacy unrecorded fields remain unknown.",
-    "Successful payload counts exclude empty, stale, missing and rejected responses. Unknown phase usage remains NA; undispatched phases use zero.",
+    "Successful payload counts require nonempty source text or excerpts and exclude stale, missing and rejected responses. Legacy audits without source-byte counts remain unknown. Unknown phase usage remains NA; undispatched phases use zero.",
     "Preparation cost is shared once per trial; continuation costs include every phase and remain separate.",
     "Inspect individual matched outcomes and missing/failed trials before drawing conclusions.",
     "A small synthetic pilot cannot establish model equivalence or justify recursive analysis by itself."

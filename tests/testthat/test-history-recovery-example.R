@@ -1317,6 +1317,277 @@ test_that("unknown or duplicate protocols are rejected before model dispatch", {
   expect_identical(calls, 0L)
 })
 
+test_that("aggregate continuation stops retain the terminal row and stop the schedule", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  # Isolate the evaluator boundary; continuations still use the real runtime.
+  example$history_prepare <- function(
+    fixture,
+    chat,
+    budget,
+    trial_id,
+    max_tokens
+  ) {
+    list(
+      fixture = fixture,
+      system_prompt = "Read-only host policy.",
+      turns = list(),
+      summary_id = "fixture",
+      summaries = list(1L, 2L, 3L)
+    )
+  }
+  answer <- as.character(jsonlite::toJSON(
+    c(fixture$expected, list(source_ids = character())),
+    auto_unbox = TRUE
+  ))
+  wire <- local({
+    reply <- runtime_reply
+    function(request, count) {
+      if (!is.null(request$response_format)) {
+        reply(answer, stream = FALSE)
+      } else {
+        reply("Ready.")
+      }
+    }
+  })
+  for (case in c(
+    "request",
+    "final-request",
+    "exact-success",
+    "unknown",
+    "cost"
+  )) {
+    server <- local_runtime_server(wire)
+    factories <- 0L
+    factory <- function(model) {
+      factories <<- factories + 1L
+      runtime_chat(server, name = if (case == "cost") "OpenAI" else "fixture")
+    }
+    evaluation <- suppressWarnings(example$history_evaluate(
+      factory,
+      fixture,
+      trials = 1L,
+      helper_models = "fixture",
+      task_model = "fixture",
+      max_requests = switch(
+        case,
+        request = 1L,
+        `final-request` = 5L,
+        `exact-success` = 6L,
+        100L
+      ),
+      max_cost_usd = switch(case, unknown = 1, cost = 1e-8, NULL),
+      protocols = c("baseline", "budget-aware")
+    ))
+    expected_rows <- if (case %in% c("final-request", "exact-success")) {
+      3L
+    } else {
+      1L
+    }
+    expect_length(evaluation$trials, expected_rows)
+    expect_identical(factories, expected_rows, info = case)
+    expect_length(evaluation$schedule, 3L)
+    expect_identical(
+      length(server$requests()),
+      evaluation$usage$requests,
+      info = case
+    )
+    if (case == "exact-success") {
+      expect_null(evaluation$failure)
+      expect_true(all(vapply(
+        evaluation$trials,
+        function(row) !is.null(row$answer),
+        logical(1)
+      )))
+    } else {
+      expect_identical(
+        evaluation$failure$class,
+        "history_evaluation_budget",
+        info = case
+      )
+      expect_null(tail(evaluation$trials, 1L)[[1L]]$answer)
+    }
+    expect_identical(
+      tail(evaluation$trials, 1L)[[1L]]$stop_reason,
+      switch(
+        case,
+        request = "request_limit",
+        `final-request` = "request_limit",
+        `exact-success` = "complete",
+        unknown = "cost_unavailable",
+        cost = "cost_limit"
+      ),
+      info = case
+    )
+  }
+})
+
+test_that("transient cancellation on the final arm remains an experiment failure", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  example$history_prepare <- function(
+    fixture,
+    chat,
+    budget,
+    trial_id,
+    max_tokens
+  ) {
+    list(
+      fixture = fixture,
+      system_prompt = "Read-only.",
+      turns = list(),
+      summary_id = "fixture",
+      summaries = list(1L, 2L, 3L)
+    )
+  }
+  answer <- as.character(jsonlite::toJSON(
+    c(fixture$expected, list(source_ids = character())),
+    auto_unbox = TRUE
+  ))
+  server <- local_runtime_server(local({
+    reply <- runtime_reply
+    function(request, count) {
+      if (!is.null(request$response_format)) {
+        reply(answer, stream = FALSE)
+      } else {
+        reply("Ready.")
+      }
+    }
+  }))
+  factories <- 0L
+  cancelled_once <- FALSE
+  factory <- function(model) {
+    factories <<- factories + 1L
+    runtime_chat(server)
+  }
+  cancelled <- function() {
+    if (factories == 3L && !cancelled_once) {
+      cancelled_once <<- TRUE
+      return(TRUE)
+    }
+    FALSE
+  }
+  evaluation <- example$history_evaluate(
+    factory,
+    fixture,
+    trials = 1L,
+    helper_models = "fixture",
+    task_model = "fixture",
+    protocols = c("baseline", "budget-aware"),
+    cancelled = cancelled
+  )
+  expect_identical(evaluation$failure$class, "history_evaluation_cancelled")
+  expect_length(evaluation$trials, 3L)
+  expect_length(server$requests(), 4L)
+  expect_false(evaluation$trials[[3L]]$attempted)
+  expect_false(cancelled())
+})
+
+test_that("missing terminal evidence stops later arms even with apparent capacity", {
+  example <- history_example()
+  example$history_prepare <- function(
+    fixture,
+    chat,
+    budget,
+    trial_id,
+    max_tokens
+  ) {
+    list(
+      fixture = fixture,
+      system_prompt = "Read-only.",
+      turns = list(),
+      summary_id = "fixture",
+      summaries = list(1L, 2L, 3L)
+    )
+  }
+  original_budget <- example$history_budget
+  example$history_budget <- function(...) {
+    budget <- original_budget(...)
+    budget$run <- function(...) {
+      rlang::abort(
+        "No terminal evidence.",
+        class = "history_evaluation_no_terminal"
+      )
+    }
+    budget
+  }
+  server <- local_runtime_server(list(runtime_reply("Must not dispatch.")))
+  factories <- 0L
+  factory <- function(model) {
+    factories <<- factories + 1L
+    runtime_chat(server)
+  }
+  evaluation <- example$history_evaluate(
+    factory,
+    example$history_fixture(1L),
+    trials = 1L,
+    helper_models = "fixture",
+    task_model = "fixture",
+    protocols = c("baseline", "budget-aware")
+  )
+  expect_identical(evaluation$failure$class, "history_evaluation_no_terminal")
+  expect_length(evaluation$trials, 1L)
+  expect_identical(factories, 1L)
+  expect_length(server$requests(), 0L)
+})
+
+test_that("a per-continuation request limit does not stop the matched schedule", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  example$history_prepare <- function(
+    fixture,
+    chat,
+    budget,
+    trial_id,
+    max_tokens
+  ) {
+    list(
+      fixture = fixture,
+      system_prompt = "Read-only host policy.",
+      turns = list(),
+      summary_id = "fixture",
+      summaries = list(1L, 2L, 3L)
+    )
+  }
+  answer <- as.character(jsonlite::toJSON(
+    c(fixture$expected, list(source_ids = character())),
+    auto_unbox = TRUE
+  ))
+  server <- local_runtime_server(local({
+    reply <- runtime_reply
+    function(request, count) {
+      if (count <= 8L) {
+        return(reply(
+          tool = "history_read",
+          arguments = list(item_id = paste0("missing-", count))
+        ))
+      }
+      if (!is.null(request$response_format)) {
+        reply(answer, stream = FALSE)
+      } else {
+        reply("Ready.")
+      }
+    }
+  }))
+  evaluation <- suppressWarnings(example$history_evaluate(
+    function(model) runtime_chat(server),
+    fixture,
+    trials = 1L,
+    helper_models = "fixture",
+    task_model = "fixture",
+    protocols = c("baseline", "budget-aware")
+  ))
+  expect_null(evaluation$failure)
+  expect_length(evaluation$trials, 3L)
+  expect_identical(evaluation$trials[[1L]]$stop_reason, "request_limit")
+  expect_identical(evaluation$trials[[1L]]$usage$requests, 8L)
+  expect_null(evaluation$trials[[1L]]$answer)
+  expect_type(evaluation$trials[[2L]]$answer, "list")
+  expect_type(evaluation$trials[[3L]]$answer, "list")
+  expect_identical(evaluation$usage$requests, 13L)
+  expect_length(server$requests(), 13L)
+})
+
 test_that("history reporting separates completion latency and source payloads", {
   example <- history_example()
   fixture <- example$history_fixture(1L)
@@ -1365,12 +1636,14 @@ test_that("history reporting separates completion latency and source payloads", 
         operation = "search",
         status = "ok",
         item_ids = character(),
+        source_bytes = 0L,
         bytes = 20L
       ),
       list(
         operation = "read",
         status = "ok",
         item_ids = "source",
+        source_bytes = 180L,
         bytes = 200L
       ),
       list(
@@ -1425,6 +1698,55 @@ test_that("history reporting separates completion latency and source payloads", 
   expect_match(
     report,
     "| fixture/1 | history/budget-aware | answer | TRUE | completed | 1 | 10 | 0.003 |",
+    fixed = TRUE
+  )
+  access <- example$history_access(fixture$records, fixture$scope)
+  id <- "assay-C-r3"
+  size <- nchar(fixture$records$text[match(id, fixture$records$item_id)])
+  access$read(id)
+  access$read(id, offset = size)
+  access$read(id, offset = size + 100L)
+  access$search(id)
+  expect_gt(access$audit()[[1L]]$source_bytes, 0L)
+  expect_identical(access$audit()[[2L]]$source_bytes, 0L)
+  expect_identical(access$audit()[[3L]]$source_bytes, 0L)
+  expect_gt(access$audit()[[4L]]$source_bytes, 0L)
+  empty_records <- fixture$records
+  index <- match(id, empty_records$item_id)
+  empty_records$text[[index]] <- ""
+  empty_records$revision[[index]] <- digest::digest(
+    "",
+    algo = "sha256",
+    serialize = FALSE
+  )
+  empty_access <- example$history_access(empty_records, fixture$scope)
+  empty_access$search(id)
+  expect_identical(empty_access$audit()[[1L]]$source_bytes, 0L)
+  payload_evaluation <- evaluation
+  payload_evaluation$trials[[1L]]$history_audit <- c(
+    access$audit(),
+    empty_access$audit()
+  )
+  payload_evaluation$trials[[1L]]$history_usage <- list(
+    calls = 5L,
+    requested_calls = 5L,
+    not_dispatched_calls = 0L,
+    adapter_refused_calls = 0L,
+    bytes = access$usage()$bytes + empty_access$usage()$bytes
+  )
+  payload_report <- paste(
+    example$history_report(payload_evaluation),
+    collapse = "\n"
+  )
+  expect_match(
+    payload_report,
+    "| fixture/1 | history/budget-aware | none | 5 | 5 | 0 | 0 | 1 | 1 |",
+    fixed = TRUE
+  )
+  payload_evaluation$trials[[1L]]$history_audit[[1L]]$source_bytes <- NULL
+  expect_match(
+    paste(example$history_report(payload_evaluation), collapse = "\n"),
+    "| fixture/1 | history/budget-aware | none | 5 | 5 | 0 | 0 | 1 | not recorded |",
     fixed = TRUE
   )
   unknown <- evaluation
