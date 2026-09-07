@@ -242,6 +242,7 @@ try_chat_fallback <- function(agent, condition) {
     isTRUE(private$should_stop) ||
       isTRUE(state$response_seen) ||
       private$current_tool_calls > 0L ||
+      isTRUE(private$.approval_resume$executed) ||
       !identical(state$model_failure, condition) ||
       !fallback_transport_error(condition) ||
       state$fallback_index >= length(private$.fallback_chats)

@@ -175,7 +175,7 @@ approval_portable <- function(
     return(invisible(value))
   }
   if (
-    inherits(value, "condition") ||
+    inherits(value, c("condition", "connection")) ||
       is.function(value) ||
       is.environment(value) ||
       typeof(value) %in% c("externalptr", "weakref") ||

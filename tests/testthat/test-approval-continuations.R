@@ -72,6 +72,7 @@ local_approval_runtime <- function(
   agent_usage_limits = UsageLimits(),
   run_usage_limits = NULL,
   pause_on_b = TRUE,
+  fallback_chats = list(),
   .local_envir = parent.frame()
 ) {
   directory <- withr::local_tempdir(.local_envir = .local_envir)
@@ -111,6 +112,7 @@ local_approval_runtime <- function(
       approval_dir = directory,
       working_dir = directory,
       usage_limits = agent_usage_limits,
+      fallback_chats = fallback_chats,
       session_id = "approval_session",
       agent_id = "approval_agent"
     )
@@ -255,7 +257,7 @@ test_that("approval restart preserves classed session results and checkpoint met
 })
 
 test_that("session metadata cannot conceal runtime objects in attributes", {
-  for (runtime in list(new.env(), function() NULL)) {
+  for (runtime in list(new.env(), function() NULL, stdout())) {
     value <- structure(1, class = "report", runtime = runtime)
     expect_error(
       approval_portable(list(metadata = value), allow_classed = TRUE),
@@ -263,6 +265,27 @@ test_that("session metadata cannot conceal runtime objects in attributes", {
       class = "deputy_approval_error"
     )
   }
+})
+
+test_that("resumed effects prevent fallback from discarding the completed result", {
+  withr::local_options(ellmer_max_tries = 1)
+  backup <- local_runtime_server(list(runtime_reply("unexpected fallback")))
+  fixture <- local_approval_runtime(
+    responses = list(approval_batch_reply(), runtime_failure()),
+    fallback_chats = list(runtime_chat(backup))
+  )
+  resumed <- fixture$make_agent()
+  expect_error(
+    resumed$resume_approval(fixture$path, "approve"),
+    class = "httr2_http_503"
+  )
+  expect_identical(fixture$effects$values, c("a", "b"))
+  expect_length(backup$requests(), 0L)
+  results <- approval_wire_results(fixture$server$requests()[[2L]])
+  expect_identical(results[[2L]]$tool_call_id, "call_b")
+  expect_identical(results[[2L]]$content, "result_b")
+  expect_identical(approval_read(fixture$path)$status, "stopped")
+  expect_identical(resumed$last_run()$usage$tool_calls, 2L)
 })
 
 test_that("approval suspension preserves a complete batch without running later siblings", {
