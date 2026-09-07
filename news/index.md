@@ -2,6 +2,23 @@
 
 ## deputy (development version)
 
+- [`mcp_repl_connection()`](https://jameshwade.github.io/deputy/reference/mcp_repl_connection.md)
+  gives an Agent an independent sandboxed mcp-repl session.
+  [`mcp_repl_control()`](https://jameshwade.github.io/deputy/reference/mcp_repl_control.md)
+  requests upstream interrupt/reset controls and preserves their
+  reported outcomes. Agent interruption cancels active owned MCP
+  connections; plots and bounded transcript previews retain upstream
+  ellmer content and artifact handling
+  ([\#69](https://github.com/JamesHWade/deputy/issues/69)).
+
+- `McpConnection` binds an independent MCP client worker to one Agent
+  and session. Hosts can inspect catalogue pages and explicitly allow
+  tools, resource URIs and prompts. Calls return promises; cancellation,
+  timeout and closure invalidate the connection’s tools. This temporary
+  adapter is qualified for mcptools 1.0.2 while public client APIs are
+  developed ([\#48](https://github.com/JamesHWade/deputy/issues/48),
+  [\#99](https://github.com/JamesHWade/deputy/issues/99)).
+
 - [`PermissionResultPending()`](https://jameshwade.github.io/deputy/reference/PermissionResultPending.md)
   suspends raw-argument tool calls in Agents with an `approval_dir`.
   [`approval_read()`](https://jameshwade.github.io/deputy/reference/approval_read.md)

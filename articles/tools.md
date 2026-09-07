@@ -340,6 +340,67 @@ already closed an old connection, its invalidated handles are removed
 even when discovery or registration fails. Malformed metadata never
 silently becomes an unannotated executable.
 
+### Connections owned by a conversation
+
+Use `McpConnection` when a host needs independent connections,
+asynchronous calls, or resource and prompt access. Create the Agent
+first, then allow exact items from one configured server:
+
+``` r
+
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  permissions = Permissions(web = TRUE)
+)
+connection <- McpConnection$new(
+  config = "~/.config/mcptools/config.json",
+  server = "evidence",
+  agent = agent,
+  tools = "inspect_evidence",
+  resources = "evidence://report/current",
+  prompts = "summarize"
+)
+agent$register_tools(c(connection$tools(), connection$capability_tools()))
+```
+
+When one Agent uses multiple connections, choose distinct capability
+prefixes, such as `first$capability_tools(prefix = "papers")` and
+`second$capability_tools(prefix = "notes")`. These produce names such as
+`papers_read_resource` and `notes_read_resource` without changing the
+allowlists. Connections with no allowed tools can use resource-only or
+prompt-only servers; they do not request a tool catalogue during
+initialization.
+
+The allowlists are fixed. `$discover("resources")` returns a promise for
+one catalogue page; its result may include a cursor for the next page.
+Discovery does not fetch resource contents, retrieve prompts, register
+tools or expand the Agent’s permissions. Resource and prompt tools still
+require the Agent’s web capability. The host can use
+`$get_prompt(name, arguments)` for prompts that require arguments;
+retrieving a prompt never inserts it into a Chat.
+
+Each connection has its own mcptools registry. Two conversations can
+therefore use the same configured server name without replacing each
+other’s connection. Tools carry the connection ID into permission
+callbacks and hooks. They reject registration with a different Agent,
+session or run context. The host assigns those identities and remains
+responsible for authentication.
+
+Calls return promises and permit one active request per connection.
+Overlapping requests fail with a busy error; other connections and the
+host event loop can continue. Construction waits for startup. Call
+`$close()` when the conversation ends, for example from a Shiny
+session’s end callback. `$cancel()` terminates the connection and
+discards its server session state. A timeout does the same; old tool
+handles never start a replacement connection implicitly.
+
+This is a temporary, version-checked mcptools 1.0.2 adapter. It uses
+upstream transport, authentication, tool conversion and shutdown with a
+small internal request bridge. Public replacements are requested in
+[mcptools \#129](https://github.com/posit-dev/mcptools/issues/129),
+[\#130](https://github.com/posit-dev/mcptools/issues/130), and
+[\#109](https://github.com/posit-dev/mcptools/issues/109).
+
 ### Sandboxed R with mcp-repl
 
 Use
@@ -369,6 +430,59 @@ are errors. mcp-repl then owns OS-specific confinement, including
 fail-closed startup on unsupported hosts. See
 [`vignette("permissions")`](https://jameshwade.github.io/deputy/articles/permissions.md)
 for the complete trust model.
+
+For a persistent session owned by a particular Agent, use
+[`mcp_repl_connection()`](https://jameshwade.github.io/deputy/reference/mcp_repl_connection.md):
+
+``` r
+
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  permissions = Permissions(web = FALSE)
+)
+connection <- mcp_repl_connection(
+  config = "~/.config/mcptools/config.json",
+  agent = agent,
+  server = "r",
+  sandbox = "workspace-write"
+)
+agent$register_tools(connection$tools())
+```
+
+Each connection starts a separate upstream REPL, even when its
+configured server name matches another conversation’s. Registering its
+tools with an unrelated Agent fails. The connection ID and selected
+sandbox appear in tool metadata for permission callbacks and hooks. The
+host must call `connection$close()` when the conversation ends.
+
+After mcp-repl returns a busy-interpreter response, the host can request
+an interrupt with `mcp_repl_control(connection, "interrupt")`. To
+discard interpreter state and request a fresh session, use
+`mcp_repl_control(connection, "reset")`. Both return promises for the
+upstream result; inspect that result before assuming the control
+succeeded. An interpreter can restart inside the same MCP connection, so
+the connection ID alone does not prove its state survived.
+
+An active client request cannot accept an overlapping control request.
+`connection$cancel()` or interruption of the owning Agent terminates
+that connection and discards its state. mcp-repl’s `timeout_ms` can
+instead return control while interpreter work continues; the client’s
+`timeout` closes the connection when the MCP request itself takes too
+long.
+
+Plots retain ellmer image content. Oversized transcripts retain
+mcp-repl’s bounded previews and artifact references, and ordinary Deputy
+result offloading still applies when configured. These paths are
+upstream-owned session artifacts; the host must preserve anything it
+needs durably before closing the session. Deputy does not create another
+spill store or automatically read every linked artifact.
+
+The tested producer combination is mcptools 1.0.2 with mcp-repl 0.3.0 on
+macOS. The executable name does not establish its version. Install the
+qualified runtime explicitly; unsupported host sandboxing remains an
+upstream startup error. Put the sandbox mode in `--sandbox`; a
+`--config sandbox_mode=...` override is rejected so it cannot change the
+policy Deputy checked.
 
 ## Human-in-the-Loop
 

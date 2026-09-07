@@ -1341,7 +1341,10 @@ object
 Request cancellation of the active stream.
 
 Cancellation is cooperative and takes effect at the next provider or
-tool boundary supported by ellmer.
+tool boundary supported by ellmer. Active
+[McpConnection](https://jameshwade.github.io/deputy/reference/McpConnection.md)
+calls terminate their owned connections and discard server session
+state.
 
 #### Usage
 

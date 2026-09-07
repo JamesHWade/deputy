@@ -495,11 +495,64 @@ fails. Malformed metadata never silently becomes an unannotated
 executable.</p>
 </div>
 <div class="section level3">
+<h3 id="connections-owned-by-a-conversation">Connections owned by a conversation<a class="anchor" aria-label="anchor" href="#connections-owned-by-a-conversation"></a>
+</h3>
+<p>Use <code>McpConnection</code> when a host needs independent
+connections, asynchronous calls, or resource and prompt access. Create
+the Agent first, then allow exact items from one configured server:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>web <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">connection</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/McpConnection.html">McpConnection</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  config <span class="op">=</span> <span class="st">"~/.config/mcptools/config.json"</span>,</span>
+<span>  server <span class="op">=</span> <span class="st">"evidence"</span>,</span>
+<span>  agent <span class="op">=</span> <span class="va">agent</span>,</span>
+<span>  tools <span class="op">=</span> <span class="st">"inspect_evidence"</span>,</span>
+<span>  resources <span class="op">=</span> <span class="st">"evidence://report/current"</span>,</span>
+<span>  prompts <span class="op">=</span> <span class="st">"summarize"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">agent</span><span class="op">$</span><span class="fu">register_tools</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">connection</span><span class="op">$</span><span class="fu">tools</span><span class="op">(</span><span class="op">)</span>, <span class="va">connection</span><span class="op">$</span><span class="fu">capability_tools</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>When one Agent uses multiple connections, choose distinct capability
+prefixes, such as <code>first$capability_tools(prefix = "papers")</code>
+and <code>second$capability_tools(prefix = "notes")</code>. These
+produce names such as <code>papers_read_resource</code> and
+<code>notes_read_resource</code> without changing the allowlists.
+Connections with no allowed tools can use resource-only or prompt-only
+servers; they do not request a tool catalogue during initialization.</p>
+<p>The allowlists are fixed. <code>$discover("resources")</code> returns
+a promise for one catalogue page; its result may include a cursor for
+the next page. Discovery does not fetch resource contents, retrieve
+prompts, register tools or expand the Agent’s permissions. Resource and
+prompt tools still require the Agent’s web capability. The host can use
+<code>$get_prompt(name, arguments)</code> for prompts that require
+arguments; retrieving a prompt never inserts it into a Chat.</p>
+<p>Each connection has its own mcptools registry. Two conversations can
+therefore use the same configured server name without replacing each
+other’s connection. Tools carry the connection ID into permission
+callbacks and hooks. They reject registration with a different Agent,
+session or run context. The host assigns those identities and remains
+responsible for authentication.</p>
+<p>Calls return promises and permit one active request per connection.
+Overlapping requests fail with a busy error; other connections and the
+host event loop can continue. Construction waits for startup. Call
+<code>$close()</code> when the conversation ends, for example from a
+Shiny session’s end callback. <code>$cancel()</code> terminates the
+connection and discards its server session state. A timeout does the
+same; old tool handles never start a replacement connection
+implicitly.</p>
+<p>This is a temporary, version-checked mcptools 1.0.2 adapter. It uses
+upstream transport, authentication, tool conversion and shutdown with a
+small internal request bridge. Public replacements are requested in <a href="https://github.com/posit-dev/mcptools/issues/129" class="external-link">mcptools
+#129</a>, <a href="https://github.com/posit-dev/mcptools/issues/130" class="external-link">#130</a>, and <a href="https://github.com/posit-dev/mcptools/issues/109" class="external-link">#109</a>.</p>
+</div>
+<div class="section level3">
 <h3 id="sandboxed-r-with-mcp-repl">Sandboxed R with mcp-repl<a class="anchor" aria-label="anchor" href="#sandboxed-r-with-mcp-repl"></a>
 </h3>
 <p>Use <code><a href="../reference/tools_mcp_repl.html">tools_mcp_repl()</a></code> when model-generated R needs an OS
 sandbox rather than the current user’s authority:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repl_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tools_mcp_repl.html">tools_mcp_repl</a></span><span class="op">(</span></span>
 <span>  config <span class="op">=</span> <span class="st">"~/.config/mcptools/config.json"</span>,</span>
 <span>  server <span class="op">=</span> <span class="st">"r"</span>,</span>
@@ -517,6 +570,52 @@ argument. Missing policies and modes that do not establish a
 Deputy-verifiable boundary are errors. mcp-repl then owns OS-specific
 confinement, including fail-closed startup on unsupported hosts. See
 <code><a href="../articles/permissions.html">vignette("permissions")</a></code> for the complete trust model.</p>
+<p>For a persistent session owned by a particular Agent, use
+<code><a href="../reference/mcp_repl_connection.html">mcp_repl_connection()</a></code>:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>web <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">connection</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mcp_repl_connection.html">mcp_repl_connection</a></span><span class="op">(</span></span>
+<span>  config <span class="op">=</span> <span class="st">"~/.config/mcptools/config.json"</span>,</span>
+<span>  agent <span class="op">=</span> <span class="va">agent</span>,</span>
+<span>  server <span class="op">=</span> <span class="st">"r"</span>,</span>
+<span>  sandbox <span class="op">=</span> <span class="st">"workspace-write"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">agent</span><span class="op">$</span><span class="fu">register_tools</span><span class="op">(</span><span class="va">connection</span><span class="op">$</span><span class="fu">tools</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>Each connection starts a separate upstream REPL, even when its
+configured server name matches another conversation’s. Registering its
+tools with an unrelated Agent fails. The connection ID and selected
+sandbox appear in tool metadata for permission callbacks and hooks. The
+host must call <code>connection$close()</code> when the conversation
+ends.</p>
+<p>After mcp-repl returns a busy-interpreter response, the host can
+request an interrupt with
+<code>mcp_repl_control(connection, "interrupt")</code>. To discard
+interpreter state and request a fresh session, use
+<code>mcp_repl_control(connection, "reset")</code>. Both return promises
+for the upstream result; inspect that result before assuming the control
+succeeded. An interpreter can restart inside the same MCP connection, so
+the connection ID alone does not prove its state survived.</p>
+<p>An active client request cannot accept an overlapping control
+request. <code>connection$cancel()</code> or interruption of the owning
+Agent terminates that connection and discards its state. mcp-repl’s
+<code>timeout_ms</code> can instead return control while interpreter
+work continues; the client’s <code>timeout</code> closes the connection
+when the MCP request itself takes too long.</p>
+<p>Plots retain ellmer image content. Oversized transcripts retain
+mcp-repl’s bounded previews and artifact references, and ordinary Deputy
+result offloading still applies when configured. These paths are
+upstream-owned session artifacts; the host must preserve anything it
+needs durably before closing the session. Deputy does not create another
+spill store or automatically read every linked artifact.</p>
+<p>The tested producer combination is mcptools 1.0.2 with mcp-repl 0.3.0
+on macOS. The executable name does not establish its version. Install
+the qualified runtime explicitly; unsupported host sandboxing remains an
+upstream startup error. Put the sandbox mode in <code>--sandbox</code>;
+a <code>--config sandbox_mode=...</code> override is rejected so it
+cannot change the policy Deputy checked.</p>
 </div>
 </div>
 <div class="section level2">
@@ -525,7 +624,7 @@ confinement, including fail-closed startup on unsupported hosts. See
 <p>The <code>tool_ask_user</code> tool lets an agent ask the user a
 question during execution. This is useful for confirmations,
 clarifications, or collecting input:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent_id</span> <span class="op">&lt;-</span> <span class="st">"agent-analysis"</span></span>
 <span><span class="va">session_id</span> <span class="op">&lt;-</span> <span class="st">"session-analysis"</span></span>
 <span></span>

@@ -33,6 +33,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/HookResultPreCompact.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/LeadAgent.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/McpConnection.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/PermissionMode.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/PermissionResultAllow.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/PermissionResultDeny.html</loc></url>
@@ -53,6 +54,8 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/index.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/is_deputy_error.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/load_skill_tools.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/mcp_repl_connection.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/mcp_repl_control.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/normalize_provider_name.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/parse_markdown_frontmatter.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/parse_user_response.html</loc></url>

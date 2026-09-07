@@ -1210,7 +1210,8 @@ event returned by <code>$run()</code>.</p><div class="section">
 <h3 id="agent-interrupt-"><code>Agent$interrupt()</code><a class="anchor" aria-label="anchor" href="#agent-interrupt-"></a></h3>
 <p>Request cancellation of the active stream.</p>
 <p>Cancellation is cooperative and takes effect at the next provider or tool
-boundary supported by ellmer.</p><div class="section">
+boundary supported by ellmer. Active <a href="McpConnection.html">McpConnection</a> calls terminate their
+owned connections and discard server session state.</p><div class="section">
 <h4 id="usage-38">Usage<a class="anchor" aria-label="anchor" href="#usage-38"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">interrupt</span><span class="op">(</span>reason <span class="op">=</span> <span class="st">"interrupted"</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
