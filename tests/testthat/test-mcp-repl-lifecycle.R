@@ -1,0 +1,172 @@
+test_that("sandbox mode overrides cannot bypass the selected policy", {
+  for (override in list(
+    c("--config", "sandbox_mode=danger-full-access"),
+    "--config=sandbox_mode=external-sandbox",
+    c("--config", " sandbox_mode = 'inherit-codex' ")
+  )) {
+    expect_error(
+      validate_mcp_repl_sandbox_server(
+        list(
+          command = "mcp-repl",
+          args = c("--sandbox", "workspace-write", override)
+        ),
+        "workspace-write"
+      ),
+      "overriding sandbox mode"
+    )
+  }
+  expect_identical(
+    validate_mcp_repl_sandbox_server(
+      list(
+        command = "mcp-repl",
+        args = c(
+          "--sandbox",
+          "workspace-write",
+          "--config",
+          "sandbox_workspace_write.network_access=false"
+        )
+      ),
+      "workspace-write"
+    ),
+    "workspace-write"
+  )
+  expect_error(
+    mcp_repl_control(NULL),
+    "mcp_repl_connection",
+    class = "deputy_mcp_repl"
+  )
+})
+
+test_that("Agent interruption terminates its active owned MCP request", {
+  config <- mcp_test_config()
+  agent <- NULL
+  interrupted <- FALSE
+  fixture <- create_shiny_tool_chat(
+    "state",
+    list(operation = "slow"),
+    execute = function(request) {
+      pending <- do.call(agent$get_tools()$state, request@arguments)
+      later::later(
+        function() {
+          interrupted <<- agent$interrupt()
+        },
+        0.01
+      )
+      mcp_test_await(pending)
+    }
+  )
+  agent <- Agent$new(chat = fixture$chat, permissions = permissions_full())
+  connection <- McpConnection$new(
+    config$path,
+    "fixture",
+    agent,
+    tools = "state"
+  )
+  withr::defer(connection$close())
+  agent$register_tools(connection$tools())
+  result <- tryCatch(agent$run_sync("Run the slow request."), error = identity)
+  expect_true(interrupted)
+  expect_identical(connection$status()$reason, "cancelled")
+  expect_identical(connection$status()$state, "closed")
+  expect_s7_class(result, AgentResult)
+  expect_identical(result$stop_reason, "interrupted")
+})
+
+test_that("released mcp-repl preserves state, content, isolation and explicit controls", {
+  executable <- Sys.getenv("DEPUTY_MCP_REPL_BIN")
+  skip_if(
+    !nzchar(executable),
+    "Set DEPUTY_MCP_REPL_BIN to a qualified mcp-repl 0.3.0 executable"
+  )
+  skip_if_not_installed("mcptools", "1.0.2")
+  skip_if(as.character(utils::packageVersion("mcptools")) != "1.0.2")
+  workspace <- tempfile("deputy-repl-")
+  dir.create(workspace)
+  config <- tempfile(fileext = ".json")
+  jsonlite::write_json(
+    list(
+      mcpServers = list(
+        r = list(
+          command = executable,
+          args = list(
+            "--interpreter",
+            "r",
+            "--sandbox",
+            "workspace-write",
+            "--add-writable-root",
+            workspace,
+            "--oversized-output",
+            "files"
+          )
+        )
+      )
+    ),
+    config,
+    auto_unbox = TRUE
+  )
+  a <- Agent$new(chat = create_mock_chat(), working_dir = workspace)
+  b <- Agent$new(chat = create_mock_chat(), working_dir = workspace)
+  first <- mcp_repl_connection(config, a)
+  withr::defer(first$close())
+  second <- mcp_repl_connection(config, b)
+  withr::defer(second$close())
+  tool_a <- first$tools()$repl
+  tool_b <- second$tools()$repl
+  expect_identical(
+    tool_metadata(tool_a)$source$execution,
+    list(backend = "mcp-repl", sandbox = "workspace-write")
+  )
+  call <- function(tool, input, timeout_ms = 5000) {
+    mcp_test_await(tool(input = input, timeout_ms = timeout_ms), timeout = 30)
+  }
+  expect_match(
+    call(tool_a, "deputy_value <- 42; deputy_value"),
+    "[1] 42",
+    fixed = TRUE
+  )
+  expect_match(
+    call(tool_b, 'exists("deputy_value")'),
+    "[1] FALSE",
+    fixed = TRUE
+  )
+  expect_match(call(tool_a, "deputy_value"), "[1] 42", fixed = TRUE)
+  plot <- call(tool_a, 'plot(1:5, main = "Deputy MCP qualification")')
+  expect_true(any(vapply(
+    plot,
+    inherits,
+    logical(1),
+    "ellmer::ContentImageInline"
+  )))
+  large <- call(tool_a, 'cat(rep("bounded evidence\\n", 2000))')
+  expect_lt(nchar(large, type = "bytes"), 6000L)
+  expect_match(large, "middle truncated", fixed = TRUE)
+  full <- regmatches(large, regexec("full output: ([^]]+)]", large))[[1L]][[2L]]
+  expect_true(file.exists(full))
+  expect_gt(file.info(full)$size, nchar(large, type = "bytes"))
+  busy <- call(tool_a, 'Sys.sleep(60); cat("unexpected completion")', 100)
+  expect_match(busy, "repl status: busy", fixed = TRUE)
+  interrupted <- mcp_test_await(
+    mcp_repl_control(first, "interrupt"),
+    timeout = 30
+  )
+  expect_false(grepl("repl status: busy", paste(interrupted), fixed = TRUE))
+  expect_match(call(tool_a, "deputy_value"), "[1] 42", fixed = TRUE)
+  reset <- mcp_test_await(mcp_repl_control(first, "reset"), timeout = 30)
+  expect_match(reset, "new session started", fixed = TRUE)
+  expect_match(
+    call(tool_a, 'exists("deputy_value")'),
+    "[1] FALSE",
+    fixed = TRUE
+  )
+  ended <- call(tool_a, 'q(save = "no")')
+  expect_match(ended, "session ended", fixed = TRUE)
+  expect_match(
+    call(tool_a, 'exists("deputy_value")'),
+    "[1] FALSE",
+    fixed = TRUE
+  )
+  first$close()
+  expect_false(mcp_tool_is_current(tool_a))
+  expect_error(tool_a(input = "1+1"), "closed")
+  expect_match(call(tool_b, "1+1"), "[1] 2", fixed = TRUE)
+})

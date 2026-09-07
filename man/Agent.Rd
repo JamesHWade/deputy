@@ -1175,7 +1175,8 @@ event returned by \verb{$run()}.
   Request cancellation of the active stream.
 
 Cancellation is cooperative and takes effect at the next provider or tool
-boundary supported by ellmer.
+boundary supported by ellmer. Active \link{McpConnection} calls terminate their
+owned connections and discard server session state.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$interrupt(reason = "interrupted")}

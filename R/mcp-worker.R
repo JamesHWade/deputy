@@ -232,3 +232,12 @@ mcp_connection_server_exited <- function(condition) {
   }
   FALSE
 }
+
+cancel_active_mcp_tools <- function(tools) {
+  for (tool in tools) {
+    source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+    cancel <- attr(source, "deputy_mcp_cancel_active", exact = TRUE)
+    if (is.function(cancel)) cancel()
+  }
+  invisible(NULL)
+}

@@ -189,6 +189,7 @@ McpConnection <- R6::R6Class(
         state = private$state,
         reason = private$reason,
         allowed = private$allowed,
+        execution = attr(self, "deputy_mcp_repl", exact = TRUE),
         adapter_version = "mcptools 1.0.2"
       )
     },
@@ -450,7 +451,17 @@ McpConnection <- R6::R6Class(
         connection_id = private$id
       )
       attr(tool, "deputy_mcp_owner") <- private$owner
+      execution <- attr(self, "deputy_mcp_repl", exact = TRUE)
+      if (!is.null(execution)) {
+        attr(tool, "deputy_tool_source")$execution <- execution
+      }
       attr(tool, "deputy_mcp_connection_id") <- private$id
+      attr(tool, "deputy_mcp_cancel_active") <- function() {
+        if (identical(self$status()$state, "busy")) {
+          self$cancel()
+        }
+        invisible(NULL)
+      }
       attr(tool, "deputy_mcp_connection_current") <- function() {
         !identical(self$status()$state, "closed") &&
           identical(private$owner, mcp_connection_owner(private$agent))

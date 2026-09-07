@@ -988,7 +988,8 @@ Agent <- R6::R6Class(
     #' Request cancellation of the active stream.
     #'
     #' Cancellation is cooperative and takes effect at the next provider or tool
-    #' boundary supported by ellmer.
+    #' boundary supported by ellmer. Active [McpConnection] calls terminate their
+    #' owned connections and discard server session state.
     #'
     #' @param reason Stable reason stored on the terminal event
     #' @return Invisible logical indicating whether a run was active
@@ -996,15 +997,7 @@ Agent <- R6::R6Class(
       if (!isTRUE(private$run_active)) {
         return(invisible(FALSE))
       }
-      private$should_stop <- TRUE
-      private$stop_reason_from_hook <- as.character(reason[[1]])
-      controller <- private$current_stream_controller
-      if (!is.null(controller)) {
-        tryCatch(
-          controller$cancel(reason = private$stop_reason_from_hook),
-          error = function(e) controller$cancel()
-        )
-      }
+      private$request_stream_stop(as.character(reason[[1]]))
       invisible(TRUE)
     },
 

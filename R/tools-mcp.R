@@ -32,6 +32,22 @@ mcp_repl_sandbox_setting <- function(arguments) {
   values <- character()
   for (index in seq_along(arguments)) {
     argument <- arguments[[index]]
+    if (identical(argument, "--config") || startsWith(argument, "--config=")) {
+      override <- if (
+        identical(argument, "--config") && index < length(arguments)
+      ) {
+        arguments[[index + 1L]]
+      } else {
+        sub("^--config=", "", argument)
+      }
+      key <- trimws(strsplit(override, "=", fixed = TRUE)[[1L]][[1L]])
+      if (identical(key, "sandbox_mode")) {
+        cli_abort(c(
+          "Set the sandbox mode with {.code --sandbox}, not {.code --config sandbox_mode}.",
+          "i" = "Deputy cannot qualify an overriding sandbox mode through this adapter."
+        ))
+      }
+    }
     if (identical(argument, "--sandbox")) {
       if (
         index == length(arguments) || startsWith(arguments[[index + 1L]], "--")

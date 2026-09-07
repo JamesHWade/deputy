@@ -215,6 +215,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
     request_stream_stop = function(reason) {
       private$should_stop <- TRUE
       private$stop_reason_from_hook <- reason
+      cancel_active_mcp_tools(private$.chat$get_tools())
       controller <- private$current_stream_controller
       if (!is.null(controller)) {
         tryCatch(

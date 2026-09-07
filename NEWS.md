@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* `mcp_repl_connection()` gives an Agent an independent sandboxed mcp-repl
+  session. `mcp_repl_control()` requests upstream interrupt/reset controls and
+  preserves their reported outcomes. Agent interruption cancels active owned
+  MCP connections; plots and bounded transcript previews retain upstream
+  ellmer content and artifact handling (#69).
+
 * `McpConnection` binds an independent MCP client worker to one Agent and
   session. Hosts can inspect catalogue pages and explicitly allow tools,
   resource URIs and prompts. Calls return promises; cancellation, timeout and
