@@ -144,7 +144,7 @@ permission_check_callback <- function(
       PermissionResultDeny(reason = "Permission callback error")
     }
   )
-  if (inherits(result, "PermissionResult")) {
+  if (S7::S7_inherits(result, PermissionResult)) {
     return(result)
   }
 

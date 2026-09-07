@@ -22,8 +22,9 @@ formats remain unchanged by the moves.
 | Public ellmer request callbacks and explicit Chat selection | `R/agent-requests.R` |
 | Ellmer structured requests and finite application corrections | `R/structured-run.R` |
 | Governance trace adapter | `R/agent-tracing.R` |
+| S7 hook and permission callback result contracts | `R/callback-result.R` |
 | Permissions object and policy presets | `R/permissions.R` |
-| Permission values, capability intersections and path policy | `R/permission-policy.R` |
+| Permission modes, capability intersections and path policy | `R/permission-policy.R` |
 | Checkpoint journal operations | `R/file-checkpoints.R` |
 | Checkpoint path and byte operations | `R/file-checkpoint-paths.R` |
 | Checkpoint state validation | `R/file-checkpoint-validation.R` |

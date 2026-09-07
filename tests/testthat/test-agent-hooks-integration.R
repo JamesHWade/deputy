@@ -260,7 +260,7 @@ test_that("Permission check occurs before PreToolUse hooks", {
     list()
   )
 
-  expect_s3_class(perm_result, "PermissionResultDeny")
+  expect_s7_class(perm_result, PermissionResultDeny)
   expect_equal(perm_result$reason, "File reading is not allowed")
 })
 

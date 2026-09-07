@@ -75,5 +75,5 @@ requirements aliases and mismatch reports, sourced tool state, and metadata
 precedence. Fresh-process tests verify RDS dispatch/frozen fields and YAML
 reattachment to a different host-supplied Skill. R CMD check runs these against
 the installed package. Runnable reference and vignette examples, full package
-gates, and final-head CI results are recorded in the PR. Remaining hook and
-permission-result value migrations stay in #119.
+gates, and final-head CI results are recorded in the PR. ADR-0015 completes the remaining hook and permission-result value families
+tracked in #119.

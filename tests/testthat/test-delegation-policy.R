@@ -42,13 +42,13 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
   restricted <- do.call(agent_definition, fields)
   child <- lead$.__enclos_env__$private$create_sub_agent(restricted)
   expect_identical(child$permissions$mode, "readonly")
-  expect_s3_class(
+  expect_s7_class(
     permissions_check(
       child$permissions,
       "write_file",
       list(path = "blocked.txt")
     ),
-    "PermissionResultDeny"
+    PermissionResultDeny
   )
 
   fields <- S7::props(widening)
@@ -92,7 +92,7 @@ test_that("sub-agent disallowed tools override permission prompts", {
   child <- lead$.__enclos_env__$private$create_sub_agent(definition)
 
   result <- permissions_check(child$permissions, "ask_user", list())
-  expect_s3_class(result, "PermissionResultDeny")
+  expect_s7_class(result, PermissionResultDeny)
   expect_false(grepl("Use ask_user", result$reason, fixed = TRUE))
 })
 
@@ -152,7 +152,7 @@ test_that("sub-agents retain inherited prompt-tool gates", {
     child <- lead$.__enclos_env__$private$create_sub_agent(definition)
     result <- permissions_check(child$permissions, "ask_user", list())
 
-    expect_s3_class(result, "PermissionResultDeny")
+    expect_s7_class(result, PermissionResultDeny)
     expect_false(grepl("Use ask_user", result$reason, fixed = TRUE))
   }
 })
@@ -377,9 +377,9 @@ test_that("delegated S7 policies preserve ceilings after serialization", {
   expect_s7_class(child$permissions, Permissions)
   expect_identical(lead$permissions@mode, "standard")
   expect_identical(child$permissions@mode, "readonly")
-  expect_s3_class(
+  expect_s7_class(
     permissions_check(child$permissions, "read_file", list(path = "x")),
-    "PermissionResultDeny"
+    PermissionResultDeny
   )
   expect_snapshot(error = TRUE, child$permissions@tool_denylist <- NULL)
   expect_snapshot(error = TRUE, child$permissions <- permissions_full())

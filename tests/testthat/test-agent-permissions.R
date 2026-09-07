@@ -56,13 +56,13 @@ test_that("permission mode changes can only narrow the current policy", {
   expect_false(agent$permissions$file_read)
   expect_false(agent$permissions$file_write)
   expect_false(agent$permissions$r_code)
-  expect_s3_class(
+  expect_s7_class(
     permissions_check(
       agent$permissions,
       "read_file",
       list(path = "blocked.txt")
     ),
-    "PermissionResultDeny"
+    PermissionResultDeny
   )
 
   expect_error(
@@ -163,26 +163,26 @@ test_that("readonly transitions retain callback denials as a veto", {
     )
   )
 
-  expect_s3_class(
+  expect_s7_class(
     permissions_check(
       agent$permissions,
       "read_file",
       list(path = "blocked.txt")
     ),
-    "PermissionResultDeny"
+    PermissionResultDeny
   )
   agent$set_permission_mode("readonly")
-  expect_s3_class(
+  expect_s7_class(
     permissions_check(
       agent$permissions,
       "read_file",
       list(path = "blocked.txt")
     ),
-    "PermissionResultDeny"
+    PermissionResultDeny
   )
-  expect_s3_class(
+  expect_s7_class(
     permissions_check(agent$permissions, "run_bash", list(command = "pwd")),
-    "PermissionResultDeny"
+    PermissionResultDeny
   )
 })
 
@@ -229,7 +229,7 @@ test_that("Agent rejects tool when permission denies", {
     list()
   )
 
-  expect_s3_class(result, "PermissionResultDeny")
+  expect_s7_class(result, PermissionResultDeny)
   expect_equal(result$reason, "File reading is not allowed")
 })
 
@@ -249,7 +249,7 @@ test_that("Agent allows tool when permission allows", {
     list()
   )
 
-  expect_s3_class(result, "PermissionResultAllow")
+  expect_s7_class(result, PermissionResultAllow)
 })
 
 test_that("Agent respects readonly mode", {
@@ -267,7 +267,7 @@ test_that("Agent respects readonly mode", {
     list(path = "test.txt"),
     list()
   )
-  expect_s3_class(read_result, "PermissionResultAllow")
+  expect_s7_class(read_result, PermissionResultAllow)
 
   # Write should be denied
   write_result <- permissions_check(
@@ -276,7 +276,7 @@ test_that("Agent respects readonly mode", {
     list(path = "test.txt", content = "data"),
     list()
   )
-  expect_s3_class(write_result, "PermissionResultDeny")
+  expect_s7_class(write_result, PermissionResultDeny)
 })
 
 test_that("Agent respects working directory restriction", {
@@ -300,7 +300,7 @@ test_that("Agent respects working directory restriction", {
     list(path = allowed_path, content = "data"),
     list()
   )
-  expect_s3_class(result_allowed, "PermissionResultAllow")
+  expect_s7_class(result_allowed, PermissionResultAllow)
 
   # Write outside allowed dir should be denied
   outside_path <- file.path(dirname(temp_dir), "outside.txt")
@@ -310,7 +310,7 @@ test_that("Agent respects working directory restriction", {
     list(path = outside_path, content = "data"),
     list()
   )
-  expect_s3_class(result_denied, "PermissionResultDeny")
+  expect_s7_class(result_denied, PermissionResultDeny)
 })
 
 test_that("Agent uses custom permission callback", {
@@ -336,7 +336,7 @@ test_that("Agent uses custom permission callback", {
   )
 
   expect_true(callback_called)
-  expect_s3_class(result, "PermissionResultAllow")
+  expect_s7_class(result, PermissionResultAllow)
 })
 
 test_that("Permission callback errors result in deny (fail-safe)", {
@@ -361,7 +361,7 @@ test_that("Permission callback errors result in deny (fail-safe)", {
     )
   })
 
-  expect_s3_class(result, "PermissionResultDeny")
+  expect_s7_class(result, PermissionResultDeny)
   expect_equal(result$reason, "Permission callback error")
 })
 
@@ -387,7 +387,7 @@ test_that("Permission callback invalid return results in deny", {
     )
   })
 
-  expect_s3_class(result, "PermissionResultDeny")
+  expect_s7_class(result, PermissionResultDeny)
   expect_equal(result$reason, "Invalid callback result")
 })
 
@@ -406,7 +406,7 @@ test_that("Agent respects bash permission", {
     list(command = "echo test"),
     list()
   )
-  expect_s3_class(result_no_bash, "PermissionResultDeny")
+  expect_s7_class(result_no_bash, PermissionResultDeny)
 
   # Bash allowed
   agent_bash <- Agent$new(
@@ -420,7 +420,7 @@ test_that("Agent respects bash permission", {
     list(command = "echo test"),
     list()
   )
-  expect_s3_class(result_bash, "PermissionResultAllow")
+  expect_s7_class(result_bash, PermissionResultAllow)
 })
 
 test_that("Agent respects r_code permission", {
@@ -438,7 +438,7 @@ test_that("Agent respects r_code permission", {
     list(code = "1 + 1"),
     list()
   )
-  expect_s3_class(result_no_r, "PermissionResultDeny")
+  expect_s7_class(result_no_r, PermissionResultDeny)
 
   # R code allowed
   agent_r <- Agent$new(
@@ -452,7 +452,7 @@ test_that("Agent respects r_code permission", {
     list(code = "1 + 1"),
     list()
   )
-  expect_s3_class(result_r, "PermissionResultAllow")
+  expect_s7_class(result_r, PermissionResultAllow)
 })
 
 test_that("full mode allows everything", {
@@ -470,7 +470,7 @@ test_that("full mode allows everything", {
     list(command = "rm -rf /"),
     list()
   )
-  expect_s3_class(result_bash, "PermissionResultAllow")
+  expect_s7_class(result_bash, PermissionResultAllow)
 
   # File write should be allowed
   result_write <- permissions_check(
@@ -479,7 +479,7 @@ test_that("full mode allows everything", {
     list(path = "/etc/passwd", content = "bad"),
     list()
   )
-  expect_s3_class(result_write, "PermissionResultAllow")
+  expect_s7_class(result_write, PermissionResultAllow)
 })
 
 test_that("Agents require an S7 policy and cannot replace their authority ceiling", {
@@ -495,8 +495,8 @@ test_that("Agents require an S7 policy and cannot replace their authority ceilin
   expect_identical(policy@mode, "standard")
   expect_identical(agent$permissions@mode, "readonly")
   expect_s7_class(agent$permissions, Permissions)
-  expect_s3_class(
+  expect_s7_class(
     permissions_check(agent$permissions, "run_r_code", list(code = "1 + 1")),
-    "PermissionResultDeny"
+    PermissionResultDeny
   )
 })

@@ -78,6 +78,12 @@ _Avoid_: permission mode, subprocess isolation
 A callback fired at a named point in an Agent's lifecycle, able to observe a run and, at some points, alter or block it.
 _Avoid_: callback, middleware, listener, interceptor
 
+**Callback result**:
+A read-only S7 decision returned by a hook or permission callback. Concrete
+HookResult and PermissionResult classes carry continuation, denial, context,
+and presentation fields. The Agent and HookRegistry interpret these values;
+nested output objects retain their own reference semantics (ADR-0015).
+
 **Hook event**:
 The named lifecycle point a hook is registered against.
 _Avoid_: trigger, lifecycle stage

@@ -163,14 +163,14 @@ test_that("missing annotations stay absent and use conservative permissions", {
     context <- list(tool_annotations = annotations)
     for (mode in c("standard", "readonly", "plan")) {
       policy <- Permissions(mode = mode, web = FALSE, file_write = FALSE)
-      expect_s3_class(
+      expect_s7_class(
         permissions_check(policy, "unknown", list(), context),
-        "PermissionResultDeny"
+        PermissionResultDeny
       )
     }
-    expect_s3_class(
+    expect_s7_class(
       permissions_check(permissions_full(), "unknown", list(), context),
-      "PermissionResultAllow"
+      PermissionResultAllow
     )
   }
   seen <- NULL
@@ -182,14 +182,14 @@ test_that("missing annotations stay absent and use conservative permissions", {
     seen <<- context$tool_annotations
     PermissionResultAllow()
   })
-  expect_s3_class(
+  expect_s7_class(
     permissions_check(
       policy,
       "unknown",
       list(),
       list(tool_annotations = list())
     ),
-    "PermissionResultAllow"
+    PermissionResultAllow
   )
   expect_identical(seen, list())
   expect_identical(effective_tool_annotations(list()), tool_annotation_defaults)

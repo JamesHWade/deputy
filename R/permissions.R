@@ -211,7 +211,7 @@ S7::method(permissions_check, Permissions) <- function(
       context
     )
     callback_checked <- TRUE
-    if (inherits(callback_result, "PermissionResultDeny")) {
+    if (S7::S7_inherits(callback_result, PermissionResultDeny)) {
       return(callback_result)
     }
   }

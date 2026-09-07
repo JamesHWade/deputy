@@ -217,6 +217,18 @@ universal function tool when authorization depends on request arguments or run
 context.
 
 It must return `PermissionResultAllow()` or `PermissionResultDeny(reason)`.
+These are read-only S7 values. Untyped lists and legacy S3 class tags do not
+satisfy this callback contract and produce the existing invalid-result denial.
+`interrupt` must be one non-missing logical value, and `reason` must be one
+non-missing string. Construct a new result to revise a decision.
+
+```{r permission-result-values, eval = TRUE}
+library(deputy)
+decision <- PermissionResultDeny("Host veto", interrupt = TRUE)
+S7::S7_inherits(decision, PermissionResult)
+decision$decision
+S7::props(decision)
+```
 
 ## Example: Read-Only Agent
 

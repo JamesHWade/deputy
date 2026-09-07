@@ -38,6 +38,7 @@ deputy/
 │   ├── permissions.R       # S7 permission configuration and public evaluation
 │   ├── permission-evaluation.R # Internal tool gating and capability evaluation
 │   ├── hooks.R             # HookRegistry for lifecycle events
+│   ├── callback-result.R   # S7 hook and permission decisions
 │   ├── skill.R             # S7 Skill values and requirement inspection
 │   ├── skills.R            # Explicit Skill file and tool loading
 │   ├── tools-files.R       # Native filesystem tools
@@ -182,8 +183,9 @@ minimum version or adopting an unreleased API.
   `result_*()` inspection functions.
   `$` reads on events, results, policies, usage, and limits are property
   conveniences; there are no R6 constructor or method facades for these values.
-  Existing value types await scoped migration; do not introduce new S3 value
-  classes. ADR-0009 records validation, read-only storage, and composition
+  Hook and permission result constructors also return read-only S7 values;
+  use their concrete S7 classes or the abstract HookResult/PermissionResult
+  families for membership checks. Do not introduce new S3 value classes. ADR-0009 records validation, read-only storage, and composition
   with ellmer classes. ADR-0010 records result inspection, policy evaluation,
   and the AgentResult/Permissions migration. ADR-0011 records accounting,
   budget construction, and persistence for usage and limits; use `S7::props()`
@@ -195,6 +197,8 @@ minimum version or adopting an unreleased API.
   version-1 YAML serialization through explicit host registries. ADR-0014
   records frozen Skill configuration, standalone requirement checks, and
   explicit source loading. Tools nested in Skills retain caller-owned state.
+  ADR-0015 records callback result validation, S7 family membership, and
+  lifecycle interpretation. Nested tool-output payloads retain their identity.
 - **Printing**: Format summaries with `cli::cli_format_method()` and write the
   resulting lines with `cli::cat_line()` so printing remains on stdout. Pass
   user strings as interpolated values, never as cli templates, and return the

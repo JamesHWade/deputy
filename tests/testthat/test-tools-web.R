@@ -196,7 +196,7 @@ test_that("web permission is checked correctly", {
     list(url = "https://example.com"),
     list()
   )
-  expect_s3_class(result_no_web, "PermissionResultDeny")
+  expect_s7_class(result_no_web, PermissionResultDeny)
 
   # Web allowed
   agent_web <- Agent$new(
@@ -211,7 +211,7 @@ test_that("web permission is checked correctly", {
     list(url = "https://example.com"),
     list()
   )
-  expect_s3_class(result_web, "PermissionResultAllow")
+  expect_s7_class(result_web, PermissionResultAllow)
 })
 
 test_that("web_search permission is checked correctly", {
@@ -230,7 +230,7 @@ test_that("web_search permission is checked correctly", {
     list(query = "test"),
     list()
   )
-  expect_s3_class(result_no_web, "PermissionResultDeny")
+  expect_s7_class(result_no_web, PermissionResultDeny)
 
   # Web allowed
   agent_web <- Agent$new(
@@ -245,7 +245,7 @@ test_that("web_search permission is checked correctly", {
     list(query = "test"),
     list()
   )
-  expect_s3_class(result_web, "PermissionResultAllow")
+  expect_s7_class(result_web, PermissionResultAllow)
 })
 
 # Helper function tests

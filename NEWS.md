@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* Hook and permission result constructors now return read-only S7 values.
+  Use `S7::S7_inherits()` for concrete or family membership and `S7::props()`
+  for plain records. Continuation/interruption flags and text are validated;
+  `suppress_output` keeps its `isTRUE()` coercion. Lifecycle decisions and
+  original tool-output object references are preserved (#129).
+
 * `Skill()` now constructs a read-only S7 configuration value. Use
   `skill_check_requirements(skill)` instead of the former instance method,
   and `S7::props()` to prepare revised configuration. `skill_create()` and

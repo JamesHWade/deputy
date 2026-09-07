@@ -31,7 +31,7 @@ test_that("plan mode allows only annotated read-only tools", {
     list(),
     list(tool_annotations = list(read_only_hint = TRUE))
   )
-  expect_s3_class(allow, "PermissionResultAllow")
+  expect_s7_class(allow, PermissionResultAllow)
 
   destructive <- permissions_check(
     perms,
@@ -44,11 +44,11 @@ test_that("plan mode allows only annotated read-only tools", {
       )
     )
   )
-  expect_s3_class(destructive, "PermissionResultDeny")
+  expect_s7_class(destructive, PermissionResultDeny)
   expect_match(destructive$reason, "destructive", ignore.case = TRUE)
 
   unannotated <- permissions_check(perms, "mystery_tool", list(), list())
-  expect_s3_class(unannotated, "PermissionResultDeny")
+  expect_s7_class(unannotated, PermissionResultDeny)
   expect_match(unannotated$reason, "read-only", ignore.case = TRUE)
 })
 
@@ -56,7 +56,7 @@ test_that("plan mode always allows the permission prompt tool", {
   perms <- permissions_plan(permission_prompt_tool_name = "ask_user")
 
   result <- permissions_check(perms, "ask_user", list(), list())
-  expect_s3_class(result, "PermissionResultAllow")
+  expect_s7_class(result, PermissionResultAllow)
 })
 
 test_that("plan mode respects a disabled file-read capability", {
@@ -82,7 +82,7 @@ test_that("plan mode respects a disabled file-read capability", {
         )
       )
     )
-    expect_s3_class(result, "PermissionResultDeny")
+    expect_s7_class(result, PermissionResultDeny)
     expect_match(result$reason, "File reading")
   }
 })

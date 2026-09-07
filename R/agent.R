@@ -1895,7 +1895,7 @@ Agent <- R6::R6Class(
               tool_annotations = tool@annotations
             )
           )
-          if (inherits(permission, "PermissionResultDeny")) {
+          if (S7::S7_inherits(permission, PermissionResultDeny)) {
             cli_abort(c(
               "Provider-native tool {.val {tool_name}} was denied at registration.",
               "x" = permission$reason,
