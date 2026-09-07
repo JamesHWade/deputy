@@ -81,6 +81,7 @@ for scenario,e in data.items():
   matched={f"{r['strategy']}/{r['protocol']}":r for r in rows if r['scenario']==scenario and r['trial_id']==trial}
   if len(matched)!=3: continue
   base=matched['history/baseline']; budget=matched['history/budget-aware']; summary=matched['summary/baseline']
+  if not (base['attempted'] and budget['attempted']): continue
   pairs.append(dict(scenario=scenario,trial_id=trial,summary_score=summary['score'],baseline_answer=base['answer_present'],budget_aware_answer=budget['answer_present'],baseline_score=base['score'],budget_aware_score=budget['score'],budget_minus_baseline_score=budget['score']-base['score'],baseline_seconds=base['seconds'],budget_aware_seconds=budget['seconds']))
 if pairs:
  with (root/'pairs.csv').open('w',newline='') as f:
