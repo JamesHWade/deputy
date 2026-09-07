@@ -71,8 +71,12 @@ per scenario rotated all three arms through each execution position.
 
 Each continuation retained its eight-request ceiling. Budget-aware retrieval
 used at most six requests and reserved two for a tool-free structured answer.
-Both history arms retained six history attempts, 4,096 bytes per response and
-16,384 bytes total. The original baseline archive is unchanged; the comparison
+Both history arms allowed payload access during only the first six adapter
+calls, with 4,096 bytes per response and 16,384 bytes total. Later adapter calls
+were refused, and runtime limits could prevent dispatch. This is a payload-access
+allowance, not a ceiling on emitted attempts: baseline history requested up to
+ten calls and invoked the adapter up to eight times. The raw counters distinguish
+these outcomes. The original baseline archive is unchanged; the comparison
 above uses the contemporaneous baseline arm in this run.
 
 [invocation.R.txt](invocation.R.txt) is the exact executed driver. It loaded a
