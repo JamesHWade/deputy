@@ -1882,6 +1882,7 @@ Agent <- R6::R6Class(
       },
 
       adapt_tool = function(tool) {
+        validate_mcp_tool_owner(tool, self)
         if (inherits(tool, "ellmer::ToolBuiltIn")) {
           if (!is.null(private$.approval_dir)) {
             approval_abort(
@@ -1967,6 +1968,7 @@ Agent <- R6::R6Class(
       },
 
       execute_tool = function(tool, arguments) {
+        validate_mcp_tool_owner(tool, self, private$effective_run_context())
         workspace_runner <- attr(
           tool,
           "deputy_workspace_runner",

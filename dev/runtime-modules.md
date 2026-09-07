@@ -34,6 +34,8 @@ formats remain unchanged by the moves.
 | Native filesystem tools | `R/tools-files.R` |
 | Document conversion helpers and tool | `R/tools-documents.R` |
 | Trusted one-shot R and shell execution | `R/tools-execution.R` |
+| Host-owned MCP connection and immutable admission lists | `R/mcp-connection.R` |
+| Qualified mcptools worker boundary and owner validation | `R/mcp-worker.R` |
 
 R6 method-list factories are internal source organization: R6 still binds their
 methods to the same `self` and `private` environments. Explicit roxygen
