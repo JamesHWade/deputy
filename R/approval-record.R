@@ -228,6 +228,10 @@ approval_result_content <- function(request, value = NULL, error = NULL) {
   if (inherits(error, "condition")) {
     error <- conditionMessage(error)
   }
+  if (is.null(error) && inherits(value, "ellmer::ContentToolResult")) {
+    value@request <- request
+    return(ellmer::contents_replay(approval_record_content(value)))
+  }
   if (S7::S7_inherits(value)) {
     value <- approval_record_content(value)
   }
@@ -239,9 +243,14 @@ approval_result_content <- function(request, value = NULL, error = NULL) {
     value <- lapply(value, approval_record_content)
   }
   if (is.atomic(value) && !is.character(value)) {
-    value <- as.character(jsonlite::toJSON(value, auto_unbox = TRUE))
+    value <- jsonlite::toJSON(
+      value,
+      auto_unbox = TRUE,
+      null = "null",
+      na = "null"
+    )
   }
-  if (is.character(value)) {
+  if (is.character(value) && !inherits(value, "json")) {
     value <- paste(value, collapse = "\n")
   }
   approval_portable(value)

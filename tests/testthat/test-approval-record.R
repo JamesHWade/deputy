@@ -22,3 +22,20 @@ test_that("pending permission values preserve the read-only result family", {
   expect_error(PermissionResultPending(NA_character_))
   expect_error(PermissionResultPending(c("one", "two")))
 })
+
+test_that("restored results preserve ellmer JSON and result content semantics", {
+  request <- ellmer::contents_replay(list(
+    version = 1,
+    class = "ellmer::ContentToolRequest",
+    props = list(id = "request_1", name = "effect", arguments = list())
+  ))
+  value <- jsonlite::toJSON(list(receipt = "receipt_1"), auto_unbox = TRUE)
+  result <- approval_result_content(request, value)
+  expect_identical(result@value, value)
+  numeric <- approval_result_content(request, 42)
+  expect_s3_class(numeric@value, "json")
+  expect_equal(jsonlite::fromJSON(numeric@value), 42)
+  rebound <- approval_result_content(request, result)
+  expect_identical(rebound@request@id, "request_1")
+  expect_identical(rebound@value, value)
+})
