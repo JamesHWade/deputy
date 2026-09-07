@@ -1,0 +1,10 @@
+scenario,trial_id,summary_score,baseline_answer,budget_aware_answer,baseline_score,budget_aware_score,budget_minus_baseline_score,baseline_seconds,budget_aware_seconds
+original,gpt-5.6-luna/1,0.7,True,True,1,1,0,9.41048502922058,14.495640039444
+original,gpt-5.6-luna/2,0.9,True,True,1,1,0,8.8979651927948,16.5131261348724
+original,gpt-5.6-luna/3,0.9,True,True,1,1,0,14.016970872879,19.1945381164551
+changed-constraint,gpt-5.6-luna/1,0.8,True,True,0.9,0.9,0.0,15.335865020752,19.9818167686462
+changed-constraint,gpt-5.6-luna/2,0.7,False,True,0,0.9,0.9,8.03105783462524,19.4277610778809
+changed-constraint,gpt-5.6-luna/3,0.8,True,True,1,1,0,13.8674869537354,17.9410970211029
+resolved-methods,gpt-5.6-luna/1,0.8,True,True,1,1,0,11.4440059661865,21.9231581687927
+resolved-methods,gpt-5.6-luna/2,0.9,True,True,1,1,0,12.9795739650726,19.0324130058289
+resolved-methods,gpt-5.6-luna/3,0.9,True,True,1,1,0,11.73872590065,16.4075992107391

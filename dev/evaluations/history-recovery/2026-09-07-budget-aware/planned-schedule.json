@@ -1,0 +1,218 @@
+[
+  {
+    "scenario": "original",
+    "trial_id": "gpt-5.6-luna/1",
+    "helper_model": "gpt-5.6-luna",
+    "position": 1,
+    "strategy": "summary",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "original",
+    "trial_id": "gpt-5.6-luna/1",
+    "helper_model": "gpt-5.6-luna",
+    "position": 2,
+    "strategy": "history",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "original",
+    "trial_id": "gpt-5.6-luna/1",
+    "helper_model": "gpt-5.6-luna",
+    "position": 3,
+    "strategy": "history",
+    "protocol": "budget-aware"
+  },
+  {
+    "scenario": "original",
+    "trial_id": "gpt-5.6-luna/2",
+    "helper_model": "gpt-5.6-luna",
+    "position": 1,
+    "strategy": "history",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "original",
+    "trial_id": "gpt-5.6-luna/2",
+    "helper_model": "gpt-5.6-luna",
+    "position": 2,
+    "strategy": "history",
+    "protocol": "budget-aware"
+  },
+  {
+    "scenario": "original",
+    "trial_id": "gpt-5.6-luna/2",
+    "helper_model": "gpt-5.6-luna",
+    "position": 3,
+    "strategy": "summary",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "original",
+    "trial_id": "gpt-5.6-luna/3",
+    "helper_model": "gpt-5.6-luna",
+    "position": 1,
+    "strategy": "history",
+    "protocol": "budget-aware"
+  },
+  {
+    "scenario": "original",
+    "trial_id": "gpt-5.6-luna/3",
+    "helper_model": "gpt-5.6-luna",
+    "position": 2,
+    "strategy": "summary",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "original",
+    "trial_id": "gpt-5.6-luna/3",
+    "helper_model": "gpt-5.6-luna",
+    "position": 3,
+    "strategy": "history",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "changed-constraint",
+    "trial_id": "gpt-5.6-luna/1",
+    "helper_model": "gpt-5.6-luna",
+    "position": 1,
+    "strategy": "summary",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "changed-constraint",
+    "trial_id": "gpt-5.6-luna/1",
+    "helper_model": "gpt-5.6-luna",
+    "position": 2,
+    "strategy": "history",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "changed-constraint",
+    "trial_id": "gpt-5.6-luna/1",
+    "helper_model": "gpt-5.6-luna",
+    "position": 3,
+    "strategy": "history",
+    "protocol": "budget-aware"
+  },
+  {
+    "scenario": "changed-constraint",
+    "trial_id": "gpt-5.6-luna/2",
+    "helper_model": "gpt-5.6-luna",
+    "position": 1,
+    "strategy": "history",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "changed-constraint",
+    "trial_id": "gpt-5.6-luna/2",
+    "helper_model": "gpt-5.6-luna",
+    "position": 2,
+    "strategy": "history",
+    "protocol": "budget-aware"
+  },
+  {
+    "scenario": "changed-constraint",
+    "trial_id": "gpt-5.6-luna/2",
+    "helper_model": "gpt-5.6-luna",
+    "position": 3,
+    "strategy": "summary",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "changed-constraint",
+    "trial_id": "gpt-5.6-luna/3",
+    "helper_model": "gpt-5.6-luna",
+    "position": 1,
+    "strategy": "history",
+    "protocol": "budget-aware"
+  },
+  {
+    "scenario": "changed-constraint",
+    "trial_id": "gpt-5.6-luna/3",
+    "helper_model": "gpt-5.6-luna",
+    "position": 2,
+    "strategy": "summary",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "changed-constraint",
+    "trial_id": "gpt-5.6-luna/3",
+    "helper_model": "gpt-5.6-luna",
+    "position": 3,
+    "strategy": "history",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "resolved-methods",
+    "trial_id": "gpt-5.6-luna/1",
+    "helper_model": "gpt-5.6-luna",
+    "position": 1,
+    "strategy": "summary",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "resolved-methods",
+    "trial_id": "gpt-5.6-luna/1",
+    "helper_model": "gpt-5.6-luna",
+    "position": 2,
+    "strategy": "history",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "resolved-methods",
+    "trial_id": "gpt-5.6-luna/1",
+    "helper_model": "gpt-5.6-luna",
+    "position": 3,
+    "strategy": "history",
+    "protocol": "budget-aware"
+  },
+  {
+    "scenario": "resolved-methods",
+    "trial_id": "gpt-5.6-luna/2",
+    "helper_model": "gpt-5.6-luna",
+    "position": 1,
+    "strategy": "history",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "resolved-methods",
+    "trial_id": "gpt-5.6-luna/2",
+    "helper_model": "gpt-5.6-luna",
+    "position": 2,
+    "strategy": "history",
+    "protocol": "budget-aware"
+  },
+  {
+    "scenario": "resolved-methods",
+    "trial_id": "gpt-5.6-luna/2",
+    "helper_model": "gpt-5.6-luna",
+    "position": 3,
+    "strategy": "summary",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "resolved-methods",
+    "trial_id": "gpt-5.6-luna/3",
+    "helper_model": "gpt-5.6-luna",
+    "position": 1,
+    "strategy": "history",
+    "protocol": "budget-aware"
+  },
+  {
+    "scenario": "resolved-methods",
+    "trial_id": "gpt-5.6-luna/3",
+    "helper_model": "gpt-5.6-luna",
+    "position": 2,
+    "strategy": "summary",
+    "protocol": "baseline"
+  },
+  {
+    "scenario": "resolved-methods",
+    "trial_id": "gpt-5.6-luna/3",
+    "helper_model": "gpt-5.6-luna",
+    "position": 3,
+    "strategy": "history",
+    "protocol": "baseline"
+  }
+]
