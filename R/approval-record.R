@@ -24,7 +24,7 @@ approval_abort <- function(
 #' Raw JSON shaped like a content record (`version`, `class`, `props`) is rejected
 #' because ellmer replay would reinterpret it as an S7 constructor.
 #' No approval is granted by constructing this value.
-#' @param reason One non-missing string explaining the pending decision.
+#' @param reason One non-empty string explaining the pending decision.
 #' @return A read-only S7 permission result.
 #' @seealso [approval_read()], [Agent]
 #' @export
@@ -37,10 +37,13 @@ PermissionResultPending <- S7::new_class(
     reason = readonly_property("reason", S7::class_character)
   ),
   constructor = function(reason = "Approval required") {
+    if (!is_nonempty_string(reason)) {
+      approval_abort("{.arg reason} must be one non-empty string.")
+    }
     value <- S7::new_object(
       S7::S7_object(),
       decision = "pending",
-      reason = validate_callback_text(reason, "reason", optional = FALSE)
+      reason = reason
     )
     freeze_value(value)
   }
@@ -159,7 +162,12 @@ S7::method(print, ApprovalContinuation) <- function(x, ...) {
 }
 
 # Reject process-local state before writing a portable control record.
-approval_portable <- function(value, depth = 0L, path = "record") {
+approval_portable <- function(
+  value,
+  depth = 0L,
+  path = "record",
+  allow_classed = FALSE
+) {
   if (depth > 100L) {
     approval_abort("Approval data exceeds the nesting limit.")
   }
@@ -171,24 +179,43 @@ approval_portable <- function(value, depth = 0L, path = "record") {
       is.function(value) ||
       is.environment(value) ||
       typeof(value) %in% c("externalptr", "weakref") ||
-      S7::S7_inherits(value)
+      S7::S7_inherits(value) ||
+      isS4(value)
   ) {
     approval_abort(
       "Approval data must not contain runtime objects or conditions."
     )
   }
-  if (is.list(value) && !is.object(value)) {
-    for (i in seq_along(value)) {
-      label <- names(value)[i] %||% as.character(i)
-      approval_portable(value[[i]], depth + 1L, paste0(path, "$", label))
+  if (is.list(value) && (!is.object(value) || allow_classed)) {
+    elements <- if (is.object(value)) unclass(value) else value
+    for (i in seq_along(elements)) {
+      label <- names(elements)[i] %||% as.character(i)
+      approval_portable(
+        elements[[i]],
+        depth + 1L,
+        paste0(path, "$", label),
+        allow_classed
+      )
     }
   } else if (
     !is.atomic(value) ||
       (is.object(value) &&
+        !allow_classed &&
         !inherits(value, c("json", "POSIXct")))
   ) {
     approval_abort(
       "Approval data at {.val {path}} must contain only portable values; found {.val {class(value)}}."
+    )
+  }
+  # Classed session data retain their RDS representation, including attributes.
+  # Inspect attributes too so an otherwise plain value cannot hide a callback
+  # or runtime environment in metadata.
+  for (attribute in attributes(value)) {
+    approval_portable(
+      attribute,
+      depth + 1L,
+      paste0(path, " attributes"),
+      allow_classed
     )
   }
   invisible(value)
@@ -303,7 +330,14 @@ approval_static_policy <- function(record) {
 }
 
 validate_approval_record <- function(record) {
-  approval_portable(record)
+  if (is.list(record) && !is.object(record)) {
+    control <- record
+    control$session <- NULL
+    approval_portable(control)
+    approval_portable(record$session, path = "session", allow_classed = TRUE)
+  } else {
+    approval_portable(record)
+  }
   approval_store_record(record)
   required <- c(
     "schema_version",

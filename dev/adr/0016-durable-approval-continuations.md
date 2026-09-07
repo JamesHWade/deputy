@@ -61,6 +61,12 @@ its tool. Hosts retain their complete conversation archive separately; no second
 conversation tree is introduced. A shinychat adapter remains optional and must
 use a supported public released contract tracked in #66, never private fields.
 
+Session offloads and checkpoint metadata preserve serializable S3 data, including
+data frames, factors, dates and custom classed lists, with their attributes.
+These values stay in the session's RDS payload; transcript content still uses
+ellmer's content format. Runtime objects, functions, environments and references
+hidden in attributes are rejected. This is not a general object-graph snapshot.
+
 ## Effect and consumption protocol
 
 An immutable initial revision records `pending`. Resume acquires a nonblocking

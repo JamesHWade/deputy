@@ -7,7 +7,7 @@
 PermissionResultPending(reason = "Approval required")
 }
 \arguments{
-\item{reason}{One non-missing string explaining the pending decision.}
+\item{reason}{One non-empty string explaining the pending decision.}
 }
 \value{
 A read-only S7 permission result.

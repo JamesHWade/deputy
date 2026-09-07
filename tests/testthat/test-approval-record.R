@@ -23,6 +23,18 @@ test_that("pending permission values preserve the read-only result family", {
   expect_error(PermissionResultPending(c("one", "two")))
 })
 
+test_that("pending permission reasons reject blank text before a run can suspend", {
+  for (reason in c("", " ", "\t\r\n")) {
+    expect_error(
+      PermissionResultPending(reason),
+      "non-empty string",
+      class = "deputy_approval_error"
+    )
+  }
+  reason <- "  Review this operation\n"
+  expect_identical(PermissionResultPending(reason)$reason, reason)
+})
+
 test_that("restored results preserve ellmer JSON and result content semantics", {
   request <- ellmer::contents_replay(list(
     version = 1,

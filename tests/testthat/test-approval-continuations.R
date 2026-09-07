@@ -173,6 +173,98 @@ test_that("approval journals retain Deputy correlation without valid provider ID
   }
 })
 
+test_that("approval restart preserves classed session results and checkpoint metadata", {
+  directory <- withr::local_tempdir()
+  offload_directory <- withr::local_tempdir()
+  server <- local_runtime_server(list(
+    approval_batch_reply(c("a", "b")),
+    runtime_reply(text = "finished")
+  ))
+  data <- data.frame(
+    date = as.Date("2026-01-01") + 0:2,
+    group = factor(c("a", "b", "a")),
+    value = 1:3
+  )
+  metadata <- list(
+    report = structure(
+      list(groups = factor(c("accepted", "pending"))),
+      class = "checkpoint_report"
+    )
+  )
+  effects <- character()
+  tool <- ellmer::tool(
+    function(value) {
+      effects <<- c(effects, value)
+      data
+    },
+    name = "effect",
+    description = "Return a classed result after recording an effect",
+    arguments = list(value = ellmer::type_string()),
+    convert = FALSE,
+    annotations = ellmer::tool_annotations(
+      read_only_hint = FALSE,
+      destructive_hint = FALSE,
+      open_world_hint = FALSE
+    )
+  )
+  make_agent <- function() {
+    Agent$new(
+      chat = runtime_chat(server),
+      tools = list(tool),
+      permissions = Permissions(can_use_tool = function(name, input, context) {
+        if (identical(input$value, "b")) {
+          PermissionResultPending("Review the second effect")
+        } else {
+          PermissionResultAllow()
+        }
+      }),
+      approval_dir = directory,
+      working_dir = directory,
+      context_policy = ContextPolicy(
+        max_tool_result_bytes = 1,
+        offload_dir = offload_directory
+      ),
+      enable_file_checkpointing = TRUE,
+      session_id = "classed_session",
+      agent_id = "classed_agent"
+    )
+  }
+  agent <- make_agent()
+  agent$checkpoint("classed metadata", metadata)
+  result <- agent$run_sync("Perform both effects")
+  expect_identical(result$stop_reason, "approval_pending")
+  expect_identical(effects, "a")
+  path <- agent$pending_approval()$source$path
+  saved <- approval_store_read(path)$session
+  expect_identical(saved$tool_result_envelopes[[1L]]$value, data)
+  expect_identical(
+    saved$file_checkpoint_state$checkpoints[[1L]]$metadata,
+    metadata
+  )
+  resumed <- make_agent()
+  result <- resumed$resume_approval(path, "approve")
+  expect_identical(trimws(result$response), "finished")
+  expect_identical(effects, c("a", "b"))
+  restored <- resumed$.__enclos_env__$private$build_session_payload()
+  expect_identical(restored$tool_result_envelopes[[1L]]$value, data)
+  expect_identical(
+    restored$file_checkpoint_state$checkpoints[[1L]]$metadata,
+    metadata
+  )
+  expect_identical(approval_read(path)$status, "completed")
+})
+
+test_that("session metadata cannot conceal runtime objects in attributes", {
+  for (runtime in list(new.env(), function() NULL)) {
+    value <- structure(1, class = "report", runtime = runtime)
+    expect_error(
+      approval_portable(list(metadata = value), allow_classed = TRUE),
+      "runtime objects",
+      class = "deputy_approval_error"
+    )
+  }
+})
+
 test_that("approval suspension preserves a complete batch without running later siblings", {
   fixture <- local_approval_runtime()
   expect_identical(fixture$result$stop_reason, "approval_pending")

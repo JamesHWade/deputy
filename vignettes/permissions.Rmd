@@ -456,7 +456,9 @@ does not claim exactly-once effects or power-loss durability.
 The stored transcript support uses ellmer's public content record/replay and the
 same session payload as `save_session()` / `load_session()`. Loading a separate
 session snapshot does not consume an approval. Tools, callbacks and provider
-clients are never serialized. The host owns access, retention and backups for
+clients are never serialized. Offloaded data frames and serializable S3 checkpoint
+metadata retain their values, classes and attributes. Runtime objects inside
+metadata or attributes remain unsupported. The host owns access, retention and backups for
 these trusted local R records. An optional shinychat adapter must use its
 released public contract; it is not required for this headless workflow. See
 [ADR-0016](https://github.com/JamesHWade/deputy/blob/main/dev/adr/0016-durable-approval-continuations.md)
