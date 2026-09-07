@@ -187,7 +187,16 @@ Connections and executable tools are not portable saved-session state.
   Build resource and prompt tools restricted to the fixed host allowlists.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{McpConnection$capability_tools()}
+    \preformatted{McpConnection$capability_tools(prefix = "mcp")}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{prefix}}{Tool name prefix. Use distinct prefixes when registering
+capability tools from multiple connections. Must contain 1 to 50
+letters, digits, underscores or hyphens.}
+    }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{

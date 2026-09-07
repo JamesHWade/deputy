@@ -295,6 +295,13 @@ connection <- McpConnection$new(
 agent$register_tools(c(connection$tools(), connection$capability_tools()))
 ```
 
+When one Agent uses multiple connections, choose distinct capability prefixes,
+such as `first$capability_tools(prefix = "papers")` and
+`second$capability_tools(prefix = "notes")`. These produce names such as
+`papers_read_resource` and `notes_read_resource` without changing the allowlists.
+Connections with no allowed tools can use resource-only or prompt-only servers;
+they do not request a tool catalogue during initialization.
+
 The allowlists are fixed. `$discover("resources")` returns a promise for one
 catalogue page; its result may include a cursor for the next page. Discovery
 does not fetch resource contents, retrieve prompts, register tools or expand

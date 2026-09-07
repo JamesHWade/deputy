@@ -1,4 +1,4 @@
-mcp_test_config <- function() {
+mcp_test_config <- function(capabilities = c("tools", "resources", "prompts")) {
   skip_if_not_installed("mcptools", "1.0.2")
   skip_if(as.character(utils::packageVersion("mcptools")) != "1.0.2")
   path <- tempfile(fileext = ".json")
@@ -11,7 +11,8 @@ mcp_test_config <- function() {
           command = file.path(R.home("bin"), "Rscript"),
           args = list(
             normalizePath(test_path("fixtures", "mcp-capabilities.R")),
-            log
+            log,
+            paste(capabilities, collapse = ",")
           )
         ),
         excluded = list(command = "deputy-must-not-start-this-server")
@@ -306,6 +307,102 @@ test_that("server exit is reported as state loss and old handles stay invalid", 
   )
   expect_identical(connection$status()$reason, "server_exited")
   expect_error(tool(operation = "get"), "closed")
+})
+
+test_that("resource-only and prompt-only servers need no tool catalogue", {
+  for (capability in c("resources", "prompts")) {
+    config <- mcp_test_config(capability)
+    agent <- Agent$new(chat = create_mock_chat())
+    arguments <- list(config = config$path, server = "fixture", agent = agent)
+    arguments[[capability]] <- if (capability == "resources") {
+      "fixture://allowed"
+    } else {
+      "summarize"
+    }
+    connection <- do.call(McpConnection$new, arguments)
+    withr::defer(connection$close())
+    expect_length(connection$tools(), 0L)
+    expect_length(connection$capability_tools(), 1L)
+    result <- if (capability == "resources") {
+      mcp_test_await(connection$read_resource("fixture://allowed"))
+    } else {
+      mcp_test_await(connection$get_prompt(
+        "summarize",
+        list(topic = "evidence")
+      ))
+    }
+    expect_identical(
+      result$source$connection_id,
+      connection$status()$connection_id
+    )
+    expect_true(is.list(mcp_test_await(connection$discover(capability))$result))
+    expect_false(any(readLines(config$log) == "tools/list "))
+    expect_equal(sum(readLines(config$log) == "initialize "), 1L)
+    connection$close()
+  }
+})
+
+test_that("one Agent can register resource and prompt tools from two connections", {
+  first_config <- mcp_test_config()
+  second_config <- mcp_test_config()
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    permissions = Permissions(web = TRUE)
+  )
+  first <- McpConnection$new(
+    first_config$path,
+    "fixture",
+    agent,
+    resources = "fixture://allowed",
+    prompts = "summarize"
+  )
+  withr::defer(first$close())
+  second <- McpConnection$new(
+    second_config$path,
+    "fixture",
+    agent,
+    resources = "fixture://allowed",
+    prompts = "summarize"
+  )
+  withr::defer(second$close())
+  agent$register_tools(c(
+    first$capability_tools(prefix = "first"),
+    second$capability_tools(prefix = "second")
+  ))
+  expect_named(
+    agent$get_tools(),
+    c(
+      "first_read_resource",
+      "first_get_prompt",
+      "second_read_resource",
+      "second_get_prompt"
+    )
+  )
+  for (prefix in c("first", "second")) {
+    connection <- if (prefix == "first") first else second
+    for (operation in c("read_resource", "get_prompt")) {
+      tool <- agent$get_tools()[[paste(prefix, operation, sep = "_")]]
+      result <- mcp_test_await(
+        if (operation == "read_resource") {
+          tool(uri = "fixture://allowed")
+        } else {
+          tool(name = "summarize")
+        }
+      )
+      expect_identical(
+        result$source$connection_id,
+        connection$status()$connection_id
+      )
+    }
+  }
+  for (config in list(first_config, second_config)) {
+    expect_equal(sum(readLines(config$log) == "resources/read "), 1L)
+    expect_equal(sum(readLines(config$log) == "prompts/get "), 1L)
+  }
+  expect_error(
+    first$capability_tools(prefix = "invalid prefix"),
+    class = "deputy_mcp_connection"
+  )
 })
 
 test_that("a clone cannot dispatch after loading a different owner context", {

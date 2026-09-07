@@ -41,7 +41,11 @@ Selection happens before any server starts. The client worker receives only
 the selected configuration, with a private temporary configuration file, the
 parent's package library paths, and the Agent's working directory. It does not
 load the host project's R profile. Each worker loads mcptools once and converts
-the tools from that connection. Metadata inspection makes no second connection.
+the allowed tool catalogue from that connection. When no tools are allowed,
+the adapter composes mcptools' transport and initialization helpers without
+calling `tools/list`, which mcptools 1.0.2 otherwise requests unconditionally.
+This permits resource-only and prompt-only servers without a tool catalogue.
+Metadata inspection makes no second connection.
 
 The immutable allowlists name exact tools, resource URIs and prompts. Catalogue
 pages and returned links do not expand these allowances, cause a read, or
@@ -49,6 +53,8 @@ register a tool. Explicitly registered resource/prompt tools use normal Agent
 permissions, hooks, request limits and result handling. Direct host access is
 limited by the host allowlists but is not an Agent run. Prompt results stay
 data until the host decides to add them to a conversation.
+`capability_tools(prefix = "mcp")` accepts a host-selected name prefix; use
+distinct prefixes when registering capabilities from multiple connections.
 
 mcptools owns configuration semantics, protocol IDs, conversion, transport,
 authentication, server errors and transport closure. The adapter invokes its

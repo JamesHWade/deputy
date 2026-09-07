@@ -83,7 +83,7 @@ McpConnection <- R6::R6Class(
         )
       }
       selected <- mcp_connection_config(config, server)
-      rlang::check_installed("mcptools")
+      rlang::check_installed("mcptools", reason = "to create an MCP connection")
       mcp_metadata_state()
       private$server <- server
       private$timeout <- timeout
@@ -118,7 +118,8 @@ McpConnection <- R6::R6Class(
         list(
           config = selected,
           server = server,
-          working_dir = agent$working_dir
+          working_dir = agent$working_dir,
+          load_tools = length(tools) > 0L
         )
       )
       while (!identical(private$worker$poll_process(20), "ready")) {
@@ -290,9 +291,20 @@ McpConnection <- R6::R6Class(
     },
 
     #' @description Build resource and prompt tools restricted to the fixed host allowlists.
+    #' @param prefix Tool name prefix. Use distinct prefixes when registering
+    #'   capability tools from multiple connections. Must contain 1 to 50
+    #'   letters, digits, underscores or hyphens.
     #' @return A named list of ellmer tools for explicit Agent registration.
-    capability_tools = function() {
+    capability_tools = function(prefix = "mcp") {
       private$check_current()
+      if (
+        !is_nonempty_string(prefix) || !grepl("^[A-Za-z0-9_-]{1,50}$", prefix)
+      ) {
+        abort_deputy(
+          "{.arg prefix} must contain 1 to 50 letters, digits, underscores or hyphens.",
+          class = "mcp_connection"
+        )
+      }
       result <- list()
       annotations <- list(
         read_only_hint = TRUE,
@@ -301,10 +313,11 @@ McpConnection <- R6::R6Class(
         open_world_hint = TRUE
       )
       if (length(private$allowed$resources)) {
-        result$mcp_read_resource <- private$decorate(
+        name <- paste0(prefix, "_read_resource")
+        result[[name]] <- private$decorate(
           ellmer::tool(
             function(uri) self$read_resource(uri),
-            name = "mcp_read_resource",
+            name = name,
             description = "Read one host-allowed MCP resource. Returned links are not fetched.",
             arguments = list(
               uri = ellmer::type_enum(private$allowed$resources)
@@ -315,10 +328,11 @@ McpConnection <- R6::R6Class(
         )
       }
       if (length(private$allowed$prompts)) {
-        result$mcp_get_prompt <- private$decorate(
+        name <- paste0(prefix, "_get_prompt")
+        result[[name]] <- private$decorate(
           ellmer::tool(
             function(name) self$get_prompt(name),
-            name = "mcp_get_prompt",
+            name = name,
             description = "Retrieve one host-allowed MCP prompt without adding it to the conversation. Prompts requiring arguments must be retrieved by the host.",
             arguments = list(name = ellmer::type_enum(private$allowed$prompts)),
             annotations = annotations

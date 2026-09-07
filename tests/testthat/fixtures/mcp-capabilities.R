@@ -1,8 +1,18 @@
 # Stateful MCP producer, exercised through the released mcptools client.
 input <- file("stdin", open = "r")
-log <- commandArgs(trailingOnly = TRUE)[[1L]]
+args <- commandArgs(trailingOnly = TRUE)
+log <- args[[1L]]
 value <- "empty"
 object <- structure(list(), names = character())
+capabilities <- if (length(args) > 1L) {
+  strsplit(args[[2L]], ",", fixed = TRUE)[[1L]]
+} else {
+  c("tools", "resources", "prompts")
+}
+capabilities <- stats::setNames(
+  rep(list(object), length(capabilities)),
+  capabilities
+)
 repeat {
   line <- readLines(input, 1L, warn = FALSE)
   if (!length(line)) {
@@ -14,80 +24,90 @@ repeat {
     next
   }
   error <- NULL
-  result <- switch(
-    request$method,
-    initialize = list(
-      protocolVersion = request$params$protocolVersion,
-      capabilities = list(tools = object, resources = object, prompts = object),
-      serverInfo = list(name = "deputy-capabilities", version = "1")
-    ),
-    `tools/list` = list(
-      tools = list(list(
-        name = "state",
-        description = "Inspect or change fixture state.",
-        inputSchema = list(
-          type = "object",
-          properties = list(
-            operation = list(type = "string"),
-            value = list(type = "string")
+  family <- strsplit(request$method, "/", fixed = TRUE)[[1L]][[1L]]
+  result <- if (
+    family %in%
+      c("tools", "resources", "prompts") &&
+      !family %in% names(capabilities)
+  ) {
+    error <- list(code = -32601L, message = "Capability is unavailable.")
+    NULL
+  } else {
+    switch(
+      request$method,
+      initialize = list(
+        protocolVersion = request$params$protocolVersion,
+        capabilities = capabilities,
+        serverInfo = list(name = "deputy-capabilities", version = "1")
+      ),
+      `tools/list` = list(
+        tools = list(list(
+          name = "state",
+          description = "Inspect or change fixture state.",
+          inputSchema = list(
+            type = "object",
+            properties = list(
+              operation = list(type = "string"),
+              value = list(type = "string")
+            ),
+            required = list("operation")
           ),
-          required = list("operation")
-        ),
-        annotations = list(
-          readOnlyHint = FALSE,
-          destructiveHint = FALSE,
-          openWorldHint = FALSE
+          annotations = list(
+            readOnlyHint = FALSE,
+            destructiveHint = FALSE,
+            openWorldHint = FALSE
+          )
+        ))
+      ),
+      `tools/call` = {
+        arguments <- request$params$arguments
+        if (identical(arguments$operation, "set")) {
+          value <- arguments$value
+        }
+        if (identical(arguments$operation, "slow")) {
+          Sys.sleep(2)
+        }
+        if (identical(arguments$operation, "crash")) {
+          quit(save = "no", status = 7)
+        }
+        list(content = list(list(type = "text", text = value)))
+      },
+      `resources/list` = if (is.null(request$params$cursor)) {
+        list(
+          resources = list(list(uri = "fixture://allowed", name = "Allowed")),
+          nextCursor = "page-2"
         )
-      ))
-    ),
-    `tools/call` = {
-      arguments <- request$params$arguments
-      if (identical(arguments$operation, "set")) {
-        value <- arguments$value
+      } else {
+        list(resources = list(list(uri = "fixture://denied", name = "Denied")))
+      },
+      `resources/read` = list(
+        contents = list(list(
+          uri = request$params$uri,
+          mimeType = "text/plain",
+          text = paste("resource", value)
+        ))
+      ),
+      `prompts/list` = list(
+        prompts = list(list(
+          name = "summarize",
+          description = "Summarize the fixture."
+        ))
+      ),
+      `prompts/get` = list(
+        messages = list(list(
+          role = "user",
+          content = list(
+            type = "text",
+            text = paste("Summarize", value, request$params$arguments$topic)
+          )
+        ))
+      ),
+      {
+        error <- list(code = -32601L, message = "Method is unavailable.")
+        NULL
       }
-      if (identical(arguments$operation, "slow")) {
-        Sys.sleep(2)
-      }
-      if (identical(arguments$operation, "crash")) {
-        quit(save = "no", status = 7)
-      }
-      list(content = list(list(type = "text", text = value)))
-    },
-    `resources/list` = if (is.null(request$params$cursor)) {
-      list(
-        resources = list(list(uri = "fixture://allowed", name = "Allowed")),
-        nextCursor = "page-2"
-      )
-    } else {
-      list(resources = list(list(uri = "fixture://denied", name = "Denied")))
-    },
-    `resources/read` = list(
-      contents = list(list(
-        uri = request$params$uri,
-        mimeType = "text/plain",
-        text = paste("resource", value)
-      ))
-    ),
-    `prompts/list` = list(
-      prompts = list(list(
-        name = "summarize",
-        description = "Summarize the fixture."
-      ))
-    ),
-    `prompts/get` = list(
-      messages = list(list(
-        role = "user",
-        content = list(
-          type = "text",
-          text = paste("Summarize", value, request$params$arguments$topic)
-        )
-      ))
-    ),
-    {
-      error <- list(code = -32601L, message = "Method is unavailable.")
-      NULL
-    }
-  )
+    )
+  }
   response <- list(jsonrpc = "2.0", id = request$id)
   if (is.null(error)) {
     response$result <- result

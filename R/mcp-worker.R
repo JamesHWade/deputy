@@ -7,7 +7,7 @@ mcp_worker_function <- function(fun) {
   fun
 }
 
-mcp_worker_start <- function(config, server, working_dir) {
+mcp_worker_start <- function(config, server, working_dir, load_tools) {
   setwd(working_dir)
   if (!identical(as.character(utils::packageVersion("mcptools")), "1.0.2")) {
     cli::cli_abort("The client adapter requires qualified mcptools 1.0.2.")
@@ -22,12 +22,36 @@ mcp_worker_start <- function(config, server, working_dir) {
     auto_unbox = TRUE,
     null = "null"
   )
-  tools <- mcptools::mcp_tools(config = path)
+  state <- utils::getFromNamespace("the", "mcptools")
+  if (load_tools) {
+    tools <- mcptools::mcp_tools(config = path)
+  } else {
+    # mcp_tools() always calls tools/list in 1.0.2, even for resource-only
+    # servers. Compose its transport/handshake helpers without that discovery.
+    upstream <- asNamespace("mcptools")
+    selected <- upstream$read_mcp_config(path)[[server]]
+    transport <- upstream$mcp_transport(selected)
+    initialized <- upstream$mcp_transport_request(
+      transport,
+      upstream$mcp_request_initialize(id = 1L)
+    )
+    upstream$mcp_transport_store_initialize(transport, initialized)
+    upstream$mcp_transport_notify(transport, upstream$mcp_request_initialized())
+    state$mcp_servers[[server]] <- list(
+      name = server,
+      type = transport$type,
+      transport = transport,
+      process = transport$process,
+      tools = list(tools = list()),
+      ignore_tools = character(),
+      id = 2L
+    )
+    tools <- list()
+  }
   if (is.null(tools)) {
     tools <- list()
   }
   names(tools) <- vapply(tools, function(tool) tool@name, character(1))
-  state <- utils::getFromNamespace("the", "mcptools")
   entry <- state$mcp_servers[[server]]
   if (!is.environment(entry$transport) || !is.list(entry$tools$tools)) {
     cli::cli_abort("The mcptools connection descriptor contract has changed.")
