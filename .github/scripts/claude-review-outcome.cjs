@@ -73,6 +73,9 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, findi
     comment.body?.includes(findingMarker));
   const withFindings = summaries.some((comment) => comment.body?.includes(`${marker}:with-findings -->`));
   const withoutFindings = summaries.some((comment) => comment.body?.includes(`${marker}:without-findings -->`));
+  if ((withFindings || withoutFindings) && !diagnostic.review_agent_calls) {
+    return blocked('Upstream review agents did not run');
+  }
   if (withFindings && !withoutFindings && findings.length) {
     return { outcome: 'completed with findings', reason: 'Current-run summary and exact-commit inline findings verified' };
   }

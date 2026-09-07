@@ -12,6 +12,7 @@ const comment = (outcome) => ({ user: { login: 'github-actions[bot]' },
   created_at: '2026-09-06T12:01:00Z', body: `${marker}:${outcome} -->` });
 const context = () => ({ diagnostic: diagnostics([{ type: 'assistant', message: { content: [
   { type: 'tool_use', name: 'Skill', input: { skill: 'code-review:code-review', args: 'example/deputy/pull/131 --comment' } },
+  { type: 'tool_use', name: 'Agent', input: { prompt: 'Review the current PR diff' } },
 ] } }, { type: 'result', subtype: 'success',
   is_error: false, permission_denials: [] }]), sha, currentSha: sha, comments: [], inline: [],
   marker, findingMarker, started: '2026-09-06T12:00:00Z', actionOutcome: 'success' });
@@ -22,7 +23,7 @@ test('SDK success alone cannot claim a clean review', () => {
 });
 
 test('upstream skips remain distinct from current-head completion', () => {
-  const diagnostic = { ...context().diagnostic, plugin_calls: 1,
+  const diagnostic = { ...context().diagnostic, plugin_calls: 1, review_agent_calls: 0,
     reported_outcome: 'skipped', reported_reason: 'already-reviewed' };
   const priorReview = { ...comment('without-findings'), created_at: '2026-09-05T12:00:00Z',
     body: `<!-- deputy-claude-review:${'b'.repeat(40)}:122:1:without-findings -->` };
@@ -98,11 +99,13 @@ test('clean and findings outcomes require current-run bot evidence', () => {
   assert.equal(classify(clean).outcome, 'completed without findings');
   assert.equal(classify({ ...clean, diagnostic: { ...clean.diagnostic, plugin_calls: 0 } }).outcome, 'blocked/failed');
   assert.equal(classify({ ...clean, diagnostic: { ...clean.diagnostic, plugin_comment_argument_seen: false } }).outcome, 'blocked/failed');
+  assert.equal(classify({ ...clean, diagnostic: { ...clean.diagnostic, review_agent_calls: 0 } }).outcome, 'blocked/failed');
   assert.equal(classify({ ...clean, comments: [{ ...clean.comments[0], created_at: '2026-09-06T11:59:58Z' }] }).outcome, 'completed without findings');
   const findings = { ...context(), comments: [comment('with-findings')],
     inline: [{ ...comment('finding'), body: findingMarker, commit_id: sha }] };
   assert.equal(classify(findings).outcome, 'completed with findings');
   assert.equal(classify({ ...findings, diagnostic: { ...findings.diagnostic, plugin_calls: 0 } }).outcome, 'blocked/failed');
+  assert.equal(classify({ ...findings, diagnostic: { ...findings.diagnostic, review_agent_calls: 0 } }).outcome, 'blocked/failed');
   assert.equal(classify({ ...findings, inline: [] }).outcome, 'blocked/failed');
   assert.equal(classify({ ...findings, inline: [{ ...findings.inline[0], body: 'Unrelated concurrent bot finding' }] }).outcome, 'blocked/failed');
   assert.equal(classify({ ...findings, inline: [{ ...findings.inline[0], commit_id: 'b'.repeat(40) }] }).outcome, 'blocked/failed');
