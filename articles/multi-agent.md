@@ -144,9 +144,10 @@ reviewer$max_requests
 
 Read properties with `$`,
 [`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html), or
-`@`. Definitions compose original ellmer tools and caller-supplied Skill
-objects. Their closures, services, and mutable reference state remain
-caller-owned; a frozen definition does not make those objects immutable.
+`@`. Definitions compose original ellmer tools and read-only Skill
+values. Executable tools nested in either value retain their closures,
+services, and caller-owned state; frozen configuration does not freeze
+tool state.
 [`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
 retains these objects, so use the YAML helpers and explicit registries
 below when you need a portable definition.

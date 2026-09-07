@@ -162,10 +162,10 @@ Use <code>disallowed_tools</code> and <code>max_requests</code> for additional l
 <code><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">S7::prop()</a></code>, or <code>@</code>. <code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> returns a plain property list for
 constructing a revised value. Canonical names, limits, and other fields
 cannot be changed after construction, including through LeadAgent snapshots.</p>
-<p>Tools and Skill objects are composed directly, without cloning executable
-code or caller-owned state. Their closures, services, and reference objects
-retain their own semantics. A read-only definition freezes the configuration
-record, not state inside those objects. Use <code><a href="agent_definition_read.html">agent_definition_write()</a></code> and
+<p>Tools and read-only Skill values are composed directly. Executable tools
+nested in either value retain their closures, services, and caller-owned
+state without cloning. Read-only configuration does not freeze tool state.
+Use <code><a href="agent_definition_read.html">agent_definition_write()</a></code> and
 <code><a href="agent_definition_read.html">agent_definition_read()</a></code> with explicit host registries for portable YAML;
 <code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> alone is not a portable serializer for executable objects.</p>
     </div>

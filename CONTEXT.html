@@ -81,7 +81,7 @@
 <p><strong>OS sandbox</strong>: A platform-enforced boundary that constrains an already authorized process. Deputy delegates this boundary to mcp-repl and verifies the requested policy; permission modes do not substitute for it. <em>Avoid</em>: permission mode, subprocess isolation</p>
 <p><strong>Hook</strong>: A callback fired at a named point in an Agent’s lifecycle, able to observe a run and, at some points, alter or block it. <em>Avoid</em>: callback, middleware, listener, interceptor</p>
 <p><strong>Hook event</strong>: The named lifecycle point a hook is registered against. <em>Avoid</em>: trigger, lifecycle stage</p>
-<p><strong>Skill</strong>: A bundle of prompt text, tools, and metadata that can be loaded into an Agent to specialize it. <em>Avoid</em>: plugin, extension, module, capability pack</p>
+<p><strong>Skill</strong>: A read-only configuration value bundling prompt text, tools, and metadata that can be loaded into an Agent to specialize it. Executable tools retain their caller-owned state. <em>Avoid</em>: plugin, extension, module, capability pack</p>
 </div>
 </div>
 </div>

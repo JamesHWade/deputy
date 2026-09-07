@@ -90,6 +90,46 @@ a calculation. Choose built-in tools or register functions with
 <code><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">ellmer::tool()</a></code>. Permissions determine which calls can
 run.</p>
 <div class="section level2">
+<h2 id="reusable-skill-configuration">Reusable Skill Configuration<a class="anchor" aria-label="anchor" href="#reusable-skill-configuration"></a>
+</h2>
+<p>A <code>Skill</code> bundles instructions, tools, and declared
+requirements in a read-only S7 value. Construct it with
+<code>Skill(...)</code> or <code>skill_create(...)</code>, and inspect
+requirements with <code>skill_check_requirements(skill)</code>.
+<code><a href="../reference/Skill.html">Skill()</a></code> defaults to version <code>"0.0.0"</code>;
+<code><a href="../reference/skill_create.html">skill_create()</a></code> retains its <code>"1.0.0"</code>
+default.</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
+<span><span class="va">concise</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/skill_create.html">skill_create</a></span><span class="op">(</span></span>
+<span>  <span class="st">"concise"</span>,</span>
+<span>  prompt <span class="op">=</span> <span class="st">"Answer in one short paragraph."</span>,</span>
+<span>  requires <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>packages <span class="op">=</span> <span class="st">"base"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/skill_check_requirements.html">skill_check_requirements</a></span><span class="op">(</span><span class="va">concise</span><span class="op">)</span><span class="op">$</span><span class="va">ok</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="va">fields</span> <span class="op">&lt;-</span> <span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">props</a></span><span class="op">(</span><span class="va">concise</span><span class="op">)</span></span>
+<span><span class="va">fields</span><span class="op">$</span><span class="va">prompt</span> <span class="op">&lt;-</span> <span class="st">"Answer in one sentence."</span></span>
+<span><span class="va">shorter</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">Skill</span>, <span class="va">fields</span><span class="op">)</span></span>
+<span><span class="va">shorter</span><span class="op">$</span><span class="va">prompt</span></span>
+<span><span class="co">#&gt; [1] "Answer in one sentence."</span></span>
+<span><span class="va">concise</span><span class="op">$</span><span class="va">prompt</span></span>
+<span><span class="co">#&gt; [1] "Answer in one short paragraph."</span></span></code></pre></div>
+<p>Read properties with <code>$</code>, <code>@</code>, or
+<code><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">S7::prop()</a></code>. Configuration is frozen, including the declared
+requirements and initially NULL fields. Tools keep their original
+closures, clients, and caller-owned state when a Skill is constructed,
+revised, or loaded into an Agent.</p>
+<p><code>agent$load_skill(skill)</code> checks package and provider
+requirements, registers tools under the Agent’s existing permissions,
+and appends the prompt. Its <code>agent$skills()</code> getter returns a
+list of read-only Skill values. Checking requirements does not install
+packages or execute tools. <code>skill_load(path)</code> remains the
+explicit file-loading entry point and can source tool files declared by
+the skill. AgentDefinition YAML attaches approved skills through a host
+registry; it does not source those files.</p>
+</div>
+<div class="section level2">
 <h2 id="built-in-tools">Built-in Tools<a class="anchor" aria-label="anchor" href="#built-in-tools"></a>
 </h2>
 <p>deputy includes the following tools out of the box:</p>
@@ -185,7 +225,7 @@ system uses to decide whether the agent is allowed to use it. See
 <h2 id="tool-bundles">Tool Bundles<a class="anchor" aria-label="anchor" href="#tool-bundles"></a>
 </h2>
 <p>Bundles group related tools together:</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>  <span class="co"># read_file, read_markdown, write_file, list_files</span></span>
@@ -198,7 +238,7 @@ the two trusted-code tools available to the model, while the Agent’s
 <code>Permissions</code> still decides whether either call may run.
 <code><a href="../reference/permissions_standard.html">permissions_standard()</a></code> denies both.</p>
 <p>Combine bundles by concatenating:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span>, tools <span class="op">=</span> <span class="va">tools</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -206,7 +246,7 @@ the two trusted-code tools available to the model, while the Agent’s
 <h2 id="tool-presets">Tool Presets<a class="anchor" aria-label="anchor" href="#tool-presets"></a>
 </h2>
 <p>Presets are named collections with opinionated defaults:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"standard"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"dev"</span><span class="op">)</span></span>
@@ -248,7 +288,7 @@ the two trusted-code tools available to the model, while the Agent’s
 types that the model can use. Start with a function you can call
 directly. This example wraps <code><a href="https://rdrr.io/r/base/chartr.html" class="external-link">toupper()</a></code>; a package function
 or your own function works the same way.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span><span class="va">uppercase</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
 <span>  <span class="fu">base</span><span class="fu">::</span><span class="va"><a href="https://rdrr.io/r/base/chartr.html" class="external-link">toupper</a></span>,</span>
@@ -265,7 +305,7 @@ or your own function works the same way.</p>
 <span><span class="fu">uppercase</span><span class="op">(</span><span class="st">"hello"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "HELLO"</span></span></code></pre></div>
 <p>Register the tool when constructing the agent:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">uppercase</span><span class="op">)</span>,</span>
@@ -330,7 +370,7 @@ trustworthiness. See <code>PermissionMode</code> for callback and mode
 behavior.</p>
 <p>Inspect the supplied fields and defaults without executing the
 tool:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tool_metadata.html">tool_metadata</a></span><span class="op">(</span><span class="va">uppercase</span><span class="op">)</span></span>
 <span><span class="co">#&gt; $name</span></span>
 <span><span class="co">#&gt; [1] "uppercase"</span></span>
@@ -381,7 +421,7 @@ tool:</p>
 Pass the chat to <code><a href="../reference/tools_web.html">tools_web()</a></code> to select provider-native web
 tools when available. Calling it without a chat returns Deputy’s
 universal web tools:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
@@ -411,7 +451,7 @@ becomes active.</p>
 </h2>
 <p>deputy can load tools from <a href="https://modelcontextprotocol.io/" class="external-link">Model Context Protocol</a>
 servers via the <a href="https://github.com/posit-dev/mcptools" class="external-link">mcptools</a> package:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Load tools from selected configured servers</span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -459,7 +499,7 @@ executable.</p>
 </h3>
 <p>Use <code><a href="../reference/tools_mcp_repl.html">tools_mcp_repl()</a></code> when model-generated R needs an OS
 sandbox rather than the current user’s authority:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repl_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tools_mcp_repl.html">tools_mcp_repl</a></span><span class="op">(</span></span>
 <span>  config <span class="op">=</span> <span class="st">"~/.config/mcptools/config.json"</span>,</span>
 <span>  server <span class="op">=</span> <span class="st">"r"</span>,</span>
@@ -485,7 +525,7 @@ confinement, including fail-closed startup on unsupported hosts. See
 <p>The <code>tool_ask_user</code> tool lets an agent ask the user a
 question during execution. This is useful for confirmations,
 clarifications, or collecting input:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent_id</span> <span class="op">&lt;-</span> <span class="st">"agent-analysis"</span></span>
 <span><span class="va">session_id</span> <span class="op">&lt;-</span> <span class="st">"session-analysis"</span></span>
 <span></span>

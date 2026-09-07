@@ -2,6 +2,19 @@
 
 ## deputy (development version)
 
+- [`Skill()`](https://jameshwade.github.io/deputy/reference/Skill.md)
+  now constructs a read-only S7 configuration value. Use
+  `skill_check_requirements(skill)` instead of the former instance
+  method, and
+  [`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
+  to prepare revised configuration.
+  [`skill_create()`](https://jameshwade.github.io/deputy/reference/skill_create.md)
+  and
+  [`skill_load()`](https://jameshwade.github.io/deputy/reference/skill_load.md)
+  retain their defaults and loading behavior; executable tool closures
+  and services remain caller-owned
+  ([\#127](https://github.com/JamesHWade/deputy/issues/127)).
+
 - [`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
   and
   [`AgentDefinition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)

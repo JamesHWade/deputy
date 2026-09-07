@@ -5,6 +5,52 @@ calculation. Choose built-in tools or register functions with
 [`ellmer::tool()`](https://ellmer.tidyverse.org/reference/tool.html).
 Permissions determine which calls can run.
 
+## Reusable Skill Configuration
+
+A `Skill` bundles instructions, tools, and declared requirements in a
+read-only S7 value. Construct it with `Skill(...)` or
+`skill_create(...)`, and inspect requirements with
+`skill_check_requirements(skill)`.
+[`Skill()`](https://jameshwade.github.io/deputy/reference/Skill.md)
+defaults to version `"0.0.0"`;
+[`skill_create()`](https://jameshwade.github.io/deputy/reference/skill_create.md)
+retains its `"1.0.0"` default.
+
+``` r
+
+library(deputy)
+concise <- skill_create(
+  "concise",
+  prompt = "Answer in one short paragraph.",
+  requires = list(packages = "base")
+)
+skill_check_requirements(concise)$ok
+#> [1] TRUE
+fields <- S7::props(concise)
+fields$prompt <- "Answer in one sentence."
+shorter <- do.call(Skill, fields)
+shorter$prompt
+#> [1] "Answer in one sentence."
+concise$prompt
+#> [1] "Answer in one short paragraph."
+```
+
+Read properties with `$`, `@`, or
+[`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html).
+Configuration is frozen, including the declared requirements and
+initially NULL fields. Tools keep their original closures, clients, and
+caller-owned state when a Skill is constructed, revised, or loaded into
+an Agent.
+
+`agent$load_skill(skill)` checks package and provider requirements,
+registers tools under the Agent’s existing permissions, and appends the
+prompt. Its `agent$skills()` getter returns a list of read-only Skill
+values. Checking requirements does not install packages or execute
+tools. `skill_load(path)` remains the explicit file-loading entry point
+and can source tool files declared by the skill. AgentDefinition YAML
+attaches approved skills through a host registry; it does not source
+those files.
+
 ## Built-in Tools
 
 deputy includes the following tools out of the box:

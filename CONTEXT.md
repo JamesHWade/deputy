@@ -84,6 +84,7 @@ callback, middleware, listener, interceptor
 **Hook event**: The named lifecycle point a hook is registered against.
 *Avoid*: trigger, lifecycle stage
 
-**Skill**: A bundle of prompt text, tools, and metadata that can be
-loaded into an Agent to specialize it. *Avoid*: plugin, extension,
-module, capability pack
+**Skill**: A read-only configuration value bundling prompt text, tools,
+and metadata that can be loaded into an Agent to specialize it.
+Executable tools retain their caller-owned state. *Avoid*: plugin,
+extension, module, capability pack

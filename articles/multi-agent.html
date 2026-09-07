@@ -284,10 +284,10 @@ definition, edit a plain property record and construct a new value:</p>
 <span><span class="va">reviewer</span><span class="op">$</span><span class="va">max_requests</span></span>
 <span><span class="co">#&gt; NULL</span></span></code></pre></div>
 <p>Read properties with <code>$</code>, <code><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">S7::prop()</a></code>, or
-<code>@</code>. Definitions compose original ellmer tools and
-caller-supplied Skill objects. Their closures, services, and mutable
-reference state remain caller-owned; a frozen definition does not make
-those objects immutable. <code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> retains these objects,
+<code>@</code>. Definitions compose original ellmer tools and read-only
+Skill values. Executable tools nested in either value retain their
+closures, services, and caller-owned state; frozen configuration does
+not freeze tool state. <code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> retains these objects,
 so use the YAML helpers and explicit registries below when you need a
 portable definition.</p>
 </div>

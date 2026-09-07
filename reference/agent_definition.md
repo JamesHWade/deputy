@@ -108,10 +108,10 @@ returns a plain property list for constructing a revised value.
 Canonical names, limits, and other fields cannot be changed after
 construction, including through LeadAgent snapshots.
 
-Tools and Skill objects are composed directly, without cloning
-executable code or caller-owned state. Their closures, services, and
-reference objects retain their own semantics. A read-only definition
-freezes the configuration record, not state inside those objects. Use
+Tools and read-only Skill values are composed directly. Executable tools
+nested in either value retain their closures, services, and caller-owned
+state without cloning. Read-only configuration does not freeze tool
+state. Use
 [`agent_definition_write()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md)
 and
 [`agent_definition_read()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md)

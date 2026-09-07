@@ -263,12 +263,14 @@ Intercept and customize agent behavior
 
 Load reusable instructions for an agent.
 
-- [`Skill`](https://jameshwade.github.io/deputy/reference/Skill.md) :
-  Skill R6 Class
+- [`Skill()`](https://jameshwade.github.io/deputy/reference/Skill.md) :
+  Declarative Skill Configuration
 - [`skill_load()`](https://jameshwade.github.io/deputy/reference/skill_load.md)
   : Load a skill from a directory
 - [`skill_create()`](https://jameshwade.github.io/deputy/reference/skill_create.md)
   : Create a skill programmatically
+- [`skill_check_requirements()`](https://jameshwade.github.io/deputy/reference/skill_check_requirements.md)
+  : Check Skill Requirements
 - [`skills_list()`](https://jameshwade.github.io/deputy/reference/skills_list.md)
   : List available skills in a directory
 
