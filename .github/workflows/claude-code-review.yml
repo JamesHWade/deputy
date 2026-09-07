@@ -68,8 +68,9 @@ jobs:
             already available at ${{ runner.temp }}/deputy-review.diff; use Read to
             inspect it. Tell every review agent this path and tool policy. Do not
             use shell pipes, redirection, or shell commands to read or buffer files.
-            Every inline finding must include this provenance marker in its body:
-            <!-- deputy-claude-review:${{ github.event.pull_request.head.sha }}:${{ github.run_id }}:${{ github.run_attempt }}:finding -->
+            Every inline finding must include this visible provenance link in its body
+            (the upstream inline-comment sanitizer removes HTML comments):
+            [Review run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }})
             After the upstream plugin completes, post a summary with gh pr comment.
             Include exactly one of these markers according to the plugin's findings:
             <!-- deputy-claude-review:${{ github.event.pull_request.head.sha }}:${{ github.run_id }}:${{ github.run_attempt }}:with-findings -->
@@ -79,7 +80,7 @@ jobs:
             blocker and do not use a completion marker. Do not modify repository files.
 
       - name: Verify review outcome and sanitize diagnostics
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -97,7 +98,7 @@ jobs:
           node "$RUNNER_TEMP/claude-review-verifier.cjs"
 
       - name: Upload sanitized review outcome
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: claude-review-outcome-${{ github.run_id }}-${{ github.run_attempt }}

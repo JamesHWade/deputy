@@ -3,7 +3,8 @@ const fs = require('node:fs');
 
 const knownTools = new Set([
   'Agent', 'Task', 'TaskOutput', 'TaskCreate', 'TaskUpdate', 'TaskList',
-  'TodoWrite', 'Skill', 'Read', 'Glob', 'Grep', 'Bash',
+  'TodoWrite', 'Skill', 'Read', 'Glob', 'Grep', 'Bash', 'ToolSearch',
+  'TaskGet', 'TaskStop', 'SendMessage', 'EnterPlanMode', 'ExitPlanMode',
   'mcp__github_inline_comment__create_inline_comment',
 ]);
 const commands = [
@@ -39,16 +40,15 @@ function diagnostics(messages) {
   };
 }
 
-function classify({ diagnostic, sha, currentSha, comments, inline, marker, started, actionOutcome }) {
+function classify({ diagnostic, sha, currentSha, comments, inline, marker, findingMarker, started, actionOutcome }) {
   const blocked = (reason) => ({ outcome: 'blocked/failed', reason });
   if (sha !== currentSha) return blocked('PR head changed during review');
   if (actionOutcome !== 'success' || !diagnostic.sdk_success) return blocked('Claude did not complete successfully');
-  if (diagnostic.permission_denials_count) return blocked('Claude tool permission denied');
   const fresh = (comment) => comment.user?.login === 'github-actions[bot]' &&
     Date.parse(comment.created_at) >= Date.parse(started) - 5000;
   const summaries = comments.filter(fresh);
   const findings = inline.filter((comment) => fresh(comment) && comment.commit_id === sha &&
-    comment.body?.includes(`${marker}:finding -->`));
+    comment.body?.includes(findingMarker));
   const withFindings = summaries.some((comment) => comment.body?.includes(`${marker}:with-findings -->`));
   const withoutFindings = summaries.some((comment) => comment.body?.includes(`${marker}:without-findings -->`));
   if (withFindings && !withoutFindings && findings.length) {
@@ -57,6 +57,7 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, start
   if (withoutFindings && !withFindings && !findings.length) {
     return { outcome: 'completed without findings', reason: 'Current-run exact-commit clean summary verified' };
   }
+  if (diagnostic.permission_denials_count) return blocked('Denied tools and no verified review evidence');
   return blocked('No consistent current-run exact-commit review evidence');
 }
 
@@ -91,6 +92,7 @@ async function main() {
     ]);
     result = classify({ diagnostic, sha, currentSha: pr.head.sha, comments, inline,
       marker: `<!-- deputy-claude-review:${sha}:${env.GITHUB_RUN_ID}:${env.GITHUB_RUN_ATTEMPT}`,
+      findingMarker: `[Review run](https://github.com/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}/attempts/${env.GITHUB_RUN_ATTEMPT})`,
       started: env.REVIEW_STARTED, actionOutcome: env.ACTION_OUTCOME });
   } catch {
     // Errors can include server responses, file contents, or token-bearing URLs.
