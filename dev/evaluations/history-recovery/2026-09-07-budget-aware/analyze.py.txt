@@ -2,7 +2,15 @@ from pathlib import Path
 import json,csv,statistics,math,hashlib,gzip,sys
 root=Path(sys.argv[1]) if len(sys.argv)>1 else Path(__file__).resolve().parent
 seq=lambda x: [] if x is None else x if isinstance(x,list) else [x]
-data={s:json.loads(gzip.decompress((root/f'{s}.json.gz').read_bytes())) for s in ['original','changed-constraint','resolved-methods'] if (root/f'{s}.json.gz').exists()}
+data={s:json.loads(gzip.decompress((root/f'{s}.json.gz').read_bytes())) for s in ['original','changed-constraint','resolved-methods']}
+planned=json.loads((root/'planned-schedule.json').read_text())
+assert len(planned)==27 and {p['scenario'] for p in planned}==set(data)
+for scenario,e in data.items():
+ expected=[{k:v for k,v in p.items() if k!='scenario'} for p in planned if p['scenario']==scenario]
+ assert e['schedule']==expected and len(expected)==9
+ assert len(e['preparations'])==3 and len(e['trials'])==9
+ assert set(e['preparations'])=={p['trial_id'] for p in expected}
+ assert [(r['trial_id'],r['strategy'],r['protocol']) for r in e['trials']]==[(p['trial_id'],p['strategy'],p['protocol']) for p in expected]
 rows=[]; validations=[]
 for scenario,e in data.items():
  assert math.isclose(sum(r['usage']['cost_usd'] for r in e['runs']),e['usage']['cost_usd'],abs_tol=1e-10)
