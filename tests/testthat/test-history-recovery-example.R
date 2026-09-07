@@ -257,17 +257,29 @@ for (scenario in c("original", "changed-constraint", "resolved-methods")) {
       trials = 2L,
       helper_models = "fixture",
       task_model = "fixture",
-      max_tokens = 500L
+      max_tokens = 500L,
+      protocols = c("baseline", "budget-aware")
     )
     expect_null(evaluation$failure)
     expect_length(evaluation$effects, 2L)
-    expect_length(evaluation$trials, 4L)
+    expect_length(evaluation$trials, 6L)
     expect_identical(
       vapply(evaluation$trials, `[[`, character(1), "strategy"),
-      c("summary", "history", "history", "summary")
+      c("summary", "history", "history", "history", "history", "summary")
     )
-    for (rows in split(evaluation$trials, rep(1:2, each = 2L))) {
-      expect_identical(rows[[1L]]$summary_id, rows[[2L]]$summary_id)
+    expect_identical(
+      vapply(evaluation$trials, `[[`, character(1), "protocol"),
+      c(
+        "baseline",
+        "baseline",
+        "budget-aware",
+        "baseline",
+        "budget-aware",
+        "baseline"
+      )
+    )
+    for (rows in split(evaluation$trials, rep(1:2, each = 3L))) {
+      expect_length(unique(vapply(rows, `[[`, character(1), "summary_id")), 1L)
       receipt <- rows[[1L]]$completed_effects_before[[1L]]
       expect_identical(receipt$executions, 1L)
       expect_identical(receipt$executor, "host")
@@ -287,14 +299,18 @@ for (scenario in c("original", "changed-constraint", "resolved-methods")) {
         rows[[1L]]$completed_effects_before,
         rows[[2L]]$completed_effects_before
       )
+      expect_identical(
+        rows[[1L]]$completed_effects_before,
+        rows[[3L]]$completed_effects_before
+      )
       expect_equal(rows[[1L]]$transitions, 3L)
       expect_identical(
         vapply(rows, function(row) row$score$all_correct, logical(1)),
-        c(TRUE, TRUE)
+        c(TRUE, TRUE, TRUE)
       )
       expect_identical(
         vapply(rows, `[[`, integer(1), "repeated_effects"),
-        c(0L, 0L)
+        c(0L, 0L, 0L)
       )
     }
     history <- Filter(
@@ -905,4 +921,359 @@ test_that("the completed source receipt describes the verified export", {
     completed$records,
     completed$scope
   ))
+})
+
+history_batch_reply <- function(ids, prefix) {
+  reply <- runtime_reply(tool = "history_read")
+  chunks <- strsplit(reply$body, "\n\n", fixed = TRUE)[[1L]]
+  first <- jsonlite::fromJSON(
+    substring(chunks[[1L]], 7L),
+    simplifyVector = FALSE
+  )
+  first$choices[[1L]]$delta$tool_calls <- lapply(seq_along(ids), function(i) {
+    list(
+      index = i - 1L,
+      id = paste0(prefix, i),
+      type = "function",
+      `function` = list(
+        name = "history_read",
+        arguments = as.character(jsonlite::toJSON(
+          list(item_id = ids[[i]]),
+          auto_unbox = TRUE
+        ))
+      )
+    )
+  })
+  chunks[[1L]] <- paste0(
+    "data: ",
+    jsonlite::toJSON(first, auto_unbox = TRUE, null = "null")
+  )
+  reply$body <- paste0(paste(chunks, collapse = "\n\n"), "\n\n")
+  reply
+}
+
+test_that("budget feedback counts attempts and fits inside the byte ceiling", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  access <- example$history_access(
+    fixture$records,
+    fixture$scope,
+    max_calls = 2L,
+    max_response_bytes = 512L,
+    max_total_bytes = 2048L,
+    budget_feedback = TRUE
+  )
+  first <- access$read("assay-C-r3")
+  expect_lte(nchar(first, type = "bytes"), 512L)
+  expect_identical(jsonlite::fromJSON(first)$budget$remaining_calls, 1L)
+  expect_identical(
+    jsonlite::fromJSON(first)$budget$remaining_bytes_before_response,
+    2048L
+  )
+  second <- access$search("no-such-evidence")
+  expect_identical(jsonlite::fromJSON(second)$items, list())
+  expect_identical(jsonlite::fromJSON(second)$budget$remaining_calls, 0L)
+  expect_identical(
+    jsonlite::fromJSON(second)$budget$remaining_bytes_before_response,
+    2048L - nchar(first, type = "bytes")
+  )
+  expect_condition(access$read("assay-C-r3"), class = "ellmer_tool_reject")
+  expect_identical(access$usage()$calls, 3L)
+  expect_identical(access$usage()$remaining_calls, 0L)
+  expect_identical(
+    access$usage()$bytes,
+    nchar(first, type = "bytes") + nchar(second, type = "bytes")
+  )
+  expect_identical(tail(access$audit(), 1L)[[1L]]$bytes, 0L)
+  expect_match(access$tools[[1L]]@description, "share 2 calls", fixed = TRUE)
+})
+
+test_that("a batch beyond remaining history access still reaches the reserved answer", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  answer <- c(fixture$expected, list(source_ids = fixture$required_sources))
+  prepared <- list(
+    system_prompt = "Read-only host policy.",
+    turns = list(),
+    summary_id = "fixture"
+  )
+  server <- local_runtime_server(list(
+    history_batch_reply(fixture$required_sources[1:4], "first_"),
+    history_batch_reply(
+      c(
+        fixture$required_sources[[5L]],
+        "assay-C-r2",
+        "quoted-untrusted-instruction"
+      ),
+      "second_"
+    ),
+    runtime_reply("Source inspection complete."),
+    runtime_reply("Answer from the available evidence."),
+    runtime_reply(
+      as.character(jsonlite::toJSON(answer, auto_unbox = TRUE)),
+      stream = FALSE
+    )
+  ))
+  budget <- example$history_budget()
+  row <- suppressWarnings(example$history_continue(
+    fixture,
+    prepared,
+    runtime_chat(server),
+    budget,
+    "batched",
+    "history",
+    protocol = "budget-aware"
+  ))
+  expect_identical(row$score$all_correct, TRUE)
+  expect_identical(row$history_usage$calls, 7L)
+  expect_identical(tail(row$history_audit, 1L)[[1L]]$status, "budget_exhausted")
+  expect_identical(tail(row$history_audit, 1L)[[1L]]$bytes, 0L)
+  expect_identical(row$usage$requests, 5L)
+  expect_identical(row$usage$tool_calls, 7L)
+  expect_identical(row$phase_runs[[2L]]$usage$tool_calls, 0L)
+  expect_equal(row$usage$cost_usd, budget$usage()$cost_usd)
+  expect_identical(
+    vapply(
+      tail(server$requests(), 2L),
+      function(x) length(x$body$tools),
+      integer(1)
+    ),
+    c(0L, 0L)
+  )
+  expect_identical(row$repeated_effects, 0L)
+})
+
+test_that("retrieval request exhaustion preserves two final requests within eight", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  answer <- c(fixture$expected, list(source_ids = character()))
+  prepared <- list(
+    system_prompt = "Read-only host policy.",
+    turns = list(),
+    summary_id = "fixture"
+  )
+  server <- local_runtime_server(local({
+    reply <- runtime_reply
+    function(request, count) {
+      if (length(request$tools)) {
+        return(reply(
+          tool = "history_read",
+          arguments = list(item_id = paste0("missing-", count))
+        ))
+      }
+      if (!is.null(request$response_format)) {
+        return(reply(
+          as.character(jsonlite::toJSON(answer, auto_unbox = TRUE)),
+          stream = FALSE
+        ))
+      }
+      reply("Answer using the available context.")
+    }
+  }))
+  row <- example$history_continue(
+    fixture,
+    prepared,
+    runtime_chat(server),
+    example$history_budget(),
+    "limited",
+    "history",
+    protocol = "budget-aware"
+  )
+  expect_identical(row$phase_runs[[1L]]$stop_reason, "request_limit")
+  expect_identical(row$phase_runs[[1L]]$usage$requests, 6L)
+  expect_identical(row$phase_runs[[2L]]$usage$requests, 2L)
+  expect_identical(row$usage$requests, 8L)
+  expect_length(server$requests(), 8L)
+  expect_type(row$answer, "list")
+  expect_identical(row$score$checks$grounded_sources, FALSE)
+  expect_identical(row$repeated_effects, 0L)
+})
+
+test_that("a blocked final dispatch retains an explicit incomplete continuation", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  prepared <- list(
+    system_prompt = "Read-only host policy.",
+    turns = list(),
+    summary_id = "fixture"
+  )
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "history_read",
+      arguments = list(item_id = "assay-C-r3")
+    ),
+    runtime_reply("There is no remaining history access.")
+  ))
+  budget <- example$history_budget(cancelled = function() {
+    length(budget$records()) > 0L
+  })
+  row <- suppressWarnings(example$history_continue(
+    fixture,
+    prepared,
+    runtime_chat(server),
+    budget,
+    "cancelled-answer",
+    "history",
+    access_limits = list(max_calls = 0L),
+    protocol = "budget-aware"
+  ))
+  expect_null(row$answer)
+  expect_identical(row$score$score, 0)
+  expect_identical(row$stop_reason, "history_evaluation_cancelled")
+  expect_identical(row$history_usage$bytes, 0L)
+  expect_identical(row$history_audit[[1L]]$status, "budget_exhausted")
+  expect_identical(row$phase_runs[[2L]]$dispatched, FALSE)
+  expect_length(server$requests(), 2L)
+  expect_identical(row$usage$requests, 2L)
+})
+
+test_that("an oversized provider batch cannot consume the reserved answer phase", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  answer <- c(fixture$expected, list(source_ids = fixture$required_sources))
+  prepared <- list(
+    system_prompt = "Read-only host policy.",
+    turns = list(),
+    summary_id = "fixture"
+  )
+  server <- local_runtime_server(list(
+    history_batch_reply(fixture$required_sources[1:4], "first_"),
+    history_batch_reply(
+      c(fixture$required_sources[[5L]], "assay-C-r2", paste0("missing-", 1:4)),
+      "second_"
+    ),
+    runtime_reply("Answer from the available evidence."),
+    runtime_reply(
+      as.character(jsonlite::toJSON(answer, auto_unbox = TRUE)),
+      stream = FALSE
+    )
+  ))
+  row <- suppressWarnings(example$history_continue(
+    fixture,
+    prepared,
+    runtime_chat(server),
+    example$history_budget(),
+    "oversized",
+    "history",
+    protocol = "budget-aware"
+  ))
+  expect_identical(row$phase_runs[[1L]]$stop_reason, "tool_call_limit")
+  expect_identical(row$phase_runs[[1L]]$tool_call_limit, 8L)
+  expect_identical(row$phase_runs[[2L]]$tool_call_limit, 0L)
+  expect_identical(row$usage$requests, 4L)
+  expect_length(server$requests(), 4L)
+  expect_gte(row$usage$tool_calls, 9L)
+  expect_identical(
+    sum(vapply(
+      row$history_audit,
+      function(entry) length(entry$item_ids) > 0L,
+      logical(1)
+    )),
+    6L
+  )
+  expect_identical(row$score$all_correct, TRUE)
+  expect_identical(row$repeated_effects, 0L)
+})
+
+test_that("unknown or duplicate protocols are rejected before model dispatch", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  calls <- 0L
+  factory <- function(model) {
+    calls <<- calls + 1L
+    stop("Unexpected model dispatch")
+  }
+  for (protocols in list(
+    character(),
+    NA_character_,
+    "unknown",
+    c("baseline", "baseline")
+  )) {
+    expect_snapshot(
+      error = TRUE,
+      example$history_evaluate(factory, fixture, protocols = protocols)
+    )
+  }
+  expect_identical(calls, 0L)
+})
+
+test_that("history reporting separates completion latency and source payloads", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  row <- list(
+    helper_model = "fixture",
+    strategy = "history",
+    protocol = "budget-aware",
+    trial_id = "fixture/1",
+    answer = fixture$expected,
+    score = list(
+      score = 1,
+      all_correct = TRUE,
+      checks = list(grounded_sources = TRUE)
+    ),
+    duration_seconds = 8,
+    stop_reason = "completed",
+    usage = list(
+      requests = 2L,
+      tool_calls = 3L,
+      total_tokens = 30,
+      cost_usd = 0.01
+    ),
+    history_usage = list(calls = 3L, bytes = 220L),
+    history_audit = list(
+      list(
+        operation = "search",
+        status = "ok",
+        item_ids = character(),
+        bytes = 20L
+      ),
+      list(
+        operation = "read",
+        status = "ok",
+        item_ids = "source",
+        bytes = 200L
+      ),
+      list(
+        operation = "read",
+        status = "budget_exhausted",
+        item_ids = character(),
+        bytes = 0L
+      )
+    ),
+    completed_effects_before = list(),
+    attempted_exports = 0L
+  )
+  incomplete <- row
+  incomplete$trial_id <- "fixture/2"
+  incomplete$answer <- NULL
+  incomplete$score <- list(
+    score = 0,
+    all_correct = FALSE,
+    checks = list(grounded_sources = FALSE)
+  )
+  incomplete$duration_seconds <- 0.2
+  incomplete$stop_reason <- "request_limit"
+  evaluation <- list(
+    trials = list(row, incomplete),
+    case_id = fixture$case_id,
+    configuration = list(
+      trials = 1L,
+      helper_models = "fixture",
+      continuation_arms = 2L
+    ),
+    usage = list(requests = 4L, cost_usd = 0.02),
+    runs = list()
+  )
+  report <- paste(example$history_report(evaluation), collapse = "\n")
+  expect_match(
+    report,
+    "| fixture/history/budget-aware | 2 | 2 | 1 | 0.500 | 1 | 8.00 | 0.20 |",
+    fixed = TRUE
+  )
+  expect_match(
+    report,
+    "| fixture/1 | history/budget-aware | none | 3 | 0 | 1 | 220 | 0 | 0 |",
+    fixed = TRUE
+  )
+  expect_match(report, "Expected 2 continuations; missing 0.", fixed = TRUE)
 })

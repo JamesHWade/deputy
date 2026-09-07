@@ -64,6 +64,27 @@ including JSON framing and provenance. Rejections contain no source payload and
 do not consume the source-byte allowance. Both strategies register an export spy;
 host permissions prohibit executing it even if source text asks for another write.
 
+## Budget-aware comparison
+
+The optional `budget-aware` protocol makes the shared history allowance explicit
+in tool descriptions and response envelopes. Calls remaining are measured after
+the attempt; bytes remaining are measured before the response, which also counts
+against the byte ceiling. Requests beyond the allowance return no source payload.
+
+The host reserves two of the existing eight model requests for the final answer.
+It first allows at most six retrieval requests, then removes all tools and asks
+for the structured answer with at most two requests. Retrieval completion or a
+request/tool-limit stop can lead to that final phase. Cancellation, exhausted
+aggregate budgets and other failures remain explicit incomplete outcomes. All
+phase costs and requests count toward the same continuation and experiment.
+
+`history_evaluate(protocols = c("baseline", "budget-aware"))` compares both
+retrieval protocols and summary-only against the same prepared context. Three
+trials rotate their order so each arm occupies every position once. The default
+for direct `history_evaluate()` calls remains the original two-arm baseline.
+The [follow-up protocol](../../../dev/evaluations/history-recovery/budget-aware-protocol.md)
+declares the comparison and its outcomes before a new paid run.
+
 ## Deterministic verification
 
 From the source checkout, with released ellmer 0.5.0 installed:
@@ -80,6 +101,9 @@ budgets. All three scenarios exercise repeated compaction and paired continuatio
 the changed-rule case also retrieves the amendment and rejects an answer that
 keeps the superseded rule. Canned answer scores test the wiring, **not model
 recall quality**.
+Budget-aware fixtures also exercise a batch beyond the remaining call allowance,
+exhausted retrieval requests, the reserved answer phase, and cancellation before
+that phase without losing the incomplete continuation's evidence.
 
 ## Live pilot
 
@@ -114,12 +138,17 @@ the task model fixed and include Luna and Terra in `DEPUTY_HISTORY_HELPERS`.
 Choose `DEPUTY_HISTORY_SCENARIO=changed-constraint` for the amendment case
 (default `original`), using a separate output directory for each scenario.
 Use `resolved-methods` for the allocation-clarification case.
+`DEPUTY_HISTORY_PROTOCOLS` defaults to `baseline,budget-aware`, producing three
+matched continuations per preparation. Set it to `baseline` for the original
+two-arm comparison or `budget-aware` to compare summary-only with the new protocol.
 Each invocation has its own spending threshold; account for their combined
 cost within the authorized allowance.
 The aggregate request budget can stop a larger experiment early; use
 `history_evaluate()` directly to choose a different request allowance.
 
-Each new output directory receives `results.json` and `report.md`. The JSON
+Each new output directory receives `results.json` and `report.md`. The JSON uses
+full numeric precision and schema version 3; it adds protocols and per-phase
+outcomes to the original evidence. The JSON
 includes fixtures, input contexts, prompts, answers, source references, run IDs,
 compaction attempts, events, usage, latency and completed-effect counters.
 Conditions are reduced to their classes so credential-bearing request objects
@@ -133,7 +162,9 @@ Report individual paired outcomes, failed/missing trials and score/latency
 distributions. Fully correct means all ten checks pass; it does not measure
 every claim in the free-text answer. Preparation costs are shared once per pair;
 continuation costs remain separate. Reports include failed checks, missing
-continuations, retrieval calls/bytes, verified completed writes and export attempts. Do not infer Luna/Terra equivalence, production
+continuations, completion counts, successful source-payload responses separately
+from retrieval attempts, verified completed writes and export attempts. Completed
+and incomplete latencies are reported separately. Do not infer Luna/Terra equivalence, production
 retrieval quality, or a need for recursive analysis from a small synthetic pilot.
 
 The optional `cancelled` callback is cooperative: checked before runs and history

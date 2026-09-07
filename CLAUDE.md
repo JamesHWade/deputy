@@ -107,6 +107,12 @@ and superseded host eligibility rules plus resolved pending work with the same
 paired-continuation protocol. Preparation executes one isolated host export and
 propagates its verified artifact receipt into both continuations.
 Live results are required before drawing model-quality conclusions (#112).
+The budget-aware follow-up can compare summary-only, baseline history and
+budget-aware history against one prepared context. The latter reserves two of
+eight model requests for a final answer with tools removed; it does not increase
+the six-call history allowance or byte ceilings. Reports distinguish completion,
+payload-bearing retrieval, failed phases and latency for incomplete runs. The
+predeclared protocol is `dev/evaluations/history-recovery/budget-aware-protocol.md`.
 History recovery proceeds with caller-owned records under ADR-0003.
 `dev/shinychat-history-consumer.md` tracks the optional shinychat adapter for #66;
 only that adapter waits for an agreed, released R API.

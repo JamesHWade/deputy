@@ -23,6 +23,12 @@ helpers <- trimws(strsplit(
 task_model <- trimws(Sys.getenv("DEPUTY_HISTORY_TASK_MODEL", "gpt-5.6-luna"))
 trials <- suppressWarnings(as.numeric(Sys.getenv("DEPUTY_HISTORY_TRIALS", "3")))
 history_validate_configuration(trials, helpers, task_model)
+protocols <- trimws(strsplit(
+  Sys.getenv("DEPUTY_HISTORY_PROTOCOLS", "baseline,budget-aware"),
+  ",",
+  fixed = TRUE
+)[[1L]])
+history_validate_protocols(protocols)
 fixture <- history_fixture(
   scenario = Sys.getenv("DEPUTY_HISTORY_SCENARIO", "original")
 )
@@ -48,7 +54,8 @@ evaluation <- history_evaluate(
   trials = trials,
   helper_models = helpers,
   task_model = task_model,
-  max_cost_usd = cost
+  max_cost_usd = cost,
+  protocols = protocols
 )
 jsonlite::write_json(
   evaluation,
@@ -56,7 +63,8 @@ jsonlite::write_json(
   auto_unbox = TRUE,
   pretty = TRUE,
   null = "null",
-  na = "null"
+  na = "null",
+  digits = NA
 )
 writeLines(history_report(evaluation), file.path(output, "report.md"))
 cli::cli_inform("Saved trial evidence to {.path {output}}.")
