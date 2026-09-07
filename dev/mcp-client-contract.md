@@ -114,8 +114,11 @@ after a busy result. A control request is a direct host operation; model-issued
 control input goes through the registered `repl` tool's normal governance.
 
 Agent interruption and internal stream stops cancel that Agent's active owned
-MCP requests. Cancellation closes the connection and discards its state. Idle
-connections remain available. A server process exit also invalidates the
+MCP requests. Pending executions retain their cancellation binding when the host
+removes or replaces registered tools; those bindings are released when the call
+settles. Cloning an Agent does not copy its pending executions. Cancellation
+checks the stopping Agent's effective ownership, closes matching busy connections
+and discards their state. Idle connections remain available. A server process exit also invalidates the
 connection. An interpreter exit can instead be reported by a surviving
 mcp-repl server, followed by a fresh interpreter on the next request. Preserve
 that state-loss message; a stable connection ID is not an interpreter-state
