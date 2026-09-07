@@ -101,6 +101,10 @@
     "trials.csv": {
       "bytes": 4648,
       "sha256": "398492cac0f1547c848cf6054386a0347fc72849d0d8302206e3a06f69d350de"
+    },
+    ".gitattributes": {
+      "bytes": 130,
+      "sha256": "d6cfbd19d560a8f106127fa829bd94fc1ed8ff867bc19d2d1b913898cee03705"
     }
   },
   "decompressed_raw_json": {

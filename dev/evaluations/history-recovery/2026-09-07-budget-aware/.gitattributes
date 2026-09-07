@@ -1,0 +1,3 @@
+# Preserve the recorded log bytes and standard CSV line endings.
+execution.txt -text -whitespace
+*.csv -text whitespace=cr-at-eol
