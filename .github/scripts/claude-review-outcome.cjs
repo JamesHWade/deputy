@@ -35,7 +35,7 @@ function classify({ diagnostic, sha, currentSha, comments, inline, marker, start
   if (sha !== currentSha) return blocked('PR head changed during review');
   if (actionOutcome !== 'success' || !diagnostic.sdk_success) return blocked('Claude did not complete successfully');
   if (diagnostic.permission_denials_count) return blocked('Claude tool permission denied');
-  const fresh = (comment) => comment.user?.login === 'claude[bot]' &&
+  const fresh = (comment) => comment.user?.login === 'github-actions[bot]' &&
     Date.parse(comment.created_at) >= Date.parse(started);
   const summaries = comments.filter(fresh);
   const findings = inline.filter((comment) => fresh(comment) && comment.commit_id === sha);

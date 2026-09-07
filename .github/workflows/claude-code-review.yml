@@ -2,7 +2,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
+    types: [opened, synchronize, ready_for_review, reopened, converted_to_draft]
 
 concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
@@ -10,15 +10,14 @@ concurrency:
 
 jobs:
   claude-review:
-    # Fork pull_request runs cannot supply the credentials/OIDC this action needs.
+    # Repository-owned PRs only; never expose reviewer credentials to forks.
     if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
       issues: read
-      id-token: write
 
     steps:
       - name: Checkout repository
@@ -28,6 +27,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Test review evidence verifier
+        run: node --test .github/scripts/claude-review-outcome.test.cjs
+
       - name: Record review start
         id: start
         run: echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
@@ -36,6 +38,9 @@ jobs:
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
+          # Supported scoped GitHub token auth also permits reviewing workflow PRs.
+          # https://github.com/anthropics/claude-code-action/blob/main/docs/custom-app.md
+          github_token: ${{ github.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'

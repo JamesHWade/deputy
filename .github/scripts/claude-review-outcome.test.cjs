@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { diagnostics, classify } = require('./claude-review-outcome.cjs');
 const sha = 'a'.repeat(40);
 const marker = `<!-- deputy-claude-review:${sha}:123:1`;
-const comment = (outcome) => ({ user: { login: 'claude[bot]' },
+const comment = (outcome) => ({ user: { login: 'github-actions[bot]' },
   created_at: '2026-09-06T12:01:00Z', body: `${marker}:${outcome} -->` });
 const context = () => ({ diagnostic: diagnostics([{ type: 'result', subtype: 'success',
   is_error: false, permission_denials: [] }]), sha, currentSha: sha, comments: [], inline: [],
