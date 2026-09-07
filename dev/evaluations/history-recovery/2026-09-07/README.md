@@ -69,10 +69,12 @@ models were configured as `gpt-5.6-luna`, with low reasoning effort and at most
 1,024 output tokens per response. There was no Terra arm or independent helper
 model comparison.
 
-This frozen run predates PR #132's additional validation of the scoped receipt
-row before export. All three recorded fixtures contain exactly one receipt row,
+This frozen run predates PR #132's additional receipt and payload validation
+before export. All three recorded fixtures contain exactly one receipt row,
 in the authorized scope at checkpoint 2; that hardening does not change the
-recorded cases. The original inputs and results have not been replaced.
+recorded cases. A direct comparison against the recorded producer also confirmed
+identical fixtures and completed export records for all three scenarios. The
+original inputs and results have not been replaced.
 
 Each of three scenarios had three paired trials. Both strategies received the
 same prepared turns and system prompt, verified by the saved summary ID.

@@ -254,18 +254,19 @@ history_budget <- function(
 
 # Host-authorized, isolated effect. No model supplies a path or write payload.
 history_export <- function(fixture, directory) {
+  contract <- history_export_contract()
   planned <- fixture$planned_export
-  valid_id <- identical(planned$id, "export-0042") &&
+  valid_id <- identical(planned$id, contract$plan$id) &&
     identical(fixture$expected$completed_export_id, planned$id)
   valid_version <- is.numeric(planned$version) &&
     length(planned$version) == 1L &&
     !is.na(planned$version) &&
     is.finite(planned$version) &&
-    planned$version == 1
+    planned$version == contract$plan$version
   if (
     !valid_id ||
       !valid_version ||
-      !identical(planned$artifact, "accepted-findings.csv") ||
+      !identical(planned$artifact, contract$plan$artifact) ||
       !is.character(planned$contents) ||
       length(planned$contents) != 1L ||
       is.na(planned$contents)
@@ -274,34 +275,43 @@ history_export <- function(fixture, directory) {
       "The host export must match the expected export-0042 ID, version 1, fixed artifact and contents."
     )
   }
-  path <- file.path(directory, "accepted-findings.csv")
+  payload <- charToRaw(enc2utf8(planned$contents))
+  if (
+    !identical(
+      digest::digest(payload, algo = "sha256", serialize = FALSE),
+      contract$sha256
+    )
+  ) {
+    cli::cli_abort("CSV contents must match the fixed export receipt digest.")
+  }
+  path <- file.path(directory, contract$plan$artifact)
   if (length(fixture$completed_effects) > 0L || file.exists(path)) {
     cli::cli_abort("The preparation export has already been completed.")
   }
   records <- fixture$records
   records$.export_row <- seq_len(nrow(records))
   records <- history_scope_records(records, fixture$scope)
-  source <- records[records$item_id == "export-receipt-0042", , drop = FALSE]
-  if (nrow(source) != 1L || source$stage[[1L]] != 2L) {
+  source <- records[records$item_id == contract$item_id, , drop = FALSE]
+  if (nrow(source) != 1L || source$stage[[1L]] != contract$checkpoint) {
     cli::cli_abort(
       "The host export requires exactly one authorized checkpoint 2 receipt."
     )
   }
   index <- source$.export_row[[1L]]
-  writeBin(charToRaw(enc2utf8(planned$contents)), path)
+  writeBin(payload, path)
   receipt <- list(
-    id = planned$id,
-    artifact = planned$artifact,
-    version = planned$version,
+    id = contract$plan$id,
+    artifact = contract$plan$artifact,
+    version = contract$plan$version,
     sha256 = digest::digest(file = path, algo = "sha256"),
     bytes = unname(file.info(path)$size),
     contents = readLines(path),
     executions = 1L,
     executor = "host",
-    checkpoint = 2L
+    checkpoint = contract$checkpoint
   )
   text <- paste(
-    fixture$records$text[[index]],
+    contract$description,
     "Verified artifact SHA-256:",
     receipt$sha256,
     "Bytes:",

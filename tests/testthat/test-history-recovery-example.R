@@ -860,3 +860,49 @@ test_that("preparation rejects a conflicting expected export before writing", {
   )
   expect_length(list.files(directory, all.files = TRUE, no.. = TRUE), 0L)
 })
+
+test_that("preparation rejects a contradictory export payload before writing", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  for (contents in c(
+    "",
+    "report,responses,denominator\nD,21,84\n",
+    "report,responses,denominator\nC,21,85\n",
+    "report,responses,denominator\r\nC,21,84\r\n"
+  )) {
+    invalid <- fixture
+    invalid$planned_export$contents <- contents
+    directory <- withr::local_tempdir()
+    expect_error(
+      example$history_export(invalid, directory),
+      "fixed export receipt digest"
+    )
+    expect_length(list.files(directory, all.files = TRUE, no.. = TRUE), 0L)
+  }
+})
+
+test_that("the completed source receipt describes the verified export", {
+  example <- history_example()
+  fixture <- example$history_fixture(1L)
+  index <- match("export-receipt-0042", fixture$records$item_id)
+  fixture$records$text[[
+    index
+  ]] <- "Unverified placeholder: this export contains D."
+  fixture$records$revision[[index]] <- digest::digest(
+    fixture$records$text[[index]],
+    algo = "sha256",
+    serialize = FALSE
+  )
+  directory <- withr::local_tempdir()
+  completed <- example$history_export(fixture, directory)
+  expect_match(completed$records$text[[index]], "C only", fixed = TRUE)
+  expect_false(grepl("Unverified placeholder", completed$records$text[[index]]))
+  expect_identical(
+    completed$completed_effects[[1L]]$contents,
+    c("report,responses,denominator", "C,21,84")
+  )
+  expect_no_error(example$history_scope_records(
+    completed$records,
+    completed$scope
+  ))
+})

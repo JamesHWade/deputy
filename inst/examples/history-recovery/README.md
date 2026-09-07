@@ -19,6 +19,13 @@ receipt records the artifact SHA-256, bytes and contents; both continuations
 inherit that verified completed effect. The temporary file is removed after
 preparation, while its receipt remains in the saved evidence.
 
+This producer uses a fixed C-only export contract: `export-0042`, version 1,
+and the exact CSV payload defined by `history_export_contract()`. Planned
+metadata, payload digest and the scoped receipt row are checked before writing.
+The completed receipt description comes from the same contract. Changing the
+fixture's planned export does not authorize an alternative artifact; a different
+effect requires a separate producer and matching evaluation protocol.
+
 The `changed-constraint` scenario adds a host instruction at checkpoint 3 that
 supersedes the adult-only rule with an all-ages randomized-study rule. B becomes
 eligible; D and F still await allocation details. The amendment is submitted as

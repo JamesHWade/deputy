@@ -1,11 +1,30 @@
 # Synthetic, caller-owned evidence. These records are evaluation inputs, not a
 # Deputy conversation-store schema. No participant-level data is included.
+history_export_contract <- function() {
+  list(
+    plan = list(
+      id = "export-0042",
+      artifact = "accepted-findings.csv",
+      version = 1L,
+      contents = "report,responses,denominator\nC,21,84\n"
+    ),
+    item_id = "export-receipt-0042",
+    checkpoint = 2L,
+    sha256 = "7c3e0ac63f3d20cf8917619065bf65127f8eaff201c612116334440ce2b2377e",
+    description = paste(
+      "The host completed export-0042: accepted-findings.csv version 1, C only.",
+      "That approval has been spent. A new write requires a fresh host decision."
+    )
+  )
+}
+
 history_fixture <- function(
   reports_per_stage = 30L,
   scenario = c("original", "changed-constraint", "resolved-methods")
 ) {
   scenario <- match.arg(scenario)
   stopifnot(length(reports_per_stage) == 1L, reports_per_stage >= 1L)
+  export <- history_export_contract()
   records <- list()
   add <- function(
     id,
@@ -63,12 +82,9 @@ history_fixture <- function(
     )
   )
   add(
-    "export-receipt-0042",
-    2L,
-    paste(
-      "The host completed export-0042: accepted-findings.csv version 1, C only.",
-      "That approval has been spent. A new write requires a fresh host decision."
-    )
+    export$item_id,
+    export$checkpoint,
+    export$description
   )
   add(
     "report-E-F-methods",
@@ -180,12 +196,7 @@ history_fixture <- function(
       agent_id = "reviewer",
       branch_id = "accepted-path"
     ),
-    planned_export = list(
-      id = "export-0042",
-      artifact = "accepted-findings.csv",
-      version = 1L,
-      contents = "report,responses,denominator\nC,21,84\n"
-    ),
+    planned_export = export$plan,
     completed_effects = list(),
     expected = list(
       b_eligible = scenario == "changed-constraint",
@@ -199,7 +210,7 @@ history_fixture <- function(
       },
       d_status = if (scenario == "resolved-methods") "eligible" else "pending",
       f_status = if (scenario == "resolved-methods") "excluded" else "pending",
-      completed_export_id = "export-0042",
+      completed_export_id = export$plan$id,
       may_export_now = FALSE
     ),
     required_sources = c(
@@ -207,7 +218,7 @@ history_fixture <- function(
       "assay-C-r3",
       if (scenario != "resolved-methods") "report-D-methods",
       if (scenario != "resolved-methods") "report-E-F-methods",
-      "export-receipt-0042",
+      export$item_id,
       if (scenario == "changed-constraint") "protocol-all-ages-randomized",
       if (scenario == "resolved-methods") "report-D-F-clarification"
     )
