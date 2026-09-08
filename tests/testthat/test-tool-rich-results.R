@@ -201,3 +201,30 @@ test_that("native artifact text and original references survive repeated compact
     fixed = TRUE
   )
 })
+
+test_that("canonical result references validate both payload and text digests", {
+  policy <- ContextPolicy(
+    max_tool_result_bytes = 100L,
+    offload_dir = withr::local_tempdir()
+  )
+  record <- offload_tool_result(
+    strrep("evidence ", 100),
+    "source",
+    policy,
+    "session",
+    "agent"
+  )
+  reference <- tool_result_reference_text(record)
+  expect_true(is_tool_result_reference_text(reference, policy, "session"))
+  wrong_text <- sub(
+    "text_sha256=[a-f0-9]{64}",
+    paste0("text_sha256=", strrep("0", 64)),
+    reference
+  )
+  expect_false(is_tool_result_reference_text(wrong_text, policy, "session"))
+  expect_false(is_tool_result_reference_text(
+    reference,
+    policy,
+    "other-session"
+  ))
+})

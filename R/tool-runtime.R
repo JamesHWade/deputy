@@ -918,7 +918,12 @@ is_tool_result_reference_text <- function(value, policy, session_id) {
   identical(
     value,
     tool_result_reference_text(list(
-      uri = references,
+      uri = paste0(
+        "deputy://tool-result/",
+        envelope$id,
+        "?text_sha256=",
+        envelope$text_sha256
+      ),
       bytes = envelope$bytes,
       sha256 = envelope$sha256,
       preview = tool_result_preview(evidence)

@@ -124,6 +124,11 @@ test_that("Agent sends native plots with bounded text and preserves saved displa
   expect_identical(as.character(saved_result@extra$display$html), display)
   expect_identical(saved_result@extra$deputy_r$code, code)
   expect_null(saved_result@request@tool)
+  rendered <- htmltools::renderTags(shinychat::contents_shinychat(
+    saved_result
+  ))$html
+  expect_match(rendered, "data:image/png;base64,", fixed = TRUE)
+  expect_match(rendered, "Details: R code", fixed = TRUE)
   fresh <- RSession$new(restored)
   withr::defer(fresh$close())
   expect_match(

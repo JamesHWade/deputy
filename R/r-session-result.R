@@ -65,9 +65,6 @@ r_session_result <- function(
       "</div>"
     ))
   )
-  if (requireNamespace("shinychat", quietly = TRUE)) {
-    display <- do.call(shinychat::tool_result_display, display)
-  }
   ellmer::ContentToolResult(
     value = values,
     extra = list(
