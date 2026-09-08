@@ -20,6 +20,9 @@
 #' `extra$deputy_r` execution record. Store conversation turns to keep code,
 #' output and plots reviewable after reopening. Worker variables are live state,
 #' are not included in Agent session files, and must be recreated after restart.
+#' Static base, ggplot2, grid and patchwork figures are supported. Visible
+#' htmlwidgets and rich HTML tables report `unsupported_output`; they are not
+#' persisted as interactive artifacts. Print underlying data for a text table.
 #' Owners and executable tools cannot be cloned or transferred between Agents.
 #'
 #' @export
@@ -114,7 +117,8 @@ RSession <- R6::R6Class(
           "Run R code in this conversation's persistent trusted R session.",
           "Variables and loaded packages persist between ordered calls.",
           "You and the user receive output, warnings, errors and rendered plots.",
-          "Create base or ggplot2 figures normally; print plots inside loops.",
+          "Create static base, ggplot2, grid or patchwork figures normally; print plots inside loops.",
+          "Interactive htmlwidgets and rich HTML tables are not supported; print underlying data for tables.",
           "Perform follow-up calculations and revisions yourself.",
           "After a reported reset, rerun required setup; old variables are gone.",
           "The session uses the local account's files and network access; it is not an OS sandbox."

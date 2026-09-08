@@ -78,6 +78,8 @@ saved display and finite context allowances. They make no paid model calls.
 
 ## Interactive output extension boundary
 
+Follow-up: [#144](https://github.com/JamesHWade/deputy/issues/144).
+
 This first slice supports static graphics and text tables. Visible htmlwidgets
 (including plotly and leaflet), HTML tags, gt and flextable values are detected
 and return `unsupported_output` with an explicit diagnostic and no pretend

@@ -24,6 +24,9 @@ Results contain native ellmer text/images, embedded display HTML, and a plain
 \code{extra$deputy_r} execution record. Store conversation turns to keep code,
 output and plots reviewable after reopening. Worker variables are live state,
 are not included in Agent session files, and must be recreated after restart.
+Static base, ggplot2, grid and patchwork figures are supported. Visible
+htmlwidgets and rich HTML tables report \code{unsupported_output}; they are not
+persisted as interactive artifacts. Print underlying data for a text table.
 Owners and executable tools cannot be cloned or transferred between Agents.
 }
 \section{Methods}{

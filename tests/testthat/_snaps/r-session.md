@@ -21,4 +21,3 @@
     Condition
       Error in `session$run()`:
       ! The R session waiting queue is full.
-

@@ -34,6 +34,10 @@ formats remain unchanged by the moves.
 | Native filesystem tools | `R/tools-files.R` |
 | Document conversion helpers and tool | `R/tools-documents.R` |
 | Trusted one-shot R and shell execution | `R/tools-execution.R` |
+| Conversation R owner, queue and process lifecycle | `R/r-session.R` |
+| Ordered R output and static plot capture | `R/r-session-worker.R` |
+| Portable R execution evidence and display content | `R/r-session-result.R` |
+| Model-facing native text and image bounds | `R/tool-rich-results.R` |
 | Host-owned MCP connection and immutable admission lists | `R/mcp-connection.R` |
 | Qualified mcptools worker boundary and owner validation | `R/mcp-worker.R` |
 | Sandboxed mcp-repl connection and upstream control input | `R/mcp-repl.R` |
