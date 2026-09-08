@@ -137,10 +137,13 @@ test_that("worker crashes settle and finite output and queue limits are enforced
   output <- r_session_await(session$run("cat(strrep('a', 10000))"))
   expect_identical(output@extra$deputy_r$outcome, "output_truncated")
   expect_lt(nchar(r_session_text(output), "bytes"), 1400)
-  expect_identical(
-    r_session_await(session$run("quit(save='no')"))@extra$deputy_r$outcome,
-    "worker_exited"
+  crashed <- r_session_await(session$run("quit(save='no')"))
+  # The process may exit before polling, or close its pipe during the read.
+  expect_contains(
+    c("worker_exited", "worker_failed"),
+    crashed@extra$deputy_r$outcome
   )
+  expect_null(session$status()$pid)
   first <- session$run("Sys.sleep(5)")
   second <- session$run("1")
   expect_snapshot(error = TRUE, session$run("2"))
