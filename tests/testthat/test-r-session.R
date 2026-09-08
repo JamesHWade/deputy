@@ -44,6 +44,31 @@ test_that("R sessions reuse variables, queue dependencies and isolate owners", {
   expect_snapshot(error = TRUE, session$run("1"))
 })
 
+test_that("no-output executions retain their confirmation in host display evidence", {
+  for (fresh in c(TRUE, FALSE)) {
+    result <- r_session_result(
+      code = "x <- 1",
+      segments = list(),
+      session_id = "session",
+      execution_id = "execution",
+      generation = 1L,
+      fresh = fresh,
+      reset_reason = NULL,
+      outcome = "complete"
+    )
+    expect_match(
+      r_session_text(result),
+      "Code ran without printed output.",
+      fixed = TRUE
+    )
+    expect_match(
+      as.character(result@extra$display$html),
+      "Code ran without printed output.",
+      fixed = TRUE
+    )
+  }
+})
+
 test_that("base and ggplot2 figures preserve drawing updates and ordered conditions", {
   skip_if_not_installed("ggplot2")
   agent <- Agent$new(

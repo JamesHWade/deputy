@@ -49,9 +49,9 @@ r_session_result <- function(
     }
   }
   if (!length(segments)) {
-    values[[length(values) + 1L]] <- ellmer::ContentText(
-      "Code ran without printed output."
-    )
+    text <- "Code ran without printed output."
+    values[[length(values) + 1L]] <- ellmer::ContentText(text)
+    html[[length(html) + 1L]] <- paste0("<p>", text, "</p>")
   }
   display <- list(
     title = "R calculation and plots",

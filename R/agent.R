@@ -2045,13 +2045,11 @@ Agent <- R6::R6Class(
           result_sha256 = record$sha256
         )
         if (is_nonempty_string(execution_id)) {
-          private$original_tool_results[[execution_id]] <- if (
-            inherits(value, "ellmer::ContentToolResult")
-          ) {
-            value@value
-          } else {
-            value
-          }
+          native <- inherits(value, "ellmer::ContentToolResult")
+          private$original_tool_results[[execution_id]] <- list(
+            value = if (native) value@value else value,
+            error = if (native) value@error else NULL
+          )
         }
         if (!is.null(rich)) rich$result else tool_result_reference_text(record)
       },

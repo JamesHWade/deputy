@@ -3,12 +3,14 @@
 public_content_text <- function(value) {
   if (inherits(value, "ellmer::ContentImage")) {
     props <- S7::props(value)
-    if (!is.null(props$url)) {
+    if (
+      !is.null(props$url) && !grepl("^data:", props$url, ignore.case = TRUE)
+    ) {
       return(paste0("[Image URL: ", props$url, "]"))
     }
     return(paste0(
       "[Inline image: ",
-      props$mime_type %||% "image",
+      props$type %||% "image",
       "; image bytes retained in the result artifact.]"
     ))
   }

@@ -233,10 +233,12 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       private$current_tool_results <- private$current_tool_results + 1L
       record <- private$tool_call_record(extracted, "result")
       extracted$tool_call_id <- record$tool_call_id
-      hook_tool_result <- private$claim_original_tool_result(
+      original <- private$claim_original_tool_result(
         record$tool_call_id,
-        extracted$tool_result
+        list(value = extracted$tool_result, error = extracted$tool_error)
       )
+      hook_tool_result <- original$value
+      hook_tool_error <- original$error
 
       private$approval_execution_result(result, record)
 
@@ -283,7 +285,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         "PostToolUse",
         tool_name = extracted$tool_name,
         tool_result = hook_tool_result,
-        tool_error = extracted$tool_error,
+        tool_error = hook_tool_error,
         context = context
       )
 
@@ -303,12 +305,12 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         }
       }
 
-      if (!is.null(extracted$tool_error)) {
+      if (!is.null(hook_tool_error)) {
         private$fire_hook(
           "PostToolUseFailure",
           tool_name = extracted$tool_name,
           tool_result = hook_tool_result,
-          tool_error = extracted$tool_error,
+          tool_error = hook_tool_error,
           context = context
         )
       }
@@ -323,7 +325,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         tool_cycle_signature(
           request_signature,
           hook_tool_result,
-          extracted$tool_error
+          hook_tool_error
         )
       }
       if (is.null(cycle_signature)) {

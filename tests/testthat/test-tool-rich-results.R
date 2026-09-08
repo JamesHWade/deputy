@@ -112,6 +112,117 @@ test_that("structured and error rich results retain display when bounded", {
   }
 })
 
+test_that("inline image text recovery uses descriptors and retains native evidence", {
+  uri <- paste0("data:image/png;base64,", jsonlite::base64_enc(as.raw(1:100)))
+  image <- ellmer::content_image_url("https://example.com/plot.png")
+  image@url <- uri
+  expect_match(
+    public_content_text(ellmer::content_image_url(uri)),
+    "[Inline image: image/png;",
+    fixed = TRUE
+  )
+  policy <- ContextPolicy(
+    max_tool_result_image_bytes = 1L,
+    offload_dir = withr::local_tempdir()
+  )
+  bounded <- bound_rich_tool_result(
+    ellmer::ContentToolResult(value = list(image)),
+    "plot",
+    policy,
+    "session",
+    "agent"
+  )
+  text <- read_tool_result_chunk(
+    bounded$record$uri,
+    offset = 0L,
+    max_chars = 1000L,
+    policy = policy,
+    session_id = "session"
+  )
+  expect_match(text, "[Inline image:", fixed = TRUE)
+  expect_false(grepl(uri, text, fixed = TRUE))
+  expect_false(grepl("data:", public_content_text(image), fixed = TRUE))
+  envelope <- read_tool_result_envelope(bounded$record$uri, policy, "session")
+  expect_identical(envelope$value$content[[1L]]@url, uri)
+  expect_identical(
+    public_content_text(ellmer::content_image_url(
+      "https://example.com/plot.png"
+    )),
+    "[Image URL: https://example.com/plot.png]"
+  )
+})
+
+test_that("hooks receive original rich failures while model errors stay bounded", {
+  diagnostic <- strrep("original diagnostic ", 100L)
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "source_read"),
+    runtime_reply("The tool failed.")
+  ))
+  tool <- ellmer::tool(
+    function() ellmer::ContentToolResult(error = diagnostic),
+    name = "source_read",
+    description = "Read evidence.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  agent <- Agent$new(
+    chat = runtime_chat(server),
+    tools = list(tool),
+    context_policy = ContextPolicy(
+      max_tool_result_bytes = 100L,
+      offload_dir = withr::local_tempdir()
+    )
+  )
+  post <- failure <- NULL
+  agent$add_hook(HookMatcher(
+    event = "PostToolUse",
+    timeout = 0,
+    callback = function(tool_name, tool_result, tool_error, context) {
+      post <<- list(value = tool_result, error = tool_error)
+      NULL
+    }
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PostToolUseFailure",
+    timeout = 0,
+    callback = function(tool_name, tool_result, tool_error, context) {
+      failure <<- list(value = tool_result, error = tool_error)
+      NULL
+    }
+  ))
+  expect_warning(agent$run_sync("Read."), "Failed to evaluate 1 tool call")
+  expect_identical(post, list(value = NULL, error = diagnostic))
+  expect_identical(failure, list(value = NULL, error = diagnostic))
+  model_error <- agent$get_turns()[[3L]]@contents[[1L]]@error
+  expect_match(model_error, "deputy://tool-result/", fixed = TRUE)
+  expect_false(grepl(diagnostic, model_error, fixed = TRUE))
+  expect_length(agent$.__enclos_env__$private$original_tool_results, 0L)
+})
+
+test_that("malformed result callbacks keep the safe hook fallback", {
+  for (result in list(
+    list(),
+    structure(list(), class = "ellmer::ContentToolResult")
+  )) {
+    agent <- Agent$new(chat = create_mock_chat())
+    observed <- NULL
+    agent$add_hook(HookMatcher(
+      event = "PostToolUse",
+      timeout = 0,
+      callback = function(tool_name, tool_result, tool_error, context) {
+        observed <<- list(value = tool_result, error = tool_error)
+        NULL
+      }
+    ))
+    expect_no_error(suppressWarnings(
+      agent$.__enclos_env__$private$handle_tool_result(result)
+    ))
+    expect_identical(observed, list(value = NULL, error = NULL))
+  }
+})
+
 test_that("native artifact text and original references survive repeated compaction and restore", {
   directory <- withr::local_tempdir()
   payload <- list(

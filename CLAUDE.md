@@ -498,6 +498,9 @@ the AgentDefinition supplies the child's executable registry.
 - `jsonlite` - Runtime JSON serialization, including atomic tool evidence
 - `Rapp` (>= 0.4.0) - CLI framework
 - `callr` - Fault isolation and timeouts for explicitly trusted R code
+- `evaluate` - Ordered R output, conditions, and graphics capture
+- `grDevices` - Graphics devices and static plot capture
+- `htmltools` - Escaped HTML for portable host display evidence
 - `mcp-repl` (optional, through mcptools) - OS-sandboxed model-generated R;
   `tools_mcp_repl()` verifies an explicit fail-closed policy before loading it
 
