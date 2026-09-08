@@ -29,7 +29,8 @@ from the Agent's task \code{fallback_chats}.}
 
 \item{max_tool_result_bytes}{Serialized size above which a tool result is
 stored outside the model context. For native content lists, this bounds
-aggregate non-image public properties. Use \code{NULL} to disable this bound.
+aggregate non-image public properties. Structured explicit results also use
+a conservative bound before JSON expansion. Use \code{NULL} to disable this bound.
 Compaction applies this limit to the public evidence in explicit
 \code{ellmer::ContentToolResult} payloads too, retaining a preview and recoverable
 reference. Large tool-request arguments use the same bound and retain a

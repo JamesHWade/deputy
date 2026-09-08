@@ -1,3 +1,43 @@
+# Image formatters may open a graphics device. Summaries and text artifacts
+# need a deterministic descriptor, never image display or decoded pixel data.
+public_content_text <- function(value) {
+  if (inherits(value, "ellmer::ContentImage")) {
+    props <- S7::props(value)
+    if (!is.null(props$url)) {
+      return(paste0("[Image URL: ", props$url, "]"))
+    }
+    return(paste0(
+      "[Inline image: ",
+      props$mime_type %||% "image",
+      "; image bytes retained in the result artifact.]"
+    ))
+  }
+  paste(format(value), collapse = "\n")
+}
+
+# Project public content without serializing class environments or display extras.
+project_tool_content <- function(
+  value,
+  for_json = FALSE,
+  formatter = public_content_text
+) {
+  if (inherits(value, "ellmer::Content")) {
+    return(formatter(value))
+  }
+  if (for_json && is.atomic(value) && !is.null(names(value))) {
+    value <- as.list(value)
+  }
+  if (is.list(value)) {
+    value[] <- lapply(
+      value,
+      project_tool_content,
+      for_json = for_json,
+      formatter = formatter
+    )
+  }
+  value
+}
+
 # Bound model-facing native content independently of host-facing display data.
 # Public property serialization avoids counting S7 class environments as payload.
 rich_content_bytes <- function(content) {
@@ -16,6 +56,9 @@ bound_rich_tool_result <- function(
   }
   payload <- value@value
   error <- value@error
+  if (inherits(payload, "ellmer::ContentImage")) {
+    payload <- list(payload)
+  }
   native <- is.list(payload) &&
     is.null(names(payload)) &&
     all(vapply(payload, inherits, logical(1), what = "ellmer::Content"))
@@ -33,15 +76,24 @@ bound_rich_tool_result <- function(
       tool_name,
       policy,
       session_id,
-      agent_id
+      agent_id,
+      force = compaction_evidence_exceeds_limit(
+        evidence,
+        policy$max_tool_result_bytes
+      )
     )
   } else if (!native) {
+    evidence <- project_tool_content(payload)
     record <- offload_tool_result(
-      payload,
+      evidence,
       tool_name,
       policy,
       session_id,
-      agent_id
+      agent_id,
+      force = compaction_evidence_exceeds_limit(
+        evidence,
+        policy$max_tool_result_bytes
+      )
     )
   } else {
     text_bytes <- 0
@@ -69,12 +121,13 @@ bound_rich_tool_result <- function(
       return(NULL)
     }
     record <- offload_tool_result(
-      list(content = payload),
+      list(kind = "deputy_native_content", content = payload),
       tool_name,
       policy,
       session_id,
       agent_id,
-      force = TRUE
+      force = TRUE,
+      public_content = TRUE
     )
   }
   if (is.null(record)) {

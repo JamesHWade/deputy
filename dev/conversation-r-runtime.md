@@ -61,7 +61,10 @@ fitting images remain native. The bounded reader returns textual evidence;
 full image recovery requires the host's `resolve_tool_result()` access to the
 stored native content. Full display evidence remains available to the host.
 
-Save Agent sessions to retain code, output, displays, plots and offload artifacts.
+Agent session snapshots retain the current model turns (including their code,
+output, displays and plots) and offload artifacts. Compaction can remove earlier
+turns. Hosts must persist full display/execution records separately when they
+need a complete visible conversation history across compaction.
 Live R objects and executable owners are not resumable state. On reopening,
 create a new owner and recreate needed variables from recorded code. Do not
 claim that a restored plot implies a restored R workspace.

@@ -82,7 +82,21 @@ test_that("Agent sends native plots with bounded text and preserves saved displa
       list(
         code = result@extra$deputy_r$code,
         display = as.character(result@extra$display$html),
-        tool_absent = is.null(result@request@tool)
+        tool_absent = is.null(result@request@tool),
+        artifacts_valid = all(vapply(
+          saved$tool_result_envelopes,
+          function(envelope) {
+            identical(
+              envelope$sha256,
+              digest::digest(
+                serialize(envelope$value, NULL, version = 3),
+                algo = "sha256",
+                serialize = FALSE
+              )
+            )
+          },
+          logical(1)
+        ))
       )
     },
     list(path = path)
@@ -90,6 +104,7 @@ test_that("Agent sends native plots with bounded text and preserves saved displa
   expect_identical(portable$code, code)
   expect_identical(portable$display, display)
   expect_true(portable$tool_absent)
+  expect_true(portable$artifacts_valid)
   expect_s7_class(result@request@tool, ellmer::ToolDef)
   session$close()
   restored <- Agent$new(
