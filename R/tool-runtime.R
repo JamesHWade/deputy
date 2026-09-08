@@ -158,7 +158,10 @@ tool_result_text_stats <- function(path) {
   )
 }
 
-write_tool_result_text <- function(value, path) {
+write_tool_result_text <- function(value, path, public_content = FALSE) {
+  if (public_content) {
+    value <- project_tool_content(value)
+  }
   if (is.character(value)) {
     connection <- file(path, open = "wb")
     on.exit(close(connection), add = TRUE)
@@ -205,7 +208,11 @@ ensure_tool_result_text <- function(envelope, directory) {
 
   temporary <- tempfile("result-text-", tmpdir = directory, fileext = ".txt")
   on.exit(unlink(temporary), add = TRUE)
-  stats <- write_tool_result_text(envelope$value, temporary)
+  stats <- write_tool_result_text(
+    envelope$value,
+    temporary,
+    public_content = identical(envelope$text_format, "public-content-v1")
+  )
   if (
     !identical(stats$chars, envelope$text_chars) ||
       !identical(stats$sha256, envelope$text_sha256)
@@ -324,7 +331,8 @@ offload_tool_result <- function(
   policy,
   session_id,
   agent_id,
-  force = FALSE
+  force = FALSE,
+  public_content = FALSE
 ) {
   threshold <- policy$max_tool_result_bytes
   if (
@@ -334,7 +342,8 @@ offload_tool_result <- function(
     return(NULL)
   }
 
-  serialized <- serialize(value, NULL, version = 3)
+  value_format <- if (public_content) "native-content-v1" else NULL
+  serialized <- serialize_tool_result_value(value, value_format)
   bytes <- length(serialized)
   if (!force && bytes <= threshold) {
     return(NULL)
@@ -360,7 +369,7 @@ offload_tool_result <- function(
       fileext = ".txt"
     )
     on.exit(unlink(text_temporary), add = TRUE)
-    text_stats <- write_tool_result_text(value, text_temporary)
+    text_stats <- write_tool_result_text(value, text_temporary, public_content)
     envelope <- list(
       schema_version = 2L,
       id = result_id,
@@ -371,8 +380,10 @@ offload_tool_result <- function(
       sha256 = sha256,
       text_chars = text_stats$chars,
       text_sha256 = text_stats$sha256,
+      text_format = if (public_content) "public-content-v1" else NULL,
       created_at = Sys.time(),
-      value = value
+      value = value,
+      value_format = value_format
     )
     temporary <- tempfile("result-", tmpdir = directory, fileext = ".rds")
     on.exit(unlink(temporary), add = TRUE)
@@ -408,7 +419,13 @@ offload_tool_result <- function(
     ),
     bytes = bytes,
     sha256 = sha256,
-    preview = tool_result_preview(value),
+    preview = tool_result_preview(
+      if (identical(envelope$text_format, "public-content-v1")) {
+        project_tool_content(value)
+      } else {
+        value
+      }
+    ),
     path = path
   )
 }
@@ -504,7 +521,7 @@ validate_tool_result_envelope <- function(
   session_id = NULL
 ) {
   serialized <- if (is.list(envelope) && "value" %in% names(envelope)) {
-    serialize(envelope$value, NULL, version = 3)
+    serialize_tool_result_value(envelope$value, envelope$value_format)
   } else {
     NULL
   }
@@ -869,4 +886,49 @@ parse_tool_result_text_reference <- function(reference) {
     )
   }
   list(id = captured[[2]], text_sha256 = captured[[3]])
+}
+
+# A verified reference envelope already has bounded preview/control overhead.
+# Do not wrap it in another artifact just because a tiny policy is smaller.
+is_tool_result_reference_text <- function(value, policy, session_id) {
+  if (
+    !is.character(value) ||
+      length(value) != 1L ||
+      is.na(value) ||
+      !is.null(names(value)) ||
+      nchar(value, "bytes") > 32768L ||
+      !startsWith(value, "[Tool result offloaded by Deputy]\n")
+  ) {
+    return(FALSE)
+  }
+  references <- compaction_tool_result_references(value)
+  if (length(references) != 1L) {
+    return(FALSE)
+  }
+  envelope <- tryCatch(
+    read_tool_result_envelope(references, policy, session_id),
+    error = function(e) NULL
+  )
+  if (is.null(envelope)) {
+    return(FALSE)
+  }
+  evidence <- if (identical(envelope$text_format, "public-content-v1")) {
+    project_tool_content(envelope$value)
+  } else {
+    envelope$value
+  }
+  identical(
+    value,
+    tool_result_reference_text(list(
+      uri = paste0(
+        "deputy://tool-result/",
+        envelope$id,
+        "?text_sha256=",
+        envelope$text_sha256
+      ),
+      bytes = envelope$bytes,
+      sha256 = envelope$sha256,
+      preview = tool_result_preview(evidence)
+    ))
+  )
 }

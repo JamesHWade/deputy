@@ -20,7 +20,9 @@ NULL
 #'   generation uses an isolated clone of the active Chat and does not select
 #'   from the Agent's task `fallback_chats`.
 #' @param max_tool_result_bytes Serialized size above which a tool result is
-#'   stored outside the model context. Use `NULL` to disable result offloading.
+#'   stored outside the model context. For native content lists, this bounds
+#'   aggregate non-image public properties. Structured explicit results also use
+#'   a conservative bound before JSON expansion. Use `NULL` to disable this bound.
 #'   Compaction applies this limit to the public evidence in explicit
 #'   `ellmer::ContentToolResult` payloads too, retaining a preview and recoverable
 #'   reference. Large tool-request arguments use the same bound and retain a
@@ -37,6 +39,16 @@ NULL
 #'   Earlier saved sessions keep their own catalog snapshots. Original result
 #'   artifacts are retained. New evidence artifacts from aborted compactions
 #'   are removed unless another compaction or tool caller has claimed them.
+#' @param max_tool_result_image_bytes Maximum aggregate serialized public image
+#'   payload bytes retained per native tool result (2 MiB by default). Inline
+#'   image bytes are encoded; remote images count their URL metadata, not remote
+#'   downloads. `NULL` disables this byte bound. Excess content remains in a
+#'   recoverable result artifact and the original display metadata is preserved.
+#' @param max_tool_result_images Maximum images retained per native tool result
+#'   (four by default). Use zero to offload all images, or `NULL` for no count
+#'   bound. Image limits are independent of the non-image `max_tool_result_bytes`
+#'   limit. Model token limits and automatic compaction continue to apply.
+#'   Display metadata is host-facing evidence and is not sent to the model.
 #' @param offload_dir Directory for durable result envelopes. Relative paths
 #'   are anchored to the current working directory when the policy is created.
 #'   `NULL` uses the Deputy user cache, partitioned by Agent session.
@@ -93,6 +105,14 @@ ContextPolicy <- S7::new_class(
       "max_tool_result_bytes",
       S7::new_union(NULL, S7::class_integer)
     ),
+    max_tool_result_image_bytes = readonly_property(
+      "max_tool_result_image_bytes",
+      S7::new_union(NULL, S7::class_integer)
+    ),
+    max_tool_result_images = readonly_property(
+      "max_tool_result_images",
+      S7::new_union(NULL, S7::class_integer)
+    ),
     offload_dir = readonly_property(
       "offload_dir",
       S7::new_union(NULL, S7::class_character)
@@ -108,7 +128,9 @@ ContextPolicy <- S7::new_class(
     fallback = c("error", "text"),
     max_tool_result_bytes = 64 * 1024,
     offload_dir = NULL,
-    summary_fallback_chats = list()
+    summary_fallback_chats = list(),
+    max_tool_result_image_bytes = 2 * 1024 * 1024,
+    max_tool_result_images = 4L
   ) {
     fallback <- match.arg(fallback)
     summary_fallback_chats <- normalize_fallback_chats(
@@ -121,6 +143,17 @@ ContextPolicy <- S7::new_class(
       max_tool_result_bytes,
       "max_tool_result_bytes"
     )
+
+    max_tool_result_image_bytes <- context_policy_whole_number(
+      max_tool_result_image_bytes,
+      "max_tool_result_image_bytes"
+    )
+    if (!is.null(max_tool_result_images)) {
+      max_tool_result_images <- context_policy_nonnegative_whole_number(
+        max_tool_result_images,
+        "max_tool_result_images"
+      )
+    }
 
     if (
       !is.numeric(compact_to) ||
@@ -159,6 +192,8 @@ ContextPolicy <- S7::new_class(
       fallback = fallback,
       max_tool_result_bytes = max_tool_result_bytes,
       offload_dir = offload_dir,
+      max_tool_result_image_bytes = max_tool_result_image_bytes,
+      max_tool_result_images = max_tool_result_images,
       summary_fallback_chats = summary_fallback_chats
     )
     freeze_value(value)

@@ -14,6 +14,7 @@ test_that("public API is deliberate", {
     "DeputyCompaction",
     "LeadAgent",
     "McpConnection",
+    "RSession",
     "AgentDefinition",
     "agent_definition",
     "agent_definition_read",

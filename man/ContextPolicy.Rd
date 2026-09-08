@@ -10,7 +10,9 @@ ContextPolicy(
   fallback = c("error", "text"),
   max_tool_result_bytes = 64 * 1024,
   offload_dir = NULL,
-  summary_fallback_chats = list()
+  summary_fallback_chats = list(),
+  max_tool_result_image_bytes = 2 * 1024 * 1024,
+  max_tool_result_images = 4L
 )
 }
 \arguments{
@@ -26,7 +28,9 @@ generation uses an isolated clone of the active Chat and does not select
 from the Agent's task \code{fallback_chats}.}
 
 \item{max_tool_result_bytes}{Serialized size above which a tool result is
-stored outside the model context. Use \code{NULL} to disable result offloading.
+stored outside the model context. For native content lists, this bounds
+aggregate non-image public properties. Structured explicit results also use
+a conservative bound before JSON expansion. Use \code{NULL} to disable this bound.
 Compaction applies this limit to the public evidence in explicit
 \code{ellmer::ContentToolResult} payloads too, retaining a preview and recoverable
 reference. Large tool-request arguments use the same bound and retain a
@@ -55,6 +59,18 @@ advance to the next template after ellmer's retries. These destinations
 are separate from the Agent's task \code{fallback_chats}; choosing a summary
 destination does not change the task Chat. Manual \verb{$compact()} uses only
 its active Chat and \code{fallback} policy. Templates are cloned at construction.}
+
+\item{max_tool_result_image_bytes}{Maximum aggregate serialized public image
+payload bytes retained per native tool result (2 MiB by default). Inline
+image bytes are encoded; remote images count their URL metadata, not remote
+downloads. \code{NULL} disables this byte bound. Excess content remains in a
+recoverable result artifact and the original display metadata is preserved.}
+
+\item{max_tool_result_images}{Maximum images retained per native tool result
+(four by default). Use zero to offload all images, or \code{NULL} for no count
+bound. Image limits are independent of the non-image \code{max_tool_result_bytes}
+limit. Model token limits and automatic compaction continue to apply.
+Display metadata is host-facing evidence and is not sent to the model.}
 }
 \value{
 A read-only \code{ContextPolicy} S7 object.

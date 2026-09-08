@@ -5,7 +5,7 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
     build_session_payload = function() {
       list(
         schema_version = 2L,
-        turns = private$.chat$get_turns(),
+        turns = portable_session_turns(private$.chat$get_turns()),
         system_prompt = private$.chat$get_system_prompt(),
         compaction_summary = private$.compaction_summary,
         tool_result_envelopes = collect_tool_result_envelopes(
@@ -234,4 +234,23 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       private$.compaction_summary <- session$compaction_summary
     }
   )
+}
+
+# Executable ToolDefs can close over processes and host resources. Saved turns
+# retain the request as evidence; hosts rebuild the executable registry.
+portable_session_turns <- function(turns) {
+  strip_tool <- function(content) {
+    if (inherits(content, "ellmer::ContentToolRequest")) {
+      content@tool <- NULL
+    } else if (inherits(content, "ellmer::ContentToolResult")) {
+      if (!is.null(content@request)) {
+        content@request <- strip_tool(content@request)
+      }
+    }
+    content
+  }
+  lapply(turns, function(turn) {
+    turn@contents <- lapply(turn@contents, strip_tool)
+    turn
+  })
 }

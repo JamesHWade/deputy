@@ -157,16 +157,32 @@ register_compaction_catalog_owner <- function(registry, owner) {
   invisible(NULL)
 }
 
-compaction_embedded_references <- function(value) {
+compaction_embedded_references <- function(value, public_only = FALSE) {
   if (is.character(value) || is.factor(value)) {
     return(compaction_tool_result_references(as.character(value)))
   }
   if (inherits(value, "ellmer::Content")) {
-    value <- S7::props(value)
+    value <- if (!public_only) {
+      S7::props(value)
+    } else if (inherits(value, "ellmer::ContentToolResult")) {
+      list(
+        value = value@value,
+        error = if (inherits(value@error, "condition")) {
+          conditionMessage(value@error)
+        } else {
+          value@error
+        }
+      )
+    } else if (inherits(value, "ellmer::ContentToolRequest")) {
+      value@arguments
+    } else {
+      public_content_text(value)
+    }
+    return(compaction_embedded_references(value, public_only))
   }
   if (is.list(value)) {
     return(unique(unlist(
-      lapply(value, compaction_embedded_references),
+      lapply(value, compaction_embedded_references, public_only = public_only),
       use.names = FALSE
     )))
   }
@@ -654,13 +670,20 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       if (method %in% c("llm", "text")) {
         # The summary provider may omit every reference. Preserve the handles
         # from both newly compacted evidence and the prior accepted summary.
-        references <- compaction_tool_result_references(c(
-          plan$previous_summary,
-          vapply(
-            plan$turns_to_compact,
-            private$compaction_turn_text,
-            character(1)
-          )
+        original_references <- compaction_embedded_references(
+          lapply(plan$turns_to_compact, function(turn) turn@contents),
+          public_only = TRUE
+        )
+        references <- unique(c(
+          compaction_tool_result_references(c(
+            plan$previous_summary,
+            vapply(
+              plan$turns_to_compact,
+              private$compaction_turn_text,
+              character(1)
+            )
+          )),
+          original_references
         ))
         if (length(references)) {
           handles <- compaction_reference_handles(
@@ -812,22 +835,13 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         }
       }
       if (!inherits(content, "ellmer::ContentToolResult")) {
-        return(paste(format(content), collapse = "\n"))
+        return(public_content_text(content))
       }
       # Keep ordinary structured results intact. Project Content objects through
       # their public formatter, including inside named/nested payloads, without
       # including tool-result display `extra`.
       project_content <- function(value, for_json = FALSE) {
-        if (inherits(value, "ellmer::Content")) {
-          return(private$compaction_content_text(value))
-        }
-        if (for_json && is.atomic(value) && !is.null(names(value))) {
-          value <- as.list(value)
-        }
-        if (is.list(value)) {
-          value[] <- lapply(value, project_content, for_json = for_json)
-        }
-        value
+        project_tool_content(value, for_json, private$compaction_content_text)
       }
       # Serialize public evidence, not S7 class environments: those can be
       # large and their bytes need not survive a save/load round trip.
@@ -847,6 +861,19 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       header <- format(content, show = "header")
       if (is_error) {
         header <- paste(header, "Error:")
+      }
+      if (
+        is_tool_result_reference_text(
+          if (is_error) diagnostic else content@value,
+          private$.context_policy,
+          private$.session_id
+        )
+      ) {
+        return(paste(
+          header,
+          if (is_error) diagnostic else content@value,
+          sep = "\n"
+        ))
       }
       # Results supplied as ContentToolResult, including restored turns, can
       # bypass runtime offloading. Bound them before paste/JSON allocates the

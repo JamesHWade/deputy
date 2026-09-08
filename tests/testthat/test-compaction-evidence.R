@@ -311,7 +311,17 @@ test_that("compaction offloads oversized explicit tool results before formatting
       )
     )
     expect_identical(agent$resolve_tool_result(reference), case$evidence)
-    expect_identical(source_turns[[3L]]@contents[[1L]]@value, value)
+    # Execution already bounded the model turn; complete public evidence is
+    # recovered from the original artifact, and host extras remain intact.
+    expect_match(
+      source_turns[[3L]]@contents[[1L]]@value,
+      reference,
+      fixed = TRUE
+    )
+    expect_identical(
+      source_turns[[3L]]@contents[[1L]]@extra,
+      list(private = "HOST-ONLY-SECRET")
+    )
     expect_match(
       agent$get_tools()[["deputy_read_tool_result"]](
         reference,
@@ -487,6 +497,10 @@ test_that("aborted compaction removes only provisional evidence files", {
       force = TRUE
     )
     files_before <- sort(list.files(dirname(existing$path)))
+    envelopes_before <- collect_tool_result_envelopes(
+      agent$context_policy,
+      agent$session_id()
+    )
     if (mode == "manual") {
       expect_error(
         agent$compact(keep_last = 0L),
@@ -534,7 +548,10 @@ test_that("aborted compaction removes only provisional evidence files", {
         }
       }
     )
-    expect_named(readRDS(snapshot)$tool_result_envelopes, existing$id)
+    expect_setequal(
+      names(readRDS(snapshot)$tool_result_envelopes),
+      names(envelopes_before)
+    )
     expect_identical(
       agent$resolve_tool_result(existing$uri),
       "Previously accepted evidence"
@@ -542,9 +559,15 @@ test_that("aborted compaction removes only provisional evidence files", {
     fresh <- agent$clone()
     fresh$set_turns(list())
     fresh$set_tools(list())
-    expect_length(fresh$get_tools(), 0L)
+    # Runtime-committed evidence keeps its existing bounded reader even when
+    # the caller clears the ordinary tools.
+    expect_named(fresh$get_tools(), "deputy_read_tool_result")
     fresh$run_sync("Start fresh.")
-    expect_null(tail(server$requests(), 1L)[[1L]]$body$tools)
+    expect_match(
+      jsonlite::toJSON(tail(server$requests(), 1L)[[1L]]$body$tools),
+      "deputy_read_tool_result",
+      fixed = TRUE
+    )
     # The unchanged original turns can subsequently produce a durable summary.
     result <- agent$compact(keep_last = 0L)
     reference <- compaction_tool_result_references(result$summary)

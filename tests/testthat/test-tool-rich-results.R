@@ -1,0 +1,376 @@
+test_that("rich results bound images independently and retain offloaded evidence", {
+  directory <- withr::local_tempdir()
+  image <- ellmer::content_image_url(paste0(
+    "data:image/png;base64,",
+    jsonlite::base64_enc(as.raw(1:100))
+  ))
+  value <- ellmer::ContentToolResult(
+    value = list(
+      ellmer::ContentText("small"),
+      image,
+      image,
+      ellmer::ContentText(strrep("x", 2000))
+    ),
+    extra = list(display = list(html = "host display"))
+  )
+  policy <- ContextPolicy(
+    max_tool_result_bytes = 1024L,
+    max_tool_result_images = 1L,
+    offload_dir = directory
+  )
+  bounded <- bound_rich_tool_result(value, "test", policy, "session", "agent")
+  expect_length(
+    Filter(
+      function(x) inherits(x, "ellmer::ContentImage"),
+      bounded$result@value
+    ),
+    1L
+  )
+  expect_identical(bounded$result@extra, value@extra)
+  expect_match(
+    r_session_text(bounded$result),
+    "deputy://tool-result/",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    strrep("x", 1000),
+    r_session_text(bounded$result),
+    fixed = TRUE
+  ))
+  unlimited <- ContextPolicy(
+    max_tool_result_bytes = NULL,
+    max_tool_result_image_bytes = NULL,
+    max_tool_result_images = NULL,
+    offload_dir = directory
+  )
+  expect_null(bound_rich_tool_result(
+    value,
+    "test",
+    unlimited,
+    "session",
+    "agent"
+  ))
+  no_images <- ContextPolicy(
+    max_tool_result_image_bytes = 1L,
+    offload_dir = directory
+  )
+  bounded <- bound_rich_tool_result(
+    value,
+    "test",
+    no_images,
+    "session",
+    "agent"
+  )
+  expect_length(
+    Filter(
+      function(x) inherits(x, "ellmer::ContentImage"),
+      bounded$result@value
+    ),
+    0L
+  )
+  single <- bound_rich_tool_result(
+    ellmer::ContentToolResult(value = image),
+    "test",
+    no_images,
+    "session",
+    "agent"
+  )
+  expect_length(
+    Filter(
+      function(x) inherits(x, "ellmer::ContentImage"),
+      single$result@value
+    ),
+    0L
+  )
+  many <- ellmer::ContentToolResult(value = rep(list(image), 1000))
+  bounded <- bound_rich_tool_result(many, "test", no_images, "session", "agent")
+  expect_length(bounded$result@value, 2L)
+})
+
+test_that("structured and error rich results retain display when bounded", {
+  policy <- ContextPolicy(
+    max_tool_result_bytes = 100L,
+    offload_dir = withr::local_tempdir()
+  )
+  for (value in list(
+    ellmer::ContentToolResult(
+      value = list(text = strrep("x", 1000)),
+      extra = list(label = "kept")
+    ),
+    ellmer::ContentToolResult(
+      error = strrep("x", 1000),
+      extra = list(label = "kept")
+    )
+  )) {
+    bounded <- bound_rich_tool_result(value, "test", policy, "session", "agent")
+    expect_identical(bounded$result@extra, value@extra)
+    expect_match(
+      bounded$result@error %||% bounded$result@value,
+      "deputy://tool-result/",
+      fixed = TRUE
+    )
+  }
+})
+
+test_that("inline image text recovery uses descriptors and retains native evidence", {
+  uri <- paste0("data:image/png;base64,", jsonlite::base64_enc(as.raw(1:100)))
+  image <- ellmer::content_image_url("https://example.com/plot.png")
+  image@url <- uri
+  expect_match(
+    public_content_text(ellmer::content_image_url(uri)),
+    "[Inline image: image/png;",
+    fixed = TRUE
+  )
+  policy <- ContextPolicy(
+    max_tool_result_image_bytes = 1L,
+    offload_dir = withr::local_tempdir()
+  )
+  bounded <- bound_rich_tool_result(
+    ellmer::ContentToolResult(value = list(image)),
+    "plot",
+    policy,
+    "session",
+    "agent"
+  )
+  text <- read_tool_result_chunk(
+    bounded$record$uri,
+    offset = 0L,
+    max_chars = 1000L,
+    policy = policy,
+    session_id = "session"
+  )
+  expect_match(text, "[Inline image:", fixed = TRUE)
+  expect_false(grepl(uri, text, fixed = TRUE))
+  expect_false(grepl("data:", public_content_text(image), fixed = TRUE))
+  envelope <- read_tool_result_envelope(bounded$record$uri, policy, "session")
+  expect_identical(envelope$value$content[[1L]]@url, uri)
+  expect_identical(
+    public_content_text(ellmer::content_image_url(
+      "https://example.com/plot.png"
+    )),
+    "[Image URL: https://example.com/plot.png]"
+  )
+})
+
+test_that("hooks receive original rich failures while model errors stay bounded", {
+  diagnostic <- strrep("original diagnostic ", 100L)
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "source_read"),
+    runtime_reply("The tool failed.")
+  ))
+  tool <- ellmer::tool(
+    function() ellmer::ContentToolResult(error = diagnostic),
+    name = "source_read",
+    description = "Read evidence.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  agent <- Agent$new(
+    chat = runtime_chat(server),
+    tools = list(tool),
+    context_policy = ContextPolicy(
+      max_tool_result_bytes = 100L,
+      offload_dir = withr::local_tempdir()
+    )
+  )
+  post <- failure <- NULL
+  agent$add_hook(HookMatcher(
+    event = "PostToolUse",
+    timeout = 0,
+    callback = function(tool_name, tool_result, tool_error, context) {
+      post <<- list(value = tool_result, error = tool_error)
+      NULL
+    }
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PostToolUseFailure",
+    timeout = 0,
+    callback = function(tool_name, tool_result, tool_error, context) {
+      failure <<- list(value = tool_result, error = tool_error)
+      NULL
+    }
+  ))
+  expect_warning(agent$run_sync("Read."), "Failed to evaluate 1 tool call")
+  expect_identical(post, list(value = NULL, error = diagnostic))
+  expect_identical(failure, list(value = NULL, error = diagnostic))
+  model_error <- agent$get_turns()[[3L]]@contents[[1L]]@error
+  expect_match(model_error, "deputy://tool-result/", fixed = TRUE)
+  expect_false(grepl(diagnostic, model_error, fixed = TRUE))
+  expect_length(agent$.__enclos_env__$private$original_tool_results, 0L)
+})
+
+test_that("malformed result callbacks keep the safe hook fallback", {
+  for (result in list(
+    list(),
+    structure(list(), class = "ellmer::ContentToolResult")
+  )) {
+    agent <- Agent$new(chat = create_mock_chat())
+    observed <- NULL
+    agent$add_hook(HookMatcher(
+      event = "PostToolUse",
+      timeout = 0,
+      callback = function(tool_name, tool_result, tool_error, context) {
+        observed <<- list(value = tool_result, error = tool_error)
+        NULL
+      }
+    ))
+    expect_no_error(suppressWarnings(
+      agent$.__enclos_env__$private$handle_tool_result(result)
+    ))
+    expect_identical(observed, list(value = NULL, error = NULL))
+  }
+})
+
+test_that("native artifact text and original references survive repeated compaction and restore", {
+  directory <- withr::local_tempdir()
+  payload <- list(
+    ellmer::ContentText(strrep("x", 5000)),
+    ellmer::ContentText(strrep("recoverable evidence ", 10000)),
+    ellmer::content_image_url(paste0(
+      "data:image/png;base64,",
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    ))
+  )
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "source_read"),
+    runtime_reply("Read."),
+    runtime_reply("Summary without a reference.", stream = FALSE),
+    runtime_reply("Updated summary without a reference.", stream = FALSE)
+  ))
+  source <- ellmer::tool(
+    function() ellmer::ContentToolResult(value = payload),
+    name = "source_read",
+    description = "Read evidence.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  agent <- Agent$new(
+    chat = runtime_chat(server),
+    tools = list(source),
+    context_policy = ContextPolicy(
+      max_tool_result_bytes = 8192L,
+      offload_dir = directory
+    )
+  )
+  agent$run_sync("Read.")
+  reference <- compaction_tool_result_references(r_session_text(agent$get_turns()[[
+    3L
+  ]]@contents[[1L]]))
+  expect_length(reference, 1L)
+  expect_identical(agent$resolve_tool_result(reference)$content, payload)
+  expect_match(
+    agent$get_tools()[["deputy_read_tool_result"]](
+      reference,
+      offset = 5500L,
+      max_chars = 128L
+    ),
+    "recoverable evidence",
+    fixed = TRUE
+  )
+  summary <- agent$compact(keep_last = 0L)
+  expect_match(summary$summary, reference, fixed = TRUE)
+  agent$add_turn(
+    ellmer::UserTurn("Continue."),
+    ellmer::AssistantTurn("Continuing."),
+    log_tokens = FALSE
+  )
+  repeated <- agent$compact(keep_last = 0L)
+  expect_match(repeated$summary, reference, fixed = TRUE)
+  path <- file.path(directory, "saved.rds")
+  suppressMessages(agent$save_session(path))
+  restored <- Agent$new(
+    chat = runtime_chat(server),
+    context_policy = ContextPolicy(
+      offload_dir = file.path(directory, "restored")
+    )
+  )
+  suppressMessages(restored$load_session(path))
+  expect_identical(restored$resolve_tool_result(reference)$content, payload)
+  # Text regeneration uses the versioned public projection, including after restore.
+  envelope <- read_tool_result_envelope(
+    reference,
+    restored$context_policy,
+    restored$session_id()
+  )
+  text_path <- tool_result_text_path(
+    tool_result_offload_dir(restored$context_policy, restored$session_id()),
+    envelope$id
+  )
+  unlink(text_path)
+  suppressMessages(restored$load_session(path))
+  expect_match(
+    restored$get_tools()[["deputy_read_tool_result"]](
+      reference,
+      offset = 5500L,
+      max_chars = 128L
+    ),
+    "recoverable evidence",
+    fixed = TRUE
+  )
+})
+
+test_that("canonical result references validate both payload and text digests", {
+  policy <- ContextPolicy(
+    max_tool_result_bytes = 100L,
+    offload_dir = withr::local_tempdir()
+  )
+  record <- offload_tool_result(
+    strrep("evidence ", 100),
+    "source",
+    policy,
+    "session",
+    "agent"
+  )
+  reference <- tool_result_reference_text(record)
+  expect_true(is_tool_result_reference_text(reference, policy, "session"))
+  wrong_text <- sub(
+    "text_sha256=[a-f0-9]{64}",
+    paste0("text_sha256=", strrep("0", 64)),
+    reference
+  )
+  expect_false(is_tool_result_reference_text(wrong_text, policy, "session"))
+  expect_false(is_tool_result_reference_text(
+    reference,
+    policy,
+    "other-session"
+  ))
+})
+
+test_that("native artifact integrity ignores formatter caches but detects content edits", {
+  content <- local({
+    cache <- new.env(parent = emptyenv())
+    cache$count <- 0L
+    cls <- S7::new_class(
+      "CachedNativeText",
+      parent = ellmer::ContentText,
+      validator = function(self) {
+        cache$count
+        NULL
+      }
+    )
+    S7::method(format, cls) <- function(x, ...) {
+      cache$count <- cache$count + 1L
+      x@text
+    }
+    cls(text = strrep("evidence ", 100L))
+  })
+  policy <- ContextPolicy(
+    max_tool_result_bytes = 100L,
+    offload_dir = withr::local_tempdir()
+  )
+  bounded <- bound_rich_tool_result(
+    ellmer::ContentToolResult(value = list(content)),
+    "source_read",
+    policy,
+    "session",
+    "agent"
+  )
+  envelope <- validate_tool_result_envelope(readRDS(bounded$record$path))
+  expect_identical(envelope$value$content[[1L]]@text, content@text)
+  envelope$value$content[[1L]]@text <- "altered evidence"
+  expect_error(validate_tool_result_envelope(envelope), "integrity validation")
+})

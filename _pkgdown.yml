@@ -73,6 +73,7 @@ reference:
   - tool_glob_files
   - tool_grep_files
   - tool_run_r_code
+  - RSession
   - tool_run_bash
   - tool_read_csv
   - tool_web_fetch
