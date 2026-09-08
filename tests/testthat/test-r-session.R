@@ -69,6 +69,29 @@ test_that("no-output executions retain their confirmation in host display eviden
   }
 })
 
+test_that("plot base64 is whitespace-free and preserves the original PNG", {
+  png <- jsonlite::base64_dec(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+  )
+  result <- r_session_result(
+    code = "plot(1)",
+    segments = list(list(type = "plot", data = png)),
+    session_id = "session",
+    execution_id = "execution",
+    generation = 1L,
+    fresh = FALSE,
+    reset_reason = NULL,
+    outcome = "complete"
+  )
+  display <- as.character(result@extra$display$html)
+  uri <- regmatches(display, regexpr('data:image/png;base64,[^"]+', display))
+  display_payload <- sub("data:image/png;base64,", "", uri, fixed = TRUE)
+  for (payload in list(result@value[[1L]]@data, display_payload)) {
+    expect_false(grepl("[[:space:]]", payload))
+    expect_identical(jsonlite::base64_dec(payload), png)
+  }
+})
+
 test_that("base and ggplot2 figures preserve drawing updates and ordered conditions", {
   skip_if_not_installed("ggplot2")
   agent <- Agent$new(

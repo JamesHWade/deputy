@@ -27,7 +27,7 @@ r_session_result <- function(
     if (identical(segment$type, "plot")) {
       uri <- paste0(
         "data:image/png;base64,",
-        jsonlite::base64_enc(segment$data)
+        gsub("[\r\n]", "", jsonlite::base64_enc(segment$data))
       )
       values[[length(values) + 1L]] <- ellmer::content_image_url(uri)
       html[[length(html) + 1L]] <- paste0(
