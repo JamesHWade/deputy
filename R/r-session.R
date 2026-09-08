@@ -379,7 +379,10 @@ RSession <- R6::R6Class(
                   }
                 } else if (identical(worker$poll_process(0), "ready")) {
                   response <- worker$read()
-                  if (inherits(response, "callr_session_result")) {
+                  if (
+                    inherits(response, "callr_session_result") &&
+                      !identical(response$code, 301L)
+                  ) {
                     if (!is.null(response$error) || response$code != 200L) {
                       private$reset("worker_failed")
                       return(invisible(NULL))
@@ -416,6 +419,7 @@ r_session_owner <- function(agent, run_context = agent$run_context) {
     abort_deputy("{.arg agent} must be an Agent.", class = "r_session")
   }
   list(
+    agent = agent,
     agent_id = agent$agent_id,
     session_id = agent$session_id(),
     working_dir = agent$working_dir,

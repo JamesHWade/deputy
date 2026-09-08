@@ -217,3 +217,53 @@ test_that("grid and patchwork compositions yield native figures and widgets fail
     0L
   )
 })
+
+test_that("Agent clones cannot read or cancel the original R owner", {
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    working_dir = withr::local_tempdir()
+  )
+  session <- RSession$new(agent)
+  withr::defer(session$close())
+  r_session_await(session$run("x <- 27"))
+  agent$register_tools(session$tools())
+  expect_error(
+    agent$clone(),
+    "different Agent",
+    class = "deputy_tool_registration"
+  )
+  expect_match(r_session_text(r_session_await(session$run("x"))), "27")
+  expect_identical(session$status()$generation, 1L)
+  # Equal public identifiers are not proof of identical process-local ownership.
+  other <- Agent$new(
+    chat = create_mock_chat(),
+    working_dir = agent$working_dir,
+    agent_id = agent$agent_id,
+    session_id = agent$session_id()
+  )
+  expect_error(
+    other$register_tools(session$tools()),
+    "different Agent",
+    class = "deputy_tool_registration"
+  )
+  pending <- session$run("Sys.sleep(0.1); x + 1")
+  cancel_active_r_session_tools(session$tools(), other, other$run_context)
+  expect_match(r_session_text(r_session_await(pending)), "28")
+})
+
+test_that("intermediate callr progress conditions preserve the worker and terminal result", {
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    working_dir = withr::local_tempdir()
+  )
+  session <- RSession$new(agent)
+  withr::defer(session$close())
+  result <- r_session_await(session$run(paste(
+    "x <- 41; signalCondition(structure(list(message='progress'),",
+    "class=c('callr_message','condition'))); x + 1"
+  )))
+  expect_identical(result@extra$deputy_r$outcome, "complete")
+  expect_match(r_session_text(result), "42")
+  expect_match(r_session_text(r_session_await(session$run("x"))), "41")
+  expect_identical(session$status()$generation, 1L)
+})
