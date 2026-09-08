@@ -15,7 +15,9 @@ ContextPolicy(
   fallback = c("error", "text"),
   max_tool_result_bytes = 64 * 1024,
   offload_dir = NULL,
-  summary_fallback_chats = list()
+  summary_fallback_chats = list(),
+  max_tool_result_image_bytes = 2 * 1024 * 1024,
+  max_tool_result_images = 4L
 )
 ```
 
@@ -41,8 +43,10 @@ ContextPolicy(
 - max_tool_result_bytes:
 
   Serialized size above which a tool result is stored outside the model
-  context. Use `NULL` to disable result offloading. Compaction applies
-  this limit to the public evidence in explicit
+  context. For native content lists, this bounds aggregate non-image
+  public properties. Structured explicit results also use a conservative
+  bound before JSON expansion. Use `NULL` to disable this bound.
+  Compaction applies this limit to the public evidence in explicit
   [`ellmer::ContentToolResult`](https://ellmer.tidyverse.org/reference/Content.html)
   payloads too, retaining a preview and recoverable reference. Large
   tool-request arguments use the same bound and retain a recoverable
@@ -77,6 +81,22 @@ ContextPolicy(
   does not change the task Chat. Manual `$compact()` uses only its
   active Chat and `fallback` policy. Templates are cloned at
   construction.
+
+- max_tool_result_image_bytes:
+
+  Maximum aggregate serialized public image payload bytes retained per
+  native tool result (2 MiB by default). Inline image bytes are encoded;
+  remote images count their URL metadata, not remote downloads. `NULL`
+  disables this byte bound. Excess content remains in a recoverable
+  result artifact and the original display metadata is preserved.
+
+- max_tool_result_images:
+
+  Maximum images retained per native tool result (four by default). Use
+  zero to offload all images, or `NULL` for no count bound. Image limits
+  are independent of the non-image `max_tool_result_bytes` limit. Model
+  token limits and automatic compaction continue to apply. Display
+  metadata is host-facing evidence and is not sent to the model.
 
 ## Value
 

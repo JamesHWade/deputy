@@ -51,6 +51,8 @@ Built-in tools and tool bundles
   : Search file contents with grep-like matching
 - [`tool_run_r_code()`](https://jameshwade.github.io/deputy/reference/tool_run_r_code.md)
   : Execute R code
+- [`RSession`](https://jameshwade.github.io/deputy/reference/RSession.md)
+  : Own a conversation's trusted R session
 - [`tool_run_bash()`](https://jameshwade.github.io/deputy/reference/tool_run_bash.md)
   : Execute bash commands
 - [`tool_read_csv()`](https://jameshwade.github.io/deputy/reference/tool_read_csv.md)
