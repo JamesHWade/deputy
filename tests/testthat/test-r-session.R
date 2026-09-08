@@ -169,18 +169,31 @@ test_that("idle worker loss and garbage collection release live state", {
   expect_match(r_session_text(result), "worker_exited")
   expect_identical(result@extra$deputy_r$generation, 2L)
   orphan <- RSession$new(agent)
-  r_session_await(orphan$run("1"))
+  orphan_result <- r_session_await(orphan$run(paste(
+    "child <- callr::r_bg(function() Sys.sleep(60));",
+    "cat('child_pid=', child$get_pid(), sep='')"
+  )))
+  child_match <- regmatches(
+    r_session_text(orphan_result),
+    regexec("child_pid=([0-9]+)", r_session_text(orphan_result))
+  )[[1L]]
+  child_pid <- as.integer(child_match[[2L]])
+  child_handle <- ps::ps_handle(child_pid)
+  withr::defer(try(ps::ps_kill(child_handle), silent = TRUE))
   orphan_pid <- orphan$status()$pid
   rm(orphan)
   # Finished poll callbacks must release the owner before collection.
   later::run_now(0.05)
   gc()
   deadline <- Sys.time() + 5
-  while (orphan_pid %in% ps::ps_pids() && Sys.time() < deadline) {
+  while (
+    any(c(orphan_pid, child_pid) %in% ps::ps_pids()) && Sys.time() < deadline
+  ) {
     later::run_now(0.01)
     gc()
   }
   expect_false(orphan_pid %in% ps::ps_pids())
+  expect_false(child_pid %in% ps::ps_pids())
 })
 
 test_that("grid and patchwork compositions yield native figures and widgets fail explicitly", {

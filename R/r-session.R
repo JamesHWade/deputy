@@ -97,14 +97,6 @@ RSession <- R6::R6Class(
       private$id <- new_deputy_id("r_session_")
       private$resource <- new.env(parent = emptyenv())
       private$resource$worker <- NULL
-      finalizer <- function(resource) {
-        if (!is.null(resource$worker)) {
-          try(resource$worker$kill_tree(), silent = TRUE)
-          try(resource$worker$close(grace = 0), silent = TRUE)
-        }
-      }
-      environment(finalizer) <- baseenv()
-      reg.finalizer(private$resource, finalizer, onexit = TRUE)
       invisible(self)
     },
 
@@ -326,7 +318,10 @@ RSession <- R6::R6Class(
               options = callr::r_session_options(
                 libpath = .libPaths(),
                 user_profile = FALSE,
-                system_profile = FALSE
+                system_profile = FALSE,
+                # Let processx finalize its own native resources. Calling
+                # callr$close() from an R finalizer can re-enter pipe cleanup.
+                extra = list(cleanup_tree = TRUE)
               ),
               wait = FALSE
             )
