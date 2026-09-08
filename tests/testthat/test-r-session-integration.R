@@ -71,6 +71,24 @@ test_that("Agent sends native plots with bounded text and preserves saved displa
   portable <- callr::r(
     function(path) {
       saved <- readRDS(path)
+      # Independently verify the portable identity in a fresh R process.
+      identity <- function(value) {
+        if (inherits(value, "ellmer::Content")) {
+          return(list(
+            type = "content",
+            classes = class(value),
+            properties = identity(S7::props(value))
+          ))
+        }
+        if (is.list(value)) {
+          return(list(
+            type = "list",
+            attributes = attributes(value),
+            items = lapply(value, identity)
+          ))
+        }
+        list(type = "value", value = value)
+      }
       contents <- unlist(
         lapply(saved$turns, function(x) x@contents),
         recursive = FALSE
@@ -89,7 +107,7 @@ test_that("Agent sends native plots with bounded text and preserves saved displa
             identical(
               envelope$sha256,
               digest::digest(
-                serialize(envelope$value, NULL, version = 3),
+                serialize(identity(envelope$value), NULL, version = 3),
                 algo = "sha256",
                 serialize = FALSE
               )

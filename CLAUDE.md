@@ -437,6 +437,8 @@ other concurrent hosts.
 disposal. It is bound to Agent/session identity, cwd and fixed run context.
 Cancellation discards live variables; saved turns preserve code, output and
 plots, not resumable R state. Native image/text bounds preserve display extras.
+Native artifact digests use content types and public properties, excluding
+mutable S7 class environments; legacy value digests remain supported.
 See `dev/conversation-r-runtime.md` for host lifecycle and recovery contracts.
 `evaluate`, `grDevices` and `htmltools` support capture and escaped displays;
 shinychat remains optional. This is not an OS security sandbox.

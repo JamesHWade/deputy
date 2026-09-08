@@ -38,6 +38,35 @@ project_tool_content <- function(
   value
 }
 
+# Native evidence identities contain public properties and type tags, never the
+# mutable S7 constructor and validator environments retained by R serialization.
+native_content_identity <- function(value) {
+  if (inherits(value, "ellmer::Content")) {
+    return(list(
+      type = "content",
+      classes = class(value),
+      properties = native_content_identity(S7::props(value))
+    ))
+  }
+  if (is.list(value)) {
+    return(list(
+      type = "list",
+      attributes = attributes(value),
+      items = lapply(value, native_content_identity)
+    ))
+  }
+  list(type = "value", value = value)
+}
+
+serialize_tool_result_value <- function(value, format = NULL) {
+  if (identical(format, "native-content-v1")) {
+    value <- native_content_identity(value)
+  } else if (!is.null(format)) {
+    cli_abort("Offloaded tool result has an unsupported value format")
+  }
+  serialize(value, NULL, version = 3)
+}
+
 # Bound model-facing native content independently of host-facing display data.
 # Public property serialization avoids counting S7 class environments as payload.
 rich_content_bytes <- function(content) {

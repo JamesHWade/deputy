@@ -342,7 +342,8 @@ offload_tool_result <- function(
     return(NULL)
   }
 
-  serialized <- serialize(value, NULL, version = 3)
+  value_format <- if (public_content) "native-content-v1" else NULL
+  serialized <- serialize_tool_result_value(value, value_format)
   bytes <- length(serialized)
   if (!force && bytes <= threshold) {
     return(NULL)
@@ -381,7 +382,8 @@ offload_tool_result <- function(
       text_sha256 = text_stats$sha256,
       text_format = if (public_content) "public-content-v1" else NULL,
       created_at = Sys.time(),
-      value = value
+      value = value,
+      value_format = value_format
     )
     temporary <- tempfile("result-", tmpdir = directory, fileext = ".rds")
     on.exit(unlink(temporary), add = TRUE)
@@ -519,7 +521,7 @@ validate_tool_result_envelope <- function(
   session_id = NULL
 ) {
   serialized <- if (is.list(envelope) && "value" %in% names(envelope)) {
-    serialize(envelope$value, NULL, version = 3)
+    serialize_tool_result_value(envelope$value, envelope$value_format)
   } else {
     NULL
   }

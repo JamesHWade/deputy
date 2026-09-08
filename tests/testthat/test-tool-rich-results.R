@@ -228,3 +228,38 @@ test_that("canonical result references validate both payload and text digests", 
     "other-session"
   ))
 })
+
+test_that("native artifact integrity ignores formatter caches but detects content edits", {
+  content <- local({
+    cache <- new.env(parent = emptyenv())
+    cache$count <- 0L
+    cls <- S7::new_class(
+      "CachedNativeText",
+      parent = ellmer::ContentText,
+      validator = function(self) {
+        cache$count
+        NULL
+      }
+    )
+    S7::method(format, cls) <- function(x, ...) {
+      cache$count <- cache$count + 1L
+      x@text
+    }
+    cls(text = strrep("evidence ", 100L))
+  })
+  policy <- ContextPolicy(
+    max_tool_result_bytes = 100L,
+    offload_dir = withr::local_tempdir()
+  )
+  bounded <- bound_rich_tool_result(
+    ellmer::ContentToolResult(value = list(content)),
+    "source_read",
+    policy,
+    "session",
+    "agent"
+  )
+  envelope <- validate_tool_result_envelope(readRDS(bounded$record$path))
+  expect_identical(envelope$value$content[[1L]]@text, content@text)
+  envelope$value$content[[1L]]@text <- "altered evidence"
+  expect_error(validate_tool_result_envelope(envelope), "integrity validation")
+})
