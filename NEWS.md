@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* `RSession` provides conversation-scoped trusted R workers with persistent
+  variables, ordered console and plot results, queued calls, cancellation and
+  explicit state-loss recovery. Native rich tool results now obey separate
+  text and image context allowances while retaining full display evidence
+  and offload artifacts (#143).
+
 * `mcp_repl_connection()` gives an Agent an independent sandboxed mcp-repl
   session. `mcp_repl_control()` requests upstream interrupt/reset controls and
   preserves their reported outcomes. Agent interruption cancels active owned

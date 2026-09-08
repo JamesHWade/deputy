@@ -216,7 +216,12 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       private$should_stop <- TRUE
       private$stop_reason_from_hook <- reason
       cancel_active_mcp_tools(
-        c(private$.chat$get_tools(), private$active_mcp_tools),
+        c(private$.chat$get_tools(), private$active_owned_tools),
+        self,
+        private$effective_run_context()
+      )
+      cancel_active_r_session_tools(
+        c(private$.chat$get_tools(), private$active_owned_tools),
         self,
         private$effective_run_context()
       )

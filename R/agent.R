@@ -1763,7 +1763,7 @@ Agent <- R6::R6Class(
       stop_reason_from_hook = NULL,
 
       # Pending executions retain cancellation even if registered tools change.
-      active_mcp_tools = list(),
+      active_owned_tools = list(),
 
       # Run-scoped tracing and usage state.
       run_active = FALSE,
@@ -1805,7 +1805,7 @@ Agent <- R6::R6Class(
       clone_client = function(deep = FALSE) {
         invisible(deep)
         cloned <- private$.r6_clone(deep = TRUE)
-        cloned$.__enclos_env__$private$active_mcp_tools <- list()
+        cloned$.__enclos_env__$private$active_owned_tools <- list()
         cloned$.__enclos_env__$private$rewire_chat_runtime()
         cloned$.__enclos_env__$private$.compaction_artifacts <- NULL
         register_compaction_catalog_owner(
@@ -1880,6 +1880,7 @@ Agent <- R6::R6Class(
 
       adapt_tool = function(tool) {
         validate_mcp_tool_owner(tool, self)
+        validate_r_session_tool_owner(tool, self)
         if (inherits(tool, "ellmer::ToolBuiltIn")) {
           if (!is.null(private$.approval_dir)) {
             approval_abort(
@@ -1966,6 +1967,11 @@ Agent <- R6::R6Class(
 
       execute_tool = function(tool, arguments) {
         validate_mcp_tool_owner(tool, self, private$effective_run_context())
+        validate_r_session_tool_owner(
+          tool,
+          self,
+          private$effective_run_context()
+        )
         workspace_runner <- attr(
           tool,
           "deputy_workspace_runner",
@@ -1976,16 +1982,17 @@ Agent <- R6::R6Class(
         }
         source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||%
           tool
-        cancel <- attr(source, "deputy_mcp_cancel_active", exact = TRUE)
+        cancel <- attr(source, "deputy_mcp_cancel_active", exact = TRUE) %||%
+          attr(source, "deputy_r_session_cancel_active", exact = TRUE)
         if (!is.function(cancel)) {
           return(do.call(tool, arguments))
         }
-        id <- new_deputy_id("mcp_call_")
-        private$active_mcp_tools[[id]] <- source
+        id <- new_deputy_id("owned_call_")
+        private$active_owned_tools[[id]] <- source
         pending <- FALSE
         on.exit({
           if (!pending) {
-            private$active_mcp_tools[[id]] <- NULL
+            private$active_owned_tools[[id]] <- NULL
           }
         })
         value <- do.call(tool, arguments)
@@ -1993,7 +2000,7 @@ Agent <- R6::R6Class(
           return(value)
         }
         result <- promises::finally(value, function() {
-          private$active_mcp_tools[[id]] <- NULL
+          private$active_owned_tools[[id]] <- NULL
         })
         pending <- TRUE
         result
@@ -2003,13 +2010,24 @@ Agent <- R6::R6Class(
         if (identical(tool_name, "deputy_read_tool_result")) {
           return(value)
         }
-        record <- offload_tool_result(
-          value = value,
-          tool_name = tool_name,
-          policy = private$.context_policy,
-          session_id = private$.session_id,
-          agent_id = private$.agent_id
+        rich <- bound_rich_tool_result(
+          value,
+          tool_name,
+          private$.context_policy,
+          private$.session_id,
+          private$.agent_id
         )
+        record <- if (!is.null(rich)) {
+          rich$record
+        } else {
+          offload_tool_result(
+            value = value,
+            tool_name = tool_name,
+            policy = private$.context_policy,
+            session_id = private$.session_id,
+            agent_id = private$.agent_id
+          )
+        }
         if (is.null(record)) {
           return(value)
         }
@@ -2027,9 +2045,15 @@ Agent <- R6::R6Class(
           result_sha256 = record$sha256
         )
         if (is_nonempty_string(execution_id)) {
-          private$original_tool_results[[execution_id]] <- value
+          private$original_tool_results[[execution_id]] <- if (
+            inherits(value, "ellmer::ContentToolResult")
+          ) {
+            value@value
+          } else {
+            value
+          }
         }
-        tool_result_reference_text(record)
+        if (!is.null(rich)) rich$result else tool_result_reference_text(record)
       },
 
       ensure_tool_result_reader = function() {

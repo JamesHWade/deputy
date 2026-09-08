@@ -46,6 +46,10 @@ deputy/
 │   ├── skills.R            # Explicit Skill file and tool loading
 │   ├── tools-files.R       # Native filesystem tools
 │   ├── tools-documents.R   # Document conversion
+│   ├── r-session.R        # Conversation-scoped trusted R worker owner
+│   ├── r-session-worker.R # Ordered evaluate output and plot capture
+│   ├── r-session-result.R # Native ellmer content and portable display evidence
+│   ├── tool-rich-results.R # Independent native text and image context bounds
 │   ├── tools-execution.R   # Trusted one-shot R and shell tools
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
@@ -425,6 +429,17 @@ Concurrent and hosted Agents bind their own handler with
 values and may be resolved lazily. `set_ask_user_callback()` is only a legacy
 process-wide fallback for single-Agent scripts; do not use it for Shiny or
 other concurrent hosts.
+
+### Conversation R workers
+
+`RSession$new(agent)` owns a lazy persistent trusted callr worker; register
+`$tools()` for governed `run_r_code` calls and close the owner at conversation
+disposal. It is bound to Agent/session identity, cwd and fixed run context.
+Cancellation discards live variables; saved turns preserve code, output and
+plots, not resumable R state. Native image/text bounds preserve display extras.
+See `dev/conversation-r-runtime.md` for host lifecycle and recovery contracts.
+`evaluate`, `grDevices` and `htmltools` support capture and escaped displays;
+shinychat remains optional. This is not an OS security sandbox.
 
 ### Tool Presets
 
