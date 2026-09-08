@@ -93,10 +93,12 @@ test_that("base and ggplot2 figures preserve drawing updates and ordered conditi
 test_that("timeouts and cancellation discard dependent queued code and restart honestly", {
   directory <- withr::local_tempdir()
   agent <- Agent$new(chat = create_mock_chat(), working_dir = directory)
-  session <- RSession$new(agent, timeout = 1)
+  # Instrumented workers need time to initialize even for a simple expression.
+  session <- RSession$new(agent, timeout = 10)
   withr::defer(session$close())
-  r_session_await(session$run("x <- 2"))
-  timed <- session$run("Sys.sleep(5)")
+  initial <- r_session_await(session$run("x <- 2"))
+  expect_identical(initial@extra$deputy_r$outcome, "complete")
+  timed <- session$run("Sys.sleep(60)")
   queued <- session$run("file.create('must-not-exist')")
   expect_identical(r_session_await(timed)@extra$deputy_r$outcome, "timed_out")
   expect_identical(
@@ -105,6 +107,7 @@ test_that("timeouts and cancellation discard dependent queued code and restart h
   )
   expect_identical(file.exists(file.path(directory, "must-not-exist")), FALSE)
   restarted <- r_session_await(session$run("exists('x')"))
+  expect_identical(restarted@extra$deputy_r$outcome, "complete")
   expect_match(r_session_text(restarted), "FALSE")
   expect_match(r_session_text(restarted), "timed_out")
   expect_identical(restarted@extra$deputy_r$generation, 2L)
