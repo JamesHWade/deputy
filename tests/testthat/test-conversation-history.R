@@ -95,7 +95,7 @@ test_that("native shinychat history retains later replies across repeated compac
           agent$stream_async(prompt, stream = "content"),
           session = session
         ),
-        timeout = 10
+        max_polls = 1000L
       )
     })
     session$flushReact()
