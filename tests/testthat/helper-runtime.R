@@ -215,7 +215,7 @@ collect_async_stream <- function(stream) {
   result
 }
 
-resolve_async_value <- function(promise) {
+resolve_async_value <- function(promise, max_polls = 100L) {
   result <- NULL
   stream_error <- NULL
   done <- FALSE
@@ -230,7 +230,7 @@ resolve_async_value <- function(promise) {
       done <<- TRUE
     })
 
-  for (i in seq_len(100)) {
+  for (i in seq_len(max_polls)) {
     if (done) {
       break
     }

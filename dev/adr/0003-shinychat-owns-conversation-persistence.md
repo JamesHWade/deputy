@@ -11,9 +11,10 @@ is available.
 
 ## Why
 
-An Agent's compacted context and session snapshot are not a complete conversation
-archive. A host must retain original evidence independently if later runs need
-to recover it. Coupling this boundary to an unreleased shinychat API would block
+An Agent's compacted model context is not a complete conversation archive.
+ADR-0017 separates it from the retained selected transcript and includes both in
+explicit snapshots. A host owns durable retention and authorized retrieval of
+original evidence. Coupling this boundary to an unreleased shinychat API would block
 headless workers and history-recovery work that already runs with caller-owned
 records and released ellmer APIs.
 
@@ -32,8 +33,8 @@ It does not introduce a Deputy conversation database or copy shinychat's tree.
 - Retrieved history supplies evidence. Current host policy supplies execution
   authority; conversation text and saved metadata cannot restore permissions.
 - `Agent$save_session()` and `load_session()` remain supported execution
-  snapshots. Removed turns are recoverable only if the host retained them
-  independently. Session IDs and host conversation IDs require explicit mapping.
+  snapshots. Schema 3 retains compacted turns alongside working context; the host owns
+  the snapshot lifecycle and durable history. Session IDs and host conversation IDs require explicit mapping.
 - Branch restoration and hosted resume must be proved against the chosen host's
   history producer. The recovery fixture alone does not establish durable
   storage, branch editing or restart behavior for a production host.
@@ -41,7 +42,7 @@ It does not introduce a Deputy conversation database or copy shinychat's tree.
 ## Optional shinychat integration
 
 Await the upstream outcome tracked in #66 and
-[`dev/shinychat-history-consumer.md`](../shinychat-history-consumer.md). Only the
+[`dev/shinychat-history-consumer.md`](../shinychat-history-consumer.md). Only the headless
 adapter is gated on a supported, released public R contract and focused
 integration tests under ADR-0004. Use public APIs; do not depend on private tree
 fields or store helpers. A future adapter must preserve the same authorization,
@@ -50,3 +51,7 @@ revision and bounded-read behavior as other host-supplied history.
 Implementation and evaluation under #112 can proceed independently. Live-model
 quality conclusions still require authorized repeated trials; removing the
 shinychat prerequisite does not supply that evidence.
+
+Native Chat-protocol history does not need the headless adapter. ADR-0017 fixes
+#146 by retaining the complete selected conversation in `Agent$get_turns()`
+while model context remains compacted. shinychat still owns its store and tree.

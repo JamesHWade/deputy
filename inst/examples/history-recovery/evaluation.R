@@ -140,7 +140,7 @@ history_budget <- function(
     input <- list(
       prompt = prompt,
       system_prompt = agent$get_system_prompt(),
-      turns = lapply(agent$get_turns(), function(turn) {
+      turns = lapply(agent$get_context_turns(), function(turn) {
         cli::ansi_strip(format(turn))
       })
     )
@@ -498,13 +498,13 @@ history_prepare <- function(
   }
   list(
     fixture = fixture,
-    turns = agent$get_turns(),
+    turns = agent$get_context_turns(),
     system_prompt = agent$get_system_prompt(),
     summaries = compactions,
     summary_id = digest::digest(
       list(
         system_prompt = agent$get_system_prompt(),
-        turns = lapply(agent$get_turns(), format)
+        turns = lapply(agent$get_context_turns(), format)
       ),
       algo = "sha256"
     )

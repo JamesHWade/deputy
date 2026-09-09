@@ -206,9 +206,12 @@ retire_compaction_catalogs <- function(
     references <- c(
       references,
       compaction_tool_result_references(owner$get_system_prompt()),
-      compaction_embedded_references(lapply(owner$get_turns(), function(turn) {
-        turn@contents
-      }))
+      compaction_embedded_references(lapply(
+        owner$get_context_turns(),
+        function(turn) {
+          turn@contents
+        }
+      ))
     )
   }
   retained <- vapply(references, parse_tool_result_reference, character(1))
@@ -736,6 +739,10 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       old_prompt <- private$.chat$get_system_prompt()
       old_tools <- if (needs_reader) private$.chat$get_tools()
       had_reader <- private$.tool_result_reader_registered
+      compacted_turns <- c(
+        private$.compacted_turns,
+        portable_session_turns(plan$turns_to_compact)
+      )
       tryCatch(
         {
           private$.chat$set_system_prompt(new_system)
@@ -753,6 +760,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           rlang::cnd_signal(error)
         }
       )
+      private$.compacted_turns <- compacted_turns
       private$.compaction_summary <- summary
       if (!is.null(private$.compaction_artifacts)) {
         private$.compaction_artifacts$installed <- TRUE

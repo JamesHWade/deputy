@@ -4,8 +4,9 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
   list(
     build_session_payload = function() {
       list(
-        schema_version = 2L,
+        schema_version = 3L,
         turns = portable_session_turns(private$.chat$get_turns()),
+        compacted_turns = portable_session_turns(private$.compacted_turns),
         system_prompt = private$.chat$get_system_prompt(),
         compaction_summary = private$.compaction_summary,
         tool_result_envelopes = collect_tool_result_envelopes(
@@ -48,15 +49,16 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
         )
       }
 
-      if (!identical(session$schema_version, 2L)) {
+      if (!identical(session$schema_version, 3L)) {
         abort_session_load(
-          "Unsupported session schema - expected version 2",
+          "Unsupported session schema - expected version 3",
           path = source
         )
       }
 
       required_fields <- c(
         "turns",
+        "compacted_turns",
         "system_prompt",
         "compaction_summary",
         "tool_result_envelopes",
@@ -89,6 +91,25 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
           path = source
         )
       }
+      if (
+        !is.list(session$compacted_turns) ||
+          !all(vapply(
+            session$compacted_turns,
+            function(turn) {
+              S7::S7_inherits(turn, ellmer::UserTurn) ||
+                S7::S7_inherits(turn, ellmer::AssistantTurn)
+            },
+            logical(1)
+          ))
+      ) {
+        abort_session_load(
+          "Invalid session file - compacted_turns must be a list of conversation turns",
+          path = source
+        )
+      }
+      restored_compacted_turns <- portable_session_turns(
+        session$compacted_turns
+      )
       if (
         !is.null(session$system_prompt) &&
           (!is.character(session$system_prompt) ||
@@ -232,6 +253,7 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       private$last_run_context <- clone_run_context(restored_run_context)
       private$appended_hook_context_hashes <- restored_hashes
       private$.compaction_summary <- session$compaction_summary
+      private$.compacted_turns <- restored_compacted_turns
     }
   )
 }

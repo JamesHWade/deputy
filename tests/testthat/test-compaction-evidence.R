@@ -758,7 +758,7 @@ test_that("compaction keeps growing recovery sets behind a bounded catalog", {
       replace_set_turns(original_set_turns)
       after <- snapshot()
       expect_identical(agent$get_system_prompt(), before$system_prompt)
-      expect_identical(agent$get_turns(), before$turns)
+      expect_identical(agent$get_context_turns(), before$turns)
       expect_identical(
         names(after$tool_result_envelopes),
         names(before$tool_result_envelopes)

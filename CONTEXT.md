@@ -37,11 +37,15 @@ A single exchange within a run — one model response and any tool calls it requ
 _Avoid_: step, iteration, round
 
 **Conversation snapshot**:
-The serialized contents of an Agent's conversation, written to and read from disk by `save_session()` and `load_session()`. Concerns what was said, not who is saying it.
+The serialized contents of an Agent's selected conversation and model context,
+written to and read from disk by `save_session()` and `load_session()`. Concerns
+what was said, not who is saying it. The host owns durable storage and branches.
 _Avoid_: session, session file, saved session, conversation state
 
 **Compaction**:
-Replacing older turns with a summary to reduce context size, preserving the thread of the conversation while discarding its detail.
+Replacing older turns in model context with a summary to reduce input size.
+The complete selected conversation remains available through `get_turns()`;
+`get_context_turns()` exposes only the current model context.
 _Avoid_: truncation, pruning, summarization
 
 **Checkpoint**:

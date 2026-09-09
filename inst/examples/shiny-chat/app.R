@@ -2,7 +2,10 @@ library(shiny)
 library(deputy)
 library(shinychat)
 
+source("compaction-notice.R", local = TRUE)
+
 ui <- bslib::page_fluid(
+  compaction_notice_ui("compaction"),
   chat_ui("chat", fill = TRUE)
 )
 
@@ -16,7 +19,7 @@ server <- function(input, output, session) {
   # Deputy adds permissions and hooks on top of the ellmer chat
   agent <- Agent$new(
     chat = chat,
-    tools = c(tools_file(), tools_data()),
+    tools = c(tools_file(), list(tool_read_csv)),
     permissions = Permissions(
       file_read = TRUE,
       file_write = FALSE,
@@ -28,7 +31,8 @@ server <- function(input, output, session) {
 
   # Agent is a drop-in ellmer chat. shinychat owns input, attachments,
   # cancellation, and history while Deputy governs every run.
-  chat_server("chat", agent)
+  chat_module <- chat_server("chat", agent)
+  compaction_notice_server("compaction", agent, chat_module, session)
 }
 
 shinyApp(ui, server)

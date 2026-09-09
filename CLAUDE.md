@@ -356,6 +356,14 @@ fallback Chats never select the task provider or inherit executable tools and
 callbacks. Installing a compacted window preserves prior usage and completed
 tool effects. Manual `compact()` remains synchronous. Evaluation cases and the
 future history-retrieval comparison are described in `dev/compaction-evaluation.md`.
+`Agent$get_turns()` and `turns()` expose the complete selected conversation;
+`get_context_turns()` exposes the compacted model input. Accepted compaction
+retains removed turns as a portable in-memory prefix, without executable tool
+references. `set_turns()` replaces both views and clears the installed summary.
+Snapshot schema 3 preserves the prefix and context separately. Hosts still own
+durable storage and branch identity; native shinychat history can use its normal
+Chat protocol without disabling compaction. See ADR-0017. Context/usage logic
+must inspect the wrapped Chat or `get_context_turns()`, not `get_turns()`.
 Compaction projects ellmer Content objects to public evidence before offloading,
 and bounds potential rendered expansion as well as serialized size. Generated
 summaries preserve up to eight direct recovery references; larger sets use one

@@ -443,7 +443,7 @@ test_that("manual save and load preserve run context", {
     product = "tempest",
     research_run_id = "research-123"
   )
-  expect_identical(payload$schema_version, 2L)
+  expect_identical(payload$schema_version, 3L)
   expect_identical(payload$run_context, expected)
 
   restored_chat <- create_mock_chat()
@@ -536,8 +536,9 @@ test_that("unsafe restored context is rejected before conversation mutation", {
     path <- file.path(root, paste0(case_name, ".rds"))
     saveRDS(
       list(
-        schema_version = 2L,
+        schema_version = 3L,
         turns = unsafe_turns,
+        compacted_turns = list(),
         system_prompt = "Unsafe prompt",
         compaction_summary = NULL,
         tool_result_envelopes = list(),
