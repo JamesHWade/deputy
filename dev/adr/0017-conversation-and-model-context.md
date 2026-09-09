@@ -63,7 +63,11 @@ exchanges. Tests require all 54 turns after save/switch/restore, smaller provide
 requests, unchanged tool-effect counts, native branch editing and navigation,
 fresh-session restoration, and workspace-scope isolation. Runtime-only tests
 cover both views, empty context, cloning, replacement, snapshot validation, and
-saved native plot evidence without executable tool references.
+saved native plot evidence without executable tool references. A durable approval
+regression compacts an already completed effect, pauses a later effect, restores
+display evidence without consuming approval, then explicitly resumes once.
+Approval records encode both turn lists as portable ellmer records and replay
+the compacted prefix without executable tools.
 
 The native store integration is optional: tests skip it when the installed
 shinychat lacks its public history exports. Core transcript behavior is covered

@@ -882,9 +882,13 @@ Agent <- R6::R6Class(
     #' @return A Turn object or NULL
     last_turn = function(role = c("assistant", "user", "system")) {
       role <- match.arg(role)
+      current <- private$.chat$last_turn(role = role)
+      if (!is.null(current)) {
+        return(current)
+      }
       turns <- Filter(
         function(turn) identical(turn@role, role),
-        self$get_turns(include_system_prompt = identical(role, "system"))
+        private$.compacted_turns
       )
       if (length(turns)) tail(turns, 1L)[[1L]] else NULL
     },
