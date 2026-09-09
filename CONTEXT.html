@@ -68,8 +68,8 @@
 <h3 id="conversation-state">Conversation state<a class="anchor" aria-label="anchor" href="#conversation-state"></a></h3>
 <p><strong>Run</strong>: One invocation of an Agent against a task, ending when the model stops, a limit is reached, or it is interrupted. An Agent may perform many runs over its lifetime. <em>Avoid</em>: execution, invocation, call</p>
 <p><strong>Turn</strong>: A single exchange within a run — one model response and any tool calls it requested. <em>Avoid</em>: step, iteration, round</p>
-<p><strong>Conversation snapshot</strong>: The serialized contents of an Agent’s conversation, written to and read from disk by <code>save_session()</code> and <code>load_session()</code>. Concerns what was said, not who is saying it. <em>Avoid</em>: session, session file, saved session, conversation state</p>
-<p><strong>Compaction</strong>: Replacing older turns with a summary to reduce context size, preserving the thread of the conversation while discarding its detail. <em>Avoid</em>: truncation, pruning, summarization</p>
+<p><strong>Conversation snapshot</strong>: The serialized contents of an Agent’s selected conversation and model context, written to and read from disk by <code>save_session()</code> and <code>load_session()</code>. Concerns what was said, not who is saying it. The host owns durable storage and branches. <em>Avoid</em>: session, session file, saved session, conversation state</p>
+<p><strong>Compaction</strong>: Replacing older turns in model context with a summary to reduce input size. The complete selected conversation remains available through <code>get_turns()</code>; <code>get_context_turns()</code> exposes only the current model context. <em>Avoid</em>: truncation, pruning, summarization</p>
 <p><strong>Checkpoint</strong>: A recorded state of the files in the workspace, restorable by rewinding. Concerns the filesystem, never the conversation. <em>Avoid</em>: snapshot, save point</p>
 </div>
 <div class="section level3">

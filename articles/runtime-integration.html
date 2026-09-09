@@ -179,8 +179,24 @@ budget before task execution.</p>
 usage, and destination attempts. Request and fallback events use
 <code>phase = "compaction"</code> for summary work. Manual
 <code>agent$compact()</code> keeps its synchronous, active-Chat-only
-contract. Removed turns are not archived by this policy; host-owned
-history retrieval remains a separate integration.</p>
+contract. <code>agent$get_turns()</code> and <code>agent$turns()</code>
+retain the complete selected conversation across compaction.
+<code>agent$get_context_turns()</code> returns only the smaller model
+context. The model receives that context and its installed summary;
+retaining the display transcript does not send old turns back to the
+provider.</p>
+<p>The retained prefix lives in memory and grows with the selected
+conversation. The host still owns durable history storage, conversation
+identity, and branches. <code>set_turns()</code> selects a replacement
+conversation, clears the old prefix and summary, and uses the supplied
+turns as context. Automatic compaction can reduce that restored context
+before the next request. A host needing retrieval can expose authorized
+bounded reads separately; transcript text grants no authority.</p>
+<p><code>save_session()</code> uses snapshot schema 3 to preserve both
+views without executable tool references. <code>load_session()</code>
+restores them under the receiving Agent’s permissions. Older development
+snapshot schemas are rejected; restore existing native conversation
+history through its host, then create a new snapshot.</p>
 <p>LeadAgent’s fallback policy applies to the lead. Child definitions
 inherit the selected provider and do not implicitly gain additional
 destinations.</p>

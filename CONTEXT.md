@@ -41,13 +41,15 @@ call
 tool calls it requested. *Avoid*: step, iteration, round
 
 **Conversation snapshot**: The serialized contents of an Agent’s
-conversation, written to and read from disk by `save_session()` and
-`load_session()`. Concerns what was said, not who is saying it. *Avoid*:
+selected conversation and model context, written to and read from disk
+by `save_session()` and `load_session()`. Concerns what was said, not
+who is saying it. The host owns durable storage and branches. *Avoid*:
 session, session file, saved session, conversation state
 
-**Compaction**: Replacing older turns with a summary to reduce context
-size, preserving the thread of the conversation while discarding its
-detail. *Avoid*: truncation, pruning, summarization
+**Compaction**: Replacing older turns in model context with a summary to
+reduce input size. The complete selected conversation remains available
+through `get_turns()`; `get_context_turns()` exposes only the current
+model context. *Avoid*: truncation, pruning, summarization
 
 **Checkpoint**: A recorded state of the files in the workspace,
 restorable by rewinding. Concerns the filesystem, never the

@@ -50,6 +50,7 @@ Inherited methods
 - [`Agent$checkpoint()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-checkpoint)
 - [`Agent$compact()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-compact)
 - [`Agent$cost()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-cost)
+- [`Agent$get_context_turns()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_context_turns)
 - [`Agent$get_cost()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_cost)
 - [`Agent$get_model()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_model)
 - [`Agent$get_model_object()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_model_object)

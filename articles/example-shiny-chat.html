@@ -137,6 +137,44 @@ finishes, <code>agent$last_run()</code> exposes the corresponding
 <p><code>chat_server()</code> passes both plain text and
 attachment-enabled ellmer content to the Agent unchanged. It also
 supplies shinychat history and cancellation around Deputy’s stream.</p>
+<p>Compaction and native conversation history can be enabled together.
+Deputy’s <code>get_turns()</code> supplies the complete selected
+conversation to shinychat, while <code>get_context_turns()</code>
+exposes only the compacted model context. Later completed replies remain
+available when the user switches conversations or restores a branch.
+Native history requires a shinychat version exporting
+<code>history_options()</code> and <code>FileConversationStore</code>;
+Deputy’s transcript contract also works without shinychat. Hosts that
+previously rejected a non-NULL <code>ContextPolicy(max_tokens)</code>
+with native history can remove that workaround when using this
+implementation.</p>
+</div>
+<div class="section level2">
+<h2 id="showing-compaction-to-users">Showing compaction to users<a class="anchor" aria-label="anchor" href="#showing-compaction-to-users"></a>
+</h2>
+<p>The runnable <code>inst/examples/shiny-chat/</code> app includes a
+host-owned compaction notice above the transcript. While summarization
+runs it says “Summarizing earlier messages…”. After successful
+installation it says “Earlier messages summarized for the assistant.
+Your full conversation is still available.” An expandable “View summary”
+shows the accepted summary as escaped text, alongside an explanation
+that the assistant uses it with recent messages and that some earlier
+details may be omitted.</p>
+<p>The notice does not add, hide, or replace chat messages.
+<code>PreCompact</code> and <code>PostCompact</code> hooks update its
+state; a <code>Stop</code> hook clears the busy indication after an
+automatic run fails or is interrupted, while retaining any previously
+accepted summary. Register custom compaction-veto hooks before this
+notice so their early return prevents the progress indication. Hosts
+that call <code>agent$compact()</code> directly must also clear progress
+when that call ends, including errors or vetoes; a manual call does not
+fire the run’s <code>Stop</code> hook. The example scopes the notice to
+shinychat’s public conversation ID and clears it through
+<code>history$on_restore()</code>, including branch navigation. Native
+history restores the complete transcript rather than the compacted
+context, so the notice stays hidden until compaction happens again. This
+presentation belongs to the host; Deputy does not insert UI messages
+into its conversation record.</p>
 </div>
 <div class="section level2">
 <h2 id="what-the-agent-adds">What the Agent Adds<a class="anchor" aria-label="anchor" href="#what-the-agent-adds"></a>
