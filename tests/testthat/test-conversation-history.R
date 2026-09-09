@@ -86,7 +86,35 @@ test_that("native shinychat history retains later replies across repeated compac
     ),
     session = session
   )
+  notice_example <- new.env(parent = baseenv())
+  sys.source(
+    system.file(
+      "examples",
+      "shiny-chat",
+      "compaction-notice.R",
+      package = "deputy"
+    ),
+    envir = notice_example
+  )
+  shiny::withReactiveDomain(session, {
+    notice_example$compaction_notice_server(
+      "compaction",
+      agent,
+      module,
+      session
+    )
+  })
+  busy_notices <- character()
+  agent$add_hook(HookMatcher(
+    event = "PreCompact",
+    callback = function(...) {
+      session$flushReact()
+      busy_notices <<- c(busy_notices, session$getOutput("compaction")$html)
+      NULL
+    }
+  ))
   session$setInputs(chat_history_browser_token = "browser-a")
+  expect_null(session$getOutput("compaction"))
   append <- function(prompt) {
     shiny::withReactiveDomain(session, {
       resolve_async_value(
@@ -107,6 +135,17 @@ test_that("native shinychat history retains later replies across repeated compac
   compact_now <- TRUE
   append("First later question")
   append("Second later question")
+  expect_gt(length(busy_notices), 0L)
+  expect_true(all(grepl("Summarizing earlier messages", busy_notices)))
+  notice_html <- session$getOutput("compaction")$html
+  expect_match(
+    notice_html,
+    "Your full conversation is still available",
+    fixed = TRUE
+  )
+  expect_match(notice_html, "<summary>View summary</summary>", fixed = TRUE)
+  expect_match(notice_html, "Retain the evidence.", fixed = TRUE)
+  expect_false(grepl("Summarizing earlier messages", notice_html))
   expect_identical(effects, 2L)
   expect_length(agent$get_turns(), 54L)
   expect_lt(length(chat$get_turns()), 54L)
@@ -129,12 +168,14 @@ test_that("native shinychat history retains later replies across repeated compac
   )
   expected <- lapply(agent$get_turns(), ellmer::contents_record)
   session$setInputs(chat_history_new = 1L)
+  expect_null(session$getOutput("compaction"))
   expect_length(agent$get_turns(), 0L)
   compact_now <- FALSE
   append("Unrelated question")
   other_id <- shiny::isolate(module$history$conversation_id())
   expect_identical(identical(other_id, original_id), FALSE)
   session$setInputs(chat_history_select = list(id = original_id))
+  expect_null(session$getOutput("compaction"))
   expect_length(agent$get_turns(), 54L)
   expect_identical(lapply(agent$get_turns(), ellmer::contents_record), expected)
   expect_identical(effects, 2L)
@@ -145,6 +186,7 @@ test_that("native shinychat history retains later replies across repeated compac
   session$setInputs(
     chat_message_edit = list(index = 46L, content = "Alternate later question")
   )
+  expect_null(session$getOutput("compaction"))
   expect_length(agent$get_turns(), 46L)
   append("Alternate later question")
   alternate <- lapply(agent$get_turns(), ellmer::contents_record)

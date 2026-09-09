@@ -1,3 +1,36 @@
+test_that("native shinychat input reaches the Agent through dynamic dots", {
+  skip_if_not_installed("shinychat")
+  skip_if_not("chat_server" %in% getNamespaceExports("shinychat"))
+  server <- local_runtime_server(list(runtime_reply("Governed reply")))
+  agent <- Agent$new(runtime_chat(server))
+  session <- shiny::MockShinySession$new()
+  withr::defer(session$close())
+  shiny::withReactiveDomain(session, {
+    module <- shinychat::chat_server(
+      "chat",
+      agent,
+      history = FALSE,
+      session = session
+    )
+    session$setInputs(chat_user_input = list("Hello", "Second content part"))
+    for (poll in seq_len(1000L)) {
+      later::run_now(0.01)
+      session$flushReact()
+      if (!identical(shiny::isolate(module$status()), "streaming")) break
+    }
+  })
+  expect_null(shiny::isolate(module$last_error()))
+  expect_identical(trimws(agent$last_run()$response), "Governed reply")
+  expect_length(server$requests(), 1L)
+  if (length(server$requests())) {
+    sent <- server$requests()[[1L]]$body$messages[[1L]]$content
+    expect_identical(
+      vapply(sent, `[[`, "", "text"),
+      c("Hello", "Second content part")
+    )
+  }
+})
+
 test_that("Agent stream_async is consumed directly by shinychat", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat")

@@ -379,7 +379,7 @@ Agent <- R6::R6Class(
         run_context
       )
       governed_run <- private$start_governed_stream(
-        messages = list(...),
+        messages = rlang::list2(...),
         limits = self$usage_limits,
         run_context = effective_run_context,
         stream = "content"
@@ -405,7 +405,7 @@ Agent <- R6::R6Class(
       run_context = list()
     ) {
       tool_mode <- match.arg(tool_mode)
-      messages <- list(...)
+      messages <- rlang::list2(...)
       effective_run_context <- merge_run_context(
         private$.run_context,
         run_context
@@ -481,7 +481,7 @@ Agent <- R6::R6Class(
         run_context
       )
       governed_run <- private$start_governed_stream(
-        messages = list(...),
+        messages = rlang::list2(...),
         limits = self$usage_limits,
         run_context = effective_run_context,
         stream = "content",
@@ -520,7 +520,7 @@ Agent <- R6::R6Class(
         run_context
       )
       governed_run <- private$start_governed_stream(
-        messages = list(...),
+        messages = rlang::list2(...),
         limits = self$usage_limits,
         run_context = effective_run_context,
         stream = stream,
@@ -562,7 +562,7 @@ Agent <- R6::R6Class(
         run_context
       )
       private$start_governed_stream(
-        messages = list(...),
+        messages = rlang::list2(...),
         limits = self$usage_limits,
         run_context = effective_run_context,
         tool_mode = tool_mode,

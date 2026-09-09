@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* The Shiny chat example shows summarization progress and an expandable accepted
+  summary without changing the transcript. Its notice follows the selected
+  conversation and clears busy status after failed or cancelled runs. Chat
+  methods now accept dynamic dots (`!!!`), including shinychat's native input
+  forwarding, and the example no longer registers overlapping tool bundles.
+
 * `Agent$get_turns()` and `turns()` retain the complete selected conversation
   across compaction, so shinychat native history keeps later replies. Use
   `get_context_turns()` to inspect the bounded model context. Snapshot schema 3
