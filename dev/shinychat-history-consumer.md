@@ -12,6 +12,21 @@ an earlier correction through bounded search/read tools. Continue this work with
 caller-owned records. Only the shinychat adapter waits for a public, released
 contract; Deputy implementation and evaluation do not depend on that outcome.
 
+## Native history and compaction (#146)
+
+Native `chat_server()` history can coexist with Deputy compaction through its
+existing Chat protocol. `Agent$get_turns()` now retains the complete selected
+conversation; `get_context_turns()` exposes the smaller model context. The
+runtime does not copy shinychat's store or call private helpers. A deterministic
+integration test uses the exported `chat_server()`, `history_options()`, and
+`FileConversationStore`, plus native UI inputs for switching and branching.
+
+The former host workaround of setting `max_tokens = NULL` with native history
+can be removed when upgrading to this implementation. Hosts restoring Deputy
+snapshots must account for schema 3; older development snapshots are rejected.
+Native host history can be restored independently and then checkpointed anew.
+This fixes native persistence, not the separate headless API request below.
+
 ## What already works
 
 At shinychat development commit

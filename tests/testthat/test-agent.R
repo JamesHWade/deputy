@@ -193,12 +193,13 @@ test_that("Agent save_session creates file", {
 
   # Check session contents
   session <- readRDS(session_file)
-  expect_identical(session$schema_version, 2L)
+  expect_identical(session$schema_version, 3L)
   expect_named(
     session,
     c(
       "schema_version",
       "turns",
+      "compacted_turns",
       "system_prompt",
       "compaction_summary",
       "tool_result_envelopes",
@@ -294,8 +295,9 @@ test_that("Agent load_session validates payload before mutating conversation", {
 
   saveRDS(
     list(
-      schema_version = 2L,
+      schema_version = 3L,
       turns = list(create_mock_user_turn("new turn")),
+      compacted_turns = list(),
       system_prompt = "new prompt",
       compaction_summary = NULL,
       tool_result_envelopes = list(),
@@ -328,7 +330,7 @@ test_that("Agent load_session validates payload before mutating conversation", {
   )
   expect_error(
     suppressMessages(agent$load_session(session_file)),
-    "expected version 2",
+    "expected version 3",
     class = "deputy_session_load"
   )
   expect_equal(chat$get_turns(), old_turns)
@@ -383,32 +385,13 @@ test_that("compact accepts custom summary", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)
 
-  # Add mock turns
   mock_turns <- list(
-    structure(
-      list(text = "Hello", contents = list()),
-      class = c("UserTurn", "Turn")
-    ),
-    structure(
-      list(text = "Hi", contents = list()),
-      class = c("AssistantTurn", "Turn")
-    ),
-    structure(
-      list(text = "Q1", contents = list()),
-      class = c("UserTurn", "Turn")
-    ),
-    structure(
-      list(text = "A1", contents = list()),
-      class = c("AssistantTurn", "Turn")
-    ),
-    structure(
-      list(text = "Q2", contents = list()),
-      class = c("UserTurn", "Turn")
-    ),
-    structure(
-      list(text = "A2", contents = list()),
-      class = c("AssistantTurn", "Turn")
-    )
+    create_mock_user_turn("Hello"),
+    create_mock_assistant_turn("Hi"),
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2"),
+    create_mock_assistant_turn("A2")
   )
   mock_chat$set_turns(mock_turns)
 

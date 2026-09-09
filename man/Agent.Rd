@@ -132,6 +132,7 @@ agent$add_hook(HookMatcher(
     \item \href{#method-Agent-resolve_tool_result}{\code{Agent$resolve_tool_result()}}
     \item \href{#method-Agent-add_turn}{\code{Agent$add_turn()}}
     \item \href{#method-Agent-get_turns}{\code{Agent$get_turns()}}
+    \item \href{#method-Agent-get_context_turns}{\code{Agent$get_context_turns()}}
     \item \href{#method-Agent-set_turns}{\code{Agent$set_turns()}}
     \item \href{#method-Agent-get_system_prompt}{\code{Agent$get_system_prompt()}}
     \item \href{#method-Agent-set_system_prompt}{\code{Agent$set_system_prompt()}}
@@ -644,7 +645,10 @@ their replacement; saved sessions retain their catalog snapshots.
 \if{html}{\out{<a id="method-Agent-get_turns"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_turns}{}}}
 \subsection{\code{Agent$get_turns()}}{
-  Return conversation turns, as in ellmer Chat.
+  Return the complete selected conversation, as in ellmer
+Chat. Compaction removes turns from model context, not from this
+transcript. Hosts can persist this view through their normal history
+API. Retained turns remain in memory until the conversation is replaced.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_turns(include_system_prompt = FALSE)}
@@ -663,11 +667,38 @@ their replacement; saved sessions retain their catalog snapshots.
 }
 
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-get_context_turns"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-get_context_turns}{}}}
+\subsection{\code{Agent$get_context_turns()}}{
+  Return only the current model context. Unlike \code{get_turns()}
+and \code{turns()}, this view shrinks when compaction succeeds. Use it when
+inspecting or transferring the bounded input for a model request.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$get_context_turns(include_system_prompt = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{include_system_prompt}}{Include the current system prompt, including
+any installed compaction summary, as a turn.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list of ellmer turns.
+  }
+}
+
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-set_turns"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-set_turns}{}}}
 \subsection{\code{Agent$set_turns()}}{
-  Replace conversation turns, as in ellmer Chat. During a
-run, already accrued usage remains charged after history replacement.
+  Replace the selected conversation and its model context,
+as in ellmer Chat. Clears the retained compacted prefix and summary,
+so host branch restoration cannot carry another branch's history.
+During a run, already accrued usage remains charged after replacement.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_turns(value)}
@@ -1043,7 +1074,7 @@ agent$add_hook(HookMatcher(
 \if{html}{\out{<a id="method-Agent-turns"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-turns}{}}}
 \subsection{\code{Agent$turns()}}{
-  Get the conversation history.
+  Get the complete selected conversation, including compacted turns.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$turns()}
@@ -1232,6 +1263,7 @@ owned connections and discard server session state.
 \item Conversation turns
 \item System prompt
 \item The cumulative compaction summary
+\item Retained compacted turns for the complete selected conversation
 \item Portable copies of offloaded tool results
 \item Effective run context
 \item File checkpoint state, when enabled
@@ -1267,6 +1299,9 @@ validated before conversation state changes and merged with constructor
 context; protected identity conflicts fail the load. Compaction summaries
 and integrity-checked tool-result envelopes are restored as conversational
 state under the receiving Agent's session identity.
+Schema 3 preserves both the selected conversation and model context.
+Earlier development schemas are rejected; native host history remains
+independently readable through that host's restore API.
   }
   \subsection{Returns}{
     Invisible self

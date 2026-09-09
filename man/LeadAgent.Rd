@@ -44,6 +44,7 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="checkpoint"><a href='../../deputy/html/Agent.html#method-Agent-checkpoint'><code>Agent$checkpoint()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href='../../deputy/html/Agent.html#method-Agent-compact'><code>Agent$compact()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href='../../deputy/html/Agent.html#method-Agent-cost'><code>Agent$cost()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_context_turns"><a href='../../deputy/html/Agent.html#method-Agent-get_context_turns'><code>Agent$get_context_turns()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_cost"><a href='../../deputy/html/Agent.html#method-Agent-get_cost'><code>Agent$get_cost()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_model"><a href='../../deputy/html/Agent.html#method-Agent-get_model'><code>Agent$get_model()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_model_object"><a href='../../deputy/html/Agent.html#method-Agent-get_model_object'><code>Agent$get_model_object()</code></a></span></li>

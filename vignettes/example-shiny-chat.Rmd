@@ -74,6 +74,15 @@ shinyApp(ui, server)
 the Agent unchanged. It also supplies shinychat history and cancellation around
 Deputy's stream.
 
+Compaction and native conversation history can be enabled together. Deputy's
+`get_turns()` supplies the complete selected conversation to shinychat, while
+`get_context_turns()` exposes only the compacted model context. Later completed
+replies remain available when the user switches conversations or restores a
+branch. Native history requires a shinychat version exporting `history_options()`
+and `FileConversationStore`; Deputy's transcript contract also works without
+shinychat. Hosts that previously rejected a non-NULL `ContextPolicy(max_tokens)`
+with native history can remove that workaround when using this implementation.
+
 ## What the Agent Adds
 
 Choose a method by the result your application needs:

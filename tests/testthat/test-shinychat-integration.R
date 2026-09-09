@@ -25,6 +25,7 @@ test_that("Agent stream_async is consumed directly by shinychat", {
   module <- shinychat::chat_server(
     "chat",
     agent,
+    history = FALSE,
     session = session
   )
 

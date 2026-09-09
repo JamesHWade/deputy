@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* `Agent$get_turns()` and `turns()` retain the complete selected conversation
+  across compaction, so shinychat native history keeps later replies. Use
+  `get_context_turns()` to inspect the bounded model context. Snapshot schema 3
+  preserves both views; earlier development snapshot schemas are rejected
+  (#146).
+
 * `RSession` provides conversation-scoped trusted R workers with persistent
   variables, ordered console and plot results, queued calls, cancellation and
   explicit state-loss recovery. Native rich tool results now obey separate
