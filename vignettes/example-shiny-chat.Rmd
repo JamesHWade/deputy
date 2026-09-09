@@ -95,7 +95,11 @@ that some earlier details may be omitted.
 
 The notice does not add, hide, or replace chat messages. `PreCompact` and
 `PostCompact` hooks update its state; a `Stop` hook clears the busy indication
-after failure or cancellation while retaining any previously accepted summary.
+after an automatic run fails or is interrupted, while retaining any previously
+accepted summary. Register custom compaction-veto hooks before this notice so
+their early return prevents the progress indication. Hosts that call
+`agent$compact()` directly must also clear progress when that call ends,
+including errors or vetoes; a manual call does not fire the run's `Stop` hook.
 The example scopes the notice to shinychat's public conversation ID and clears
 it through `history$on_restore()`, including branch navigation. Native history
 restores the complete transcript rather than the compacted context, so the
