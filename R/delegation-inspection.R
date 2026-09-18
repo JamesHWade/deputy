@@ -267,7 +267,11 @@ delegation_outcome <- function(record, compact = FALSE) {
     ),
     answer = record$answer %||% inspection_text(record$result),
     references = if (compact) {
-      utils::head(references, 8L)
+      lapply(utils::head(references, 8L), function(ref) {
+        # Host ownership and storage routing are not model context.
+        ref[c("scope", "storage_session_id")] <- NULL
+        ref
+      })
     } else {
       record$references %||% list()
     },
