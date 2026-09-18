@@ -152,7 +152,15 @@ observation_payload <- function(event, max_bytes = 65536) {
   ) {
     data <- data[intersect(
       names(data),
-      c("message", "phase", "request_number", "model", "provider")
+      c(
+        "message",
+        "phase",
+        "request_number",
+        "model",
+        "provider",
+        "fallback_index",
+        "usage"
+      )
     )]
   }
   if (!observation_payload_fits(data, max_bytes)) {
