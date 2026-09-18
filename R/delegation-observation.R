@@ -450,6 +450,12 @@ observation_payload_fits <- function(value, max_bytes) {
         return(FALSE)
       }
     }
+    if (inherits(value, c("Date", "POSIXt"))) {
+      # Timestamp JSON needs quotes, separators, date/time, fractional seconds
+      # and zone text. Charge a conservative rendered allowance before format().
+      remaining <<- remaining - 64 * length(value)
+      return(remaining >= 0)
+    }
     if (is.data.frame(value)) {
       remaining <<- remaining -
         nrow(value) * sum(6 * nchar(names(value), type = "bytes") + 8)
