@@ -17,9 +17,10 @@ DelegationDisclosure(
 \item{redact}{Function of \code{view} and \code{requester}, returning a redacted list.
 It may remove fields or content. It must not perform agent execution.}
 
-\item{max_bytes}{Maximum serialized bytes in one disclosed snapshot or saved
-history. Oversized disclosures fail explicitly; select fewer children or
-omit transcripts. Defaults to 16 MiB.}
+\item{max_bytes}{Maximum serialized content-payload bytes in one disclosed
+snapshot or saved history, including replayed turn content but excluding
+shared R class/method metadata. Oversized disclosures fail explicitly;
+select fewer children or omit transcripts. Defaults to 16 MiB.}
 }
 \value{
 Read-only \code{DelegationDisclosure} host configuration.

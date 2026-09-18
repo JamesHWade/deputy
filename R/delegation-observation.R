@@ -128,6 +128,13 @@ observation_payload <- function(event) {
     return(NULL)
   }
   data <- event$data
+  if (
+    event$type %in%
+      c("request_error", "run_error", "fallback") &&
+      inherits(data$condition, "condition")
+  ) {
+    data$message <- inspection_text(conditionMessage(data$condition), 1024L)
+  }
   # Request/transport objects and conditions may contain credentials. Only public
   # error text is observed, never arbitrary provider objects or call stacks.
   if (

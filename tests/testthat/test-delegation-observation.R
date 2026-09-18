@@ -267,3 +267,54 @@ test_that("lineage fixtures retain parent identities without enabling recursive 
   expect_identical(event$parent_run_id, "fixture-intermediate-run")
   expect_identical(event$parent_tool_call_id, "fixture-parent-tool")
 })
+
+test_that("failure envelopes retain bounded text without condition internals", {
+  error <- simpleError(strrep("failure ", 300))
+  error$private <- new.env(parent = emptyenv())
+  for (type in c("request_error", "run_error", "fallback")) {
+    payload <- observation_payload(AgentEvent(
+      type,
+      condition = error,
+      request = new.env()
+    ))
+    expect_match(payload$message, "failure")
+    expect_lte(nchar(payload$message, type = "bytes"), 1024L)
+    expect_null(payload$condition)
+    expect_null(payload$request)
+    expect_no_error(inspection_portable(payload))
+  }
+})
+
+test_that("queued cancellation does not publish running or invoke start hooks", {
+  state <- new.env(parent = emptyenv())
+  lead <- observation_lead(state)
+  reader <- lead$observe_subagents("owner")
+  hooks <- character()
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(context, ...) {
+    hooks <<- c(hooks, context$child_agent_name)
+    if (context$child_agent_name == "a") {
+      queued <- lead$list_subagents()
+      lead$interrupt_subagent(
+        queued$delegation_id[queued$agent_name == "b"],
+        "cancelled_while_queued"
+      )
+    }
+    NULL
+  }))
+  batch <- lead$parallel_delegate(c(a = "run", b = "cancel"), max_active = 1L)
+  expect_identical(batch$status, c(a = "completed", b = "not_started"))
+  expect_identical(hooks, "a")
+  expect_identical(state$started, "a")
+  runs <- lead$list_subagents()
+  b <- runs[runs$agent_name == "b", ]
+  expect_identical(b$stop_reason, "cancelled_while_queued")
+  expect_true(is.na(b$started_at))
+  events <- Filter(
+    function(x) identical(x$delegation_id, b$delegation_id),
+    reader$poll()$events
+  )
+  expect_false(any(vapply(events, function(x) x$type == "running", logical(1))))
+  expect_length(Filter(function(x) x$type == "settled", events), 1L)
+  expect_length(lead$.__enclos_env__$private$delegation_usage_reservations, 0L)
+  expect_length(lead$.__enclos_env__$private$delegation_bindings, 0L)
+})

@@ -353,3 +353,75 @@ test_that("tool failures replay as portable errors without condition environment
   expect_identical(replay@contents[[1L]]@request@id, "failed-tool")
   expect_null(replay@contents[[1L]]@request@tool)
 })
+
+test_that("compact truncation always keeps the retained full-answer locator", {
+  references <- c(
+    rep(list(list(source = "tool_result", reference = "tool")), 9),
+    list(list(source = "delegation_answer", reference = "full-answer"))
+  )
+  outcome <- delegation_outcome(
+    list(answer = "bounded", answer_truncated = TRUE, references = references),
+    compact = TRUE
+  )
+  expect_length(outcome$references, 8L)
+  expect_identical(outcome$references[[1L]]$reference, "full-answer")
+  expect_identical(outcome$runtime$omitted_references, 2L)
+})
+
+test_that("inspection bounds the final replayed disclosure", {
+  lead <- inspection_lead()
+  lead$parallel_delegate(c(a = strrep("text", 500)))
+  raw <- lead_inspect_subagents(lead, "owner", NULL, TRUE)
+  limit <- length(serialize(raw, NULL, version = 3)) + 1
+  lead$.__enclos_env__$private$.delegation_disclosure <- inspection_policy(
+    max_bytes = limit
+  )
+  expect_no_error(lead_inspect_subagents(lead, "owner", NULL, TRUE))
+  expect_error(
+    lead$inspect_subagents("owner", transcript = TRUE),
+    "exceeds max_bytes"
+  )
+})
+
+test_that("export settlement cannot be changed or broken by redaction", {
+  lead <- inspection_lead()
+  lead$parallel_delegate(c(a = "settled"))
+  policy <- inspection_policy(redact = function(view, requester) {
+    view$outcome <- NULL
+    view
+  })
+  lead$.__enclos_env__$private$.delegation_disclosure <- policy
+  saved <- lead$export_subagents("owner")
+  expect_true(saved$settled)
+  expect_null(saved$children[[1L]]$outcome)
+  restored <- delegation_history(saved, "owner", policy, saved$scope)
+  expect_null(restored[[1L]]$outcome)
+  expect_length(restored[[1L]]$turns, 2L)
+  lead$.__enclos_env__$private$.delegation_disclosure <- inspection_policy(
+    redact = function(view, requester) {
+      view$outcome$runtime$status <- "completed"
+      view
+    }
+  )
+  private <- lead$.__enclos_env__$private
+  lead_admit_delegation(
+    lead,
+    agent_definition("a", "A", "role"),
+    "queued",
+    private$claim_delegation()
+  )
+  expect_error(lead$export_subagents("owner"), "Only settled")
+})
+
+test_that("disclosure sizing counts replayed content without R class metadata", {
+  turn <- ellmer::UserTurn(list(ellmer::ContentText(strrep("data", 1000))))
+  record <- inspection_record_turn(turn)
+  payload <- list(transcript = list(record), turns = list(record))
+  bytes <- length(serialize(payload, NULL, version = 3))
+  view <- list(transcript = list(record), turns = list(turn))
+  expect_no_error(inspection_bound(view, inspection_policy(max_bytes = bytes)))
+  expect_error(
+    inspection_bound(view, inspection_policy(max_bytes = bytes - 1)),
+    "exceeds max_bytes"
+  )
+})

@@ -225,7 +225,10 @@ lead_run_delegation <- function(
     started <- FALSE
     tryCatch(
       {
-        if (!isTRUE(private$should_stop)) {
+        if (
+          !isTRUE(private$should_stop) &&
+            is.null(private$subagent_runs[[id]]$cancel_reason)
+        ) {
           record <- private$subagent_runs[[id]]
           record$status <- "running"
           record$started_at <- Sys.time()

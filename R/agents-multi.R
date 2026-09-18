@@ -495,12 +495,13 @@ LeadAgent <- R6::R6Class(
         delegation_id,
         transcript
       )
-      lapply(views, function(view) {
+      views <- lapply(views, function(view) {
         if (transcript) {
           view$turns <- lapply(view$transcript, inspection_replay)
         }
         view
       })
+      inspection_bound(views, private$.delegation_disclosure)
     },
 
     #' @description
@@ -511,22 +512,17 @@ LeadAgent <- R6::R6Class(
     #'   active selected children. The host supplies current disclosure policy
     #'   when reading it back. Only public ellmer records are retained.
     export_subagents = function(requester, delegation_id = NULL) {
-      views <- lead_inspect_subagents(self, requester, delegation_id, TRUE)
-      if (
-        any(vapply(
-          views,
-          function(view) {
-            !view$outcome$runtime$status %in%
-              c("completed", "failed", "stopped", "not_started", "suspended")
-          },
-          logical(1)
-        ))
-      ) {
-        cli::cli_abort("Only settled children can be exported.")
-      }
+      views <- lead_inspect_subagents(
+        self,
+        requester,
+        delegation_id,
+        TRUE,
+        settled_only = TRUE
+      )
       inspection_bound(
         list(
           schema_version = 1L,
+          settled = TRUE,
           scope = inspection_scope(self),
           children = views
         ),
