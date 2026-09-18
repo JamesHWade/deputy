@@ -101,6 +101,12 @@ lead_observe_event <- function(lead, id, event) {
     timestamp = as.numeric(event$timestamp),
     data = payload
   )
+  # Payload projection was bounded separately. Metadata has a fixed schema;
+  # preflight its values without charging fixed field names a second time.
+  metadata <- unname(envelope[names(envelope) != "data"])
+  if (!observation_payload_fits(metadata, buffer$policy$max_event_bytes)) {
+    return(invisible(NULL))
+  }
   bytes <- length(serialize(envelope, NULL, version = 3))
   if (bytes > buffer$policy$max_event_bytes) {
     envelope$data <- list(content_omitted = "oversized", recover = "snapshot")
@@ -185,6 +191,19 @@ observation_payload <- function(event, max_bytes = 65536) {
     if (inherits(value, "ellmer::Content")) {
       turn <- ellmer::AssistantTurn(list(value))
       return(inspection_record_turn(turn)$props$contents[[1L]])
+    }
+    if (
+      is.data.frame(value) ||
+        is.factor(value) ||
+        inherits(value, c("Date", "POSIXt", "difftime"))
+    ) {
+      return(as.character(jsonlite::toJSON(
+        value,
+        dataframe = "rows",
+        auto_unbox = TRUE,
+        null = "null",
+        na = "null"
+      )))
     }
     if (inherits(value, "ellmer_dollars")) {
       return(as.numeric(value))
@@ -424,7 +443,12 @@ observation_payload_fits <- function(value, max_bytes) {
       metadata <- attr(value, field, exact = TRUE)
       if (!is.null(metadata) && !visit(metadata, depth + 1L)) return(FALSE)
     }
-    if (is.list(value) && !is.object(value)) {
+    if (is.data.frame(value)) {
+      remaining <<- remaining -
+        nrow(value) * sum(nchar(names(value), type = "bytes") + 8)
+      if (remaining < 0) return(FALSE)
+    }
+    if (is.list(value) && (!is.object(value) || is.data.frame(value))) {
       if (length(value) * 64 > remaining) {
         return(FALSE)
       }
