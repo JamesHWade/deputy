@@ -465,3 +465,78 @@ test_that("partial turns and nested results keep only public inspectable content
   expect_identical(restored@reason, "interrupted")
   expect_identical(restored@text, "partial answer")
 })
+
+test_that("released structured and uploaded content replay through public records", {
+  server <- local_runtime_server(list(runtime_reply(
+    '{"status":"ok"}',
+    stream = FALSE
+  )))
+  chat <- runtime_chat(server)
+  chat$chat_structured(
+    "extract",
+    type = ellmer::type_object(status = ellmer::type_string())
+  )
+  turn <- tail(chat$get_turns(), 1L)[[1L]]
+  replay <- inspection_replay(inspection_record_turn(turn))
+  expect_equal(ellmer::contents_record(replay), inspection_record_turn(turn))
+  json <- ellmer::contents_replay(list(
+    version = 1,
+    class = "ellmer::ContentJson",
+    props = list(data = list(status = "ok"), string = NULL)
+  ))
+  request <- ellmer::ContentToolRequest(
+    id = "json",
+    name = "fixture",
+    arguments = list()
+  )
+  result <- ellmer::ContentToolResult(list(json), request = request)
+  expect_no_error(inspection_replay(inspection_record_turn(ellmer::UserTurn(list(
+    result
+  )))))
+  upload <- ellmer::ContentUploaded(
+    uri = "fixture:document",
+    mime_type = "text/plain",
+    provider = "fixture",
+    extra = list(private = "omitted")
+  )
+  restored <- inspection_replay(inspection_record_turn(ellmer::UserTurn(list(
+    upload
+  ))))
+  expect_identical(restored@contents[[1L]]@uri, "fixture:document")
+  expect_identical(restored@contents[[1L]]@extra, list())
+})
+
+test_that("artifact reads use host storage after reference disclosure", {
+  lead <- inspection_lead(
+    context_policy = ContextPolicy(offload_dir = withr::local_tempdir())
+  )
+  resolve_async_value(lead$get_tools()$delegate_to_agent(
+    "a",
+    strrep("x", 9000)
+  ))
+  id <- lead$list_subagents()$delegation_id
+  lead$.__enclos_env__$private$.delegation_disclosure <- inspection_policy(
+    redact = function(view, requester) {
+      if (!is.null(view$outcome)) {
+        view$outcome$references <- lapply(
+          view$outcome$references,
+          function(ref) {
+            ref$storage_session_id <- NULL
+            ref
+          }
+        )
+      }
+      view
+    }
+  )
+  reference <- lead$inspect_subagents("owner", id)[[1L]]$outcome$references[[
+    1L
+  ]]
+  expect_null(reference$storage_session_id)
+  chunk <- lead$read_subagent_result("owner", id, reference$reference)
+  expect_match(chunk$result, "xxxx", fixed = TRUE)
+  expect_error(
+    lead$read_subagent_result("other", id, reference$reference),
+    class = "deputy_delegation_disclosure"
+  )
+})

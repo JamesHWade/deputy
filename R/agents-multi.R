@@ -510,12 +510,21 @@ LeadAgent <- R6::R6Class(
       ) {
         delegation_disclosure_abort()
       }
+      # Disclosure authorizes the public reference. Storage routing remains
+      # host-owned even when the redactor removes or replaces private metadata.
+      stored <- Filter(
+        function(ref) identical(ref$reference, reference),
+        private$subagent_runs[[delegation_id]]$references
+      )
+      if (!length(stored)) {
+        delegation_disclosure_abort()
+      }
       chunk <- read_tool_result_chunk(
         reference,
         offset = offset,
         max_chars = 8192L,
         policy = self$context_policy,
-        session_id = selected[[1L]]$storage_session_id
+        session_id = stored[[1L]]$storage_session_id
       )
       view <- private$.delegation_disclosure$redact(
         list(kind = "artifact", reference = reference, result = chunk),
