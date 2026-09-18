@@ -728,3 +728,23 @@ test_that("completed tool artifacts can be inspected before child settlement", {
     fixed = TRUE
   )
 })
+
+
+test_that("compact references exclude host scope and storage routing", {
+  scope <- list(
+    owner_id = strrep("o", 1024^2),
+    conversation_id = strrep("c", 1024^2)
+  )
+  ref <- list(
+    reference = "artifact://fixture",
+    scope = scope,
+    storage_session_id = "host"
+  )
+  record <- list(answer = "bounded", references = rep(list(ref), 8L))
+  compact <- delegation_outcome(record, compact = TRUE)
+  expect_lt(nchar(jsonlite::toJSON(S7::props(compact)), type = "bytes"), 8192L)
+  expect_identical(compact$references[[1L]]$reference, ref$reference)
+  expect_null(compact$references[[1L]]$scope)
+  expect_null(compact$references[[1L]]$storage_session_id)
+  expect_identical(delegation_outcome(record)$references[[1L]], ref)
+})
