@@ -212,7 +212,13 @@ test_that("native JSON tool content uses safe markdown instead of raw HTML", {
 test_that("demo fingerprints retain failure text without condition environments", {
   fixture <- new.env(parent = globalenv())
   sys.source(
-    test_path("..", "..", "inst", "examples", "subagent-chats", "fixture.R"),
+    system.file(
+      "examples",
+      "subagent-chats",
+      "fixture.R",
+      package = "deputy",
+      mustWork = TRUE
+    ),
     fixture
   )
   turn <- function(message, state) {
