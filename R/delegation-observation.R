@@ -418,7 +418,10 @@ DelegationSubscription <- R6::R6Class(
 # materializing public records or serializing large payloads on the runtime path.
 observation_payload_fits <- function(value, max_bytes) {
   remaining <- max_bytes
-  visit <- function(value, depth = 0L) {
+  visit <- function(value, depth = 0L, json = FALSE) {
+    # Classed values become JSON text before the final envelope is serialized.
+    # Every input byte may require a six-byte Unicode escape in that projection.
+    json <- json || is.data.frame(value) || is.factor(value)
     remaining <<- remaining - 64
     if (remaining < 0 || depth > 64L) {
       return(FALSE)
@@ -435,17 +438,21 @@ observation_payload_fits <- function(value, max_bytes) {
         fields <- setdiff(fields, c("text", "role"))
       }
       for (field in fields) {
-        if (!visit(S7::prop(value, field), depth + 1L)) return(FALSE)
+        if (!visit(S7::prop(value, field), depth + 1L, json = json)) {
+          return(FALSE)
+        }
       }
       return(TRUE)
     }
     for (field in c("names", "dim", "dimnames", "levels")) {
       metadata <- attr(value, field, exact = TRUE)
-      if (!is.null(metadata) && !visit(metadata, depth + 1L)) return(FALSE)
+      if (!is.null(metadata) && !visit(metadata, depth + 1L, json = json)) {
+        return(FALSE)
+      }
     }
     if (is.data.frame(value)) {
       remaining <<- remaining -
-        nrow(value) * sum(nchar(names(value), type = "bytes") + 8)
+        nrow(value) * sum(6 * nchar(names(value), type = "bytes") + 8)
       if (remaining < 0) return(FALSE)
     }
     if (is.list(value) && (!is.object(value) || is.data.frame(value))) {
@@ -453,7 +460,7 @@ observation_payload_fits <- function(value, max_bytes) {
         return(FALSE)
       }
       for (item in value) {
-        if (!visit(item, depth + 1L)) return(FALSE)
+        if (!visit(item, depth + 1L, json = json)) return(FALSE)
       }
       return(TRUE)
     }
@@ -464,7 +471,11 @@ observation_payload_fits <- function(value, max_bytes) {
       for (item in value) {
         remaining <<- remaining -
           16 -
-          if (is.na(item)) 0 else nchar(item, type = "bytes")
+          if (is.na(item)) {
+            0
+          } else {
+            nchar(item, type = "bytes") * if (json) 6 else 1
+          }
         if (remaining < 0) return(FALSE)
       }
       return(TRUE)
@@ -476,7 +487,7 @@ observation_payload_fits <- function(value, max_bytes) {
       labels <- levels(value)
       for (code in unclass(value)) {
         label <- if (is.na(code)) NA_character_ else labels[[code]]
-        if (!visit(label, depth + 1L)) return(FALSE)
+        if (!visit(label, depth + 1L, json = TRUE)) return(FALSE)
       }
       return(TRUE)
     }

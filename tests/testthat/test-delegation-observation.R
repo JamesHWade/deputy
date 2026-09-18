@@ -431,3 +431,30 @@ test_that("small data frame observations retain a portable projection", {
   names(frame) <- rep(strrep("x", 1000), 2)
   expect_false(observation_payload_fits(frame[rep(1L, 100), ], 2048))
 })
+
+
+test_that("JSON escaping is budgeted before classed payload materialization", {
+  local_mocked_bindings(inspection_record_turn = function(...) {
+    stop("must not materialize")
+  })
+  text <- strrep("\u0001", 400L)
+  frame <- data.frame(value = text)
+  named <- data.frame(value = 1)
+  names(named) <- text
+  for (value in list(factor(text), frame, named)) {
+    expect_false(observation_payload_fits(value, 2048L))
+    for (event in list(
+      AgentEvent("content", content = ellmer::ContentToolResult(value)),
+      AgentEvent("tool_end", value = value)
+    )) {
+      expect_identical(
+        observation_payload(event, max_bytes = 2048L)$content_omitted,
+        "oversized"
+      )
+    }
+  }
+  expect_true(observation_payload_fits(
+    data.frame(value = "small", group = factor("a")),
+    2048L
+  ))
+})
