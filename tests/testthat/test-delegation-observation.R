@@ -318,3 +318,45 @@ test_that("queued cancellation does not publish running or invoke start hooks", 
   expect_length(lead$.__enclos_env__$private$delegation_usage_reservations, 0L)
   expect_length(lead$.__enclos_env__$private$delegation_bindings, 0L)
 })
+
+test_that("oversized content is omitted before public-record materialization", {
+  result <- ellmer::ContentToolResult(strrep("large payload", 100000))
+  event <- AgentEvent("content", content = result)
+  local_mocked_bindings(inspection_record_turn = function(...) {
+    stop("must not materialize")
+  })
+  payload <- observation_payload(event, max_bytes = 2048L)
+  expect_identical(payload$content_omitted, "oversized")
+  expect_identical(payload$recover, "snapshot")
+  expect_false(observation_payload_fits(rep(list(1), 10000), 2048L))
+  expect_true(observation_payload_fits(list(text = "small"), 2048L))
+})
+
+test_that("queued cancellation survives a batch request-limit exit", {
+  lead <- observation_lead()
+  reader <- lead$observe_subagents("owner")
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(context, ...) {
+    runs <- lead$list_subagents()
+    lead$interrupt_subagent(
+      runs$delegation_id[runs$agent_name == "b"],
+      "specific_cancel"
+    )
+    NULL
+  }))
+  lead$parallel_delegate(
+    c(a = "run", b = "cancel"),
+    max_active = 1L,
+    usage_limits = UsageLimits(max_requests = 1L)
+  )
+  b <- lead$list_subagents()
+  b <- b[b$agent_name == "b", ]
+  expect_identical(b$stop_reason, "specific_cancel")
+  settled <- Filter(
+    function(x) {
+      x$type == "settled" && identical(x$delegation_id, b$delegation_id)
+    },
+    reader$poll()$events
+  )
+  expect_length(settled, 1L)
+  expect_identical(settled[[1L]]$data$stop_reason, "specific_cancel")
+})
