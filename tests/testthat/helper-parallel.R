@@ -70,7 +70,8 @@ create_parallel_chat <- function(state = new.env(parent = emptyenv())) {
       if (key %in% state$fail) {
         stop("deterministic responder failure")
       }
-      text <- paste(key, prompt)
+      task <- jsonlite::fromJSON(prompt, simplifyVector = FALSE)$brief$task
+      text <- paste(key, task)
       if (is.function(state$responder)) {
         text <- state$responder(key, prompt)
       }

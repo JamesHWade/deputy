@@ -36,6 +36,16 @@ Subagents, and prepare the entire batch before any provider request. Missing,
 stale, unauthorized, invalid and oversized inputs have typed preparation errors
 and retained failed records; unstarted siblings remain explicit.
 
+The first user message is a single JSON object (`deputy_delegation_v1`), including
+for scalar string tasks and empty evidence. Definition initial instructions,
+model-supplied brief fields, and the host's `resolved_evidence` array occupy
+separate properties. JSON escaping keeps forged headers, quotes and nested
+objects inside their original text fields; no markdown delimiter carries
+provenance. The encoded message is retained verbatim in the manifest and counted
+against admission bounds. This is an unambiguous representation of host source
+selection, not a guarantee about model interpretation or prompt-injection
+resistance. Source text remains untrusted data and does not grant authority.
+
 The manifest records the normalized brief, resolved source content/provenance and
 SHA-256 content digests, definition prompt/static memory/initial prompt/skill
 names, prepared system prompt and initial message, model, registered tool names,

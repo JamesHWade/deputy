@@ -369,6 +369,8 @@ test_that("released ellmer Chats preserve transport and isolate runtime callback
       expect_length(content, 1L)
       content <- content[[1L]]$text
     }
-    expect_true(content %in% c("first", "second"))
+    input <- jsonlite::fromJSON(content, simplifyVector = FALSE)
+    expect_true(input$brief$task %in% c("first", "second"))
+    expect_identical(input$resolved_evidence, list())
   }
 })

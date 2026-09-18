@@ -6,6 +6,8 @@
   receipts, separately from working context and retained child chats. Plain
   string tasks still work. Directly invoked children now respond to lead
   interruption, and status polling avoids materializing transcripts (#149).
+  Child messages encode brief fields separately from resolved evidence, including
+  empty evidence, so supplied text cannot forge the serialized source list.
 
 * `LeadAgent$list_subagents()` exposes admitted and running delegations in
   admission order, with exact stop reasons and separate observer errors. Ordinary

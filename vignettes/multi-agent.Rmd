@@ -347,7 +347,12 @@ lead$get_subagent_messages()                      # retained child chats
 
 Model-driven `delegate_to_agent` calls support the same brief fields. Models can
 select exact source revisions, but cannot supply source bodies, owner scope or
-byte ceilings. The host supplies authenticated, authorized text snapshots;
+byte ceilings. Every child brief is encoded as one JSON object with separate
+brief fields and a `resolved_evidence` array, even when that array is empty.
+Text that imitates an evidence header remains inside its quoted brief field.
+This preserves source-selection provenance in the representation; it does not
+make source text trustworthy or guarantee how the model interprets it.
+The host supplies authenticated, authorized text snapshots;
 Deputy checks scope, definition eligibility and revision equality against that
 snapshot. Refreshing external evidence requires a new snapshot and LeadAgent.
 Missing or `NULL` `allowed_agents` permits all definitions; `character()` permits
