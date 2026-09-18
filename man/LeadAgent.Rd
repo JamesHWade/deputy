@@ -31,6 +31,8 @@ sub-agents based on registered AgentDefinitions.
     \item \href{#method-LeadAgent-get_subagent_results}{\code{LeadAgent$get_subagent_results()}}
     \item \href{#method-LeadAgent-get_subagent_messages}{\code{LeadAgent$get_subagent_messages()}}
     \item \href{#method-LeadAgent-get_subagent_contexts}{\code{LeadAgent$get_subagent_contexts()}}
+    \item \href{#method-LeadAgent-observe_subagents}{\code{LeadAgent$observe_subagents()}}
+    \item \href{#method-LeadAgent-interrupt_subagent}{\code{LeadAgent$interrupt_subagent()}}
     \item \href{#method-LeadAgent-inspect_subagents}{\code{LeadAgent$inspect_subagents()}}
     \item \href{#method-LeadAgent-export_subagents}{\code{LeadAgent$export_subagents()}}
     \item \href{#method-LeadAgent-read_subagent_result}{\code{LeadAgent$read_subagent_result()}}
@@ -124,6 +126,7 @@ sub-agents based on registered AgentDefinitions.
   delegation_max_bytes = 65536L,
   delegation_policy = DelegationPolicy(),
   delegation_disclosure = DelegationDisclosure(),
+  delegation_observation = DelegationObservation(),
   approval_dir = NULL
 )}
     \if{html}{\out{</div>}}
@@ -175,6 +178,8 @@ on byte bounds. Sources are text only, with a 16 MiB catalogue ceiling.}
 resource ownership and interactive routing.}
       \item{\code{delegation_disclosure}}{Host-only \link{DelegationDisclosure} authorizing
 inspection and saved-history disclosure. Defaults to deny.}
+      \item{\code{delegation_observation}}{\link{DelegationObservation} bounds for the
+transient child activity stream.}
       \item{\code{approval_dir}}{Optional standalone lead approval directory. Delegation
 rejects this unsupported durable child-continuation combination.}
     }
@@ -427,6 +432,56 @@ requires host disclosure policy. The retained manifest is unchanged.}
   \subsection{Returns}{
     A list; \code{NULL} entries mean no prepared context is available.
 Current context is retained at settlement; no matches returns \code{list()}.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-observe_subagents"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-observe_subagents}{}}}
+\subsection{\code{LeadAgent$observe_subagents()}}{
+  Observe bounded child activity without consuming or driving its stream.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$observe_subagents(requester, delegation_id = NULL, after = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{requester}}{Host-authenticated request context.}
+      \item{\code{delegation_id}}{Optional child locator filter.}
+      \item{\code{after}}{Optional cursor returned by a subscription on this lead.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A \link{DelegationSubscription}. Snapshot, observation, cancellation
+and continuation are distinct operations. Closing it only detaches.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-interrupt_subagent"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-interrupt_subagent}{}}}
+\subsection{\code{LeadAgent$interrupt_subagent()}}{
+  Ask one child to stop cooperatively. This trusted host control API is
+separate from disclosure authorization; hosts must authorize the action
+before routing a user request here. It is never exposed as an agent tool.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$interrupt_subagent(delegation_id, reason = "interrupted")}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{delegation_id}}{Exact admitted child locator.}
+      \item{\code{reason}}{Stable stop reason, default \code{"interrupted"}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible logical; FALSE for missing or already settled children.
   }
 }
 

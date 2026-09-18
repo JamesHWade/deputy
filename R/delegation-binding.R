@@ -255,6 +255,17 @@ bind_delegation_host <- function(
   id <- correlation$delegation_id
   binding <- private$delegation_bindings[[id]]
   child_private <- child$.__enclos_env__$private
+  child_private$.delegation_observe <- function(event) {
+    tryCatch(lead_observe_event(lead, id, event), error = function(error) {
+      record <- private$subagent_runs[[id]]
+      record$observation_error <- inspection_text(
+        conditionMessage(error),
+        1024L
+      )
+      private$subagent_runs[[id]] <- record
+    })
+    invisible(NULL)
+  }
   child_private$.delegation_guard <- function(tool_name, tool_input, context) {
     # The child's callback already retains the immutable lead callback. Recheck
     # current static restrictions separately, including mode shortcuts.

@@ -651,3 +651,53 @@ ones. The default 16 MiB disclosure ceiling fails explicitly for larger views;
 select one child or omit its transcript. Storage retention and durable active-run
 recovery remain host responsibilities. The optional child-chat adapter builds on
 these headless records; Deputy core does not require shinychat.
+
+## Observe child activity
+
+Observation reads a transient, bounded buffer. The runtime remains the only
+consumer of each child stream. This supports concurrent subscribers without
+running tools twice or letting a slow view block a child.
+
+```{r, eval=FALSE}
+reader <- lead$observe_subagents(owner_session)
+initial <- reader$snapshot(transcript = FALSE)
+# Start work through a separate host action; observation itself starts nothing.
+promise <- lead$parallel_delegate_async(c(analyst = "Analyze the evidence"))
+update <- reader$poll()
+update$events
+update$gaps # ranges lost to eviction; recover with reader$snapshot()
+reader$close() # detach only; the child continues
+
+reconnected <- lead$observe_subagents(owner_session, after = update$cursor)
+reconnected$poll()
+# A separately authorized host action may cancel one child:
+lead$interrupt_subagent(delegation_id, reason = "user_cancelled")
+```
+
+Each cursor contains a transient stream ID and sequence number. Sequences increase
+across the lead, while envelopes retain child conversation, delegation, run,
+parent and tool-call IDs. A snapshot returns its boundary cursor; subsequent polls
+return later events. Reconnecting with a previous cursor does not repeat events
+already acknowledged. Foreign and future cursors fail. A filtered subscription
+still reports gaps conservatively for the whole stream.
+
+The defaults retain at most 256 envelopes and 1 MiB. Individual events above
+64 KiB become an explicit `content_omitted` envelope, recoverable from retained
+public history when available. These limits cover the observation buffer, not
+the separately retained conversation. `DelegationObservation()` configures them.
+There are no per-reader queues and no subscriber callbacks inside execution.
+
+Every read reauthorizes the host request. Event redaction receives
+`list(kind = "event", event = envelope)`; returning a list without `event` hides
+it. Redaction errors leave the cursor unchanged and never fail the child. Host
+redactors must remain synchronous and must not drive execution. Internal
+observation errors appear separately as `observation_error`. Hidden thinking and
+private transport objects are excluded. Tool start events are deduplicated
+against the existing runtime tool-call identity; execution is unchanged.
+
+`settled` is the delegation terminal envelope; a child's own `stop` event may
+precede it. The former includes setup/unstarted outcomes and final governance
+status. Closing, selecting and replaying a view do not cancel or resume a child.
+`interrupt_subagent()` is a trusted host control API requiring the host's separate
+action authorization. Streams are in-process only: process restart needs
+host-owned saved history, and active-run recovery remains unsupported.

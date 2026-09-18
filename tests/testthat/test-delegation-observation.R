@@ -1,0 +1,269 @@
+observation_disclosure <- function(redact = function(view, requester) view) {
+  DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "owner"),
+    redact = redact
+  )
+}
+
+observation_lead <- function(state = new.env(parent = emptyenv()), ...) {
+  parallel_test_lead(
+    state,
+    delegation_disclosure = observation_disclosure(),
+    ...
+  )
+}
+
+test_that("independent cursors observe one concurrent execution in stable order", {
+  state <- new.env(parent = emptyenv())
+  lead <- observation_lead(state)
+  state$hold_a_until_b <- TRUE
+  first <- lead$observe_subagents("owner")
+  second <- lead$observe_subagents("owner")
+  initial <- first$snapshot()
+  expect_length(initial$children, 0L)
+  expect_identical(initial$cursor$sequence, 0)
+  lead$parallel_delegate(c(a = "one", b = "two"))
+  a <- first$poll()
+  b <- second$poll()
+  expect_identical(a, b)
+  expect_length(a$gaps, 0L)
+  sequences <- vapply(a$events, function(x) x$sequence, numeric(1))
+  expect_identical(sequences, as.numeric(seq_along(sequences)))
+  expect_identical(state$completed, c("b", "a"))
+  expect_length(Filter(function(x) x$type == "settled", a$events), 2L)
+  expect_length(first$poll()$events, 0L)
+  expect_length(state$started, 2L)
+  recovered <- lead$observe_subagents("owner", after = a$cursor)
+  expect_length(recovered$poll()$events, 0L)
+  state$hold_a_until_b <- FALSE
+  lead$parallel_delegate(c(a = "again"))
+  next_events <- recovered$poll()$events
+  expect_identical(
+    all(vapply(
+      next_events,
+      function(x) x$sequence > max(sequences),
+      logical(1)
+    )),
+    TRUE
+  )
+  ids <- unique(vapply(
+    c(a$events, next_events),
+    function(x) x$delegation_id,
+    character(1)
+  ))
+  expect_length(ids, 3L)
+  expect_length(unique(lead$list_subagents()$session_id), 3L)
+})
+
+test_that("overflow is bounded and reports gaps without stalling children", {
+  lead <- observation_lead(
+    delegation_observation = DelegationObservation(
+      max_events = 3L,
+      max_bytes = 4096,
+      max_event_bytes = 2048
+    )
+  )
+  observer <- lead$observe_subagents("owner")
+  lead$parallel_delegate(c(a = "one", b = "two"))
+  buffer <- lead$.__enclos_env__$private$.delegation_buffer
+  expect_lte(length(buffer$events), 3L)
+  expect_lte(sum(buffer$sizes), 4096)
+  result <- observer$poll()
+  expect_length(result$gaps, 1L)
+  expect_identical(result$gaps[[1L]]$from, 1)
+  expect_identical(result$events[[1L]]$sequence, result$gaps[[1L]]$to + 1)
+  snapshot <- observer$snapshot(transcript = TRUE)
+  expect_length(snapshot$children, 2L)
+  expect_length(snapshot$children[[1L]]$transcript, 2L)
+  expect_length(observer$poll()$events, 0L)
+  id <- lead$list_subagents()$delegation_id[[1L]]
+  lead_observe_event(lead, id, AgentEvent("text", text = strrep("x", 10000)))
+  oversized <- observer$poll()$events[[1L]]
+  expect_identical(oversized$data$content_omitted, "oversized")
+  expect_lte(sum(buffer$sizes), 4096)
+})
+
+test_that("closing observers never cancels work and redaction errors are read-local", {
+  state <- new.env(parent = emptyenv())
+  broken <- TRUE
+  lead <- parallel_test_lead(
+    state,
+    delegation_disclosure = observation_disclosure(
+      redact = function(view, requester) {
+        if (identical(view$kind, "event") && broken) {
+          cli::cli_abort("observer failed")
+        }
+        view
+      }
+    )
+  )
+  detached <- lead$observe_subagents("owner")
+  reader <- lead$observe_subagents("owner")
+  detached$close()
+  detached$close()
+  lead$parallel_delegate(c(a = "one", b = "two"))
+  expect_snapshot(error = TRUE, detached$poll())
+  expect_snapshot(error = TRUE, reader$poll())
+  expect_identical(lead$list_subagents()$status, c("completed", "completed"))
+  broken <- FALSE
+  expect_gt(length(reader$poll()$events), 0L)
+  expect_length(state$started, 2L)
+})
+
+test_that("authorization is rechecked on reads and foreign cursors disclose nothing", {
+  requester <- new.env(parent = emptyenv())
+  requester$allowed <- TRUE
+  lead <- parallel_test_lead(
+    new.env(parent = emptyenv()),
+    delegation_disclosure = DelegationDisclosure(authorize = function(
+      requester,
+      scope
+    ) {
+      isTRUE(requester$allowed)
+    })
+  )
+  reader <- lead$observe_subagents(requester)
+  cursor <- reader$snapshot()$cursor
+  requester$allowed <- FALSE
+  expect_snapshot(error = TRUE, reader$poll())
+  expect_snapshot(error = TRUE, reader$snapshot(TRUE))
+  requester$allowed <- TRUE
+  clone <- lead$clone()
+  expect_snapshot(
+    error = TRUE,
+    clone$observe_subagents(requester, after = cursor)
+  )
+  expect_identical(reader$poll()$cursor, cursor)
+  denied <- observation_lead()
+  expect_snapshot(
+    error = TRUE,
+    denied$observe_subagents("other", "missing", cursor)
+  )
+})
+
+test_that("public tool observations retain pairing and hide hidden reasoning", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "effect"),
+    runtime_reply("done")
+  ))
+  tool <- ellmer::tool(
+    function() "result",
+    name = "effect",
+    description = "Fixture",
+    arguments = list()
+  )
+  lead <- LeadAgent$new(
+    runtime_chat(server),
+    permissions = permissions_full(),
+    sub_agents = list(agent_definition("a", "A", "worker", tools = list(tool))),
+    delegation_disclosure = observation_disclosure()
+  )
+  reader <- lead$observe_subagents("owner")
+  resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
+  events <- reader$poll()$events
+  starts <- Filter(function(x) x$type == "tool_start", events)
+  ends <- Filter(function(x) x$type == "tool_end", events)
+  expect_length(starts, 1L)
+  expect_length(ends, 1L)
+  expect_identical(starts[[1L]]$tool_call_id, ends[[1L]]$tool_call_id)
+  expect_lt(starts[[1L]]$sequence, ends[[1L]]$sequence)
+  expect_identical(
+    starts[[1L]]$conversation_id,
+    lead$list_subagents()$session_id
+  )
+  expect_identical(starts[[1L]]$run_id, lead$list_subagents()$run_id)
+  expect_length(Filter(function(x) x$type == "settled", events), 1L)
+  before <- reader$poll()$cursor
+  id <- lead$list_subagents()$delegation_id
+  thinking <- ellmer::ContentThinking("private thought")
+  lead_observe_event(lead, id, AgentEvent("content", content = thinking))
+  expect_identical(reader$poll()$cursor, before)
+})
+
+test_that("targeted cancellation and view selection are separate operations", {
+  lead <- observation_lead()
+  reader <- lead$observe_subagents("owner")
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(context, ...) {
+    if (context$child_agent_name == "a") {
+      lead$interrupt_subagent(context$delegation_id, "host_cancelled")
+    }
+    NULL
+  }))
+  batch <- lead$parallel_delegate(c(a = "cancel", b = "finish"))
+  expect_identical(batch$status, c(a = "not_started", b = "completed"))
+  runs <- lead$list_subagents()
+  expect_identical(runs$stop_reason, c("host_cancelled", "complete"))
+  events <- reader$poll()
+  selected <- lead$observe_subagents(
+    "owner",
+    runs$delegation_id[[2L]],
+    after = list(stream_id = events$cursor$stream_id, sequence = 0)
+  )
+  expect_identical(
+    unique(vapply(
+      selected$poll()$events,
+      function(x) x$delegation_id,
+      character(1)
+    )),
+    runs$delegation_id[[2L]]
+  )
+  expect_identical(lead$interrupt_subagent(runs$delegation_id[[2L]]), FALSE)
+})
+
+test_that("released ellmer concurrent children use only the runtime stream consumer", {
+  server <- local_parallel_server()
+  lead <- LeadAgent$new(
+    ellmer::chat_openai_compatible(
+      base_url = server$url,
+      model = "gpt-4o-mini",
+      credentials = function() "fixture",
+      echo = "none"
+    ),
+    sub_agents = list(
+      agent_definition("a", "A", "A"),
+      agent_definition("b", "B", "B")
+    ),
+    delegation_disclosure = observation_disclosure()
+  )
+  one <- lead$observe_subagents("owner")
+  two <- lead$observe_subagents("owner")
+  lead$parallel_delegate(c(a = "one", b = "two"))
+  events <- one$poll()
+  expect_identical(events, two$poll())
+  expect_length(server$requests(), 2L)
+  expect_length(Filter(function(x) x$type == "settled", events$events), 2L)
+  snapshot <- one$snapshot(TRUE)
+  expect_length(snapshot$children[[1L]]$transcript, 2L)
+  expect_length(server$requests(), 2L)
+})
+
+test_that("observation failures never leak reservations or prevent settlement", {
+  lead <- observation_lead()
+  local_mocked_bindings(lead_observe_event = function(...) {
+    cli::cli_abort("fixture observation error")
+  })
+  batch <- lead$parallel_delegate(c(a = "one", b = "two"))
+  expect_identical(batch$status, c(a = "completed", b = "completed"))
+  expect_identical(
+    lead$list_subagents()$observation_error,
+    rep("fixture observation error", 2L)
+  )
+  expect_length(lead$.__enclos_env__$private$delegation_usage_reservations, 0L)
+  expect_length(lead$.__enclos_env__$private$delegation_bindings, 0L)
+})
+
+test_that("lineage fixtures retain parent identities without enabling recursive work", {
+  lead <- observation_lead()
+  lead$parallel_delegate(c(a = "one"))
+  reader <- lead$observe_subagents("owner")
+  id <- lead$list_subagents()$delegation_id
+  private <- lead$.__enclos_env__$private
+  private$subagent_runs[[id]]$parent_agent_id <- "fixture-intermediate-child"
+  private$subagent_runs[[id]]$parent_run_id <- "fixture-intermediate-run"
+  private$subagent_runs[[id]]$tool_call_id <- "fixture-parent-tool"
+  lead_observe_status(lead, id, "settled")
+  event <- reader$poll()$events[[1L]]
+  expect_identical(event$parent_agent_id, "fixture-intermediate-child")
+  expect_identical(event$parent_run_id, "fixture-intermediate-run")
+  expect_identical(event$parent_tool_call_id, "fixture-parent-tool")
+})

@@ -145,6 +145,8 @@ reference:
   - DelegationResources
   - DelegationDisclosure
   - DelegationOutcome
+  - DelegationObservation
+  - DelegationSubscription
   - delegation_history
   - agent_definition
   - agent_definition_read

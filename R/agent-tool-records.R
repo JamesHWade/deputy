@@ -95,10 +95,12 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       }
 
       record <- records[[index]]
+      phase_seen_before <- isTRUE(record[[paste0(phase, "_seen")]])
       record[[paste0(phase, "_seen")]] <- TRUE
       records[[index]] <- record
       private$tool_call_records <- records
       record$record_index <- index
+      record$phase_seen_before <- phase_seen_before
       record
     },
 
@@ -177,6 +179,9 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
 
     tool_start_event = function(extracted) {
       record <- private$tool_call_record(extracted, "start")
+      if (isTRUE(record$phase_seen_before)) {
+        return(NULL)
+      }
       private$tool_started_at[[record$tool_call_id]] <- Sys.time()
       private$agent_event(
         "tool_start",

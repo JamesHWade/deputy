@@ -52,6 +52,7 @@ lead_admit_delegation <- function(lead, definition, task, correlation) {
     manifest = NULL,
     working_context = NULL
   )
+  lead_observe_status(lead, id, "admitted")
   id
 }
 
@@ -63,6 +64,7 @@ lead_bind_delegation <- function(lead, id, child, manifest = NULL) {
   record$session_id <- child$session_id()
   record$run_context <- child$run_context
   private$subagent_runs[[id]] <- record
+  lead_observe_status(lead, id, "prepared")
   invisible(NULL)
 }
 
@@ -106,7 +108,8 @@ lead_settle_delegation <- function(
   child = NULL,
   result = NULL,
   error = NULL,
-  stop_reason = NULL
+  stop_reason = NULL,
+  observe = TRUE
 ) {
   private <- lead$.__enclos_env__$private
   record <- private$subagent_runs[[id]]
@@ -143,6 +146,9 @@ lead_settle_delegation <- function(
   record$completed_at <- Sys.time()
   private$subagent_runs[[id]] <- record
   lead_prepare_outcome(lead, id)
+  if (observe) {
+    lead_observe_status(lead, id, "settled")
+  }
   invisible(private$subagent_runs[[id]])
 }
 
@@ -225,6 +231,7 @@ lead_run_delegation <- function(
           record$started_at <- Sys.time()
           private$subagent_runs[[id]] <- record
           private$active_subagents[[id]] <- child
+          lead_observe_status(lead, id, "running")
           started <- TRUE
           lead_delegation_hook(lead, id, "SubagentStart", definition)
           if (
@@ -246,7 +253,8 @@ lead_run_delegation <- function(
       result,
       error,
       stop_reason = private$subagent_runs[[id]]$cancel_reason %||%
-        private$stop_reason_from_hook
+        private$stop_reason_from_hook,
+      observe = FALSE
     )
     private$release_delegation_usage(id)
     private$current_external_usage <- agent_usage_add(
@@ -269,6 +277,7 @@ lead_run_delegation <- function(
         }
       )
     }
+    lead_observe_status(lead, id, "settled")
     list(
       result = result,
       error = error,

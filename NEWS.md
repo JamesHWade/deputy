@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* `LeadAgent$observe_subagents()` provides authorized snapshots and bounded
+  child event cursors without driving execution. Overflow and omitted content
+  are explicit, readers detach independently, and targeted host cancellation
+  uses the separate `interrupt_subagent()` control (#157).
+
 * `LeadAgent` returns compact `DelegationOutcome` values and offers authorized,
   redacted child inspection through `DelegationDisclosure`. Large answers use
   existing artifact offloading; settled native ellmer history can be exported
