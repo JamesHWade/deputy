@@ -10,7 +10,9 @@ formats remain unchanged by the moves.
 | Public Agent API, construction, runtime wiring and policy | `R/agent.R` |
 | S7 AgentDefinition values and routing normalization | `R/agent-definition.R` |
 | Portable YAML definition format and explicit registry resolution | `R/agent-definition-files.R` |
-| Mutable LeadAgent registry and delegation lifecycle | `R/agents-multi.R` |
+| Mutable LeadAgent registry and delegated policy | `R/agents-multi.R` |
+| Admitted delegation records, lifecycle hooks and child settlement | `R/delegation-lifecycle.R` |
+| Stateless responder wave scheduling | `R/parallel-delegate.R` |
 | S7 Skill configuration and requirement inspection | `R/skill.R` |
 | Skill directory discovery, metadata, and explicit tool loading | `R/skills.R` |
 | Shared governed stream, adapters and finalization | `R/agent-stream.R` |

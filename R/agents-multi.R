@@ -217,11 +217,32 @@ LeadAgent <- R6::R6Class(
     },
 
     #' @description
-    #' List delegated sub-agent runs, including failures.
+    #' Interrupt the lead and its active subagents cooperatively.
+    #' @param reason Stable reason retained on stopped runs.
+    #' @return Invisible logical indicating whether the lead was active.
+    interrupt = function(reason = "interrupted") {
+      active <- super$interrupt(reason)
+      if (isTRUE(active)) {
+        for (child in private$active_subagents) {
+          child$interrupt(reason)
+        }
+      }
+      invisible(active)
+    },
+
+    #' @description
+    #' List admitted subagent delegations in admission order, including live work.
+    #' Status is `queued`, `running`, `completed`, `failed`, `stopped`,
+    #' `not_started`, or `suspended` (for supported approval suspensions).
+    #' `completed` means the run stopped with `complete`, not verified task success.
+    #' `stop_reason` retains the exact runtime reason. Identifiers and timestamps
+    #' are `NA` until assigned. `completed_at` marks settlement of this invocation,
+    #' including suspension. `hook_error` records observer errors independently.
+    #' These in-memory records are not durable jobs or a token event feed.
     #'
-    #' @return Data frame with one row per sub-agent run
+    #' @return Data frame with one row per admitted delegation
     list_subagents = function() {
-      runs <- private$subagent_runs
+      runs <- lead_delegation_records(self)
       if (length(runs) == 0) {
         return(data.frame(
           agent_name = character(),
@@ -234,6 +255,9 @@ LeadAgent <- R6::R6Class(
           tool_call_id = character(),
           task = character(),
           status = character(),
+          stop_reason = character(),
+          admitted_at = as.POSIXct(character()),
+          hook_error = character(),
           started_at = as.POSIXct(character()),
           completed_at = as.POSIXct(character()),
           error = character(),
@@ -254,7 +278,10 @@ LeadAgent <- R6::R6Class(
             delegation_id = run$delegation_id %||% NA_character_,
             tool_call_id = run$tool_call_id %||% NA_character_,
             task = run$task,
-            status = run$status %||% "completed",
+            status = run$status,
+            stop_reason = run$stop_reason %||% NA_character_,
+            admitted_at = as.POSIXct(run$admitted_at, tz = "UTC"),
+            hook_error = run$hook_error %||% NA_character_,
             started_at = as.POSIXct(run$started_at, tz = "UTC"),
             completed_at = as.POSIXct(run$completed_at, tz = "UTC"),
             error = run$error %||% NA_character_,
@@ -269,9 +296,10 @@ LeadAgent <- R6::R6Class(
     #'
     #' @param agent_name Optional sub-agent name filter
     #' @param delegation_id Optional delegation identifier filter
-    #' @return List of [AgentResult] objects or `NULL` entries for failed runs
+    #' @return List of [AgentResult] objects in admission order, with `NULL` for
+    #'   live, unstarted, or failed runs that did not return an AgentResult
     get_subagent_results = function(agent_name = NULL, delegation_id = NULL) {
-      runs <- private$subagent_runs
+      runs <- lead_delegation_records(self)
       if (!is.null(agent_name)) {
         runs <- Filter(
           function(run) identical(run$agent_name, agent_name),
@@ -288,13 +316,16 @@ LeadAgent <- R6::R6Class(
     },
 
     #' @description
-    #' Get stored turn history for delegated sub-agent runs.
+    #' Get current or retained conversation turns for admitted delegations.
+    #' Live snapshots contain available turns, not every in-flight token.
+    #' Reading history does not add it to the lead's model context. Hosts must
+    #' authorize and redact disclosures before exposing these records to users.
     #'
     #' @param agent_name Optional sub-agent name filter
     #' @param session_id Optional sub-agent session id filter
     #' @return List of turn histories
     get_subagent_messages = function(agent_name = NULL, session_id = NULL) {
-      runs <- private$subagent_runs
+      runs <- lead_delegation_records(self)
       if (!is.null(agent_name)) {
         runs <- Filter(
           function(run) identical(run$agent_name, agent_name),
@@ -430,167 +461,48 @@ LeadAgent <- R6::R6Class(
             ))
           }
 
-          # Derive the child budget before creating it. The reservation is
-          # recorded before this tool returns its promise, so concurrent tool
-          # calls cannot all receive the same remaining lead-agent budget.
-          child_usage_limits <- private$derive_subagent_usage_limits(def)
-          sub_agent <- private$create_sub_agent(
-            def,
-            correlation,
-            usage_limits = child_usage_limits
-          )
-
-          # Run the task
-          cli::cli_alert_info("Delegating to {.val {agent_name}}: {task}")
-          started_at <- Sys.time()
-
-          private$fire_hook(
-            "SubagentStart",
-            agent_name = agent_name,
-            task = task,
-            context = private$hook_context(
-              agent_definition = def,
-              tool_call_id = correlation$tool_call_id,
-              parent_agent_id = correlation$parent_agent_id,
-              parent_run_id = correlation$parent_run_id,
-              child_agent_id = sub_agent$agent_id,
-              child_agent_name = sub_agent$agent_name,
-              child_run_context = sub_agent$run_context,
-              delegation_id = correlation$delegation_id
-            )
-          )
-
-          task_to_run <- task
-          if (
-            !is.null(def$initial_prompt) && nzchar(trimws(def$initial_prompt))
-          ) {
-            task_to_run <- paste(def$initial_prompt, task, sep = "\n\n")
-          }
-
-          # Record the run before invoking so failures aren't lost when
-          # `tool_reject` short-circuits the rest of this closure.
-          record_run <- function(
-            status,
-            result_text = NULL,
-            error = NULL,
-            usage = NULL,
-            agent_result = NULL
-          ) {
-            child_run_id <- agent_result$run_id %||%
-              sub_agent$.__enclos_env__$private$current_run_id
-            private$subagent_runs <- c(
-              private$subagent_runs,
-              list(list(
-                agent_name = agent_name,
-                agent_id = sub_agent$agent_id,
-                parent_agent_id = correlation$parent_agent_id,
-                task = task,
-                session_id = sub_agent$session_id(),
-                run_id = child_run_id,
-                parent_run_id = correlation$parent_run_id,
-                delegation_id = correlation$delegation_id,
-                tool_call_id = correlation$tool_call_id,
-                run_context = agent_result$run_context %||%
-                  sub_agent$run_context,
-                started_at = started_at,
-                completed_at = Sys.time(),
-                status = status,
-                result = result_text,
-                error = error,
-                usage = usage,
-                agent_result = agent_result,
-                turns = tryCatch(sub_agent$turns(), error = function(e) list())
-              ))
-            )
-          }
-
-          private$reserve_delegation_usage(
-            correlation$delegation_id,
-            child_usage_limits
-          )
-          reservation_active <- TRUE
-          settle_usage <- function(usage) {
-            if (!isTRUE(reservation_active)) {
-              return(invisible(NULL))
+          id <- lead_admit_delegation(lead_agent, def, task, correlation)
+          child <- tryCatch(
+            {
+              limits <- private$derive_subagent_usage_limits(def)
+              child <- private$create_sub_agent(def, correlation, limits)
+              lead_bind_delegation(lead_agent, id, child)
+              child
+            },
+            error = function(condition) {
+              lead_settle_delegation(
+                lead_agent,
+                id,
+                error = condition,
+                stop_reason = "setup_error"
+              )
+              stop(condition)
             }
-            private$release_delegation_usage(correlation$delegation_id)
-            reservation_active <<- FALSE
-            private$add_external_usage(usage)
-            invisible(NULL)
-          }
-
-          promises::promise_resolve(NULL) |>
-            promises::then(function(...) {
-              sub_agent$run_async(task_to_run)
-            }) |>
-            promises::then(function(sub_result) {
-              settle_usage(sub_result$usage)
-              result <- sub_result$response
-
-              private$fire_hook(
-                "SubagentStop",
-                agent_name = agent_name,
-                task = task,
-                result = result,
-                context = private$hook_context(
-                  status = "completed",
-                  tool_call_id = correlation$tool_call_id,
-                  parent_agent_id = correlation$parent_agent_id,
-                  parent_run_id = correlation$parent_run_id,
-                  child_agent_id = sub_agent$agent_id,
-                  child_agent_name = sub_agent$agent_name,
-                  child_run_id = sub_result$run_id,
-                  child_run_context = sub_result$run_context,
-                  delegation_id = correlation$delegation_id
+          )
+          # Reserve before returning the promise, so concurrent calls cannot
+          # each receive the same remaining budget.
+          private$reserve_delegation_usage(id, limits)
+          cli::cli_alert_info("Delegating to {.val {def$name}}: {task}")
+          lead_run_delegation(lead_agent, id, child, def, task) |>
+            promises::then(function(outcome) {
+              if (!is.null(private$current_usage_limits)) {
+                limit <- usage_limit_status(
+                  private$current_run_usage(),
+                  private$current_usage_limits,
+                  require_followup = TRUE
                 )
-              )
-
-              record_run(
-                status = "completed",
-                result_text = result,
-                usage = sub_result$usage,
-                agent_result = sub_result
-              )
-              result
-            }) |>
-            promises::catch(function(e) {
-              failed_usage <- sub_agent$.__enclos_env__$private$last_run_usage
-              settle_usage(failed_usage)
-              cli::cli_alert_danger(
-                "Sub-agent {.val {agent_name}} failed: {e$message}"
-              )
-              record_run(
-                status = "failed",
-                error = e$message,
-                usage = failed_usage,
-                agent_result = NULL
-              )
-              child_run_id <- sub_agent$.__enclos_env__$private$current_run_id
-              private$fire_hook(
-                "SubagentStop",
-                agent_name = agent_name,
-                task = task,
-                result = NULL,
-                context = private$hook_context(
-                  status = "failed",
-                  error = e$message,
-                  tool_call_id = correlation$tool_call_id,
-                  parent_agent_id = correlation$parent_agent_id,
-                  parent_run_id = correlation$parent_run_id,
-                  child_agent_id = sub_agent$agent_id,
-                  child_agent_name = sub_agent$agent_name,
-                  child_run_id = child_run_id,
-                  child_run_context = sub_agent$run_context,
-                  delegation_id = correlation$delegation_id
-                )
-              )
-              ellmer::tool_reject(paste0(
-                "Sub-agent '",
-                agent_name,
-                "' failed.\n",
-                "Error: ",
-                e$message
-              ))
+                if (!is.null(limit)) private$mark_usage_limit(limit)
+              }
+              if (!is.null(outcome$error)) {
+                ellmer::tool_reject(paste0(
+                  "Sub-agent '",
+                  def$name,
+                  "' failed.\n",
+                  "Error: ",
+                  conditionMessage(outcome$error)
+                ))
+              }
+              outcome$result$response %||% "Subagent did not start."
             })
         },
         name = "delegate_to_agent",
@@ -917,6 +829,7 @@ LeadAgent <- R6::R6Class(
 
     .sub_agent_defs = list(),
     subagent_runs = list(),
+    active_subagents = list(),
     delegation_usage_reservations = list()
   )
 )

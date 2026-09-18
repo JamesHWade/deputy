@@ -73,132 +73,23 @@ parallel_child_limits <- function(remaining, definition, count, index) {
   do.call(UsageLimits, allocation)
 }
 
-parallel_responder <- function(
-  lead,
-  child,
-  definition,
-  task,
-  correlation,
-  limits,
-  state
-) {
+parallel_responder <- function(lead, item, state) {
   private <- lead$.__enclos_env__$private
-  coro::async(function() {
-    on.exit(
-      {
-        private$release_delegation_usage(correlation$delegation_id)
-        state$active[[definition$name]] <- NULL
-      },
-      add = TRUE
-    )
-    error <- NULL
-    started_at <- Sys.time()
-    result <- tryCatch(
-      {
-        if (isTRUE(private$should_stop)) {
-          return(list(result = NULL, error = NULL, status = "not_started"))
-        }
-        lead$hooks$fire(
-          "SubagentStart",
-          agent_name = definition$name,
-          task = task,
-          context = private$hook_context(
-            agent_definition = definition,
-            parent_agent_id = correlation$parent_agent_id,
-            parent_run_id = correlation$parent_run_id,
-            child_agent_id = child$agent_id,
-            child_agent_name = child$agent_name,
-            child_run_context = child$run_context,
-            delegation_id = correlation$delegation_id
-          )
-        )
-        if (isTRUE(private$should_stop)) {
-          NULL
-        } else {
-          task_to_run <- task
-          if (!is.null(definition$initial_prompt)) {
-            task_to_run <- paste(definition$initial_prompt, task, sep = "\n\n")
-          }
-          coro::await(child$run_async(task_to_run, usage_limits = limits))
-        }
-      },
-      error = function(condition) {
-        error <<- condition
-        NULL
+  lead_run_delegation(
+    lead,
+    item$correlation$delegation_id,
+    item$child,
+    item$definition,
+    item$task,
+    item$limits
+  ) |>
+    promises::then(function(outcome) {
+      limit <- usage_limit_status(private$current_run_usage(), state$limits)
+      if (!is.null(limit)) {
+        private$mark_usage_limit(limit)
       }
-    )
-    usage <- result$usage %||%
-      child$.__enclos_env__$private$last_run_usage %||%
-      AgentUsage()
-    private$current_external_usage <- agent_usage_add(
-      private$current_external_usage,
-      usage
-    )
-    if (!is.null(error)) {
-      status <- "failed"
-    } else if (is.null(result)) {
-      status <- "not_started"
-    } else if (identical(result$stop_reason, "complete")) {
-      status <- "completed"
-    } else if (result$stop_reason %in% c("error", "provider_error")) {
-      status <- "failed"
-    } else {
-      status <- "stopped"
-    }
-    child_run_id <- result$run_id %||%
-      child$.__enclos_env__$private$current_run_id
-    tryCatch(
-      lead$hooks$fire(
-        "SubagentStop",
-        agent_name = definition$name,
-        task = task,
-        result = result$response,
-        context = private$hook_context(
-          status = status,
-          error = if (!is.null(error)) conditionMessage(error),
-          parent_agent_id = correlation$parent_agent_id,
-          parent_run_id = correlation$parent_run_id,
-          child_agent_id = child$agent_id,
-          child_agent_name = child$agent_name,
-          child_run_id = child_run_id,
-          child_run_context = child$run_context,
-          delegation_id = correlation$delegation_id
-        )
-      ),
-      error = function(condition) {
-        error <<- condition
-        status <<- "failed"
-      }
-    )
-    private$subagent_runs <- c(
-      private$subagent_runs,
-      list(list(
-        agent_name = definition$name,
-        agent_id = child$agent_id,
-        parent_agent_id = lead$agent_id,
-        task = task,
-        session_id = child$session_id(),
-        run_id = child_run_id,
-        parent_run_id = correlation$parent_run_id,
-        delegation_id = correlation$delegation_id,
-        tool_call_id = NULL,
-        run_context = child$run_context,
-        started_at = started_at,
-        completed_at = Sys.time(),
-        status = status,
-        result = result$response,
-        error = if (!is.null(error)) conditionMessage(error),
-        usage = usage,
-        agent_result = result,
-        turns = child$turns()
-      ))
-    )
-    limit <- usage_limit_status(private$current_run_usage(), state$limits)
-    if (!is.null(limit)) {
-      private$mark_usage_limit(limit)
-    }
-    list(result = result, error = error, status = status)
-  })()
+      outcome
+    })
 }
 
 lead_parallel_delegate <- function(
@@ -225,17 +116,25 @@ lead_parallel_delegate <- function(
       )
     }
     state <- private$new_callback_run_state()
-    state$active <- list()
     controller <- list(cancel = function(reason = "interrupted") {
-      for (child in state$active) {
+      for (child in private$active_subagents) {
         child$interrupt(reason)
       }
     })
     completed <- FALSE
+    admitted <- character()
     on.exit(
       {
         if (!completed) {
           state$reason <- "error"
+        }
+        for (id in admitted) {
+          lead_settle_delegation(
+            lead,
+            id,
+            stop_reason = private$stop_reason_from_hook %||%
+              if (completed) "not_started" else "batch_error"
+          )
         }
         private$finish_callback_run(state)
       },
@@ -250,8 +149,8 @@ lead_parallel_delegate <- function(
       controller
     )
     count <- length(selected$tasks)
-    # Prepare the complete batch before any provider request. Fresh Chat
-    # objects are cheap; max_active bounds network activity.
+    # Admit every selected task before preparing children. Failed preparation
+    # must retain the failing record and unstarted siblings without paid work.
     prepared <- lapply(seq_len(count), function(index) {
       definition <- selected$definitions[[index]]
       correlation <- list(
@@ -261,21 +160,36 @@ lead_parallel_delegate <- function(
         run_context = context,
         tool_call_id = NULL
       )
-      child <- private$create_sub_agent(
-        definition,
-        correlation,
-        UsageLimits(
-          max_requests = min(1L, definition$max_requests %||% 1L),
-          max_tool_calls = 0L
+      task <- selected$tasks[[index]]
+      id <- lead_admit_delegation(lead, definition, task, correlation)
+      admitted <<- c(admitted, id)
+      list(definition = definition, correlation = correlation, task = task)
+    })
+    # Prepare the complete batch before any provider request.
+    prepared <- lapply(prepared, function(item) {
+      id <- item$correlation$delegation_id
+      item$child <- tryCatch(
+        private$create_sub_agent(
+          item$definition,
+          item$correlation,
+          UsageLimits(
+            max_requests = min(1L, item$definition$max_requests %||% 1L),
+            max_tool_calls = 0L
+          ),
+          stateless = TRUE
         ),
-        stateless = TRUE
+        error = function(condition) {
+          lead_settle_delegation(
+            lead,
+            id,
+            error = condition,
+            stop_reason = "setup_error"
+          )
+          stop(condition)
+        }
       )
-      list(
-        child = child,
-        definition = definition,
-        correlation = correlation,
-        task = selected$tasks[[index]]
-      )
+      lead_bind_delegation(lead, id, item$child)
+      item
     })
     outcomes <- rep(
       list(list(
@@ -322,20 +236,18 @@ lead_parallel_delegate <- function(
           item$correlation$delegation_id,
           item$limits
         )
-        state$active[[item$definition$name]] <- item$child
-        parallel_responder(
-          lead,
-          item$child,
-          item$definition,
-          item$task,
-          item$correlation,
-          item$limits,
-          state
-        )
+        parallel_responder(lead, item, state)
       })
       wave_outcomes <- coro::await(promises::promise_all(.list = promises))
       outcomes[indices] <- wave_outcomes
       next_index <- next_index + wave_size
+    }
+    for (id in admitted) {
+      lead_settle_delegation(
+        lead,
+        id,
+        stop_reason = private$stop_reason_from_hook %||% "not_started"
+      )
     }
     statuses <- vapply(outcomes, `[[`, character(1), "status")
     if (isTRUE(private$should_stop)) {

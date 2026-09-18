@@ -138,7 +138,7 @@ Child construction does not explicitly bind lead hooks or `approval_dir`. The
 definition selects tools, which may themselves capture mutable state. Therefore
 static permission inheritance alone does not define host approval routing,
 interactive input, scoped R workers, or cleanup ownership. Host policy must explicitly
-bind or reject these cases before dispatch; blindly copying every hook or closure
+bind or reject these cases before delegation; blindly copying every hook or closure
 would introduce different bugs.
 
 Already implemented and to be reused:

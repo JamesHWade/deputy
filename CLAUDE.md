@@ -30,6 +30,7 @@ deputy/
 │   ├── approval-store.R     # Locked immutable approval revisions
 │   ├── agent-requests.R    # Public ellmer callbacks and explicit fallback
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
+│   ├── delegation-lifecycle.R # Shared live records and child settlement
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
 │   ├── compaction-run.R    # Governed asynchronous summary attempts and recovery
@@ -758,3 +759,7 @@ size exception for the public Agent facade.
 `dev/subagent-context-research.md` records the 2026-09-17 source review of btw,
 Trusted Mini-Agents, and recent delegation guidance, with the implementation
 backlog in #148. Its proposed contracts are not implemented runtime guarantees.
+
+`dev/subagent-chat-exposure.md` records the ellmer/shinychat upstream research
+and the separate child inspection and event-routing work. Lifecycle records do
+not themselves implement nested streaming or durable child conversations.
