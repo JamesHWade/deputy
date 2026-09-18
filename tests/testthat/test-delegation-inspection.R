@@ -333,3 +333,23 @@ test_that("explicit claims and omitted references cannot change runtime truth", 
   expect_identical(outcome$claims$unresolved_work, "repeat assay")
   expect_identical(outcome$runtime$task_success, "not_assessed")
 })
+
+
+test_that("tool failures replay as portable errors without condition environments", {
+  request <- ellmer::ContentToolRequest(
+    id = "failed-tool",
+    name = "fixture",
+    arguments = list()
+  )
+  result <- ellmer::ContentToolResult(
+    value = NULL,
+    error = simpleError("fixture failure"),
+    request = request
+  )
+  replay <- inspection_replay(inspection_record_turn(ellmer::UserTurn(list(
+    result
+  ))))
+  expect_identical(replay@contents[[1L]]@error, "fixture failure")
+  expect_identical(replay@contents[[1L]]@request@id, "failed-tool")
+  expect_null(replay@contents[[1L]]@request@tool)
+})

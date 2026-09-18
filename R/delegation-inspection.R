@@ -267,6 +267,9 @@ inspection_record_turn <- function(turn) {
     }
     if (inherits(content, "ellmer::ContentToolResult")) {
       content@extra <- list()
+      if (inherits(content@error, "condition")) {
+        content@error <- conditionMessage(content@error)
+      }
       if (!is.null(content@request)) content@request <- clean(content@request)
     }
     content
