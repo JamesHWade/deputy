@@ -243,7 +243,7 @@ server <- function(input, output, session) {
   observe({
     invalidateLater(500, session)
     turns <- lead$get_turns()
-    signature <- digest::digest(lapply(turns, ellmer::contents_record))
+    signature <- child_chat_signature(turns)
     if (!identical(signature, current_signature)) {
       current_signature <<- signature
       shinychat::chat_clear("lead")

@@ -75,7 +75,8 @@ child_chat_fixture <- function() {
           }
           results <- Filter(function(msg) msg$role == "tool", request$messages)
           scenario <- readRDS(file.path(directory, "scenario.rds"))
-          Sys.sleep(if (is.null(child)) 0.3 else 1.5)
+          # Leave enough time to inspect and cancel a running child by hand.
+          Sys.sleep(if (is.null(child)) 0.3 else 5)
           if (
             identical(child, "auditor") &&
               isTRUE(scenario$fail) &&
@@ -222,4 +223,22 @@ child_chat_fixture <- function() {
       unlink(directory, recursive = TRUE)
     }
   )
+}
+
+
+# Fingerprint display data, never the environments attached to error conditions.
+child_chat_signature <- function(turns) {
+  display_data <- function(x) {
+    if (inherits(x, "condition")) {
+      return(conditionMessage(x))
+    }
+    if (is.environment(x) || is.function(x)) {
+      return(NULL)
+    }
+    if (is.list(x)) {
+      return(lapply(x, display_data))
+    }
+    x
+  }
+  digest::digest(display_data(lapply(turns, ellmer::contents_record)))
 }

@@ -207,3 +207,28 @@ test_that("native JSON tool content uses safe markdown instead of raw HTML", {
     ellmer::ContentToolResult(list(json), request = request)
   )))))
 })
+
+
+test_that("demo fingerprints retain failure text without condition environments", {
+  fixture <- new.env(parent = globalenv())
+  sys.source(
+    test_path("..", "..", "inst", "examples", "subagent-chats", "fixture.R"),
+    fixture
+  )
+  turn <- function(message, state) {
+    error <- simpleError(message)
+    error$private <- state
+    ellmer::UserTurn(list(ellmer::ContentToolResult(error = error)))
+  }
+  first <- turn("failed", new.env())
+  same <- turn("failed", globalenv())
+  changed <- turn("different failure", globalenv())
+  expect_identical(
+    fixture$child_chat_signature(list(first)),
+    fixture$child_chat_signature(list(same))
+  )
+  expect_false(identical(
+    fixture$child_chat_signature(list(first)),
+    fixture$child_chat_signature(list(changed))
+  ))
+})

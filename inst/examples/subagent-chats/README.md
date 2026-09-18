@@ -14,7 +14,8 @@ the fixture and removes its temporary data.
 
 Run two specialists, select their activity cards, and expand a native tool card
 to inspect the retained evidence plot. Both definitions have explicit request
-budgets. Repeat the analyst to see a distinct conversation for the same name.
+budgets. Child responses pause for five seconds so running work can be inspected
+and cancelled by hand. Repeat the analyst to see a distinct conversation for the same name.
 Enable the auditor failure to retain partial evidence after a provider error;
 the large-answer option exercises compact outcomes and artifact offloading.
 
