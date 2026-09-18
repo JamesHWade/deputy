@@ -458,3 +458,28 @@ test_that("JSON escaping is budgeted before classed payload materialization", {
     2048L
   ))
 })
+
+
+test_that("timestamp projections are bounded before formatting", {
+  local_mocked_bindings(inspection_record_turn = function(...) {
+    stop("must not materialize")
+  })
+  time <- as.POSIXct("2026-09-18 12:34:56", tz = "UTC")
+  for (value in list(
+    rep(time, 100L),
+    as.POSIXlt(rep(time, 100L)),
+    rep(as.Date(time), 100L)
+  )) {
+    expect_false(observation_payload_fits(value, 2048L))
+    expect_identical(
+      observation_payload(
+        AgentEvent("content", content = ellmer::ContentToolResult(value)),
+        max_bytes = 2048L
+      )$content_omitted,
+      "oversized"
+    )
+  }
+  expect_true(observation_payload_fits(time, 2048L))
+  payload <- observation_payload(AgentEvent("tool_end", value = time))
+  expect_match(payload$value, "2026-09-18", fixed = TRUE)
+})

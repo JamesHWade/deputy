@@ -748,3 +748,31 @@ test_that("compact references exclude host scope and storage routing", {
   expect_null(compact$references[[1L]]$storage_session_id)
   expect_identical(delegation_outcome(record)$references[[1L]], ref)
 })
+
+
+test_that("compact runtime metadata cannot grow with host labels and correlations", {
+  record <- list(
+    answer = "",
+    agent_name = strrep("a", 100000),
+    tool_call_id = strrep("t", 100000),
+    references = list(list(
+      reference = "artifact://fixture",
+      tool_call_id = strrep("t", 100000)
+    ))
+  )
+  outcome <- delegation_outcome(record, compact = TRUE)
+  expect_identical(outcome$runtime$agent_name, strrep("a", 512L))
+  expect_null(outcome$runtime$tool_call_id)
+  expect_null(outcome$references[[1L]]$tool_call_id)
+  expect_identical(outcome$references[[1L]]$reference, "artifact://fixture")
+  expect_identical(outcome$runtime$omitted_fields, "tool_call_id")
+  expect_lt(nchar(jsonlite::toJSON(S7::props(outcome)), type = "bytes"), 2048L)
+  expect_identical(
+    delegation_outcome(record)$runtime$agent_name,
+    record$agent_name
+  )
+  expect_identical(
+    delegation_outcome(record)$runtime$tool_call_id,
+    record$tool_call_id
+  )
+})
