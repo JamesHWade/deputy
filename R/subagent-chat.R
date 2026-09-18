@@ -121,6 +121,7 @@ subagent_chat_server <- function(
     state <- new.env(parent = emptyenv())
     state$reader <- NULL
     state$lead <- NULL
+    state$requester <- NULL
     state$history <- NULL
     state$partial <- ""
     detach <- function() {
@@ -161,6 +162,7 @@ subagent_chat_server <- function(
           )
         )
       }
+      current <- filter_views(current)
       if (!length(current)) {
         selected(NULL)
         clear()
@@ -191,7 +193,27 @@ subagent_chat_server <- function(
       ))
       invisible(view)
     }
+    filter_views <- function(next_views) {
+      Filter(
+        function(view) {
+          id <- view$outcome$runtime$delegation_id
+          is.character(id) && length(id) == 1L && !is.na(id) && nzchar(id)
+        },
+        next_views
+      )
+    }
     update_views <- function(next_views) {
+      next_views <- filter_views(next_views)
+      ids <- vapply(
+        next_views,
+        function(view) view$outcome$runtime$delegation_id,
+        character(1)
+      )
+      if (!is.null(selected()) && !selected() %in% ids) {
+        selected(NULL)
+        clear()
+        notice("The selected child is no longer available.")
+      }
       views(next_views)
       choices <- stats::setNames(
         vapply(
@@ -203,8 +225,8 @@ subagent_chat_server <- function(
           next_views,
           function(view) {
             paste(
-              view$outcome$runtime$agent_name,
-              view$outcome$runtime$status,
+              view$outcome$runtime$agent_name %||% "Child",
+              view$outcome$runtime$status %||% "Status unavailable",
               inspection_text(view$task, 50L),
               sep = " \u00b7 "
             )
@@ -225,6 +247,13 @@ subagent_chat_server <- function(
         {
           saved <- value(history)
           current_lead <- value(lead)
+          current_requester <- requester()
+          requester_changed <- !identical(current_requester, state$requester)
+          if (requester_changed) {
+            detach()
+            clear()
+            state$requester <- current_requester
+          }
           if (!is.null(saved)) {
             detach()
             current <- delegation_history(
@@ -233,8 +262,11 @@ subagent_chat_server <- function(
               value(disclosure),
               value(scope)
             )
+            current <- filter_views(current)
             if (
-              !identical(saved, state$history) || !identical(current, views())
+              requester_changed ||
+                !identical(saved, state$history) ||
+                !identical(current, views())
             ) {
               state$history <- saved
               update_views(current)
@@ -247,7 +279,9 @@ subagent_chat_server <- function(
           }
           if (closed()) {
             detach()
-            current <- current_lead$inspect_subagents(requester())
+            current <- filter_views(current_lead$inspect_subagents(
+              current_requester
+            ))
             if (!identical(current, views())) {
               update_views(current)
             }
@@ -259,12 +293,14 @@ subagent_chat_server <- function(
           if (changed || is.null(state$reader)) {
             detach()
             state$lead <- current_lead
-            state$reader <- current_lead$observe_subagents(requester())
+            state$reader <- current_lead$observe_subagents(current_requester)
             update_views(state$reader$snapshot()$children)
             render_child()
           }
           update <- state$reader$poll()
-          fresh_views <- current_lead$inspect_subagents(requester())
+          fresh_views <- filter_views(current_lead$inspect_subagents(
+            current_requester
+          ))
           disclosure_changed <- !identical(fresh_views, views())
           if (
             length(update$events) || length(update$gaps) || disclosure_changed
@@ -434,7 +470,7 @@ subagent_chat_server <- function(
         !is.null(on_cancel) &&
           is.null(value(history)) &&
           !is.null(view) &&
-          view$outcome$runtime$status %in% c("queued", "running")
+          isTRUE(view$outcome$runtime$status %in% c("queued", "running"))
       ) {
         shiny::actionButton(
           session$ns("cancel"),
@@ -473,7 +509,7 @@ subagent_chat_server <- function(
         if (nzchar(view$outcome$answer %||% "")) {
           shiny::tags$details(
             shiny::tags$summary(
-              if (runtime$status == "completed") {
+              if (identical(runtime$status, "completed")) {
                 "Outcome"
               } else {
                 "Partial outcome"

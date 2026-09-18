@@ -232,3 +232,91 @@ test_that("demo fingerprints retain failure text without condition environments"
     fixture$child_chat_signature(list(changed))
   ))
 })
+
+
+test_that("changing the requester replaces the event disclosure context", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("bslib")
+  requester <- shiny::reactiveVal("first")
+  lead <- parallel_test_lead(
+    new.env(parent = emptyenv()),
+    delegation_disclosure = DelegationDisclosure(
+      authorize = function(requester, scope) TRUE,
+      redact = function(view, requester) {
+        if (
+          identical(view$event$type, "text") && identical(requester, "second")
+        ) {
+          view$event$data$text <- NULL
+        }
+        view
+      }
+    )
+  )
+  lead$parallel_delegate(c(a = "one"))
+  id <- lead$list_subagents()$delegation_id[[1L]]
+  shiny::testServer(
+    subagent_chat_server,
+    args = list(lead = lead, requester = requester),
+    {
+      session$flushReact()
+      id <- lead$list_subagents()$delegation_id[[1L]]
+      session$setInputs(selected = id)
+      session$flushReact()
+      expect_identical(selected(), id)
+      lead_observe_event(lead, id, AgentEvent("text", text = "first user only"))
+      session$elapse(300)
+      session$flushReact()
+      expect_identical(state$partial, "first user only")
+      previous <- state$reader
+      requester("second")
+      session$elapse(300)
+      session$flushReact()
+      expect_false(identical(state$reader, previous))
+      expect_identical(state$requester, "second")
+      expect_identical(state$partial, "")
+      lead_observe_event(lead, id, AgentEvent("text", text = "first user only"))
+      session$elapse(300)
+      session$flushReact()
+      expect_identical(state$partial, "")
+      expect_length(views(), 1L)
+    }
+  )
+})
+
+test_that("redacted identities do not hide remaining child views", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("bslib")
+  owner <- new.env(parent = emptyenv())
+  owner$allowed <- TRUE
+  owner$hidden <- FALSE
+  lead <- chat_fixture_lead(owner, redact = function(view, requester) {
+    if (owner$hidden && identical(view$outcome$runtime$agent_name, "a")) {
+      view$outcome <- NULL
+    } else {
+      view$outcome$runtime$status <- NULL
+      view$outcome$runtime$agent_name <- NULL
+    }
+    view
+  })
+  lead$parallel_delegate(c(a = "one", b = "two"))
+  id <- lead$list_subagents()$delegation_id[[1L]]
+  shiny::testServer(
+    subagent_chat_server,
+    args = list(lead = lead, requester = function() owner),
+    {
+      session$flushReact()
+      id <- lead$list_subagents()$delegation_id[[1L]]
+      session$setInputs(selected = id)
+      session$flushReact()
+      expect_length(views(), 2L)
+      expect_type(output$details$html, "character")
+      owner$hidden <- TRUE
+      session$elapse(300)
+      session$flushReact()
+      expect_length(views(), 1L)
+      expect_null(selected())
+      expect_match(output$notice, "no longer available")
+      expect_type(output$activity$html, "character")
+    }
+  )
+})
