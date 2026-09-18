@@ -183,3 +183,27 @@ test_that("saved nested lineage remains visible without recursive execution", {
   )
   expect_equal(lead$usage(), before)
 })
+
+test_that("native JSON tool content uses safe markdown instead of raw HTML", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  json <- ellmer::contents_replay(list(
+    version = 1,
+    class = "ellmer::ContentJson",
+    props = list(
+      data = list(text = "<img src=x onerror=alert(1)>"),
+      string = NULL
+    )
+  ))
+  safe <- subagent_chat_safe_content(json)
+  expect_s7_class(safe, ellmer::ContentText)
+  expect_match(safe@text, "```json", fixed = TRUE)
+  expect_match(safe@text, "&lt;img", fixed = TRUE)
+  request <- ellmer::ContentToolRequest(
+    id = "json",
+    name = "fixture",
+    arguments = list()
+  )
+  expect_no_error(subagent_chat_messages(list(ellmer::UserTurn(list(
+    ellmer::ContentToolResult(list(json), request = request)
+  )))))
+})

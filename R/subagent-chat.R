@@ -547,6 +547,9 @@ subagent_chat_messages <- function(turns) {
 # Native markdown permits HTML. Escape raw markup in untrusted model/tool text,
 # while preserving markdown and typed image/document attachments.
 subagent_chat_safe_content <- function(content) {
+  if (inherits(content, "ellmer::ContentJson")) {
+    content <- ellmer::ContentText(ellmer::contents_markdown(content))
+  }
   if (inherits(content, "ellmer::ContentText")) {
     content@text <- as.character(htmltools::htmlEscape(content@text))
   } else if (
