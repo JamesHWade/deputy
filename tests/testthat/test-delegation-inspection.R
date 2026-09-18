@@ -776,3 +776,45 @@ test_that("compact runtime metadata cannot grow with host labels and correlation
     record$tool_call_id
   )
 })
+
+
+test_that("stop hooks retain and can read full-answer artifacts", {
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(
+    state,
+    delegation_disclosure = inspection_policy(),
+    context_policy = ContextPolicy(offload_dir = withr::local_tempdir())
+  )
+  state$responder <- function(...) strrep("x", 10000)
+  observed <- NULL
+  lead$add_hook(HookMatcher("SubagentStop", callback = function(context, ...) {
+    view <- lead$inspect_subagents("owner", context$delegation_id)[[1L]]
+    reference <- view$outcome$references[[1L]]$reference
+    observed <<- lead$read_subagent_result(
+      "owner",
+      context$delegation_id,
+      reference
+    )$result
+    NULL
+  }))
+  resolve_async_value(lead$get_tools()$delegate_to_agent("a", "short task"))
+  expect_type(observed, "character")
+  expect_match(observed, strrep("x", 100), fixed = TRUE)
+  expect_true(is.na(lead$list_subagents()$hook_error[[1L]]))
+})
+
+test_that("failure wrappers keep large errors out of model context", {
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state, delegation_disclosure = inspection_policy())
+  state$responder <- function(...) {
+    stop(simpleError(strrep("failure", 100000)))
+  }
+  failure <- tryCatch(
+    resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task")),
+    error = identity
+  )
+  expect_s3_class(failure, "error")
+  expect_lt(nchar(conditionMessage(failure), type = "bytes"), 8192L)
+  expect_match(conditionMessage(failure), "failure", fixed = TRUE)
+  expect_gt(nchar(lead$inspect_subagents("owner")[[1L]]$errors$error), 100000L)
+})
