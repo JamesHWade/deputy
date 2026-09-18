@@ -483,3 +483,36 @@ test_that("timestamp projections are bounded before formatting", {
   payload <- observation_payload(AgentEvent("tool_end", value = time))
   expect_match(payload$value, "2026-09-18", fixed = TRUE)
 })
+
+
+test_that("payload and metadata share one pre-serialization budget", {
+  lead <- observation_lead(
+    delegation_observation = DelegationObservation(
+      max_bytes = 16384,
+      max_event_bytes = 8192
+    )
+  )
+  lead$parallel_delegate(c(a = "one"))
+  id <- lead$list_subagents()$delegation_id[[1L]]
+  lead$.__enclos_env__$private$subagent_runs[[id]]$agent_name <- strrep(
+    "n",
+    3500
+  )
+  reader <- lead$observe_subagents("owner")
+  event <- AgentEvent("text", text = strrep("x", 6500))
+  sizes <- numeric()
+  original_serialize <- base::serialize
+  local_mocked_bindings(
+    serialize = function(object, ...) {
+      bytes <- original_serialize(object, ...)
+      sizes <<- c(sizes, length(bytes))
+      bytes
+    },
+    .package = "base"
+  )
+  lead_observe_event(lead, id, event)
+  expect_gt(length(sizes), 0L)
+  expect_true(all(sizes <= 8192))
+  update <- reader$poll()
+  expect_identical(update$events[[1L]]$data$content_omitted, "oversized")
+})

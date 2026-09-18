@@ -75,13 +75,10 @@ lead_observe_event <- function(lead, id, event) {
   if (is.null(buffer) || is.null(record)) {
     return(invisible(NULL))
   }
-  payload <- tryCatch(
-    observation_payload(event, buffer$policy$max_event_bytes),
-    error = function(e) {
-      list(content_omitted = "nonportable", recover = "snapshot")
-    }
-  )
-  if (is.null(payload)) {
+  if (
+    event$type == "content" &&
+      inherits(event$content, "ellmer::ContentThinking")
+  ) {
     return(invisible(NULL))
   }
   buffer$sequence <- buffer$sequence + 1
@@ -99,14 +96,37 @@ lead_observe_event <- function(lead, id, event) {
     tool_call_id = event$tool_call_id,
     type = event$type,
     timestamp = as.numeric(event$timestamp),
-    data = payload
+    data = NULL
   )
-  # Payload projection was bounded separately. Metadata has a fixed schema;
-  # preflight its values without charging fixed field names a second time.
+  # Bound fixed-schema metadata first, then charge its actual serialized size
+  # against the same allowance used for payload projection and serialization.
   metadata <- unname(envelope[names(envelope) != "data"])
   if (!observation_payload_fits(metadata, buffer$policy$max_event_bytes)) {
     return(invisible(NULL))
   }
+  metadata_bytes <- length(serialize(envelope, NULL, version = 3))
+  payload_budget <- buffer$policy$max_event_bytes - metadata_bytes
+  if (payload_budget <= 0) {
+    return(invisible(NULL))
+  }
+  payload <- tryCatch(
+    observation_payload(event, payload_budget),
+    error = function(e) {
+      list(content_omitted = "nonportable", recover = "snapshot")
+    }
+  )
+  if (is.null(payload)) {
+    return(invisible(NULL))
+  }
+  # The portable record can add structure to native Content. Check that final
+  # projection against the remaining allowance before serializing the envelope.
+  if (!observation_payload_fits(payload, payload_budget)) {
+    payload <- list(content_omitted = "oversized", recover = "snapshot")
+  }
+  if (!observation_payload_fits(payload, payload_budget)) {
+    return(invisible(NULL))
+  }
+  envelope$data <- payload
   bytes <- length(serialize(envelope, NULL, version = 3))
   if (bytes > buffer$policy$max_event_bytes) {
     envelope$data <- list(content_omitted = "oversized", recover = "snapshot")
