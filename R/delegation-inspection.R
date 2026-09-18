@@ -238,22 +238,41 @@ delegation_outcome <- function(record, compact = FALSE) {
     )
     references <- c(references[answer], references[!answer])
   }
+  runtime <- record[c(
+    "delegation_id",
+    "agent_id",
+    "agent_name",
+    "session_id",
+    "run_id",
+    "parent_agent_id",
+    "parent_run_id",
+    "tool_call_id",
+    "status",
+    "stop_reason"
+  )]
+  compact_fields <- function(fields) {
+    fields$omitted_fields <- names(Filter(
+      function(value) {
+        is.character(value) &&
+          (length(value) != 1L ||
+            anyNA(value) ||
+            nchar(enc2utf8(value), type = "bytes") > 1024L)
+      },
+      fields
+    ))
+    fields[fields$omitted_fields] <- NULL
+    fields
+  }
+  if (compact) {
+    # Display labels may be shortened; opaque correlations must stay exact.
+    runtime$agent_name <- inspection_text(runtime$agent_name, 512L)
+    runtime <- compact_fields(runtime)
+  }
   DelegationOutcome(
     runtime = c(
-      record[c(
-        "delegation_id",
-        "agent_id",
-        "agent_name",
-        "session_id",
-        "run_id",
-        "parent_agent_id",
-        "parent_run_id",
-        "tool_call_id",
-        "status",
-        "stop_reason"
-      )],
+      runtime,
       list(
-        conversation_id = record$session_id,
+        conversation_id = runtime$session_id,
         task_success = "not_assessed",
         answer_truncated = isTRUE(record$answer_truncated),
         omitted_references = if (compact) {
@@ -270,7 +289,7 @@ delegation_outcome <- function(record, compact = FALSE) {
       lapply(utils::head(references, 8L), function(ref) {
         # Host ownership and storage routing are not model context.
         ref[c("scope", "storage_session_id")] <- NULL
-        ref
+        compact_fields(ref)
       })
     } else {
       record$references %||% list()
