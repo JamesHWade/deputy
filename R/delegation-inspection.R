@@ -632,18 +632,19 @@ delegation_history <- function(history, requester, disclosure, scope) {
     ) {
       cli::cli_abort("Only settled child history can be replayed.")
     }
-    view <- disclosure$redact(view, requester)
-    inspection_portable(view)
-    if (!is.list(view)) {
-      cli::cli_abort("Disclosure redaction must return a list.")
-    }
-    view$turns <- lapply(view$transcript, inspection_replay)
     if (!is.null(view$outcome$references)) {
       view$outcome$references <- lapply(view$outcome$references, function(ref) {
         ref$availability <- "unresolved"
         ref
       })
     }
+    view <- disclosure$redact(view, requester)
+    inspection_portable(view)
+    if (!is.list(view)) {
+      cli::cli_abort("Disclosure redaction must return a list.")
+    }
+    view$turns <- lapply(view$transcript, inspection_replay)
+
     view
   })
   inspection_bound(views, disclosure)

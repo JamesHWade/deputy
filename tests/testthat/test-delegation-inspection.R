@@ -618,3 +618,22 @@ test_that("mixed tool payloads retain typed content and literal record-shaped da
   expect_identical(actual$nested[[2L]]@text, "typed note")
   expect_identical(actual$nested[[3L]], lookalike)
 })
+
+
+test_that("history redaction has the final say on artifact availability", {
+  lead <- inspection_lead()
+  lead$parallel_delegate(c(a = "one"))
+  history <- lead$export_subagents("owner")
+  history$children[[1L]]$outcome$references <- list(list(
+    reference = "fixture",
+    availability = "available"
+  ))
+  policy <- inspection_policy(redact = function(view, requester) {
+    expect_identical(view$outcome$references[[1L]]$availability, "unresolved")
+    view$outcome$references[[1L]]$availability <- NULL
+    view
+  })
+  restored <- delegation_history(history, "owner", policy, history$scope)
+  expect_null(restored[[1L]]$outcome$references[[1L]]$availability)
+  expect_identical(restored[[1L]]$outcome$references[[1L]]$reference, "fixture")
+})
