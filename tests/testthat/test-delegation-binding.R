@@ -643,3 +643,53 @@ test_that("forwarded governance failures are retained with their delegation", {
   )
   expect_identical(lead$list_subagents()$status, "completed")
 })
+
+
+test_that("unowned child construction cannot acquire resources or leases", {
+  for (mode in c("owned", "exclusive")) {
+    acquired <- 0L
+    policy <- if (mode == "owned") {
+      DelegationPolicy("owned", resources = function(...) {
+        acquired <<- acquired + 1L
+        DelegationResources(cleanup = function() NULL)
+      })
+    } else {
+      DelegationPolicy("exclusive", resource_key = "unowned-test")
+    }
+    lead <- parallel_test_lead(
+      new.env(parent = emptyenv()),
+      delegation_policy = policy
+    )
+    private <- lead$.__enclos_env__$private
+    definition <- lead$sub_agent_defs[[1L]]
+    for (correlation in list(NULL, private$claim_delegation())) {
+      failure <- tryCatch(
+        private$create_sub_agent(definition, correlation),
+        error = identity
+      )
+      expect_s3_class(failure, "deputy_delegation_binding")
+    }
+    expect_length(private$delegation_bindings, 0L)
+    expect_identical(acquired, 0L)
+    binding_run(lead)
+    expect_length(private$delegation_bindings, 0L)
+  }
+})
+
+test_that("redacted bindings retain governance but hide resource locators", {
+  lead <- parallel_test_lead(
+    new.env(parent = emptyenv()),
+    delegation_policy = DelegationPolicy(
+      "exclusive",
+      resource_key = "private-resource"
+    )
+  )
+  binding_run(lead)
+  manifest <- lead$get_subagent_contexts(redact = TRUE)[[1L]]
+  expect_identical(manifest$policies$binding$resource_mode, "exclusive")
+  expect_identical(manifest$policies$binding$cleanup, "host-owned")
+  expect_identical(manifest$policies$binding$approval, "unsupported")
+  expect_null(manifest$policies$binding$resource_key)
+  expect_null(manifest$policies$binding$workspace)
+  expect_identical(grepl("private-resource", jsonlite::toJSON(manifest)), FALSE)
+})

@@ -206,11 +206,23 @@ redact_delegation_manifest <- function(manifest) {
     model = manifest$model,
     tools = manifest$tools,
     size = manifest$size,
-    policies = manifest$policies[c(
-      "permissions_id",
-      "permission_mode",
-      "context_policy_id"
-    )],
+    policies = c(
+      manifest$policies[c(
+        "permissions_id",
+        "permission_mode",
+        "context_policy_id"
+      )],
+      list(
+        binding = manifest$policies$binding[c(
+          "resource_mode",
+          "hooks",
+          "permissions",
+          "approval",
+          "human_input",
+          "cleanup"
+        )]
+      )
+    ),
     sources = lapply(manifest$sources, function(source) {
       source[c(
         "source_id",

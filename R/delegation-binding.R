@@ -144,6 +144,20 @@ delegation_resource_leases <- new.env(parent = emptyenv())
 begin_delegation_binding <- function(lead, definition, correlation, stateless) {
   private <- lead$.__enclos_env__$private
   policy <- private$.delegation_policy
+  id <- correlation$delegation_id
+  record <- if (is.character(id) && length(id) == 1L && !is.na(id)) {
+    private$subagent_runs[[id]]
+  }
+  if (
+    is.null(record) ||
+      !identical(record$status, "queued") ||
+      !identical(record$parent_agent_id, lead$agent_id) ||
+      !is.null(private$delegation_bindings[[id]])
+  ) {
+    delegation_binding_abort(
+      "Child binding requires an admitted, unbound delegation."
+    )
+  }
   if (!is.null(private$.approval_dir)) {
     delegation_binding_abort(
       "Delegated durable approvals are unsupported; use a standalone Agent approval workflow."

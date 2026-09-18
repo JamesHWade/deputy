@@ -654,7 +654,6 @@ LeadAgent <- R6::R6Class(
       usage_limits = NULL,
       stateless = FALSE
     ) {
-      correlation <- correlation %||% private$claim_delegation()
       begin_delegation_binding(self, def, correlation, stateless)
       bound <- FALSE
       on.exit(
