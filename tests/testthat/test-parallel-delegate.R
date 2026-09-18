@@ -319,7 +319,7 @@ test_that("cancellation from SubagentStart balances hooks without dispatching", 
   expect_length(state$started, 0L)
   expect_identical(batch$run$usage$requests, 0L)
   expect_identical(batch$run$stop_reason, "cancelled_before_dispatch")
-  expect_identical(lead$list_subagents()$status, "not_started")
+  expect_identical(lead$list_subagents()$status, rep("not_started", 2L))
   expect_length(lead$.__enclos_env__$private$delegation_usage_reservations, 0L)
 })
 

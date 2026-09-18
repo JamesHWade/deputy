@@ -26,6 +26,7 @@ sub-agents based on registered AgentDefinitions.
     \item \href{#method-LeadAgent-available_sub_agents}{\code{LeadAgent$available_sub_agents()}}
     \item \href{#method-LeadAgent-parallel_delegate}{\code{LeadAgent$parallel_delegate()}}
     \item \href{#method-LeadAgent-parallel_delegate_async}{\code{LeadAgent$parallel_delegate_async()}}
+    \item \href{#method-LeadAgent-interrupt}{\code{LeadAgent$interrupt()}}
     \item \href{#method-LeadAgent-list_subagents}{\code{LeadAgent$list_subagents()}}
     \item \href{#method-LeadAgent-get_subagent_results}{\code{LeadAgent$get_subagent_results()}}
     \item \href{#method-LeadAgent-get_subagent_messages}{\code{LeadAgent$get_subagent_messages()}}
@@ -54,7 +55,6 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_tokens"><a href='../../deputy/html/Agent.html#method-Agent-get_tokens'><code>Agent$get_tokens()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_tools"><a href='../../deputy/html/Agent.html#method-Agent-get_tools'><code>Agent$get_tools()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_turns"><a href='../../deputy/html/Agent.html#method-Agent-get_turns'><code>Agent$get_turns()</code></a></span></li>
-  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="interrupt"><a href='../../deputy/html/Agent.html#method-Agent-interrupt'><code>Agent$interrupt()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_compaction"><a href='../../deputy/html/Agent.html#method-Agent-last_compaction'><code>Agent$last_compaction()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_run"><a href='../../deputy/html/Agent.html#method-Agent-last_run'><code>Agent$last_run()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_turn"><a href='../../deputy/html/Agent.html#method-Agent-last_turn'><code>Agent$last_turn()</code></a></span></li>
@@ -270,17 +270,46 @@ active responders to stop at their next supported provider boundary.
 }
 
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-interrupt"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-interrupt}{}}}
+\subsection{\code{LeadAgent$interrupt()}}{
+  Interrupt the lead and its active subagents cooperatively.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$interrupt(reason = "interrupted")}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{reason}}{Stable reason retained on stopped runs.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible logical indicating whether the lead was active.
+  }
+}
+
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-LeadAgent-list_subagents"></a>}}
 \if{latex}{\out{\hypertarget{method-LeadAgent-list_subagents}{}}}
 \subsection{\code{LeadAgent$list_subagents()}}{
-  List delegated sub-agent runs, including failures.
+  List admitted subagent delegations in admission order, including live work.
+Status is \code{queued}, \code{running}, \code{completed}, \code{failed}, \code{stopped},
+\code{not_started}, or \code{suspended} (for supported approval suspensions).
+\code{completed} means the run stopped with \code{complete}, not verified task success.
+\code{stop_reason} retains the exact runtime reason. Identifiers and timestamps
+are \code{NA} until assigned. \code{completed_at} marks settlement of this invocation,
+including suspension. \code{hook_error} records observer errors independently.
+These in-memory records are not durable jobs or a token event feed.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{LeadAgent$list_subagents()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Data frame with one row per sub-agent run
+    Data frame with one row per admitted delegation
   }
 }
 
@@ -303,7 +332,8 @@ active responders to stop at their next supported provider boundary.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    List of \link{AgentResult} objects or \code{NULL} entries for failed runs
+    List of \link{AgentResult} objects in admission order, with \code{NULL} for
+live, unstarted, or failed runs that did not return an AgentResult
   }
 }
 
@@ -311,7 +341,10 @@ active responders to stop at their next supported provider boundary.
 \if{html}{\out{<a id="method-LeadAgent-get_subagent_messages"></a>}}
 \if{latex}{\out{\hypertarget{method-LeadAgent-get_subagent_messages}{}}}
 \subsection{\code{LeadAgent$get_subagent_messages()}}{
-  Get stored turn history for delegated sub-agent runs.
+  Get current or retained conversation turns for admitted delegations.
+Live snapshots contain available turns, not every in-flight token.
+Reading history does not add it to the lead's model context. Hosts must
+authorize and redact disclosures before exposing these records to users.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{LeadAgent$get_subagent_messages(agent_name = NULL, session_id = NULL)}

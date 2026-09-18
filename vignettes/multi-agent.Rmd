@@ -273,6 +273,43 @@ agent$load_skill(system.file("skills", "debate", package = "deputy"))
 Loading this prompt does not start independent responders. The host supplies
 arguments or orchestrates fan-out explicitly.
 
+## Inspecting child conversations
+
+`lead$list_subagents()` has one row per admitted delegation in admission order,
+even while children are running. `delegation_id` remains stable as `status`
+changes from `queued` to `running` and then a settled outcome:
+
+| Status | Meaning |
+| --- | --- |
+| `completed` | The child returned an AgentResult with stop reason `complete` |
+| `stopped` | A limit, interruption, or another non-complete stop |
+| `failed` | Construction or execution failed |
+| `not_started` | Admitted work never entered a child run |
+| `suspended` | An approval suspension, where the child supports it |
+
+`stop_reason` preserves the exact runtime reason. Completion does not verify the
+assigned task or its evidence. `admitted_at` records acceptance, `started_at`
+records lifecycle entry before the start hook, and `completed_at` records the
+invocation settling, including suspension. Cancellation in a start hook can
+therefore yield `not_started` with a start timestamp. Run IDs are unavailable
+until the child starts a run. Callback failures follow the existing hook policy
+and appear separately in `hook_error`; they do not turn a successful child
+response into an execution failure.
+
+`get_subagent_results(delegation_id = id)` returns a retained AgentResult, or
+`NULL` if none is available. `get_subagent_messages(session_id = session)`
+returns the child's available conversation turns, including partial history
+after failure. Both accessors retain admission order. Live message snapshots
+are not a token stream. Reading them does not copy them into the lead's context,
+resume a child, or approve a pending action. The host must authorize and redact
+any user-facing disclosure. These records belong to the live LeadAgent; they
+are not persisted as a durable child job store.
+
+For an asynchronous lead run, `lead$interrupt(reason = "cancelled_by_host")`
+cooperatively interrupts both the lead and active children. It takes effect at
+the next supported provider boundary. Closing an inspection panel should not
+call this method unless the user explicitly requests cancellation.
+
 ## Monitoring with SubagentStop Hooks
 
 Use a `SubagentStop` hook to log or inspect sub-agent results:

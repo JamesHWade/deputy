@@ -84,6 +84,7 @@ Collate:
     'compaction-run.R'
     'context-estimation.R'
     'context-policy.R'
+    'delegation-lifecycle.R'
     'deputy-package.R'
     'errors.R'
     'file-checkpoint-paths.R'
