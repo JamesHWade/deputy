@@ -589,3 +589,32 @@ test_that("payload record-shaped objects stay data and classed results project p
   ))))
   expect_identical(restored@contents[[1L]]@source@url, source@url)
 })
+
+
+test_that("mixed tool payloads retain typed content and literal record-shaped data", {
+  lookalike <- list(
+    version = 1,
+    class = "ellmer::ContentText",
+    props = list(text = "ordinary metadata")
+  )
+  value <- list(
+    image = ellmer::ContentImageRemote(
+      url = "https://example.com/evidence.png"
+    ),
+    caption = "Evidence",
+    metadata = lookalike,
+    nested = list(NULL, ellmer::ContentText("typed note"), lookalike)
+  )
+  result <- ellmer::ContentToolResult(value)
+  restored <- inspection_replay(inspection_record_turn(ellmer::UserTurn(list(
+    result
+  ))))
+  actual <- restored@contents[[1L]]@value
+  expect_s7_class(actual$image, ellmer::ContentImageRemote)
+  expect_identical(actual$image@url, value$image@url)
+  expect_identical(actual$caption, "Evidence")
+  expect_identical(actual$metadata, lookalike)
+  expect_identical(actual$nested[[1L]], NULL)
+  expect_identical(actual$nested[[2L]]@text, "typed note")
+  expect_identical(actual$nested[[3L]], lookalike)
+})
