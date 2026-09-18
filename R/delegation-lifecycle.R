@@ -72,7 +72,7 @@ lead_delegation_records <- function(lead, messages = FALSE, usage = FALSE) {
   private <- lead$.__enclos_env__$private
   unname(lapply(private$subagent_runs, function(record) {
     child <- private$active_subagents[[record$delegation_id]]
-    if (!is.null(child)) {
+    if (!is.null(child) && is.na(record$completed_at)) {
       record$run_id <- child$.__enclos_env__$private$current_run_id
       record$artifacts <- child$.__enclos_env__$private$delegation_artifacts
       record$references <- lapply(record$artifacts, function(ref) {

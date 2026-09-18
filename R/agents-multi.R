@@ -786,14 +786,8 @@ LeadAgent <- R6::R6Class(
                 compact = TRUE
               )))
               if (!is.null(outcome$error)) {
-                ellmer::tool_reject(paste0(
-                  "Subagent '",
-                  def$name,
-                  "' failed.\nError: ",
-                  conditionMessage(outcome$error),
-                  "\n",
-                  payload
-                ))
+                # The bounded payload already contains the label and error.
+                ellmer::tool_reject(paste0("Subagent failed.\n", payload))
               }
               payload
             })
