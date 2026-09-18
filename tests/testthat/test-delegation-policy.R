@@ -297,7 +297,7 @@ test_that("delegation passes permissions to sub-agent", {
   delegate_tool <- tools[["delegate_to_agent"]]
 
   result <- resolve_async_value(delegate_tool("sub", "Read something"))
-  expect_equal(result, "Done")
+  expect_equal(jsonlite::fromJSON(result)$answer, "Done")
 })
 
 test_that("SubagentStop hook receives working_dir in context", {
