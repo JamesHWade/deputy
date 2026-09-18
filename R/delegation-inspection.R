@@ -303,6 +303,18 @@ inspection_record_turn <- function(turn) {
         }
         content@value <- clean(content@value)
       }
+    } else if (
+      is.data.frame(content) ||
+        is.factor(content) ||
+        inherits(content, c("Date", "POSIXt", "difftime"))
+    ) {
+      content <- as.character(jsonlite::toJSON(
+        content,
+        dataframe = "rows",
+        auto_unbox = TRUE,
+        null = "null",
+        na = "null"
+      ))
     } else if (is.list(content) && !is.object(content)) {
       content <- lapply(
         Filter(function(x) !inherits(x, "ellmer::ContentThinking"), content),
@@ -315,8 +327,41 @@ inspection_record_turn <- function(turn) {
   if ("cost" %in% S7::prop_names(turn)) {
     turn@cost <- as.numeric(turn@cost)
   }
-  record <- ellmer::contents_record(turn)
+  record <- inspection_record_content(turn)
   inspection_portable(record)
+  record
+}
+
+# Mark genuinely typed tool values before serializing; application objects can
+# legitimately have the same field names as an ellmer record.
+inspection_record_content <- function(content) {
+  record <- ellmer::contents_record(content)
+  for (field in names(record$props)) {
+    value <- S7::prop(content, field)
+    if (inherits(value, "S7_object")) {
+      record$props[[field]] <- inspection_record_content(value)
+    } else if (
+      is.list(value) &&
+        length(value) &&
+        all(vapply(value, inherits, logical(1), "S7_object"))
+    ) {
+      record$props[[field]] <- lapply(value, inspection_record_content)
+    }
+  }
+  if (inherits(content, "ellmer::ContentToolResult")) {
+    value <- content@value
+    record$deputy_value_kind <- if (inherits(value, "ellmer::Content")) {
+      "content"
+    } else if (
+      is.list(value) &&
+        length(value) &&
+        all(vapply(value, inherits, logical(1), "ellmer::Content"))
+    ) {
+      "contents"
+    } else {
+      "data"
+    }
+  }
   record
 }
 
@@ -341,38 +386,84 @@ inspection_replay <- function(record) {
       "ContentToolRequestSearch",
       "ContentToolResponseSearch",
       "ContentToolRequestFetch",
-      "ContentToolResponseFetch"
+      "ContentToolResponseFetch",
+      "Source",
+      "WebSource"
     )
   )
-  validate <- function(x) {
-    if (!is.list(x)) {
-      return(invisible(NULL))
+  inspection_portable(record)
+  replay <- function(x) {
+    if (!is.list(x) || !all(c("version", "class", "props") %in% names(x))) {
+      cli::cli_abort("Invalid inspection content record.")
     }
-    if (all(c("version", "class", "props") %in% names(x))) {
-      if (!identical(x$version, 1) && !identical(x$version, 1L)) {
-        cli::cli_abort("Unsupported ellmer content record version.")
+    if (!identical(x$version, 1) && !identical(x$version, 1L)) {
+      cli::cli_abort("Unsupported ellmer content record version.")
+    }
+    if (
+      !is.character(x$class) || length(x$class) != 1L || !x$class %in% allowed
+    ) {
+      cli::cli_abort("Unsupported inspection content class.")
+    }
+    props <- x$props
+    if (
+      !is.null(props$tool) ||
+        length(props$extra) > 0L ||
+        length(props$json) > 0L
+    ) {
+      cli::cli_abort(
+        "Inspection history cannot restore executable or private content."
+      )
+    }
+    if (
+      x$class %in%
+        paste0(
+          "ellmer::",
+          c("UserTurn", "AssistantTurn", "AssistantPartialTurn", "SystemTurn")
+        )
+    ) {
+      props$contents <- lapply(props$contents, replay)
+    }
+    if (identical(x$class, "ellmer::ContentToolResult")) {
+      if (!is.null(props$request)) {
+        props$request <- replay(props$request)
       }
-      if (
-        !is.character(x$class) || length(x$class) != 1L || !x$class %in% allowed
-      ) {
-        cli::cli_abort("Unsupported inspection content class.")
+      kind <- x$deputy_value_kind %||% "data"
+      if (!kind %in% c("content", "contents", "data")) {
+        cli::cli_abort("Invalid tool payload kind.")
       }
-      if (
-        !is.null(x$props$tool) ||
-          length(x$props$extra) > 0L ||
-          length(x$props$json) > 0L
-      ) {
-        cli::cli_abort(
-          "Inspection history cannot restore executable or private content."
+      props$value <- switch(
+        kind,
+        content = replay(props$value),
+        contents = lapply(props$value, replay),
+        data = props$value
+      )
+    }
+    if (
+      identical(x$class, "ellmer::ContentCitation") && !is.null(props$source)
+    ) {
+      props$source <- replay(props$source)
+    }
+    if (identical(x$class, "ellmer::ContentToolResponseSearch")) {
+      props$sources <- lapply(props$sources, replay)
+    }
+    # The native constructor must never interpret opaque application objects as
+    # record envelopes. Restore list-valued properties only after construction.
+    safe <- x
+    safe$version <- 1
+    for (field in names(props)) {
+      if (is.list(props[[field]]) || inherits(props[[field]], "S7_object")) {
+        safe$props[field] <- list(
+          if (field %in% c("request", "source")) NULL else list()
         )
       }
     }
-    lapply(x, validate)
-    invisible(NULL)
+    out <- ellmer::contents_replay(safe, tools = list())
+    for (field in names(props)) {
+      S7::prop(out, field) <- props[[field]]
+    }
+    out
   }
-  inspection_portable(record)
-  validate(record)
-  ellmer::contents_replay(record, tools = list())
+  replay(record)
 }
 
 lead_inspection_records <- function(lead, delegation_id, transcript) {

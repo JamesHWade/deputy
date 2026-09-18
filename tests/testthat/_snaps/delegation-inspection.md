@@ -51,7 +51,7 @@
     Code
       delegation_history(snapshot, "owner", inspection_policy(), snapshot$scope)
     Condition
-      Error in `validate()`:
+      Error in `replay()`:
       ! Unsupported inspection content class.
 
 # public history omits hidden thinking and raw provider payloads
