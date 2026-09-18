@@ -425,3 +425,43 @@ test_that("disclosure sizing counts replayed content without R class metadata", 
     "exceeds max_bytes"
   )
 })
+
+test_that("partial turns and nested results keep only public inspectable content", {
+  request <- ellmer::ContentToolRequest(
+    id = "tool",
+    name = "fixture",
+    arguments = list(),
+    extra = list(private = "secret")
+  )
+  result <- ellmer::ContentToolResult(
+    list(
+      ellmer::ContentThinking("hidden thought"),
+      ellmer::ContentText("retained evidence"),
+      ellmer::ContentToolResult(
+        list(
+          ellmer::ContentThinking("nested thought"),
+          ellmer::ContentText("nested evidence")
+        ),
+        request = request
+      )
+    ),
+    request = request
+  )
+  partial <- ellmer::AssistantPartialTurn(
+    list(ellmer::ContentText("partial answer")),
+    reason = "interrupted"
+  )
+  record <- inspection_record_turn(ellmer::UserTurn(list(result)))
+  text <- jsonlite::toJSON(record, auto_unbox = TRUE)
+  expect_false(grepl(
+    "secret|hidden thought|nested thought|ContentThinking",
+    text
+  ))
+  replay <- inspection_replay(record)
+  expect_identical(replay@contents[[1L]]@request@extra, list())
+  expect_identical(replay@contents[[1L]]@value[[1L]]@text, "retained evidence")
+  restored <- inspection_replay(inspection_record_turn(partial))
+  expect_s7_class(restored, ellmer::AssistantPartialTurn)
+  expect_identical(restored@reason, "interrupted")
+  expect_identical(restored@text, "partial answer")
+})
