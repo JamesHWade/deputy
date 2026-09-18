@@ -445,6 +445,74 @@ be reused with any Agent:</p>
 supplies arguments or orchestrates fan-out explicitly.</p>
 </div>
 <div class="section level2">
+<h2 id="inspecting-child-conversations">Inspecting child conversations<a class="anchor" aria-label="anchor" href="#inspecting-child-conversations"></a>
+</h2>
+<p><code>lead$list_subagents()</code> has one row per admitted
+delegation in admission order, even while children are running.
+<code>delegation_id</code> remains stable as <code>status</code> changes
+from <code>queued</code> to <code>running</code> and then a settled
+outcome:</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>Status</th>
+<th>Meaning</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>completed</code></td>
+<td>The child returned an AgentResult with stop reason
+<code>complete</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>stopped</code></td>
+<td>A limit, interruption, or another non-complete stop</td>
+</tr>
+<tr class="odd">
+<td><code>failed</code></td>
+<td>Construction or execution failed</td>
+</tr>
+<tr class="even">
+<td><code>not_started</code></td>
+<td>Admitted work never entered a child run</td>
+</tr>
+<tr class="odd">
+<td><code>suspended</code></td>
+<td>An approval suspension, where the child supports it</td>
+</tr>
+</tbody>
+</table>
+<p><code>stop_reason</code> preserves the exact runtime reason.
+Completion does not verify the assigned task or its evidence.
+<code>admitted_at</code> records acceptance, <code>started_at</code>
+records lifecycle entry before the start hook, and
+<code>completed_at</code> records the invocation settling, including
+suspension. Cancellation in a start hook can therefore yield
+<code>not_started</code> with a start timestamp. Run IDs are unavailable
+until the child starts a run. Callback failures follow the existing hook
+policy and appear separately in <code>hook_error</code>; they do not
+turn a successful child response into an execution failure.</p>
+<p><code>get_subagent_results(delegation_id = id)</code> returns a
+retained AgentResult, or <code>NULL</code> if none is available.
+<code>get_subagent_messages(session_id = session)</code> returns the
+child’s available conversation turns, including partial history after
+failure. Both accessors retain admission order. Live message snapshots
+are not a token stream. Reading them does not copy them into the lead’s
+context, resume a child, or approve a pending action. The host must
+authorize and redact any user-facing disclosure. These records belong to
+the live LeadAgent; they are not persisted as a durable child job
+store.</p>
+<p>For an asynchronous lead run,
+<code>lead$interrupt(reason = "cancelled_by_host")</code> cooperatively
+interrupts both the lead and active children. It takes effect at the
+next supported provider boundary. Closing an inspection panel should not
+call this method unless the user explicitly requests cancellation.</p>
+</div>
+<div class="section level2">
 <h2 id="monitoring-with-subagentstop-hooks">Monitoring with SubagentStop Hooks<a class="anchor" aria-label="anchor" href="#monitoring-with-subagentstop-hooks"></a>
 </h2>
 <p>Use a <code>SubagentStop</code> hook to log or inspect sub-agent

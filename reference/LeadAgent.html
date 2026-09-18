@@ -85,6 +85,7 @@ sub-agents based on registered AgentDefinitions.</p>
 <li><p><a href="#method-LeadAgent-available_sub_agents"><code>LeadAgent$available_sub_agents()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-parallel_delegate"><code>LeadAgent$parallel_delegate()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-parallel_delegate_async"><code>LeadAgent$parallel_delegate_async()</code></a></p></li>
+<li><p><a href="#method-LeadAgent-interrupt"><code>LeadAgent$interrupt()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-list_subagents"><code>LeadAgent$list_subagents()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-get_subagent_results"><code>LeadAgent$get_subagent_results()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-get_subagent_messages"><code>LeadAgent$get_subagent_messages()</code></a></p></li>
@@ -109,7 +110,6 @@ sub-agents based on registered AgentDefinitions.</p>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_tokens"><a href="Agent.html#method-get_tokens"><code>Agent$get_tokens()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_tools"><a href="Agent.html#method-get_tools"><code>Agent$get_tools()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_turns"><a href="Agent.html#method-get_turns"><code>Agent$get_turns()</code></a></span></li>
-  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="interrupt"><a href="Agent.html#method-interrupt"><code>Agent$interrupt()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_compaction"><a href="Agent.html#method-last_compaction"><code>Agent$last_compaction()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_run"><a href="Agent.html#method-last_run"><code>Agent$last_run()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_turn"><a href="Agent.html#method-last_turn"><code>Agent$last_turn()</code></a></span></li>
@@ -344,14 +344,40 @@ active responders to stop at their next supported provider boundary.</p>
 
 </div>
 
-<p></p><hr><a id="method-LeadAgent-list_subagents"></a><div class="section">
-<h3 id="leadagent-list-subagents-"><code>LeadAgent$list_subagents()</code><a class="anchor" aria-label="anchor" href="#leadagent-list-subagents-"></a></h3>
-<p>List delegated sub-agent runs, including failures.</p><div class="section">
+<p></p><hr><a id="method-LeadAgent-interrupt"></a><div class="section">
+<h3 id="leadagent-interrupt-"><code>LeadAgent$interrupt()</code><a class="anchor" aria-label="anchor" href="#leadagent-interrupt-"></a></h3>
+<p>Interrupt the lead and its active subagents cooperatively.</p><div class="section">
 <h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">interrupt</span><span class="op">(</span>reason <span class="op">=</span> <span class="st">"interrupted"</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>reason</code></dt>
+<dd><p>Stable reason retained on stopped runs.</p></dd>
+
+
+</dl><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
-<p>Data frame with one row per sub-agent run</p>
+<p>Invisible logical indicating whether the lead was active.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-LeadAgent-list_subagents"></a><div class="section">
+<h3 id="leadagent-list-subagents-"><code>LeadAgent$list_subagents()</code><a class="anchor" aria-label="anchor" href="#leadagent-list-subagents-"></a></h3>
+<p>List admitted subagent delegations in admission order, including live work.
+Status is <code>queued</code>, <code>running</code>, <code>completed</code>, <code>failed</code>, <code>stopped</code>,
+<code>not_started</code>, or <code>suspended</code> (for supported approval suspensions).
+<code>completed</code> means the run stopped with <code>complete</code>, not verified task success.
+<code>stop_reason</code> retains the exact runtime reason. Identifiers and timestamps
+are <code>NA</code> until assigned. <code>completed_at</code> marks settlement of this invocation,
+including suspension. <code>hook_error</code> records observer errors independently.
+These in-memory records are not durable jobs or a token event feed.</p><div class="section">
+<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
+<p>Data frame with one row per admitted delegation</p>
 </div>
 
 </div>
@@ -359,10 +385,10 @@ active responders to stop at their next supported provider boundary.</p>
 <p></p><hr><a id="method-LeadAgent-get_subagent_results"></a><div class="section">
 <h3 id="leadagent-get-subagent-results-"><code>LeadAgent$get_subagent_results()</code><a class="anchor" aria-label="anchor" href="#leadagent-get-subagent-results-"></a></h3>
 <p>Get retained results from delegated sub-agent runs.</p><div class="section">
-<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
+<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">get_subagent_results</span><span class="op">(</span>agent_name <span class="op">=</span> <span class="cn">NULL</span>, delegation_id <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
+<h4 id="arguments-5">Arguments<a class="anchor" aria-label="anchor" href="#arguments-5"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>agent_name</code></dt>
 <dd><p>Optional sub-agent name filter</p></dd>
 
@@ -372,19 +398,23 @@ active responders to stop at their next supported provider boundary.</p>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
-<p>List of <a href="AgentResult.html">AgentResult</a> objects or <code>NULL</code> entries for failed runs</p>
+<h4 id="returns-7">Returns<a class="anchor" aria-label="anchor" href="#returns-7"></a></h4>
+<p>List of <a href="AgentResult.html">AgentResult</a> objects in admission order, with <code>NULL</code> for
+live, unstarted, or failed runs that did not return an AgentResult</p>
 </div>
 
 </div>
 
 <p></p><hr><a id="method-LeadAgent-get_subagent_messages"></a><div class="section">
 <h3 id="leadagent-get-subagent-messages-"><code>LeadAgent$get_subagent_messages()</code><a class="anchor" aria-label="anchor" href="#leadagent-get-subagent-messages-"></a></h3>
-<p>Get stored turn history for delegated sub-agent runs.</p><div class="section">
-<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
+<p>Get current or retained conversation turns for admitted delegations.
+Live snapshots contain available turns, not every in-flight token.
+Reading history does not add it to the lead's model context. Hosts must
+authorize and redact disclosures before exposing these records to users.</p><div class="section">
+<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">get_subagent_messages</span><span class="op">(</span>agent_name <span class="op">=</span> <span class="cn">NULL</span>, session_id <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-5">Arguments<a class="anchor" aria-label="anchor" href="#arguments-5"></a></h4>
+<h4 id="arguments-6">Arguments<a class="anchor" aria-label="anchor" href="#arguments-6"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>agent_name</code></dt>
 <dd><p>Optional sub-agent name filter</p></dd>
 
@@ -394,7 +424,7 @@ active responders to stop at their next supported provider boundary.</p>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-7">Returns<a class="anchor" aria-label="anchor" href="#returns-7"></a></h4>
+<h4 id="returns-8">Returns<a class="anchor" aria-label="anchor" href="#returns-8"></a></h4>
 <p>List of turn histories</p>
 </div>
 
@@ -403,7 +433,7 @@ active responders to stop at their next supported provider boundary.</p>
 <p></p><hr><a id="method-LeadAgent-print"></a><div class="section">
 <h3 id="leadagent-print-"><code>LeadAgent$print()</code><a class="anchor" aria-label="anchor" href="#leadagent-print-"></a></h3>
 <p>Print the lead agent.</p><div class="section">
-<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
+<h4 id="usage-9">Usage<a class="anchor" aria-label="anchor" href="#usage-9"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -412,10 +442,10 @@ active responders to stop at their next supported provider boundary.</p>
 <p></p><hr><a id="method-LeadAgent-clone"></a><div class="section">
 <h3 id="leadagent-clone-"><code>LeadAgent$clone()</code><a class="anchor" aria-label="anchor" href="#leadagent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-9">Usage<a class="anchor" aria-label="anchor" href="#usage-9"></a></h4>
+<h4 id="usage-10">Usage<a class="anchor" aria-label="anchor" href="#usage-10"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-6">Arguments<a class="anchor" aria-label="anchor" href="#arguments-6"></a></h4>
+<h4 id="arguments-7">Arguments<a class="anchor" aria-label="anchor" href="#arguments-7"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

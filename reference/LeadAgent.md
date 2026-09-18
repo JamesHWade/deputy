@@ -29,6 +29,8 @@ it to spawn sub-agents based on registered AgentDefinitions.
 
 - [`LeadAgent$parallel_delegate_async()`](#method-LeadAgent-parallel_delegate_async)
 
+- [`LeadAgent$interrupt()`](#method-LeadAgent-interrupt)
+
 - [`LeadAgent$list_subagents()`](#method-LeadAgent-list_subagents)
 
 - [`LeadAgent$get_subagent_results()`](#method-LeadAgent-get_subagent_results)
@@ -60,7 +62,6 @@ Inherited methods
 - [`Agent$get_tokens()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_tokens)
 - [`Agent$get_tools()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_tools)
 - [`Agent$get_turns()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-get_turns)
-- [`Agent$interrupt()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-interrupt)
 - [`Agent$last_compaction()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-last_compaction)
 - [`Agent$last_run()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-last_run)
 - [`Agent$last_turn()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-last_turn)
@@ -331,9 +332,37 @@ their next supported provider boundary.
 
 ------------------------------------------------------------------------
 
+### `LeadAgent$interrupt()`
+
+Interrupt the lead and its active subagents cooperatively.
+
+#### Usage
+
+    LeadAgent$interrupt(reason = "interrupted")
+
+#### Arguments
+
+- `reason`:
+
+  Stable reason retained on stopped runs.
+
+#### Returns
+
+Invisible logical indicating whether the lead was active.
+
+------------------------------------------------------------------------
+
 ### `LeadAgent$list_subagents()`
 
-List delegated sub-agent runs, including failures.
+List admitted subagent delegations in admission order, including live
+work. Status is `queued`, `running`, `completed`, `failed`, `stopped`,
+`not_started`, or `suspended` (for supported approval suspensions).
+`completed` means the run stopped with `complete`, not verified task
+success. `stop_reason` retains the exact runtime reason. Identifiers and
+timestamps are `NA` until assigned. `completed_at` marks settlement of
+this invocation, including suspension. `hook_error` records observer
+errors independently. These in-memory records are not durable jobs or a
+token event feed.
 
 #### Usage
 
@@ -341,7 +370,7 @@ List delegated sub-agent runs, including failures.
 
 #### Returns
 
-Data frame with one row per sub-agent run
+Data frame with one row per admitted delegation
 
 ------------------------------------------------------------------------
 
@@ -367,13 +396,17 @@ Get retained results from delegated sub-agent runs.
 
 List of
 [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
-objects or `NULL` entries for failed runs
+objects in admission order, with `NULL` for live, unstarted, or failed
+runs that did not return an AgentResult
 
 ------------------------------------------------------------------------
 
 ### `LeadAgent$get_subagent_messages()`
 
-Get stored turn history for delegated sub-agent runs.
+Get current or retained conversation turns for admitted delegations.
+Live snapshots contain available turns, not every in-flight token.
+Reading history does not add it to the lead's model context. Hosts must
+authorize and redact disclosures before exposing these records to users.
 
 #### Usage
 

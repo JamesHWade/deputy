@@ -2,6 +2,14 @@
 
 ## deputy (development version)
 
+- `LeadAgent$list_subagents()` exposes admitted and running delegations
+  in admission order, with exact stop reasons and separate observer
+  errors. Ordinary and parallel delegation share lifecycle accounting;
+  stopped runs no longer appear completed. Lead interruption also
+  reaches active ordinary subagents, and queued batch work remains
+  inspectable after cancellation
+  ([\#150](https://github.com/JamesHWade/deputy/issues/150)).
+
 - The Shiny chat example shows summarization progress and an expandable
   accepted summary without changing the transcript. Its notice follows
   the selected conversation and clears busy status after failed or
