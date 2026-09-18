@@ -181,10 +181,20 @@ subagent_chat_server <- function(
       if (!force && identical(view, state$rendered)) {
         return(FALSE)
       }
+      previous_cursor <- if (
+        !force &&
+          identical(
+            state$rendered$outcome$runtime$delegation_id,
+            id
+          )
+      ) {
+        state$partial_cursor
+      }
       clear()
       state$rendered <- view
       if (!is.null(state$reader)) {
-        state$partial_cursor <- state$reader$snapshot()$cursor
+        state$partial_cursor <- previous_cursor %||%
+          state$reader$snapshot()$cursor
       }
       for (message in subagent_chat_messages(view$turns)) {
         shinychat::chat_append_message(
@@ -325,14 +335,14 @@ subagent_chat_server <- function(
           }
           # Re-read selected content under the current policy, even when only
           # mutable host disclosure state changed. Repaint only changed views.
-          refreshed <- render_child(force = length(update$gaps) > 0L)
+          render_child(force = length(update$gaps) > 0L)
           if (length(update$gaps)) {
             notice(
               "Some live events were missed. Recovered retained child history."
             )
           }
           if (!is.null(selected()) && !closed()) {
-            if (refreshed || is.null(state$partial_cursor)) {
+            if (is.null(state$partial_cursor)) {
               state$partial_cursor <- update$cursor
             } else {
               # Re-read the bounded retained event suffix to reapply redaction
@@ -353,6 +363,14 @@ subagent_chat_server <- function(
                 )
               } else {
                 for (event in recent$events) {
+                  # Completed requests now live in retained history. A new
+                  # request starts a fresh preview; settlement clears it.
+                  if (
+                    event$type %in% c("request_start", "request_end", "settled")
+                  ) {
+                    partial <- ""
+                    truncated <- FALSE
+                  }
                   if (identical(event$type, "text")) {
                     combined <- paste0(partial, event$data$text)
                     truncated <- truncated ||

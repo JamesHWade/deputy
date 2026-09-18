@@ -495,3 +495,66 @@ test_that("mixed native tool evidence keeps Markdown code faithful and markup in
   )
   expect_length(xml2::xml_find_all(dom, "//script|//*[@onerror]"), 0L)
 })
+
+
+test_that("snapshot refresh retains the current text batch and request boundaries", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("bslib")
+  owner <- new.env(parent = emptyenv())
+  owner$allowed <- TRUE
+  lead <- chat_fixture_lead(owner)
+  lead$parallel_delegate(c(a = "one"))
+  shiny::testServer(
+    subagent_chat_server,
+    args = list(lead = lead, requester = function() owner),
+    {
+      session$flushReact()
+      id <- lead$list_subagents()$delegation_id[[1L]]
+      session$setInputs(selected = id)
+      session$flushReact()
+      private <- lead$.__enclos_env__$private
+      private$subagent_runs[[id]]$status <- "running"
+      private$subagent_runs[[
+        id
+      ]]$turns <- list(ellmer::UserTurn(list(ellmer::ContentText(
+        "new request"
+      ))))
+      lead_observe_event(lead, id, AgentEvent("request_start"))
+      lead_observe_event(lead, id, AgentEvent("text", text = "first chunk"))
+      session$elapse(300)
+      session$flushReact()
+      expect_identical(state$partial, "first chunk")
+      lead_observe_event(lead, id, AgentEvent("text", text = " and second"))
+      session$elapse(300)
+      session$flushReact()
+      expect_identical(state$partial, "first chunk and second")
+      lead_observe_event(lead, id, AgentEvent("request_end"))
+      lead_observe_event(lead, id, AgentEvent("request_start"))
+      lead_observe_event(lead, id, AgentEvent("text", text = "next request"))
+      session$elapse(300)
+      session$flushReact()
+      expect_identical(state$partial, "next request")
+      lead_observe_status(lead, id, "settled")
+      session$elapse(300)
+      session$flushReact()
+      expect_identical(state$partial, "")
+    }
+  )
+})
+
+test_that("deeply nested Content stays in native code display", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "nested",
+    name = "fixture",
+    arguments = list()
+  )
+  value <- list(nested = list(ellmer::ContentText("<script>bad()</script>")))
+  block <- shinychat::contents_shinychat(subagent_chat_safe_content(ellmer::ContentToolResult(
+    value,
+    request = request
+  )))
+  expect_identical(block$value_type, "code")
+  expect_false(grepl("<script>", block$value, fixed = TRUE))
+})
