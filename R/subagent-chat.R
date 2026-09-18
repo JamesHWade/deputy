@@ -1,6 +1,6 @@
 subagent_chat_dependencies <- function() {
   rlang::check_installed(
-    c("shiny", "shinychat", "bslib"),
+    c("shiny", "shinychat", "bslib", "commonmark", "xml2"),
     reason = "to display child conversations"
   )
   if (utils::packageVersion("shinychat") < "0.5.0") {
@@ -16,7 +16,8 @@ subagent_chat_dependencies <- function() {
 #' The panel has no prompt handler and cannot resume or approve a child.
 #' @param id Shiny module ID.
 #' @param height Height of the read-only child chat, default `"420px"`.
-#' @return A bslib card. Requires optional shiny, shinychat >= 0.5.0 and bslib.
+#' @return A bslib card. Requires optional shiny, shinychat >= 0.5.0, bslib,
+#'   commonmark and xml2.
 #' @export
 subagent_chat_ui <- function(id, height = "420px") {
   subagent_chat_dependencies()
@@ -374,7 +375,7 @@ subagent_chat_server <- function(
                 state$partial <- partial
                 shinychat::markdown_stream(
                   "partial",
-                  htmltools::htmlEscape(partial),
+                  subagent_chat_markdown(partial),
                   session = session
                 )
               }
@@ -593,7 +594,10 @@ subagent_chat_messages <- function(turns) {
     } else {
       "assistant"
     }
-    turn@contents <- lapply(turn@contents, subagent_chat_safe_content)
+    # Native user messages are plain text; only assistant messages use Markdown.
+    if (identical(role, "assistant")) {
+      turn@contents <- lapply(turn@contents, subagent_chat_safe_content)
+    }
     content <- shinychat::contents_shinychat(turn)
     if (!length(content)) {
       next
@@ -608,24 +612,102 @@ subagent_chat_messages <- function(turns) {
   messages
 }
 
-# Native markdown permits HTML. Escape raw markup in untrusted model/tool text,
-# while preserving markdown and typed image/document attachments.
+# Render Markdown once, then rebuild only inert HTML. Sanitizing the rendered
+# tree preserves literal characters in inline, fenced and indented code.
+subagent_chat_markdown <- function(text) {
+  if (!nzchar(text)) {
+    return("")
+  }
+  html <- commonmark::markdown_html(text, extensions = TRUE)
+  document <- xml2::read_html(paste0("<html><body>", html, "</body></html>"))
+  allowed <- c(
+    "p",
+    "br",
+    "hr",
+    "pre",
+    "code",
+    "em",
+    "strong",
+    "del",
+    "blockquote",
+    "ul",
+    "ol",
+    "li",
+    paste0("h", 1:6),
+    "a",
+    "img",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td"
+  )
+  safe_url <- function(value) {
+    scheme <- gsub("[[:space:][:cntrl:]]", "", value)
+    !grepl(":", sub("[/?#].*$", "", scheme)) ||
+      grepl("^(https?|mailto):", scheme, ignore.case = TRUE)
+  }
+  render <- function(node) {
+    if (identical(xml2::xml_type(node), "text")) {
+      return(xml2::xml_text(node))
+    }
+    name <- xml2::xml_name(node)
+    if (!name %in% allowed) {
+      # Unknown markup is visible as text, never sent as executable HTML.
+      return(as.character(node))
+    }
+    attributes <- as.list(xml2::xml_attrs(node))
+    attributes <- attributes[intersect(names(attributes), c("title", "alt"))]
+    url_field <- switch(name, a = "href", img = "src", NULL)
+    if (!is.null(url_field)) {
+      url <- xml2::xml_attr(node, url_field)
+      if (!is.na(url) && safe_url(url)) attributes[[url_field]] <- url
+    }
+    if (identical(name, "code")) {
+      language <- xml2::xml_attr(node, "class")
+      if (!is.na(language) && grepl("^language-[a-zA-Z0-9_-]+$", language)) {
+        attributes$class <- language
+      }
+    }
+    if (identical(name, "ol")) {
+      start <- xml2::xml_attr(node, "start")
+      if (!is.na(start) && grepl("^[0-9]+$", start)) attributes$start <- start
+    }
+    children <- lapply(xml2::xml_contents(node), render)
+    htmltools::tag(name, c(attributes, children))
+  }
+  body <- xml2::xml_find_first(document, "//body")
+  as.character(htmltools::tagList(lapply(xml2::xml_contents(body), render)))
+}
+
 subagent_chat_safe_content <- function(content) {
-  if (is.character(content)) {
-    return(as.character(htmltools::htmlEscape(content)))
-  }
-  if (is.list(content) && !is.object(content)) {
-    return(lapply(content, subagent_chat_safe_content))
-  }
   if (inherits(content, "ellmer::ContentJson")) {
     content <- ellmer::ContentText(ellmer::contents_markdown(content))
   }
   if (inherits(content, "ellmer::ContentText")) {
-    content@text <- as.character(htmltools::htmlEscape(content@text))
+    content@text <- subagent_chat_markdown(content@text)
   } else if (inherits(content, "ellmer::ContentToolResult")) {
-    content@value <- subagent_chat_safe_content(content@value)
-    if (is.character(content@error)) {
-      content@error <- as.character(htmltools::htmlEscape(content@error))
+    value <- content@value
+    if (
+      inherits(value, "ellmer::ContentText") ||
+        inherits(value, "ellmer::ContentJson")
+    ) {
+      value <- list(value)
+    }
+    # Native tool cards display plain values and errors as code. Only mixed
+    # Content lists use Markdown for their text items.
+    if (
+      is.list(value) &&
+        any(vapply(value, inherits, logical(1), "ellmer::Content"))
+    ) {
+      content@value <- lapply(value, function(item) {
+        if (inherits(item, "ellmer::Content")) {
+          subagent_chat_safe_content(item)
+        } else {
+          subagent_chat_markdown(paste(as.character(item), collapse = "\n"))
+        }
+      })
     }
   }
   content

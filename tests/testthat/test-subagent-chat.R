@@ -1,3 +1,6 @@
+skip_if_not_installed("commonmark")
+skip_if_not_installed("xml2")
+
 chat_fixture_lead <- function(
   requester,
   redact = function(view, requester) view
@@ -121,13 +124,14 @@ test_that("native replay pairs tool cards across turn boundaries", {
   )
   messages <- subagent_chat_messages(turns)
   expect_length(messages, 2L)
+  expect_identical(messages[[1L]]$content[[1L]], "task")
   expect_identical(messages[[2L]]$role, "assistant")
   content <- messages[[2L]]$content
   expect_identical(content[[1L]]$request_id, "tool-1")
   expect_identical(content[[2L]]$request_id, "tool-1")
   expect_identical(content[[2L]]$status, "success")
   expect_identical(content[[2L]]$value, "retained evidence")
-  expect_identical(content[[3L]], "answer")
+  expect_identical(xml2::xml_text(xml2::read_html(content[[3L]])), "answer")
 })
 
 
@@ -145,12 +149,16 @@ test_that("untrusted markdown cannot introduce active HTML", {
   result <- ellmer::ContentToolResult(list(text), request = request)
   safe <- subagent_chat_safe_content(result)
   expect_match(safe@value[[1L]]@text, "&lt;script&gt;", fixed = TRUE)
-  expect_match(safe@value[[1L]]@text, "**Keep markdown**", fixed = TRUE)
+  expect_match(
+    safe@value[[1L]]@text,
+    "<strong>Keep markdown</strong>",
+    fixed = TRUE
+  )
   expect_match(text@text, "<script>", fixed = TRUE)
   message <- subagent_chat_messages(list(ellmer::AssistantTurn(list(text))))[[
     1L
   ]]
-  expect_match(message$content[[1L]], "&lt;img", fixed = TRUE)
+  expect_false(grepl("onerror=|<script>", message$content[[1L]]))
 })
 
 test_that("saved nested lineage remains visible without recursive execution", {
@@ -203,7 +211,10 @@ test_that("native JSON tool content uses safe markdown instead of raw HTML", {
   ))
   safe <- subagent_chat_safe_content(json)
   expect_s7_class(safe, ellmer::ContentText)
-  expect_match(safe@text, "```json", fixed = TRUE)
+  expect_length(
+    xml2::xml_find_all(xml2::read_html(safe@text), "//pre/code"),
+    1L
+  )
   expect_match(safe@text, "&lt;img", fixed = TRUE)
   request <- ellmer::ContentToolRequest(
     id = "json",
@@ -337,17 +348,62 @@ test_that("redacted identities do not hide remaining child views", {
 })
 
 
-test_that("all public tool text forms escape active markup", {
-  for (value in list(
-    "<img src=x onerror=bad()>",
-    ellmer::ContentText("<script>bad()</script>"),
-    list(nested = list("<script>bad()</script>"))
+test_that("native tool code values and errors preserve literal characters", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  text <- "<img src=x onerror=bad()> & literal"
+  request <- ellmer::ContentToolRequest(
+    id = "literal",
+    name = "fixture",
+    arguments = list()
+  )
+  for (result in list(
+    ellmer::ContentToolResult(text, request = request),
+    ellmer::ContentToolResult(NULL, error = text, request = request)
   )) {
-    safe <- subagent_chat_safe_content(ellmer::ContentToolResult(value))
-    record <- jsonlite::toJSON(ellmer::contents_record(safe), auto_unbox = TRUE)
-    expect_false(grepl("<script>|<img", record))
-    expect_match(record, "&lt;", fixed = TRUE)
+    block <- shinychat::contents_shinychat(subagent_chat_safe_content(result))
+    expect_identical(block$value_type, "code")
+    expect_identical(block$value, text)
   }
+})
+
+test_that("sanitized Markdown preserves code and rejects active markup and URLs", {
+  skip_if_not_installed("commonmark")
+  skip_if_not_installed("xml2")
+  source <- paste(
+    "**Markdown** and `a < b & c > d`.",
+    "",
+    "```r",
+    "a < b & c > d",
+    "```",
+    "",
+    "    a < b & c > d",
+    "",
+    '<img src=x onerror="bad()"><script>bad()</script>',
+    "",
+    "[bad](javascript:alert%281%29) [good](https://example.com)",
+    sep = "\n"
+  )
+  html <- subagent_chat_markdown(source)
+  dom <- xml2::read_html(html)
+  expect_identical(
+    xml2::xml_text(xml2::xml_find_all(dom, "//code")),
+    c("a < b & c > d", "a < b & c > d\n", "a < b & c > d\n")
+  )
+  expect_length(
+    xml2::xml_find_all(
+      dom,
+      "//script|//*[@onerror]|//a[starts-with(@href, 'javascript:')]"
+    ),
+    0L
+  )
+  expect_identical(
+    xml2::xml_text(xml2::xml_find_first(dom, "//strong")),
+    "Markdown"
+  )
+  expect_identical(
+    xml2::xml_attr(xml2::xml_find_all(dom, "//a"), "href"),
+    c(NA_character_, "https://example.com")
+  )
 })
 
 test_that("mutable disclosure re-redacts retained transcript and streamed text", {
@@ -409,4 +465,33 @@ test_that("mutable disclosure re-redacts retained transcript and streamed text",
     }
   )
   expect_equal(lead$usage(), before)
+})
+
+
+test_that("mixed native tool evidence keeps Markdown code faithful and markup inert", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "mixed",
+    name = "fixture",
+    arguments = list()
+  )
+  value <- list(
+    ellmer::ContentText("`a < b & c > d`"),
+    "<img src=x onerror=bad()>",
+    list(nested = "<script>bad()</script>")
+  )
+  block <- shinychat::contents_shinychat(subagent_chat_safe_content(
+    ellmer::ContentToolResult(value, request = request)
+  ))
+  expect_identical(block$value_type, "content_extra")
+  items <- jsonlite::fromJSON(block$value, simplifyVector = FALSE)
+  dom <- xml2::read_html(paste(
+    vapply(items, function(x) x$value, character(1)),
+    collapse = "\n"
+  ))
+  expect_identical(
+    xml2::xml_text(xml2::xml_find_first(dom, "//code")),
+    "a < b & c > d"
+  )
+  expect_length(xml2::xml_find_all(dom, "//script|//*[@onerror]"), 0L)
 })

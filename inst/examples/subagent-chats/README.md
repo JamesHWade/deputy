@@ -7,7 +7,7 @@ pkgload::load_all()
 shiny::runApp("inst/examples/subagent-chats")
 ```
 
-Requires Shiny, bslib, shinychat >= 0.5.0, ellmer >= 0.5.0, callr and httpuv.
+Requires Shiny, bslib, shinychat >= 0.5.0, ellmer >= 0.5.0, callr, httpuv, commonmark and xml2.
 The demo starts a local OpenAI-compatible fixture in a child process. It needs
 no model credentials and makes no paid provider calls. Ending the session stops
 the fixture and removes its temporary data.
@@ -33,8 +33,8 @@ independently of the snapshot.
 The access buttons modify only this disposable demo's in-memory display flag.
 Denied access clears child disclosure; it does not alter any external account,
 file permission, credentials, network access or persistent security setting.
-Tool and model text deliberately contain hostile HTML. The adapter escapes raw
-markup before native Markdown conversion; typed images remain visible.
+Tool and model text deliberately contain hostile HTML. The adapter renders Markdown then rebuilds inert HTML, preserving literal
+characters in code examples; typed images remain visible.
 
 The ring deliberately retains only eight events so snapshot recovery and gap
 notices are observable. Retained history is separate from the transient ring.

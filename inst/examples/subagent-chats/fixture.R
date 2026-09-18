@@ -160,7 +160,7 @@ child_chat_fixture <- function() {
             answer <- paste0(
               "### ",
               tools::toTitleCase(child),
-              " notes\n\nThe retained tool result contains the evidence. **Unresolved:** confirm the measurement conditions.\n\n<script>window.deputyInjected = true</script>\n<img src=x onerror=\"window.deputyInjected=true\">\n\nThis markup is untrusted fixture text."
+              " notes\n\nThe retained tool result contains the evidence. **Unresolved:** confirm the measurement conditions.\n\n<script>window.deputyInjected = true</script>\n<img src=x onerror=\"window.deputyInjected=true\">\n\nThis markup is untrusted fixture text.\n\nInline code: `a < b & c > d`.\n\n```r\na < b & c > d\n```"
             )
             if (isTRUE(scenario$large)) {
               answer <- paste(

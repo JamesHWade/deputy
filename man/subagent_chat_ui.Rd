@@ -42,7 +42,8 @@ replay, observation or closing the panel.}
 \item{poll_interval}{Poll interval in milliseconds, at least 100, default 250.}
 }
 \value{
-A bslib card. Requires optional shiny, shinychat >= 0.5.0 and bslib.
+A bslib card. Requires optional shiny, shinychat >= 0.5.0, bslib,
+commonmark and xml2.
 
 \code{subagent_chat_server()} returns reactive \code{selected}, \code{views}, \code{notice}
 and \code{closed} values for host composition/testing. No runtime generator is

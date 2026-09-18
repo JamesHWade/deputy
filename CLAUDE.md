@@ -535,6 +535,7 @@ the AgentDefinition supplies the child's executable registry.
 - `promises` - Async support for `run_shiny()`
 - `shiny` - Shiny framework
 - `shinychat` - Chat UI component
+- `commonmark` and `xml2` - optional child chat Markdown rendering and inert HTML projection
 
 ## Agent skills
 

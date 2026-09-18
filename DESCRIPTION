@@ -18,6 +18,7 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Suggests:
     bslib,
+    commonmark,
     httr2,
     ggplot2,
     htmlwidgets,
