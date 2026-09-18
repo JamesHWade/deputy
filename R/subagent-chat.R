@@ -180,7 +180,7 @@ subagent_chat_server <- function(
       notice(paste(
         "Child",
         runtime$agent_name,
-        "—",
+        "\u2014",
         runtime$status,
         if (!is.null(runtime$stop_reason)) {
           paste0("(", runtime$stop_reason, ")")
@@ -205,7 +205,7 @@ subagent_chat_server <- function(
               view$outcome$runtime$agent_name,
               view$outcome$runtime$status,
               inspection_text(view$task, 50L),
-              sep = " · "
+              sep = " \u00b7 "
             )
           },
           character(1)
@@ -406,7 +406,7 @@ subagent_chat_server <- function(
             shiny::tags$small(paste(
               runtime$status,
               runtime$stop_reason %||% "",
-              sep = " · "
+              sep = " \u00b7 "
             ))
           )
         })
@@ -452,9 +452,9 @@ subagent_chat_server <- function(
         class = "deputy-child-meta",
         shiny::tags$p(paste0(
           view$usage$total_tokens %||% "Unknown",
-          " tokens · ",
+          " tokens \u00b7 ",
           cost_label,
-          " · Task success not assessed"
+          " \u00b7 Task success not assessed"
         )),
         shiny::tags$details(
           shiny::tags$summary("Identity and initial context"),
@@ -488,7 +488,7 @@ subagent_chat_server <- function(
             paste(
               "Artifact",
               ref$availability %||% "unresolved",
-              "— verification not assessed"
+              "\u2014 verification not assessed"
             )
           )
         }),
