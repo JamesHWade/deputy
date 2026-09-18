@@ -412,3 +412,16 @@ test_that("export settlement cannot be changed or broken by redaction", {
   )
   expect_error(lead$export_subagents("owner"), "Only settled")
 })
+
+test_that("disclosure sizing counts replayed content without R class metadata", {
+  turn <- ellmer::UserTurn(list(ellmer::ContentText(strrep("data", 1000))))
+  record <- inspection_record_turn(turn)
+  payload <- list(transcript = list(record), turns = list(record))
+  bytes <- length(serialize(payload, NULL, version = 3))
+  view <- list(transcript = list(record), turns = list(turn))
+  expect_no_error(inspection_bound(view, inspection_policy(max_bytes = bytes)))
+  expect_error(
+    inspection_bound(view, inspection_policy(max_bytes = bytes - 1)),
+    "exceeds max_bytes"
+  )
+})
