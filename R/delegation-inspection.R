@@ -222,13 +222,36 @@ lead_prepare_outcome <- function(lead, id) {
 
 delegation_outcome <- function(record, compact = FALSE) {
   structured <- record$agent_result$structured_output
+  claim_omissions <- list()
   claim <- function(name) {
     value <- if (is.list(structured)) structured[[name]]
     if (!is.character(value) || anyNA(value)) {
       return(NULL)
     }
-    inspection_text(paste(utils::head(value, 16L), collapse = "\n"), 2048L)
+    retained <- utils::head(value, 16L)
+    bytes <- sum(nchar(enc2utf8(retained), type = "bytes")) +
+      max(0L, length(retained) - 1L)
+    claim_omissions[[name]] <<- list(
+      omitted_entries = max(0L, length(value) - 16L),
+      text_truncated = bytes > 2048L
+    )
+    inspection_text(
+      paste(
+        vapply(
+          retained,
+          inspection_text,
+          character(1),
+          bytes = 2048L
+        ),
+        collapse = "\n"
+      ),
+      2048L
+    )
   }
+  claims <- list(
+    missing_evidence = claim("missing_evidence"),
+    unresolved_work = claim("unresolved_work")
+  )
   references <- record$references %||% list()
   if (compact && isTRUE(record$answer_truncated)) {
     answer <- vapply(
@@ -275,6 +298,7 @@ delegation_outcome <- function(record, compact = FALSE) {
         conversation_id = runtime$session_id,
         task_success = "not_assessed",
         answer_truncated = isTRUE(record$answer_truncated),
+        claim_omissions = claim_omissions,
         omitted_references = if (compact) {
           max(0L, length(record$references) - 8L)
         } else {
@@ -294,10 +318,7 @@ delegation_outcome <- function(record, compact = FALSE) {
     } else {
       record$references %||% list()
     },
-    claims = list(
-      missing_evidence = claim("missing_evidence"),
-      unresolved_work = claim("unresolved_work")
-    )
+    claims = claims
   )
 }
 
@@ -340,7 +361,7 @@ inspection_record_turn <- function(turn) {
         null = "null",
         na = "null"
       ))
-    } else if (inherits(content, "S7_object")) {
+    } else if (is.object(content)) {
       # Unknown application classes have no portable public record contract.
       # Do not execute their format/record methods or lose sibling histories.
       content <- "[Unsupported tool payload omitted from retained history.]"
