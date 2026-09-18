@@ -28,7 +28,8 @@ subagent_chat_ui <- function(id, height = "420px") {
       shiny::selectInput(
         ns("choice"),
         "Inspect a child conversation",
-        choices = character()
+        choices = character(),
+        selectize = FALSE
       ),
       shiny::tags$div(
         shiny::actionButton(ns("close"), "Close child view", class = "btn-sm"),
@@ -342,6 +343,7 @@ subagent_chat_server <- function(
         detach()
         closed(TRUE)
         selected(NULL)
+        shiny::updateSelectInput(session, "choice", selected = "")
         clear()
         notice("Child view closed. Running children continue.")
         session$sendCustomMessage(
