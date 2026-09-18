@@ -16,8 +16,11 @@ separately authorized host callback.
 
 Use released shinychat 0.5.0 public content conversion and message APIs. Group
 adjacent assistant content, including tool results carried by user turns, to
-preserve native request/result pairing. Escape untrusted raw HTML before
-Markdown conversion while preserving typed attachments. Scoped CSS hides the
+preserve native request/result pairing. Render assistant Markdown with commonmark,
+then use xml2 and htmltools to rebuild an inert HTML tree with allowed tags and
+URL schemes. This preserves literal characters in code and typed attachments.
+Native plain-text user messages, tool values and errors stay in their text/code
+rendering paths. Scoped CSS hides the
 composer; no prompt handler is installed. Do not use private shinychat state or
 copy its renderer. Native nested tool streams remain an upstream concern.
 

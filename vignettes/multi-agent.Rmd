@@ -711,8 +711,10 @@ host-owned saved history, and active-run recovery remains unsupported.
 ## Inspect children in Shiny
 
 The optional adapter places an activity strip and selected child conversation
-beside the host's lead chat. It requires shinychat 0.5.0, Shiny and bslib. The
-core runtime has no UI dependency.
+beside the host's lead chat. It requires shinychat 0.5.0, Shiny, bslib, commonmark
+and xml2. The core runtime has no UI dependency. Assistant Markdown is rendered
+then filtered to inert HTML so inline and fenced code retain their literal
+characters. Native tool code values and errors remain plain text.
 
 ```{r, eval=FALSE}
 ui <- bslib::page_fluid(
