@@ -786,8 +786,14 @@ LeadAgent <- R6::R6Class(
                 compact = TRUE
               )))
               if (!is.null(outcome$error)) {
-                # The bounded payload already contains the label and error.
-                ellmer::tool_reject(paste0("Subagent failed.\n", payload))
+                # Preserve the diagnostic label without repeating an unbounded
+                # provider error; the bounded payload contains that message.
+                ellmer::tool_reject(paste0(
+                  "Subagent '",
+                  inspection_text(def$name, 512L),
+                  "' failed.\n",
+                  payload
+                ))
               }
               payload
             })

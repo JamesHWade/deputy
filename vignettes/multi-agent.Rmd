@@ -599,7 +599,9 @@ are model-authored. A normal stop never verifies a claim or approves an artifact
 
 Answers are bounded to 8 KiB of UTF-8 text. Larger answers use the existing
 ContextPolicy offload store; a scoped reference retains provenance. The model
-projection includes at most eight references and reports omissions. Full child
+projection includes at most eight references and reports omissions.
+`runtime$claim_omissions` reports omitted entries and text truncation for each
+structured claim, including in host inspection. Full child
 history is separate from the lead's model context.
 
 Bind disclosure to the authenticated host session before exposing inspection:

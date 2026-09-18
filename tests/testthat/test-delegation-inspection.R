@@ -818,3 +818,59 @@ test_that("failure wrappers keep large errors out of model context", {
   expect_match(conditionMessage(failure), "failure", fixed = TRUE)
   expect_gt(nchar(lead$inspect_subagents("owner")[[1L]]$errors$error), 100000L)
 })
+
+
+test_that("unsupported S3 payloads omit only their own values", {
+  lead <- inspection_lead()
+  lead$parallel_delegate(c(a = "one", b = "two"))
+  id <- lead$list_subagents()$delegation_id[[1L]]
+  value <- structure(list(private = "not portable"), class = "report")
+  lead$.__enclos_env__$private$subagent_runs[[
+    id
+  ]]$turns <- list(ellmer::UserTurn(list(
+    ellmer::ContentToolResult(value),
+    ellmer::ContentToolResult(list(nested = value, retained = "evidence"))
+  )))
+  views <- lead$inspect_subagents("owner", transcript = TRUE)
+  expect_length(views, 2L)
+  expect_match(
+    views[[1L]]$turns[[1L]]@contents[[1L]]@value,
+    "Unsupported tool payload omitted"
+  )
+  expect_identical(
+    views[[1L]]$turns[[1L]]@contents[[2L]]@value$retained,
+    "evidence"
+  )
+  saved <- lead$export_subagents("owner")
+  expect_no_error(delegation_history(
+    saved,
+    "owner",
+    inspection_policy(),
+    saved$scope
+  ))
+  expect_length(views[[2L]]$turns, 2L)
+})
+
+
+test_that("structured claim omissions are explicit for models and hosts", {
+  record <- list(
+    agent_result = AgentResult(
+      structured_output = list(
+        missing_evidence = strrep("é", 2048L),
+        unresolved_work = c(rep("done", 16L), "review still pending")
+      )
+    )
+  )
+  for (compact in c(FALSE, TRUE)) {
+    outcome <- delegation_outcome(record, compact = compact)
+    expect_equal(nchar(outcome$claims$missing_evidence, type = "bytes"), 2048L)
+    expect_identical(
+      outcome$runtime$claim_omissions$missing_evidence,
+      list(omitted_entries = 0L, text_truncated = TRUE)
+    )
+    expect_identical(
+      outcome$runtime$claim_omissions$unresolved_work,
+      list(omitted_entries = 1L, text_truncated = FALSE)
+    )
+  }
+})
