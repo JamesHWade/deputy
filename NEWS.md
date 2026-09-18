@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* `subagent_chat_ui()` and `subagent_chat_server()` compose an optional read-only
+  child conversation panel with native shinychat tool cards, retained attachments,
+  live activity, authorized saved-history replay and separate host cancellation.
+  A deterministic local demo covers concurrent and repeated specialists (#158).
+
 * `LeadAgent$observe_subagents()` provides authorized snapshots and bounded
   child event cursors without driving execution. Overflow and omitted content
   are explicit, readers detach independently, and targeted host cancellation

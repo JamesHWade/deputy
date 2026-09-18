@@ -17,6 +17,7 @@ Depends:
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Suggests:
+    bslib,
     httr2,
     ggplot2,
     htmlwidgets,
@@ -114,6 +115,7 @@ Collate:
     'skills.R'
     'stall-detection.R'
     'structured-run.R'
+    'subagent-chat.R'
     'tool-metadata.R'
     'tool-registration.R'
     'tool-request-validation.R'

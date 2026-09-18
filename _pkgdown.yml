@@ -147,6 +147,7 @@ reference:
   - DelegationOutcome
   - DelegationObservation
   - DelegationSubscription
+  - subagent_chat_ui
   - delegation_history
   - agent_definition
   - agent_definition_read
