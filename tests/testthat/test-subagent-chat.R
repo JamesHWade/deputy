@@ -14,6 +14,7 @@ chat_fixture_lead <- function(
 }
 
 test_that("optional child UI composes a labeled read-only native chat", {
+  skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   skip_if_not_installed("bslib")
   ui <- as.character(subagent_chat_ui("children"))
@@ -25,6 +26,7 @@ test_that("optional child UI composes a labeled read-only native chat", {
 })
 
 test_that("selection close and saved replay never execute a child", {
+  skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   skip_if_not_installed("bslib")
   auth_context <- new.env(parent = emptyenv())
@@ -80,6 +82,7 @@ test_that("selection close and saved replay never execute a child", {
 })
 
 test_that("activity labels escape hostile task text", {
+  skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   skip_if_not_installed("bslib")
   auth_context <- new.env(parent = emptyenv())
@@ -102,6 +105,7 @@ test_that("activity labels escape hostile task text", {
 })
 
 test_that("native replay pairs tool cards across turn boundaries", {
+  skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   request <- ellmer::ContentToolRequest(
     id = "tool-1",
@@ -128,6 +132,7 @@ test_that("native replay pairs tool cards across turn boundaries", {
 
 
 test_that("untrusted markdown cannot introduce active HTML", {
+  skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   text <- ellmer::ContentText(
     "**Keep markdown** <img src=x onerror='alert(1)'><script>alert(1)</script>"
@@ -149,6 +154,7 @@ test_that("untrusted markdown cannot introduce active HTML", {
 })
 
 test_that("saved nested lineage remains visible without recursive execution", {
+  skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   skip_if_not_installed("bslib")
   auth_context <- new.env(parent = emptyenv())
@@ -185,6 +191,7 @@ test_that("saved nested lineage remains visible without recursive execution", {
 })
 
 test_that("native JSON tool content uses safe markdown instead of raw HTML", {
+  skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   json <- ellmer::contents_replay(list(
     version = 1,
@@ -241,6 +248,7 @@ test_that("demo fingerprints retain failure text without condition environments"
 
 
 test_that("changing the requester replaces the event disclosure context", {
+  skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   skip_if_not_installed("bslib")
   requester <- shiny::reactiveVal("first")
@@ -290,6 +298,7 @@ test_that("changing the requester replaces the event disclosure context", {
 })
 
 test_that("redacted identities do not hide remaining child views", {
+  skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   skip_if_not_installed("bslib")
   owner <- new.env(parent = emptyenv())
@@ -325,4 +334,79 @@ test_that("redacted identities do not hide remaining child views", {
       expect_type(output$activity$html, "character")
     }
   )
+})
+
+
+test_that("all public tool text forms escape active markup", {
+  for (value in list(
+    "<img src=x onerror=bad()>",
+    ellmer::ContentText("<script>bad()</script>"),
+    list(nested = list("<script>bad()</script>"))
+  )) {
+    safe <- subagent_chat_safe_content(ellmer::ContentToolResult(value))
+    record <- jsonlite::toJSON(ellmer::contents_record(safe), auto_unbox = TRUE)
+    expect_false(grepl("<script>|<img", record))
+    expect_match(record, "&lt;", fixed = TRUE)
+  }
+})
+
+test_that("mutable disclosure re-redacts retained transcript and streamed text", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("bslib")
+  owner <- new.env(parent = emptyenv())
+  owner$allowed <- TRUE
+  owner$hide_text <- FALSE
+  owner$hide_history <- FALSE
+  lead <- chat_fixture_lead(owner, redact = function(view, requester) {
+    if (requester$hide_text && identical(view$kind, "event")) {
+      view$event <- NULL
+    }
+    if (requester$hide_history) {
+      view$transcript <- NULL
+    }
+    view
+  })
+  lead$parallel_delegate(c(a = "one"))
+  before <- lead$usage()
+  shiny::testServer(
+    subagent_chat_server,
+    args = list(lead = lead, requester = function() owner),
+    {
+      session$flushReact()
+      id <- lead$list_subagents()$delegation_id[[1L]]
+      session$setInputs(selected = id)
+      session$flushReact()
+      session$elapse(300)
+      session$flushReact()
+      lead_observe_event(
+        lead,
+        id,
+        AgentEvent("text", text = "sensitive live text")
+      )
+      session$elapse(300)
+      session$flushReact()
+      expect_identical(state$partial, "sensitive live text")
+      expect_length(state$rendered$turns, 2L)
+      lead_observe_event(lead, id, AgentEvent("text", text = strrep("x", 9000)))
+      session$elapse(300)
+      session$flushReact()
+      expect_lte(nchar(state$partial, type = "bytes"), 8192L)
+      expect_match(output$notice, "truncated")
+      owner$hide_text <- TRUE
+      session$elapse(300)
+      session$flushReact()
+      expect_identical(state$partial, "")
+      owner$hide_history <- TRUE
+      session$elapse(300)
+      session$flushReact()
+      expect_length(state$rendered$turns, 0L)
+      expect_length(views(), 1L)
+      owner$hide_history <- FALSE
+      session$elapse(300)
+      session$flushReact()
+      expect_length(state$rendered$turns, 2L)
+    }
+  )
+  expect_equal(lead$usage(), before)
 })

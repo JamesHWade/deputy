@@ -1,5 +1,8 @@
 subagent_chat_dependencies <- function() {
-  rlang::check_installed(c("shiny", "shinychat", "bslib"))
+  rlang::check_installed(
+    c("shiny", "shinychat", "bslib"),
+    reason = "to display child conversations"
+  )
   if (utils::packageVersion("shinychat") < "0.5.0") {
     cli::cli_abort("Child chat inspection requires shinychat >= 0.5.0.")
   }
@@ -124,6 +127,8 @@ subagent_chat_server <- function(
     state$requester <- NULL
     state$history <- NULL
     state$partial <- ""
+    state$partial_cursor <- NULL
+    state$rendered <- NULL
     detach <- function() {
       if (!is.null(state$reader)) {
         state$reader$close()
@@ -134,6 +139,8 @@ subagent_chat_server <- function(
       shinychat::chat_clear("transcript", session = session)
       shinychat::markdown_stream("partial", "", session = session)
       state$partial <- ""
+      state$partial_cursor <- NULL
+      state$rendered <- NULL
     }
     failure <- function(error) {
       detach()
@@ -143,10 +150,10 @@ subagent_chat_server <- function(
       notice("This child view is unavailable or access was denied.")
       invisible(NULL)
     }
-    render_child <- function() {
+    render_child <- function(force = FALSE) {
       id <- selected()
       if (is.null(id) || closed()) {
-        return(invisible(NULL))
+        return(FALSE)
       }
       saved <- value(history)
       current <- if (is.null(saved)) {
@@ -167,10 +174,17 @@ subagent_chat_server <- function(
         selected(NULL)
         clear()
         notice("The selected child history is missing or no longer available.")
-        return(invisible(NULL))
+        return(FALSE)
       }
       view <- current[[1L]]
+      if (!force && identical(view, state$rendered)) {
+        return(FALSE)
+      }
       clear()
+      state$rendered <- view
+      if (!is.null(state$reader)) {
+        state$partial_cursor <- state$reader$snapshot()$cursor
+      }
       for (message in subagent_chat_messages(view$turns)) {
         shinychat::chat_append_message(
           "transcript",
@@ -191,7 +205,7 @@ subagent_chat_server <- function(
           ""
         }
       ))
-      invisible(view)
+      TRUE
     }
     filter_views <- function(next_views) {
       Filter(
@@ -292,6 +306,7 @@ subagent_chat_server <- function(
           state$history <- NULL
           if (changed || is.null(state$reader)) {
             detach()
+            clear()
             state$lead <- current_lead
             state$reader <- current_lead$observe_subagents(current_requester)
             update_views(state$reader$snapshot()$children)
@@ -306,50 +321,63 @@ subagent_chat_server <- function(
             length(update$events) || length(update$gaps) || disclosure_changed
           ) {
             update_views(fresh_views)
-            chosen <- Filter(
-              function(event) identical(event$delegation_id, selected()),
-              update$events
+          }
+          # Re-read selected content under the current policy, even when only
+          # mutable host disclosure state changed. Repaint only changed views.
+          refreshed <- render_child(force = length(update$gaps) > 0L)
+          if (length(update$gaps)) {
+            notice(
+              "Some live events were missed. Recovered retained child history."
             )
-            refresh <- disclosure_changed ||
-              length(update$gaps) ||
-              any(vapply(
-                chosen,
-                function(event) {
-                  event$type %in%
-                    c("tool_start", "tool_end", "turn", "stop", "settled")
-                },
-                logical(1)
-              ))
-            if (refresh) {
-              render_child()
-            }
-            if (length(update$gaps)) {
-              notice(
-                "Some live events were missed. Recovered retained child history."
+          }
+          if (!is.null(selected()) && !closed()) {
+            if (refreshed || is.null(state$partial_cursor)) {
+              state$partial_cursor <- update$cursor
+            } else {
+              # Re-read the bounded retained event suffix to reapply redaction
+              # to cached streamed text as well as newly arriving text.
+              reader <- current_lead$observe_subagents(
+                current_requester,
+                selected(),
+                after = state$partial_cursor
               )
-            }
-            if (!refresh) {
-              for (event in chosen) {
-                if (event$type == "text") {
-                  partial <- paste0(state$partial, event$data$text)
-                  state$partial <- inspection_text(partial, 8192L)
-                  if (nchar(enc2utf8(partial), type = "bytes") > 8192L) {
+              recent <- tryCatch(reader$poll(), finally = reader$close())
+              partial <- ""
+              truncated <- FALSE
+              if (length(recent$gaps)) {
+                render_child(force = TRUE)
+                state$partial_cursor <- recent$cursor
+                notice(
+                  "Some live events were missed. Recovered retained child history."
+                )
+              } else {
+                for (event in recent$events) {
+                  if (identical(event$type, "text")) {
+                    combined <- paste0(partial, event$data$text)
+                    truncated <- truncated ||
+                      nchar(enc2utf8(combined), type = "bytes") > 8192L
+                    partial <- inspection_text(combined, 8192L)
+                  }
+                  if (!is.null(event$data$content_omitted)) {
                     notice(
-                      "Live text preview was truncated. Retained history remains available."
+                      "Large live content was omitted. Retained history remains available."
                     )
                   }
                 }
-                if (!is.null(event$data$content_omitted)) {
-                  notice(
-                    "Large live content was omitted. Retained history remains available."
-                  )
-                }
               }
-              shinychat::markdown_stream(
-                "partial",
-                htmltools::htmlEscape(state$partial),
-                session = session
-              )
+              if (truncated) {
+                notice(
+                  "Live text preview was truncated. Retained history remains available."
+                )
+              }
+              if (!identical(partial, state$partial)) {
+                state$partial <- partial
+                shinychat::markdown_stream(
+                  "partial",
+                  htmltools::htmlEscape(partial),
+                  session = session
+                )
+              }
             }
           }
         },
@@ -583,15 +611,22 @@ subagent_chat_messages <- function(turns) {
 # Native markdown permits HTML. Escape raw markup in untrusted model/tool text,
 # while preserving markdown and typed image/document attachments.
 subagent_chat_safe_content <- function(content) {
+  if (is.character(content)) {
+    return(as.character(htmltools::htmlEscape(content)))
+  }
+  if (is.list(content) && !is.object(content)) {
+    return(lapply(content, subagent_chat_safe_content))
+  }
   if (inherits(content, "ellmer::ContentJson")) {
     content <- ellmer::ContentText(ellmer::contents_markdown(content))
   }
   if (inherits(content, "ellmer::ContentText")) {
     content@text <- as.character(htmltools::htmlEscape(content@text))
-  } else if (
-    inherits(content, "ellmer::ContentToolResult") && is.list(content@value)
-  ) {
-    content@value <- lapply(content@value, subagent_chat_safe_content)
+  } else if (inherits(content, "ellmer::ContentToolResult")) {
+    content@value <- subagent_chat_safe_content(content@value)
+    if (is.character(content@error)) {
+      content@error <- as.character(htmltools::htmlEscape(content@error))
+    }
   }
   content
 }
