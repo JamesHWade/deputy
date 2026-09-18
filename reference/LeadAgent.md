@@ -37,6 +37,8 @@ it to spawn sub-agents based on registered AgentDefinitions.
 
 - [`LeadAgent$get_subagent_messages()`](#method-LeadAgent-get_subagent_messages)
 
+- [`LeadAgent$get_subagent_contexts()`](#method-LeadAgent-get_subagent_contexts)
+
 - [`LeadAgent$print()`](#method-LeadAgent-print)
 
 - [`LeadAgent$clone()`](#method-LeadAgent-clone)
@@ -121,7 +123,10 @@ Create a new LeadAgent.
       run_context = list(),
       agent_id = NULL,
       agent_name = NULL,
-      fallback_chats = list()
+      fallback_chats = list(),
+      delegation_sources = list(),
+      delegation_scope = list(),
+      delegation_max_bytes = 65536L
     )
 
 #### Arguments
@@ -204,6 +209,31 @@ Create a new LeadAgent.
   their own. See
   [Agent](https://jameshwade.github.io/deputy/reference/Agent.md).
 
+- `delegation_sources`:
+
+  Host-owned snapshot: unnamed list of up to 128 text records with
+  `source_id`, `revision`, `owner_id`, `conversation_id`, and `text`.
+  Optional `allowed_agents` restricts definition names; `NULL` allows
+  all registered definitions,
+  [`character()`](https://rdrr.io/r/base/character.html) allows none.
+  Each source ID has one revision per scope. The host authenticates and
+  authorizes this snapshot; Deputy checks scope and exact revision, not
+  live freshness.
+
+- `delegation_scope`:
+
+  Plain list with `owner_id` and `conversation_id`; required when
+  sources are supplied. Model arguments cannot override it.
+
+- `delegation_max_bytes`:
+
+  Positive finite admission ceiling, default 64 KiB, applied separately
+  to the UTF-8 system/message text and serialized complete manifest.
+  Known complete-context estimates also obey
+  [ContextPolicy](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
+  `max_tokens`; unknown estimates remain `NULL` and rely on byte bounds.
+  Sources are text only, with a 16 MiB catalogue ceiling.
+
 #### Returns
 
 A new `LeadAgent` object
@@ -269,8 +299,9 @@ Results preserve input order, including failures and unstarted tasks.
 
 - `tasks`:
 
-  A named character vector of tasks. Names select unique registered
-  AgentDefinitions.
+  A named character vector or named list of strings and
+  [DelegationInput](https://jameshwade.github.io/deputy/reference/DelegationInput.md)
+  values. Names select unique registered AgentDefinitions.
 
 - `max_active`:
 
@@ -348,7 +379,7 @@ Interrupt the lead and its active subagents cooperatively.
 
 #### Returns
 
-Invisible logical indicating whether the lead was active.
+Invisible logical indicating whether the lead or a Subagent was active.
 
 ------------------------------------------------------------------------
 
@@ -361,8 +392,9 @@ work. Status is `queued`, `running`, `completed`, `failed`, `stopped`,
 success. `stop_reason` retains the exact runtime reason. Identifiers and
 timestamps are `NA` until assigned. `completed_at` marks settlement of
 this invocation, including suspension. `hook_error` records observer
-errors independently. These in-memory records are not durable jobs or a
-token event feed.
+errors independently. `input_error` identifies preparation rejection as
+`invalid`, `missing`, `stale`, `unauthorized`, or `oversized`. These
+in-memory records are not durable jobs or a token event feed.
 
 #### Usage
 
@@ -425,6 +457,48 @@ authorize and redact disclosures before exposing these records to users.
 #### Returns
 
 List of turn histories
+
+------------------------------------------------------------------------
+
+### `LeadAgent$get_subagent_contexts()`
+
+Inspect initial manifests or current model context in admission order.
+Initial manifests are immutable preparation receipts, separate from
+current working context and retained conversation turns. No provider
+requests or tool calls occur during inspection. Hosts authorize
+disclosure.
+
+#### Usage
+
+    LeadAgent$get_subagent_contexts(
+      delegation_id = NULL,
+      view = "initial",
+      redact = FALSE
+    )
+
+#### Arguments
+
+- `delegation_id`:
+
+  Optional exact delegation identifier.
+
+- `view`:
+
+  `"initial"` for
+  [DelegationManifest](https://jameshwade.github.io/deputy/reference/DelegationManifest.md)
+  values, `"current"` for available system prompts and working turns.
+
+- `redact`:
+
+  For initial manifests only, return an explicitly redacted portable
+  view omitting task, instructions and source text. Metadata still
+  requires host disclosure policy. The retained manifest is unchanged.
+
+#### Returns
+
+A list; `NULL` entries mean no prepared context is available. Current
+context is retained at settlement; no matches returns
+[`list()`](https://rdrr.io/r/base/list.html).
 
 ------------------------------------------------------------------------
 

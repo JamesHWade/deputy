@@ -84,6 +84,8 @@
 <p><strong>Approval continuation</strong>: A durable Deputy control record for one pending tool operation. It carries the source correlation, saved authority, observed usage, host decision, and completed effect journal. Inspection does not execute tools; only a pending record can be consumed under current authority. Its supporting transcript uses the existing session payload and ellmer content records. The host owns conversation associations and reconciliation of indeterminate effects (ADR-0016). <em>Avoid</em>: saved coroutine, conversation database, exactly-once execution</p>
 <p><strong>Hook event</strong>: The named lifecycle point a hook is registered against. <em>Avoid</em>: trigger, lifecycle stage</p>
 <p><strong>Skill</strong>: A read-only configuration value bundling prompt text, tools, and metadata that can be loaded into an Agent to specialize it. Executable tools retain their caller-owned state. <em>Avoid</em>: plugin, extension, module, capability pack</p>
+<p><strong>DelegationInput</strong>: An immutable task-specific brief: task, constraints, evidence references, deliverable and stop conditions. Evidence selects exact revisions from a scoped host snapshot; instructions do not grant authority.</p>
+<p><strong>DelegationManifest</strong>: An immutable receipt for a delegation’s prepared initial context, including resolved evidence and declarative policy fingerprints. It is distinct from the current working context, retained child transcript and provider wire framing.</p>
 </div>
 </div>
 </div>

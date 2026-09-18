@@ -311,8 +311,9 @@ child starts a run. Callback failures follow the existing hook policy
 and appear separately in `hook_error`; they do not turn a successful
 child response into an execution failure.
 
-`get_subagent_results(delegation_id = id)` returns a retained
-AgentResult, or `NULL` if none is available.
+`get_subagent_results(delegation_id = id)` returns a list of retained
+AgentResults, with `NULL` entries where no result is available and an
+empty list when no delegation matches.
 `get_subagent_messages(session_id = session)` returns the child’s
 available conversation turns, including partial history after failure.
 Both accessors retain admission order. Live message snapshots are not a
@@ -326,6 +327,74 @@ For an asynchronous lead run,
 both the lead and active children. It takes effect at the next supported
 provider boundary. Closing an inspection panel should not call this
 method unless the user explicitly requests cancellation.
+
+## Explicit input and context inspection
+
+A plain task string still starts a fresh child conversation. For
+structured work, use
+[`DelegationInput()`](https://jameshwade.github.io/deputy/reference/DelegationInput.md)
+with constraints, evidence references, a deliverable and stop
+conditions. Stop conditions are instructions; runtime limits and
+permissions remain separate host configuration.
+
+``` r
+
+lead <- LeadAgent$new(
+  chat = ellmer::chat_openai(),
+  sub_agents = list(agent_definition("reviewer", "Review evidence", "Keep units explicit.")),
+  delegation_scope = list(owner_id = "team-a", conversation_id = "review-17"),
+  delegation_sources = list(list(
+    source_id = "assay-17", revision = "r3",
+    owner_id = "team-a", conversation_id = "review-17",
+    text = "Reported concentration: 12 mg/L.",
+    allowed_agents = "reviewer"
+  ))
+)
+brief <- DelegationInput(
+  "Assess the reported concentration",
+  constraints = "Preserve the reported units",
+  evidence = list(list(source_id = "assay-17", revision = "r3")),
+  deliverable = "A conclusion citing the source revision",
+  stop_conditions = "State uncertainty if method information is missing"
+)
+lead$parallel_delegate(list(reviewer = brief))
+id <- lead$list_subagents()$delegation_id[[1]]
+lead$get_subagent_contexts(id)                     # initial manifest
+lead$get_subagent_contexts(id, view = "current")   # working context
+lead$get_subagent_contexts(id, redact = TRUE)      # content-redacted metadata
+lead$get_subagent_messages()                      # retained child chats
+```
+
+Model-driven `delegate_to_agent` calls support the same brief fields.
+Models can select exact source revisions, but cannot supply source
+bodies, owner scope or byte ceilings. Every child brief is encoded as
+one JSON object with separate brief fields and a `resolved_evidence`
+array, even when that array is empty. Text that imitates an evidence
+header remains inside its quoted brief field. This preserves
+source-selection provenance in the representation; it does not make
+source text trustworthy or guarantee how the model interprets it. The
+host supplies authenticated, authorized text snapshots; Deputy checks
+scope, definition eligibility and revision equality against that
+snapshot. Refreshing external evidence requires a new snapshot and
+LeadAgent. Missing or `NULL` `allowed_agents` permits all definitions;
+[`character()`](https://rdrr.io/r/base/character.html) permits none.
+Snapshots are text only, not live retrieval or multimodal storage.
+
+The default admission ceiling is 64 KiB for both initial system/message
+text and the complete serialized manifest. Inputs reject explicitly when
+missing, stale, unauthorized, invalid or oversized;
+`list_subagents()$input_error` records why. Known token estimates also
+obey `ContextPolicy$max_tokens`. Unknown estimates remain explicit and
+rely on byte admission, without a token-bound guarantee.
+
+The initial manifest records static definition memory separately from
+resolved evidence and survives changes to the working context. It is a
+preparation receipt, not the exact provider wire payload or an authority
+grant. A redacted view is explicitly incomplete. Hosts control
+disclosure of both text and metadata. Inspection does not add child
+history to the lead, resume a child, or approve a tool. This provides
+the data for a child-chat inspector; nested live streaming and durable
+child continuation remain separate work.
 
 ## Monitoring with SubagentStop Hooks
 

@@ -89,6 +89,7 @@ sub-agents based on registered AgentDefinitions.</p>
 <li><p><a href="#method-LeadAgent-list_subagents"><code>LeadAgent$list_subagents()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-get_subagent_results"><code>LeadAgent$get_subagent_results()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-get_subagent_messages"><code>LeadAgent$get_subagent_messages()</code></a></p></li>
+<li><p><a href="#method-LeadAgent-get_subagent_contexts"><code>LeadAgent$get_subagent_contexts()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-print"><code>LeadAgent$print()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-clone"><code>LeadAgent$clone()</code></a></p></li>
 </ul></div><p><details><summary>Inherited methods</summary><ul><li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href="Agent.html#method-add_hook"><code>Agent$add_hook()</code></a></span></li>
@@ -164,7 +165,10 @@ sub-agents based on registered AgentDefinitions.</p>
 <span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  agent_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  agent_name <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  delegation_sources <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  delegation_scope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  delegation_max_bytes <span class="op">=</span> <span class="fl">65536L</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h4>
@@ -227,6 +231,25 @@ runs and delegated agents.</p></dd>
 Child definitions inherit the selected provider, without an implicit
 fallback policy of their own. See <a href="Agent.html">Agent</a>.</p></dd>
 
+      <dt><code>delegation_sources</code></dt>
+<dd><p>Host-owned snapshot: unnamed list of up to 128
+text records with <code>source_id</code>, <code>revision</code>, <code>owner_id</code>, <code>conversation_id</code>,
+and <code>text</code>. Optional <code>allowed_agents</code> restricts definition names; <code>NULL</code>
+allows all registered definitions, <code><a href="https://rdrr.io/r/base/character.html" class="external-link">character()</a></code> allows none. Each source
+ID has one revision per scope. The host authenticates and authorizes
+this snapshot; Deputy checks scope and exact revision, not live freshness.</p></dd>
+
+      <dt><code>delegation_scope</code></dt>
+<dd><p>Plain list with <code>owner_id</code> and <code>conversation_id</code>;
+required when sources are supplied. Model arguments cannot override it.</p></dd>
+
+      <dt><code>delegation_max_bytes</code></dt>
+<dd><p>Positive finite admission ceiling, default
+64 KiB, applied separately to the UTF-8 system/message text and serialized
+complete manifest. Known complete-context estimates also obey
+<a href="ContextPolicy.html">ContextPolicy</a> <code>max_tokens</code>; unknown estimates remain <code>NULL</code> and rely
+on byte bounds. Sources are text only, with a 16 MiB catalogue ceiling.</p></dd>
+
 
 </dl><p></p></div>
 </div><p></p><div class="section">
@@ -285,8 +308,8 @@ Results preserve input order, including failures and unstarted tasks.</p><div cl
 </div><p></p><div class="section">
 <h4 id="arguments-2">Arguments<a class="anchor" aria-label="anchor" href="#arguments-2"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>tasks</code></dt>
-<dd><p>A named character vector of tasks. Names select unique
-registered AgentDefinitions.</p></dd>
+<dd><p>A named character vector or named list of strings and
+<a href="DelegationInput.html">DelegationInput</a> values. Names select unique registered AgentDefinitions.</p></dd>
 
       <dt><code>max_active</code></dt>
 <dd><p>Maximum simultaneous responders.</p></dd>
@@ -358,7 +381,7 @@ active responders to stop at their next supported provider boundary.</p>
 </dl><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
-<p>Invisible logical indicating whether the lead was active.</p>
+<p>Invisible logical indicating whether the lead or a Subagent was active.</p>
 </div>
 
 </div>
@@ -372,7 +395,9 @@ Status is <code>queued</code>, <code>running</code>, <code>completed</code>, <co
 <code>stop_reason</code> retains the exact runtime reason. Identifiers and timestamps
 are <code>NA</code> until assigned. <code>completed_at</code> marks settlement of this invocation,
 including suspension. <code>hook_error</code> records observer errors independently.
-These in-memory records are not durable jobs or a token event feed.</p><div class="section">
+<code>input_error</code> identifies preparation rejection as <code>invalid</code>, <code>missing</code>,
+<code>stale</code>, <code>unauthorized</code>, or <code>oversized</code>. These in-memory records are not
+durable jobs or a token event feed.</p><div class="section">
 <h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
@@ -430,10 +455,46 @@ authorize and redact disclosures before exposing these records to users.</p><div
 
 </div>
 
+<p></p><hr><a id="method-LeadAgent-get_subagent_contexts"></a><div class="section">
+<h3 id="leadagent-get-subagent-contexts-"><code>LeadAgent$get_subagent_contexts()</code><a class="anchor" aria-label="anchor" href="#leadagent-get-subagent-contexts-"></a></h3>
+<p>Inspect initial manifests or current model context in admission order.
+Initial manifests are immutable preparation receipts, separate from
+current working context and retained conversation turns. No provider
+requests or tool calls occur during inspection. Hosts authorize disclosure.</p><div class="section">
+<h4 id="usage-9">Usage<a class="anchor" aria-label="anchor" href="#usage-9"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">get_subagent_contexts</span><span class="op">(</span></span>
+<span>  delegation_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  view <span class="op">=</span> <span class="st">"initial"</span>,</span>
+<span>  redact <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-7">Arguments<a class="anchor" aria-label="anchor" href="#arguments-7"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>delegation_id</code></dt>
+<dd><p>Optional exact delegation identifier.</p></dd>
+
+      <dt><code>view</code></dt>
+<dd><p><code>"initial"</code> for <a href="DelegationManifest.html">DelegationManifest</a> values, <code>"current"</code> for
+available system prompts and working turns.</p></dd>
+
+      <dt><code>redact</code></dt>
+<dd><p>For initial manifests only, return an explicitly redacted
+portable view omitting task, instructions and source text. Metadata still
+requires host disclosure policy. The retained manifest is unchanged.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-9">Returns<a class="anchor" aria-label="anchor" href="#returns-9"></a></h4>
+<p>A list; <code>NULL</code> entries mean no prepared context is available.
+Current context is retained at settlement; no matches returns <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code>.</p>
+</div>
+
+</div>
+
 <p></p><hr><a id="method-LeadAgent-print"></a><div class="section">
 <h3 id="leadagent-print-"><code>LeadAgent$print()</code><a class="anchor" aria-label="anchor" href="#leadagent-print-"></a></h3>
 <p>Print the lead agent.</p><div class="section">
-<h4 id="usage-9">Usage<a class="anchor" aria-label="anchor" href="#usage-9"></a></h4>
+<h4 id="usage-10">Usage<a class="anchor" aria-label="anchor" href="#usage-10"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -442,10 +503,10 @@ authorize and redact disclosures before exposing these records to users.</p><div
 <p></p><hr><a id="method-LeadAgent-clone"></a><div class="section">
 <h3 id="leadagent-clone-"><code>LeadAgent$clone()</code><a class="anchor" aria-label="anchor" href="#leadagent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-10">Usage<a class="anchor" aria-label="anchor" href="#usage-10"></a></h4>
+<h4 id="usage-11">Usage<a class="anchor" aria-label="anchor" href="#usage-11"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-7">Arguments<a class="anchor" aria-label="anchor" href="#arguments-7"></a></h4>
+<h4 id="arguments-8">Arguments<a class="anchor" aria-label="anchor" href="#arguments-8"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

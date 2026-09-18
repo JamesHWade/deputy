@@ -168,6 +168,10 @@ Coordinate multiple specialized agents
 
 - [`LeadAgent`](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
   : LeadAgent R6 Class
+- [`DelegationInput()`](https://jameshwade.github.io/deputy/reference/DelegationInput.md)
+  : Describe a task-specific delegation input
+- [`DelegationManifest()`](https://jameshwade.github.io/deputy/reference/DelegationManifest.md)
+  : Inspect the prepared initial context of a delegation
 - [`AgentDefinition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
   [`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
   : Create an Agent Definition

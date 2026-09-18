@@ -496,8 +496,9 @@ suspension. Cancellation in a start hook can therefore yield
 until the child starts a run. Callback failures follow the existing hook
 policy and appear separately in <code>hook_error</code>; they do not
 turn a successful child response into an execution failure.</p>
-<p><code>get_subagent_results(delegation_id = id)</code> returns a
-retained AgentResult, or <code>NULL</code> if none is available.
+<p><code>get_subagent_results(delegation_id = id)</code> returns a list
+of retained AgentResults, with <code>NULL</code> entries where no result
+is available and an empty list when no delegation matches.
 <code>get_subagent_messages(session_id = session)</code> returns the
 child’s available conversation turns, including partial history after
 failure. Both accessors retain admission order. Live message snapshots
@@ -513,11 +514,75 @@ next supported provider boundary. Closing an inspection panel should not
 call this method unless the user explicitly requests cancellation.</p>
 </div>
 <div class="section level2">
+<h2 id="explicit-input-and-context-inspection">Explicit input and context inspection<a class="anchor" aria-label="anchor" href="#explicit-input-and-context-inspection"></a>
+</h2>
+<p>A plain task string still starts a fresh child conversation. For
+structured work, use <code><a href="../reference/DelegationInput.html">DelegationInput()</a></code> with constraints,
+evidence references, a deliverable and stop conditions. Stop conditions
+are instructions; runtime limits and permissions remain separate host
+configuration.</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"reviewer"</span>, <span class="st">"Review evidence"</span>, <span class="st">"Keep units explicit."</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  delegation_scope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>owner_id <span class="op">=</span> <span class="st">"team-a"</span>, conversation_id <span class="op">=</span> <span class="st">"review-17"</span><span class="op">)</span>,</span>
+<span>  delegation_sources <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    source_id <span class="op">=</span> <span class="st">"assay-17"</span>, revision <span class="op">=</span> <span class="st">"r3"</span>,</span>
+<span>    owner_id <span class="op">=</span> <span class="st">"team-a"</span>, conversation_id <span class="op">=</span> <span class="st">"review-17"</span>,</span>
+<span>    text <span class="op">=</span> <span class="st">"Reported concentration: 12 mg/L."</span>,</span>
+<span>    allowed_agents <span class="op">=</span> <span class="st">"reviewer"</span></span>
+<span>  <span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">brief</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationInput.html">DelegationInput</a></span><span class="op">(</span></span>
+<span>  <span class="st">"Assess the reported concentration"</span>,</span>
+<span>  constraints <span class="op">=</span> <span class="st">"Preserve the reported units"</span>,</span>
+<span>  evidence <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>source_id <span class="op">=</span> <span class="st">"assay-17"</span>, revision <span class="op">=</span> <span class="st">"r3"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  deliverable <span class="op">=</span> <span class="st">"A conclusion citing the source revision"</span>,</span>
+<span>  stop_conditions <span class="op">=</span> <span class="st">"State uncertainty if method information is missing"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">lead</span><span class="op">$</span><span class="fu">parallel_delegate</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>reviewer <span class="op">=</span> <span class="va">brief</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">id</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">delegation_id</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span>
+<span><span class="va">lead</span><span class="op">$</span><span class="fu">get_subagent_contexts</span><span class="op">(</span><span class="va">id</span><span class="op">)</span>                     <span class="co"># initial manifest</span></span>
+<span><span class="va">lead</span><span class="op">$</span><span class="fu">get_subagent_contexts</span><span class="op">(</span><span class="va">id</span>, view <span class="op">=</span> <span class="st">"current"</span><span class="op">)</span>   <span class="co"># working context</span></span>
+<span><span class="va">lead</span><span class="op">$</span><span class="fu">get_subagent_contexts</span><span class="op">(</span><span class="va">id</span>, redact <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>      <span class="co"># content-redacted metadata</span></span>
+<span><span class="va">lead</span><span class="op">$</span><span class="fu">get_subagent_messages</span><span class="op">(</span><span class="op">)</span>                      <span class="co"># retained child chats</span></span></code></pre></div>
+<p>Model-driven <code>delegate_to_agent</code> calls support the same
+brief fields. Models can select exact source revisions, but cannot
+supply source bodies, owner scope or byte ceilings. Every child brief is
+encoded as one JSON object with separate brief fields and a
+<code>resolved_evidence</code> array, even when that array is empty.
+Text that imitates an evidence header remains inside its quoted brief
+field. This preserves source-selection provenance in the representation;
+it does not make source text trustworthy or guarantee how the model
+interprets it. The host supplies authenticated, authorized text
+snapshots; Deputy checks scope, definition eligibility and revision
+equality against that snapshot. Refreshing external evidence requires a
+new snapshot and LeadAgent. Missing or <code>NULL</code>
+<code>allowed_agents</code> permits all definitions;
+<code><a href="https://rdrr.io/r/base/character.html" class="external-link">character()</a></code> permits none. Snapshots are text only, not live
+retrieval or multimodal storage.</p>
+<p>The default admission ceiling is 64 KiB for both initial
+system/message text and the complete serialized manifest. Inputs reject
+explicitly when missing, stale, unauthorized, invalid or oversized;
+<code>list_subagents()$input_error</code> records why. Known token
+estimates also obey <code>ContextPolicy$max_tokens</code>. Unknown
+estimates remain explicit and rely on byte admission, without a
+token-bound guarantee.</p>
+<p>The initial manifest records static definition memory separately from
+resolved evidence and survives changes to the working context. It is a
+preparation receipt, not the exact provider wire payload or an authority
+grant. A redacted view is explicitly incomplete. Hosts control
+disclosure of both text and metadata. Inspection does not add child
+history to the lead, resume a child, or approve a tool. This provides
+the data for a child-chat inspector; nested live streaming and durable
+child continuation remain separate work.</p>
+</div>
+<div class="section level2">
 <h2 id="monitoring-with-subagentstop-hooks">Monitoring with SubagentStop Hooks<a class="anchor" aria-label="anchor" href="#monitoring-with-subagentstop-hooks"></a>
 </h2>
 <p>Use a <code>SubagentStop</code> hook to log or inspect sub-agent
 results:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">hook_monitor</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"SubagentStop"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">agent_name</span>, <span class="va">task</span>, <span class="va">result</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
@@ -538,21 +603,21 @@ host chooses the actual tools and skills it can reference. Reading files
 does not run R code, load a Skill, contact an MCP server, or create an
 Agent.</p>
 <p>Here is a complete version 1 definition:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">version</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> reviewer</span></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="fu">description</span><span class="kw">:</span><span class="at"> Reviews local text for gaps</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">prompt</span><span class="kw">: </span><span class="ch">|</span></span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  Read the supplied text using read_file.</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  Report unsupported claims and missing evidence concisely.</span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="fu">tools</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">read_file</span><span class="kw">]</span></span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="fu">model</span><span class="kw">:</span><span class="at"> inherit</span></span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="fu">skills</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="fu">disallowed_tools</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">write_file</span><span class="kw">,</span><span class="at"> run_bash</span><span class="kw">]</span></span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="fu">mcp_servers</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="fu">initial_prompt</span><span class="kw">:</span><span class="at"> Keep the review grounded in the supplied text.</span></span>
-<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a><span class="fu">max_requests</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
-<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a><span class="fu">permission_mode</span><span class="kw">:</span><span class="at"> readonly</span></span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">version</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> reviewer</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="fu">description</span><span class="kw">:</span><span class="at"> Reviews local text for gaps</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="fu">prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  Read the supplied text using read_file.</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  Report unsupported claims and missing evidence concisely.</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a><span class="fu">tools</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">read_file</span><span class="kw">]</span></span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="fu">model</span><span class="kw">:</span><span class="at"> inherit</span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="fu">skills</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a><span class="fu">disallowed_tools</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">write_file</span><span class="kw">,</span><span class="at"> run_bash</span><span class="kw">]</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a><span class="fu">mcp_servers</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="fu">initial_prompt</span><span class="kw">:</span><span class="at"> Keep the review grounded in the supplied text.</span></span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="fu">max_requests</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a><span class="fu">permission_mode</span><span class="kw">:</span><span class="at"> readonly</span></span></code></pre></div>
 <p>Only <code>version</code>, <code>name</code>,
 <code>description</code>, and <code>prompt</code> are required. All
 other fields use <code><a href="../reference/agent_definition.html">agent_definition()</a></code> defaults when omitted.
@@ -653,7 +718,7 @@ accepted for one-element sequences. Files are limited to 1 MiB.</p>
 </h3>
 <p>The package ships the YAML above as a working example. This chunk
 reads it without model credentials:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span><span class="va">tool_registry</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>read_file <span class="op">=</span> <span class="va">tool_read_file</span><span class="op">)</span></span>
 <span><span class="va">definition_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples"</span>, <span class="st">"agent-definitions"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span></span>
@@ -668,7 +733,7 @@ reads it without model credentials:</p>
 filename. A missing or empty directory returns an empty list. Duplicate
 canonical names and invalid files stop discovery rather than silently
 dropping a definition.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span>,</span>
 <span>  sub_agents <span class="op">=</span> <span class="va">definitions</span>,</span>
@@ -693,7 +758,7 @@ completed file into place. Otherwise it creates a hard link, which fails
 atomically if another writer has already created the destination. This
 requires filesystem support for hard links. A failed write or
 installation leaves an existing definition intact.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".yaml"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/agent_definition_read.html">agent_definition_write</a></span><span class="op">(</span><span class="va">definitions</span><span class="op">$</span><span class="va">reviewer</span>, <span class="va">path</span>, tools <span class="op">=</span> <span class="va">tool_registry</span><span class="op">)</span></span>
 <span><span class="va">restored</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition_read.html">agent_definition_read</a></span><span class="op">(</span><span class="va">path</span>, tools <span class="op">=</span> <span class="va">tool_registry</span><span class="op">)</span></span>
