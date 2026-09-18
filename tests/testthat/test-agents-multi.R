@@ -819,7 +819,7 @@ test_that("delegation executes sub-agent and returns result", {
 
   result <- resolve_async_value(delegate_tool("worker", "Complete the task"))
 
-  expect_equal(result, "Task completed successfully")
+  expect_equal(jsonlite::fromJSON(result)$answer, "Task completed successfully")
   expect_length(
     lead$.__enclos_env__$private$delegation_usage_reservations,
     0L
