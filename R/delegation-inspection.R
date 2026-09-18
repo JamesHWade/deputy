@@ -172,7 +172,7 @@ inspection_text <- function(text, bytes = 8192L) {
 lead_prepare_outcome <- function(lead, id) {
   private <- lead$.__enclos_env__$private
   record <- private$subagent_runs[[id]]
-  text <- record$result %||% ""
+  text <- enc2utf8(record$result %||% "")
   record$answer <- inspection_text(text)
   record$answer_truncated <- nchar(text, type = "bytes") > 8192L
   record$references <- lapply(record$artifacts, function(ref) {
@@ -211,6 +211,8 @@ lead_prepare_outcome <- function(lead, id) {
           approval = "not_granted"
         ))
       )
+      # Publishing the answer claims shared bytes independently of compaction.
+      private$.compaction_catalog_registry$provisional[[ref$id]] <- NULL
       private$ensure_tool_result_reader()
     }
   }
@@ -315,6 +317,10 @@ inspection_record_turn <- function(turn) {
         null = "null",
         na = "null"
       ))
+    } else if (inherits(content, "S7_object")) {
+      # Unknown application classes have no portable public record contract.
+      # Do not execute their format/record methods or lose sibling histories.
+      content <- "[Unsupported tool payload omitted from retained history.]"
     } else if (is.list(content) && !is.object(content)) {
       content <- lapply(
         Filter(function(x) !inherits(x, "ellmer::ContentThinking"), content),
