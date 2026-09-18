@@ -223,9 +223,6 @@ subagent_chat_server <- function(
       shiny::invalidateLater(poll_interval, session)
       shiny::isolate(tryCatch(
         {
-          if (closed()) {
-            return()
-          }
           saved <- value(history)
           current_lead <- value(lead)
           if (!is.null(saved)) {
@@ -247,6 +244,14 @@ subagent_chat_server <- function(
           }
           if (!inherits(current_lead, "LeadAgent")) {
             cli::cli_abort("No live lead is available.")
+          }
+          if (closed()) {
+            detach()
+            current <- current_lead$inspect_subagents(requester())
+            if (!identical(current, views())) {
+              update_views(current)
+            }
+            return()
           }
           changed <- !identical(current_lead, state$lead) ||
             !is.null(state$history)

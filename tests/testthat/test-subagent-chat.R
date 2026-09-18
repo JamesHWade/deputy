@@ -65,6 +65,9 @@ test_that("selection close and saved replay never execute a child", {
       session$flushReact()
       expect_length(views(), 2L)
       expect_length(cancelled, 0L)
+      session$setInputs(close = 2L)
+      session$flushReact()
+      expect_identical(closed(), TRUE)
       auth_context$allowed <- FALSE
       session$elapse(300)
       session$flushReact()
