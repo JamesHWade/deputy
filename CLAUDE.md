@@ -37,6 +37,7 @@ deputy/
 │   ├── delegation-lifecycle.R # Shared live records and child settlement
 │   ├── delegation-observation.R # Bounded child events and independent cursors
 │   ├── parallel-delegate.R # Bounded stateless responder batches
+│   ├── subagent-chat.R    # Optional authorized child activity and transcript UI
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
 │   ├── compaction-run.R    # Governed asynchronous summary attempts and recovery
 │   ├── agent-definition.R # S7 AgentDefinition values and routing normalization
@@ -411,6 +412,16 @@ consumer of each child stream. Every snapshot/poll reauthorizes and redacts;
 evicted or omitted events produce explicit gaps recovered from retained history.
 `interrupt_subagent()` is a separate trusted-host control. Detaching a reader
 never cancels work. See ADR-0021 and `R/delegation-observation.R`.
+
+### Optional child chat panel
+
+`subagent_chat_ui()` / `subagent_chat_server()` compose read-only activity and
+selected-child history beside a host lead chat. Public shinychat APIs preserve
+tool pairing and typed attachments. Commonmark/xml2/htmltools render inert
+assistant Markdown while native plain text/code paths remain unchanged.
+Selection, replay and close never execute or resume work. Every poll refreshes
+disclosure, and host cancellation has separate authorization. See ADR-0022 and
+`inst/examples/subagent-chats/` for the deterministic local fixture.
 
 ### Permission Modes
 
