@@ -649,5 +649,9 @@ Restored artifact availability is explicitly unresolved until checked against
 host storage. Live inspection checks retained artifacts and reports missing
 ones. The default 16 MiB disclosure ceiling fails explicitly for larger views;
 select one child or omit its transcript. Storage retention and durable active-run
-recovery remain host responsibilities. The optional child-chat adapter builds on
+recovery remain host responsibilities. Public content records carry a tool-value
+kind receipt so ordinary application objects are never interpreted as content
+constructors. Supported classed tool values (data frames, factors, dates, times,
+and durations) use a portable JSON text projection; native typed attachments
+retain their content representation. The optional child-chat adapter builds on
 these headless records; Deputy core does not require shinychat.
