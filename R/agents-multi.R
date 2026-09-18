@@ -707,11 +707,7 @@ LeadAgent <- R6::R6Class(
         permissions = sub_permissions,
         usage_limits = usage_limits %||%
           private$derive_subagent_usage_limits(def),
-        context_policy = if (stateless) {
-          ContextPolicy(max_tokens = NULL, max_tool_result_bytes = NULL)
-        } else {
-          self$context_policy
-        },
+        context_policy = self$context_policy,
         working_dir = self$working_dir,
         session_id = new_deputy_id("session_"),
         run_context = child_run_context,

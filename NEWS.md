@@ -8,6 +8,8 @@
   interruption, and status polling avoids materializing transcripts (#149).
   Child messages encode brief fields separately from resolved evidence, including
   empty evidence, so supplied text cannot forge the serialized source list.
+  Parallel delegates enforce the lead's token cap and retain failed input and
+  unstarted sibling records when a batch brief is malformed.
 
 * `LeadAgent$list_subagents()` exposes admitted and running delegations in
   admission order, with exact stop reasons and separate observer errors. Ordinary

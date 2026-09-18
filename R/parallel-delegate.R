@@ -18,7 +18,7 @@ validate_parallel_tasks <- function(lead, tasks, max_active, mode) {
   ) {
     cli_abort("{.arg tasks} must be a non-empty named character vector or list")
   }
-  tasks <- lapply(as.list(tasks), normalize_delegation_input)
+  tasks <- as.list(tasks)
   keys <- vapply(names(tasks), normalize_agent_definition_name, character(1))
   if (anyDuplicated(keys)) {
     cli_abort("{.arg tasks} must select each AgentDefinition at most once")
@@ -143,7 +143,11 @@ lead_parallel_delegate <- function(
     initialize_agent_run(
       lead,
       state,
-      lapply(selected$tasks, function(input) input$task),
+      lapply(
+        selected$tasks,
+        delegation_task_label,
+        max_bytes = private$delegation_max_bytes
+      ),
       limits,
       context,
       controller

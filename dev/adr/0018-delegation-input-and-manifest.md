@@ -34,7 +34,10 @@ and freezes a read-only S7 `DelegationManifest`. Ordinary delegation and paralle
 batches use this module. Batches validate all selected evidence before constructing
 Subagents, and prepare the entire batch before any provider request. Missing,
 stale, unauthorized, invalid and oversized inputs have typed preparation errors
-and retained failed records; unstarted siblings remain explicit.
+and retained failed records; unstarted siblings remain explicit. Once batch routing
+and definitions are valid, all items are admitted before brief normalization.
+Malformed or oversized items use bounded text labels in records and run events;
+arbitrary input objects are never retained as event payloads.
 
 The first user message is a single JSON object (`deputy_delegation_v1`), including
 for scalar string tasks and empty evidence. Definition initial instructions,
@@ -59,7 +62,10 @@ manifest and the initial system/message text. Enforce input/reference/catalogue
 limits before rendering. Reject rather than truncate; use existing ContextPolicy
 for later model-context compaction and tool-result offloading. A public complete
 context estimate is recorded when available and checked against ContextPolicy
-before any paid compaction or task request. Unknown estimates remain `NULL`;
+before any paid compaction or task request. Stateless children inherit the lead's
+ContextPolicy too, so their receipt and admission check use the same token cap.
+Their fresh conversation and one-request usage limit remain the stateless
+execution contract. Unknown estimates remain `NULL`;
 byte admission still applies, with no claimed initial token bound.
 No second compaction or offloading engine is introduced.
 

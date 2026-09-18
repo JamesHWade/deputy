@@ -1,18 +1,37 @@
+# Keep rejected input inspectable without retaining arbitrary objects or unbounded
+# task text in lifecycle events. Validation follows admission, before dispatch.
+delegation_task_label <- function(task, max_bytes) {
+  tryCatch(
+    {
+      text <- if (S7::S7_inherits(task, DelegationInput)) task$task else task
+      text <- delegation_text(text, "task")
+      if (nchar(text, type = "bytes") > max_bytes) {
+        return("<oversized delegation input>")
+      }
+      text
+    },
+    error = function(error) {
+      if (
+        inherits(error, "deputy_delegation_input_error") &&
+          identical(error$reason, "oversized")
+      ) {
+        "<oversized delegation input>"
+      } else {
+        "<invalid delegation input>"
+      }
+    }
+  )
+}
+
 # One admitted record per delegation, independent of child completion order.
 lead_admit_delegation <- function(lead, definition, task, correlation) {
   private <- lead$.__enclos_env__$private
   id <- correlation$delegation_id
-  task_text <- if (S7::S7_inherits(task, DelegationInput)) task$task else task
-  if (!is_nonempty_string(task_text)) {
-    task_text <- "<invalid delegation input>"
-  } else if (nchar(task_text, type = "bytes") > private$delegation_max_bytes) {
-    task_text <- "<oversized delegation input>"
-  }
   private$subagent_runs[[id]] <- list(
     agent_name = definition$name,
     agent_id = NULL,
     parent_agent_id = correlation$parent_agent_id,
-    task = task_text,
+    task = delegation_task_label(task, private$delegation_max_bytes),
     session_id = NULL,
     run_id = NULL,
     parent_run_id = correlation$parent_run_id,

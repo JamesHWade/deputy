@@ -351,6 +351,13 @@ test_that("initial ContextPolicy bounds reject paid compaction and task requests
   expect_identical(error$reason, "oversized")
   expect_length(server$requests(), 0L)
   expect_identical(lead$list_subagents()$input_error, "oversized")
+  batch_error <- tryCatch(
+    lead$parallel_delegate(c(a = "task")),
+    error = identity
+  )
+  expect_identical(batch_error$reason, "oversized")
+  expect_length(server$requests(), 0L)
+  expect_identical(lead$list_subagents()$input_error, rep("oversized", 2L))
 })
 
 test_that("initial manifests survive compaction and settlement of working context", {
@@ -528,4 +535,76 @@ test_that("encoded framing counts toward admission before dispatch", {
   expect_identical(error$reason, "oversized")
   expect_match(conditionMessage(error), "Prepared message exceeds")
   expect_length(state$started, 0L)
+})
+
+
+test_that("stateless receipts retain the effective lead context policy", {
+  server <- local_runtime_server(list(runtime_reply("accepted")))
+  chat <- runtime_chat(server)
+  rlang::env_binding_unlock(chat, "token_count")
+  chat$token_count <- function(...) 40
+  policy <- ContextPolicy(max_tokens = 50, max_tool_result_bytes = 2048)
+  lead <- LeadAgent$new(
+    chat,
+    sub_agents = list(agent_definition("a", "A", "ROLE")),
+    context_policy = policy
+  )
+  lead$parallel_delegate(c(a = "task"))
+  manifest <- lead$get_subagent_contexts()[[1L]]
+  expect_identical(manifest$size$estimated_tokens, 40)
+  expect_identical(manifest$policies$context_policy$max_tokens, 50L)
+  expect_identical(
+    manifest$policies$context_policy$max_tool_result_bytes,
+    2048L
+  )
+  expect_length(server$requests(), 1L)
+})
+
+test_that("malformed batch inputs retain failed and unstarted records before work", {
+  invalid <- list(
+    oversized = strrep("x", 1024^2 + 1L),
+    invalid = list(image = "unsupported"),
+    invalid = function() stop("must not execute"),
+    invalid = structure("text", callback = function() stop("must not retain"))
+  )
+  for (i in seq_along(invalid)) {
+    state <- new.env(parent = emptyenv())
+    lead <- input_test_lead(state)
+    seen <- NULL
+    lead$add_hook(HookMatcher(
+      "UserPromptSubmit",
+      callback = function(prompt, ...) {
+        seen <<- prompt
+        NULL
+      }
+    ))
+    error <- tryCatch(
+      lead$parallel_delegate(list(a = "valid", b = invalid[[i]], c = "valid")),
+      error = identity
+    )
+    expect_identical(error$reason, names(invalid)[[i]])
+    records <- lead$list_subagents()
+    expect_identical(records$agent_name, c("a", "b", "c"))
+    expect_identical(records$status, c("not_started", "failed", "not_started"))
+    expect_identical(
+      records$input_error,
+      c(NA_character_, names(invalid)[[i]], NA_character_)
+    )
+    expect_identical(
+      records$task[[2L]],
+      if (i == 1L) {
+        "<oversized delegation input>"
+      } else {
+        "<invalid delegation input>"
+      }
+    )
+    expect_identical(seen[[2L]], records$task[[2L]])
+    expect_identical(lead$get_subagent_contexts(), list(NULL, NULL, NULL))
+    expect_length(state$started, 0L)
+    # A rejected batch must release the lead for a later valid batch.
+    expect_identical(
+      lead$parallel_delegate(c(a = "valid"))$status,
+      c(a = "completed")
+    )
+  }
 })
