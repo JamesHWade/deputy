@@ -349,18 +349,22 @@ inspection_record_content <- function(content) {
     }
   }
   if (inherits(content, "ellmer::ContentToolResult")) {
-    value <- content@value
-    record$deputy_value_kind <- if (inherits(value, "ellmer::Content")) {
-      "content"
-    } else if (
-      is.list(value) &&
-        length(value) &&
-        all(vapply(value, inherits, logical(1), "ellmer::Content"))
-    ) {
-      "contents"
-    } else {
-      "data"
+    paths <- list()
+    record_value <- function(value, path = integer()) {
+      if (inherits(value, "ellmer::Content")) {
+        paths[[length(paths) + 1L]] <<- path
+        return(inspection_record_content(value))
+      }
+      if (is.list(value) && !is.object(value)) {
+        for (i in seq_along(value)) {
+          value[i] <- list(record_value(value[[i]], c(path, i)))
+        }
+      }
+      value
     }
+    record$props$value <- record_value(content@value)
+    record$deputy_value_kind <- "marked"
+    record$deputy_content_paths <- paths
   }
   record
 }
@@ -428,14 +432,40 @@ inspection_replay <- function(record) {
         props$request <- replay(props$request)
       }
       kind <- x$deputy_value_kind %||% "data"
-      if (!kind %in% c("content", "contents", "data")) {
+      if (!kind %in% c("content", "contents", "data", "marked")) {
         cli::cli_abort("Invalid tool payload kind.")
       }
       props$value <- switch(
         kind,
         content = replay(props$value),
         contents = lapply(props$value, replay),
-        data = props$value
+        data = props$value,
+        marked = {
+          restore_path <- function(value, path) {
+            if (!length(path)) {
+              return(replay(value))
+            }
+            index <- path[[1L]]
+            if (
+              !is.list(value) ||
+                !is.numeric(index) ||
+                length(index) != 1L ||
+                is.na(index) ||
+                index < 1L ||
+                index > length(value) ||
+                index != as.integer(index)
+            ) {
+              cli::cli_abort("Invalid tool content position.")
+            }
+            value[index] <- list(restore_path(value[[index]], path[-1L]))
+            value
+          }
+          value <- props$value
+          for (path in x$deputy_content_paths) {
+            value <- restore_path(value, path)
+          }
+          value
+        }
       )
     }
     if (
