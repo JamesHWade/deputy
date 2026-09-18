@@ -754,3 +754,7 @@ Run workflow evidence tests with `node --test .github/scripts/claude-review-outc
 
 See `dev/runtime-modules.md` for internal module boundaries and the documented
 size exception for the public Agent facade.
+
+`dev/subagent-context-research.md` records the 2026-09-17 source review of btw,
+Trusted Mini-Agents, and recent delegation guidance, with the implementation
+backlog in #148. Its proposed contracts are not implemented runtime guarantees.
