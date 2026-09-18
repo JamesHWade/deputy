@@ -413,10 +413,14 @@ test_that("mutable disclosure re-redacts retained transcript and streamed text",
   owner <- new.env(parent = emptyenv())
   owner$allowed <- TRUE
   owner$hide_text <- FALSE
+  owner$hide_type <- FALSE
   owner$hide_history <- FALSE
   lead <- chat_fixture_lead(owner, redact = function(view, requester) {
     if (requester$hide_text && identical(view$kind, "event")) {
       view$event <- NULL
+    }
+    if (isTRUE(requester$hide_type) && identical(view$kind, "event")) {
+      view$event$type <- NULL
     }
     if (requester$hide_history) {
       view$transcript <- NULL
@@ -443,6 +447,12 @@ test_that("mutable disclosure re-redacts retained transcript and streamed text",
       session$elapse(300)
       session$flushReact()
       expect_identical(state$partial, "sensitive live text")
+      owner$hide_type <- TRUE
+      session$elapse(300)
+      session$flushReact()
+      expect_identical(state$partial, "")
+      expect_identical(selected(), id)
+      owner$hide_type <- FALSE
       expect_length(state$rendered$turns, 2L)
       lead_observe_event(lead, id, AgentEvent("text", text = strrep("x", 9000)))
       session$elapse(300)

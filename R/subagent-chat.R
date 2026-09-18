@@ -366,7 +366,10 @@ subagent_chat_server <- function(
                   # Completed requests now live in retained history. A new
                   # request starts a fresh preview; settlement clears it.
                   if (
-                    event$type %in% c("request_start", "request_end", "settled")
+                    isTRUE(
+                      event$type %in%
+                        c("request_start", "request_end", "settled")
+                    )
                   ) {
                     partial <- ""
                     truncated <- FALSE
