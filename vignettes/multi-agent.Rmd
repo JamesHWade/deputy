@@ -653,7 +653,9 @@ recovery remain host responsibilities. Public content records carry a tool-value
 kind receipt so ordinary application objects are never interpreted as content
 constructors. Supported classed tool values (data frames, factors, dates, times,
 and durations) use a portable JSON text projection; native typed attachments
-retain their content representation. The optional child-chat adapter builds on
+retain their content representation. Unsupported application S7 values become
+an explicit omission notice without invoking their methods or exposing private
+fields. Other nonportable values still fail closed. The optional child-chat adapter builds on
 these headless records; Deputy core does not require shinychat.
 
 ## Observe child activity

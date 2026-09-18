@@ -637,3 +637,63 @@ test_that("history redaction has the final say on artifact availability", {
   expect_null(restored[[1L]]$outcome$references[[1L]]$availability)
   expect_identical(restored[[1L]]$outcome$references[[1L]]$reference, "fixture")
 })
+
+
+test_that("UTF-8 answer truncation claims artifacts independently of compaction", {
+  lead <- inspection_lead(
+    context_policy = ContextPolicy(offload_dir = withr::local_tempdir())
+  )
+  lead$parallel_delegate(c(a = "one"))
+  id <- lead$list_subagents()$delegation_id
+  text <- iconv(strrep("é", 4100), from = "UTF-8", to = "latin1")
+  expect_lt(nchar(text, type = "bytes"), 8192)
+  expect_gt(nchar(enc2utf8(text), type = "bytes"), 8192)
+  private <- lead$.__enclos_env__$private
+  transaction <- private$begin_compaction_artifacts()
+  artifact <- offload_tool_result(
+    enc2utf8(text),
+    "delegate_to_agent",
+    lead$context_policy,
+    lead$session_id(),
+    lead$agent_id,
+    force = TRUE
+  )
+  private$track_compaction_artifact(artifact)
+  expect_length(private$.compaction_catalog_registry$provisional, 1L)
+  private$subagent_runs[[id]]$result <- text
+  lead_prepare_outcome(lead, id)
+  expect_true(private$subagent_runs[[id]]$answer_truncated)
+  expect_lte(nchar(private$subagent_runs[[id]]$answer, type = "bytes"), 8192)
+  expect_length(private$.compaction_catalog_registry$provisional, 0L)
+  private$finish_compaction_artifacts(transaction)
+  expect_identical(lead$resolve_tool_result(artifact$uri), enc2utf8(text))
+})
+
+test_that("unsupported S7 payloads do not hide sibling histories", {
+  lead <- inspection_lead()
+  lead$parallel_delegate(c(a = "one", b = "two"))
+  id <- lead$list_subagents()$delegation_id[[1L]]
+  Payload <- S7::new_class(
+    "PrivateFixturePayload",
+    properties = list(secret = S7::class_character)
+  )
+  private <- lead$.__enclos_env__$private
+  private$subagent_runs[[
+    id
+  ]]$turns <- list(ellmer::UserTurn(list(ellmer::ContentToolResult(Payload(
+    secret = "private fixture"
+  )))))
+  views <- lead$inspect_subagents("owner", transcript = TRUE)
+  expect_length(views, 2L)
+  expect_match(
+    views[[1L]]$turns[[1L]]@contents[[1L]]@value,
+    "Unsupported tool payload omitted",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "private fixture",
+    jsonlite::toJSON(lead$export_subagents("owner"), auto_unbox = TRUE),
+    fixed = TRUE
+  ))
+  expect_length(views[[2L]]$turns, 2L)
+})
