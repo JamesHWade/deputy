@@ -212,7 +212,7 @@ delegation_outcome <- function(record, compact = FALSE) {
     if (!is.character(value) || anyNA(value)) {
       return(NULL)
     }
-    inspection_text(paste(head(value, 16L), collapse = "\n"), 2048L)
+    inspection_text(paste(utils::head(value, 16L), collapse = "\n"), 2048L)
   }
   DelegationOutcome(
     runtime = c(
@@ -243,7 +243,7 @@ delegation_outcome <- function(record, compact = FALSE) {
     ),
     answer = record$answer %||% inspection_text(record$result),
     references = if (compact) {
-      head(record$references %||% list(), 8L)
+      utils::head(record$references %||% list(), 8L)
     } else {
       record$references %||% list()
     },
