@@ -18,9 +18,10 @@ delegation_disclosure_abort <- function() {
 #'   `TRUE` permits disclosure. Errors deny access without disclosing details.
 #' @param redact Function of `view` and `requester`, returning a redacted list.
 #'   It may remove fields or content. It must not perform agent execution.
-#' @param max_bytes Maximum serialized bytes in one disclosed snapshot or saved
-#'   history. Oversized disclosures fail explicitly; select fewer children or
-#'   omit transcripts. Defaults to 16 MiB.
+#' @param max_bytes Maximum serialized content-payload bytes in one disclosed
+#'   snapshot or saved history, including replayed turn content but excluding
+#'   shared R class/method metadata. Oversized disclosures fail explicitly;
+#'   select fewer children or omit transcripts. Defaults to 16 MiB.
 #' @return Read-only `DelegationDisclosure` host configuration.
 #' @export
 DelegationDisclosure <- S7::new_class(
@@ -117,7 +118,19 @@ inspection_portable <- function(x, depth = 0L) {
 }
 
 inspection_bound <- function(x, disclosure) {
-  if (length(serialize(x, NULL, version = 3)) > disclosure$max_bytes) {
+  # Replayed S7 turns carry shared class/method metadata. Measure their public
+  # data payload, including each replayed copy, without serializing runtime
+  # method environments whose size depends on the host R session.
+  payload <- function(value) {
+    if (inherits(value, "ellmer::Turn")) {
+      return(inspection_record_turn(value))
+    }
+    if (is.list(value)) {
+      return(lapply(value, payload))
+    }
+    value
+  }
+  if (length(serialize(payload(x), NULL, version = 3)) > disclosure$max_bytes) {
     cli::cli_abort(
       "Delegation disclosure exceeds max_bytes; narrow the selection."
     )
