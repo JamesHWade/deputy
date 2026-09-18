@@ -564,7 +564,16 @@ LeadAgent <- R6::R6Class(
       # host-owned even when the redactor removes or replaces private metadata.
       stored <- Filter(
         function(ref) identical(ref$reference, reference),
-        private$subagent_runs[[delegation_id]]$references
+        unlist(
+          lapply(
+            Filter(
+              function(record) identical(record$delegation_id, delegation_id),
+              lead_delegation_records(self)
+            ),
+            function(record) record$references
+          ),
+          recursive = FALSE
+        )
       )
       if (!length(stored)) {
         delegation_disclosure_abort()
