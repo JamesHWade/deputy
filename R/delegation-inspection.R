@@ -287,12 +287,27 @@ inspection_record_turn <- function(turn) {
     if (inherits(content, "ellmer::ContentThinking")) {
       return(NULL)
     }
-    if (inherits(content, "ellmer::ContentToolResult")) {
-      content@extra <- list()
-      if (inherits(content@error, "condition")) {
-        content@error <- conditionMessage(content@error)
+    if (inherits(content, "ellmer::Content")) {
+      if ("extra" %in% S7::prop_names(content)) {
+        content@extra <- list()
       }
-      if (!is.null(content@request)) content@request <- clean(content@request)
+      if (inherits(content, "ellmer::ContentToolRequest")) {
+        content@tool <- NULL
+      }
+      if (inherits(content, "ellmer::ContentToolResult")) {
+        if (inherits(content@error, "condition")) {
+          content@error <- conditionMessage(content@error)
+        }
+        if (!is.null(content@request)) {
+          content@request <- clean(content@request)
+        }
+        content@value <- clean(content@value)
+      }
+    } else if (is.list(content) && !is.object(content)) {
+      content <- lapply(
+        Filter(function(x) !inherits(x, "ellmer::ContentThinking"), content),
+        clean
+      )
     }
     content
   }
@@ -311,6 +326,7 @@ inspection_replay <- function(record) {
     c(
       "UserTurn",
       "AssistantTurn",
+      "AssistantPartialTurn",
       "SystemTurn",
       "ContentText",
       "ContentImageInline",
