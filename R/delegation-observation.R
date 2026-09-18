@@ -75,9 +75,12 @@ lead_observe_event <- function(lead, id, event) {
   if (is.null(buffer) || is.null(record)) {
     return(invisible(NULL))
   }
-  payload <- tryCatch(observation_payload(event), error = function(e) {
-    list(content_omitted = "nonportable", recover = "snapshot")
-  })
+  payload <- tryCatch(
+    observation_payload(event, buffer$policy$max_event_bytes),
+    error = function(e) {
+      list(content_omitted = "nonportable", recover = "snapshot")
+    }
+  )
   if (is.null(payload)) {
     return(invisible(NULL))
   }
@@ -120,7 +123,7 @@ lead_observe_event <- function(lead, id, event) {
   invisible(NULL)
 }
 
-observation_payload <- function(event) {
+observation_payload <- function(event, max_bytes = 65536) {
   if (
     event$type == "content" &&
       inherits(event$content, "ellmer::ContentThinking")
@@ -151,6 +154,9 @@ observation_payload <- function(event) {
       names(data),
       c("message", "phase", "request_number", "model", "provider")
     )]
+  }
+  if (!observation_payload_fits(data, max_bytes)) {
+    return(list(content_omitted = "oversized", recover = "snapshot"))
   }
   public <- function(value) {
     if (inherits(value, "condition")) {
@@ -380,3 +386,62 @@ DelegationSubscription <- R6::R6Class(
     }
   )
 )
+
+# Budget traversal itself as well as the data. Inspect shared values without
+# materializing public records or serializing large payloads on the runtime path.
+observation_payload_fits <- function(value, max_bytes) {
+  remaining <- max_bytes
+  visit <- function(value, depth = 0L) {
+    remaining <<- remaining - 64
+    if (remaining < 0 || depth > 64L) {
+      return(FALSE)
+    }
+    if (is.null(value) || inherits(value, "ellmer::ContentThinking")) {
+      return(TRUE)
+    }
+    if (inherits(value, "condition")) {
+      return(visit(inspection_text(conditionMessage(value), 1024L), depth + 1L))
+    }
+    if (inherits(value, "S7_object")) {
+      fields <- setdiff(S7::prop_names(value), c("tool", "extra", "json"))
+      if (inherits(value, "ellmer::Turn")) {
+        fields <- setdiff(fields, c("text", "role"))
+      }
+      for (field in fields) {
+        if (!visit(S7::prop(value, field), depth + 1L)) return(FALSE)
+      }
+      return(TRUE)
+    }
+    for (field in c("names", "dim", "dimnames")) {
+      metadata <- attr(value, field, exact = TRUE)
+      if (!is.null(metadata) && !visit(metadata, depth + 1L)) return(FALSE)
+    }
+    if (is.list(value) && !is.object(value)) {
+      if (length(value) * 64 > remaining) {
+        return(FALSE)
+      }
+      for (item in value) {
+        if (!visit(item, depth + 1L)) return(FALSE)
+      }
+      return(TRUE)
+    }
+    if (is.character(value)) {
+      if (length(value) * 16 > remaining) {
+        return(FALSE)
+      }
+      for (item in value) {
+        remaining <<- remaining -
+          16 -
+          if (is.na(item)) 0 else nchar(item, type = "bytes")
+        if (remaining < 0) return(FALSE)
+      }
+      return(TRUE)
+    }
+    if (is.atomic(value)) {
+      remaining <<- remaining - length(value) * if (is.raw(value)) 1 else 16
+      return(remaining >= 0)
+    }
+    FALSE
+  }
+  visit(value)
+}

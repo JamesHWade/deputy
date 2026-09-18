@@ -122,6 +122,7 @@ lead_settle_delegation <- function(
   record$status <- delegation_status(result, error)
   record$stop_reason <- result$stop_reason %||%
     last_result$stop_reason %||%
+    record$cancel_reason %||%
     stop_reason %||%
     if (!is.null(error)) "error" else "not_started"
   record$error <- if (!is.null(error)) conditionMessage(error)
