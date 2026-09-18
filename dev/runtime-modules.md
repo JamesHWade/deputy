@@ -12,6 +12,7 @@ formats remain unchanged by the moves.
 | Portable YAML definition format and explicit registry resolution | `R/agent-definition-files.R` |
 | Mutable LeadAgent registry and delegated policy | `R/agents-multi.R` |
 | Immutable briefs and bounded scoped evidence preparation | `R/delegation-input.R` |
+| Host governance forwarding, resource leases and owned cleanup | `R/delegation-binding.R` |
 | Initial context receipts and independent context views | `R/delegation-manifest.R` |
 | Admitted delegation records, lifecycle hooks and child settlement | `R/delegation-lifecycle.R` |
 | Stateless responder wave scheduling | `R/parallel-delegate.R` |

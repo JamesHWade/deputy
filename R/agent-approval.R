@@ -2,6 +2,11 @@
 deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
   list(
     pause_for_approval = function(request, reason, kind = "tool") {
+      if (!is.null(private$.delegation_binding)) {
+        delegation_binding_abort(
+          "Delegated approvals are unsupported; no tool effect was approved."
+        )
+      }
       if (is.null(private$.approval_dir)) {
         approval_abort(
           "Configure an approval_dir before requesting durable approval."

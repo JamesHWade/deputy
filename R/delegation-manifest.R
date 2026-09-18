@@ -121,7 +121,8 @@ prepare_delegation_manifest <- function(lead, definition, prepared, child) {
     permission_callback_present = callback_present,
     fingerprint_scope = "declarative settings; excludes callbacks, credentials and offload path",
     context_policy_id = delegation_digest(context_fields),
-    context_policy = context_fields
+    context_policy = context_fields,
+    binding = child$.__enclos_env__$private$.delegation_binding
   )
   system_prompt <- child$get_system_prompt() %||% ""
   text_bytes <- nchar(system_prompt, type = "bytes") +

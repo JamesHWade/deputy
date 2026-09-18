@@ -1796,6 +1796,8 @@ Agent <- R6::R6Class(
       .context_policy = NULL,
       .working_dir = NULL,
       .hooks = NULL,
+      .delegation_guard = NULL,
+      .delegation_binding = NULL,
       .run_context = list(),
       .agent_id = NULL,
       .agent_name = NULL,

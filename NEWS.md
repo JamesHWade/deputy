@@ -1,5 +1,7 @@
 # deputy (development version)
 
+* `LeadAgent` binds child governance and resource ownership through `DelegationPolicy()` and records it in initial manifests. Shared closures remain explicit; owned factories release child resources after settlement or failed setup, and exclusive leases reject overlapping use. Child human input requires a host handler, and unsupported delegated durable approvals fail explicitly (#151).
+
 * `DelegationInput` supplies bounded task instructions and scoped evidence
   references for ordinary and parallel delegation. `LeadAgent` rejects invalid
   evidence before requests and retains immutable initial `DelegationManifest`

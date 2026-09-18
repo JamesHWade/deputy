@@ -32,6 +32,7 @@ deputy/
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
 │   ├── delegation-input.R # Immutable briefs and scoped source preparation
 │   ├── delegation-manifest.R # Initial receipts and context inspection
+│   ├── delegation-binding.R # Host governance and child resource ownership
 │   ├── delegation-lifecycle.R # Shared live records and child settlement
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
@@ -378,6 +379,17 @@ them; saved sessions keep their snapshots and source artifacts remain.
 Aborted compactions remove their provisional evidence artifacts, preserving
 artifacts claimed by another compaction or returned to a tool caller.
 Caller-supplied summaries retain control over their content.
+
+### Child host binding
+
+`DelegationPolicy` supplies explicit child resource ownership and human-input
+routing. Tool governance hooks forward from the live lead registry; other observers
+are opt-in. Children recheck current lead restrictions at tool execution.
+Owned factories return `DelegationResources` through public Agent/RSession/MCP
+interfaces; cleanup runs after settlement and preparation failure. Definition MCP
+selections require owned factories. Shared closures and workspaces are not isolated.
+Delegated durable approval/continuation is rejected until #152/#42 supports it.
+See ADR-0019 and `R/delegation-binding.R`.
 
 ### Permission Modes
 

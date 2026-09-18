@@ -203,6 +203,7 @@ lead_run_delegation <- function(
       {
         private$release_delegation_usage(id)
         private$active_subagents[[id]] <- NULL
+        release_delegation_binding(lead, id)
       },
       add = TRUE
     )
