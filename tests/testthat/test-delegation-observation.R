@@ -378,3 +378,24 @@ test_that("factor labels are bounded before text projection", {
   }
   expect_true(observation_payload_fits(factor(c("a", "b", NA)), 2048L))
 })
+
+
+test_that("fallback observations retain selected fallback and incurred usage", {
+  usage <- AgentUsage(input_tokens = 10, output_tokens = 5)
+  condition <- simpleError("primary failed")
+  condition$private <- globalenv()
+  payload <- observation_payload(AgentEvent(
+    "fallback",
+    fallback_index = 2L,
+    usage = usage,
+    condition = condition,
+    provider = "fixture",
+    model = "fallback",
+    request = globalenv()
+  ))
+  expect_identical(payload$fallback_index, 2L)
+  expect_equal(payload$usage$total_tokens, 15)
+  expect_identical(payload$message, "primary failed")
+  expect_null(payload$condition)
+  expect_null(payload$request)
+})
