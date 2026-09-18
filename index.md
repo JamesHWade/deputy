@@ -83,8 +83,9 @@ common errors.
   or write a hook that uses
   [`cli::cli_inform()`](https://cli.r-lib.org/reference/cli_abort.html).
   See [Hooks](https://jameshwade.github.io/deputy/articles/hooks.html).
-- Pass an Agent to `shinychat::chat_server()` to build a chat app. See
-  [Shiny
+- Pass an Agent to
+  [`shinychat::chat_server()`](https://posit-dev.github.io/shinychat/r/reference/chat_app.html)
+  to build a chat app. See [Shiny
   chat](https://jameshwade.github.io/deputy/articles/example-shiny-chat.html).
 
 ## Choose a guide

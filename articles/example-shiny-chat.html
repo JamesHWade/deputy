@@ -86,7 +86,7 @@
     
     
 <p>Deputy Agents implement the ellmer chat methods used by <a href="https://posit-dev.github.io/shinychat/" class="external-link">shinychat</a>. Pass an
-Agent directly to <code>chat_server()</code> to stream responses and
+Agent directly to <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server()</a></code> to stream responses and
 tool activity while Deputy checks permissions and tracks usage.</p>
 <pre class="text"><code>shinychat input -&gt; Agent$stream_async() -&gt; ellmer
                                       \-&gt; AgentResult + hooks + usage</code></pre>
@@ -130,11 +130,11 @@ finishes, <code>agent$last_run()</code> exposes the corresponding
 <span>    working_dir <span class="op">=</span> <span class="va">workspace</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
-<span>  <span class="fu">chat_server</span><span class="op">(</span><span class="st">"chat"</span>, <span class="va">agent</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server</a></span><span class="op">(</span><span class="st">"chat"</span>, <span class="va">agent</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/shinyApp.html" class="external-link">shinyApp</a></span><span class="op">(</span><span class="va">ui</span>, <span class="va">server</span><span class="op">)</span></span></code></pre></div>
-<p><code>chat_server()</code> passes both plain text and
+<p><code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server()</a></code> passes both plain text and
 attachment-enabled ellmer content to the Agent unchanged. It also
 supplies shinychat history and cancellation around Deputy’s stream.</p>
 <p>Compaction and native conversation history can be enabled together.
@@ -143,7 +143,7 @@ conversation to shinychat, while <code>get_context_turns()</code>
 exposes only the compacted model context. Later completed replies remain
 available when the user switches conversations or restores a branch.
 Native history requires a shinychat version exporting
-<code>history_options()</code> and <code>FileConversationStore</code>;
+<code><a href="https://posit-dev.github.io/shinychat/r/reference/history_options.html" class="external-link">history_options()</a></code> and <code>FileConversationStore</code>;
 Deputy’s transcript contract also works without shinychat. Hosts that
 previously rejected a non-NULL <code>ContextPolicy(max_tokens)</code>
 with native history can remove that workaround when using this

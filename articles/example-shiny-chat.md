@@ -2,8 +2,10 @@
 
 Deputy Agents implement the ellmer chat methods used by
 [shinychat](https://posit-dev.github.io/shinychat/). Pass an Agent
-directly to `chat_server()` to stream responses and tool activity while
-Deputy checks permissions and tracks usage.
+directly to
+[`chat_server()`](https://posit-dev.github.io/shinychat/r/reference/chat_app.html)
+to stream responses and tool activity while Deputy checks permissions
+and tracks usage.
 
 ``` text
 shinychat input -> Agent$stream_async() -> ellmer
@@ -56,19 +58,22 @@ server <- function(input, output, session) {
 shinyApp(ui, server)
 ```
 
-`chat_server()` passes both plain text and attachment-enabled ellmer
-content to the Agent unchanged. It also supplies shinychat history and
-cancellation around Deputy’s stream.
+[`chat_server()`](https://posit-dev.github.io/shinychat/r/reference/chat_app.html)
+passes both plain text and attachment-enabled ellmer content to the
+Agent unchanged. It also supplies shinychat history and cancellation
+around Deputy’s stream.
 
 Compaction and native conversation history can be enabled together.
 Deputy’s `get_turns()` supplies the complete selected conversation to
 shinychat, while `get_context_turns()` exposes only the compacted model
 context. Later completed replies remain available when the user switches
 conversations or restores a branch. Native history requires a shinychat
-version exporting `history_options()` and `FileConversationStore`;
-Deputy’s transcript contract also works without shinychat. Hosts that
-previously rejected a non-NULL `ContextPolicy(max_tokens)` with native
-history can remove that workaround when using this implementation.
+version exporting
+[`history_options()`](https://posit-dev.github.io/shinychat/r/reference/history_options.html)
+and `FileConversationStore`; Deputy’s transcript contract also works
+without shinychat. Hosts that previously rejected a non-NULL
+`ContextPolicy(max_tokens)` with native history can remove that
+workaround when using this implementation.
 
 ## Showing compaction to users
 
