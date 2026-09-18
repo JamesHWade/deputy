@@ -278,7 +278,7 @@ test_that("released MCP transport preserves origin, annotations and connection i
             tools = list(tools$inspect_evidence),
             permissions = Permissions(web = FALSE, file_write = FALSE)
           )
-          child <- local_test_subagent(lead, loaded)
+          child <- test_helpers$local_test_subagent(lead, loaded)
           child$add_hook(HookMatcher(
             event = "PreToolUse",
             timeout = 0,
