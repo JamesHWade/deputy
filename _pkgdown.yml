@@ -143,6 +143,9 @@ reference:
   - DelegationManifest
   - DelegationPolicy
   - DelegationResources
+  - DelegationDisclosure
+  - DelegationOutcome
+  - delegation_history
   - agent_definition
   - agent_definition_read
 

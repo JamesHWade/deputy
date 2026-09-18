@@ -14,10 +14,11 @@ binding_tool <- function(fun = function() "ok", name = "effect") {
 }
 
 binding_run <- function(lead, task = "task") {
-  resolve_async_value(
+  response <- resolve_async_value(
     lead$get_tools()$delegate_to_agent("a", task),
     max_polls = 10000L
   )
+  jsonlite::fromJSON(response)$answer
 }
 
 test_that("binding configuration is immutable and rejects unsupported combinations", {

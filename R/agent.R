@@ -1835,6 +1835,7 @@ Agent <- R6::R6Class(
       tool_call_records = list(),
       pending_delegations = list(),
       original_tool_results = list(),
+      delegation_artifacts = list(),
       last_run_usage = NULL,
       .last_run_result = NULL,
       last_limit_status = NULL,
@@ -2086,6 +2087,24 @@ Agent <- R6::R6Class(
         # concurrent compaction that first created these content-addressed bytes.
         private$.compaction_catalog_registry$provisional[[record$id]] <- NULL
         private$ensure_tool_result_reader()
+        if (!is.null(private$.delegation_id)) {
+          private$delegation_artifacts[[
+            length(private$delegation_artifacts) + 1L
+          ]] <- list(
+            reference = record$uri,
+            source = "tool_result",
+            bytes = record$bytes,
+            sha256 = record$sha256,
+            agent_id = private$.agent_id,
+            run_id = private$current_run_id,
+            delegation_id = private$.delegation_id,
+            tool_call_id = execution_id,
+            tool_name = tool_name,
+            storage_session_id = private$.session_id,
+            verification = "not_assessed",
+            approval = "not_granted"
+          )
+        }
         private$notify(
           paste0("Offloaded large result from ", tool_name, "."),
           level = "info",

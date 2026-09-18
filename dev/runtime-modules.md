@@ -67,3 +67,7 @@ The other files listed in #72 are below 1,000 lines. Tests now separate hook
 registry behavior, hook result values, built-in hook policies, AgentDefinitions,
 and delegated permission/budget policy. Whole test cases move along those
 boundaries and continue to use shared helper files.
+
+`R/delegation-inspection.R` owns compact outcomes, authorized disclosure and
+settled public-content replay. It reuses ContextPolicy artifacts and ellmer
+record/replay; it does not execute children or implement a UI renderer.

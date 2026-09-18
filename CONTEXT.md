@@ -123,3 +123,10 @@ current working context, retained child transcript and provider wire framing.
 routing and shared, exclusive or owned resources. `DelegationResources` transfers
 cleanup responsibility for factory-created tools to one delegation. These runtime
 objects are separate from the portable binding receipt in `DelegationManifest`.
+
+### Delegation inspection
+
+`DelegationOutcome` separates bounded model answers and claims from execution
+facts. `DelegationDisclosure` is the host authorization/redaction boundary for
+child snapshots and artifacts. A saved child history is read-only public ellmer
+evidence, never a continuation or an access grant. See ADR-0020.
