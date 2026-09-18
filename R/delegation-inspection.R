@@ -214,6 +214,15 @@ delegation_outcome <- function(record, compact = FALSE) {
     }
     inspection_text(paste(utils::head(value, 16L), collapse = "\n"), 2048L)
   }
+  references <- record$references %||% list()
+  if (compact && isTRUE(record$answer_truncated)) {
+    answer <- vapply(
+      references,
+      function(ref) identical(ref$source, "delegation_answer"),
+      logical(1)
+    )
+    references <- c(references[answer], references[!answer])
+  }
   DelegationOutcome(
     runtime = c(
       record[c(
@@ -243,7 +252,7 @@ delegation_outcome <- function(record, compact = FALSE) {
     ),
     answer = record$answer %||% inspection_text(record$result),
     references = if (compact) {
-      utils::head(record$references %||% list(), 8L)
+      utils::head(references, 8L)
     } else {
       record$references %||% list()
     },
@@ -393,7 +402,13 @@ lead_inspection_records <- function(lead, delegation_id, transcript) {
   })
 }
 
-lead_inspect_subagents <- function(lead, requester, delegation_id, transcript) {
+lead_inspect_subagents <- function(
+  lead,
+  requester,
+  delegation_id,
+  transcript,
+  settled_only = FALSE
+) {
   private <- lead$.__enclos_env__$private
   disclosure <- private$.delegation_disclosure
   inspection_authorize(disclosure, requester, inspection_scope(lead))
@@ -403,6 +418,19 @@ lead_inspect_subagents <- function(lead, requester, delegation_id, transcript) {
     cli::cli_abort("transcript must be TRUE or FALSE.")
   }
   views <- lead_inspection_records(lead, delegation_id, transcript)
+  if (
+    settled_only &&
+      any(vapply(
+        views,
+        function(view) {
+          !view$outcome$runtime$status %in%
+            c("completed", "failed", "stopped", "not_started", "suspended")
+        },
+        logical(1)
+      ))
+  ) {
+    cli::cli_abort("Only settled children can be exported.")
+  }
   views <- lapply(views, function(view) {
     view <- disclosure$redact(view, requester)
     if (!is.list(view)) {
@@ -436,15 +464,19 @@ delegation_history <- function(history, requester, disclosure, scope) {
   if (
     !identical(history$schema_version, 1L) ||
       !identical(history$scope, scope) ||
-      !is.list(history$children)
+      !is.list(history$children) ||
+      !identical(history$settled, TRUE)
   ) {
     delegation_disclosure_abort()
   }
   views <- lapply(history$children, function(view) {
     if (
       !is.list(view) ||
-        !view$outcome$runtime$status %in%
-          c("completed", "failed", "stopped", "not_started", "suspended")
+        (!is.null(view$outcome$runtime$status) &&
+          !isTRUE(
+            view$outcome$runtime$status %in%
+              c("completed", "failed", "stopped", "not_started", "suspended")
+          ))
     ) {
       cli::cli_abort("Only settled child history can be replayed.")
     }
@@ -454,10 +486,12 @@ delegation_history <- function(history, requester, disclosure, scope) {
       cli::cli_abort("Disclosure redaction must return a list.")
     }
     view$turns <- lapply(view$transcript, inspection_replay)
-    view$outcome$references <- lapply(view$outcome$references, function(ref) {
-      ref$availability <- "unresolved"
-      ref
-    })
+    if (!is.null(view$outcome$references)) {
+      view$outcome$references <- lapply(view$outcome$references, function(ref) {
+        ref$availability <- "unresolved"
+        ref
+      })
+    }
     view
   })
   inspection_bound(views, disclosure)
