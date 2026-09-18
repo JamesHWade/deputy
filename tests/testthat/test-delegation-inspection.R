@@ -540,3 +540,52 @@ test_that("artifact reads use host storage after reference disclosure", {
     class = "deputy_delegation_disclosure"
   )
 })
+
+test_that("payload record-shaped objects stay data and classed results project portably", {
+  invoice <- list(version = 1, class = "invoice", props = list(total = 42))
+  lookalike <- list(
+    version = 1,
+    class = "ellmer::ContentText",
+    props = list(text = "literal data")
+  )
+  request <- ellmer::ContentToolRequest(
+    id = "data",
+    name = "fixture",
+    arguments = invoice
+  )
+  for (value in list(invoice, lookalike)) {
+    turn <- ellmer::UserTurn(list(ellmer::ContentToolResult(
+      value,
+      request = request
+    )))
+    restored <- inspection_replay(inspection_record_turn(turn))
+    expect_identical(restored@contents[[1L]]@value, value)
+    expect_identical(restored@contents[[1L]]@request@arguments, invoice)
+  }
+  json <- ellmer::contents_replay(list(
+    version = 1,
+    class = "ellmer::ContentJson",
+    props = list(data = list(), string = NULL)
+  ))
+  json@data <- invoice
+  restored <- inspection_replay(inspection_record_turn(ellmer::AssistantTurn(list(
+    json
+  ))))
+  expect_identical(restored@contents[[1L]]@data, invoice)
+  frame <- data.frame(value = c(1, 2), label = factor(c("a", "b")))
+  restored <- inspection_replay(inspection_record_turn(ellmer::UserTurn(list(ellmer::ContentToolResult(
+    frame,
+    request = request
+  )))))
+  expect_type(restored@contents[[1L]]@value, "character")
+  expect_equal(
+    jsonlite::fromJSON(restored@contents[[1L]]@value),
+    transform(frame, label = as.character(label))
+  )
+  source <- ellmer::WebSource(url = "https://example.com", title = "Evidence")
+  citation <- ellmer::ContentCitation(source = source)
+  restored <- inspection_replay(inspection_record_turn(ellmer::AssistantTurn(list(
+    citation
+  ))))
+  expect_identical(restored@contents[[1L]]@source@url, source@url)
+})
