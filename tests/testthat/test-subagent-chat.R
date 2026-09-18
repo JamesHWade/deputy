@@ -539,6 +539,22 @@ test_that("snapshot refresh retains the current text batch and request boundarie
       session$elapse(300)
       session$flushReact()
       expect_identical(state$partial, "first chunk and second")
+      private$subagent_runs[[id]]$turns <- list(ellmer::AssistantPartialTurn(
+        list(ellmer::ContentText("first chunk and second")),
+        reason = "interrupted"
+      ))
+      session$elapse(300)
+      session$flushReact()
+      expect_identical(state$partial, "")
+      messages <- subagent_chat_messages(state$rendered$turns)
+      expect_match(
+        messages[[1L]]$content[[1L]],
+        "first chunk and second",
+        fixed = TRUE
+      )
+      private$subagent_runs[[id]]$turns <- list(ellmer::AssistantTurn(
+        list(ellmer::ContentText("first chunk and second"))
+      ))
       lead_observe_event(lead, id, AgentEvent("request_end"))
       lead_observe_event(lead, id, AgentEvent("request_start"))
       lead_observe_event(lead, id, AgentEvent("text", text = "next request"))
@@ -567,4 +583,29 @@ test_that("deeply nested Content stays in native code display", {
   )))
   expect_identical(block$value_type, "code")
   expect_false(grepl("<script>", block$value, fixed = TRUE))
+})
+
+
+test_that("mixed user turns pair tool results while retaining user text", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "mixed",
+    name = "evidence",
+    arguments = list()
+  )
+  result <- ellmer::ContentToolResult("evidence", request = request)
+  messages <- subagent_chat_messages(list(
+    ellmer::AssistantTurn(list(request)),
+    ellmer::UserTurn(list(ellmer::ContentText("extra context"), result)),
+    ellmer::AssistantTurn(list(ellmer::ContentText("answer")))
+  ))
+  expect_identical(
+    vapply(messages, `[[`, character(1), "role"),
+    c("assistant", "user", "assistant")
+  )
+  expect_length(messages[[1L]]$content, 2L)
+  expect_identical(messages[[1L]]$content[[1L]]$request_id, "mixed")
+  expect_identical(messages[[1L]]$content[[2L]]$request_id, "mixed")
+  expect_identical(messages[[1L]]$content[[2L]]$status, "success")
+  expect_identical(messages[[2L]]$content[[1L]], "extra context")
 })

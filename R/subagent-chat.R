@@ -387,6 +387,20 @@ subagent_chat_server <- function(
                   }
                 }
               }
+              # Ellmer may already expose its accumulated partial turn in the
+              # authorized snapshot. Use that native rendering as the sole
+              # display until it is committed; do not echo the same text below.
+              if (
+                any(vapply(
+                  state$rendered$turns,
+                  inherits,
+                  logical(1),
+                  "ellmer::AssistantPartialTurn"
+                ))
+              ) {
+                partial <- ""
+                truncated <- FALSE
+              }
               if (truncated) {
                 notice(
                   "Live text preview was truncated. Retained history remains available."
@@ -604,16 +618,30 @@ subagent_chat_server <- function(
 subagent_chat_messages <- function(turns) {
   messages <- list()
   for (turn in turns) {
-    results_only <- length(turn@contents) > 0L &&
-      all(vapply(
+    if (inherits(turn, "ellmer::UserTurn")) {
+      is_result <- vapply(
         turn@contents,
         function(x) inherits(x, "ellmer::ContentToolResult"),
         logical(1)
-      ))
-    role <- if (inherits(turn, "ellmer::UserTurn") && !results_only) {
-      "user"
+      )
+      if (any(is_result)) {
+        results <- turn
+        results@contents <- lapply(
+          turn@contents[is_result],
+          subagent_chat_safe_content
+        )
+        content <- shinychat::contents_shinychat(results)
+        last <- length(messages)
+        if (last && identical(messages[[last]]$role, "assistant")) {
+          messages[[last]]$content <- c(messages[[last]]$content, content)
+        } else {
+          messages[[last + 1L]] <- list(role = "assistant", content = content)
+        }
+        turn@contents <- turn@contents[!is_result]
+      }
+      role <- "user"
     } else {
-      "assistant"
+      role <- "assistant"
     }
     # Native user messages are plain text; only assistant messages use Markdown.
     if (identical(role, "assistant")) {
