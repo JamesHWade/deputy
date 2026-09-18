@@ -329,6 +329,8 @@ inspection_replay <- function(record) {
       "AssistantPartialTurn",
       "SystemTurn",
       "ContentText",
+      "ContentJson",
+      "ContentUploaded",
       "ContentImageInline",
       "ContentImageRemote",
       "ContentPDF",
