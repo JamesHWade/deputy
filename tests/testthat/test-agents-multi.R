@@ -863,7 +863,7 @@ test_that("delegation handles sub-agent execution failure", {
     suppressWarnings(resolve_async_value(
       delegate_tool("failer", "Do something")
     )),
-    "Sub-agent 'failer' failed"
+    "Subagent 'failer' failed"
   )
   expect_length(
     lead$.__enclos_env__$private$delegation_usage_reservations,

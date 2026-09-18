@@ -139,6 +139,8 @@ reference:
   desc: Coordinate multiple specialized agents
   contents:
   - LeadAgent
+  - DelegationInput
+  - DelegationManifest
   - agent_definition
   - agent_definition_read
 

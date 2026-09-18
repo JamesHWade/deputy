@@ -30,6 +30,7 @@ sub-agents based on registered AgentDefinitions.
     \item \href{#method-LeadAgent-list_subagents}{\code{LeadAgent$list_subagents()}}
     \item \href{#method-LeadAgent-get_subagent_results}{\code{LeadAgent$get_subagent_results()}}
     \item \href{#method-LeadAgent-get_subagent_messages}{\code{LeadAgent$get_subagent_messages()}}
+    \item \href{#method-LeadAgent-get_subagent_contexts}{\code{LeadAgent$get_subagent_contexts()}}
     \item \href{#method-LeadAgent-print}{\code{LeadAgent$print()}}
     \item \href{#method-LeadAgent-clone}{\code{LeadAgent$clone()}}
   }
@@ -114,7 +115,10 @@ sub-agents based on registered AgentDefinitions.
   run_context = list(),
   agent_id = NULL,
   agent_name = NULL,
-  fallback_chats = list()
+  fallback_chats = list(),
+  delegation_sources = list(),
+  delegation_scope = list(),
+  delegation_max_bytes = 65536L
 )}
     \if{html}{\out{</div>}}
   }
@@ -148,6 +152,19 @@ runs and delegated agents.}
       \item{\code{fallback_chats}}{Ordered configured fallback Chats for the lead.
 Child definitions inherit the selected provider, without an implicit
 fallback policy of their own. See \link{Agent}.}
+      \item{\code{delegation_sources}}{Host-owned snapshot: unnamed list of up to 128
+text records with \code{source_id}, \code{revision}, \code{owner_id}, \code{conversation_id},
+and \code{text}. Optional \code{allowed_agents} restricts definition names; \code{NULL}
+allows all registered definitions, \code{character()} allows none. Each source
+ID has one revision per scope. The host authenticates and authorizes
+this snapshot; Deputy checks scope and exact revision, not live freshness.}
+      \item{\code{delegation_scope}}{Plain list with \code{owner_id} and \code{conversation_id};
+required when sources are supplied. Model arguments cannot override it.}
+      \item{\code{delegation_max_bytes}}{Positive finite admission ceiling, default
+64 KiB, applied separately to the UTF-8 system/message text and serialized
+complete manifest. Known complete-context estimates also obey
+\link{ContextPolicy} \code{max_tokens}; unknown estimates remain \code{NULL} and rely
+on byte bounds. Sources are text only, with a 16 MiB catalogue ceiling.}
     }
     \if{html}{\out{</div>}}
   }
@@ -217,8 +234,8 @@ Results preserve input order, including failures and unstarted tasks.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{tasks}}{A named character vector of tasks. Names select unique
-registered AgentDefinitions.}
+      \item{\code{tasks}}{A named character vector or named list of strings and
+\link{DelegationInput} values. Names select unique registered AgentDefinitions.}
       \item{\code{max_active}}{Maximum simultaneous responders.}
       \item{\code{mode}}{Execution contract. Currently only \code{"stateless"} is supported.}
       \item{\code{usage_limits}}{Optional batch-wide \link{UsageLimits}. Unset fields
@@ -287,7 +304,7 @@ active responders to stop at their next supported provider boundary.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible logical indicating whether the lead was active.
+    Invisible logical indicating whether the lead or a Subagent was active.
   }
 }
 
@@ -302,7 +319,9 @@ Status is \code{queued}, \code{running}, \code{completed}, \code{failed}, \code{
 \code{stop_reason} retains the exact runtime reason. Identifiers and timestamps
 are \code{NA} until assigned. \code{completed_at} marks settlement of this invocation,
 including suspension. \code{hook_error} records observer errors independently.
-These in-memory records are not durable jobs or a token event feed.
+\code{input_error} identifies preparation rejection as \code{invalid}, \code{missing},
+\code{stale}, \code{unauthorized}, or \code{oversized}. These in-memory records are not
+durable jobs or a token event feed.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{LeadAgent$list_subagents()}
@@ -360,6 +379,41 @@ authorize and redact disclosures before exposing these records to users.
   }
   \subsection{Returns}{
     List of turn histories
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-get_subagent_contexts"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-get_subagent_contexts}{}}}
+\subsection{\code{LeadAgent$get_subagent_contexts()}}{
+  Inspect initial manifests or current model context in admission order.
+Initial manifests are immutable preparation receipts, separate from
+current working context and retained conversation turns. No provider
+requests or tool calls occur during inspection. Hosts authorize disclosure.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$get_subagent_contexts(
+  delegation_id = NULL,
+  view = "initial",
+  redact = FALSE
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{delegation_id}}{Optional exact delegation identifier.}
+      \item{\code{view}}{\code{"initial"} for \link{DelegationManifest} values, \code{"current"} for
+available system prompts and working turns.}
+      \item{\code{redact}}{For initial manifests only, return an explicitly redacted
+portable view omitting task, instructions and source text. Metadata still
+requires host disclosure policy. The retained manifest is unchanged.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list; \code{NULL} entries mean no prepared context is available.
+Current context is retained at settlement; no matches returns \code{list()}.
   }
 }
 

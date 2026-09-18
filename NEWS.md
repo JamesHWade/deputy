@@ -1,5 +1,16 @@
 # deputy (development version)
 
+* `DelegationInput` supplies bounded task instructions and scoped evidence
+  references for ordinary and parallel delegation. `LeadAgent` rejects invalid
+  evidence before requests and retains immutable initial `DelegationManifest`
+  receipts, separately from working context and retained child chats. Plain
+  string tasks still work. Directly invoked children now respond to lead
+  interruption, and status polling avoids materializing transcripts (#149).
+  Child messages encode brief fields separately from resolved evidence, including
+  empty evidence, so supplied text cannot forge the serialized source list.
+  Parallel delegates enforce the lead's token cap and retain failed input and
+  unstarted sibling records when a batch brief is malformed.
+
 * `LeadAgent$list_subagents()` exposes admitted and running delegations in
   admission order, with exact stop reasons and separate observer errors. Ordinary
   and parallel delegation share lifecycle accounting; stopped runs no longer

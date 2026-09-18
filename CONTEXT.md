@@ -106,3 +106,13 @@ A read-only configuration value bundling prompt text, tools, and metadata that
 can be loaded into an Agent to specialize it. Executable tools retain their
 caller-owned state.
 _Avoid_: plugin, extension, module, capability pack
+
+**DelegationInput**:
+An immutable task-specific brief: task, constraints, evidence references,
+deliverable and stop conditions. Evidence selects exact revisions from a scoped
+host snapshot; instructions do not grant authority.
+
+**DelegationManifest**:
+An immutable receipt for a delegation's prepared initial context, including
+resolved evidence and declarative policy fingerprints. It is distinct from the
+current working context, retained child transcript and provider wire framing.
