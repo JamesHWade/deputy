@@ -11,14 +11,14 @@ validate_parallel_tasks <- function(lead, tasks, max_active, mode) {
     cli_abort("{.arg max_active} must be a positive whole number")
   }
   if (
-    !is.character(tasks) ||
-      length(tasks) == 0L ||
-      anyNA(tasks) ||
-      !all(nzchar(trimws(tasks))) ||
-      is.null(names(tasks))
+    (!is.character(tasks) && !is.list(tasks)) ||
+      !length(tasks) ||
+      is.null(names(tasks)) ||
+      anyNA(names(tasks))
   ) {
-    cli_abort("{.arg tasks} must be a non-empty named character vector")
+    cli_abort("{.arg tasks} must be a non-empty named character vector or list")
   }
+  tasks <- lapply(as.list(tasks), normalize_delegation_input)
   keys <- vapply(names(tasks), normalize_agent_definition_name, character(1))
   if (anyDuplicated(keys)) {
     cli_abort("{.arg tasks} must select each AgentDefinition at most once")
@@ -80,7 +80,7 @@ parallel_responder <- function(lead, item, state) {
     item$correlation$delegation_id,
     item$child,
     item$definition,
-    item$task,
+    item$manifest$message,
     item$limits
   ) |>
     promises::then(function(outcome) {
@@ -143,7 +143,7 @@ lead_parallel_delegate <- function(
     initialize_agent_run(
       lead,
       state,
-      as.list(selected$tasks),
+      lapply(selected$tasks, function(input) input$task),
       limits,
       context,
       controller
@@ -164,6 +164,22 @@ lead_parallel_delegate <- function(
       id <- lead_admit_delegation(lead, definition, task, correlation)
       admitted <<- c(admitted, id)
       list(definition = definition, correlation = correlation, task = task)
+    })
+    # Resolve every reference before constructing any Subagent.
+    prepared <- lapply(prepared, function(item) {
+      item$prepared <- tryCatch(
+        resolve_delegation_input(lead, item$definition, item$task),
+        error = function(condition) {
+          lead_settle_delegation(
+            lead,
+            item$correlation$delegation_id,
+            error = condition,
+            stop_reason = "setup_error"
+          )
+          rlang::cnd_signal(condition)
+        }
+      )
+      item
     })
     # Prepare the complete batch before any provider request.
     prepared <- lapply(prepared, function(item) {
@@ -188,7 +204,25 @@ lead_parallel_delegate <- function(
           stop(condition)
         }
       )
-      lead_bind_delegation(lead, id, item$child)
+      item$manifest <- tryCatch(
+        prepare_delegation_manifest(
+          lead,
+          item$definition,
+          item$prepared,
+          item$child
+        ),
+        error = function(condition) {
+          lead_settle_delegation(
+            lead,
+            id,
+            item$child,
+            error = condition,
+            stop_reason = "setup_error"
+          )
+          rlang::cnd_signal(condition)
+        }
+      )
+      lead_bind_delegation(lead, id, item$child, item$manifest)
       item
     })
     outcomes <- rep(

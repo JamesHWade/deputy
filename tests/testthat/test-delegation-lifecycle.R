@@ -303,3 +303,62 @@ test_that("batch observer failures settle once and retain successful siblings", 
   expect_length(lead$.__enclos_env__$private$delegation_usage_reservations, 0L)
   expect_length(lead$.__enclos_env__$private$active_subagents, 0L)
 })
+
+test_that("status polling does not materialize active Subagent transcripts", {
+  state <- new.env(parent = emptyenv())
+  chat <- create_parallel_chat(state)
+  clone <- chat$clone
+  reads <- 0L
+  chat$clone <- function(deep = FALSE) {
+    child <- clone(deep)
+    get_turns <- child$get_turns
+    child$get_turns <- function(...) {
+      reads <<- reads + 1L
+      get_turns(...)
+    }
+    child
+  }
+  lead <- LeadAgent$new(
+    chat,
+    sub_agents = list(agent_definition("a", "A", "a"))
+  )
+  promise <- lead$get_tools()$delegate_to_agent("a", "task")
+  baseline <- reads
+  lead$list_subagents()
+  lead$get_subagent_results()
+  expect_identical(reads, baseline)
+  lead$get_subagent_messages()
+  expect_gt(reads, baseline)
+  resolve_async_value(promise)
+})
+
+test_that("direct delegation can be interrupted without an active lead run", {
+  reply <- runtime_reply("partial")
+  attr(reply, "fixture_delay") <- 0.2
+  server <- local_runtime_server(list(reply))
+  lead <- LeadAgent$new(
+    runtime_chat(server),
+    sub_agents = list(agent_definition("a", "A", "a"))
+  )
+  promise <- lead$get_tools()$delegate_to_agent("a", "task")
+  expect_identical(lead$interrupt("host_cancelled"), TRUE)
+  resolve_async_value(promise)
+  expect_identical(lead$list_subagents()$stop_reason, "host_cancelled")
+  expect_identical(lead$list_subagents()$status, "stopped")
+  expect_identical(lead$interrupt(), FALSE)
+  resolve_async_value(lead$get_tools()$delegate_to_agent("a", "next"))
+  expect_identical(tail(lead$list_subagents()$status, 1L), "completed")
+})
+
+test_that("direct start-hook cancellation prevents the first Subagent request", {
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    expect_identical(lead$interrupt("before_request"), TRUE)
+    NULL
+  }))
+  resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
+  expect_length(state$started, 0L)
+  expect_identical(lead$list_subagents()$status, "not_started")
+  expect_identical(lead$list_subagents()$stop_reason, "before_request")
+})

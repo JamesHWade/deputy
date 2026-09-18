@@ -1,4 +1,4 @@
-#' @include agent-definition.R
+#' @include agent-definition.R delegation-manifest.R
 NULL
 
 # Multi-agent orchestration for deputy
@@ -51,6 +51,19 @@ LeadAgent <- R6::R6Class(
     #' @param fallback_chats Ordered configured fallback Chats for the lead.
     #'   Child definitions inherit the selected provider, without an implicit
     #'   fallback policy of their own. See [Agent].
+    #' @param delegation_sources Host-owned snapshot: unnamed list of up to 128
+    #'   text records with `source_id`, `revision`, `owner_id`, `conversation_id`,
+    #'   and `text`. Optional `allowed_agents` restricts definition names; `NULL`
+    #'   allows all registered definitions, `character()` allows none. Each source
+    #'   ID has one revision per scope. The host authenticates and authorizes
+    #'   this snapshot; Deputy checks scope and exact revision, not live freshness.
+    #' @param delegation_scope Plain list with `owner_id` and `conversation_id`;
+    #'   required when sources are supplied. Model arguments cannot override it.
+    #' @param delegation_max_bytes Positive finite admission ceiling, default
+    #'   64 KiB, applied separately to the UTF-8 system/message text and serialized
+    #'   complete manifest. Known complete-context estimates also obey
+    #'   [ContextPolicy] `max_tokens`; unknown estimates remain `NULL` and rely
+    #'   on byte bounds. Sources are text only, with a 16 MiB catalogue ceiling.
     #' @return A new `LeadAgent` object
     initialize = function(
       chat,
@@ -68,8 +81,27 @@ LeadAgent <- R6::R6Class(
       run_context = list(),
       agent_id = NULL,
       agent_name = NULL,
-      fallback_chats = list()
+      fallback_chats = list(),
+      delegation_sources = list(),
+      delegation_scope = list(),
+      delegation_max_bytes = 65536L
     ) {
+      sources <- normalize_delegation_sources(
+        delegation_sources,
+        delegation_scope
+      )
+      private$delegation_sources <- sources$sources
+      private$delegation_scope <- sources$scope
+      private$delegation_max_bytes <- context_policy_whole_number(
+        delegation_max_bytes,
+        "delegation_max_bytes"
+      )
+      if (is.null(private$delegation_max_bytes)) {
+        delegation_input_abort(
+          "invalid",
+          "delegation_max_bytes must be finite."
+        )
+      }
       private$.sub_agent_defs <- normalize_agent_definitions(sub_agents)
 
       # Build enhanced system prompt
@@ -154,8 +186,8 @@ LeadAgent <- R6::R6Class(
     #' model request. Definitions with tools, skills, or MCP servers are
     #' rejected. This is tier-1 fan-out, not background tool-using agents.
     #' Results preserve input order, including failures and unstarted tasks.
-    #' @param tasks A named character vector of tasks. Names select unique
-    #'   registered AgentDefinitions.
+    #' @param tasks A named character vector or named list of strings and
+    #'   [DelegationInput] values. Names select unique registered AgentDefinitions.
     #' @param max_active Maximum simultaneous responders.
     #' @param mode Execution contract. Currently only `"stateless"` is supported.
     #' @param usage_limits Optional batch-wide [UsageLimits]. Unset fields
@@ -219,15 +251,15 @@ LeadAgent <- R6::R6Class(
     #' @description
     #' Interrupt the lead and its active subagents cooperatively.
     #' @param reason Stable reason retained on stopped runs.
-    #' @return Invisible logical indicating whether the lead was active.
+    #' @return Invisible logical indicating whether the lead or a Subagent was active.
     interrupt = function(reason = "interrupted") {
       active <- super$interrupt(reason)
-      if (isTRUE(active)) {
-        for (child in private$active_subagents) {
-          child$interrupt(reason)
-        }
+      children <- private$active_subagents
+      for (id in names(children)) {
+        private$subagent_runs[[id]]$cancel_reason <- as.character(reason[[1L]])
+        children[[id]]$interrupt(reason)
       }
-      invisible(active)
+      invisible(isTRUE(active) || length(children) > 0L)
     },
 
     #' @description
@@ -238,7 +270,9 @@ LeadAgent <- R6::R6Class(
     #' `stop_reason` retains the exact runtime reason. Identifiers and timestamps
     #' are `NA` until assigned. `completed_at` marks settlement of this invocation,
     #' including suspension. `hook_error` records observer errors independently.
-    #' These in-memory records are not durable jobs or a token event feed.
+    #' `input_error` identifies preparation rejection as `invalid`, `missing`,
+    #' `stale`, `unauthorized`, or `oversized`. These in-memory records are not
+    #' durable jobs or a token event feed.
     #'
     #' @return Data frame with one row per admitted delegation
     list_subagents = function() {
@@ -256,6 +290,7 @@ LeadAgent <- R6::R6Class(
           task = character(),
           status = character(),
           stop_reason = character(),
+          input_error = character(),
           admitted_at = as.POSIXct(character()),
           hook_error = character(),
           started_at = as.POSIXct(character()),
@@ -280,6 +315,7 @@ LeadAgent <- R6::R6Class(
             task = run$task,
             status = run$status,
             stop_reason = run$stop_reason %||% NA_character_,
+            input_error = run$input_error %||% NA_character_,
             admitted_at = as.POSIXct(run$admitted_at, tz = "UTC"),
             hook_error = run$hook_error %||% NA_character_,
             started_at = as.POSIXct(run$started_at, tz = "UTC"),
@@ -325,7 +361,7 @@ LeadAgent <- R6::R6Class(
     #' @param session_id Optional sub-agent session id filter
     #' @return List of turn histories
     get_subagent_messages = function(agent_name = NULL, session_id = NULL) {
-      runs <- lead_delegation_records(self)
+      runs <- lead_delegation_records(self, messages = TRUE)
       if (!is.null(agent_name)) {
         runs <- Filter(
           function(run) identical(run$agent_name, agent_name),
@@ -340,6 +376,27 @@ LeadAgent <- R6::R6Class(
       }
 
       lapply(runs, function(run) run$turns)
+    },
+
+    #' @description
+    #' Inspect initial manifests or current model context in admission order.
+    #' Initial manifests are immutable preparation receipts, separate from
+    #' current working context and retained conversation turns. No provider
+    #' requests or tool calls occur during inspection. Hosts authorize disclosure.
+    #' @param delegation_id Optional exact delegation identifier.
+    #' @param view `"initial"` for [DelegationManifest] values, `"current"` for
+    #'   available system prompts and working turns.
+    #' @param redact For initial manifests only, return an explicitly redacted
+    #'   portable view omitting task, instructions and source text. Metadata still
+    #'   requires host disclosure policy. The retained manifest is unchanged.
+    #' @return A list; `NULL` entries mean no prepared context is available.
+    #'   Current context is retained at settlement; no matches returns `list()`.
+    get_subagent_contexts = function(
+      delegation_id = NULL,
+      view = "initial",
+      redact = FALSE
+    ) {
+      lead_subagent_contexts(self, delegation_id, view, redact)
     },
 
     #' @description
@@ -440,7 +497,14 @@ LeadAgent <- R6::R6Class(
       lead_agent <- self
 
       ellmer::tool(
-        fun = function(agent_name, task) {
+        fun = function(
+          agent_name,
+          task,
+          constraints = character(),
+          evidence = list(),
+          deliverable = NULL,
+          stop_conditions = character()
+        ) {
           correlation <- private$claim_delegation()
 
           route_key <- if (is_nonempty_string(agent_name)) {
@@ -464,9 +528,38 @@ LeadAgent <- R6::R6Class(
           id <- lead_admit_delegation(lead_agent, def, task, correlation)
           child <- tryCatch(
             {
+              input <- if (S7::S7_inherits(task, DelegationInput)) {
+                if (
+                  length(constraints) ||
+                    length(evidence) ||
+                    !is.null(deliverable) ||
+                    length(stop_conditions)
+                ) {
+                  delegation_input_abort(
+                    "invalid",
+                    "Structured task cannot be combined with separate brief fields."
+                  )
+                }
+                normalize_delegation_input(task)
+              } else {
+                DelegationInput(
+                  task,
+                  constraints,
+                  delegation_tool_references(evidence),
+                  deliverable,
+                  stop_conditions
+                )
+              }
+              prepared <- resolve_delegation_input(lead_agent, def, input)
               limits <- private$derive_subagent_usage_limits(def)
               child <- private$create_sub_agent(def, correlation, limits)
-              lead_bind_delegation(lead_agent, id, child)
+              manifest <- prepare_delegation_manifest(
+                lead_agent,
+                def,
+                prepared,
+                child
+              )
+              lead_bind_delegation(lead_agent, id, child, manifest)
               child
             },
             error = function(condition) {
@@ -482,8 +575,8 @@ LeadAgent <- R6::R6Class(
           # Reserve before returning the promise, so concurrent calls cannot
           # each receive the same remaining budget.
           private$reserve_delegation_usage(id, limits)
-          cli::cli_alert_info("Delegating to {.val {def$name}}: {task}")
-          lead_run_delegation(lead_agent, id, child, def, task) |>
+          cli::cli_alert_info("Delegating to {.val {def$name}}: {input$task}")
+          lead_run_delegation(lead_agent, id, child, def, manifest$message) |>
             promises::then(function(outcome) {
               if (!is.null(private$current_usage_limits)) {
                 limit <- usage_limit_status(
@@ -495,7 +588,7 @@ LeadAgent <- R6::R6Class(
               }
               if (!is.null(outcome$error)) {
                 ellmer::tool_reject(paste0(
-                  "Sub-agent '",
+                  "Subagent '",
                   def$name,
                   "' failed.\n",
                   "Error: ",
@@ -511,7 +604,23 @@ LeadAgent <- R6::R6Class(
           agent_name = ellmer::type_string(
             "Name of the sub-agent to delegate to"
           ),
-          task = ellmer::type_string("The task to delegate to the sub-agent")
+          task = ellmer::type_string("The task to delegate to the Subagent"),
+          constraints = ellmer::type_array(
+            ellmer::type_string(),
+            required = FALSE
+          ),
+          evidence = ellmer::type_array(
+            ellmer::type_object(
+              source_id = ellmer::type_string(),
+              revision = ellmer::type_string()
+            ),
+            required = FALSE
+          ),
+          deliverable = ellmer::type_string(required = FALSE),
+          stop_conditions = ellmer::type_array(
+            ellmer::type_string(),
+            required = FALSE
+          )
         ),
         annotations = ellmer::tool_annotations(
           read_only_hint = FALSE,
@@ -830,6 +939,9 @@ LeadAgent <- R6::R6Class(
     .sub_agent_defs = list(),
     subagent_runs = list(),
     active_subagents = list(),
+    delegation_sources = list(),
+    delegation_scope = list(),
+    delegation_max_bytes = 65536L,
     delegation_usage_reservations = list()
   )
 )

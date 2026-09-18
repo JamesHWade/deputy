@@ -11,6 +11,8 @@ formats remain unchanged by the moves.
 | S7 AgentDefinition values and routing normalization | `R/agent-definition.R` |
 | Portable YAML definition format and explicit registry resolution | `R/agent-definition-files.R` |
 | Mutable LeadAgent registry and delegated policy | `R/agents-multi.R` |
+| Immutable briefs and bounded scoped evidence preparation | `R/delegation-input.R` |
+| Initial context receipts and independent context views | `R/delegation-manifest.R` |
 | Admitted delegation records, lifecycle hooks and child settlement | `R/delegation-lifecycle.R` |
 | Stateless responder wave scheduling | `R/parallel-delegate.R` |
 | S7 Skill configuration and requirement inspection | `R/skill.R` |

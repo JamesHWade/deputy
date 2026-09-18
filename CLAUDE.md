@@ -30,6 +30,8 @@ deputy/
 │   ├── approval-store.R     # Locked immutable approval revisions
 │   ├── agent-requests.R    # Public ellmer callbacks and explicit fallback
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
+│   ├── delegation-input.R # Immutable briefs and scoped source preparation
+│   ├── delegation-manifest.R # Initial receipts and context inspection
 │   ├── delegation-lifecycle.R # Shared live records and child settlement
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
@@ -763,3 +765,8 @@ backlog in #148. Its proposed contracts are not implemented runtime guarantees.
 `dev/subagent-chat-exposure.md` records the ellmer/shinychat upstream research
 and the separate child inspection and event-routing work. Lifecycle records do
 not themselves implement nested streaming or durable child conversations.
+
+`DelegationInput` and `DelegationManifest` separate task instructions, scoped
+evidence, and immutable preparation receipts from working context and retained
+transcripts (ADR-0018). Source snapshots are host-owned text records, not live
+retrieval or authority. Policy fingerprints omit executable configuration.

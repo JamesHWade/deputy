@@ -2,11 +2,17 @@
 lead_admit_delegation <- function(lead, definition, task, correlation) {
   private <- lead$.__enclos_env__$private
   id <- correlation$delegation_id
+  task_text <- if (S7::S7_inherits(task, DelegationInput)) task$task else task
+  if (!is_nonempty_string(task_text)) {
+    task_text <- "<invalid delegation input>"
+  } else if (nchar(task_text, type = "bytes") > private$delegation_max_bytes) {
+    task_text <- "<oversized delegation input>"
+  }
   private$subagent_runs[[id]] <- list(
     agent_name = definition$name,
     agent_id = NULL,
     parent_agent_id = correlation$parent_agent_id,
-    task = task,
+    task = task_text,
     session_id = NULL,
     run_id = NULL,
     parent_run_id = correlation$parent_run_id,
@@ -23,14 +29,17 @@ lead_admit_delegation <- function(lead, definition, task, correlation) {
     result = NULL,
     usage = NULL,
     agent_result = NULL,
-    turns = list()
+    turns = list(),
+    manifest = NULL,
+    working_context = NULL
   )
   id
 }
 
-lead_bind_delegation <- function(lead, id, child) {
+lead_bind_delegation <- function(lead, id, child, manifest = NULL) {
   private <- lead$.__enclos_env__$private
   record <- private$subagent_runs[[id]]
+  record$manifest <- manifest
   record$agent_id <- child$agent_id
   record$session_id <- child$session_id()
   record$run_context <- child$run_context
@@ -38,13 +47,13 @@ lead_bind_delegation <- function(lead, id, child) {
   invisible(NULL)
 }
 
-lead_delegation_records <- function(lead) {
+lead_delegation_records <- function(lead, messages = FALSE) {
   private <- lead$.__enclos_env__$private
   unname(lapply(private$subagent_runs, function(record) {
     child <- private$active_subagents[[record$delegation_id]]
     if (!is.null(child)) {
       record$run_id <- child$.__enclos_env__$private$current_run_id
-      record$turns <- child$turns()
+      if (messages) record$turns <- child$turns()
     }
     record
   }))
@@ -89,6 +98,9 @@ lead_settle_delegation <- function(
     stop_reason %||%
     if (!is.null(error)) "error" else "not_started"
   record$error <- if (!is.null(error)) conditionMessage(error)
+  record$input_error <- if (inherits(error, "deputy_delegation_input_error")) {
+    error$reason
+  }
   record$result <- result$response
   record$usage <- result$usage %||% child_private$last_run_usage
   record$agent_result <- result
@@ -96,6 +108,12 @@ lead_settle_delegation <- function(
     tryCatch(child$turns(), error = function(e) list())
   } else {
     list()
+  }
+  record$working_context <- if (!is.null(child)) {
+    list(
+      system_prompt = child$get_system_prompt(),
+      turns = child$get_context_turns()
+    )
   }
   record$completed_at <- Sys.time()
   private$subagent_runs[[id]] <- record
@@ -182,10 +200,10 @@ lead_run_delegation <- function(
           private$active_subagents[[id]] <- child
           started <- TRUE
           lead_delegation_hook(lead, id, "SubagentStart", definition)
-          if (!isTRUE(private$should_stop)) {
-            if (!is.null(definition$initial_prompt)) {
-              task <- paste(definition$initial_prompt, task, sep = "\n\n")
-            }
+          if (
+            !isTRUE(private$should_stop) &&
+              is.null(private$subagent_runs[[id]]$cancel_reason)
+          ) {
             result <- coro::await(child$run_async(task, usage_limits = limits))
           }
         }
@@ -200,7 +218,8 @@ lead_run_delegation <- function(
       child,
       result,
       error,
-      stop_reason = private$stop_reason_from_hook
+      stop_reason = private$subagent_runs[[id]]$cancel_reason %||%
+        private$stop_reason_from_hook
     )
     private$release_delegation_usage(id)
     private$current_external_usage <- agent_usage_add(
