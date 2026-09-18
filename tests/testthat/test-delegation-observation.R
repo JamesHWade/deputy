@@ -360,3 +360,21 @@ test_that("queued cancellation survives a batch request-limit exit", {
   expect_length(settled, 1L)
   expect_identical(settled[[1L]]$data$stop_reason, "specific_cancel")
 })
+
+
+test_that("factor labels are bounded before text projection", {
+  local_mocked_bindings(inspection_record_turn = function(...) {
+    stop("must not materialize")
+  })
+  for (value in list(
+    factor(strrep("x", 100000)),
+    factor(rep(strrep("x", 100), 100))
+  )) {
+    event <- AgentEvent("content", content = ellmer::ContentToolResult(value))
+    expect_identical(
+      observation_payload(event, max_bytes = 2048L)$content_omitted,
+      "oversized"
+    )
+  }
+  expect_true(observation_payload_fits(factor(c("a", "b", NA)), 2048L))
+})

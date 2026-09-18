@@ -412,7 +412,7 @@ observation_payload_fits <- function(value, max_bytes) {
       }
       return(TRUE)
     }
-    for (field in c("names", "dim", "dimnames")) {
+    for (field in c("names", "dim", "dimnames", "levels")) {
       metadata <- attr(value, field, exact = TRUE)
       if (!is.null(metadata) && !visit(metadata, depth + 1L)) return(FALSE)
     }
@@ -434,6 +434,17 @@ observation_payload_fits <- function(value, max_bytes) {
           16 -
           if (is.na(item)) 0 else nchar(item, type = "bytes")
         if (remaining < 0) return(FALSE)
+      }
+      return(TRUE)
+    }
+    if (is.factor(value)) {
+      if (length(value) * 16 > remaining) {
+        return(FALSE)
+      }
+      labels <- levels(value)
+      for (code in unclass(value)) {
+        label <- if (is.na(code)) NA_character_ else labels[[code]]
+        if (!visit(label, depth + 1L)) return(FALSE)
       }
       return(TRUE)
     }
