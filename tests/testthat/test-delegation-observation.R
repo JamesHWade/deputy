@@ -399,3 +399,35 @@ test_that("fallback observations retain selected fallback and incurred usage", {
   expect_null(payload$condition)
   expect_null(payload$request)
 })
+
+
+test_that("envelope metadata is bounded before serialization", {
+  lead <- observation_lead()
+  lead$parallel_delegate(c(a = "one"))
+  id <- lead$list_subagents()$delegation_id[[1L]]
+  private <- lead$.__enclos_env__$private
+  private$subagent_runs[[id]]$agent_name <- strrep("x", 1000000)
+  reader <- lead$observe_subagents("owner")
+  expect_no_error(lead_observe_event(
+    lead,
+    id,
+    AgentEvent("text", text = "small")
+  ))
+  expect_length(reader$poll()$gaps, 1L)
+})
+
+test_that("small data frame observations retain a portable projection", {
+  frame <- data.frame(value = 1:2, group = factor(c("a", "b")))
+  payload <- observation_payload(AgentEvent(
+    "tool_end",
+    value = frame,
+    tool_name = "fixture"
+  ))
+  expect_identical(payload$tool_name, "fixture")
+  expect_equal(
+    jsonlite::fromJSON(payload$value),
+    transform(frame, group = as.character(group))
+  )
+  names(frame) <- rep(strrep("x", 1000), 2)
+  expect_false(observation_payload_fits(frame[rep(1L, 100), ], 2048))
+})

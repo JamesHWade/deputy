@@ -74,6 +74,11 @@ lead_delegation_records <- function(lead, messages = FALSE, usage = FALSE) {
     child <- private$active_subagents[[record$delegation_id]]
     if (!is.null(child)) {
       record$run_id <- child$.__enclos_env__$private$current_run_id
+      record$artifacts <- child$.__enclos_env__$private$delegation_artifacts
+      record$references <- lapply(record$artifacts, function(ref) {
+        ref$scope <- private$delegation_scope
+        ref
+      })
       if (messages) {
         record$turns <- child$turns()
       }

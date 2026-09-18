@@ -697,3 +697,34 @@ test_that("unsupported S7 payloads do not hide sibling histories", {
   ))
   expect_length(views[[2L]]$turns, 2L)
 })
+
+
+test_that("completed tool artifacts can be inspected before child settlement", {
+  lead <- inspection_lead(
+    context_policy = ContextPolicy(offload_dir = withr::local_tempdir())
+  )
+  child <- local_test_subagent(lead, agent_definition("a", "A", "role"))
+  id <- lead$list_subagents()$delegation_id[[1L]]
+  artifact <- offload_tool_result(
+    "live evidence",
+    "fixture",
+    lead$context_policy,
+    child$session_id(),
+    child$agent_id,
+    force = TRUE
+  )
+  child$.__enclos_env__$private$delegation_artifacts <- list(list(
+    reference = artifact$uri,
+    storage_session_id = child$session_id(),
+    source = "tool_result",
+    delegation_id = id
+  ))
+  lead$.__enclos_env__$private$active_subagents[[id]] <- child
+  view <- lead$inspect_subagents("owner", id)[[1L]]
+  expect_identical(view$outcome$references[[1L]]$reference, artifact$uri)
+  expect_match(
+    lead$read_subagent_result("owner", id, artifact$uri)$result,
+    "live evidence",
+    fixed = TRUE
+  )
+})
