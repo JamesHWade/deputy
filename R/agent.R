@@ -272,7 +272,10 @@ Agent <- R6::R6Class(
     #' @description
     #' Retain a specialist for explicit in-process follow-ups. The host transfers
     #' execution ownership to this Agent. Ordinary runs on the specialist reject
-    #' until release. Its tools and external resources remain host-owned.
+    #' until release. Its retained history, prompt, model, and tools cannot be
+    #' changed through the specialist or another Agent sharing its Chat until
+    #' the idle handle is released. Its tools and external resources remain
+    #' host-owned.
     #' @param agent A standalone Agent, with no durable approval or fallback.
     #' @param usage_limits Explicit cumulative ceiling for the handle, or the
     #'   allocation for one continuation. Both intersect the specialist and caller.
@@ -996,6 +999,7 @@ Agent <- R6::R6Class(
     #' @param log_tokens Whether ellmer should log token metadata.
     #' @return Invisible self.
     add_turn = function(user, assistant, log_tokens = TRUE) {
+      check_conversation_lease(self, NULL)
       private$.chat$add_turn(user, assistant, log_tokens = log_tokens)
       invisible(self)
     },
@@ -1043,6 +1047,7 @@ Agent <- R6::R6Class(
     #' @param value A list of ellmer turns.
     #' @return Invisible self.
     set_turns = function(value) {
+      check_conversation_lease(self, NULL)
       usage <- if (isTRUE(private$run_active)) private$current_run_usage()
       previous_turns <- private$.chat$get_turns()
       prompt <- private$.chat$get_system_prompt()
@@ -1076,6 +1081,7 @@ Agent <- R6::R6Class(
     #' @param value The new system prompt or `NULL`.
     #' @return Invisible self.
     set_system_prompt = function(value) {
+      check_conversation_lease(self, NULL)
       previous_summary <- private$.compaction_summary
       private$.chat$set_system_prompt(value)
       private$appended_hook_context_hashes <- character()
@@ -1102,6 +1108,7 @@ Agent <- R6::R6Class(
     #' @param tools A list of ellmer tool definitions.
     #' @return Invisible self.
     set_tools = function(tools) {
+      check_conversation_lease(self, NULL)
       had_result_reader <- isTRUE(private$.tool_result_reader_registered)
       tools <- validate_tool_batch(tools, preserve_reader = TRUE)
       wrapped <- lapply(tools, private$adapt_tool)
@@ -1169,6 +1176,7 @@ Agent <- R6::R6Class(
     #' @param model Model identifier.
     #' @return Invisible self.
     set_model = function(model) {
+      check_conversation_lease(self, NULL)
       private$.chat$set_model(model)
       invisible(self)
     },
@@ -1202,6 +1210,7 @@ Agent <- R6::R6Class(
     #'   Defaults to FALSE. Duplicate names within a batch always fail.
     #' @return Invisible self for chaining
     register_tools = function(tools, replace = FALSE) {
+      check_conversation_lease(self, NULL)
       existing <- private$.chat$get_tools()
       tools <- validate_tool_batch(tools, existing, replace = replace)
       wrapped <- lapply(tools, private$adapt_tool)
@@ -1503,6 +1512,7 @@ Agent <- R6::R6Class(
     #' Earlier development schemas are rejected; native host history remains
     #' independently readable through that host's restore API.
     load_session = function(path) {
+      check_conversation_lease(self, NULL)
       if (isTRUE(private$run_active)) {
         cli::cli_abort(
           "Cannot load session state while this agent has an active run",
@@ -1568,6 +1578,7 @@ Agent <- R6::R6Class(
       tool_input = NULL,
       usage_limits = NULL
     ) {
+      check_conversation_lease(self, NULL)
       decision <- match.arg(decision)
       approval_resume(self, path, decision, tool_input, usage_limits)
     },
@@ -1741,6 +1752,7 @@ Agent <- R6::R6Class(
     #'   Set TRUE to allow overwriting existing tools.
     #' @return Invisible self for chaining.
     load_skill = function(skill, allow_conflicts = FALSE) {
+      check_conversation_lease(self, NULL)
       if (is.character(skill)) {
         # Load from path
         skill <- skill_load(skill)
@@ -1879,6 +1891,7 @@ Agent <- R6::R6Class(
     #'   tools whose connections were invalidated are removed; working tools remain.
     #' @return Invisible self for chaining
     load_mcp = function(config = NULL, servers = NULL, replace = FALSE) {
+      check_conversation_lease(self, NULL)
       if (!rlang::is_bool(replace)) {
         tool_registration_error("{.arg replace} must be TRUE or FALSE.")
       }

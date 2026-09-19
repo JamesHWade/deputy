@@ -176,6 +176,7 @@ LeadAgent <- R6::R6Class(
     #' @param definition An [agent_definition()] object
     #' @return Invisible self
     register_sub_agent = function(definition) {
+      check_conversation_lease(self, NULL)
       if (!S7::S7_inherits(definition, AgentDefinition)) {
         cli_abort("{.arg definition} must be an AgentDefinition object")
       }

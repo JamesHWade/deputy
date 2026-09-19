@@ -281,7 +281,10 @@ See \code{\link[=approval_read]{approval_read()}} and \verb{$resume_approval()}.
 \subsection{\code{Agent$retain_agent()}}{
   Retain a specialist for explicit in-process follow-ups. The host transfers
 execution ownership to this Agent. Ordinary runs on the specialist reject
-until release. Its tools and external resources remain host-owned.
+until release. Its retained history, prompt, model, and tools cannot be
+changed through the specialist or another Agent sharing its Chat until
+the idle handle is released. Its tools and external resources remain
+host-owned.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$retain_agent(agent, usage_limits, max_runs = 32L)}
