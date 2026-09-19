@@ -169,6 +169,20 @@ inspection_text <- function(text, bytes = 8192L) {
   text
 }
 
+lead_artifact_storage <- function(lead, record, reference) {
+  route <- record$artifact_routing
+  if (!is.null(route) && !identical(reference$source, "delegation_answer")) {
+    return(list(
+      policy = ContextPolicy(offload_dir = route$offload_dir),
+      session_id = reference$storage_session_id %||% route$session_id
+    ))
+  }
+  list(
+    policy = lead$context_policy,
+    session_id = reference$storage_session_id %||% lead$session_id()
+  )
+}
+
 lead_prepare_outcome <- function(lead, id) {
   private <- lead$.__enclos_env__$private
   record <- private$subagent_runs[[id]]
@@ -564,12 +578,13 @@ lead_inspection_records <- function(lead, delegation_id, transcript) {
   lapply(records, function(record) {
     outcome <- delegation_outcome(record)
     references <- lapply(outcome$references, function(ref) {
+      storage <- lead_artifact_storage(lead, record, ref)
       available <- tryCatch(
         {
           read_tool_result_manifest(
             ref$reference,
-            lead$context_policy,
-            ref$storage_session_id
+            storage$policy,
+            storage$session_id
           )
           TRUE
         },

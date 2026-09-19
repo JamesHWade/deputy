@@ -287,6 +287,7 @@ the idle handle is released. Its tools and external resources remain
 host-owned. Retention replaces the Chat's tool callbacks with the
 specialist's governed runtime, preserving observers registered through
 that specialist's \verb{$on_tool_request()} and \verb{$on_tool_result()} methods.
+New observer registrations on the specialist or its aliases require release.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$retain_agent(agent, usage_limits, max_runs = 32L)}
