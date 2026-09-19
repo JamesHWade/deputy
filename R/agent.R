@@ -278,7 +278,8 @@ Agent <- R6::R6Class(
     #' host-owned. Retention replaces the Chat's tool callbacks with the
     #' specialist's governed runtime, preserving observers registered through
     #' that specialist's `$on_tool_request()` and `$on_tool_result()` methods.
-    #' New observer registrations on the specialist or its aliases require release.
+    #' New observer registrations and hook configuration changes on the specialist
+    #' or its aliases require release.
     #' @param agent A standalone Agent, with no durable approval or fallback.
     #' @param usage_limits Explicit cumulative ceiling for the handle, or the
     #'   allocation for one continuation. Both intersect the specialist and caller.
@@ -1262,6 +1263,7 @@ Agent <- R6::R6Class(
     #' ))
     #' }
     add_hook = function(hook) {
+      check_conversation_lease(self, NULL)
       if (!S7::S7_inherits(hook, HookMatcher)) {
         cli_abort("{.arg hook} must be a HookMatcher object")
       }

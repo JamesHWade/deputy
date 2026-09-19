@@ -92,6 +92,7 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
     attr(cp$.chat, "deputy_conversation_owner") <- entry$token
   }
   cp$.conversation_owner <- entry$token
+  cp$.hooks$.__enclos_env__$private$configuration_locked <- TRUE
   op$owned_conversations[[handle]] <- entry
   handle
 }
@@ -215,11 +216,12 @@ continue_conversation <- function(
       )
     }
   }
-  cp$.hooks <- child$hooks$clone(deep = TRUE)
+  runtime_hooks <- cp$.hooks$clone(deep = TRUE)
+  runtime_hooks$.__enclos_env__$private$configuration_locked <- FALSE
   for (event in c("PreToolUse", "PostToolUse", "PostToolUseFailure")) {
     local({
       selected <- event
-      child$add_hook(HookMatcher(
+      runtime_hooks$add(HookMatcher(
         selected,
         timeout = 0,
         callback = function(...) {
@@ -228,6 +230,8 @@ continue_conversation <- function(
       ))
     })
   }
+  runtime_hooks$.__enclos_env__$private$configuration_locked <- TRUE
+  cp$.hooks <- runtime_hooks
   if (!isTRUE(op$run_active) && !length(op$active_subagents)) {
     op$should_stop <- FALSE
   }
@@ -299,6 +303,7 @@ release_conversation <- function(owner, handle) {
     attr(cp$.chat, "deputy_conversation_owner") <- NULL
   }
   cp$.conversation_owner <- NULL
+  cp$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
   op$owned_conversations[[handle]] <- NULL
   # Release snapshots too; hosts can explicitly export them beforehand.
   op$subagent_runs[entry$ids] <- NULL
@@ -330,6 +335,7 @@ finalize_owned_conversations <- function(owner) {
     child <- entry$agent$.__enclos_env__$private
     if (identical(child$.conversation_owner, entry$token)) {
       child$.conversation_owner <- NULL
+      child$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
     }
     if (
       identical(attr(child$.chat, "deputy_conversation_owner"), entry$token)
