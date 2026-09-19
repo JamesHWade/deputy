@@ -300,6 +300,7 @@ HookRegistry <- R6::R6Class(
     #' @description
     #' Create a new HookRegistry.
     initialize = function() {
+      private$assert_configurable()
       private$hooks <- list()
     },
 
@@ -309,6 +310,7 @@ HookRegistry <- R6::R6Class(
     #' @param hook A [HookMatcher] object
     #' @return Invisible self for chaining
     add = function(hook) {
+      private$assert_configurable()
       if (!S7::S7_inherits(hook, HookMatcher)) {
         cli_abort("{.arg hook} must be a HookMatcher object")
       }
@@ -490,6 +492,14 @@ HookRegistry <- R6::R6Class(
   ),
 
   private = list(
+    configuration_locked = FALSE,
+    assert_configurable = function() {
+      if (private$configuration_locked) {
+        conversation_abort(
+          "Hook configuration belongs to a retained conversation until release."
+        )
+      }
+    },
     hooks = list(),
     hook_errors = list(),
     callr_warned = FALSE

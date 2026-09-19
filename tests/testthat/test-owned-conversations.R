@@ -415,6 +415,8 @@ test_that("collection of an idle owner releases borrowed conversations", {
     owner$retain_agent(child, UsageLimits(max_requests = 1))
   })
   gc()
+  child$add_hook(HookMatcher("PreToolUse", callback = function(...) NULL))
+  expect_identical(child$hooks$count(), 1L)
   expect_identical(child$run_sync("owner collected")$response, "answer")
   owner <- owned_test_owner()
   handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
@@ -473,6 +475,8 @@ test_that("cloned owners release idle specialists when collected", {
     owner$retain_agent(child, UsageLimits(max_requests = 1))
   })
   gc()
+  child$add_hook(HookMatcher("PreToolUse", callback = function(...) NULL))
+  expect_identical(child$hooks$count(), 1L)
   expect_identical(child$run_sync("cloned owner collected")$response, "answer")
 })
 
@@ -619,4 +623,59 @@ test_that("retention rebinds shared tool callbacks and adapters to the child", {
   expect_identical(effects, 2L)
   expect_identical(alias_requests, 0L)
   expect_identical(owner_hooks, 1L)
+})
+
+
+test_that("retained hook registries cannot widen policy before dispatch", {
+  server <- local_runtime_server(rep(
+    list(
+      runtime_reply(tool = "write_file"),
+      runtime_reply("settled")
+    ),
+    2L
+  ))
+  effects <- 0L
+  child <- Agent$new(
+    runtime_chat(server),
+    permissions = Permissions(file_write = FALSE),
+    tools = list(ellmer::tool(
+      function() {
+        effects <<- effects + 1L
+        "written"
+      },
+      name = "write_file",
+      description = "Write",
+      arguments = list()
+    ))
+  )
+  original_hooks <- child$hooks
+  allow <- HookMatcher("PermissionRequest", callback = function(...) {
+    PermissionResultAllow()
+  })
+  owner <- owned_test_owner(permissions = permissions_full())
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 2))
+  expect_error(original_hooks$add(allow), class = "deputy_conversation")
+  pending <- owner$continue_agent_async(
+    handle,
+    "write",
+    UsageLimits(max_requests = 2)
+  )
+  runtime_hooks <- child$hooks
+  count <- runtime_hooks$count()
+  expect_error(child$add_hook(allow), class = "deputy_conversation")
+  expect_error(runtime_hooks$add(allow), class = "deputy_conversation")
+  expect_error(original_hooks$initialize(), class = "deputy_conversation")
+  expect_error(runtime_hooks$initialize(), class = "deputy_conversation")
+  expect_identical(runtime_hooks$count(), count)
+  result <- suppressWarnings(resolve_async_value(pending))
+  expect_identical(trimws(result$response), "settled")
+  expect_identical(effects, 0L)
+  expect_identical(child$hooks, original_hooks)
+  expect_error(original_hooks$add(allow), class = "deputy_conversation")
+  owner$release_agent(handle)
+  original_hooks$add(allow)
+  expect_identical(child$hooks$count(), 1L)
+  released <- child$run_sync("released")
+  expect_identical(trimws(released$response), "settled")
+  expect_identical(effects, 1L)
 })
