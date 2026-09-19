@@ -32,6 +32,7 @@ check_conversation_owner <- function(owner) {
   ) {
     conversation_abort("Recursive conversation ownership is not yet supported.")
   }
+  check_conversation_access(owner, NULL)
 }
 
 retain_conversation <- function(owner, agent, usage_limits, max_runs) {
@@ -52,6 +53,7 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
   }
   if (
     !is.null(attr(cp$.chat, "deputy_conversation_owner")) ||
+      !is.null(attr(cp$.chat, "deputy_active_runtime", exact = TRUE)) ||
       length(attr(cp$.chat, "deputy_active_conversations", exact = TRUE)) >
         0L ||
       isTRUE(cp$run_active) ||
@@ -91,6 +93,7 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
   # execution authority to this Agent, so remove the other wrapper's callback
   # stacks and re-adapt the shared tools before recording the retained setup.
   cp$rewire_chat_runtime()
+  attr(cp$.chat, "deputy_retained_runtime") <- TRUE
   entry <- new.env(parent = emptyenv())
   entry$agent <- agent
   entry$token <- new.env(parent = emptyenv())
@@ -341,9 +344,36 @@ release_conversation <- function(owner, handle) {
   invisible(NULL)
 }
 
+check_conversation_initialization <- function(agent) {
+  if (isTRUE(agent$.__enclos_env__$private$run_active)) {
+    conversation_abort(
+      "Wait for the active run before reinitializing an Agent."
+    )
+  }
+  if (length(agent$.__enclos_env__$private$owned_conversations)) {
+    conversation_abort(
+      "Release retained conversations before reinitializing an Agent."
+    )
+  }
+  check_conversation_lease(agent, NULL)
+}
+
 check_conversation_lease <- function(agent, token) {
   check_owner_children(agent)
+  check_conversation_access(agent, token)
+}
+
+check_conversation_access <- function(agent, token) {
   private <- agent$.__enclos_env__$private
+  active <- attr(private$.chat, "deputy_active_runtime", exact = TRUE)
+  if (
+    !is.null(active) &&
+      !(isTRUE(private$run_active) && identical(active, private$current_run_id))
+  ) {
+    conversation_abort(
+      "Wait for the active run before accessing this shared Chat."
+    )
+  }
   shared <- attr(private$.chat, "deputy_conversation_owner", exact = TRUE)
   if (
     !identical(private$.conversation_owner, token) ||
@@ -379,7 +409,15 @@ finalize_owned_conversations <- function(owner) {
 
 check_owner_children <- function(agent) {
   private <- agent$.__enclos_env__$private
-  if (!isTRUE(private$run_active) && length(private$active_subagents)) {
+  if (
+    !isTRUE(private$run_active) &&
+      (length(private$active_subagents) ||
+        length(attr(
+          private$.chat,
+          "deputy_active_conversations",
+          exact = TRUE
+        )))
+  ) {
     conversation_abort(
       "Wait for active child conversations before starting an owner run."
     )

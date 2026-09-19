@@ -99,7 +99,7 @@ LeadAgent <- R6::R6Class(
       approval_dir = NULL
     ) {
       if (!is.null(private$.chat)) {
-        check_conversation_lease(self, NULL)
+        check_conversation_initialization(self)
       }
       if (!S7::S7_inherits(delegation_policy, DelegationPolicy)) {
         delegation_binding_abort(
@@ -292,13 +292,7 @@ LeadAgent <- R6::R6Class(
     #' @param reason Stable reason retained on stopped runs.
     #' @return Invisible logical indicating whether the lead or a Subagent was active.
     interrupt = function(reason = "interrupted") {
-      active <- super$interrupt(reason)
-      children <- private$active_subagents
-      for (id in names(children)) {
-        private$subagent_runs[[id]]$cancel_reason <- as.character(reason[[1L]])
-        children[[id]]$interrupt(reason)
-      }
-      invisible(isTRUE(active) || length(children) > 0L)
+      super$interrupt(reason)
     },
 
     #' @description

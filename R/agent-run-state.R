@@ -19,6 +19,17 @@ initialize_agent_run <- function(
   initial_usage = AgentUsage()
 ) {
   private <- agent$.__enclos_env__$private
+  runtime_chat <- private$.chat
+  tracked_runtime <- isTRUE(attr(
+    runtime_chat,
+    "deputy_retained_runtime",
+    exact = TRUE
+  ))
+  if (!is.null(attr(runtime_chat, "deputy_active_runtime", exact = TRUE))) {
+    conversation_abort(
+      "Wait for the active run before accessing this shared Chat."
+    )
+  }
   private$run_active <- TRUE
   private$current_run_id <-
     private$new_run_id()
@@ -28,6 +39,9 @@ initialize_agent_run <- function(
   state$active_run_id <- active_run_id
   state$run_context <- run_context
   state$limits <- limits
+  state$runtime_chat <- runtime_chat
+  state$runtime_token <- active_run_id
+  attr(runtime_chat, "deputy_active_runtime") <- active_run_id
 
   # Initialize lazily on first consumption. Merely constructing and
   # abandoning a stream must not reserve this Agent forever.
@@ -74,6 +88,11 @@ initialize_agent_run <- function(
   state$model_failure <- NULL
   state$dispatch_turns <- private$.chat$get_turns()
   state$trace_span <- start_run_trace(agent, state)
+  # Retention rewires the Chat to its specialist. After release, whichever
+  # wrapper dispatches next must supply its own adapters and governance.
+  if (tracked_runtime && is.null(private$.conversation_owner)) {
+    private$rewire_chat_runtime()
+  }
   install_request_callbacks(agent)
   private$pending_events <- list()
   private$tool_started_at <- list()

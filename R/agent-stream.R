@@ -594,6 +594,20 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       state$finished <- TRUE
       on.exit(finish_run_trace(state), add = TRUE)
       on.exit(remove_request_callbacks(private$.chat), add = TRUE)
+      on.exit(
+        {
+          if (
+            !is.null(state$runtime_chat) &&
+              identical(
+                attr(state$runtime_chat, "deputy_active_runtime", exact = TRUE),
+                state$runtime_token
+              )
+          ) {
+            attr(state$runtime_chat, "deputy_active_runtime") <- NULL
+          }
+        },
+        add = TRUE
+      )
 
       cleanup_error <- NULL
       tryCatch(

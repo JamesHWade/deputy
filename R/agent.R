@@ -148,7 +148,7 @@ Agent <- R6::R6Class(
       delegation_observation = DelegationObservation()
     ) {
       if (!is.null(private$.chat)) {
-        check_conversation_lease(self, NULL)
+        check_conversation_initialization(self)
       }
       if (
         !S7::S7_inherits(delegation_disclosure, DelegationDisclosure) ||
@@ -161,7 +161,10 @@ Agent <- R6::R6Class(
       private$.delegation_buffer <- new_delegation_buffer(
         delegation_observation
       )
-      if (!is.null(attr(chat, "deputy_conversation_owner"))) {
+      if (
+        !is.null(attr(chat, "deputy_conversation_owner")) ||
+          !is.null(attr(chat, "deputy_active_runtime", exact = TRUE))
+      ) {
         conversation_abort(
           "This Chat is already owned by a retained conversation."
         )
@@ -516,7 +519,12 @@ Agent <- R6::R6Class(
       private$subagent_runs[[delegation_id]]$cancel_reason <- reason
       child <- private$active_subagents[[delegation_id]]
       if (!is.null(child)) {
-        child$interrupt(reason)
+        if (!is.null(record$conversation_handle)) {
+          entry <- conversation_entry(self, record$conversation_handle)
+          child$.__enclos_env__$private$interrupt_run(reason, entry$token)
+        } else {
+          child$interrupt(reason)
+        }
       }
       invisible(TRUE)
     },
@@ -1445,16 +1453,7 @@ Agent <- R6::R6Class(
     #' @param reason Stable reason stored on the terminal event
     #' @return Invisible logical indicating whether a run was active
     interrupt = function(reason = "interrupted") {
-      interrupted <- FALSE
-      for (id in names(private$active_subagents)) {
-        interrupted <- isTRUE(self$interrupt_subagent(id, reason)) ||
-          interrupted
-      }
-      if (!isTRUE(private$run_active)) {
-        return(invisible(interrupted))
-      }
-      private$request_stream_stop(as.character(reason[[1]]))
-      invisible(TRUE)
+      private$interrupt_run(reason)
     },
 
     #' @description
@@ -2362,6 +2361,20 @@ Agent <- R6::R6Class(
       .tool_observer_removers = list(),
       .r6_clone = NULL,
       current_run_checkpoint_id = NULL,
+
+      interrupt_run = function(reason, conversation_token = NULL) {
+        check_conversation_access(self, conversation_token)
+        interrupted <- FALSE
+        for (id in names(private$active_subagents)) {
+          interrupted <- isTRUE(self$interrupt_subagent(id, reason)) ||
+            interrupted
+        }
+        if (!isTRUE(private$run_active)) {
+          return(invisible(interrupted))
+        }
+        private$request_stream_stop(as.character(reason[[1]]))
+        invisible(TRUE)
+      },
 
       clone_client = function(deep = FALSE) {
         invisible(deep)
