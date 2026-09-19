@@ -261,7 +261,7 @@ delegation_outcome <- function(record, compact = FALSE) {
     )
     references <- c(references[answer], references[!answer])
   }
-  runtime <- record[c(
+  runtime_fields <- c(
     "delegation_id",
     "agent_id",
     "agent_name",
@@ -274,7 +274,11 @@ delegation_outcome <- function(record, compact = FALSE) {
     "previous_delegation_id",
     "status",
     "stop_reason"
-  )]
+  )
+  runtime <- stats::setNames(
+    lapply(runtime_fields, function(field) record[[field]]),
+    runtime_fields
+  )
   compact_fields <- function(fields) {
     fields$omitted_fields <- names(Filter(
       function(value) {
