@@ -16,41 +16,49 @@ study_test_workflow <- function(
   treatment = "trt2",
   failure = FALSE,
   proposal_failure = FALSE,
+  preparation_failure = FALSE,
+  draft_failure = FALSE,
   bypass = FALSE,
   .local_envir = parent.frame()
 ) {
   recipe <- study_recipe()
   plan <- recipe$study_plan(treatment)
   proposer <- local_runtime_server(
-    list(
-      runtime_reply(
-        tool = "delegate_to_agent",
-        arguments = list(agent_name = "analyst", task = "Propose the study")
-      ),
-      runtime_reply(tool = "propose_analysis", arguments = list(plan = plan)),
-      runtime_reply("Proposal drafted"),
-      if (proposal_failure) {
-        runtime_failure(403L)
-      } else {
-        runtime_reply("FORGED RESULT: the difference is 999 grams")
-      }
+    c(
+      if (draft_failure) list(runtime_failure(403L)),
+      list(
+        runtime_reply(
+          tool = "delegate_to_agent",
+          arguments = list(agent_name = "analyst", task = "Propose the study")
+        ),
+        runtime_reply(tool = "propose_analysis", arguments = list(plan = plan)),
+        runtime_reply("Proposal drafted"),
+        if (proposal_failure) {
+          runtime_failure(403L)
+        } else {
+          runtime_reply("FORGED RESULT: the difference is 999 grams")
+        }
+      )
     ),
     .local_envir = .local_envir
   )
   executor <- local_runtime_server(
-    list(
-      runtime_reply(tool = "compute_summary", arguments = list(plan = plan)),
-      if (failure) {
-        runtime_failure(403L)
-      } else if (bypass) {
-        runtime_reply(
-          tool = "write_file",
-          arguments = list(path = "result.json", content = "999 grams")
-        )
-      } else {
+    c(
+      if (preparation_failure) list(runtime_failure(403L)),
+      list(
+        runtime_reply(tool = "compute_summary", arguments = list(plan = plan)),
+        if (failure) {
+          runtime_failure(403L)
+        } else if (bypass) {
+          runtime_reply(
+            tool = "write_file",
+            arguments = list(path = "result.json", content = "999 grams")
+          )
+        } else {
+          runtime_reply("FORGED RESULT: the difference is 999 grams")
+        },
         runtime_reply("FORGED RESULT: the difference is 999 grams")
-      },
-      runtime_reply("FORGED RESULT: the difference is 999 grams")
+      )
     ),
     .local_envir = .local_envir
   )
@@ -290,4 +298,33 @@ test_that("successful review clears an earlier proposal-stage failure", {
   expect_null(result$error)
   expect_equal(result$receipt$result$difference, 2)
   expect_identical(result$pending$status, "completed")
+})
+
+
+test_that("failed preparation can be retried with the retained proposal", {
+  x <- study_test_workflow(preparation_failure = TRUE)
+  x$workflow$propose("study", x$owner)
+  expect_snapshot(error = TRUE, x$workflow$prepare(x$owner))
+  expect_null(x$workflow$view(x$owner)$pending)
+  expect_null(x$workflow$view(x$owner)$receipt)
+  prepared <- x$workflow$prepare(x$owner)
+  expect_identical(prepared$pending$status, "pending")
+  result <- x$workflow$decide(x$owner, "approve")
+  expect_null(result$error)
+  expect_equal(result$receipt$result$difference, 2)
+})
+
+
+test_that("draft retries require no retained proposal and no cancellation", {
+  x <- study_test_workflow(draft_failure = TRUE)
+  failed <- x$workflow$propose("study", x$owner)
+  expect_null(failed$proposal)
+  expect_type(failed$error, "character")
+  retried <- x$workflow$propose("study", x$owner)
+  expect_identical(retried$proposal, x$plan)
+  expect_null(retried$error)
+  expect_snapshot(error = TRUE, x$workflow$propose("replace", x$owner))
+  x$workflow$cancel(x$owner)
+  expect_snapshot(error = TRUE, x$workflow$propose("after cancel", x$owner))
+  expect_length(x$proposer$requests(), 5L)
 })

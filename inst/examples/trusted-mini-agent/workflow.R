@@ -315,10 +315,20 @@ study_workflow <- function(
     view = view,
     propose = function(task, candidate) {
       access(candidate)
+      if (state$cancelled) {
+        cli::cli_abort("The study was cancelled.")
+      }
       if (state$started) {
         cli::cli_abort("Start a new workflow for another proposal.")
       }
       state$started <- TRUE
+      on.exit(
+        {
+          if (is.null(state$proposal)) state$started <- FALSE
+        },
+        add = TRUE
+      )
+      state$error <- NULL
       state$lead_result <- tryCatch(lead$run_sync(task), error = function(e) {
         state$error <- conditionMessage(e)
         NULL
@@ -338,7 +348,7 @@ study_workflow <- function(
         )
       }
       plan <- study_validate(state$proposal, data)
-      state$executor <- deputy::Agent$new(
+      executor <- deputy::Agent$new(
         chat = chat_factory("executor"),
         tools = list(compute_tool),
         system_prompt = "STUDY_EXECUTOR. Request compute_summary with the supplied inputs exactly. All subsequent text is commentary.",
@@ -387,13 +397,15 @@ study_workflow <- function(
         })
       )
       state$error <- NULL
-      state$executor$run_sync(study_json(plan))
-      state$pending <- state$executor$pending_approval()
-      if (is.null(state$pending)) {
+      executor$run_sync(study_json(plan))
+      pending <- executor$pending_approval()
+      if (is.null(pending)) {
         cli::cli_abort(
           "The executor did not produce a reviewable computation request."
         )
       }
+      state$executor <- executor
+      state$pending <- pending
       view(candidate)
     },
     decide = function(candidate, decision = c("approve", "deny"), plan = NULL) {

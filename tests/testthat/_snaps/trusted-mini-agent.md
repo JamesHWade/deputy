@@ -83,3 +83,28 @@
       Warning:
       Failed to evaluate 1 tool call.
       x [propose_analysis (proposal_rejected)]: A proposal has already been recorded.
+
+# failed preparation can be retried with the retained proposal
+
+    Code
+      x$workflow$prepare(x$owner)
+    Condition
+      Error in `req_perform_connection()`:
+      ! HTTP 403 Forbidden.
+      i fixture unavailable
+
+# draft retries require no retained proposal and no cancellation
+
+    Code
+      x$workflow$propose("replace", x$owner)
+    Condition
+      Error in `x$workflow$propose()`:
+      ! Start a new workflow for another proposal.
+
+---
+
+    Code
+      x$workflow$propose("after cancel", x$owner)
+    Condition
+      Error in `x$workflow$propose()`:
+      ! The study was cancelled.
