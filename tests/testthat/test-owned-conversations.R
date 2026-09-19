@@ -323,3 +323,28 @@ test_that("optional outcome identities remain named null fields", {
   expect_identical(any(names(runtime) == ""), FALSE)
   expect_null(runtime$previous_delegation_id)
 })
+
+
+test_that("delayed owner streams cannot start over independently active children", {
+  owner <- owned_test_owner()
+  delayed <- owner$stream_async("created while idle")
+  handle <- owner$retain_agent(
+    owned_test_agent(),
+    UsageLimits(max_requests = 2)
+  )
+  rejected <- NULL
+  owner$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    rejected <<- tryCatch(collect_async_stream(delayed), error = identity)
+    NULL
+  }))
+  result <- owner$continue_agent(
+    handle,
+    "independent child",
+    UsageLimits(max_requests = 1)
+  )
+  expect_s3_class(rejected, "deputy_conversation")
+  expect_match(conditionMessage(rejected), "Wait for active child")
+  expect_identical(result$response, "answer")
+  expect_null(owner$last_run())
+  expect_identical(owner$run_sync("after child settled")$response, "answer")
+})

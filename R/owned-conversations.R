@@ -292,6 +292,7 @@ release_conversation <- function(owner, handle) {
 }
 
 check_conversation_lease <- function(agent, token) {
+  check_owner_children(agent)
   private <- agent$.__enclos_env__$private
   shared <- attr(private$.chat, "deputy_conversation_owner", exact = TRUE)
   if (
@@ -321,6 +322,16 @@ finalize_owned_conversations <- function(owner) {
     ) {
       attr(child$.chat, "deputy_conversation_owner") <- NULL
     }
+  }
+  invisible(NULL)
+}
+
+check_owner_children <- function(agent) {
+  private <- agent$.__enclos_env__$private
+  if (!isTRUE(private$run_active) && length(private$active_subagents)) {
+    conversation_abort(
+      "Wait for active child conversations before starting an owner run."
+    )
   }
   invisible(NULL)
 }
