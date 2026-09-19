@@ -224,3 +224,34 @@ test_that("rejected incoming Chats preserve existing disclosure and lead state",
   )
   owner$release_agent(handle)
 })
+
+
+test_that("retention rejects foreign native delegation tools", {
+  chat <- create_mock_chat()
+  child <- Agent$new(chat)
+  alias <- LeadAgent$new(
+    chat,
+    sub_agents = list(agent_definition("leaf", "Leaf", "Leaf"))
+  )
+  owner <- owned_test_owner()
+  before <- child$get_tools()
+  expect_error(
+    owner$retain_agent(child, UsageLimits(max_requests = 1)),
+    "cannot contain delegation tools",
+    class = "deputy_conversation"
+  )
+  expect_identical(child$get_tools(), before)
+  expect_null(child$.__enclos_env__$private$.conversation_owner)
+  expect_null(attr(chat, "deputy_conversation_owner"))
+  expect_equal(nrow(alias$list_subagents()), 0L)
+  renamed <- attr(before[["delegate_to_agent"]], "deputy_runtime_source_tool")
+  renamed@name <- "foreign_leaf"
+  isolated <- Agent$new(create_mock_chat(), tools = list(renamed))
+  expect_error(
+    owner$retain_agent(isolated, UsageLimits(max_requests = 1)),
+    "cannot contain delegation tools"
+  )
+  alias$set_tools(list())
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
+  owner$release_agent(handle)
+})

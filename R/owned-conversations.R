@@ -68,6 +68,20 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
     )
   }
   if (
+    any(vapply(
+      agent$get_tools(),
+      function(tool) {
+        source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||%
+          tool
+        isTRUE(attr(source, "deputy_delegation_tool", exact = TRUE)) ||
+          identical(source@name, "delegate_to_agent")
+      },
+      logical(1)
+    ))
+  ) {
+    conversation_abort("Retained specialists cannot contain delegation tools.")
+  }
+  if (
     any(vapply(agent$get_tools(), inherits, logical(1), "ellmer::ToolBuiltIn"))
   ) {
     conversation_abort(

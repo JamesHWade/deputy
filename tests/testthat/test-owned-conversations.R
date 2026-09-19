@@ -270,6 +270,7 @@ test_that("LeadAgent aliases cannot change or execute a retained conversation", 
     child$.__enclos_env__$private$.chat,
     sub_agents = list(agent_definition("leaf", "Work", "Work"))
   )
+  alias$set_tools(list())
   owner <- owned_test_owner()
   handle <- owner$retain_agent(child, UsageLimits(max_requests = 2))
   prompt <- child$get_system_prompt()

@@ -73,6 +73,7 @@ test_that("active released Chats reject competing aliases and adaptation", {
     chat,
     sub_agents = list(agent_definition("leaf", "Leaf", "Leaf"))
   )
+  lead$set_tools(list())
   owner <- owned_test_owner()
   handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
   owner$release_agent(handle)

@@ -393,7 +393,7 @@ LeadAgent <- R6::R6Class(
       # Capture self for the closure
       lead_agent <- self
 
-      ellmer::tool(
+      tool <- ellmer::tool(
         fun = function(
           agent_name,
           task,
@@ -532,6 +532,8 @@ LeadAgent <- R6::R6Class(
           idempotent_hint = FALSE
         )
       )
+      attr(tool, "deputy_delegation_tool") <- TRUE
+      tool
     },
 
     # Create a sub-agent from a definition
