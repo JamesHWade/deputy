@@ -326,7 +326,8 @@ Agent. The returned promise is the wait handle and has one runtime consumer.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Promise resolving to an AgentResult.
+    Promise resolving to an AgentResult. Cancellation before dispatch
+returns zero usage and no run ID because no child run started.
   }
 }
 

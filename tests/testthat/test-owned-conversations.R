@@ -75,7 +75,16 @@ test_that("busy rejection and cooperative cancellation settle exactly once", {
   expect_snapshot(error = TRUE, owner$release_agent(handle))
   owner$cancel_agent(handle)
   owner$cancel_agent(handle)
-  resolve_async_value(pending)
+  cancelled <- resolve_async_value(pending)
+  expect_s7_class(cancelled, AgentResult)
+  expect_identical(cancelled$stop_reason, "interrupted")
+  expect_identical(cancelled$usage$requests, 0L)
+  expect_identical(cancelled$agent_id, child$agent_id)
+  expect_identical(cancelled$session_id, child$session_id())
+  expect_identical(
+    cancelled$delegation_id,
+    owner$list_subagents()$delegation_id
+  )
   expect_equal(nrow(owner$list_subagents()), 1L)
   expect_identical(owner$list_subagents()$stop_reason, "interrupted")
   expect_identical(owner$cancel_agent(handle), FALSE)
@@ -87,6 +96,57 @@ test_that("busy rejection and cooperative cancellation settle exactly once", {
     )$response,
     "answer"
   )
+})
+
+test_that("cancellation before child dispatch returns an interrupted result", {
+  owner <- owned_test_owner()
+  child <- owned_test_agent()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 2))
+  owner$add_hook(HookMatcher(
+    "SubagentStart",
+    timeout = 0,
+    callback = function(...) {
+      owner$cancel_agent(handle)
+      NULL
+    }
+  ))
+  result <- owner$continue_agent(
+    handle,
+    "cancel",
+    UsageLimits(max_requests = 1)
+  )
+  expect_s7_class(result, AgentResult)
+  expect_identical(result$stop_reason, "interrupted")
+  expect_identical(result$usage$requests, 0L)
+  expect_null(result$run_id)
+  expect_null(result$response)
+  expect_identical(result$agent_id, child$agent_id)
+  expect_identical(result$session_id, child$session_id())
+  expect_identical(result$delegation_id, owner$list_subagents()$delegation_id)
+  expect_identical(owner$list_subagents()$status, "not_started")
+  expect_length(child$get_turns(), 0L)
+})
+
+test_that("manual compaction cannot bypass a retained Chat lease", {
+  server <- local_runtime_server(list(runtime_reply("summary", stream = FALSE)))
+  chat <- runtime_compaction_chat(server)
+  child <- Agent$new(chat)
+  alias <- Agent$new(chat)
+  owner <- owned_test_owner()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 2))
+  before <- child$get_turns()
+  for (agent in list(child, alias)) {
+    expect_error(agent$compact(keep_last = 0), "current owner")
+    expect_error(
+      agent$compact(keep_last = 0, automatic = TRUE),
+      "current owner"
+    )
+  }
+  expect_length(server$requests(), 0L)
+  expect_identical(child$get_turns(), before)
+  owner$release_agent(handle)
+  result <- child$compact(keep_last = 0, summary = "released summary")
+  expect_identical(result$method, "custom")
 })
 
 test_that("configuration changes and finite retention reject before execution", {
