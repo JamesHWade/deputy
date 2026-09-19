@@ -2,6 +2,12 @@
 
 ## deputy (development version)
 
+- `Agent$retain_agent_graph()` configures recursive specialist routes
+  with shared lifetime budgets, bounded depth and concurrency, subtree
+  cancellation, and root-authorized descendant chats. A deterministic
+  three-level example exercises the real streaming runtime
+  ([\#169](https://github.com/JamesHWade/deputy/issues/169)).
+
 - [`adopt_chat()`](https://jameshwade.github.io/deputy/reference/adopt_chat.md)
   and
   [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)

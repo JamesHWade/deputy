@@ -104,6 +104,12 @@ for writes made through its native file tools.
 
 - [`Agent$retain_agent()`](#method-Agent-retain_agent)
 
+- [`Agent$retain_agent_graph()`](#method-Agent-retain_agent_graph)
+
+- [`Agent$delegation_graph_usage()`](#method-Agent-delegation_graph_usage)
+
+- [`Agent$release_agent_graph()`](#method-Agent-release_agent_graph)
+
 - [`Agent$continue_agent_async()`](#method-Agent-continue_agent_async)
 
 - [`Agent$continue_agent()`](#method-Agent-continue_agent)
@@ -429,6 +435,93 @@ configuration changes on the specialist or its aliases require release.
 #### Returns
 
 An opaque handle belonging only to this Agent.
+
+------------------------------------------------------------------------
+
+### `Agent$retain_agent_graph()`
+
+Retain a host-configured graph of curated Agents. One root owns all
+chats, budgets and descendant inspection. Limits accumulate until graph
+release. Root depth is zero; concurrency counts queued and running
+descendants, including callers waiting for their own children. Cycles
+may be configured, but calls into an active chat reject before dispatch.
+
+#### Usage
+
+    Agent$retain_agent_graph(
+      agents,
+      routes,
+      usage_limits,
+      max_depth,
+      max_delegations,
+      max_concurrency,
+      max_runs = 32L
+    )
+
+#### Arguments
+
+- `agents`:
+
+  Named list of distinct standalone Agents. `root` is reserved.
+
+- `routes`:
+
+  Named list keyed by `root` or an agent name. Each value is a named
+  list of tools, each with `target`, `description` and `usage_limits`.
+
+- `usage_limits`:
+
+  Cumulative graph UsageLimits; max_requests is required.
+
+- `max_depth`:
+
+  Maximum descendant depth, with direct children at one.
+
+- `max_delegations`:
+
+  Maximum admitted invocations over the graph lifetime.
+
+- `max_concurrency`:
+
+  Maximum simultaneously admitted child invocations.
+
+- `max_runs`:
+
+  Maximum invocations of each retained conversation.
+
+#### Returns
+
+Named conversation handles, usable for explicit host follow-ups.
+
+------------------------------------------------------------------------
+
+### `Agent$delegation_graph_usage()`
+
+Read cumulative graph usage, including active descendants.
+
+#### Usage
+
+    Agent$delegation_graph_usage()
+
+#### Returns
+
+An AgentUsage value. This trusted host API grants no disclosure.
+
+------------------------------------------------------------------------
+
+### `Agent$release_agent_graph()`
+
+Release an idle graph, removing its route tools and handles. Borrowed
+tools and resources remain host-owned. Export inspection first. A new
+graph is a new host authorization; models cannot reset its budgets.
+
+#### Usage
+
+    Agent$release_agent_graph()
+
+#### Returns
+
+Invisible NULL.
 
 ------------------------------------------------------------------------
 
