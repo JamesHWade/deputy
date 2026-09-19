@@ -17,3 +17,4 @@
 ^dev$
 ^CONTEXT\.md$
 ^cran-comments\.md$
+^inst/examples/[^/]+/[.]shinychat$

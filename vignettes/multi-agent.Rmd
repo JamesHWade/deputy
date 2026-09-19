@@ -32,6 +32,70 @@ Multi-agent orchestration is useful when:
 
 For simpler tasks, a single `Agent` with the right tools is usually enough.
 
+## Composing retained specialists
+
+For existing, independently configured conversations, use an ordinary `Agent`
+as the root and `retain_agent_graph()` to declare the permitted routes. The
+following assumes `root`, `analyst` and `reviewer` are distinct Agents whose
+permissions already allow the relevant tools:
+
+```{r}
+handles <- root$retain_agent_graph(
+  agents = list(analyst = analyst, reviewer = reviewer),
+  routes = list(
+    root = list(analyze = list(
+      target = "analyst", description = "Analyze the evidence",
+      usage_limits = UsageLimits(max_requests = 4)
+    )),
+    analyst = list(review = list(
+      target = "reviewer", description = "Check the analysis",
+      usage_limits = UsageLimits(max_requests = 2)
+    ))
+  ),
+  usage_limits = UsageLimits(max_requests = 12, max_tool_calls = 8),
+  max_depth = 2, max_delegations = 8, max_concurrency = 2
+)
+result <- root$run_sync("Analyze the evidence and have it reviewed.")
+root$delegation_graph_usage()
+```
+
+The root owns all retained conversations and descendant records. Each route
+fixes its target and allocation; the model supplies only a new task brief.
+Provider configuration, prompts and executable tools stay with each specialist.
+Policies and tool hooks from every ancestor also govern descendant tool calls.
+A child cannot grant itself more authority than its callers.
+
+The graph budget is cumulative across root runs and explicit host follow-ups.
+Depth counts edges from the root. Concurrency includes parents waiting for their
+children, so this three-level route requires two child slots. At capacity calls
+reject before dispatch. Cyclic routes can be configured, but a busy conversation
+cannot be reentered. Token and cost ceilings use reported responses; requests
+already in flight can overshoot them. A request ceiling bounds dispatch itself.
+
+```{r}
+# Host controls require application authorization independently of disclosure.
+root$continue_agent(handles[["analyst"]], "Revisit the conclusion",
+  UsageLimits(max_requests = 1))
+rows <- root$list_subagents()
+# With an explicitly configured DelegationDisclosure policy:
+views <- root$inspect_subagents(requester, transcript = TRUE)
+reader <- root$observe_subagents(requester)
+reader$poll() # ordered root events with parent/depth metadata
+reader$close()
+root$interrupt_subagent(rows$delegation_id[[1]], "host_cancelled")
+# Await outstanding continuations before releasing all members together.
+root$release_agent_graph()
+```
+
+Observation and selected-child panels never consume a producer stream or inject
+child transcripts into the root's model context. Cancellation cooperatively stops
+a subtree; siblings remain independently inspectable. Release removes graph
+routes and ownership, while borrowed tools and external resources remain the
+host's responsibility. These handles do not survive an R restart.
+
+The `examples/recursive-agents` Shiny app provides a deterministic local HTTP
+producer and separate descendant transcript selection, with no paid model calls.
+
 ## Defining Sub-Agents
 
 Use `agent_definition()` to describe a sub-agent:
