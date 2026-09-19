@@ -316,6 +316,7 @@ register_tool_observer <- function(agent, phase, callback) {
   private[[field]][[id]] <- callback
   private$.tool_observer_removers[[id]] <- remove
   function() {
+    check_conversation_lease(agent, NULL)
     remove <- private$.tool_observer_removers[[id]]
     if (is.function(remove)) {
       remove()
