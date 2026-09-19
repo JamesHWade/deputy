@@ -309,3 +309,17 @@ test_that("cloned owners release idle specialists when collected", {
   gc()
   expect_identical(child$run_sync("cloned owner collected")$response, "answer")
 })
+
+
+test_that("optional outcome identities remain named null fields", {
+  owner <- owned_test_owner()
+  handle <- owner$retain_agent(
+    owned_test_agent(),
+    UsageLimits(max_requests = 1)
+  )
+  owner$continue_agent(handle, "first", UsageLimits(max_requests = 1))
+  runtime <- owner$inspect_subagents("owner")[[1L]]$outcome$runtime
+  expect_identical(anyNA(names(runtime)), FALSE)
+  expect_identical(any(names(runtime) == ""), FALSE)
+  expect_null(runtime$previous_delegation_id)
+})
