@@ -265,6 +265,7 @@ Agent <- R6::R6Class(
         private$.session_id
       )
 
+      reg.finalizer(self, finalize_owned_conversations, onexit = TRUE)
       invisible(self)
     },
 

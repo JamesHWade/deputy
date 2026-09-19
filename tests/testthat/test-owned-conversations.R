@@ -1,27 +1,3 @@
-owned_test_agent <- function(text = "answer", ...) {
-  chat <- create_mock_chat()
-  chat$stream_async <- function(prompt, ...) {
-    coro::async_generator(function() {
-      chat$set_turns(c(chat$get_turns(), list(create_mock_user_turn(prompt))))
-      coro::yield(ellmer::ContentText(text))
-      chat$set_turns(c(
-        chat$get_turns(),
-        list(create_mock_assistant_turn(text))
-      ))
-    })()
-  }
-  Agent$new(chat, ...)
-}
-
-owned_test_owner <- function(...) {
-  owned_test_agent(
-    delegation_disclosure = DelegationDisclosure(
-      authorize = function(requester, scope) identical(requester, "owner")
-    ),
-    ...
-  )
-}
-
 test_that("follow-ups retain history and identity with independent run accounting", {
   owner <- owned_test_owner()
   child <- owned_test_agent(system_prompt = "specialist")
@@ -235,12 +211,15 @@ test_that("a retained mutable Chat cannot be adopted through a second wrapper", 
   chat <- create_mock_chat()
   child <- Agent$new(chat)
   alias <- Agent$new(chat)
+  delayed_alias <- alias$stream_async("delayed alias")
   handle <- owner$retain_agent(child, UsageLimits(max_requests = 2))
   expect_snapshot(
     error = TRUE,
     owned_test_owner()$retain_agent(alias, UsageLimits())
   )
   expect_snapshot(error = TRUE, Agent$new(chat))
+  expect_snapshot(error = TRUE, alias$run_sync("alias bypass"))
+  expect_snapshot(error = TRUE, collect_async_stream(delayed_alias))
   owner$release_agent(handle)
 })
 
@@ -260,4 +239,62 @@ test_that("sibling histories stay separate and current policy can narrow", {
   owner$set_permission_mode("readonly")
   owner$continue_agent(handle, "write", UsageLimits(max_requests = 1))
   expect_identical(fixture$state$tool_executed, FALSE)
+})
+
+
+test_that("collection of an idle owner releases borrowed conversations", {
+  child <- owned_test_agent()
+  local({
+    owner <- owned_test_owner()
+    owner$retain_agent(child, UsageLimits(max_requests = 1))
+  })
+  gc()
+  expect_identical(child$run_sync("owner collected")$response, "answer")
+  owner <- owned_test_owner()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
+  owner$release_agent(handle)
+})
+
+test_that("mid-stream failures and cancellation retain partial history for retry", {
+  for (mode in c("fail", "cancel")) {
+    owner <- owned_test_owner()
+    chat <- create_mock_chat()
+    attempts <- 0L
+    chat$stream_async <- function(prompt, ...) {
+      coro::async_generator(function() {
+        attempts <<- attempts + 1L
+        chat$set_turns(c(chat$get_turns(), list(create_mock_user_turn(prompt))))
+        if (attempts == 1L) {
+          chat$set_turns(c(
+            chat$get_turns(),
+            list(create_mock_assistant_turn("partial"))
+          ))
+          coro::yield(ellmer::ContentText("partial"))
+          if (mode == "fail") {
+            abort_deputy("failure after partial output")
+          }
+          owner$cancel_agent(handle)
+        } else {
+          coro::yield(ellmer::ContentText("recovered"))
+        }
+      })()
+    }
+    child <- Agent$new(chat)
+    handle <- owner$retain_agent(child, UsageLimits(max_requests = 3))
+    result <- tryCatch(
+      owner$continue_agent(handle, "first", UsageLimits(max_requests = 1)),
+      deputy_error = identity
+    )
+    view <- owner$inspect_subagents("owner", transcript = TRUE)[[1L]]
+    expect_identical(view$outcome$answer, "partial")
+    expect_length(view$turns, 2L)
+    expect_identical(view$turns[[2L]]@contents[[1L]]@text, "partial")
+    result <- owner$continue_agent(
+      handle,
+      "recover",
+      UsageLimits(max_requests = 1)
+    )
+    expect_identical(result$response, "recovered")
+    expect_length(child$turns(), 3L)
+  }
 })

@@ -117,3 +117,19 @@
     Condition
       Error in `conversation_abort()`:
       ! This Chat is already owned by a retained conversation.
+
+---
+
+    Code
+      alias$run_sync("alias bypass")
+    Condition
+      Error in `conversation_abort()`:
+      ! This conversation must be run through its current owner.
+
+---
+
+    Code
+      collect_async_stream(delayed_alias)
+    Condition
+      Error in `conversation_abort()`:
+      ! This conversation must be run through its current owner.

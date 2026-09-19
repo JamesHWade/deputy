@@ -292,10 +292,35 @@ release_conversation <- function(owner, handle) {
 }
 
 check_conversation_lease <- function(agent, token) {
-  if (!identical(agent$.__enclos_env__$private$.conversation_owner, token)) {
+  private <- agent$.__enclos_env__$private
+  shared <- attr(private$.chat, "deputy_conversation_owner", exact = TRUE)
+  if (
+    !identical(private$.conversation_owner, token) ||
+      (!is.null(shared) && !identical(shared, token))
+  ) {
     conversation_abort(
       "This conversation must be run through its current owner."
     )
+  }
+  invisible(NULL)
+}
+
+# Registered without an owner-capturing closure, so collection can release leases.
+finalize_owned_conversations <- function(owner) {
+  private <- owner$.__enclos_env__$private
+  for (entry in private$owned_conversations) {
+    if (isTRUE(entry$busy)) {
+      next
+    }
+    child <- entry$agent$.__enclos_env__$private
+    if (identical(child$.conversation_owner, entry$token)) {
+      child$.conversation_owner <- NULL
+    }
+    if (
+      identical(attr(child$.chat, "deputy_conversation_owner"), entry$token)
+    ) {
+      attr(child$.chat, "deputy_conversation_owner") <- NULL
+    }
   }
   invisible(NULL)
 }
