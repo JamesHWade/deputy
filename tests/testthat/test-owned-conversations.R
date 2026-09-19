@@ -164,11 +164,117 @@ test_that("configuration changes and finite retention reject before execution", 
   )
   owner$release_agent(handle)
   handle <- owner$retain_agent(child, UsageLimits(max_requests = 3))
-  child$set_system_prompt("changed")
+  # Raw host access is outside the public facade; still reject changed setup.
+  child$.__enclos_env__$private$.chat$set_system_prompt("changed")
   expect_snapshot(
     error = TRUE,
     owner$continue_agent(handle, "changed", UsageLimits())
   )
+})
+
+test_that("retained conversation mutation rejects through every public entry", {
+  server <- local_runtime_server(list())
+  chat <- runtime_chat(server)
+  chat$set_turns(list(ellmer::UserTurn("retained evidence")))
+  child <- Agent$new(chat, system_prompt = "retained policy")
+  alias <- Agent$new(chat)
+  path <- withr::local_tempfile(fileext = ".rds")
+  child$save_session(path)
+  tool <- ellmer::tool(
+    function() "read",
+    "Read",
+    arguments = list(),
+    name = "read"
+  )
+  operations <- list(
+    add_turn = function(agent) agent$add_turn("replacement", "answer"),
+    set_turns = function(agent) agent$set_turns(list()),
+    set_system_prompt = function(agent) agent$set_system_prompt("replacement"),
+    set_model = function(agent) agent$set_model("replacement"),
+    set_tools = function(agent) agent$set_tools(list(tool)),
+    register_tool = function(agent) agent$register_tool(tool),
+    register_tools = function(agent) agent$register_tools(list(tool)),
+    load_session = function(agent) agent$load_session(path),
+    load_skill = function(agent) agent$load_skill(Skill("replacement")),
+    load_mcp = function(agent) agent$load_mcp(config = "nonexistent.json")
+  )
+  before <- list(
+    turns = child$get_turns(),
+    prompt = child$get_system_prompt(),
+    model = child$get_model(),
+    tools = child$get_tools()
+  )
+  owner <- owned_test_owner()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 2))
+  for (agent in list(child, alias)) {
+    for (operation in operations) {
+      expect_error(operation(agent), "current owner")
+    }
+  }
+  expect_identical(child$get_turns(), before$turns)
+  expect_identical(child$get_system_prompt(), before$prompt)
+  expect_identical(child$get_model(), before$model)
+  expect_identical(child$get_tools(), before$tools)
+  expect_length(server$requests(), 0L)
+  owner$release_agent(handle)
+  alias$set_turns(list())
+  expect_length(child$get_turns(), 0L)
+  child$load_session(path)
+  expect_identical(child$get_turns(), before$turns)
+  child$set_system_prompt("released policy")
+  expect_identical(alias$get_system_prompt(), "released policy")
+})
+
+test_that("an active retained run cannot be rewritten through an alias", {
+  child <- owned_test_agent()
+  alias <- Agent$new(child$.__enclos_env__$private$.chat)
+  child$set_turns(list(create_mock_user_turn("retained evidence")))
+  attempts <- list()
+  child$add_hook(HookMatcher(
+    "UserPromptSubmit",
+    timeout = 0,
+    callback = function(...) {
+      attempts <<- lapply(list(child, alias), function(agent) {
+        tryCatch(agent$set_turns(list()), error = identity)
+      })
+      NULL
+    }
+  ))
+  owner <- owned_test_owner()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
+  result <- owner$continue_agent(
+    handle,
+    "continue",
+    UsageLimits(max_requests = 1)
+  )
+  expect_identical(result$response, "answer")
+  expect_length(attempts, 2L)
+  expect_true(all(vapply(attempts, inherits, logical(1), "deputy_error")))
+  expect_length(child$get_turns(), 3L)
+  expect_identical(
+    child$get_turns()[[1L]]@contents[[1L]]@text,
+    "retained evidence"
+  )
+})
+
+test_that("LeadAgent aliases cannot change or execute a retained conversation", {
+  child <- owned_test_agent()
+  alias <- LeadAgent$new(
+    child$.__enclos_env__$private$.chat,
+    sub_agents = list(agent_definition("leaf", "Work", "Work"))
+  )
+  owner <- owned_test_owner()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 2))
+  prompt <- child$get_system_prompt()
+  definition <- agent_definition("extra", "Work", "Work")
+  expect_error(alias$register_sub_agent(definition), "current owner")
+  expect_identical(alias$available_sub_agents(), "leaf")
+  expect_identical(child$get_system_prompt(), prompt)
+  expect_error(alias$parallel_delegate(c(leaf = "work")), "current owner")
+  expect_equal(nrow(alias$list_subagents()), 0L)
+  owner$release_agent(handle)
+  alias$register_sub_agent(definition)
+  expect_identical(alias$available_sub_agents(), c("leaf", "extra"))
 })
 
 test_that("current caller policy and specialist policy both govern tools", {

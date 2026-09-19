@@ -109,7 +109,7 @@ lead_parallel_delegate <- function(
   }
   context <- merge_run_context(lead$run_context, run_context)
   coro::async(function() {
-    check_owner_children(lead)
+    check_conversation_lease(lead, NULL)
     if (isTRUE(private$run_active)) {
       cli::cli_abort(
         "This agent already has an active run",

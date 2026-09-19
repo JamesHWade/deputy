@@ -17,6 +17,11 @@ reject. The runtime alone drains the governed stream. Direct runs and delayed
 streams created before ownership transfer cannot bypass the owner. Neither side
 may be cloned while retaining a conversation.
 
+Public history, prompt, model and tool-registry mutations also reject while the
+conversation is retained, including through pre-existing Agent aliases. Release
+the idle handle before changing its configuration or loading another session.
+Governed execution and automatic compaction use the internal runtime paths.
+
 Each continuation has a new delegation and run identity, with a predecessor link;
 Agent and session identity stay stable. The existing lifecycle, observation ring,
 authorized snapshots, and child panel work on ordinary Agents as well as leads.

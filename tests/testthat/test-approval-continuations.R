@@ -398,6 +398,21 @@ test_that("resumed effects prevent fallback from discarding the completed result
   expect_identical(resumed$last_run()$usage$tool_calls, 2L)
 })
 
+test_that("an approval alias cannot restore a retained conversation", {
+  fixture <- local_approval_runtime()
+  alias <- fixture$agent
+  child <- Agent$new(alias$.__enclos_env__$private$.chat)
+  child$set_turns(list(ellmer::UserTurn("retained replacement")))
+  before <- child$get_turns()
+  owner <- owned_test_owner()
+  owner$retain_agent(child, UsageLimits(max_requests = 2))
+  expect_error(alias$resume_approval(fixture$path, "deny"), "current owner")
+  expect_identical(child$get_turns(), before)
+  expect_identical(approval_read(fixture$path)$status, "pending")
+  expect_identical(fixture$effects$values, "a")
+  expect_length(fixture$server$requests(), 1L)
+})
+
 test_that("approval suspension preserves a complete batch without running later siblings", {
   fixture <- local_approval_runtime()
   expect_identical(fixture$result$stop_reason, "approval_pending")
