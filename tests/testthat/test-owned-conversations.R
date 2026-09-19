@@ -187,6 +187,13 @@ test_that("retained conversation mutation rejects through every public entry", {
     name = "read"
   )
   operations <- list(
+    initialize = function(agent) {
+      agent$initialize(
+        create_mock_chat(),
+        permissions = permissions_full(),
+        system_prompt = "replacement"
+      )
+    },
     add_turn = function(agent) agent$add_turn("replacement", "answer"),
     set_turns = function(agent) agent$set_turns(list()),
     set_system_prompt = function(agent) agent$set_system_prompt("replacement"),
@@ -267,6 +274,7 @@ test_that("LeadAgent aliases cannot change or execute a retained conversation", 
   handle <- owner$retain_agent(child, UsageLimits(max_requests = 2))
   prompt <- child$get_system_prompt()
   definition <- agent_definition("extra", "Work", "Work")
+  expect_error(alias$initialize(create_mock_chat()), "current owner")
   expect_error(alias$register_sub_agent(definition), "current owner")
   expect_identical(alias$available_sub_agents(), "leaf")
   expect_identical(child$get_system_prompt(), prompt)
@@ -659,6 +667,10 @@ test_that("retained hook registries cannot widen policy before dispatch", {
     handle,
     "write",
     UsageLimits(max_requests = 2)
+  )
+  expect_error(
+    child$initialize(create_mock_chat(), permissions = permissions_full()),
+    class = "deputy_conversation"
   )
   runtime_hooks <- child$hooks
   count <- runtime_hooks$count()

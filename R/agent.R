@@ -147,6 +147,9 @@ Agent <- R6::R6Class(
       delegation_disclosure = DelegationDisclosure(),
       delegation_observation = DelegationObservation()
     ) {
+      if (!is.null(private$.chat)) {
+        check_conversation_lease(self, NULL)
+      }
       if (
         !S7::S7_inherits(delegation_disclosure, DelegationDisclosure) ||
           !S7::S7_inherits(delegation_observation, DelegationObservation)
