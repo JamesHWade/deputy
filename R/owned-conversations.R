@@ -47,6 +47,11 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
   }
   op <- owner$.__enclos_env__$private
   cp <- agent$.__enclos_env__$private
+  if (identical(op$.chat, cp$.chat)) {
+    conversation_abort(
+      "The owner and retained specialist must use distinct Chats."
+    )
+  }
   check_conversation_owner(owner)
   if (length(cp$owned_conversations)) {
     conversation_abort("Recursive conversation ownership is not yet supported.")
