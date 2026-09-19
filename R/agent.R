@@ -2429,6 +2429,7 @@ Agent <- R6::R6Class(
       },
 
       adapt_tool = function(tool) {
+        validate_composition_tool_owner(tool, self)
         validate_mcp_tool_owner(tool, self)
         validate_r_session_tool_owner(tool, self)
         if (inherits(tool, "ellmer::ToolBuiltIn")) {
@@ -2516,6 +2517,7 @@ Agent <- R6::R6Class(
       },
 
       execute_tool = function(tool, arguments) {
+        validate_composition_tool_owner(tool, self)
         validate_mcp_tool_owner(tool, self, private$effective_run_context())
         validate_r_session_tool_owner(
           tool,

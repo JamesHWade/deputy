@@ -80,7 +80,12 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
             new_deputy_id("tool_"),
           provider_tool_call_id = provider_tool_call_id,
           tool_name = tool_name,
-          delegation_id = if (identical(tool_name, "delegate_to_agent")) {
+          delegation_id = if (
+            identical(tool_name, "delegate_to_agent") ||
+              !is.null(composition_tool_owner(private$.chat$get_tools()[[
+                tool_name
+              ]]))
+          ) {
             new_deputy_id("delegation_")
           } else {
             NULL
@@ -150,6 +155,7 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
         private$pending_delegations,
         list(list(
           tool_call_id = record$tool_call_id,
+          tool_name = record$tool_name,
           delegation_id = record$delegation_id,
           parent_agent_id = private$.agent_id,
           parent_run_id = private$active_run_id(),
@@ -162,11 +168,24 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       invisible(record)
     },
 
-    claim_delegation = function() {
-      if (length(private$pending_delegations) > 0L) {
-        correlation <- private$pending_delegations[[1L]]
-        private$pending_delegations <- private$pending_delegations[-1L]
+    claim_delegation = function(tool_name = NULL, required = FALSE) {
+      matches <- which(vapply(
+        private$pending_delegations,
+        function(record) {
+          is.null(tool_name) || identical(record$tool_name, tool_name)
+        },
+        logical(1)
+      ))
+      if (length(matches)) {
+        index <- matches[[1L]]
+        correlation <- private$pending_delegations[[index]]
+        private$pending_delegations <- private$pending_delegations[-index]
         return(correlation)
+      }
+      if (required) {
+        conversation_abort(
+          "No governed tool call is waiting for this delegation."
+        )
       }
       list(
         tool_call_id = NULL,
