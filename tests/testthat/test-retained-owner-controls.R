@@ -255,3 +255,21 @@ test_that("retention rejects foreign native delegation tools", {
   handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
   owner$release_agent(handle)
 })
+
+
+test_that("owners cannot retain an alias of their own Chat", {
+  owner <- owned_test_owner()
+  chat <- owner$.__enclos_env__$private$.chat
+  child <- Agent$new(chat)
+  tools <- child$get_tools()
+  expect_error(
+    owner$retain_agent(child, UsageLimits(max_requests = 1)),
+    "must use distinct Chats",
+    class = "deputy_conversation"
+  )
+  expect_null(attr(chat, "deputy_conversation_owner"))
+  expect_null(child$.__enclos_env__$private$.conversation_owner)
+  expect_length(owner$.__enclos_env__$private$owned_conversations, 0L)
+  expect_identical(child$get_tools(), tools)
+  expect_identical(owner$run_sync("still usable")$response, "answer")
+})
