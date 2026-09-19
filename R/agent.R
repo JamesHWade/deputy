@@ -1,3 +1,6 @@
+#' @include delegation-binding.R delegation-inspection.R delegation-observation.R
+NULL
+
 # Agent class for deputy
 
 #' Agent R6 Class
@@ -119,6 +122,9 @@ Agent <- R6::R6Class(
     #' @param approval_dir Optional existing host-owned directory for durable tool
     #'   approvals. Enables sequential tool execution and an execution journal.
     #'   See [approval_read()] and `$resume_approval()`.
+    #' @param delegation_scope Plain host-owned scope for child disclosure.
+    #' @param delegation_disclosure Host-only [DelegationDisclosure], deny by default.
+    #' @param delegation_observation Child activity bounds.
     #' @return A new `Agent` object
     initialize = function(
       chat,
@@ -136,8 +142,27 @@ Agent <- R6::R6Class(
       agent_id = NULL,
       agent_name = NULL,
       fallback_chats = list(),
-      approval_dir = NULL
+      approval_dir = NULL,
+      delegation_scope = list(),
+      delegation_disclosure = DelegationDisclosure(),
+      delegation_observation = DelegationObservation()
     ) {
+      if (
+        !S7::S7_inherits(delegation_disclosure, DelegationDisclosure) ||
+          !S7::S7_inherits(delegation_observation, DelegationObservation)
+      ) {
+        abort_deputy("Invalid delegation disclosure or observation policy.")
+      }
+      private$delegation_scope <- normalize_run_context(delegation_scope)
+      private$.delegation_disclosure <- delegation_disclosure
+      private$.delegation_buffer <- new_delegation_buffer(
+        delegation_observation
+      )
+      if (!is.null(attr(chat, "deputy_conversation_owner"))) {
+        conversation_abort(
+          "This Chat is already owned by a retained conversation."
+        )
+      }
       validate_chat(chat)
       private$.fallback_chats <- normalize_fallback_chats(fallback_chats, chat)
 
@@ -241,6 +266,368 @@ Agent <- R6::R6Class(
       )
 
       invisible(self)
+    },
+
+    #' @description
+    #' Retain a specialist for explicit in-process follow-ups. The host transfers
+    #' execution ownership to this Agent. Ordinary runs on the specialist reject
+    #' until release. Its tools and external resources remain host-owned.
+    #' @param agent A standalone Agent, with no durable approval or fallback.
+    #' @param usage_limits Explicit cumulative ceiling for the handle, or the
+    #'   allocation for one continuation. Both intersect the specialist and caller.
+    #' @param max_runs Finite retained invocation limit; default 32.
+    #' @return An opaque handle belonging only to this Agent.
+    retain_agent = function(agent, usage_limits, max_runs = 32L) {
+      retain_conversation(self, agent, usage_limits, max_runs)
+    },
+
+    #' @description
+    #' Continue a retained specialist with a new brief and explicit allocation.
+    #' Failed and cancelled conversations require this explicit call to restart.
+    #' Busy, changed, released and foreign conversations reject before dispatch.
+    #' Hosts authorize control calls; a handle alone grants no access on another
+    #' Agent. The returned promise is the wait handle and has one runtime consumer.
+    #' @param handle An owner-local handle from `$retain_agent()`.
+    #' @param task A new bounded plain-text brief. Existing history is retained.
+    #' @param usage_limits Explicit [UsageLimits] allocation for this invocation.
+    #' @return Promise resolving to an AgentResult.
+    continue_agent_async = function(handle, task, usage_limits) {
+      continue_conversation(self, handle, task, usage_limits)
+    },
+
+    #' @description
+    #' Blocking version of `$continue_agent_async()`.
+    #' @param handle,task,usage_limits See `$continue_agent_async()`.
+    #' @return An AgentResult.
+    continue_agent = function(handle, task, usage_limits) {
+      private$resolve_promise(self$continue_agent_async(
+        handle,
+        task,
+        usage_limits
+      ))
+    },
+
+    #' @description
+    #' Cancel the active retained invocation cooperatively. Repeated calls are
+    #' harmless; cancellation retains partial history and does not restart work.
+    #' @param handle Owner-local conversation handle.
+    #' @param reason Stable cancellation reason.
+    #' @return Invisible logical indicating whether cancellation was requested.
+    cancel_agent = function(handle, reason = "interrupted") {
+      entry <- conversation_entry(self, handle)
+      if (!entry$busy || !length(entry$ids)) {
+        return(invisible(FALSE))
+      }
+      self$interrupt_subagent(utils::tail(entry$ids, 1L), reason)
+    },
+
+    #' @description
+    #' Release an idle handle and its retained invocation snapshots. Export
+    #' inspection history first if needed. Borrowed tools are never closed.
+    #' Busy handles must be cancelled and awaited first. Release is explicit;
+    #' handles otherwise live until their owning Agent is collected. Neither
+    #' handles nor saved transcripts promise recovery after an R restart.
+    #' @param handle Owner-local conversation handle.
+    #' @return Invisible NULL.
+    release_agent = function(handle) release_conversation(self, handle),
+
+    #' @description
+    #' List admitted subagent delegations in admission order, including live work.
+    #' Status is `queued`, `running`, `completed`, `failed`, `stopped`,
+    #' `not_started`, or `suspended` (for supported approval suspensions).
+    #' `completed` means the run stopped with `complete`, not verified task success.
+    #' `stop_reason` retains the exact runtime reason. Identifiers and timestamps
+    #' are `NA` until assigned. `completed_at` marks settlement of this invocation,
+    #' including suspension. `hook_error` records observer errors independently.
+    #' `input_error` identifies preparation rejection as `invalid`, `missing`,
+    #' `stale`, `unauthorized`, or `oversized`. These in-memory records are not
+    #' durable jobs or a token event feed.
+    #'
+    #' @return Data frame with one row per admitted delegation
+    list_subagents = function() {
+      runs <- lead_delegation_records(self)
+      if (length(runs) == 0) {
+        return(data.frame(
+          agent_name = character(),
+          agent_id = character(),
+          parent_agent_id = character(),
+          session_id = character(),
+          run_id = character(),
+          parent_run_id = character(),
+          delegation_id = character(),
+          tool_call_id = character(),
+          task = character(),
+          status = character(),
+          stop_reason = character(),
+          input_error = character(),
+          admitted_at = as.POSIXct(character()),
+          hook_error = character(),
+          cleanup_error = character(),
+          observation_error = character(),
+          started_at = as.POSIXct(character()),
+          completed_at = as.POSIXct(character()),
+          error = character(),
+          stringsAsFactors = FALSE
+        ))
+      }
+
+      do.call(
+        rbind,
+        lapply(runs, function(run) {
+          data.frame(
+            agent_name = run$agent_name,
+            agent_id = run$agent_id %||% NA_character_,
+            parent_agent_id = run$parent_agent_id %||% NA_character_,
+            session_id = run$session_id %||% NA_character_,
+            run_id = run$run_id %||% NA_character_,
+            parent_run_id = run$parent_run_id %||% NA_character_,
+            delegation_id = run$delegation_id %||% NA_character_,
+            tool_call_id = run$tool_call_id %||% NA_character_,
+            task = run$task,
+            status = run$status,
+            stop_reason = run$stop_reason %||% NA_character_,
+            input_error = run$input_error %||% NA_character_,
+            admitted_at = as.POSIXct(run$admitted_at, tz = "UTC"),
+            hook_error = run$hook_error %||% NA_character_,
+            cleanup_error = run$cleanup_error %||% NA_character_,
+            observation_error = run$observation_error %||% NA_character_,
+            started_at = as.POSIXct(run$started_at, tz = "UTC"),
+            completed_at = as.POSIXct(run$completed_at, tz = "UTC"),
+            error = run$error %||% NA_character_,
+            stringsAsFactors = FALSE
+          )
+        })
+      )
+    },
+
+    #' @description
+    #' Get retained results from delegated sub-agent runs.
+    #'
+    #' @param agent_name Optional sub-agent name filter
+    #' @param delegation_id Optional delegation identifier filter
+    #' @return List of [AgentResult] objects in admission order, with `NULL` for
+    #'   live, unstarted, or failed runs that did not return an AgentResult
+    get_subagent_results = function(agent_name = NULL, delegation_id = NULL) {
+      runs <- lead_delegation_records(self)
+      if (!is.null(agent_name)) {
+        runs <- Filter(
+          function(run) identical(run$agent_name, agent_name),
+          runs
+        )
+      }
+      if (!is.null(delegation_id)) {
+        runs <- Filter(
+          function(run) identical(run$delegation_id, delegation_id),
+          runs
+        )
+      }
+      lapply(runs, function(run) run$agent_result)
+    },
+
+    #' @description
+    #' Get current or retained conversation turns for admitted delegations.
+    #' Live snapshots contain available turns, not every in-flight token.
+    #' Reading history does not add it to the lead's model context. Hosts must
+    #' authorize and redact disclosures before exposing these records to users.
+    #'
+    #' @param agent_name Optional sub-agent name filter
+    #' @param session_id Optional sub-agent session id filter
+    #' @return List of turn histories
+    get_subagent_messages = function(agent_name = NULL, session_id = NULL) {
+      runs <- lead_delegation_records(self, messages = TRUE)
+      if (!is.null(agent_name)) {
+        runs <- Filter(
+          function(run) identical(run$agent_name, agent_name),
+          runs
+        )
+      }
+      if (!is.null(session_id)) {
+        runs <- Filter(
+          function(run) identical(run$session_id, session_id),
+          runs
+        )
+      }
+
+      lapply(runs, function(run) run$turns)
+    },
+
+    #' @description
+    #' Inspect initial manifests or current model context in admission order.
+    #' Initial manifests are immutable preparation receipts, separate from
+    #' current working context and retained conversation turns. No provider
+    #' requests or tool calls occur during inspection. Hosts authorize disclosure.
+    #' @param delegation_id Optional exact delegation identifier.
+    #' @param view `"initial"` for [DelegationManifest] values, `"current"` for
+    #'   available system prompts and working turns.
+    #' @param redact For initial manifests only, return an explicitly redacted
+    #'   portable view omitting task, instructions and source text. Metadata still
+    #'   requires host disclosure policy. The retained manifest is unchanged.
+    #' @return A list; `NULL` entries mean no prepared context is available.
+    #'   Current context is retained at settlement; no matches returns `list()`.
+    get_subagent_contexts = function(
+      delegation_id = NULL,
+      view = "initial",
+      redact = FALSE
+    ) {
+      lead_subagent_contexts(self, delegation_id, view, redact)
+    },
+
+    #' @description
+    #' Observe bounded child activity without consuming or driving its stream.
+    #' @param requester Host-authenticated request context.
+    #' @param delegation_id Optional child locator filter.
+    #' @param after Optional cursor returned by a subscription on this lead.
+    #' @return A [DelegationSubscription]. Snapshot, observation, cancellation
+    #'   and continuation are distinct operations. Closing it only detaches.
+    observe_subagents = function(
+      requester,
+      delegation_id = NULL,
+      after = NULL
+    ) {
+      DelegationSubscription$new(self, requester, delegation_id, after)
+    },
+
+    #' @description
+    #' Ask one child to stop cooperatively. This trusted host control API is
+    #' separate from disclosure authorization; hosts must authorize the action
+    #' before routing a user request here. It is never exposed as an agent tool.
+    #' @param delegation_id Exact admitted child locator.
+    #' @param reason Stable stop reason, default `"interrupted"`.
+    #' @return Invisible logical; FALSE for missing or already settled children.
+    interrupt_subagent = function(delegation_id, reason = "interrupted") {
+      delegation_id <- delegation_text(delegation_id, "delegation_id")
+      reason <- delegation_text(reason, "reason")
+      record <- private$subagent_runs[[delegation_id]]
+      if (is.null(record) || !is.na(record$completed_at)) {
+        return(invisible(FALSE))
+      }
+      private$subagent_runs[[delegation_id]]$cancel_reason <- reason
+      child <- private$active_subagents[[delegation_id]]
+      if (!is.null(child)) {
+        child$interrupt(reason)
+      }
+      invisible(TRUE)
+    },
+
+    #' @description
+    #' Inspect authorized child snapshots without executing or changing context.
+    #' Runtime facts, model claims, per-run usage, retained transcript and initial
+    #' manifest are separate. Retained conversations also report cumulative
+    #' usage across invocations. Unknown usage is NULL.
+    #' @param requester Host-authenticated request context, never model arguments.
+    #' @param delegation_id Optional exact delegation locator, checked only after
+    #'   disclosure authorization. Unknown IDs return an empty list.
+    #' @param transcript Include public ellmer content records and replayed
+    #'   `turns`. Hidden thinking, provider JSON and display closures are omitted.
+    #' @return Authorized and redacted read-only view lists. These are snapshots;
+    #'   modifying a returned list never changes the child or lead context.
+    inspect_subagents = function(
+      requester,
+      delegation_id = NULL,
+      transcript = FALSE
+    ) {
+      views <- lead_inspect_subagents(
+        self,
+        requester,
+        delegation_id,
+        transcript
+      )
+      views <- lapply(views, function(view) {
+        if (transcript) {
+          view$turns <- lapply(view$transcript, inspection_replay)
+        }
+        view
+      })
+      inspection_bound(views, private$.delegation_disclosure)
+    },
+
+    #' @description
+    #' Export authorized settled child history for host-owned durable storage.
+    #' This is observation history, not a resumable Agent/session snapshot.
+    #' @param requester,delegation_id See `$inspect_subagents()`.
+    #' @return Portable versioned list for [delegation_history()]. Export rejects
+    #'   active selected children. The host supplies current disclosure policy
+    #'   when reading it back. Only public ellmer records are retained.
+    export_subagents = function(requester, delegation_id = NULL) {
+      views <- lead_inspect_subagents(
+        self,
+        requester,
+        delegation_id,
+        TRUE,
+        settled_only = TRUE
+      )
+      inspection_bound(
+        list(
+          schema_version = 1L,
+          settled = TRUE,
+          scope = inspection_scope(self),
+          children = views
+        ),
+        private$.delegation_disclosure
+      )
+    },
+
+    #' @description
+    #' Read an authorized retained delegation-answer artifact.
+    #' @param requester,delegation_id See `$inspect_subagents()`.
+    #' @param reference An exact reference included in the redacted authorized
+    #'   child view. Missing or expired artifacts fail explicitly.
+    #' @param offset Character offset for a bounded chunk, starting at zero.
+    #' @return Existing bounded tool-result chunk; no tool or model executes.
+    read_subagent_result = function(
+      requester,
+      delegation_id,
+      reference,
+      offset = 0L
+    ) {
+      views <- lead_inspect_subagents(self, requester, delegation_id, FALSE)
+      references <- unlist(
+        lapply(views, function(view) view$outcome$references),
+        recursive = FALSE
+      )
+      selected <- Filter(
+        function(ref) identical(ref$reference, reference),
+        references
+      )
+      if (
+        !is.character(reference) ||
+          length(reference) != 1L ||
+          is.na(reference) ||
+          !length(selected)
+      ) {
+        delegation_disclosure_abort()
+      }
+      # Disclosure authorizes the public reference. Storage routing remains
+      # host-owned even when the redactor removes or replaces private metadata.
+      stored <- Filter(
+        function(ref) identical(ref$reference, reference),
+        unlist(
+          lapply(
+            Filter(
+              function(record) identical(record$delegation_id, delegation_id),
+              lead_delegation_records(self)
+            ),
+            function(record) record$references
+          ),
+          recursive = FALSE
+        )
+      )
+      if (!length(stored)) {
+        delegation_disclosure_abort()
+      }
+      chunk <- read_tool_result_chunk(
+        reference,
+        offset = offset,
+        max_chars = 8192L,
+        policy = self$context_policy,
+        session_id = stored[[1L]]$storage_session_id
+      )
+      view <- private$.delegation_disclosure$redact(
+        list(kind = "artifact", reference = reference, result = chunk),
+        requester
+      )
+      inspection_portable(view)
+      inspection_bound(view, private$.delegation_disclosure)
     },
 
     #' @description
@@ -1038,6 +1425,9 @@ Agent <- R6::R6Class(
     #' @param reason Stable reason stored on the terminal event
     #' @return Invisible logical indicating whether a run was active
     interrupt = function(reason = "interrupted") {
+      for (id in names(private$active_subagents)) {
+        self$interrupt_subagent(id, reason)
+      }
       if (!isTRUE(private$run_active)) {
         return(invisible(FALSE))
       }
@@ -1788,6 +2178,97 @@ Agent <- R6::R6Class(
 
   private = c(
     list(
+      derive_subagent_usage_limits = function(def) {
+        limits <- private$current_usage_limits %||% self$usage_limits
+        current <- if (isTRUE(private$run_active)) {
+          private$current_run_usage()
+        } else {
+          AgentUsage()
+        }
+        usage_fields <- c(
+          max_requests = "requests",
+          max_tool_calls = "tool_calls",
+          max_input_tokens = "input_tokens",
+          max_output_tokens = "output_tokens",
+          max_total_tokens = "total_tokens",
+          max_cost_usd = "cost_usd"
+        )
+        reserved <- private$reserved_delegation_usage()
+        remaining <- lapply(names(usage_fields), function(limit_field) {
+          limit <- S7::prop(limits, limit_field)
+          if (is.null(limit)) {
+            return(NULL)
+          }
+          max(
+            0,
+            limit -
+              S7::prop(current, usage_fields[[limit_field]]) -
+              reserved[[limit_field]]
+          )
+        })
+        names(remaining) <- names(usage_fields)
+        if (!is.null(def$max_requests)) {
+          remaining$max_requests <- if (is.null(remaining$max_requests)) {
+            def$max_requests
+          } else {
+            min(remaining$max_requests, def$max_requests)
+          }
+        }
+
+        do.call(
+          UsageLimits,
+          c(remaining, list(on_exceed = limits$on_exceed))
+        )
+      },
+
+      reserve_delegation_usage = function(delegation_id, limits) {
+        fields <- c(
+          "max_requests",
+          "max_tool_calls",
+          "max_input_tokens",
+          "max_output_tokens",
+          "max_total_tokens",
+          "max_cost_usd"
+        )
+        private$delegation_usage_reservations[[delegation_id]] <- vapply(
+          fields,
+          function(field) S7::prop(limits, field) %||% 0,
+          numeric(1)
+        )
+        invisible(NULL)
+      },
+
+      release_delegation_usage = function(delegation_id) {
+        private$delegation_usage_reservations[[delegation_id]] <- NULL
+        invisible(NULL)
+      },
+
+      reserved_delegation_usage = function() {
+        fields <- c(
+          "max_requests",
+          "max_tool_calls",
+          "max_input_tokens",
+          "max_output_tokens",
+          "max_total_tokens",
+          "max_cost_usd"
+        )
+        reserved <- stats::setNames(numeric(length(fields)), fields)
+        for (reservation in private$delegation_usage_reservations) {
+          reserved <- reserved + reservation[fields]
+        }
+        reserved
+      },
+
+      .delegation_disclosure = NULL,
+      .delegation_buffer = NULL,
+      delegation_bindings = list(),
+      subagent_runs = list(),
+      active_subagents = list(),
+      delegation_scope = list(),
+      delegation_max_bytes = 65536L,
+      delegation_usage_reservations = list(),
+      .conversation_owner = NULL,
+      owned_conversations = list(),
       .chat = NULL,
       .fallback_chats = list(),
       .fallback_position = 0L,
@@ -1857,6 +2338,14 @@ Agent <- R6::R6Class(
 
       clone_client = function(deep = FALSE) {
         invisible(deep)
+        if (
+          !is.null(private$.conversation_owner) ||
+            length(private$owned_conversations)
+        ) {
+          conversation_abort(
+            "Release retained conversations before cloning an Agent."
+          )
+        }
         cloned <- private$.r6_clone(deep = TRUE)
         cloned$.__enclos_env__$private$active_owned_tools <- list()
         cloned$.__enclos_env__$private$rewire_chat_runtime()

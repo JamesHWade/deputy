@@ -4,7 +4,7 @@
 \alias{DelegationSubscription}
 \title{Read bounded child activity without driving execution}
 \description{
-Create through \code{LeadAgent$observe_subagents()}. The runtime consumes each
+Create through \code{Agent$observe_subagents()}. The runtime consumes each
 child stream once; subscriptions only observe retained public events.
 Authorization is rechecked on every read, including snapshot and reconnect.
 Sequence numbers are monotonic across one lead's transient stream, not per
@@ -32,7 +32,7 @@ child. Cursors are locators and cannot authorize access.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{lead}}{A LeadAgent.}
+      \item{\code{lead}}{An Agent owning delegated conversations.}
       \item{\code{requester}}{Host-authenticated request context.}
       \item{\code{delegation_id}}{Optional child locator filter.}
       \item{\code{after}}{A cursor previously returned by this lead, or NULL to start

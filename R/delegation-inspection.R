@@ -270,6 +270,8 @@ delegation_outcome <- function(record, compact = FALSE) {
     "parent_agent_id",
     "parent_run_id",
     "tool_call_id",
+    "conversation_handle",
+    "previous_delegation_id",
     "status",
     "stop_reason"
   )]
@@ -582,7 +584,11 @@ lead_inspection_records <- function(lead, delegation_id, transcript) {
       outcome = S7::props(outcome),
       manifest = if (!is.null(record$manifest)) S7::props(record$manifest),
       usage = if (!is.null(record$usage)) S7::props(record$usage),
-      cumulative_usage = if (!is.null(record$usage)) S7::props(record$usage),
+      cumulative_usage = if (
+        !is.null(record$cumulative_usage %||% record$usage)
+      ) {
+        S7::props(record$cumulative_usage %||% record$usage)
+      },
       errors = record[c(
         "error",
         "hook_error",
@@ -598,7 +604,11 @@ lead_inspection_records <- function(lead, delegation_id, transcript) {
       retention = list(
         transcript = if (transcript) "included" else "not_requested",
         execution = "read_only",
-        continuation = "unsupported"
+        continuation = if (is.null(record$conversation_handle)) {
+          "unsupported"
+        } else {
+          "explicit_owner_call"
+        }
       )
     )
   })

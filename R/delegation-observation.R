@@ -3,7 +3,7 @@ NULL
 
 #' Bound the child activity observation buffer
 #'
-#' One in-memory ring belongs to each LeadAgent. Subscribers hold only cursors;
+#' One in-memory ring belongs to each Agent. Subscribers hold only cursors;
 #' they cannot block execution or accumulate private queues. Retained transcript
 #' storage is separate from this transient buffer.
 #' @param max_events Maximum retained events, default 256.
@@ -12,7 +12,7 @@ NULL
 #' @param max_event_bytes Maximum bytes in one event, default 64 KiB. Oversized
 #'   or nonportable content becomes an explicit omission envelope; hosts recover
 #'   completed public content from an authorized snapshot.
-#' @return Read-only observation limits for [LeadAgent].
+#' @return Read-only observation limits for [Agent].
 #' @export
 DelegationObservation <- S7::new_class(
   "DelegationObservation",
@@ -286,7 +286,7 @@ validate_observation_cursor <- function(cursor, buffer) {
 
 #' Read bounded child activity without driving execution
 #'
-#' Create through `LeadAgent$observe_subagents()`. The runtime consumes each
+#' Create through `Agent$observe_subagents()`. The runtime consumes each
 #' child stream once; subscriptions only observe retained public events.
 #' Authorization is rechecked on every read, including snapshot and reconnect.
 #' Sequence numbers are monotonic across one lead's transient stream, not per
@@ -297,14 +297,14 @@ DelegationSubscription <- R6::R6Class(
   cloneable = FALSE,
   public = list(
     #' @description Create an authorized cursor. Normally use the lead method.
-    #' @param lead A LeadAgent.
+    #' @param lead An Agent owning delegated conversations.
     #' @param requester Host-authenticated request context.
     #' @param delegation_id Optional child locator filter.
     #' @param after A cursor previously returned by this lead, or NULL to start
     #'   at its current sequence. Foreign/future cursors fail explicitly.
     initialize = function(lead, requester, delegation_id = NULL, after = NULL) {
-      if (!inherits(lead, "LeadAgent")) {
-        cli::cli_abort("lead must be a LeadAgent.")
+      if (!inherits(lead, "Agent")) {
+        cli::cli_abort("lead must be an Agent.")
       }
       private$lead <- lead
       private$requester <- requester

@@ -214,7 +214,8 @@ lead_run_delegation <- function(
   child,
   definition,
   task,
-  limits = NULL
+  limits = NULL,
+  run = NULL
 ) {
   private <- lead$.__enclos_env__$private
   coro::async(function() {
@@ -247,7 +248,13 @@ lead_run_delegation <- function(
             !isTRUE(private$should_stop) &&
               is.null(private$subagent_runs[[id]]$cancel_reason)
           ) {
-            result <- coro::await(child$run_async(task, usage_limits = limits))
+            result <- coro::await(
+              if (is.null(run)) {
+                child$run_async(task, usage_limits = limits)
+              } else {
+                run()
+              }
+            )
           }
         }
       },

@@ -119,6 +119,20 @@ agent$add_hook(HookMatcher(
 \subsection{Public methods}{
   \itemize{
     \item \href{#method-Agent-initialize}{\code{Agent$new()}}
+    \item \href{#method-Agent-retain_agent}{\code{Agent$retain_agent()}}
+    \item \href{#method-Agent-continue_agent_async}{\code{Agent$continue_agent_async()}}
+    \item \href{#method-Agent-continue_agent}{\code{Agent$continue_agent()}}
+    \item \href{#method-Agent-cancel_agent}{\code{Agent$cancel_agent()}}
+    \item \href{#method-Agent-release_agent}{\code{Agent$release_agent()}}
+    \item \href{#method-Agent-list_subagents}{\code{Agent$list_subagents()}}
+    \item \href{#method-Agent-get_subagent_results}{\code{Agent$get_subagent_results()}}
+    \item \href{#method-Agent-get_subagent_messages}{\code{Agent$get_subagent_messages()}}
+    \item \href{#method-Agent-get_subagent_contexts}{\code{Agent$get_subagent_contexts()}}
+    \item \href{#method-Agent-observe_subagents}{\code{Agent$observe_subagents()}}
+    \item \href{#method-Agent-interrupt_subagent}{\code{Agent$interrupt_subagent()}}
+    \item \href{#method-Agent-inspect_subagents}{\code{Agent$inspect_subagents()}}
+    \item \href{#method-Agent-export_subagents}{\code{Agent$export_subagents()}}
+    \item \href{#method-Agent-read_subagent_result}{\code{Agent$read_subagent_result()}}
     \item \href{#method-Agent-run}{\code{Agent$run()}}
     \item \href{#method-Agent-run_sync}{\code{Agent$run_sync()}}
     \item \href{#method-Agent-chat}{\code{Agent$chat()}}
@@ -200,7 +214,10 @@ agent$add_hook(HookMatcher(
   agent_id = NULL,
   agent_name = NULL,
   fallback_chats = list(),
-  approval_dir = NULL
+  approval_dir = NULL,
+  delegation_scope = list(),
+  delegation_disclosure = DelegationDisclosure(),
+  delegation_observation = DelegationObservation()
 )}
     \if{html}{\out{</div>}}
   }
@@ -247,11 +264,380 @@ compaction retains the separate \link{ContextPolicy} summary-failure policy.}
       \item{\code{approval_dir}}{Optional existing host-owned directory for durable tool
 approvals. Enables sequential tool execution and an execution journal.
 See \code{\link[=approval_read]{approval_read()}} and \verb{$resume_approval()}.}
+      \item{\code{delegation_scope}}{Plain host-owned scope for child disclosure.}
+      \item{\code{delegation_disclosure}}{Host-only \link{DelegationDisclosure}, deny by default.}
+      \item{\code{delegation_observation}}{Child activity bounds.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
     A new \code{Agent} object
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-retain_agent"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-retain_agent}{}}}
+\subsection{\code{Agent$retain_agent()}}{
+  Retain a specialist for explicit in-process follow-ups. The host transfers
+execution ownership to this Agent. Ordinary runs on the specialist reject
+until release. Its tools and external resources remain host-owned.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$retain_agent(agent, usage_limits, max_runs = 32L)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{agent}}{A standalone Agent, with no durable approval or fallback.}
+      \item{\code{usage_limits}}{Explicit cumulative ceiling for the handle, or the
+allocation for one continuation. Both intersect the specialist and caller.}
+      \item{\code{max_runs}}{Finite retained invocation limit; default 32.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    An opaque handle belonging only to this Agent.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-continue_agent_async"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-continue_agent_async}{}}}
+\subsection{\code{Agent$continue_agent_async()}}{
+  Continue a retained specialist with a new brief and explicit allocation.
+Failed and cancelled conversations require this explicit call to restart.
+Busy, changed, released and foreign conversations reject before dispatch.
+Hosts authorize control calls; a handle alone grants no access on another
+Agent. The returned promise is the wait handle and has one runtime consumer.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$continue_agent_async(handle, task, usage_limits)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{handle}}{An owner-local handle from \verb{$retain_agent()}.}
+      \item{\code{task}}{A new bounded plain-text brief. Existing history is retained.}
+      \item{\code{usage_limits}}{Explicit \link{UsageLimits} allocation for this invocation.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Promise resolving to an AgentResult.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-continue_agent"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-continue_agent}{}}}
+\subsection{\code{Agent$continue_agent()}}{
+  Blocking version of \verb{$continue_agent_async()}.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$continue_agent(handle, task, usage_limits)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{handle, task, usage_limits}}{See \verb{$continue_agent_async()}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    An AgentResult.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-cancel_agent"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-cancel_agent}{}}}
+\subsection{\code{Agent$cancel_agent()}}{
+  Cancel the active retained invocation cooperatively. Repeated calls are
+harmless; cancellation retains partial history and does not restart work.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$cancel_agent(handle, reason = "interrupted")}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{handle}}{Owner-local conversation handle.}
+      \item{\code{reason}}{Stable cancellation reason.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible logical indicating whether cancellation was requested.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-release_agent"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-release_agent}{}}}
+\subsection{\code{Agent$release_agent()}}{
+  Release an idle handle and its retained invocation snapshots. Export
+inspection history first if needed. Borrowed tools are never closed.
+Busy handles must be cancelled and awaited first. Release is explicit;
+handles otherwise live until their owning Agent is collected. Neither
+handles nor saved transcripts promise recovery after an R restart.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$release_agent(handle)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{handle}}{Owner-local conversation handle.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible NULL.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-list_subagents"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-list_subagents}{}}}
+\subsection{\code{Agent$list_subagents()}}{
+  List admitted subagent delegations in admission order, including live work.
+Status is \code{queued}, \code{running}, \code{completed}, \code{failed}, \code{stopped},
+\code{not_started}, or \code{suspended} (for supported approval suspensions).
+\code{completed} means the run stopped with \code{complete}, not verified task success.
+\code{stop_reason} retains the exact runtime reason. Identifiers and timestamps
+are \code{NA} until assigned. \code{completed_at} marks settlement of this invocation,
+including suspension. \code{hook_error} records observer errors independently.
+\code{input_error} identifies preparation rejection as \code{invalid}, \code{missing},
+\code{stale}, \code{unauthorized}, or \code{oversized}. These in-memory records are not
+durable jobs or a token event feed.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$list_subagents()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Data frame with one row per admitted delegation
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-get_subagent_results"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-get_subagent_results}{}}}
+\subsection{\code{Agent$get_subagent_results()}}{
+  Get retained results from delegated sub-agent runs.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$get_subagent_results(agent_name = NULL, delegation_id = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{agent_name}}{Optional sub-agent name filter}
+      \item{\code{delegation_id}}{Optional delegation identifier filter}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    List of \link{AgentResult} objects in admission order, with \code{NULL} for
+live, unstarted, or failed runs that did not return an AgentResult
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-get_subagent_messages"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-get_subagent_messages}{}}}
+\subsection{\code{Agent$get_subagent_messages()}}{
+  Get current or retained conversation turns for admitted delegations.
+Live snapshots contain available turns, not every in-flight token.
+Reading history does not add it to the lead's model context. Hosts must
+authorize and redact disclosures before exposing these records to users.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$get_subagent_messages(agent_name = NULL, session_id = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{agent_name}}{Optional sub-agent name filter}
+      \item{\code{session_id}}{Optional sub-agent session id filter}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    List of turn histories
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-get_subagent_contexts"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-get_subagent_contexts}{}}}
+\subsection{\code{Agent$get_subagent_contexts()}}{
+  Inspect initial manifests or current model context in admission order.
+Initial manifests are immutable preparation receipts, separate from
+current working context and retained conversation turns. No provider
+requests or tool calls occur during inspection. Hosts authorize disclosure.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$get_subagent_contexts(
+  delegation_id = NULL,
+  view = "initial",
+  redact = FALSE
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{delegation_id}}{Optional exact delegation identifier.}
+      \item{\code{view}}{\code{"initial"} for \link{DelegationManifest} values, \code{"current"} for
+available system prompts and working turns.}
+      \item{\code{redact}}{For initial manifests only, return an explicitly redacted
+portable view omitting task, instructions and source text. Metadata still
+requires host disclosure policy. The retained manifest is unchanged.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list; \code{NULL} entries mean no prepared context is available.
+Current context is retained at settlement; no matches returns \code{list()}.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-observe_subagents"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-observe_subagents}{}}}
+\subsection{\code{Agent$observe_subagents()}}{
+  Observe bounded child activity without consuming or driving its stream.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$observe_subagents(requester, delegation_id = NULL, after = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{requester}}{Host-authenticated request context.}
+      \item{\code{delegation_id}}{Optional child locator filter.}
+      \item{\code{after}}{Optional cursor returned by a subscription on this lead.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A \link{DelegationSubscription}. Snapshot, observation, cancellation
+and continuation are distinct operations. Closing it only detaches.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-interrupt_subagent"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-interrupt_subagent}{}}}
+\subsection{\code{Agent$interrupt_subagent()}}{
+  Ask one child to stop cooperatively. This trusted host control API is
+separate from disclosure authorization; hosts must authorize the action
+before routing a user request here. It is never exposed as an agent tool.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$interrupt_subagent(delegation_id, reason = "interrupted")}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{delegation_id}}{Exact admitted child locator.}
+      \item{\code{reason}}{Stable stop reason, default \code{"interrupted"}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible logical; FALSE for missing or already settled children.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-inspect_subagents"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-inspect_subagents}{}}}
+\subsection{\code{Agent$inspect_subagents()}}{
+  Inspect authorized child snapshots without executing or changing context.
+Runtime facts, model claims, per-run usage, retained transcript and initial
+manifest are separate. Retained conversations also report cumulative
+usage across invocations. Unknown usage is NULL.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$inspect_subagents(requester, delegation_id = NULL, transcript = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{requester}}{Host-authenticated request context, never model arguments.}
+      \item{\code{delegation_id}}{Optional exact delegation locator, checked only after
+disclosure authorization. Unknown IDs return an empty list.}
+      \item{\code{transcript}}{Include public ellmer content records and replayed
+\code{turns}. Hidden thinking, provider JSON and display closures are omitted.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Authorized and redacted read-only view lists. These are snapshots;
+modifying a returned list never changes the child or lead context.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-export_subagents"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-export_subagents}{}}}
+\subsection{\code{Agent$export_subagents()}}{
+  Export authorized settled child history for host-owned durable storage.
+This is observation history, not a resumable Agent/session snapshot.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$export_subagents(requester, delegation_id = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{requester, delegation_id}}{See \verb{$inspect_subagents()}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Portable versioned list for \code{\link[=delegation_history]{delegation_history()}}. Export rejects
+active selected children. The host supplies current disclosure policy
+when reading it back. Only public ellmer records are retained.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-read_subagent_result"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-read_subagent_result}{}}}
+\subsection{\code{Agent$read_subagent_result()}}{
+  Read an authorized retained delegation-answer artifact.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$read_subagent_result(requester, delegation_id, reference, offset = 0L)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{requester, delegation_id}}{See \verb{$inspect_subagents()}.}
+      \item{\code{reference}}{An exact reference included in the redacted authorized
+child view. Missing or expired artifacts fail explicitly.}
+      \item{\code{offset}}{Character offset for a bounded chunk, starting at zero.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Existing bounded tool-result chunk; no tool or model executes.
   }
 }
 

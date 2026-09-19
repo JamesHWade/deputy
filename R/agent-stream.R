@@ -45,8 +45,15 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       controller = NULL,
       structured = NULL,
       extraction = NULL,
-      stream_type = NULL
+      stream_type = NULL,
+      conversation_token = NULL
     ) {
+      check_conversation_lease(self, conversation_token)
+      if (!isTRUE(private$run_active) && length(private$active_subagents)) {
+        conversation_abort(
+          "Wait for active child conversations before starting an owner run."
+        )
+      }
       if (isTRUE(private$run_active)) {
         cli::cli_abort(
           "This agent already has an active run",
@@ -78,7 +85,8 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         structured = structured,
         extraction = extraction,
         stream_type = stream_type,
-        state = state
+        state = state,
+        conversation_token = conversation_token
       )
       agent <- self
       reg.finalizer(
@@ -312,7 +320,8 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       structured,
       extraction,
       stream_type,
-      state
+      state,
+      conversation_token = NULL
     ) {
       agent <- self
       stream_state <- state
@@ -320,6 +329,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       run_limits <- limits
 
       coro::async_generator(function() {
+        check_conversation_lease(agent, conversation_token)
         if (isTRUE(agent$.__enclos_env__$private$run_active)) {
           cli::cli_abort(
             "This agent already has an active run",

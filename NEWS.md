@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* `Agent$retain_agent()` and explicit continuation methods preserve specialist
+  conversations with owner-local handles, busy rejection, cumulative budgets,
+  cancellation and release. Ordinary Agents now share child inspection,
+  observation and optional chat panels with LeadAgent (#152).
+
 * A trusted mini-agent example now demonstrates reviewed scientific inputs, a
   designated computation, and tool-owned results separate from model commentary
   (#154).

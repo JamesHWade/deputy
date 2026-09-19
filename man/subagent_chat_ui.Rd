@@ -23,7 +23,7 @@ subagent_chat_server(
 
 \item{height}{Height of the read-only child chat, default \code{"420px"}.}
 
-\item{lead}{A host-owned LeadAgent, or a reactive/function returning it.}
+\item{lead}{A host-owned Agent or LeadAgent, or a function returning it.}
 
 \item{requester}{Function returning the authenticated host request context.}
 
