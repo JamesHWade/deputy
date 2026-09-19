@@ -507,9 +507,8 @@ setup/release, `R/delegation-tree-budget.R` owns cumulative graph accounting, an
 cancellation. Every descendant uses the ordinary run kernel and root lifecycle
 registry. Depth/count/concurrency and UsageLimits apply until explicit graph
 release; parents waiting on children occupy concurrency slots. See ADR-0025.
-Run deterministic transport tests with
-`devtools::test(filter = "recursive|delegation-graph|delegation-tree")`.
-The companion example and user guide are tracked in PR #176.
+`inst/examples/recursive-agents/` supplies the deterministic three-level browser
+fixture; test it with `devtools::test(filter = "recursive|delegation-graph|delegation-tree")`.
 Durable restart recovery remains #42.
 
 ### Human Input

@@ -54,6 +54,6 @@ close their external resources. The graph references its root weakly, allowing
 idle owner collection to release members. A newly retained graph represents a
 new host authorization. Models cannot reset or recreate the graph.
 
-Deterministic transport tests use real local HTTP producers without paid model
-calls. The companion Shiny app and user guide are tracked in PR #176. Durable
-restart/recovery remains #42; saved transcripts do not restore execution ownership.
+The deterministic `inst/examples/recursive-agents/` app and transport tests use
+real local HTTP producers without paid model calls. Durable restart/recovery
+remains #42; saved transcripts do not restore execution ownership.
