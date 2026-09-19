@@ -74,3 +74,59 @@ test_that("retained children and aliases cannot interrupt owner continuations", 
     expect_identical(alias$interrupt(), FALSE)
   }
 })
+
+
+test_that("saved observer removers respect retained ownership", {
+  server <- local_runtime_server(rep(
+    list(
+      runtime_reply(tool = "read_fixture", arguments = list()),
+      runtime_reply("settled")
+    ),
+    2L
+  ))
+  child <- Agent$new(
+    runtime_chat(server),
+    permissions = permissions_full(),
+    tools = list(ellmer::tool(
+      function() "evidence",
+      name = "read_fixture",
+      description = "Read",
+      arguments = list()
+    ))
+  )
+  requests <- 0L
+  results <- 0L
+  removers <- list(
+    child$on_tool_request(function(request) requests <<- requests + 1L),
+    child$on_tool_result(function(result) results <<- results + 1L)
+  )
+  owner <- owned_test_owner(permissions = permissions_full())
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 2))
+  for (remove in removers) {
+    expect_error(remove(), class = "deputy_conversation")
+  }
+  active_attempts <- list()
+  owner$add_hook(HookMatcher("PreToolUse", callback = function(...) {
+    active_attempts <<- lapply(removers, function(remove) {
+      tryCatch(remove(), error = identity)
+    })
+    NULL
+  }))
+  owner$continue_agent(handle, "observe", UsageLimits(max_requests = 2))
+  expect_length(active_attempts, 2L)
+  expect_true(all(vapply(
+    active_attempts,
+    inherits,
+    logical(1),
+    "deputy_conversation"
+  )))
+  expect_identical(requests, 1L)
+  expect_identical(results, 1L)
+  owner$release_agent(handle)
+  for (remove in removers) {
+    remove()
+  }
+  child$run_sync("removed", usage_limits = UsageLimits(max_requests = 2))
+  expect_identical(requests, 1L)
+  expect_identical(results, 1L)
+})
