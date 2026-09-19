@@ -39,6 +39,6 @@ directory <- tempfile()
 dir.create(directory)
 writeLines("example", file.path(directory, "example.txt"))
 tool_glob_files("*.txt", directory)
-#> [1] "Base path: /tmp/Rtmp3pUT8B/file196724c31cae\nMatches: 1\n\nexample.txt"
+#> [1] "Base path: /tmp/RtmpoGUKxx/file1a51551b8849\nMatches: 1\n\nexample.txt"
 unlink(directory, recursive = TRUE)
 ```

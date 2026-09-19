@@ -1035,6 +1035,25 @@ access revocation and saved-history replay. Its visible model/tool
 counters make extra execution detectable. It uses a local fixture
 service and needs no paid model credentials.</p>
 </div>
+<div class="section level2">
+<h2 id="a-trusted-scientific-result">A trusted scientific result<a class="anchor" aria-label="anchor" href="#a-trusted-scientific-result"></a>
+</h2>
+<p>The runnable <code>inst/examples/trusted-mini-agent</code> example
+delegates proposal writing to a specialist, then uses a separate
+host-owned Agent for durable approval and a fixed descriptive
+computation. The reviewer sees the dataset revision, groups, units and
+method, and can edit or deny the inputs. The computed result panel reads
+only the designated tool’s host receipt; deliberately false model
+commentary cannot replace it. The example uses clearly synthetic plant
+weights and a local deterministic provider, with no paid calls.</p>
+<p><code>r eval=FALSE shiny::runApp(system.file("examples", "trusted-mini-agent", package = "deputy"))</code></p>
+<p>The explicit handoff is necessary because delegated child approval
+continuation is not yet supported. The receipt keeps the source child
+delegation separate from the execution Agent. Reading a child remains
+observational. This example demonstrates the execution and output
+contract, not scientific correctness or model quality; trusted code,
+appropriate inputs and effective review are still required.</p>
+</div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>

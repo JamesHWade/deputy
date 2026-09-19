@@ -2,6 +2,11 @@
 
 ## deputy (development version)
 
+- A trusted mini-agent example now demonstrates reviewed scientific
+  inputs, a designated computation, and tool-owned results separate from
+  model commentary
+  ([\#154](https://github.com/JamesHWade/deputy/issues/154)).
+
 - [`subagent_chat_ui()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md)
   and
   [`subagent_chat_server()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md)
