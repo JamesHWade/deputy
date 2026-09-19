@@ -67,7 +67,11 @@ server <- function(input, output, session) {
   fixture <- study_fixture(study_plan())
   session$onSessionEnded(fixture$close)
   owner <- new.env(parent = emptyenv())
-  workflow <- study_workflow(fixture$chat, tempfile("reviewed-study-"), owner)
+  workflow_directory <- tempfile("reviewed-study-")
+  session$onSessionEnded(function() {
+    unlink(workflow_directory, recursive = TRUE)
+  })
+  workflow <- study_workflow(fixture$chat, workflow_directory, owner)
   current <- reactiveVal(workflow$view(owner))
   status <- reactiveVal("Draft a proposal to begin. No computation has run.")
   refresh <- function(fun, message) {

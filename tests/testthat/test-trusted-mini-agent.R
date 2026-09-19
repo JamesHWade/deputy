@@ -328,3 +328,22 @@ test_that("draft retries require no retained proposal and no cancellation", {
   expect_snapshot(error = TRUE, x$workflow$propose("after cancel", x$owner))
   expect_length(x$proposer$requests(), 5L)
 })
+
+
+test_that("the Shiny recipe removes its private workflow files on disconnect", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("bslib")
+  skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("commonmark")
+  skip_if_not_installed("xml2")
+  directory <- system.file("examples", "trusted-mini-agent", package = "deputy")
+  withr::local_dir(directory)
+  app <- source("app.R", local = TRUE)$value
+  shiny::testServer(app, {
+    retained_path <- workflow_directory
+    expect_identical(dir.exists(retained_path), TRUE)
+    writeLines("synthetic receipt", file.path(retained_path, "result.json"))
+    session$close()
+    expect_identical(dir.exists(retained_path), FALSE)
+  })
+})

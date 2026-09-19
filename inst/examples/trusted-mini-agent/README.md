@@ -17,6 +17,7 @@ The example needs the suggested shiny, bslib, shinychat, commonmark, xml2 and
 httpuv packages. It uses a separate local HTTP fixture through real ellmer public
 APIs. There are no paid model calls, credentials, patient data or external writes.
 The host stores approvals and one JSON result receipt in a fresh temporary directory.
+The Shiny session removes these demonstration files when it disconnects.
 For deployment, configure an authenticated requester and host-owned private storage.
 The example itself is an in-process, per-Shiny-session demonstration.
 
