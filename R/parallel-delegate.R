@@ -118,8 +118,8 @@ lead_parallel_delegate <- function(
     }
     state <- private$new_callback_run_state()
     controller <- list(cancel = function(reason = "interrupted") {
-      for (child in private$active_subagents) {
-        child$interrupt(reason)
+      for (id in names(private$active_subagents)) {
+        lead$interrupt_subagent(id, reason)
       }
     })
     completed <- FALSE
