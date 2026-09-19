@@ -1,8 +1,8 @@
 # Read bounded child activity without driving execution
 
-Create through `LeadAgent$observe_subagents()`. The runtime consumes
-each child stream once; subscriptions only observe retained public
-events. Authorization is rechecked on every read, including snapshot and
+Create through `Agent$observe_subagents()`. The runtime consumes each
+child stream once; subscriptions only observe retained public events.
+Authorization is rechecked on every read, including snapshot and
 reconnect. Sequence numbers are monotonic across one lead's transient
 stream, not per child. Cursors are locators and cannot authorize access.
 
@@ -32,7 +32,7 @@ Create an authorized cursor. Normally use the lead method.
 
 - `lead`:
 
-  A LeadAgent.
+  An Agent owning delegated conversations.
 
 - `requester`:
 

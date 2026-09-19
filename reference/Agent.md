@@ -102,6 +102,34 @@ for writes made through its native file tools.
 
 - [`Agent$new()`](#method-Agent-initialize)
 
+- [`Agent$retain_agent()`](#method-Agent-retain_agent)
+
+- [`Agent$continue_agent_async()`](#method-Agent-continue_agent_async)
+
+- [`Agent$continue_agent()`](#method-Agent-continue_agent)
+
+- [`Agent$cancel_agent()`](#method-Agent-cancel_agent)
+
+- [`Agent$release_agent()`](#method-Agent-release_agent)
+
+- [`Agent$list_subagents()`](#method-Agent-list_subagents)
+
+- [`Agent$get_subagent_results()`](#method-Agent-get_subagent_results)
+
+- [`Agent$get_subagent_messages()`](#method-Agent-get_subagent_messages)
+
+- [`Agent$get_subagent_contexts()`](#method-Agent-get_subagent_contexts)
+
+- [`Agent$observe_subagents()`](#method-Agent-observe_subagents)
+
+- [`Agent$interrupt_subagent()`](#method-Agent-interrupt_subagent)
+
+- [`Agent$inspect_subagents()`](#method-Agent-inspect_subagents)
+
+- [`Agent$export_subagents()`](#method-Agent-export_subagents)
+
+- [`Agent$read_subagent_result()`](#method-Agent-read_subagent_result)
+
 - [`Agent$run()`](#method-Agent-run)
 
 - [`Agent$run_sync()`](#method-Agent-run_sync)
@@ -238,7 +266,10 @@ Create a new Agent.
       agent_id = NULL,
       agent_name = NULL,
       fallback_chats = list(),
-      approval_dir = NULL
+      approval_dir = NULL,
+      delegation_scope = list(),
+      delegation_disclosure = DelegationDisclosure(),
+      delegation_observation = DelegationObservation()
     )
 
 #### Arguments
@@ -343,9 +374,432 @@ Create a new Agent.
   [`approval_read()`](https://jameshwade.github.io/deputy/reference/approval_read.md)
   and `$resume_approval()`.
 
+- `delegation_scope`:
+
+  Plain host-owned scope for child disclosure.
+
+- `delegation_disclosure`:
+
+  Host-only
+  [DelegationDisclosure](https://jameshwade.github.io/deputy/reference/DelegationDisclosure.md),
+  deny by default.
+
+- `delegation_observation`:
+
+  Child activity bounds.
+
 #### Returns
 
 A new `Agent` object
+
+------------------------------------------------------------------------
+
+### `Agent$retain_agent()`
+
+Retain a specialist for explicit in-process follow-ups. The host
+transfers execution ownership to this Agent. Ordinary runs on the
+specialist reject until release. Its retained history, prompt, model,
+and tools cannot be changed through the specialist or another Agent
+sharing its Chat until the idle handle is released. Its tools and
+external resources remain host-owned. Retention replaces the Chat's tool
+callbacks with the specialist's governed runtime, preserving observers
+registered through that specialist's `$on_tool_request()` and
+`$on_tool_result()` methods. New observer registrations and hook
+configuration changes on the specialist or its aliases require release.
+
+#### Usage
+
+    Agent$retain_agent(agent, usage_limits, max_runs = 32L)
+
+#### Arguments
+
+- `agent`:
+
+  A standalone Agent, with no durable approval or fallback.
+
+- `usage_limits`:
+
+  Explicit cumulative ceiling for the handle, or the allocation for one
+  continuation. Both intersect the specialist and caller.
+
+- `max_runs`:
+
+  Finite retained invocation limit; default 32.
+
+#### Returns
+
+An opaque handle belonging only to this Agent.
+
+------------------------------------------------------------------------
+
+### `Agent$continue_agent_async()`
+
+Continue a retained specialist with a new brief and explicit allocation.
+Failed and cancelled conversations require this explicit call to
+restart. Busy, changed, released and foreign conversations reject before
+dispatch. Hosts authorize control calls; a handle alone grants no access
+on another Agent. The returned promise is the wait handle and has one
+runtime consumer.
+
+#### Usage
+
+    Agent$continue_agent_async(handle, task, usage_limits)
+
+#### Arguments
+
+- `handle`:
+
+  An owner-local handle from `$retain_agent()`.
+
+- `task`:
+
+  A new bounded plain-text brief. Existing history is retained.
+
+- `usage_limits`:
+
+  Explicit
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  allocation for this invocation.
+
+#### Returns
+
+Promise resolving to an AgentResult. Cancellation before dispatch
+returns zero usage and no run ID because no child run started.
+
+------------------------------------------------------------------------
+
+### `Agent$continue_agent()`
+
+Blocking version of `$continue_agent_async()`.
+
+#### Usage
+
+    Agent$continue_agent(handle, task, usage_limits)
+
+#### Arguments
+
+- `handle, task, usage_limits`:
+
+  See `$continue_agent_async()`.
+
+#### Returns
+
+An AgentResult.
+
+------------------------------------------------------------------------
+
+### `Agent$cancel_agent()`
+
+Cancel the active retained invocation cooperatively. Repeated calls are
+harmless; cancellation retains partial history and does not restart
+work.
+
+#### Usage
+
+    Agent$cancel_agent(handle, reason = "interrupted")
+
+#### Arguments
+
+- `handle`:
+
+  Owner-local conversation handle.
+
+- `reason`:
+
+  Stable cancellation reason.
+
+#### Returns
+
+Invisible logical indicating whether cancellation was requested.
+
+------------------------------------------------------------------------
+
+### `Agent$release_agent()`
+
+Release an idle handle and its retained invocation snapshots. Export
+inspection history first if needed. Borrowed tools are never closed.
+Busy handles must be cancelled and awaited first. Release is explicit;
+handles otherwise live until their owning Agent is collected. Neither
+handles nor saved transcripts promise recovery after an R restart.
+
+#### Usage
+
+    Agent$release_agent(handle)
+
+#### Arguments
+
+- `handle`:
+
+  Owner-local conversation handle.
+
+#### Returns
+
+Invisible NULL.
+
+------------------------------------------------------------------------
+
+### `Agent$list_subagents()`
+
+List admitted subagent delegations in admission order, including live
+work. Status is `queued`, `running`, `completed`, `failed`, `stopped`,
+`not_started`, or `suspended` (for supported approval suspensions).
+`completed` means the run stopped with `complete`, not verified task
+success. `stop_reason` retains the exact runtime reason. Identifiers and
+timestamps are `NA` until assigned. `completed_at` marks settlement of
+this invocation, including suspension. `hook_error` records observer
+errors independently. `input_error` identifies preparation rejection as
+`invalid`, `missing`, `stale`, `unauthorized`, or `oversized`. These
+in-memory records are not durable jobs or a token event feed.
+
+#### Usage
+
+    Agent$list_subagents()
+
+#### Returns
+
+Data frame with one row per admitted delegation
+
+------------------------------------------------------------------------
+
+### `Agent$get_subagent_results()`
+
+Get retained results from delegated sub-agent runs.
+
+#### Usage
+
+    Agent$get_subagent_results(agent_name = NULL, delegation_id = NULL)
+
+#### Arguments
+
+- `agent_name`:
+
+  Optional sub-agent name filter
+
+- `delegation_id`:
+
+  Optional delegation identifier filter
+
+#### Returns
+
+List of
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
+objects in admission order, with `NULL` for live, unstarted, or failed
+runs that did not return an AgentResult
+
+------------------------------------------------------------------------
+
+### `Agent$get_subagent_messages()`
+
+Get current or retained conversation turns for admitted delegations.
+Live snapshots contain available turns, not every in-flight token.
+Reading history does not add it to the lead's model context. Hosts must
+authorize and redact disclosures before exposing these records to users.
+
+#### Usage
+
+    Agent$get_subagent_messages(agent_name = NULL, session_id = NULL)
+
+#### Arguments
+
+- `agent_name`:
+
+  Optional sub-agent name filter
+
+- `session_id`:
+
+  Optional sub-agent session id filter
+
+#### Returns
+
+List of turn histories
+
+------------------------------------------------------------------------
+
+### `Agent$get_subagent_contexts()`
+
+Inspect initial manifests or current model context in admission order.
+Initial manifests are immutable preparation receipts, separate from
+current working context and retained conversation turns. No provider
+requests or tool calls occur during inspection. Hosts authorize
+disclosure.
+
+#### Usage
+
+    Agent$get_subagent_contexts(
+      delegation_id = NULL,
+      view = "initial",
+      redact = FALSE
+    )
+
+#### Arguments
+
+- `delegation_id`:
+
+  Optional exact delegation identifier.
+
+- `view`:
+
+  `"initial"` for
+  [DelegationManifest](https://jameshwade.github.io/deputy/reference/DelegationManifest.md)
+  values, `"current"` for available system prompts and working turns.
+
+- `redact`:
+
+  For initial manifests only, return an explicitly redacted portable
+  view omitting task, instructions and source text. Metadata still
+  requires host disclosure policy. The retained manifest is unchanged.
+
+#### Returns
+
+A list; `NULL` entries mean no prepared context is available. Current
+context is retained at settlement; no matches returns
+[`list()`](https://rdrr.io/r/base/list.html).
+
+------------------------------------------------------------------------
+
+### `Agent$observe_subagents()`
+
+Observe bounded child activity without consuming or driving its stream.
+
+#### Usage
+
+    Agent$observe_subagents(requester, delegation_id = NULL, after = NULL)
+
+#### Arguments
+
+- `requester`:
+
+  Host-authenticated request context.
+
+- `delegation_id`:
+
+  Optional child locator filter.
+
+- `after`:
+
+  Optional cursor returned by a subscription on this lead.
+
+#### Returns
+
+A
+[DelegationSubscription](https://jameshwade.github.io/deputy/reference/DelegationSubscription.md).
+Snapshot, observation, cancellation and continuation are distinct
+operations. Closing it only detaches.
+
+------------------------------------------------------------------------
+
+### `Agent$interrupt_subagent()`
+
+Ask one child to stop cooperatively. This trusted host control API is
+separate from disclosure authorization; hosts must authorize the action
+before routing a user request here. It is never exposed as an agent
+tool.
+
+#### Usage
+
+    Agent$interrupt_subagent(delegation_id, reason = "interrupted")
+
+#### Arguments
+
+- `delegation_id`:
+
+  Exact admitted child locator.
+
+- `reason`:
+
+  Stable stop reason, default `"interrupted"`.
+
+#### Returns
+
+Invisible logical; FALSE for missing or already settled children.
+
+------------------------------------------------------------------------
+
+### `Agent$inspect_subagents()`
+
+Inspect authorized child snapshots without executing or changing
+context. Runtime facts, model claims, per-run usage, retained transcript
+and initial manifest are separate. Retained conversations also report
+cumulative usage across invocations. Unknown usage is NULL.
+
+#### Usage
+
+    Agent$inspect_subagents(requester, delegation_id = NULL, transcript = FALSE)
+
+#### Arguments
+
+- `requester`:
+
+  Host-authenticated request context, never model arguments.
+
+- `delegation_id`:
+
+  Optional exact delegation locator, checked only after disclosure
+  authorization. Unknown IDs return an empty list.
+
+- `transcript`:
+
+  Include public ellmer content records and replayed `turns`. Hidden
+  thinking, provider JSON and display closures are omitted.
+
+#### Returns
+
+Authorized and redacted read-only view lists. These are snapshots;
+modifying a returned list never changes the child or lead context.
+
+------------------------------------------------------------------------
+
+### `Agent$export_subagents()`
+
+Export authorized settled child history for host-owned durable storage.
+This is observation history, not a resumable Agent/session snapshot.
+
+#### Usage
+
+    Agent$export_subagents(requester, delegation_id = NULL)
+
+#### Arguments
+
+- `requester, delegation_id`:
+
+  See `$inspect_subagents()`.
+
+#### Returns
+
+Portable versioned list for
+[`delegation_history()`](https://jameshwade.github.io/deputy/reference/delegation_history.md).
+Export rejects active selected children. The host supplies current
+disclosure policy when reading it back. Only public ellmer records are
+retained.
+
+------------------------------------------------------------------------
+
+### `Agent$read_subagent_result()`
+
+Read an authorized retained delegation-answer artifact.
+
+#### Usage
+
+    Agent$read_subagent_result(requester, delegation_id, reference, offset = 0L)
+
+#### Arguments
+
+- `requester, delegation_id`:
+
+  See `$inspect_subagents()`.
+
+- `reference`:
+
+  An exact reference included in the redacted authorized child view.
+  Missing or expired artifacts fail explicitly.
+
+- `offset`:
+
+  Character offset for a bounded chunk, starting at zero.
+
+#### Returns
+
+Existing bounded tool-result chunk; no tool or model executes.
 
 ------------------------------------------------------------------------
 

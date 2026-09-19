@@ -1,8 +1,8 @@
 # Bound the child activity observation buffer
 
-One in-memory ring belongs to each LeadAgent. Subscribers hold only
-cursors; they cannot block execution or accumulate private queues.
-Retained transcript storage is separate from this transient buffer.
+One in-memory ring belongs to each Agent. Subscribers hold only cursors;
+they cannot block execution or accumulate private queues. Retained
+transcript storage is separate from this transient buffer.
 
 ## Usage
 
@@ -34,4 +34,4 @@ DelegationObservation(
 ## Value
 
 Read-only observation limits for
-[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md).
+[Agent](https://jameshwade.github.io/deputy/reference/Agent.md).

@@ -6,6 +6,10 @@ Run a task and inspect its response, tool calls, and usage.
 
 - [`Agent`](https://jameshwade.github.io/deputy/reference/Agent.md) :
   Agent R6 Class
+- [`adopt_chat()`](https://jameshwade.github.io/deputy/reference/adopt_chat.md)
+  : Adopt a curated Chat for owned delegation
+- [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
+  : Delegate through a host-curated specialist
 - [`AgentResult()`](https://jameshwade.github.io/deputy/reference/AgentResult.md)
   : Create a completed agent result
 - [`result_n_turns()`](https://jameshwade.github.io/deputy/reference/result_n_turns.md)

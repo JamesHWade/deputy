@@ -35,7 +35,7 @@ subagent_chat_server(
 
 - lead:
 
-  A host-owned LeadAgent, or a reactive/function returning it.
+  A host-owned Agent or LeadAgent, or a function returning it.
 
 - requester:
 

@@ -2,6 +2,20 @@
 
 ## deputy (development version)
 
+- [`adopt_chat()`](https://jameshwade.github.io/deputy/reference/adopt_chat.md)
+  and
+  [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
+  compose independently configured chats through an ordinary Agent,
+  preserving selected provider, prompt, tools and history with explicit
+  callback ownership and governed follow-ups
+  ([\#168](https://github.com/JamesHWade/deputy/issues/168)).
+
+- `Agent$retain_agent()` and explicit continuation methods preserve
+  specialist conversations with owner-local handles, busy rejection,
+  cumulative budgets, cancellation and release. Ordinary Agents now
+  share child inspection, observation and optional chat panels with
+  LeadAgent ([\#152](https://github.com/JamesHWade/deputy/issues/152)).
+
 - A trusted mini-agent example now demonstrates reviewed scientific
   inputs, a designated computation, and tool-owned results separate from
   model commentary

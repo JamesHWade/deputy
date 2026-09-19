@@ -86,53 +86,58 @@ sub-agents based on registered AgentDefinitions.</p>
 <li><p><a href="#method-LeadAgent-parallel_delegate"><code>LeadAgent$parallel_delegate()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-parallel_delegate_async"><code>LeadAgent$parallel_delegate_async()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-interrupt"><code>LeadAgent$interrupt()</code></a></p></li>
-<li><p><a href="#method-LeadAgent-list_subagents"><code>LeadAgent$list_subagents()</code></a></p></li>
-<li><p><a href="#method-LeadAgent-get_subagent_results"><code>LeadAgent$get_subagent_results()</code></a></p></li>
-<li><p><a href="#method-LeadAgent-get_subagent_messages"><code>LeadAgent$get_subagent_messages()</code></a></p></li>
-<li><p><a href="#method-LeadAgent-get_subagent_contexts"><code>LeadAgent$get_subagent_contexts()</code></a></p></li>
-<li><p><a href="#method-LeadAgent-observe_subagents"><code>LeadAgent$observe_subagents()</code></a></p></li>
-<li><p><a href="#method-LeadAgent-interrupt_subagent"><code>LeadAgent$interrupt_subagent()</code></a></p></li>
-<li><p><a href="#method-LeadAgent-inspect_subagents"><code>LeadAgent$inspect_subagents()</code></a></p></li>
-<li><p><a href="#method-LeadAgent-export_subagents"><code>LeadAgent$export_subagents()</code></a></p></li>
-<li><p><a href="#method-LeadAgent-read_subagent_result"><code>LeadAgent$read_subagent_result()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-print"><code>LeadAgent$print()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-clone"><code>LeadAgent$clone()</code></a></p></li>
 </ul></div><p><details><summary>Inherited methods</summary><ul><li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href="Agent.html#method-add_hook"><code>Agent$add_hook()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_turn"><a href="Agent.html#method-add_turn"><code>Agent$add_turn()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cancel_agent"><a href="Agent.html#method-cancel_agent"><code>Agent$cancel_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat"><a href="Agent.html#method-chat"><code>Agent$chat()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_async"><a href="Agent.html#method-chat_async"><code>Agent$chat_async()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_structured"><a href="Agent.html#method-chat_structured"><code>Agent$chat_structured()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_structured_async"><a href="Agent.html#method-chat_structured_async"><code>Agent$chat_structured_async()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="checkpoint"><a href="Agent.html#method-checkpoint"><code>Agent$checkpoint()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href="Agent.html#method-compact"><code>Agent$compact()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="continue_agent"><a href="Agent.html#method-continue_agent"><code>Agent$continue_agent()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="continue_agent_async"><a href="Agent.html#method-continue_agent_async"><code>Agent$continue_agent_async()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href="Agent.html#method-cost"><code>Agent$cost()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="export_subagents"><a href="Agent.html#method-export_subagents"><code>Agent$export_subagents()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_context_turns"><a href="Agent.html#method-get_context_turns"><code>Agent$get_context_turns()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_cost"><a href="Agent.html#method-get_cost"><code>Agent$get_cost()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_model"><a href="Agent.html#method-get_model"><code>Agent$get_model()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_model_object"><a href="Agent.html#method-get_model_object"><code>Agent$get_model_object()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_permission_mode"><a href="Agent.html#method-get_permission_mode"><code>Agent$get_permission_mode()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_provider"><a href="Agent.html#method-get_provider"><code>Agent$get_provider()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_subagent_contexts"><a href="Agent.html#method-get_subagent_contexts"><code>Agent$get_subagent_contexts()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_subagent_messages"><a href="Agent.html#method-get_subagent_messages"><code>Agent$get_subagent_messages()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_subagent_results"><a href="Agent.html#method-get_subagent_results"><code>Agent$get_subagent_results()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_system_prompt"><a href="Agent.html#method-get_system_prompt"><code>Agent$get_system_prompt()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_tokens"><a href="Agent.html#method-get_tokens"><code>Agent$get_tokens()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_tools"><a href="Agent.html#method-get_tools"><code>Agent$get_tools()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_turns"><a href="Agent.html#method-get_turns"><code>Agent$get_turns()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="inspect_subagents"><a href="Agent.html#method-inspect_subagents"><code>Agent$inspect_subagents()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="interrupt_subagent"><a href="Agent.html#method-interrupt_subagent"><code>Agent$interrupt_subagent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_compaction"><a href="Agent.html#method-last_compaction"><code>Agent$last_compaction()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_run"><a href="Agent.html#method-last_run"><code>Agent$last_run()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="last_turn"><a href="Agent.html#method-last_turn"><code>Agent$last_turn()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="list_checkpoints"><a href="Agent.html#method-list_checkpoints"><code>Agent$list_checkpoints()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="list_subagents"><a href="Agent.html#method-list_subagents"><code>Agent$list_subagents()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_mcp"><a href="Agent.html#method-load_mcp"><code>Agent$load_mcp()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_session"><a href="Agent.html#method-load_session"><code>Agent$load_session()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_skill"><a href="Agent.html#method-load_skill"><code>Agent$load_skill()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_status"><a href="Agent.html#method-mcp_status"><code>Agent$mcp_status()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_tools"><a href="Agent.html#method-mcp_tools"><code>Agent$mcp_tools()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="observe_subagents"><a href="Agent.html#method-observe_subagents"><code>Agent$observe_subagents()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="on_tool_request"><a href="Agent.html#method-on_tool_request"><code>Agent$on_tool_request()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="on_tool_result"><a href="Agent.html#method-on_tool_result"><code>Agent$on_tool_result()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="pending_approval"><a href="Agent.html#method-pending_approval"><code>Agent$pending_approval()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="provider"><a href="Agent.html#method-provider"><code>Agent$provider()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="read_subagent_result"><a href="Agent.html#method-read_subagent_result"><code>Agent$read_subagent_result()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tool"><a href="Agent.html#method-register_tool"><code>Agent$register_tool()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tools"><a href="Agent.html#method-register_tools"><code>Agent$register_tools()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="release_agent"><a href="Agent.html#method-release_agent"><code>Agent$release_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resolve_tool_result"><a href="Agent.html#method-resolve_tool_result"><code>Agent$resolve_tool_result()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resume_approval"><a href="Agent.html#method-resume_approval"><code>Agent$resume_approval()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="retain_agent"><a href="Agent.html#method-retain_agent"><code>Agent$retain_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="rewind_files"><a href="Agent.html#method-rewind_files"><code>Agent$rewind_files()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run"><a href="Agent.html#method-run"><code>Agent$run()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_async"><a href="Agent.html#method-run_async"><code>Agent$run_async()</code></a></span></li>
@@ -412,253 +417,10 @@ active responders to stop at their next supported provider boundary.</p>
 
 </div>
 
-<p></p><hr><a id="method-LeadAgent-list_subagents"></a><div class="section">
-<h3 id="leadagent-list-subagents-"><code>LeadAgent$list_subagents()</code><a class="anchor" aria-label="anchor" href="#leadagent-list-subagents-"></a></h3>
-<p>List admitted subagent delegations in admission order, including live work.
-Status is <code>queued</code>, <code>running</code>, <code>completed</code>, <code>failed</code>, <code>stopped</code>,
-<code>not_started</code>, or <code>suspended</code> (for supported approval suspensions).
-<code>completed</code> means the run stopped with <code>complete</code>, not verified task success.
-<code>stop_reason</code> retains the exact runtime reason. Identifiers and timestamps
-are <code>NA</code> until assigned. <code>completed_at</code> marks settlement of this invocation,
-including suspension. <code>hook_error</code> records observer errors independently.
-<code>input_error</code> identifies preparation rejection as <code>invalid</code>, <code>missing</code>,
-<code>stale</code>, <code>unauthorized</code>, or <code>oversized</code>. These in-memory records are not
-durable jobs or a token event feed.</p><div class="section">
-<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
-<p>Data frame with one row per admitted delegation</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-LeadAgent-get_subagent_results"></a><div class="section">
-<h3 id="leadagent-get-subagent-results-"><code>LeadAgent$get_subagent_results()</code><a class="anchor" aria-label="anchor" href="#leadagent-get-subagent-results-"></a></h3>
-<p>Get retained results from delegated sub-agent runs.</p><div class="section">
-<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">get_subagent_results</span><span class="op">(</span>agent_name <span class="op">=</span> <span class="cn">NULL</span>, delegation_id <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-5">Arguments<a class="anchor" aria-label="anchor" href="#arguments-5"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>agent_name</code></dt>
-<dd><p>Optional sub-agent name filter</p></dd>
-
-      <dt><code>delegation_id</code></dt>
-<dd><p>Optional delegation identifier filter</p></dd>
-
-
-</dl><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-7">Returns<a class="anchor" aria-label="anchor" href="#returns-7"></a></h4>
-<p>List of <a href="AgentResult.html">AgentResult</a> objects in admission order, with <code>NULL</code> for
-live, unstarted, or failed runs that did not return an AgentResult</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-LeadAgent-get_subagent_messages"></a><div class="section">
-<h3 id="leadagent-get-subagent-messages-"><code>LeadAgent$get_subagent_messages()</code><a class="anchor" aria-label="anchor" href="#leadagent-get-subagent-messages-"></a></h3>
-<p>Get current or retained conversation turns for admitted delegations.
-Live snapshots contain available turns, not every in-flight token.
-Reading history does not add it to the lead's model context. Hosts must
-authorize and redact disclosures before exposing these records to users.</p><div class="section">
-<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">get_subagent_messages</span><span class="op">(</span>agent_name <span class="op">=</span> <span class="cn">NULL</span>, session_id <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-6">Arguments<a class="anchor" aria-label="anchor" href="#arguments-6"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>agent_name</code></dt>
-<dd><p>Optional sub-agent name filter</p></dd>
-
-      <dt><code>session_id</code></dt>
-<dd><p>Optional sub-agent session id filter</p></dd>
-
-
-</dl><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-8">Returns<a class="anchor" aria-label="anchor" href="#returns-8"></a></h4>
-<p>List of turn histories</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-LeadAgent-get_subagent_contexts"></a><div class="section">
-<h3 id="leadagent-get-subagent-contexts-"><code>LeadAgent$get_subagent_contexts()</code><a class="anchor" aria-label="anchor" href="#leadagent-get-subagent-contexts-"></a></h3>
-<p>Inspect initial manifests or current model context in admission order.
-Initial manifests are immutable preparation receipts, separate from
-current working context and retained conversation turns. No provider
-requests or tool calls occur during inspection. Hosts authorize disclosure.</p><div class="section">
-<h4 id="usage-9">Usage<a class="anchor" aria-label="anchor" href="#usage-9"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">get_subagent_contexts</span><span class="op">(</span></span>
-<span>  delegation_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  view <span class="op">=</span> <span class="st">"initial"</span>,</span>
-<span>  redact <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-7">Arguments<a class="anchor" aria-label="anchor" href="#arguments-7"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>delegation_id</code></dt>
-<dd><p>Optional exact delegation identifier.</p></dd>
-
-      <dt><code>view</code></dt>
-<dd><p><code>"initial"</code> for <a href="DelegationManifest.html">DelegationManifest</a> values, <code>"current"</code> for
-available system prompts and working turns.</p></dd>
-
-      <dt><code>redact</code></dt>
-<dd><p>For initial manifests only, return an explicitly redacted
-portable view omitting task, instructions and source text. Metadata still
-requires host disclosure policy. The retained manifest is unchanged.</p></dd>
-
-
-</dl><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-9">Returns<a class="anchor" aria-label="anchor" href="#returns-9"></a></h4>
-<p>A list; <code>NULL</code> entries mean no prepared context is available.
-Current context is retained at settlement; no matches returns <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code>.</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-LeadAgent-observe_subagents"></a><div class="section">
-<h3 id="leadagent-observe-subagents-"><code>LeadAgent$observe_subagents()</code><a class="anchor" aria-label="anchor" href="#leadagent-observe-subagents-"></a></h3>
-<p>Observe bounded child activity without consuming or driving its stream.</p><div class="section">
-<h4 id="usage-10">Usage<a class="anchor" aria-label="anchor" href="#usage-10"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">observe_subagents</span><span class="op">(</span><span class="va">requester</span>, delegation_id <span class="op">=</span> <span class="cn">NULL</span>, after <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-8">Arguments<a class="anchor" aria-label="anchor" href="#arguments-8"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>requester</code></dt>
-<dd><p>Host-authenticated request context.</p></dd>
-
-      <dt><code>delegation_id</code></dt>
-<dd><p>Optional child locator filter.</p></dd>
-
-      <dt><code>after</code></dt>
-<dd><p>Optional cursor returned by a subscription on this lead.</p></dd>
-
-
-</dl><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-10">Returns<a class="anchor" aria-label="anchor" href="#returns-10"></a></h4>
-<p>A <a href="DelegationSubscription.html">DelegationSubscription</a>. Snapshot, observation, cancellation
-and continuation are distinct operations. Closing it only detaches.</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-LeadAgent-interrupt_subagent"></a><div class="section">
-<h3 id="leadagent-interrupt-subagent-"><code>LeadAgent$interrupt_subagent()</code><a class="anchor" aria-label="anchor" href="#leadagent-interrupt-subagent-"></a></h3>
-<p>Ask one child to stop cooperatively. This trusted host control API is
-separate from disclosure authorization; hosts must authorize the action
-before routing a user request here. It is never exposed as an agent tool.</p><div class="section">
-<h4 id="usage-11">Usage<a class="anchor" aria-label="anchor" href="#usage-11"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">interrupt_subagent</span><span class="op">(</span><span class="va">delegation_id</span>, reason <span class="op">=</span> <span class="st">"interrupted"</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-9">Arguments<a class="anchor" aria-label="anchor" href="#arguments-9"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>delegation_id</code></dt>
-<dd><p>Exact admitted child locator.</p></dd>
-
-      <dt><code>reason</code></dt>
-<dd><p>Stable stop reason, default <code>"interrupted"</code>.</p></dd>
-
-
-</dl><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-11">Returns<a class="anchor" aria-label="anchor" href="#returns-11"></a></h4>
-<p>Invisible logical; FALSE for missing or already settled children.</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-LeadAgent-inspect_subagents"></a><div class="section">
-<h3 id="leadagent-inspect-subagents-"><code>LeadAgent$inspect_subagents()</code><a class="anchor" aria-label="anchor" href="#leadagent-inspect-subagents-"></a></h3>
-<p>Inspect authorized child snapshots without executing or changing context.
-Runtime facts, model claims, per-run usage, retained transcript and initial
-manifest are separate. Cumulative child usage currently equals per-run
-usage because child continuation is unsupported. Unknown usage is NULL.</p><div class="section">
-<h4 id="usage-12">Usage<a class="anchor" aria-label="anchor" href="#usage-12"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">inspect_subagents</span><span class="op">(</span></span>
-<span>  <span class="va">requester</span>,</span>
-<span>  delegation_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  transcript <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-10">Arguments<a class="anchor" aria-label="anchor" href="#arguments-10"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>requester</code></dt>
-<dd><p>Host-authenticated request context, never model arguments.</p></dd>
-
-      <dt><code>delegation_id</code></dt>
-<dd><p>Optional exact delegation locator, checked only after
-disclosure authorization. Unknown IDs return an empty list.</p></dd>
-
-      <dt><code>transcript</code></dt>
-<dd><p>Include public ellmer content records and replayed
-<code>turns</code>. Hidden thinking, provider JSON and display closures are omitted.</p></dd>
-
-
-</dl><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-12">Returns<a class="anchor" aria-label="anchor" href="#returns-12"></a></h4>
-<p>Authorized and redacted read-only view lists. These are snapshots;
-modifying a returned list never changes the child or lead context.</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-LeadAgent-export_subagents"></a><div class="section">
-<h3 id="leadagent-export-subagents-"><code>LeadAgent$export_subagents()</code><a class="anchor" aria-label="anchor" href="#leadagent-export-subagents-"></a></h3>
-<p>Export authorized settled child history for host-owned durable storage.
-This is observation history, not a resumable Agent/session snapshot.</p><div class="section">
-<h4 id="usage-13">Usage<a class="anchor" aria-label="anchor" href="#usage-13"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">export_subagents</span><span class="op">(</span><span class="va">requester</span>, delegation_id <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-11">Arguments<a class="anchor" aria-label="anchor" href="#arguments-11"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>requester, delegation_id</code></dt>
-<dd><p>See <code>$inspect_subagents()</code>.</p></dd>
-
-
-</dl><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-13">Returns<a class="anchor" aria-label="anchor" href="#returns-13"></a></h4>
-<p>Portable versioned list for <code><a href="delegation_history.html">delegation_history()</a></code>. Export rejects
-active selected children. The host supplies current disclosure policy
-when reading it back. Only public ellmer records are retained.</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-LeadAgent-read_subagent_result"></a><div class="section">
-<h3 id="leadagent-read-subagent-result-"><code>LeadAgent$read_subagent_result()</code><a class="anchor" aria-label="anchor" href="#leadagent-read-subagent-result-"></a></h3>
-<p>Read an authorized retained delegation-answer artifact.</p><div class="section">
-<h4 id="usage-14">Usage<a class="anchor" aria-label="anchor" href="#usage-14"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">read_subagent_result</span><span class="op">(</span></span>
-<span>  <span class="va">requester</span>,</span>
-<span>  <span class="va">delegation_id</span>,</span>
-<span>  <span class="va">reference</span>,</span>
-<span>  offset <span class="op">=</span> <span class="fl">0L</span></span>
-<span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-12">Arguments<a class="anchor" aria-label="anchor" href="#arguments-12"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>requester, delegation_id</code></dt>
-<dd><p>See <code>$inspect_subagents()</code>.</p></dd>
-
-      <dt><code>reference</code></dt>
-<dd><p>An exact reference included in the redacted authorized
-child view. Missing or expired artifacts fail explicitly.</p></dd>
-
-      <dt><code>offset</code></dt>
-<dd><p>Character offset for a bounded chunk, starting at zero.</p></dd>
-
-
-</dl><p></p></div>
-</div><p></p><div class="section">
-<h4 id="returns-14">Returns<a class="anchor" aria-label="anchor" href="#returns-14"></a></h4>
-<p>Existing bounded tool-result chunk; no tool or model executes.</p>
-</div>
-
-</div>
-
 <p></p><hr><a id="method-LeadAgent-print"></a><div class="section">
 <h3 id="leadagent-print-"><code>LeadAgent$print()</code><a class="anchor" aria-label="anchor" href="#leadagent-print-"></a></h3>
 <p>Print the lead agent.</p><div class="section">
-<h4 id="usage-15">Usage<a class="anchor" aria-label="anchor" href="#usage-15"></a></h4>
+<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -667,10 +429,10 @@ child view. Missing or expired artifacts fail explicitly.</p></dd>
 <p></p><hr><a id="method-LeadAgent-clone"></a><div class="section">
 <h3 id="leadagent-clone-"><code>LeadAgent$clone()</code><a class="anchor" aria-label="anchor" href="#leadagent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-16">Usage<a class="anchor" aria-label="anchor" href="#usage-16"></a></h4>
+<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-13">Arguments<a class="anchor" aria-label="anchor" href="#arguments-13"></a></h4>
+<h4 id="arguments-5">Arguments<a class="anchor" aria-label="anchor" href="#arguments-5"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 
