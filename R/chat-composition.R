@@ -98,11 +98,29 @@ delegation_tool <- function(owner, handle, name, description, usage_limits) {
         )
       }
       correlation <- private$claim_delegation(tool_name = name, required = TRUE)
-      continue_conversation(owner, handle, task, usage_limits, correlation) |>
-        promises::then(function(result) {
+      promises::then(
+        continue_conversation(owner, handle, task, usage_limits, correlation),
+        function(result) {
           record <- private$subagent_runs[[correlation$delegation_id]]
           delegation_json(S7::props(delegation_outcome(record, compact = TRUE)))
-        })
+        },
+        function(error) {
+          record <- private$subagent_runs[[correlation$delegation_id]]
+          if (is.null(record)) {
+            rlang::cnd_signal(error)
+          }
+          payload <- delegation_json(S7::props(delegation_outcome(
+            record,
+            compact = TRUE
+          )))
+          ellmer::tool_reject(paste0(
+            "Subagent '",
+            inspection_text(record$agent_name %||% "specialist", 512L),
+            "' failed.\n",
+            payload
+          ))
+        }
+      )
     },
     name = name,
     description = description,

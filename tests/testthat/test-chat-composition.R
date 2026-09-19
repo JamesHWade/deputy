@@ -257,6 +257,53 @@ test_that("composition retains failed and cancelled invocations without retry", 
   setup$owner$release_agent(setup$handle)
 })
 
+test_that("composition rejects failed specialists with a bounded outcome", {
+  child <- owned_test_agent()
+  child$.__enclos_env__$private$.chat$stream_async <- function(...) {
+    abort_deputy(strrep("application failure ", 10000L))
+  }
+  setup <- composition_parent(child)
+
+  result <- suppressWarnings(setup$owner$run_sync("delegate"))
+  record <- setup$owner$list_subagents()
+  tool_result <- result_tool_results(result)[[1L]]
+  tool_error <- tool_result$tool_error$message
+  payload_text <- sub("^[^{]*", "", tool_error)
+  payload <- jsonlite::fromJSON(payload_text, simplifyVector = FALSE)
+
+  expect_identical(record$status, "failed")
+  expect_identical(record$stop_reason, "error")
+  expect_identical(record$parent_agent_id, result$agent_id)
+  expect_identical(record$parent_run_id, result$run_id)
+  expect_identical(record$tool_call_id, tool_result$tool_call_id)
+  expect_identical(record$delegation_id, tool_result$delegation_id)
+  expect_lt(nchar(tool_error, type = "bytes"), 4096L)
+  expect_match(tool_error, "application failure", fixed = TRUE)
+  expect_identical(
+    grepl(strrep("application failure ", 10000L), tool_error, fixed = TRUE),
+    FALSE
+  )
+  expect_identical(
+    payload$runtime[c(
+      "delegation_id",
+      "tool_call_id",
+      "parent_agent_id",
+      "parent_run_id",
+      "status",
+      "stop_reason"
+    )],
+    list(
+      delegation_id = record$delegation_id,
+      tool_call_id = record$tool_call_id,
+      parent_agent_id = record$parent_agent_id,
+      parent_run_id = record$parent_run_id,
+      status = "failed",
+      stop_reason = "error"
+    )
+  )
+  setup$owner$release_agent(setup$handle)
+})
+
 test_that("concurrent model calls cannot mutate one retained specialist twice", {
   reply <- runtime_reply(tool = "ask", arguments = list(task = "work"))
   lines <- strsplit(reply$body, "\n", fixed = TRUE)[[1L]]
