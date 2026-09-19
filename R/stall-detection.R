@@ -34,7 +34,15 @@ tool_cycle_signature <- function(request_signature, tool_result, tool_error) {
       list(
         request = request_signature,
         result = canonicalize_tool_input(tool_result),
-        error = canonicalize_tool_input(tool_error)
+        error = if (inherits(tool_error, "condition")) {
+          # Error traces and captured environments are not observable progress.
+          list(
+            class = class(tool_error),
+            message = conditionMessage(tool_error)
+          )
+        } else {
+          canonicalize_tool_input(tool_error)
+        }
       ),
       algo = "sha256",
       serialize = TRUE

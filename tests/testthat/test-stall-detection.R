@@ -115,3 +115,25 @@ test_that("changing tool results reset loop detection for polling", {
 
   expect_identical(private$stop_reason_from_hook, NULL)
 })
+
+test_that("equivalent tool errors ignore trace and environment identity", {
+  first <- simpleError(
+    "No matching observations",
+    call = quote(first_attempt())
+  )
+  first$owner <- new.env(parent = emptyenv())
+  first$owner$secret <- "first private state"
+  second <- simpleError(
+    "No matching observations",
+    call = quote(second_attempt())
+  )
+  second$owner <- new.env(parent = emptyenv())
+  second$owner$secret <- "second private state"
+  signature <- tool_cycle_signature("request", NULL, first)
+  expect_identical(signature, tool_cycle_signature("request", NULL, second))
+  expect_false(identical(
+    signature,
+    tool_cycle_signature("request", NULL, simpleError("Data unavailable"))
+  ))
+  expect_type(signature, "character")
+})

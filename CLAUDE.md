@@ -128,6 +128,14 @@ History recovery proceeds with caller-owned records under ADR-0003.
 `dev/shinychat-history-consumer.md` tracks the optional shinychat adapter for #66;
 only that adapter waits for an agreed, released R API.
 
+The deterministic trusted mini-agent recipe in `inst/examples/trusted-mini-agent/`
+uses a child to propose typed analysis inputs and a standalone host-owned Agent
+for durable approval and the designated computation. Run
+`devtools::test(filter = "^trusted-mini-agent$")`; launch its `app.R` with Shiny.
+Model commentary cannot write its authoritative host receipt. Curated-chat
+composition and bounded recursion are designed in ADR-0023 and tracked in
+#168/#169; they are not implemented by the recipe.
+
 ## Common Commands
 
 ### Testing
