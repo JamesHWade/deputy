@@ -2348,6 +2348,7 @@ Agent <- R6::R6Class(
           )
         }
         cloned <- private$.r6_clone(deep = TRUE)
+        reg.finalizer(cloned, finalize_owned_conversations, onexit = TRUE)
         cloned$.__enclos_env__$private$active_owned_tools <- list()
         cloned$.__enclos_env__$private$rewire_chat_runtime()
         cloned$.__enclos_env__$private$.compaction_artifacts <- NULL

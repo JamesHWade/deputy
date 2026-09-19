@@ -298,3 +298,14 @@ test_that("mid-stream failures and cancellation retain partial history for retry
     expect_length(child$turns(), 3L)
   }
 })
+
+
+test_that("cloned owners release idle specialists when collected", {
+  child <- owned_test_agent()
+  local({
+    owner <- owned_test_owner()$clone()
+    owner$retain_agent(child, UsageLimits(max_requests = 1))
+  })
+  gc()
+  expect_identical(child$run_sync("cloned owner collected")$response, "answer")
+})
