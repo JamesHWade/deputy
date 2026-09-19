@@ -1445,11 +1445,13 @@ Agent <- R6::R6Class(
     #' @param reason Stable reason stored on the terminal event
     #' @return Invisible logical indicating whether a run was active
     interrupt = function(reason = "interrupted") {
+      interrupted <- FALSE
       for (id in names(private$active_subagents)) {
-        self$interrupt_subagent(id, reason)
+        interrupted <- isTRUE(self$interrupt_subagent(id, reason)) ||
+          interrupted
       }
       if (!isTRUE(private$run_active)) {
-        return(invisible(FALSE))
+        return(invisible(interrupted))
       }
       private$request_stream_stop(as.character(reason[[1]]))
       invisible(TRUE)
