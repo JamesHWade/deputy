@@ -392,8 +392,91 @@ test_that("a retained mutable Chat cannot be adopted through a second wrapper", 
     owned_test_owner()$retain_agent(alias, UsageLimits())
   )
   expect_snapshot(error = TRUE, Agent$new(chat))
+  expect_error(alias$clone(), class = "deputy_conversation")
+  expect_error(alias$clone(deep = TRUE), class = "deputy_conversation")
   expect_snapshot(error = TRUE, alias$run_sync("alias bypass"))
   expect_snapshot(error = TRUE, collect_async_stream(delayed_alias))
+  owner$release_agent(handle)
+})
+
+test_that("leased Chat aliases cannot admit or dispatch retained children", {
+  owner <- owned_test_owner()
+  child <- owned_test_agent()
+  alias <- Agent$new(child$.__enclos_env__$private$.chat)
+  nested <- owned_test_agent()
+  old_handle <- alias$retain_agent(nested, UsageLimits(max_requests = 2))
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 2))
+  other <- owned_test_agent()
+
+  expect_error(
+    alias$retain_agent(other, UsageLimits(max_requests = 1)),
+    class = "deputy_conversation"
+  )
+  expect_null(other$.__enclos_env__$private$.conversation_owner)
+  expect_error(
+    alias$continue_agent(old_handle, "bypass", UsageLimits(max_requests = 1)),
+    class = "deputy_conversation"
+  )
+  expect_error(
+    alias$continue_agent_async(
+      old_handle,
+      "bypass",
+      UsageLimits(max_requests = 1)
+    ),
+    class = "deputy_conversation"
+  )
+  expect_equal(nrow(alias$list_subagents()), 0L)
+  expect_length(nested$turns(), 0L)
+
+  alias$release_agent(old_handle)
+  owner$release_agent(handle)
+  restored <- alias$retain_agent(other, UsageLimits(max_requests = 1))
+  result <- alias$continue_agent(
+    restored,
+    "allowed",
+    UsageLimits(max_requests = 1)
+  )
+  expect_identical(result$response, "answer")
+  alias$release_agent(restored)
+  expect_s3_class(alias$clone(), "Agent")
+})
+
+test_that("outstanding alias continuations prevent shared Chat adoption", {
+  owner <- owned_test_owner()
+  child <- owned_test_agent()
+  alias <- Agent$new(child$.__enclos_env__$private$.chat)
+  nested <- owned_test_agent()
+  old_handle <- alias$retain_agent(nested, UsageLimits(max_requests = 2))
+  during_dispatch <- NULL
+  alias$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    during_dispatch <<- tryCatch(
+      owner$retain_agent(child, UsageLimits(max_requests = 1)),
+      error = identity
+    )
+    NULL
+  }))
+  pending <- alias$continue_agent_async(
+    old_handle,
+    "queued work",
+    UsageLimits(max_requests = 1)
+  )
+  expect_error(
+    owner$retain_agent(child, UsageLimits(max_requests = 1)),
+    class = "deputy_conversation"
+  )
+  result <- resolve_async_value(pending)
+  expect_identical(result$response, "answer")
+  expect_s3_class(during_dispatch, "deputy_conversation")
+  expect_null(attr(
+    alias$.__enclos_env__$private$.chat,
+    "deputy_active_conversations"
+  ))
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
+  expect_error(
+    alias$continue_agent(old_handle, "bypass", UsageLimits(max_requests = 1)),
+    class = "deputy_conversation"
+  )
+  alias$release_agent(old_handle)
   owner$release_agent(handle)
 })
 
