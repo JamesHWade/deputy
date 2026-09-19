@@ -74,6 +74,10 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
     normalize_usage_limits(usage_limits),
     agent$usage_limits
   )
+  # A Chat may already be wrapped by another Agent. Retention transfers
+  # execution authority to this Agent, so remove the other wrapper's callback
+  # stacks and re-adapt the shared tools before recording the retained setup.
+  cp$rewire_chat_runtime()
   entry <- new.env(parent = emptyenv())
   entry$agent <- agent
   entry$token <- new.env(parent = emptyenv())

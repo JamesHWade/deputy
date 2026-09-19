@@ -514,3 +514,80 @@ test_that("delayed owner streams cannot start over independently active children
   expect_null(owner$last_run())
   expect_identical(owner$run_sync("after child settled")$response, "answer")
 })
+
+
+test_that("retention rebinds shared tool callbacks and adapters to the child", {
+  server <- local_runtime_server(rep(
+    list(
+      runtime_reply(tool = "write_file", arguments = list()),
+      runtime_reply("settled")
+    ),
+    3L
+  ))
+  chat <- runtime_chat(server)
+  effects <- 0L
+  child_requests <- 0L
+  alias_requests <- 0L
+  owner_hooks <- 0L
+  child <- Agent$new(
+    chat,
+    permissions = Permissions(file_write = TRUE),
+    tools = list(ellmer::tool(
+      function() {
+        effects <<- effects + 1L
+        "written"
+      },
+      name = "write_file",
+      description = "Write",
+      arguments = list()
+    ))
+  )
+  child$on_tool_request(function(request) {
+    child_requests <<- child_requests + 1L
+  })
+  alias <- Agent$new(chat)
+  alias$on_tool_request(function(request) {
+    alias_requests <<- alias_requests + 1L
+  })
+  owner <- owned_test_owner(permissions = Permissions(file_write = TRUE))
+  owner$add_hook(HookMatcher("PreToolUse", callback = function(...) {
+    owner_hooks <<- owner_hooks + 1L
+    NULL
+  }))
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 4))
+  first <- owner$continue_agent(handle, "write", UsageLimits(max_requests = 2))
+  expect_identical(trimws(first$response), "settled")
+  expect_identical(effects, 1L)
+  expect_identical(child_requests, 1L)
+  expect_identical(alias_requests, 0L)
+  expect_identical(owner_hooks, 1L)
+  expect_identical(first$usage$requests, 2L)
+  expect_identical(first$usage$tool_calls, 1L)
+
+  owner$set_permission_mode("readonly")
+  second <- suppressWarnings(owner$continue_agent(
+    handle,
+    "write again",
+    UsageLimits(max_requests = 2)
+  ))
+  expect_identical(trimws(second$response), "settled")
+  expect_identical(effects, 1L)
+  expect_identical(alias_requests, 0L)
+  expect_identical(second$usage$requests, 2L)
+  expect_identical(
+    owner$inspect_subagents("owner")[[2L]]$cumulative_usage$requests,
+    4L
+  )
+  expect_match(
+    jsonlite::toJSON(server$requests()[[4L]]$body),
+    "denied|not allowed|read.only",
+    ignore.case = TRUE
+  )
+
+  owner$release_agent(handle)
+  released <- child$run_sync("released")
+  expect_identical(trimws(released$response), "settled")
+  expect_identical(effects, 2L)
+  expect_identical(alias_requests, 0L)
+  expect_identical(owner_hooks, 1L)
+})
