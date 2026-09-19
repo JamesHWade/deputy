@@ -98,6 +98,9 @@ LeadAgent <- R6::R6Class(
       delegation_observation = DelegationObservation(),
       approval_dir = NULL
     ) {
+      if (!is.null(private$.chat)) {
+        check_conversation_lease(self, NULL)
+      }
       if (!S7::S7_inherits(delegation_policy, DelegationPolicy)) {
         delegation_binding_abort(
           "delegation_policy must be a DelegationPolicy."
