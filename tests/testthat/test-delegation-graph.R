@@ -277,3 +277,25 @@ test_that("graph finalizer releases a root while a routed child remains alive", 
   expect_null(left_private$.conversation_owner)
   expect_identical(left$run_sync("released")$response, "answer")
 })
+
+
+test_that("graph routes cannot impersonate the reserved result reader", {
+  root <- graph_test_owner()
+  left <- graph_test_agent()
+  right <- graph_test_agent()
+  expect_error(
+    graph_test_configure(
+      root,
+      left,
+      right,
+      routes = list(
+        left = list(deputy_read_tool_result = graph_test_route("left"))
+      )
+    ),
+    "reserved by Deputy",
+    class = "deputy_conversation"
+  )
+  graph_test_expect_unowned(root, list(left, right))
+  expect_length(left$get_tools(), 0L)
+  expect_false(left$.__enclos_env__$private$.tool_result_reader_registered)
+})

@@ -234,6 +234,11 @@ graph_validate_routes <- function(routes, nodes, agents) {
         "' must be unique."
       ))
     }
+    if ("deputy_read_tool_result" %in% tool_names) {
+      graph_abort(
+        "Route tool name 'deputy_read_tool_result' is reserved by Deputy."
+      )
+    }
     source_agent <- agents[[source_name]]
     existing <- names(graph_node_tools(source_agent))
     if (any(tool_names %in% existing)) {
@@ -340,7 +345,13 @@ graph_restore_tools <- function(private, base_tools) {
   current <- private$.chat$get_tools()
   reader <- current[["deputy_read_tool_result"]]
   restored <- base_tools %||% list()
-  if (!is.null(reader)) {
+  if (
+    !is.null(reader) &&
+      identical(
+        attr(graph_tool_source(reader), "deputy_internal_tool", exact = TRUE),
+        deputy_tool_result_reader_marker
+      )
+  ) {
     restored[["deputy_read_tool_result"]] <- reader
   }
   private$.chat$set_tools(restored)
