@@ -141,6 +141,8 @@ reference:
   - LeadAgent
   - DelegationInput
   - DelegationManifest
+  - DelegationPolicy
+  - DelegationResources
   - agent_definition
   - agent_definition_read
 

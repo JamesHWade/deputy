@@ -345,9 +345,12 @@ test_that("released ellmer Chats preserve transport and isolate runtime callback
   )
   lead$set_turns(history)
   parent_manager <- chat$.__enclos_env__$private$callback_on_tool_request
-  child <- lead$.__enclos_env__$private$create_sub_agent(lead$sub_agent_defs[[
-    1L
-  ]])
+  child <- local_test_subagent(
+    lead,
+    lead$sub_agent_defs[[
+      1L
+    ]]
+  )
   child_manager <- child$.__enclos_env__$private$.chat$.__enclos_env__$private$callback_on_tool_request
   expect_false(identical(parent_manager, child_manager))
   expect_identical(child_manager$count(), parent_manager$count())

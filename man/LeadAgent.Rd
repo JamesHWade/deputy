@@ -118,7 +118,9 @@ sub-agents based on registered AgentDefinitions.
   fallback_chats = list(),
   delegation_sources = list(),
   delegation_scope = list(),
-  delegation_max_bytes = 65536L
+  delegation_max_bytes = 65536L,
+  delegation_policy = DelegationPolicy(),
+  approval_dir = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -165,6 +167,10 @@ required when sources are supplied. Model arguments cannot override it.}
 complete manifest. Known complete-context estimates also obey
 \link{ContextPolicy} \code{max_tokens}; unknown estimates remain \code{NULL} and rely
 on byte bounds. Sources are text only, with a 16 MiB catalogue ceiling.}
+      \item{\code{delegation_policy}}{Host-only \link{DelegationPolicy} for child governance,
+resource ownership and interactive routing.}
+      \item{\code{approval_dir}}{Optional standalone lead approval directory. Delegation
+rejects this unsupported durable child-continuation combination.}
     }
     \if{html}{\out{</div>}}
   }

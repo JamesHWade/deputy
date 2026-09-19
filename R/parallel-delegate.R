@@ -135,6 +135,7 @@ lead_parallel_delegate <- function(
             stop_reason = private$stop_reason_from_hook %||%
               if (completed) "not_started" else "batch_error"
           )
+          release_delegation_binding(lead, id)
         }
         private$finish_callback_run(state)
       },

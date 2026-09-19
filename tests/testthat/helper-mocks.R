@@ -404,3 +404,17 @@ create_compaction_mock_chat <- function(
     result_manager = create_mock_callback_manager(result_callbacks)
   )
 }
+
+# Private-construction fixtures explicitly own admission and disposal.
+local_test_subagent <- function(
+  lead,
+  definition,
+  ...,
+  .local_envir = parent.frame()
+) {
+  private <- lead$.__enclos_env__$private
+  correlation <- private$claim_delegation()
+  id <- lead_admit_delegation(lead, definition, "fixture", correlation)
+  withr::defer(release_delegation_binding(lead, id), envir = .local_envir)
+  private$create_sub_agent(definition, correlation, ...)
+}

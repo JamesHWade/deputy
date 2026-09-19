@@ -149,9 +149,7 @@ test_that("agent_definition accepts only canonical permission modes", {
     sub_agents = list(readonly_definition),
     permissions = permissions_full()
   )
-  readonly_child <- full_lead$.__enclos_env__$private$create_sub_agent(
-    readonly_definition
-  )
+  readonly_child <- local_test_subagent(full_lead, readonly_definition)
   expect_identical(readonly_child$permissions$mode, "readonly")
   expect_false(readonly_child$permissions$file_write)
 })

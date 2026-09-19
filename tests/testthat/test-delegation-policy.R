@@ -32,7 +32,7 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
   )
 
   expect_error(
-    lead$.__enclos_env__$private$create_sub_agent(widening),
+    local_test_subagent(lead, widening),
     "cannot change under the lead policy"
   )
 
@@ -40,7 +40,7 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
   fields$name <- "restricted"
   fields$permission_mode <- "readonly"
   restricted <- do.call(agent_definition, fields)
-  child <- lead$.__enclos_env__$private$create_sub_agent(restricted)
+  child <- local_test_subagent(lead, restricted)
   expect_identical(child$permissions$mode, "readonly")
   expect_s7_class(
     permissions_check(
@@ -69,9 +69,7 @@ test_that("sub-agent permission modes cannot exceed the lead policy", {
       tool_allowlist = "custom_tool"
     )
   )
-  plan_child <- plan_lead$.__enclos_env__$private$create_sub_agent(
-    plan_definition
-  )
+  plan_child <- local_test_subagent(plan_lead, plan_definition)
   expect_identical(plan_child$permissions$mode, "readonly")
   expect_false(plan_child$permissions$web)
 })
@@ -89,7 +87,7 @@ test_that("sub-agent disallowed tools override permission prompts", {
     sub_agents = list(definition),
     permissions = permissions_full()
   )
-  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+  child <- local_test_subagent(lead, definition)
 
   result <- permissions_check(child$permissions, "ask_user", list())
   expect_s7_class(result, PermissionResultDeny)
@@ -149,7 +147,7 @@ test_that("sub-agents retain inherited prompt-tool gates", {
       sub_agents = list(definition),
       permissions = permissions
     )
-    child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+    child <- local_test_subagent(lead, definition)
     result <- permissions_check(child$permissions, "ask_user", list())
 
     expect_s7_class(result, PermissionResultDeny)
@@ -191,7 +189,7 @@ test_that("sub-agents inherit remaining lead run budgets", {
   )
   private$run_active <- TRUE
 
-  child <- private$create_sub_agent(definition)
+  child <- local_test_subagent(lead, definition)
 
   expect_identical(child$usage_limits$max_requests, 3L)
   expect_identical(child$usage_limits$max_tool_calls, 3L)
@@ -373,7 +371,7 @@ test_that("delegated S7 policies preserve ceilings after serialization", {
     NULL
   ))
   lead <- LeadAgent$new(chat = create_mock_chat(), permissions = policy)
-  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+  child <- local_test_subagent(lead, definition)
   expect_s7_class(child$permissions, Permissions)
   expect_identical(lead$permissions@mode, "standard")
   expect_identical(child$permissions@mode, "readonly")

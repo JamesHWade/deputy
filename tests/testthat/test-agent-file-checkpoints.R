@@ -294,7 +294,7 @@ test_that("LeadAgent shares its workspace checkpoint journal with sub-agents", {
     file_checkpoint_max_journal_bytes = 4096,
     working_dir = root
   )
-  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+  child <- local_test_subagent(lead, definition)
 
   expect_identical(
     child$.__enclos_env__$private$.file_checkpoints,

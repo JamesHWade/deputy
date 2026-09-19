@@ -116,3 +116,10 @@ host snapshot; instructions do not grant authority.
 An immutable receipt for a delegation's prepared initial context, including
 resolved evidence and declarative policy fingerprints. It is distinct from the
 current working context, retained child transcript and provider wire framing.
+
+## Delegation host binding
+
+`DelegationPolicy` is host runtime configuration for child governance, interactive
+routing and shared, exclusive or owned resources. `DelegationResources` transfers
+cleanup responsibility for factory-created tools to one delegation. These runtime
+objects are separate from the portable binding receipt in `DelegationManifest`.

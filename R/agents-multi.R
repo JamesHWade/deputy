@@ -1,4 +1,4 @@
-#' @include agent-definition.R delegation-manifest.R
+#' @include agent-definition.R delegation-manifest.R delegation-binding.R
 NULL
 
 # Multi-agent orchestration for deputy
@@ -59,6 +59,10 @@ LeadAgent <- R6::R6Class(
     #'   this snapshot; Deputy checks scope and exact revision, not live freshness.
     #' @param delegation_scope Plain list with `owner_id` and `conversation_id`;
     #'   required when sources are supplied. Model arguments cannot override it.
+    #' @param delegation_policy Host-only [DelegationPolicy] for child governance,
+    #'   resource ownership and interactive routing.
+    #' @param approval_dir Optional standalone lead approval directory. Delegation
+    #'   rejects this unsupported durable child-continuation combination.
     #' @param delegation_max_bytes Positive finite admission ceiling, default
     #'   64 KiB, applied separately to the UTF-8 system/message text and serialized
     #'   complete manifest. Known complete-context estimates also obey
@@ -84,8 +88,16 @@ LeadAgent <- R6::R6Class(
       fallback_chats = list(),
       delegation_sources = list(),
       delegation_scope = list(),
-      delegation_max_bytes = 65536L
+      delegation_max_bytes = 65536L,
+      delegation_policy = DelegationPolicy(),
+      approval_dir = NULL
     ) {
+      if (!S7::S7_inherits(delegation_policy, DelegationPolicy)) {
+        delegation_binding_abort(
+          "delegation_policy must be a DelegationPolicy."
+        )
+      }
+      private$.delegation_policy <- delegation_policy
       sources <- normalize_delegation_sources(
         delegation_sources,
         delegation_scope
@@ -132,7 +144,8 @@ LeadAgent <- R6::R6Class(
         run_context = run_context,
         agent_id = agent_id,
         agent_name = agent_name,
-        fallback_chats = fallback_chats
+        fallback_chats = fallback_chats,
+        approval_dir = approval_dir
       )
     },
 
@@ -293,6 +306,7 @@ LeadAgent <- R6::R6Class(
           input_error = character(),
           admitted_at = as.POSIXct(character()),
           hook_error = character(),
+          cleanup_error = character(),
           started_at = as.POSIXct(character()),
           completed_at = as.POSIXct(character()),
           error = character(),
@@ -318,6 +332,7 @@ LeadAgent <- R6::R6Class(
             input_error = run$input_error %||% NA_character_,
             admitted_at = as.POSIXct(run$admitted_at, tz = "UTC"),
             hook_error = run$hook_error %||% NA_character_,
+            cleanup_error = run$cleanup_error %||% NA_character_,
             started_at = as.POSIXct(run$started_at, tz = "UTC"),
             completed_at = as.POSIXct(run$completed_at, tz = "UTC"),
             error = run$error %||% NA_character_,
@@ -569,6 +584,7 @@ LeadAgent <- R6::R6Class(
                 error = condition,
                 stop_reason = "setup_error"
               )
+              release_delegation_binding(lead_agent, id)
               stop(condition)
             }
           )
@@ -638,7 +654,12 @@ LeadAgent <- R6::R6Class(
       usage_limits = NULL,
       stateless = FALSE
     ) {
-      correlation <- correlation %||% private$claim_delegation()
+      begin_delegation_binding(self, def, correlation, stateless)
+      bound <- FALSE
+      on.exit(
+        if (!bound) release_delegation_binding(self, correlation$delegation_id),
+        add = TRUE
+      )
 
       # Get the model to use
       if (def$model == "inherit") {
@@ -731,10 +752,8 @@ LeadAgent <- R6::R6Class(
         sub_agent$load_skill(skill)
       }
 
-      if (!is.null(def$mcp_servers) && length(def$mcp_servers) > 0) {
-        sub_agent$load_mcp(servers = def$mcp_servers)
-      }
-
+      bind_delegation_host(self, sub_agent, def, correlation, stateless)
+      bound <- TRUE
       sub_agent
     },
 
@@ -933,6 +952,8 @@ LeadAgent <- R6::R6Class(
     },
 
     .sub_agent_defs = list(),
+    .delegation_policy = NULL,
+    delegation_bindings = list(),
     subagent_runs = list(),
     active_subagents = list(),
     delegation_sources = list(),

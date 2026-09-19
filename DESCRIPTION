@@ -76,6 +76,7 @@ Collate:
     'agent-tool-records.R'
     'agent-tracing.R'
     'agent.R'
+    'delegation-binding.R'
     'delegation-input.R'
     'delegation-manifest.R'
     'agents-multi.R'

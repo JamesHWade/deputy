@@ -501,3 +501,89 @@ restored <- agent_definition_read(path, tools = tool_registry)
 identical(restored, definitions$reviewer)
 unlink(path)
 ```
+
+## Bind host policy and execution resources
+
+A child starts a fresh conversation, but a tool closure can still capture shared
+state. `DelegationPolicy()` makes that ownership visible in its initial manifest.
+The default `resource_mode = "shared"` borrows definition and skill tools; Deputy
+does not close them. Choose `"exclusive"` with a shared host `resource_key` to
+reject overlapping delegations that use one resource in the same R process.
+This does not lock direct host access or isolate the filesystem.
+
+For an independent R worker per delegation, use the public resource factory:
+
+```{r, eval=FALSE}
+policy <- DelegationPolicy(
+  resource_mode = "owned",
+  resources = function(agent, definition, context) {
+    worker <- RSession$new(agent)
+    DelegationResources(worker$tools(), cleanup = worker$close)
+  },
+  observers = c("Notification", "Stop")
+)
+lead <- LeadAgent$new(
+  chat = chat,
+  permissions = permissions_full(), # Trusted R uses this account's access
+  sub_agents = list(agent_definition("analyst", "Analyze data", "Check the data.")),
+  delegation_policy = policy
+)
+```
+
+The factory receives a fresh child before provider dispatch. It can bind an
+`RSession` or `McpConnection` using public Agent identity and workspace APIs.
+Return tools without running or mutating the child. A factory must clean up its
+own partial construction if it throws; once it returns `DelegationResources`,
+Deputy calls cleanup exactly once after settlement or subsequent setup failure.
+Cancellation is cooperative. Cleanup errors appear separately in
+`lead$list_subagents()$cleanup_error`.
+
+Owned mode rejects tools captured in definitions or skills. MCP selections in a
+definition require an owned factory, which resolves the host's explicit config
+and server/tool allowances. The ordinary child permissions and definition denylist
+apply to all registered tool origins. Stateless parallel responders never call a
+resource factory or acquire tools, handlers or resource leases.
+
+Tool governance hooks (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`) forward
+from the live lead registry. Other observers require explicit selection. Their
+callbacks remain shared host code; Deputy does not clone captured state. Children
+retain the initial permission ceiling and check current lead restrictions before
+each tool operation. Provider-native tools are unsupported for delegated runs
+because they bypass these execution gates.
+
+For a hosted child that asks questions, select the interactive tool in its
+definition (or return it from its owned factory) and bind a handler:
+
+```{r, eval=FALSE}
+policy <- DelegationPolicy(human_input = function(questions, context) {
+  # The host authenticates the owner and supplies the UI routing function.
+  request_answers(
+    questions,
+    owner = context$scope$owner_id,
+    agent_id = context$agent_id,
+    run_id = context$run_id,
+    delegation_id = context$delegation_id
+  )
+})
+lead <- LeadAgent$new(
+  chat,
+  sub_agents = list(agent_definition(
+    "interviewer", "Clarify requirements", "Ask focused questions.",
+    tools = tools_interactive()
+  )),
+  delegation_scope = list(owner_id = "authenticated-owner", conversation_id = "chat-1"),
+  delegation_policy = policy
+)
+```
+
+The current routing context includes child, parent and session identifiers. An
+unbound `ask_user` fails preparation rather than falling back to a process-wide
+handler. Scope values are host assertions, not authentication. The host still
+controls access and redaction for manifests and retained transcripts.
+
+Human answers and delegation briefs never approve tool effects. Delegated durable
+approval is not yet supported: a lead configured with `approval_dir` rejects
+delegation before dispatch, and a child permission callback returning
+`PermissionResultPending` stops without executing the requested effect. Continue
+to use standalone `Agent` approval APIs where durable suspension is needed.
+Child continuation and durable job recovery are separate backlog work.

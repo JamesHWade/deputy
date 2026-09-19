@@ -28,7 +28,7 @@ test_that("LeadAgent and sub-agents use native session identifiers", {
     session_id = "session-lead"
   )
 
-  child <- lead$.__enclos_env__$private$create_sub_agent(sub_agent)
+  child <- local_test_subagent(lead, sub_agent)
 
   expect_identical(lead$session_id(), "session-lead")
   expect_match(child$session_id(), "^session_")
@@ -72,7 +72,7 @@ test_that("LeadAgent propagates context policy to sub-agents", {
     context_policy = policy
   )
 
-  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+  child <- local_test_subagent(lead, definition)
 
   expect_identical(lead$context_policy, policy)
   expect_identical(child$context_policy, policy)
@@ -279,7 +279,7 @@ test_that("readonly sub-agents retain custom lead read restrictions", {
       sub_agents = list(definition),
       permissions = permissions
     )
-    child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+    child <- local_test_subagent(lead, definition)
 
     expect_identical(child$permissions$mode, "readonly")
     expect_false(child$permissions$file_read)
@@ -315,7 +315,7 @@ test_that("readonly sub-agents retain custom callback denials", {
       can_use_tool = callback
     )
   )
-  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+  child <- local_test_subagent(lead, definition)
 
   expect_s7_class(
     permissions_check(

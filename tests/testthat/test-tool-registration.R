@@ -227,7 +227,7 @@ test_that("child definitions can share parent tools without inheriting the regis
     sub_agents = list(definition),
     tools = list(shared, registration_tool("parent_only"))
   )
-  child <- lead$.__enclos_env__$private$create_sub_agent(definition)
+  child <- local_test_subagent(lead, definition)
   expect_named(child$get_tools(), "shared")
   expect_identical(child$get_tools()$shared(), "original")
   expect_true(all(
