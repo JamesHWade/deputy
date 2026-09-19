@@ -15,6 +15,9 @@ formats remain unchanged by the moves.
 | Host governance forwarding, resource leases and owned cleanup | `R/delegation-binding.R` |
 | Initial context receipts and independent context views | `R/delegation-manifest.R` |
 | Admitted delegation records, lifecycle hooks and child settlement | `R/delegation-lifecycle.R` |
+| Atomic host-curated graph setup and release | `R/delegation-graph.R` |
+| Graph lifetime budgets and structural admission | `R/delegation-tree-budget.R` |
+| Recursive ancestry, hooks and subtree cancellation | `R/delegation-tree-runtime.R` |
 | Stateless responder wave scheduling | `R/parallel-delegate.R` |
 | S7 Skill configuration and requirement inspection | `R/skill.R` |
 | Skill directory discovery, metadata, and explicit tool loading | `R/skills.R` |

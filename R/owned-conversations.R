@@ -35,7 +35,7 @@ check_conversation_owner <- function(owner) {
   check_conversation_access(owner, NULL)
 }
 
-retain_conversation <- function(owner, agent, usage_limits, max_runs) {
+validate_conversation_candidate <- function(owner, agent) {
   if (
     !inherits(agent, "Agent") ||
       inherits(agent, "LeadAgent") ||
@@ -96,6 +96,18 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
   if (length(cp$.fallback_chats)) {
     conversation_abort(
       "Retained delegation currently requires one configured provider."
+    )
+  }
+  invisible(NULL)
+}
+
+retain_conversation <- function(owner, agent, usage_limits, max_runs) {
+  validate_conversation_candidate(owner, agent)
+  op <- owner$.__enclos_env__$private
+  cp <- agent$.__enclos_env__$private
+  if (!is.null(op$.delegation_tree)) {
+    conversation_abort(
+      "Release the configured graph before retaining more agents."
     )
   }
   max_runs <- context_policy_whole_number(max_runs, "max_runs")
@@ -163,13 +175,19 @@ continue_conversation <- function(
   handle,
   task,
   usage_limits,
-  correlation = NULL
+  correlation = NULL,
+  caller = owner
 ) {
   check_conversation_owner(owner)
   entry <- conversation_entry(owner, handle)
   op <- owner$.__enclos_env__$private
   child <- entry$agent
   cp <- child$.__enclos_env__$private
+  caller_private <- caller$.__enclos_env__$private
+  tree <- op$.delegation_tree
+  if (!identical(caller, owner)) {
+    check_graph_caller(tree, caller)
+  }
   if (entry$busy || isTRUE(cp$run_active)) {
     conversation_abort("The conversation is busy.")
   }
@@ -194,7 +212,7 @@ continue_conversation <- function(
     normalize_usage_limits(usage_limits),
     intersect_usage_limits(
       conversation_remaining(entry$limits, entry$usage),
-      op$derive_subagent_usage_limits(list(max_requests = NULL))
+      caller_private$derive_subagent_usage_limits(list(max_requests = NULL))
     )
   )
   limits <- intersect_usage_limits(limits, child$usage_limits)
@@ -202,10 +220,69 @@ continue_conversation <- function(
     list(
       delegation_id = new_deputy_id("delegation_"),
       tool_call_id = NULL,
-      parent_agent_id = owner$agent_id,
-      parent_run_id = if (isTRUE(op$run_active)) op$current_run_id else NULL,
-      run_context = op$effective_run_context()
+      parent_agent_id = caller$agent_id,
+      parent_run_id = if (isTRUE(caller_private$run_active)) {
+        caller_private$current_run_id
+      } else {
+        NULL
+      },
+      run_context = caller_private$effective_run_context()
     )
+  tree_admission <- NULL
+  if (!is.null(tree)) {
+    if (!handle %in% tree$handles) {
+      conversation_abort("This handle is not part of the configured graph.")
+    }
+    check_graph_ancestors(owner, caller)
+    tree_admission <- tree_admit(
+      tree,
+      correlation$delegation_id,
+      caller_private$.delegation_id
+    )
+    correlation <- c(correlation, tree_admission)
+  }
+  id <- correlation$delegation_id
+  old <- NULL
+  owner_chat <- op$.chat
+  handed_off <- FALSE
+  cleanup <- function() {
+    if (!is.null(tree)) {
+      tree_settle(tree, id)
+    }
+    active <- setdiff(
+      attr(owner_chat, "deputy_active_conversations", exact = TRUE),
+      id
+    )
+    attr(owner_chat, "deputy_active_conversations") <- if (length(active)) {
+      active
+    } else {
+      NULL
+    }
+    caller_private$release_delegation_usage(id)
+    if (!is.null(old)) {
+      cp$.parent_agent_id <- old$parent_agent_id
+      cp$.parent_run_id <- old$parent_run_id
+      cp$.delegation_id <- old$delegation_id
+      cp$.delegation_guard <- old$guard
+      cp$.delegation_observe <- old$observe
+      cp$.delegation_binding <- old$binding
+      cp$.hooks <- old$hooks
+      cp$.delegation_ancestors <- old$ancestors
+    }
+    entry$busy <- FALSE
+    entry$configuration <- conversation_configuration(child)
+  }
+  on.exit(
+    {
+      if (!handed_off) {
+        cleanup()
+        if (!is.null(op$subagent_runs[[id]])) {
+          lead_settle_delegation(owner, id, stop_reason = "setup_failed")
+        }
+      }
+    },
+    add = TRUE
+  )
   definition <- list(name = child$agent_name %||% "specialist")
   entry$busy <- TRUE
   id <- lead_admit_delegation(owner, definition, task, correlation)
@@ -217,7 +294,7 @@ continue_conversation <- function(
     NULL
   }
   entry$ids <- c(entry$ids, id)
-  op$reserve_delegation_usage(id, limits)
+  caller_private$reserve_delegation_usage(id, limits)
   # Acquire before returning the promise, including before the first dispatch.
   old <- list(
     parent_agent_id = cp$.parent_agent_id,
@@ -226,48 +303,60 @@ continue_conversation <- function(
     guard = cp$.delegation_guard,
     observe = cp$.delegation_observe,
     binding = cp$.delegation_binding,
-    hooks = cp$.hooks
+    hooks = cp$.hooks,
+    ancestors = cp$.delegation_ancestors
   )
   cp$current_run_id <- NULL
   cp$last_run_usage <- AgentUsage()
   cp$.last_run_result <- NULL
   cp$delegation_artifacts <- list()
-  cp$.parent_agent_id <- owner$agent_id
+  cp$.parent_agent_id <- correlation$parent_agent_id
   cp$.parent_run_id <- correlation$parent_run_id
   cp$.delegation_id <- id
   cp$.delegation_binding <- list(mode = "retained", approval = "unsupported")
+  ancestors <- if (is.null(tree)) {
+    list(owner)
+  } else {
+    graph_ancestors(owner, caller)
+  }
   cp$.delegation_guard <- function(tool_name, tool_input, context) {
     if (!is.null(old$guard)) {
       old$guard(tool_name, tool_input, context)
     }
-    decision <- permissions_check(
-      owner$permissions,
-      tool_name,
-      tool_input,
-      context
-    )
-    if (!S7::S7_inherits(decision, PermissionResultAllow)) {
-      ellmer::tool_reject(
-        decision$reason %||% "Denied by current caller policy."
+    for (ancestor in ancestors) {
+      decision <- permissions_check(
+        ancestor$permissions,
+        tool_name,
+        tool_input,
+        context
       )
+      if (!S7::S7_inherits(decision, PermissionResultAllow)) {
+        ellmer::tool_reject(
+          decision$reason %||% "Denied by current caller policy."
+        )
+      }
     }
   }
-  runtime_hooks <- cp$.hooks$clone(deep = TRUE)
-  runtime_hooks$.__enclos_env__$private$configuration_locked <- FALSE
-  for (event in c("PreToolUse", "PostToolUse", "PostToolUseFailure")) {
-    local({
-      selected <- event
-      runtime_hooks$add(HookMatcher(
-        selected,
-        timeout = 0,
-        callback = function(...) {
-          forward_delegation_hook(owner, id, selected, ...)
-        }
-      ))
-    })
+  if (is.null(tree)) {
+    runtime_hooks <- cp$.hooks$clone(deep = TRUE)
+    runtime_hooks$.__enclos_env__$private$configuration_locked <- FALSE
+    for (event in c("PreToolUse", "PostToolUse", "PostToolUseFailure")) {
+      local({
+        selected <- event
+        runtime_hooks$add(HookMatcher(
+          selected,
+          timeout = 0,
+          callback = function(...) {
+            forward_delegation_hook(owner, id, selected, ...)
+          }
+        ))
+      })
+    }
+    runtime_hooks$.__enclos_env__$private$configuration_locked <- TRUE
+    cp$.hooks <- runtime_hooks
+  } else {
+    cp$.delegation_ancestors <- ancestors
   }
-  runtime_hooks$.__enclos_env__$private$configuration_locked <- TRUE
-  cp$.hooks <- runtime_hooks
   if (!isTRUE(op$run_active) && !length(op$active_subagents)) {
     op$should_stop <- FALSE
   }
@@ -280,31 +369,8 @@ continue_conversation <- function(
     attr(owner_chat, "deputy_active_conversations", exact = TRUE),
     id
   )
-  coro::async(function() {
-    on.exit(
-      {
-        active <- setdiff(
-          attr(owner_chat, "deputy_active_conversations", exact = TRUE),
-          id
-        )
-        attr(owner_chat, "deputy_active_conversations") <- if (length(active)) {
-          active
-        } else {
-          NULL
-        }
-        op$release_delegation_usage(id)
-        cp$.parent_agent_id <- old$parent_agent_id
-        cp$.parent_run_id <- old$parent_run_id
-        cp$.delegation_id <- old$delegation_id
-        cp$.delegation_guard <- old$guard
-        cp$.delegation_observe <- old$observe
-        cp$.delegation_binding <- old$binding
-        cp$.hooks <- old$hooks
-        entry$configuration <- conversation_configuration(child)
-        entry$busy <- FALSE
-      },
-      add = TRUE
-    )
+  promise <- coro::async(function() {
+    on.exit(cleanup(), add = TRUE)
     outcome <- coro::await(lead_run_delegation(
       owner,
       id,
@@ -312,8 +378,12 @@ continue_conversation <- function(
       definition,
       task,
       limits = limits,
+      usage_owner = caller,
       run = function() {
         check_conversation_owner(owner)
+        if (!is.null(tree)) {
+          check_graph_ancestors(owner, caller)
+        }
         stream <- cp$start_governed_stream(
           list(task),
           limits,
@@ -341,10 +411,17 @@ continue_conversation <- function(
         run_context = record$run_context
       )
   })()
+  handed_off <- TRUE
+  promise
 }
 
 release_conversation <- function(owner, handle) {
   entry <- conversation_entry(owner, handle)
+  if (!is.null(owner$.__enclos_env__$private$.delegation_tree)) {
+    conversation_abort(
+      "Release graph members together with release_agent_graph()."
+    )
+  }
   if (entry$busy) {
     conversation_abort(
       "Cancel and wait for settlement before releasing a busy conversation."
@@ -417,6 +494,7 @@ check_conversation_access <- function(agent, token) {
 
 # Registered without an owner-capturing closure, so collection can release leases.
 finalize_owned_conversations <- function(owner) {
+  finalize_delegation_graph(owner)
   private <- owner$.__enclos_env__$private
   for (entry in private$owned_conversations) {
     if (isTRUE(entry$busy)) {

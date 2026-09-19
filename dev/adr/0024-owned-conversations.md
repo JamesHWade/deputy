@@ -62,6 +62,6 @@ continuation, or promise of survival across R restart.
 
 Durable approval, fallback provider changes, recursive ownership, and LeadAgent
 specialists are rejected in this first increment. Approval suspension must use the
-standalone approval protocol. Recursive admission and transitive budgets remain
-#169; restart recovery remains #42. Existing AgentDefinition delegation still
+standalone approval protocol. ADR-0025 extends this with root-owned graph admission and transitive budgets
+for #169; nested ownership remains unsupported and restart recovery remains #42. Existing AgentDefinition delegation still
 creates fresh children by default.
