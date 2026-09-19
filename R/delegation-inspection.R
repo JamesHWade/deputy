@@ -169,6 +169,20 @@ inspection_text <- function(text, bytes = 8192L) {
   text
 }
 
+lead_artifact_storage <- function(lead, record, reference) {
+  route <- record$artifact_routing
+  if (!is.null(route) && !identical(reference$source, "delegation_answer")) {
+    return(list(
+      policy = ContextPolicy(offload_dir = route$offload_dir),
+      session_id = reference$storage_session_id %||% route$session_id
+    ))
+  }
+  list(
+    policy = lead$context_policy,
+    session_id = reference$storage_session_id %||% lead$session_id()
+  )
+}
+
 lead_prepare_outcome <- function(lead, id) {
   private <- lead$.__enclos_env__$private
   record <- private$subagent_runs[[id]]
@@ -261,7 +275,7 @@ delegation_outcome <- function(record, compact = FALSE) {
     )
     references <- c(references[answer], references[!answer])
   }
-  runtime <- record[c(
+  runtime_fields <- c(
     "delegation_id",
     "agent_id",
     "agent_name",
@@ -270,9 +284,15 @@ delegation_outcome <- function(record, compact = FALSE) {
     "parent_agent_id",
     "parent_run_id",
     "tool_call_id",
+    "conversation_handle",
+    "previous_delegation_id",
     "status",
     "stop_reason"
-  )]
+  )
+  runtime <- stats::setNames(
+    lapply(runtime_fields, function(field) record[[field]]),
+    runtime_fields
+  )
   compact_fields <- function(fields) {
     fields$omitted_fields <- names(Filter(
       function(value) {
@@ -558,12 +578,13 @@ lead_inspection_records <- function(lead, delegation_id, transcript) {
   lapply(records, function(record) {
     outcome <- delegation_outcome(record)
     references <- lapply(outcome$references, function(ref) {
+      storage <- lead_artifact_storage(lead, record, ref)
       available <- tryCatch(
         {
           read_tool_result_manifest(
             ref$reference,
-            lead$context_policy,
-            ref$storage_session_id
+            storage$policy,
+            storage$session_id
           )
           TRUE
         },
@@ -582,7 +603,11 @@ lead_inspection_records <- function(lead, delegation_id, transcript) {
       outcome = S7::props(outcome),
       manifest = if (!is.null(record$manifest)) S7::props(record$manifest),
       usage = if (!is.null(record$usage)) S7::props(record$usage),
-      cumulative_usage = if (!is.null(record$usage)) S7::props(record$usage),
+      cumulative_usage = if (
+        !is.null(record$cumulative_usage %||% record$usage)
+      ) {
+        S7::props(record$cumulative_usage %||% record$usage)
+      },
       errors = record[c(
         "error",
         "hook_error",
@@ -598,7 +623,11 @@ lead_inspection_records <- function(lead, delegation_id, transcript) {
       retention = list(
         transcript = if (transcript) "included" else "not_requested",
         execution = "read_only",
-        continuation = "unsupported"
+        continuation = if (is.null(record$conversation_handle)) {
+          "unsupported"
+        } else {
+          "explicit_owner_call"
+        }
       )
     )
   })

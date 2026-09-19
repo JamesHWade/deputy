@@ -485,6 +485,16 @@ power-loss durability. Indeterminate records require host reconciliation and
 cannot resume. See ADR-0016 and the Permissions vignette for ownership and
 limits. File storage uses the `filelock` package.
 
+### Retained specialist conversations
+
+`Agent$retain_agent()` transfers execution ownership of a standalone specialist.
+`continue_agent()` / `continue_agent_async()` keep its history with explicit
+cumulative budgets and one active lease; `cancel_agent()` and `release_agent()`
+are trusted host controls. The shared child inspection and observation methods
+now live on Agent and are inherited by LeadAgent. `R/owned-conversations.R` owns
+handle admission and cleanup; it uses the existing delegation lifecycle and run
+kernel. See ADR-0024 for lifetime, resource, approval and recursion boundaries.
+
 ### Human Input
 
 Concurrent and hosted Agents bind their own handler with

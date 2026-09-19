@@ -1,3 +1,11 @@
+lead_child_artifact_routing <- function(child) {
+  policy <- child$context_policy
+  list(
+    offload_dir = policy$offload_dir,
+    session_id = child$session_id()
+  )
+}
+
 # Keep rejected input inspectable without retaining arbitrary objects or unbounded
 # task text in lifecycle events. Validation follows admission, before dispatch.
 delegation_task_label <- function(task, max_bytes) {
@@ -50,7 +58,8 @@ lead_admit_delegation <- function(lead, definition, task, correlation) {
     agent_result = NULL,
     turns = list(),
     manifest = NULL,
-    working_context = NULL
+    working_context = NULL,
+    artifact_routing = NULL
   )
   lead_observe_status(lead, id, "admitted")
   id
@@ -63,6 +72,7 @@ lead_bind_delegation <- function(lead, id, child, manifest = NULL) {
   record$agent_id <- child$agent_id
   record$session_id <- child$session_id()
   record$run_context <- child$run_context
+  record$artifact_routing <- lead_child_artifact_routing(child)
   private$subagent_runs[[id]] <- record
   lead_observe_status(lead, id, "prepared")
   invisible(NULL)
@@ -74,6 +84,7 @@ lead_delegation_records <- function(lead, messages = FALSE, usage = FALSE) {
     child <- private$active_subagents[[record$delegation_id]]
     if (!is.null(child) && is.na(record$completed_at)) {
       record$run_id <- child$.__enclos_env__$private$current_run_id
+      record$artifact_routing <- lead_child_artifact_routing(child)
       record$artifacts <- child$.__enclos_env__$private$delegation_artifacts
       record$references <- lapply(record$artifacts, function(ref) {
         ref$scope <- private$delegation_scope
@@ -138,6 +149,9 @@ lead_settle_delegation <- function(
   record$usage <- result$usage %||% child_private$last_run_usage
   record$agent_result <- result
   record$artifacts <- child_private$delegation_artifacts %||% list()
+  if (!is.null(child)) {
+    record$artifact_routing <- lead_child_artifact_routing(child)
+  }
   record$turns <- if (!is.null(child)) {
     tryCatch(child$turns(), error = function(e) list())
   } else {
@@ -214,7 +228,8 @@ lead_run_delegation <- function(
   child,
   definition,
   task,
-  limits = NULL
+  limits = NULL,
+  run = NULL
 ) {
   private <- lead$.__enclos_env__$private
   coro::async(function() {
@@ -247,7 +262,13 @@ lead_run_delegation <- function(
             !isTRUE(private$should_stop) &&
               is.null(private$subagent_runs[[id]]$cancel_reason)
           ) {
-            result <- coro::await(child$run_async(task, usage_limits = limits))
+            result <- coro::await(
+              if (is.null(run)) {
+                child$run_async(task, usage_limits = limits)
+              } else {
+                run()
+              }
+            )
           }
         }
       },
