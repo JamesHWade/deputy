@@ -80,7 +80,7 @@ subagent_chat_ui <- function(id, height = "420px") {
 }
 
 #' @rdname subagent_chat_ui
-#' @param lead A host-owned LeadAgent, or a reactive/function returning it.
+#' @param lead A host-owned Agent or LeadAgent, or a function returning it.
 #' @param requester Function returning the authenticated host request context.
 #' @param history Optional reactive/function returning saved settled child
 #'   history; returning NULL selects the live lead. No active recovery occurs.
@@ -299,7 +299,7 @@ subagent_chat_server <- function(
             }
             return()
           }
-          if (!inherits(current_lead, "LeadAgent")) {
+          if (!inherits(current_lead, "Agent")) {
             cli::cli_abort("No live lead is available.")
           }
           if (closed()) {

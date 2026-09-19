@@ -21,10 +21,10 @@ or nonportable content becomes an explicit omission envelope; hosts recover
 completed public content from an authorized snapshot.}
 }
 \value{
-Read-only observation limits for \link{LeadAgent}.
+Read-only observation limits for \link{Agent}.
 }
 \description{
-One in-memory ring belongs to each LeadAgent. Subscribers hold only cursors;
+One in-memory ring belongs to each Agent. Subscribers hold only cursors;
 they cannot block execution or accumulate private queues. Retained transcript
 storage is separate from this transient buffer.
 }
