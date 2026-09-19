@@ -1,5 +1,9 @@
 # deputy (development version)
 
+* `adopt_chat()` and `delegation_tool()` compose independently configured chats
+  through an ordinary Agent, preserving selected provider, prompt, tools and
+  history with explicit callback ownership and governed follow-ups (#168).
+
 * `Agent$retain_agent()` and explicit continuation methods preserve specialist
   conversations with owner-local handles, busy rejection, cumulative budgets,
   cancellation and release. Ordinary Agents now share child inspection,
