@@ -2365,6 +2365,11 @@ Agent <- R6::R6Class(
         invisible(deep)
         if (
           !is.null(private$.conversation_owner) ||
+            !is.null(attr(
+              private$.chat,
+              "deputy_conversation_owner",
+              exact = TRUE
+            )) ||
             length(private$owned_conversations)
         ) {
           conversation_abort(

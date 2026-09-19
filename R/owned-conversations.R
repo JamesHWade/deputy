@@ -24,6 +24,16 @@ conversation_configuration <- function(agent) {
   )
 }
 
+check_conversation_owner <- function(owner) {
+  private <- owner$.__enclos_env__$private
+  if (
+    !is.null(private$.conversation_owner) ||
+      !is.null(attr(private$.chat, "deputy_conversation_owner", exact = TRUE))
+  ) {
+    conversation_abort("Recursive conversation ownership is not yet supported.")
+  }
+}
+
 retain_conversation <- function(owner, agent, usage_limits, max_runs) {
   if (
     !inherits(agent, "Agent") ||
@@ -36,11 +46,14 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
   }
   op <- owner$.__enclos_env__$private
   cp <- agent$.__enclos_env__$private
-  if (!is.null(op$.conversation_owner) || length(cp$owned_conversations)) {
+  check_conversation_owner(owner)
+  if (length(cp$owned_conversations)) {
     conversation_abort("Recursive conversation ownership is not yet supported.")
   }
   if (
     !is.null(attr(cp$.chat, "deputy_conversation_owner")) ||
+      length(attr(cp$.chat, "deputy_active_conversations", exact = TRUE)) >
+        0L ||
       isTRUE(cp$run_active) ||
       !is.null(cp$.conversation_owner) ||
       !is.null(cp$.delegation_binding)
@@ -130,6 +143,7 @@ continue_conversation <- function(
   usage_limits,
   correlation = NULL
 ) {
+  check_conversation_owner(owner)
   entry <- conversation_entry(owner, handle)
   op <- owner$.__enclos_env__$private
   child <- entry$agent
@@ -237,9 +251,25 @@ continue_conversation <- function(
   }
   cp$.delegation_observe <- function(event) lead_observe_event(owner, id, event)
   lead_bind_delegation(owner, id, child)
+  # Track work on the shared Chat too: another Agent wrapper must not adopt
+  # this owner while its admitted child continuations are still outstanding.
+  owner_chat <- op$.chat
+  attr(owner_chat, "deputy_active_conversations") <- c(
+    attr(owner_chat, "deputy_active_conversations", exact = TRUE),
+    id
+  )
   coro::async(function() {
     on.exit(
       {
+        active <- setdiff(
+          attr(owner_chat, "deputy_active_conversations", exact = TRUE),
+          id
+        )
+        attr(owner_chat, "deputy_active_conversations") <- if (length(active)) {
+          active
+        } else {
+          NULL
+        }
         op$release_delegation_usage(id)
         cp$.parent_agent_id <- old$parent_agent_id
         cp$.parent_run_id <- old$parent_run_id
@@ -261,6 +291,7 @@ continue_conversation <- function(
       task,
       limits = limits,
       run = function() {
+        check_conversation_owner(owner)
         stream <- cp$start_governed_stream(
           list(task),
           limits,
