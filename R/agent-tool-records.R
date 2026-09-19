@@ -109,12 +109,14 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       record
     },
 
-    begin_tool_execution = function(tool_name) {
+    begin_tool_execution = function(tool_name, tool_call_id = NULL) {
       records <- private$tool_call_records
       matches <- which(vapply(
         records,
         function(record) {
           identical(record$tool_name, tool_name) &&
+            (is.null(tool_call_id) ||
+              identical(record$tool_call_id, tool_call_id)) &&
             isTRUE(record$request_seen) &&
             !isTRUE(record$result_seen) &&
             !isTRUE(record$execution_started)
@@ -168,11 +170,17 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       invisible(record)
     },
 
-    claim_delegation = function(tool_name = NULL, required = FALSE) {
+    claim_delegation = function(
+      tool_name = NULL,
+      required = FALSE,
+      tool_call_id = NULL
+    ) {
       matches <- which(vapply(
         private$pending_delegations,
         function(record) {
-          is.null(tool_name) || identical(record$tool_name, tool_name)
+          (is.null(tool_name) || identical(record$tool_name, tool_name)) &&
+            (is.null(tool_call_id) ||
+              identical(record$tool_call_id, tool_call_id))
         },
         logical(1)
       ))

@@ -89,37 +89,36 @@ delegation_tool <- function(owner, handle, name, description, usage_limits) {
   name <- delegation_text(name, "name")
   description <- delegation_text(description, "description")
   usage_limits <- normalize_usage_limits(usage_limits)
+  invoke <- function(task, correlation) {
+    private <- owner$.__enclos_env__$private
+    promises::then(
+      continue_conversation(owner, handle, task, usage_limits, correlation),
+      function(result) {
+        record <- private$subagent_runs[[correlation$delegation_id]]
+        delegation_json(S7::props(delegation_outcome(record, compact = TRUE)))
+      },
+      function(error) {
+        record <- private$subagent_runs[[correlation$delegation_id]]
+        if (is.null(record)) {
+          rlang::cnd_signal(error)
+        }
+        payload <- delegation_json(S7::props(delegation_outcome(
+          record,
+          compact = TRUE
+        )))
+        ellmer::tool_reject(paste0(
+          "Subagent '",
+          inspection_text(record$agent_name %||% "specialist", 512L),
+          "' failed.\n",
+          payload
+        ))
+      }
+    )
+  }
   tool <- ellmer::tool(
     function(task) {
-      private <- owner$.__enclos_env__$private
-      if (!isTRUE(private$run_active)) {
-        conversation_abort(
-          "Delegation tools require their owner's active governed run."
-        )
-      }
-      correlation <- private$claim_delegation(tool_name = name, required = TRUE)
-      promises::then(
-        continue_conversation(owner, handle, task, usage_limits, correlation),
-        function(result) {
-          record <- private$subagent_runs[[correlation$delegation_id]]
-          delegation_json(S7::props(delegation_outcome(record, compact = TRUE)))
-        },
-        function(error) {
-          record <- private$subagent_runs[[correlation$delegation_id]]
-          if (is.null(record)) {
-            rlang::cnd_signal(error)
-          }
-          payload <- delegation_json(S7::props(delegation_outcome(
-            record,
-            compact = TRUE
-          )))
-          ellmer::tool_reject(paste0(
-            "Subagent '",
-            inspection_text(record$agent_name %||% "specialist", 512L),
-            "' failed.\n",
-            payload
-          ))
-        }
+      conversation_abort(
+        "Delegation tools require their owner's active governed run."
       )
     },
     name = name,
@@ -135,12 +134,37 @@ delegation_tool <- function(owner, handle, name, description, usage_limits) {
     )
   )
   attr(tool, "deputy_composition_owner") <- owner
+  attr(tool, "deputy_composition_invoke") <- invoke
   tool
 }
 
 composition_tool_owner <- function(tool) {
   source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
   attr(source, "deputy_composition_owner", exact = TRUE)
+}
+
+composition_invocation_id <- function(tool, arguments) {
+  if (is.null(composition_tool_owner(tool))) {
+    return(NULL)
+  }
+  context <- tryCatch(ellmer::tool_context(), error = function(error) NULL)
+  request <- context$request
+  source <- if (!is.null(request) && !is.null(request@tool)) {
+    attr(request@tool, "deputy_runtime_source_tool", exact = TRUE) %||%
+      request@tool
+  }
+  if (
+    is.null(request) ||
+      !identical(source, tool) ||
+      !identical(request@name, tool@name) ||
+      !identical(request@arguments$task, arguments$task) ||
+      !is_nonempty_string(request@id)
+  ) {
+    conversation_abort(
+      "Delegation tools require their owner's governed tool invocation."
+    )
+  }
+  request@id
 }
 
 validate_composition_tool_owner <- function(tool, agent) {
