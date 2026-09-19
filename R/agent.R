@@ -150,6 +150,7 @@ Agent <- R6::R6Class(
       if (!is.null(private$.chat)) {
         check_conversation_initialization(self)
       }
+      check_incoming_conversation(chat)
       if (
         !S7::S7_inherits(delegation_disclosure, DelegationDisclosure) ||
           !S7::S7_inherits(delegation_observation, DelegationObservation)
@@ -161,14 +162,6 @@ Agent <- R6::R6Class(
       private$.delegation_buffer <- new_delegation_buffer(
         delegation_observation
       )
-      if (
-        !is.null(attr(chat, "deputy_conversation_owner")) ||
-          !is.null(attr(chat, "deputy_active_runtime", exact = TRUE))
-      ) {
-        conversation_abort(
-          "This Chat is already owned by a retained conversation."
-        )
-      }
       validate_chat(chat)
       private$.fallback_chats <- normalize_fallback_chats(fallback_chats, chat)
 
@@ -1335,6 +1328,7 @@ Agent <- R6::R6Class(
     #' @param mode Permission mode, see [PermissionMode]
     #' @return Invisible self
     set_permission_mode = function(mode) {
+      check_conversation_access(self, NULL)
       mode <- validate_permission_mode_value(mode)
       existing <- self$permissions
       old_mode <- existing$mode

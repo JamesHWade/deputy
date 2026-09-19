@@ -344,6 +344,16 @@ release_conversation <- function(owner, handle) {
   invisible(NULL)
 }
 
+check_incoming_conversation <- function(chat) {
+  if (
+    !is.null(attr(chat, "deputy_conversation_owner", exact = TRUE)) ||
+      !is.null(attr(chat, "deputy_active_runtime", exact = TRUE)) ||
+      length(attr(chat, "deputy_active_conversations", exact = TRUE))
+  ) {
+    conversation_abort("This Chat is already owned by a retained conversation.")
+  }
+}
+
 check_conversation_initialization <- function(agent) {
   if (isTRUE(agent$.__enclos_env__$private$run_active)) {
     conversation_abort(
