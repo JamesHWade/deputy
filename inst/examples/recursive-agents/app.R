@@ -139,12 +139,6 @@ server <- function(input, output, session) {
     "children",
     root,
     requester = function() requester,
-    on_cancel = function(id, candidate) {
-      if (!identical(candidate, requester)) {
-        cli::cli_abort("Not authorized")
-      }
-      root$interrupt_subagent(id, "user_cancelled")
-    },
     poll_interval = 250L
   )
 

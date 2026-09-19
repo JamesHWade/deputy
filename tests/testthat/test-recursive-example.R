@@ -161,6 +161,46 @@ test_that("the recursive example keeps graph budgets across retained follow-ups"
   )
 })
 
+test_that("the local fixture emits tool arguments as a JSON string", {
+  skip_if_not_installed("callr")
+  skip_if_not_installed("httpuv")
+  skip_if_not_installed("httr2")
+  skip_if_not_installed("jsonlite")
+
+  example <- recursive_example_environment()
+  fixture <- example$recursive_local_fixture(delay = 0.01)
+  withr::defer(fixture$close())
+
+  response <- httr2::request(fixture$url) |>
+    httr2::req_url_path_append("chat/completions") |>
+    httr2::req_headers(Authorization = "Bearer fixture") |>
+    httr2::req_body_json(list(
+      model = "recursive-root",
+      stream = TRUE,
+      messages = list(
+        list(role = "system", content = "RECURSIVE_ROOT"),
+        list(role = "user", content = "Analyze the fixture evidence.")
+      )
+    )) |>
+    httr2::req_perform()
+
+  chunks <- strsplit(
+    httr2::resp_body_string(response),
+    "\n\n",
+    fixed = TRUE
+  )[[1L]]
+  payloads <- chunks[startsWith(chunks, "data: {")]
+  expect_gt(length(payloads), 0L)
+  first <- jsonlite::fromJSON(
+    sub("^data: ", "", payloads[[1L]]),
+    simplifyVector = FALSE
+  )
+  arguments <- first$choices[[1L]]$delta$tool_calls[[1L]]$`function`$arguments
+
+  expect_type(arguments, "character")
+  expect_identical(arguments, "{\"task\":\"Analyze the fixture evidence.\"}")
+})
+
 test_that("a repeated root run admits a fresh route before the graph cap", {
   skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")

@@ -49,10 +49,10 @@ recursive_local_fixture <- function(delay = 0.15) {
               type = "function",
               `function` = list(
                 name = message$name,
-                arguments = jsonlite::toJSON(
+                arguments = as.character(jsonlite::toJSON(
                   message$arguments,
                   auto_unbox = TRUE
-                )
+                ))
               )
             ))
           )

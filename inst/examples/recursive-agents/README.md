@@ -22,6 +22,12 @@ cancellation, and the graph budget. The `Follow up with analyst` button spends
 the same cumulative graph allocation; it does not create a second budget or
 silently reset the analyst's conversation.
 
+Each Shiny session creates and owns its own graph. The local host controls act
+only on that session's graph; the child panel exposes observation without a
+cancellation callback. The requester token demonstrates disclosure scoping,
+not end-user authentication. A shared deployment must supply its own identity
+and action authorization, independently of permission to view child transcripts.
+
 The route declarations demonstrate borrowing. The root may borrow `analyst`
 through `analyze`, and `analyst` may borrow `reviewer` through `review`. Each
 route fixes its target, description, and per-invocation allocation. Depth is

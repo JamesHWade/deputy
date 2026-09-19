@@ -95,6 +95,9 @@ host's responsibility. These handles do not survive an R restart.
 
 The `examples/recursive-agents` Shiny app provides a deterministic local HTTP
 producer and separate descendant transcript selection, with no paid model calls.
+Each session owns a separate graph and its host controls. The example's requester
+token scopes disclosure; shared applications must supply authenticated identities
+and independent action authorization.
 
 ## Defining Sub-Agents
 
