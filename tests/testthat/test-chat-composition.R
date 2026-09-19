@@ -281,3 +281,44 @@ test_that("concurrent model calls cannot mutate one retained specialist twice", 
   parent <- setup$server$requests()[[2L]]$body
   expect_match(jsonlite::toJSON(parent), "conversation is busy")
 })
+
+test_that("the public composition recipe authorizes its curated read tools", {
+  env <- new.env(parent = globalenv())
+  sys.source(
+    test_path("..", "..", "inst", "examples", "curated-chats", "composition.R"),
+    env
+  )
+  parent_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_analyst", arguments = list(task = "read")),
+    runtime_reply("settled")
+  ))
+  child_server <- local_runtime_server(list(
+    runtime_reply(tool = "inspect_evidence", arguments = list()),
+    runtime_reply("read complete")
+  ))
+  effects <- 0L
+  analyst <- runtime_chat(child_server)
+  analyst$register_tool(ellmer::tool(
+    function() {
+      effects <<- effects + 1L
+      "evidence"
+    },
+    name = "inspect_evidence",
+    description = "Read evidence",
+    arguments = list(),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      destructive_hint = FALSE,
+      open_world_hint = FALSE
+    )
+  ))
+  setup <- env$curated_conversations(
+    runtime_chat(parent_server),
+    analyst,
+    runtime_chat(child_server),
+    DelegationDisclosure(authorize = function(...) TRUE)
+  )
+  setup$owner$run_sync("read evidence")
+  expect_identical(effects, 1L)
+  expect_identical(setup$owner$list_subagents()$agent_name, "analyst")
+})

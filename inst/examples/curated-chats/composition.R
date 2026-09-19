@@ -16,7 +16,12 @@ curated_conversations <- function(
     deputy::adopt_chat(
       chat,
       owner,
-      permissions = deputy::permissions_readonly(),
+      permissions = deputy::Permissions(
+        mode = "readonly",
+        file_read = TRUE,
+        file_write = FALSE,
+        tool_allowlist = names(chat$get_tools())
+      ),
       usage_limits = deputy::UsageLimits(max_requests = 8),
       history = "retain",
       callbacks = "replace",
