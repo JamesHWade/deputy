@@ -709,3 +709,54 @@ status. Closing, selecting and replaying a view do not cancel or resume a child.
 `interrupt_subagent()` is a trusted host control API requiring the host's separate
 action authorization. Streams are in-process only: process restart needs
 host-owned saved history, and active-run recovery remains unsupported.
+
+## Inspect children in Shiny
+
+The optional adapter places an activity strip and selected child conversation
+beside the host's lead chat. It requires shinychat 0.5.0, Shiny, bslib, commonmark
+and xml2. The core runtime has no UI dependency. Assistant Markdown is rendered
+then filtered to inert HTML so inline and fenced code retain their literal
+characters. Native tool code values and errors remain plain text.
+
+```{r, eval=FALSE}
+ui <- bslib::page_fluid(
+  bslib::layout_columns(lead_chat_ui, subagent_chat_ui("children"))
+)
+server <- function(input, output, session) {
+  subagent_chat_server(
+    "children", lead,
+    requester = function() authenticated_owner_session,
+    # Optional: authorize this action separately from disclosure.
+    on_cancel = function(id, requester) {
+      authorize_child_cancellation(requester, id)
+      lead$interrupt_subagent(id, "user_cancelled")
+    }
+  )
+}
+```
+
+Activity cards and the keyboard-accessible selector identify individual
+delegations, including repeated calls to the same specialist. The selected view
+shows execution status, initial context, usage, unresolved claims and native tool
+cards with retained attachments. Completed execution does not establish task
+success, approval or evidence verification. Tool results remain untrusted.
+
+Selecting, closing and reopening a child only reads history. The panel has no
+prompt handler; it cannot resume a child. Closing detaches its reader while
+children continue. Cancellation appears only when the host supplies a separately
+authorized callback. Polling rechecks authorization and redaction; denial clears
+the displayed history. Buffer gaps recover from retained snapshots, while partial
+live text is bounded. The read-only composer is hidden with scoped presentation
+CSS tested against shinychat 0.5.0; no private runtime helpers are used.
+
+For saved history, provide a reactive `history` plus the current host-owned
+`disclosure` policy and trusted `scope`, obtained independently of the saved
+payload. Replay restores no execution, and unresolved artifact references stay
+unresolved. The module returns reactive selection, views, notice and closed
+state for host composition.
+
+Run `inst/examples/subagent-chats/app.R` for a deterministic local demo with
+native tool output and a plot, concurrent specialists, repeated names, a partial
+failure, optional cancellation, access revocation and saved-history replay. Its
+visible model/tool counters make extra execution detectable. It uses a local
+fixture service and needs no paid model credentials.
