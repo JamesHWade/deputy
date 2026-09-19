@@ -1,6 +1,8 @@
 # Host-owned three-level retained graph used by the Shiny app and tests.
 recursive_agents <- function(fixture, effects = new.env(parent = emptyenv())) {
-  effects$count <- effects$count %||% 0L
+  if (is.null(effects$count)) {
+    effects$count <- 0L
+  }
   requester <- new.env(parent = emptyenv())
   disclosure <- DelegationDisclosure(
     authorize = function(candidate, scope) identical(candidate, requester)

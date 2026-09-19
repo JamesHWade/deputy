@@ -161,6 +161,48 @@ test_that("the recursive example keeps graph budgets across retained follow-ups"
   )
 })
 
+test_that("a repeated root run admits a fresh route before the graph cap", {
+  skip_if_not_installed("callr")
+  skip_if_not_installed("httpuv")
+  skip_if_not_installed("jsonlite")
+
+  example <- recursive_example_environment()
+  fixture <- example$recursive_local_fixture(delay = 0.01)
+  withr::defer(fixture$close())
+  graph <- example$recursive_agents(fixture)
+  withr::defer(
+    try(graph$root$release_agent_graph(), silent = TRUE)
+  )
+
+  graph$root$run_sync(
+    "Analyze the fixture evidence and ask the reviewer to check it."
+  )
+  repeated <- graph$root$run_sync(
+    "Run the bounded review again using the retained route."
+  )
+
+  expect_identical(repeated$stop_reason, "request_limit")
+  expect_identical(graph$root$delegation_graph_usage()$requests, 8L)
+  expect_gt(graph$root$delegation_graph_usage()$tool_calls, 3L)
+  expect_identical(graph$effects$count, 1L)
+
+  requests <- fixture$requests()
+  expect_length(requests, 8L)
+  expect_identical(
+    tail(
+      vapply(requests, function(request) request$body$model, character(1)),
+      2L
+    ),
+    c("recursive-root", "recursive-analyst")
+  )
+
+  rows <- graph$root$list_subagents()
+  expect_identical(rows$agent_name, c("analyst", "reviewer", "analyst"))
+  expect_identical(rows$depth, c(1L, 2L, 1L))
+  expect_identical(rows$status, c("completed", "completed", "stopped"))
+  expect_false(is.na(rows$tool_call_id[[3L]]))
+})
+
 test_that("the recursive example exposes host controls and read-only child selection", {
   skip_if_not_installed("bslib")
   skip_if_not_installed("commonmark")

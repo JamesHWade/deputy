@@ -112,6 +112,16 @@ recursive_local_fixture <- function(delay = 0.15) {
             file.path(directory, sprintf("%04d.rds", count))
           )
           messages <- request$messages %||% list()
+          user_positions <- which(vapply(
+            messages,
+            function(message) identical(message$role, "user"),
+            logical(1)
+          ))
+          current_messages <- if (length(user_positions)) {
+            messages[tail(user_positions, 1L):length(messages)]
+          } else {
+            messages
+          }
           system <- paste(
             vapply(
               Filter(
@@ -124,13 +134,16 @@ recursive_local_fixture <- function(delay = 0.15) {
             collapse = " "
           )
           user_messages <- vapply(
-            Filter(function(message) identical(message$role, "user"), messages),
+            Filter(
+              function(message) identical(message$role, "user"),
+              current_messages
+            ),
             message_text,
             character(1)
           )
           tool_messages <- Filter(
             function(message) identical(message$role, "tool"),
-            messages
+            current_messages
           )
           tool_text <- paste(
             vapply(tool_messages, message_text, character(1)),
