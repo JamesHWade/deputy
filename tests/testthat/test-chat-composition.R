@@ -285,7 +285,12 @@ test_that("concurrent model calls cannot mutate one retained specialist twice", 
 test_that("the public composition recipe authorizes its curated read tools", {
   env <- new.env(parent = globalenv())
   sys.source(
-    test_path("..", "..", "inst", "examples", "curated-chats", "composition.R"),
+    system.file(
+      "examples",
+      "curated-chats",
+      "composition.R",
+      package = "deputy"
+    ),
     env
   )
   parent_server <- local_runtime_server(list(
