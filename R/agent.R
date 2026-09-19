@@ -1798,6 +1798,7 @@ Agent <- R6::R6Class(
       .hooks = NULL,
       .delegation_guard = NULL,
       .delegation_binding = NULL,
+      .delegation_observe = NULL,
       .run_context = list(),
       .agent_id = NULL,
       .agent_name = NULL,
@@ -1868,6 +1869,12 @@ Agent <- R6::R6Class(
       },
 
       deep_clone = function(name, value) {
+        if (identical(name, ".delegation_buffer") && !is.null(value)) {
+          return(new_delegation_buffer(value$policy))
+        }
+        if (identical(name, ".delegation_observe")) {
+          return(NULL)
+        }
         if (identical(name, ".chat") && is.function(value$clone)) {
           return(clone_governed_chat(value))
         }
@@ -2158,10 +2165,16 @@ Agent <- R6::R6Class(
       },
 
       record_run_event = function(event) {
+        if (is.null(event)) {
+          return(invisible(NULL))
+        }
         state <- private$current_run_state
         if (!is.null(state)) {
           state$events[[length(state$events) + 1L]] <- event
           trace_governance_event(state$trace_span, event)
+        }
+        if (is.function(private$.delegation_observe)) {
+          private$.delegation_observe(event)
         }
         invisible(event)
       },

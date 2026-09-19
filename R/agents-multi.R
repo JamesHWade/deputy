@@ -1,4 +1,4 @@
-#' @include agent-definition.R delegation-manifest.R delegation-binding.R delegation-inspection.R
+#' @include agent-definition.R delegation-manifest.R delegation-binding.R delegation-inspection.R delegation-observation.R
 NULL
 
 # Multi-agent orchestration for deputy
@@ -63,6 +63,8 @@ LeadAgent <- R6::R6Class(
     #'   resource ownership and interactive routing.
     #' @param delegation_disclosure Host-only [DelegationDisclosure] authorizing
     #'   inspection and saved-history disclosure. Defaults to deny.
+    #' @param delegation_observation [DelegationObservation] bounds for the
+    #'   transient child activity stream.
     #' @param approval_dir Optional standalone lead approval directory. Delegation
     #'   rejects this unsupported durable child-continuation combination.
     #' @param delegation_max_bytes Positive finite admission ceiling, default
@@ -93,6 +95,7 @@ LeadAgent <- R6::R6Class(
       delegation_max_bytes = 65536L,
       delegation_policy = DelegationPolicy(),
       delegation_disclosure = DelegationDisclosure(),
+      delegation_observation = DelegationObservation(),
       approval_dir = NULL
     ) {
       if (!S7::S7_inherits(delegation_policy, DelegationPolicy)) {
@@ -103,6 +106,14 @@ LeadAgent <- R6::R6Class(
       if (!S7::S7_inherits(delegation_disclosure, DelegationDisclosure)) {
         cli::cli_abort("delegation_disclosure must be a DelegationDisclosure.")
       }
+      if (!S7::S7_inherits(delegation_observation, DelegationObservation)) {
+        cli::cli_abort(
+          "delegation_observation must be a DelegationObservation."
+        )
+      }
+      private$.delegation_buffer <- new_delegation_buffer(
+        delegation_observation
+      )
       private$.delegation_disclosure <- delegation_disclosure
       private$.delegation_policy <- delegation_policy
       sources <- normalize_delegation_sources(
@@ -315,6 +326,7 @@ LeadAgent <- R6::R6Class(
           admitted_at = as.POSIXct(character()),
           hook_error = character(),
           cleanup_error = character(),
+          observation_error = character(),
           started_at = as.POSIXct(character()),
           completed_at = as.POSIXct(character()),
           error = character(),
@@ -341,6 +353,7 @@ LeadAgent <- R6::R6Class(
             admitted_at = as.POSIXct(run$admitted_at, tz = "UTC"),
             hook_error = run$hook_error %||% NA_character_,
             cleanup_error = run$cleanup_error %||% NA_character_,
+            observation_error = run$observation_error %||% NA_character_,
             started_at = as.POSIXct(run$started_at, tz = "UTC"),
             completed_at = as.POSIXct(run$completed_at, tz = "UTC"),
             error = run$error %||% NA_character_,
@@ -420,6 +433,43 @@ LeadAgent <- R6::R6Class(
       redact = FALSE
     ) {
       lead_subagent_contexts(self, delegation_id, view, redact)
+    },
+
+    #' @description
+    #' Observe bounded child activity without consuming or driving its stream.
+    #' @param requester Host-authenticated request context.
+    #' @param delegation_id Optional child locator filter.
+    #' @param after Optional cursor returned by a subscription on this lead.
+    #' @return A [DelegationSubscription]. Snapshot, observation, cancellation
+    #'   and continuation are distinct operations. Closing it only detaches.
+    observe_subagents = function(
+      requester,
+      delegation_id = NULL,
+      after = NULL
+    ) {
+      DelegationSubscription$new(self, requester, delegation_id, after)
+    },
+
+    #' @description
+    #' Ask one child to stop cooperatively. This trusted host control API is
+    #' separate from disclosure authorization; hosts must authorize the action
+    #' before routing a user request here. It is never exposed as an agent tool.
+    #' @param delegation_id Exact admitted child locator.
+    #' @param reason Stable stop reason, default `"interrupted"`.
+    #' @return Invisible logical; FALSE for missing or already settled children.
+    interrupt_subagent = function(delegation_id, reason = "interrupted") {
+      delegation_id <- delegation_text(delegation_id, "delegation_id")
+      reason <- delegation_text(reason, "reason")
+      record <- private$subagent_runs[[delegation_id]]
+      if (is.null(record) || !is.na(record$completed_at)) {
+        return(invisible(FALSE))
+      }
+      private$subagent_runs[[delegation_id]]$cancel_reason <- reason
+      child <- private$active_subagents[[delegation_id]]
+      if (!is.null(child)) {
+        child$interrupt(reason)
+      }
+      invisible(TRUE)
     },
 
     #' @description
@@ -1088,6 +1138,7 @@ LeadAgent <- R6::R6Class(
     .sub_agent_defs = list(),
     .delegation_policy = NULL,
     .delegation_disclosure = NULL,
+    .delegation_buffer = NULL,
     delegation_bindings = list(),
     subagent_runs = list(),
     active_subagents = list(),

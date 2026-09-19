@@ -130,3 +130,7 @@ objects are separate from the portable binding receipt in `DelegationManifest`.
 facts. `DelegationDisclosure` is the host authorization/redaction boundary for
 child snapshots and artifacts. A saved child history is read-only public ellmer
 evidence, never a continuation or an access grant. See ADR-0020.
+
+`DelegationObservation` bounds a lead's transient event stream. A
+`DelegationSubscription` is an authorized read cursor, not a job, conversation
+owner or cancellation handle. Gaps require snapshot recovery.

@@ -78,6 +78,7 @@ Collate:
     'agent.R'
     'delegation-input.R'
     'delegation-inspection.R'
+    'delegation-observation.R'
     'delegation-binding.R'
     'delegation-manifest.R'
     'agents-multi.R'

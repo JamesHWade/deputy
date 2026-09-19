@@ -35,6 +35,7 @@ deputy/
 │   ├── delegation-binding.R # Host governance and child resource ownership
 │   ├── delegation-inspection.R # Compact outcomes, authorized history and replay
 │   ├── delegation-lifecycle.R # Shared live records and child settlement
+│   ├── delegation-observation.R # Bounded child events and independent cursors
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
 │   ├── compaction-run.R    # Governed asynchronous summary attempts and recovery
@@ -401,6 +402,15 @@ and `export_subagents()` preserve provenance without granting authority or
 verifying model claims. Settled records remain authoritative during stop hooks.
 `delegation_history()` replays allowlisted public ellmer records as read-only
 history, never active execution. See ADR-0020 and `R/delegation-inspection.R`.
+
+### Child observation
+
+`DelegationObservation` bounds one per-lead event ring. `observe_subagents()`
+returns independent `DelegationSubscription` cursors; runtime remains the sole
+consumer of each child stream. Every snapshot/poll reauthorizes and redacts;
+evicted or omitted events produce explicit gaps recovered from retained history.
+`interrupt_subagent()` is a separate trusted-host control. Detaching a reader
+never cancels work. See ADR-0021 and `R/delegation-observation.R`.
 
 ### Permission Modes
 

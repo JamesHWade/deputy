@@ -71,3 +71,7 @@ boundaries and continue to use shared helper files.
 `R/delegation-inspection.R` owns compact outcomes, authorized disclosure and
 settled public-content replay. It reuses ContextPolicy artifacts and ellmer
 record/replay; it does not execute children or implement a UI renderer.
+
+`R/delegation-observation.R` owns bounded event envelopes and authorized cursor
+readers. The Agent event kernel appends data; subscribers never consume child
+generators or run callbacks inside execution. See ADR-0021.

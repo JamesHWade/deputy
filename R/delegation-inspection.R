@@ -587,7 +587,8 @@ lead_inspection_records <- function(lead, delegation_id, transcript) {
         "error",
         "hook_error",
         "cleanup_error",
-        "outcome_error"
+        "outcome_error",
+        "observation_error"
       )],
       transcript = if (transcript) {
         lapply(record$turns, inspection_record_turn)
