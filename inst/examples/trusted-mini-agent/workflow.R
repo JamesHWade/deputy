@@ -386,6 +386,7 @@ study_workflow <- function(
           }
         })
       )
+      state$error <- NULL
       state$executor$run_sync(study_json(plan))
       state$pending <- state$executor$pending_approval()
       if (is.null(state$pending)) {
@@ -411,6 +412,7 @@ study_workflow <- function(
         state$approved <- study_validate(plan, data)
       }
       on.exit(state$approved <- NULL, add = TRUE)
+      state$error <- NULL
       state$commentary <- tryCatch(
         state$executor$resume_approval(
           state$pending$source$path,
