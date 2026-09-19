@@ -291,7 +291,8 @@ Agent <- R6::R6Class(
     #' @param handle An owner-local handle from `$retain_agent()`.
     #' @param task A new bounded plain-text brief. Existing history is retained.
     #' @param usage_limits Explicit [UsageLimits] allocation for this invocation.
-    #' @return Promise resolving to an AgentResult.
+    #' @return Promise resolving to an AgentResult. Cancellation before dispatch
+    #'   returns zero usage and no run ID because no child run started.
     continue_agent_async = function(handle, task, usage_limits) {
       continue_conversation(self, handle, task, usage_limits)
     },
@@ -1670,6 +1671,7 @@ Agent <- R6::R6Class(
       automatic = FALSE,
       estimated_tokens = NULL
     ) {
+      check_conversation_lease(self, NULL)
       if (isTRUE(private$run_active) && !isTRUE(automatic)) {
         cli::cli_abort(
           "Cannot compact conversation state while this agent has an active run",

@@ -268,7 +268,17 @@ continue_conversation <- function(
     if (!is.null(outcome$error)) {
       rlang::cnd_signal(outcome$error)
     }
-    outcome$result
+    outcome$result %||%
+      AgentResult(
+        stop_reason = record$stop_reason,
+        session_id = record$session_id,
+        agent_id = record$agent_id,
+        agent_name = record$agent_name,
+        parent_agent_id = record$parent_agent_id,
+        parent_run_id = record$parent_run_id,
+        delegation_id = id,
+        run_context = record$run_context
+      )
   })()
 }
 
