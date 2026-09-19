@@ -1,5 +1,9 @@
 # deputy (development version)
 
+* A trusted mini-agent example now demonstrates reviewed scientific inputs, a
+  designated computation, and tool-owned results separate from model commentary
+  (#154).
+
 * `subagent_chat_ui()` and `subagent_chat_server()` compose an optional read-only
   child conversation panel with native shinychat tool cards, retained attachments,
   live activity, authorized saved-history replay and separate host cancellation.
