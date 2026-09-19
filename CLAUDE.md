@@ -495,6 +495,12 @@ now live on Agent and are inherited by LeadAgent. `R/owned-conversations.R` owns
 handle admission and cleanup; it uses the existing delegation lifecycle and run
 kernel. See ADR-0024 for lifetime, resource, approval and recursion boundaries.
 
+`adopt_chat()` copies a curated ellmer Chat through the qualified callback-isolation
+boundary and explicitly selects retained/fresh history. `delegation_tool()` binds
+one handle and allocation to its owning Agent; models supply only a task brief.
+`inst/examples/curated-chats/` demonstrates composition and separately inspectable
+follow-ups with a deterministic local Shiny app. There is no second run engine.
+
 ### Human Input
 
 Concurrent and hosted Agents bind their own handler with

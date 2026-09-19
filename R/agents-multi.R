@@ -402,7 +402,9 @@ LeadAgent <- R6::R6Class(
           deliverable = NULL,
           stop_conditions = character()
         ) {
-          correlation <- private$claim_delegation()
+          correlation <- private$claim_delegation(
+            tool_name = "delegate_to_agent"
+          )
 
           route_key <- if (is_nonempty_string(agent_name)) {
             tolower(trimws(agent_name))

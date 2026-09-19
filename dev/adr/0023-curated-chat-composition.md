@@ -1,7 +1,7 @@
 # ADR-0023: Curated chat composition and bounded recursion
 
-Status: design accepted; implementation tracked in #168 and #169. No new public
-composition API is introduced by this document.
+Status: curated composition implemented in #168 with ADR-0024 ownership.
+Recursive execution remains tracked in #169.
 
 ## Problem
 
@@ -17,12 +17,14 @@ Design a small host-created delegation tool around an existing governed Agent,
 with explicit adoption of a host-supplied ellmer Chat as a convenience. The caller
 registers that tool on its orchestrator. Agent and LeadAgent stay the runtime
 facades; the adapter must reuse their run, permission, budget and observation
-machinery rather than introduce another executor. Names shown below illustrate
-the contract and are not exported functions:
+machinery rather than introduce another executor. The exported adapter uses an Agent owner and an opaque retained handle:
 
 ```r
-specialist <- adopt_chat(curated_chat, owner = owner, history = "retain")
-tool <- delegation_tool(specialist, name = "analyst", description = "...")
+specialist <- adopt_chat(curated_chat, owner = orchestrator,
+  permissions = permissions_readonly(), usage_limits = UsageLimits(max_requests = 8),
+  history = "retain", callbacks = "replace")
+tool <- delegation_tool(orchestrator, specialist, name = "analyst",
+  description = "...", usage_limits = UsageLimits(max_requests = 2))
 orchestrator$register_tool(tool)
 ```
 

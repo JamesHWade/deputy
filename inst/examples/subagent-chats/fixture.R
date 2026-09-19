@@ -1,6 +1,6 @@
 # Deterministic local OpenAI-compatible fixture. No credentials or paid service.
 # Run the transport in a separate process so Shiny stays responsive.
-child_chat_fixture <- function() {
+child_chat_fixture <- function(curated = FALSE) {
   directory <- tempfile("deputy-child-demo-")
   dir.create(directory)
   saveRDS(
@@ -8,7 +8,7 @@ child_chat_fixture <- function() {
     file.path(directory, "scenario.rds")
   )
   process <- callr::r_bg(
-    function(directory) {
+    function(directory, curated) {
       `%||%` <- function(x, y) if (is.null(x)) y else x
       count <- 0L
       port <- httpuv::randomPort()
@@ -114,14 +114,20 @@ child_chat_fixture <- function() {
                   id = paste0("delegate-", count, "-", i),
                   type = "function",
                   `function` = list(
-                    name = "delegate_to_agent",
+                    name = if (curated) {
+                      paste0("ask_", names[[i]])
+                    } else {
+                      "delegate_to_agent"
+                    },
                     arguments = as.character(jsonlite::toJSON(
-                      list(
-                        agent_name = names[[i]],
-                        task = paste(
-                          "Inspect the",
-                          names[[i]],
-                          "evidence and report limitations."
+                      c(
+                        if (!curated) list(agent_name = names[[i]]),
+                        list(
+                          task = paste(
+                            "Inspect the",
+                            names[[i]],
+                            "evidence and report limitations."
+                          )
                         )
                       ),
                       auto_unbox = TRUE
@@ -189,7 +195,7 @@ child_chat_fixture <- function() {
         httpuv::service(50)
       }
     },
-    args = list(directory = directory)
+    args = list(directory = directory, curated = curated)
   )
   deadline <- Sys.time() + 15
   while (!file.exists(file.path(directory, "port.rds"))) {
