@@ -130,3 +130,97 @@ test_that("saved observer removers respect retained ownership", {
   expect_identical(requests, 1L)
   expect_identical(results, 1L)
 })
+
+
+test_that("retained permission modes change only after release", {
+  child <- owned_test_agent(permissions = permissions_full())
+  alias <- Agent$new(
+    child$.__enclos_env__$private$.chat,
+    permissions = permissions_full()
+  )
+  owner <- owned_test_owner(permissions = permissions_full())
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
+  original <- child$permissions
+  expect_error(
+    child$set_permission_mode("readonly"),
+    class = "deputy_conversation"
+  )
+  expect_error(
+    alias$set_permission_mode("readonly"),
+    class = "deputy_conversation"
+  )
+  expect_identical(child$permissions, original)
+  attempted <- NULL
+  owner$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    attempted <<- tryCatch(
+      child$set_permission_mode("readonly"),
+      error = identity
+    )
+    owner$set_permission_mode("readonly")
+    NULL
+  }))
+  owner$continue_agent(handle, "narrow caller", UsageLimits(max_requests = 1))
+  expect_s3_class(attempted, "deputy_conversation")
+  expect_identical(child$permissions, original)
+  expect_identical(owner$get_permission_mode(), "readonly")
+  owner$release_agent(handle)
+  child$set_permission_mode("readonly")
+  expect_identical(child$get_permission_mode(), "readonly")
+})
+
+test_that("rejected incoming Chats preserve existing disclosure and lead state", {
+  lead <- parallel_test_lead(
+    new.env(parent = emptyenv()),
+    delegation_disclosure = DelegationDisclosure(authorize = function(
+      requester,
+      scope
+    ) {
+      identical(requester, "owner")
+    })
+  )
+  lead$parallel_delegate(c(a = "settled evidence"))
+  original_view <- lead$inspect_subagents("owner", transcript = TRUE)
+  original_defs <- lead$available_sub_agents()
+  original_chat <- lead$.__enclos_env__$private$.chat
+  original_buffer <- lead$.__enclos_env__$private$.delegation_buffer
+  original_disclosure <- lead$.__enclos_env__$private$.delegation_disclosure
+  child <- owned_test_agent()
+  owner <- owned_test_owner()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
+  target <- child$.__enclos_env__$private$.chat
+  for (agent in list(lead, owned_test_owner())) {
+    before <- agent$.__enclos_env__$private$.delegation_disclosure
+    expect_error(
+      agent$initialize(
+        target,
+        delegation_disclosure = DelegationDisclosure(authorize = function(...) {
+          TRUE
+        })
+      ),
+      class = "deputy_conversation"
+    )
+    expect_identical(
+      agent$.__enclos_env__$private$.delegation_disclosure,
+      before
+    )
+  }
+  expect_identical(lead$.__enclos_env__$private$.chat, original_chat)
+  expect_identical(
+    lead$.__enclos_env__$private$.delegation_buffer,
+    original_buffer
+  )
+  expect_identical(
+    lead$.__enclos_env__$private$.delegation_disclosure,
+    original_disclosure
+  )
+  expect_identical(lead$available_sub_agents(), original_defs)
+  expect_identical(
+    lead$inspect_subagents("owner", transcript = TRUE),
+    original_view
+  )
+  expect_error(
+    lead$inspect_subagents("stranger", transcript = TRUE),
+    class = "deputy_error"
+  )
+  owner$release_agent(handle)
+})
