@@ -1,5 +1,14 @@
 recursive_example_directory <- function() {
-  test_path("..", "..", "inst", "examples", "recursive-agents")
+  source <- test_path("..", "..", "inst", "examples", "recursive-agents")
+  if (dir.exists(source)) {
+    return(normalizePath(source))
+  }
+  system.file(
+    "examples",
+    "recursive-agents",
+    package = "deputy",
+    mustWork = TRUE
+  )
 }
 
 recursive_example_environment <- function() {
