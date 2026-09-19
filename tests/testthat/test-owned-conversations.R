@@ -441,6 +441,30 @@ test_that("leased Chat aliases cannot admit or dispatch retained children", {
   expect_s3_class(alias$clone(), "Agent")
 })
 
+test_that("interrupt reports cancellation of an independent retained child", {
+  owner <- owned_test_owner()
+  child <- owned_test_agent()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
+  interrupted <- NULL
+  owner$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    interrupted <<- owner$interrupt("host_cancelled")
+    NULL
+  }))
+  expect_identical(owner$interrupt(), FALSE)
+  result <- owner$continue_agent(
+    handle,
+    "cancel",
+    UsageLimits(max_requests = 1)
+  )
+  expect_identical(interrupted, TRUE)
+  expect_identical(result$stop_reason, "host_cancelled")
+  expect_identical(result$usage$requests, 0L)
+  expect_length(child$turns(), 0L)
+  expect_identical(owner$list_subagents()$stop_reason, "host_cancelled")
+  expect_identical(owner$interrupt(), FALSE)
+  owner$release_agent(handle)
+})
+
 test_that("outstanding alias continuations prevent shared Chat adoption", {
   owner <- owned_test_owner()
   child <- owned_test_agent()
