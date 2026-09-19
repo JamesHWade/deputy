@@ -529,6 +529,7 @@ test_that("retention rebinds shared tool callbacks and adapters to the child", {
   child_requests <- 0L
   alias_requests <- 0L
   owner_hooks <- 0L
+  active_registration <- NULL
   child <- Agent$new(
     chat,
     permissions = Permissions(file_write = TRUE),
@@ -552,15 +553,38 @@ test_that("retention rebinds shared tool callbacks and adapters to the child", {
   owner <- owned_test_owner(permissions = Permissions(file_write = TRUE))
   owner$add_hook(HookMatcher("PreToolUse", callback = function(...) {
     owner_hooks <<- owner_hooks + 1L
+    active_registration <<- tryCatch(
+      alias$on_tool_result(function(result) {
+        alias_requests <<- alias_requests + 1L
+      }),
+      error = identity
+    )
     NULL
   }))
   handle <- owner$retain_agent(child, UsageLimits(max_requests = 4))
+  for (observer in list(child, alias)) {
+    denied_request <- tryCatch(
+      observer$on_tool_request(function(request) {
+        alias_requests <<- alias_requests + 1L
+      }),
+      error = identity
+    )
+    denied_result <- tryCatch(
+      observer$on_tool_result(function(result) {
+        alias_requests <<- alias_requests + 1L
+      }),
+      error = identity
+    )
+    expect_s3_class(denied_request, "deputy_conversation")
+    expect_s3_class(denied_result, "deputy_conversation")
+  }
   first <- owner$continue_agent(handle, "write", UsageLimits(max_requests = 2))
   expect_identical(trimws(first$response), "settled")
   expect_identical(effects, 1L)
   expect_identical(child_requests, 1L)
   expect_identical(alias_requests, 0L)
   expect_identical(owner_hooks, 1L)
+  expect_s3_class(active_registration, "deputy_conversation")
   expect_identical(first$usage$requests, 2L)
   expect_identical(first$usage$tool_calls, 1L)
 
@@ -585,7 +609,12 @@ test_that("retention rebinds shared tool callbacks and adapters to the child", {
   )
 
   owner$release_agent(handle)
+  released_results <- 0L
+  child$on_tool_result(function(result) {
+    released_results <<- released_results + 1L
+  })
   released <- child$run_sync("released")
+  expect_identical(released_results, 1L)
   expect_identical(trimws(released$response), "settled")
   expect_identical(effects, 2L)
   expect_identical(alias_requests, 0L)

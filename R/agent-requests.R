@@ -306,6 +306,7 @@ try_chat_fallback <- function(agent, condition) {
 }
 
 register_tool_observer <- function(agent, phase, callback) {
+  check_conversation_lease(agent, NULL)
   private <- agent$.__enclos_env__$private
   method <- paste0("on_tool_", phase)
   field <- paste0(".tool_", phase, "_observers")

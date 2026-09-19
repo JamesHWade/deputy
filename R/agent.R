@@ -278,6 +278,7 @@ Agent <- R6::R6Class(
     #' host-owned. Retention replaces the Chat's tool callbacks with the
     #' specialist's governed runtime, preserving observers registered through
     #' that specialist's `$on_tool_request()` and `$on_tool_result()` methods.
+    #' New observer registrations on the specialist or its aliases require release.
     #' @param agent A standalone Agent, with no durable approval or fallback.
     #' @param usage_limits Explicit cumulative ceiling for the handle, or the
     #'   allocation for one continuation. Both intersect the specialist and caller.
@@ -606,28 +607,29 @@ Agent <- R6::R6Class(
       }
       # Disclosure authorizes the public reference. Storage routing remains
       # host-owned even when the redactor removes or replaces private metadata.
-      stored <- Filter(
-        function(ref) identical(ref$reference, reference),
-        unlist(
-          lapply(
-            Filter(
-              function(record) identical(record$delegation_id, delegation_id),
-              lead_delegation_records(self)
-            ),
-            function(record) record$references
-          ),
-          recursive = FALSE
-        )
+      records <- Filter(
+        function(record) identical(record$delegation_id, delegation_id),
+        lead_delegation_records(self)
       )
+      stored <- if (length(records) == 1L) {
+        Filter(
+          function(ref) identical(ref$reference, reference),
+          records[[1L]]$references
+        )
+      } else {
+        list()
+      }
       if (!length(stored)) {
         delegation_disclosure_abort()
       }
+      record <- records[[1L]]
+      storage <- lead_artifact_storage(self, record, stored[[1L]])
       chunk <- read_tool_result_chunk(
         reference,
         offset = offset,
         max_chars = 8192L,
-        policy = self$context_policy,
-        session_id = stored[[1L]]$storage_session_id
+        policy = storage$policy,
+        session_id = storage$session_id
       )
       view <- private$.delegation_disclosure$redact(
         list(kind = "artifact", reference = reference, result = chunk),
