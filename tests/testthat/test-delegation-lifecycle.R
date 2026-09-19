@@ -50,7 +50,7 @@ test_that("ordinary delegation preserves non-complete results and exact reasons"
   }))
   answer <- resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
 
-  expect_identical(answer, "a task")
+  expect_identical(jsonlite::fromJSON(answer)$answer, "a task")
   expect_identical(statuses, "stopped")
   expect_identical(lead$list_subagents()$status, "stopped")
   expect_identical(lead$list_subagents()$stop_reason, "total_token_limit")
@@ -113,7 +113,7 @@ test_that("observer errors remain inspectable without duplicate outcomes", {
     }))
   }
   answer <- resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
-  expect_identical(answer, "a task")
+  expect_identical(jsonlite::fromJSON(answer)$answer, "a task")
   runs <- lead$list_subagents()
   expect_equal(nrow(runs), 1L)
   expect_identical(runs$status, "completed")
@@ -162,7 +162,10 @@ test_that("released ellmer exposes ordinary child identity during a request", {
   expect_match(running$run_id, "^run_")
   expect_match(running$session_id, "^session_")
   expect_identical(lead$get_subagent_results(), list(NULL))
-  expect_identical(trimws(resolve_async_value(promise)), "child reply")
+  expect_identical(
+    trimws(jsonlite::fromJSON(resolve_async_value(promise))$answer),
+    "child reply"
+  )
   complete <- lead$list_subagents()
   expect_identical(complete$delegation_id, running$delegation_id)
   expect_identical(complete$run_id, running$run_id)

@@ -587,3 +587,75 @@ delegation before dispatch, and a child permission callback returning
 `PermissionResultPending` stops without executing the requested effect. Continue
 to use standalone `Agent` approval APIs where durable suspension is needed.
 Child continuation and durable job recovery are separate backlog work.
+
+## Compact outcomes and child history
+
+The `delegate_to_agent` tool returns a JSON `DelegationOutcome` projection. Its
+`runtime` contains execution status, exact stop reason, and stable child, run,
+parent tool-call and delegation identities. The `answer` and optional `claims`
+are model-authored. A normal stop never verifies a claim or approves an artifact.
+`missing_evidence` and `unresolved_work` are `NULL` when not supplied.
+`parallel_delegate()` also returns named `outcomes` beside its existing results.
+
+Answers are bounded to 8 KiB of UTF-8 text. Larger answers use the existing
+ContextPolicy offload store; a scoped reference retains provenance. The model
+projection includes at most eight references and reports omissions.
+`runtime$claim_omissions` reports omitted entries and text truncation for each
+structured claim, including in host inspection. Full child
+history is separate from the lead's model context.
+
+Bind disclosure to the authenticated host session before exposing inspection:
+
+```{r, eval=FALSE}
+owner_session <- new.env(parent = emptyenv()) # supplied by host authentication
+scope <- list(owner_id = "owner-1", conversation_id = "chat-1")
+disclosure <- DelegationDisclosure(
+  authorize = function(requester, scope) identical(requester, owner_session),
+  redact = function(view, requester) view # apply application-specific redaction
+)
+lead <- LeadAgent$new(
+  chat, sub_agents = definitions,
+  delegation_scope = scope, delegation_disclosure = disclosure
+)
+lead$parallel_delegate(c(analyst = "Analyze the evidence"))
+views <- lead$inspect_subagents(owner_session, transcript = TRUE)
+views[[1]]$outcome$runtime
+views[[1]]$turns # native public ellmer turns for optional rendering
+
+history <- lead$export_subagents(owner_session)
+saveRDS(history, "child-history.rds") # host-owned private storage
+restored <- delegation_history(
+  readRDS("child-history.rds"), owner_session, disclosure,
+  scope = history$scope # use the host's trusted ownership record on reload
+)
+```
+
+Authorization runs before lookup, even for nonexistent IDs. The default policy
+denies access. Redaction receives a child view, or a list with `kind = "artifact"`
+and `result` for `read_subagent_result()`. Remove references as well as text when
+an artifact must not be disclosed. Host callbacks are trusted application code;
+requester strings and saved scope do not authenticate a user. The low-level
+`get_subagent_*()` getters remain private-to-the-host inspection surfaces and do
+not perform end-user authorization.
+
+Snapshots include initial manifests, run and cumulative child usage, outcomes,
+errors and optionally transcripts. Child cumulative usage currently equals its
+single run; continuation is unsupported. Unknown usage/cost stays unknown.
+Public ellmer record/replay strips executable tools, raw provider payloads,
+hidden thinking and arbitrary display extras. General rich-widget persistence
+is separate work. Text remains untrusted content for the renderer to sanitize.
+
+Export accepts settled children only. Replay neither constructs an Agent nor
+runs a model or tool, and never grants permission, cancels or resumes execution.
+Restored artifact availability is explicitly unresolved until checked against
+host storage. Live inspection checks retained artifacts and reports missing
+ones. The default 16 MiB disclosure ceiling fails explicitly for larger views;
+select one child or omit its transcript. Storage retention and durable active-run
+recovery remain host responsibilities. Public content records carry a tool-value
+kind receipt so ordinary application objects are never interpreted as content
+constructors. Supported classed tool values (data frames, factors, dates, times,
+and durations) use a portable JSON text projection; native typed attachments
+retain their content representation. Unsupported application S7 values become
+an explicit omission notice without invoking their methods or exposing private
+fields. Other nonportable values still fail closed. The optional child-chat adapter builds on
+these headless records; Deputy core does not require shinychat.

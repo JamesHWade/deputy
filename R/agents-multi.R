@@ -1,4 +1,4 @@
-#' @include agent-definition.R delegation-manifest.R delegation-binding.R
+#' @include agent-definition.R delegation-manifest.R delegation-binding.R delegation-inspection.R
 NULL
 
 # Multi-agent orchestration for deputy
@@ -61,6 +61,8 @@ LeadAgent <- R6::R6Class(
     #'   required when sources are supplied. Model arguments cannot override it.
     #' @param delegation_policy Host-only [DelegationPolicy] for child governance,
     #'   resource ownership and interactive routing.
+    #' @param delegation_disclosure Host-only [DelegationDisclosure] authorizing
+    #'   inspection and saved-history disclosure. Defaults to deny.
     #' @param approval_dir Optional standalone lead approval directory. Delegation
     #'   rejects this unsupported durable child-continuation combination.
     #' @param delegation_max_bytes Positive finite admission ceiling, default
@@ -90,6 +92,7 @@ LeadAgent <- R6::R6Class(
       delegation_scope = list(),
       delegation_max_bytes = 65536L,
       delegation_policy = DelegationPolicy(),
+      delegation_disclosure = DelegationDisclosure(),
       approval_dir = NULL
     ) {
       if (!S7::S7_inherits(delegation_policy, DelegationPolicy)) {
@@ -97,6 +100,10 @@ LeadAgent <- R6::R6Class(
           "delegation_policy must be a DelegationPolicy."
         )
       }
+      if (!S7::S7_inherits(delegation_disclosure, DelegationDisclosure)) {
+        cli::cli_abort("delegation_disclosure must be a DelegationDisclosure.")
+      }
+      private$.delegation_disclosure <- delegation_disclosure
       private$.delegation_policy <- delegation_policy
       sources <- normalize_delegation_sources(
         delegation_sources,
@@ -210,7 +217,8 @@ LeadAgent <- R6::R6Class(
     #'   active responder.
     #' @param run_context Additional immutable context for the batch.
     #' @return A list with `mode`, named `results` ([AgentResult] or `NULL`),
-    #'   named `errors`, named `status`, and an aggregate `run` ([AgentResult]).
+    #'   named `outcomes` ([DelegationOutcome]), `errors`, `status`, and an
+    #'   aggregate `run` ([AgentResult]).
     #'   `$last_run()` retains the aggregate run. The lead's conversation is
     #'   unchanged. Failed responders do not discard successful siblings.
     parallel_delegate = function(
@@ -415,6 +423,127 @@ LeadAgent <- R6::R6Class(
     },
 
     #' @description
+    #' Inspect authorized child snapshots without executing or changing context.
+    #' Runtime facts, model claims, per-run usage, retained transcript and initial
+    #' manifest are separate. Cumulative child usage currently equals per-run
+    #' usage because child continuation is unsupported. Unknown usage is NULL.
+    #' @param requester Host-authenticated request context, never model arguments.
+    #' @param delegation_id Optional exact delegation locator, checked only after
+    #'   disclosure authorization. Unknown IDs return an empty list.
+    #' @param transcript Include public ellmer content records and replayed
+    #'   `turns`. Hidden thinking, provider JSON and display closures are omitted.
+    #' @return Authorized and redacted read-only view lists. These are snapshots;
+    #'   modifying a returned list never changes the child or lead context.
+    inspect_subagents = function(
+      requester,
+      delegation_id = NULL,
+      transcript = FALSE
+    ) {
+      views <- lead_inspect_subagents(
+        self,
+        requester,
+        delegation_id,
+        transcript
+      )
+      views <- lapply(views, function(view) {
+        if (transcript) {
+          view$turns <- lapply(view$transcript, inspection_replay)
+        }
+        view
+      })
+      inspection_bound(views, private$.delegation_disclosure)
+    },
+
+    #' @description
+    #' Export authorized settled child history for host-owned durable storage.
+    #' This is observation history, not a resumable Agent/session snapshot.
+    #' @param requester,delegation_id See `$inspect_subagents()`.
+    #' @return Portable versioned list for [delegation_history()]. Export rejects
+    #'   active selected children. The host supplies current disclosure policy
+    #'   when reading it back. Only public ellmer records are retained.
+    export_subagents = function(requester, delegation_id = NULL) {
+      views <- lead_inspect_subagents(
+        self,
+        requester,
+        delegation_id,
+        TRUE,
+        settled_only = TRUE
+      )
+      inspection_bound(
+        list(
+          schema_version = 1L,
+          settled = TRUE,
+          scope = inspection_scope(self),
+          children = views
+        ),
+        private$.delegation_disclosure
+      )
+    },
+
+    #' @description
+    #' Read an authorized retained delegation-answer artifact.
+    #' @param requester,delegation_id See `$inspect_subagents()`.
+    #' @param reference An exact reference included in the redacted authorized
+    #'   child view. Missing or expired artifacts fail explicitly.
+    #' @param offset Character offset for a bounded chunk, starting at zero.
+    #' @return Existing bounded tool-result chunk; no tool or model executes.
+    read_subagent_result = function(
+      requester,
+      delegation_id,
+      reference,
+      offset = 0L
+    ) {
+      views <- lead_inspect_subagents(self, requester, delegation_id, FALSE)
+      references <- unlist(
+        lapply(views, function(view) view$outcome$references),
+        recursive = FALSE
+      )
+      selected <- Filter(
+        function(ref) identical(ref$reference, reference),
+        references
+      )
+      if (
+        !is.character(reference) ||
+          length(reference) != 1L ||
+          is.na(reference) ||
+          !length(selected)
+      ) {
+        delegation_disclosure_abort()
+      }
+      # Disclosure authorizes the public reference. Storage routing remains
+      # host-owned even when the redactor removes or replaces private metadata.
+      stored <- Filter(
+        function(ref) identical(ref$reference, reference),
+        unlist(
+          lapply(
+            Filter(
+              function(record) identical(record$delegation_id, delegation_id),
+              lead_delegation_records(self)
+            ),
+            function(record) record$references
+          ),
+          recursive = FALSE
+        )
+      )
+      if (!length(stored)) {
+        delegation_disclosure_abort()
+      }
+      chunk <- read_tool_result_chunk(
+        reference,
+        offset = offset,
+        max_chars = 8192L,
+        policy = self$context_policy,
+        session_id = stored[[1L]]$storage_session_id
+      )
+      view <- private$.delegation_disclosure$redact(
+        list(kind = "artifact", reference = reference, result = chunk),
+        requester
+      )
+      inspection_portable(view)
+      inspection_bound(view, private$.delegation_disclosure)
+    },
+
+    #' @description
     #' Print the lead agent.
     print = function() {
       super$print()
@@ -602,16 +731,21 @@ LeadAgent <- R6::R6Class(
                 )
                 if (!is.null(limit)) private$mark_usage_limit(limit)
               }
+              payload <- delegation_json(S7::props(delegation_outcome(
+                private$subagent_runs[[id]],
+                compact = TRUE
+              )))
               if (!is.null(outcome$error)) {
+                # Preserve the diagnostic label without repeating an unbounded
+                # provider error; the bounded payload contains that message.
                 ellmer::tool_reject(paste0(
                   "Subagent '",
-                  def$name,
+                  inspection_text(def$name, 512L),
                   "' failed.\n",
-                  "Error: ",
-                  conditionMessage(outcome$error)
+                  payload
                 ))
               }
-              outcome$result$response %||% "Subagent did not start."
+              payload
             })
         },
         name = "delegate_to_agent",
@@ -953,6 +1087,7 @@ LeadAgent <- R6::R6Class(
 
     .sub_agent_defs = list(),
     .delegation_policy = NULL,
+    .delegation_disclosure = NULL,
     delegation_bindings = list(),
     subagent_runs = list(),
     active_subagents = list(),

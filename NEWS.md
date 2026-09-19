@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* `LeadAgent` returns compact `DelegationOutcome` values and offers authorized,
+  redacted child inspection through `DelegationDisclosure`. Large answers use
+  existing artifact offloading; settled native ellmer history can be exported
+  and replayed without executing tools or changing the lead context (#153).
+
 * `LeadAgent` binds child governance and resource ownership through `DelegationPolicy()` and records it in initial manifests. Shared closures remain explicit; owned factories release child resources after settlement or failed setup, and exclusive leases reject overlapping use. Child human input requires a host handler, and unsupported delegated durable approvals fail explicitly (#151).
 
 * `DelegationInput` supplies bounded task instructions and scoped evidence

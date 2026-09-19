@@ -303,6 +303,12 @@ lead_parallel_delegate <- function(
     list(
       mode = "stateless",
       results = lapply(outcomes, `[[`, "result"),
+      outcomes = stats::setNames(
+        lapply(admitted, function(id) {
+          delegation_outcome(private$subagent_runs[[id]])
+        }),
+        names(selected$tasks)
+      ),
       errors = lapply(outcomes, `[[`, "error"),
       status = statuses,
       run = state$result

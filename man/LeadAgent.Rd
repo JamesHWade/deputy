@@ -31,6 +31,9 @@ sub-agents based on registered AgentDefinitions.
     \item \href{#method-LeadAgent-get_subagent_results}{\code{LeadAgent$get_subagent_results()}}
     \item \href{#method-LeadAgent-get_subagent_messages}{\code{LeadAgent$get_subagent_messages()}}
     \item \href{#method-LeadAgent-get_subagent_contexts}{\code{LeadAgent$get_subagent_contexts()}}
+    \item \href{#method-LeadAgent-inspect_subagents}{\code{LeadAgent$inspect_subagents()}}
+    \item \href{#method-LeadAgent-export_subagents}{\code{LeadAgent$export_subagents()}}
+    \item \href{#method-LeadAgent-read_subagent_result}{\code{LeadAgent$read_subagent_result()}}
     \item \href{#method-LeadAgent-print}{\code{LeadAgent$print()}}
     \item \href{#method-LeadAgent-clone}{\code{LeadAgent$clone()}}
   }
@@ -120,6 +123,7 @@ sub-agents based on registered AgentDefinitions.
   delegation_scope = list(),
   delegation_max_bytes = 65536L,
   delegation_policy = DelegationPolicy(),
+  delegation_disclosure = DelegationDisclosure(),
   approval_dir = NULL
 )}
     \if{html}{\out{</div>}}
@@ -169,6 +173,8 @@ complete manifest. Known complete-context estimates also obey
 on byte bounds. Sources are text only, with a 16 MiB catalogue ceiling.}
       \item{\code{delegation_policy}}{Host-only \link{DelegationPolicy} for child governance,
 resource ownership and interactive routing.}
+      \item{\code{delegation_disclosure}}{Host-only \link{DelegationDisclosure} authorizing
+inspection and saved-history disclosure. Defaults to deny.}
       \item{\code{approval_dir}}{Optional standalone lead approval directory. Delegation
 rejects this unsupported durable child-continuation combination.}
     }
@@ -255,7 +261,8 @@ active responder.}
   }
   \subsection{Returns}{
     A list with \code{mode}, named \code{results} (\link{AgentResult} or \code{NULL}),
-named \code{errors}, named \code{status}, and an aggregate \code{run} (\link{AgentResult}).
+named \code{outcomes} (\link{DelegationOutcome}), \code{errors}, \code{status}, and an
+aggregate \code{run} (\link{AgentResult}).
 \verb{$last_run()} retains the aggregate run. The lead's conversation is
 unchanged. Failed responders do not discard successful siblings.
   }
@@ -420,6 +427,95 @@ requires host disclosure policy. The retained manifest is unchanged.}
   \subsection{Returns}{
     A list; \code{NULL} entries mean no prepared context is available.
 Current context is retained at settlement; no matches returns \code{list()}.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-inspect_subagents"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-inspect_subagents}{}}}
+\subsection{\code{LeadAgent$inspect_subagents()}}{
+  Inspect authorized child snapshots without executing or changing context.
+Runtime facts, model claims, per-run usage, retained transcript and initial
+manifest are separate. Cumulative child usage currently equals per-run
+usage because child continuation is unsupported. Unknown usage is NULL.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$inspect_subagents(
+  requester,
+  delegation_id = NULL,
+  transcript = FALSE
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{requester}}{Host-authenticated request context, never model arguments.}
+      \item{\code{delegation_id}}{Optional exact delegation locator, checked only after
+disclosure authorization. Unknown IDs return an empty list.}
+      \item{\code{transcript}}{Include public ellmer content records and replayed
+\code{turns}. Hidden thinking, provider JSON and display closures are omitted.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Authorized and redacted read-only view lists. These are snapshots;
+modifying a returned list never changes the child or lead context.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-export_subagents"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-export_subagents}{}}}
+\subsection{\code{LeadAgent$export_subagents()}}{
+  Export authorized settled child history for host-owned durable storage.
+This is observation history, not a resumable Agent/session snapshot.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$export_subagents(requester, delegation_id = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{requester, delegation_id}}{See \verb{$inspect_subagents()}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Portable versioned list for \code{\link[=delegation_history]{delegation_history()}}. Export rejects
+active selected children. The host supplies current disclosure policy
+when reading it back. Only public ellmer records are retained.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-read_subagent_result"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-read_subagent_result}{}}}
+\subsection{\code{LeadAgent$read_subagent_result()}}{
+  Read an authorized retained delegation-answer artifact.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$read_subagent_result(
+  requester,
+  delegation_id,
+  reference,
+  offset = 0L
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{requester, delegation_id}}{See \verb{$inspect_subagents()}.}
+      \item{\code{reference}}{An exact reference included in the redacted authorized
+child view. Missing or expired artifacts fail explicitly.}
+      \item{\code{offset}}{Character offset for a bounded chunk, starting at zero.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Existing bounded tool-result chunk; no tool or model executes.
   }
 }
 

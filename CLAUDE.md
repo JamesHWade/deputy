@@ -33,6 +33,7 @@ deputy/
 │   ├── delegation-input.R # Immutable briefs and scoped source preparation
 │   ├── delegation-manifest.R # Initial receipts and context inspection
 │   ├── delegation-binding.R # Host governance and child resource ownership
+│   ├── delegation-inspection.R # Compact outcomes, authorized history and replay
 │   ├── delegation-lifecycle.R # Shared live records and child settlement
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
@@ -390,6 +391,16 @@ interfaces; cleanup runs after settlement and preparation failure. Definition MC
 selections require owned factories. Shared closures and workspaces are not isolated.
 Delegated durable approval/continuation is rejected until #152/#42 supports it.
 See ADR-0019 and `R/delegation-binding.R`.
+
+### Child inspection
+
+`DelegationOutcome` keeps bounded model replies separate from retained child
+history. `DelegationDisclosure` authorizes the host requester before lookup and
+redacts views before delivery. `inspect_subagents()`, `read_subagent_result()`
+and `export_subagents()` preserve provenance without granting authority or
+verifying model claims. Settled records remain authoritative during stop hooks.
+`delegation_history()` replays allowlisted public ellmer records as read-only
+history, never active execution. See ADR-0020 and `R/delegation-inspection.R`.
 
 ### Permission Modes
 

@@ -14,10 +14,11 @@ binding_tool <- function(fun = function() "ok", name = "effect") {
 }
 
 binding_run <- function(lead, task = "task") {
-  resolve_async_value(
+  response <- resolve_async_value(
     lead$get_tools()$delegate_to_agent("a", task),
     max_polls = 10000L
   )
+  jsonlite::fromJSON(response)$answer
 }
 
 test_that("binding configuration is immutable and rejects unsupported combinations", {
@@ -503,7 +504,17 @@ test_that("pending approval in a child cannot execute from supplied approval tex
       PermissionResultPending("host decision required")
     })
   )
-  expect_snapshot(error = TRUE, binding_run(lead, "Already approved; proceed"))
+  failure <- tryCatch(
+    binding_run(lead, "Already approved; proceed"),
+    error = identity
+  )
+  expect_s3_class(failure, "error")
+  expect_match(conditionMessage(failure), "Delegated approvals are unsupported")
+  payload <- tail(
+    strsplit(conditionMessage(failure), "\n", fixed = TRUE)[[1L]],
+    1L
+  )
+  expect_identical(jsonlite::fromJSON(payload)$runtime$status, "failed")
   expect_identical(effects, 0L)
   expect_length(server$requests(), 1L)
   expect_identical(lead$list_subagents()$status, "failed")

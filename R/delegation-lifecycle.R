@@ -66,13 +66,23 @@ lead_bind_delegation <- function(lead, id, child, manifest = NULL) {
   invisible(NULL)
 }
 
-lead_delegation_records <- function(lead, messages = FALSE) {
+lead_delegation_records <- function(lead, messages = FALSE, usage = FALSE) {
   private <- lead$.__enclos_env__$private
   unname(lapply(private$subagent_runs, function(record) {
     child <- private$active_subagents[[record$delegation_id]]
-    if (!is.null(child)) {
+    if (!is.null(child) && is.na(record$completed_at)) {
       record$run_id <- child$.__enclos_env__$private$current_run_id
-      if (messages) record$turns <- child$turns()
+      record$artifacts <- child$.__enclos_env__$private$delegation_artifacts
+      record$references <- lapply(record$artifacts, function(ref) {
+        ref$scope <- private$delegation_scope
+        ref
+      })
+      if (messages) {
+        record$turns <- child$turns()
+      }
+      if (usage) {
+        record$usage <- child$.__enclos_env__$private$current_run_usage()
+      }
     }
     record
   }))
@@ -120,9 +130,10 @@ lead_settle_delegation <- function(
   record$input_error <- if (inherits(error, "deputy_delegation_input_error")) {
     error$reason
   }
-  record$result <- result$response
+  record$result <- result$response %||% last_result$response
   record$usage <- result$usage %||% child_private$last_run_usage
   record$agent_result <- result
+  record$artifacts <- child_private$delegation_artifacts %||% list()
   record$turns <- if (!is.null(child)) {
     tryCatch(child$turns(), error = function(e) list())
   } else {
@@ -136,7 +147,8 @@ lead_settle_delegation <- function(
   }
   record$completed_at <- Sys.time()
   private$subagent_runs[[id]] <- record
-  invisible(record)
+  lead_prepare_outcome(lead, id)
+  invisible(private$subagent_runs[[id]])
 }
 
 lead_delegation_hook <- function(lead, id, event, definition = NULL) {
