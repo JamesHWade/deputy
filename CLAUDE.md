@@ -132,9 +132,8 @@ The deterministic trusted mini-agent recipe in `inst/examples/trusted-mini-agent
 uses a child to propose typed analysis inputs and a standalone host-owned Agent
 for durable approval and the designated computation. Run
 `devtools::test(filter = "^trusted-mini-agent$")`; launch its `app.R` with Shiny.
-Model commentary cannot write its authoritative host receipt. Curated-chat
-composition and bounded recursion are designed in ADR-0023 and tracked in
-#168/#169; they are not implemented by the recipe.
+Model commentary cannot write its authoritative host receipt. The recipe is separate from curated-chat composition (ADR-0024) and the
+recursive graph runtime (ADR-0025).
 
 ## Common Commands
 
@@ -500,6 +499,17 @@ boundary and explicitly selects retained/fresh history. `delegation_tool()` bind
 one handle and allocation to its owning Agent; models supply only a task brief.
 `inst/examples/curated-chats/` demonstrates composition and separately inspectable
 follow-ups with a deterministic local Shiny app. There is no second run engine.
+
+`Agent$retain_agent_graph()` atomically retains a flat root-owned graph of
+standalone Agents and installs host-declared routes. `R/delegation-graph.R` owns
+setup/release, `R/delegation-tree-budget.R` owns cumulative graph accounting, and
+`R/delegation-tree-runtime.R` owns ancestry, ancestor governance and subtree
+cancellation. Every descendant uses the ordinary run kernel and root lifecycle
+registry. Depth/count/concurrency and UsageLimits apply until explicit graph
+release; parents waiting on children occupy concurrency slots. See ADR-0025.
+`inst/examples/recursive-agents/` supplies the deterministic three-level browser
+fixture; test it with `devtools::test(filter = "recursive|delegation-graph|delegation-tree")`.
+Durable restart recovery remains #42.
 
 ### Human Input
 

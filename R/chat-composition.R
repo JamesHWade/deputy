@@ -89,10 +89,40 @@ delegation_tool <- function(owner, handle, name, description, usage_limits) {
   name <- delegation_text(name, "name")
   description <- delegation_text(description, "description")
   usage_limits <- normalize_usage_limits(usage_limits)
+  make_delegation_tool(owner, handle, name, description, usage_limits)
+}
+
+graph_delegation_tool <- function(
+  tree,
+  caller,
+  handle,
+  name,
+  description,
+  usage_limits
+) {
+  make_delegation_tool(caller, handle, name, description, usage_limits, tree)
+}
+
+make_delegation_tool <- function(
+  caller,
+  handle,
+  name,
+  description,
+  usage_limits,
+  tree = NULL
+) {
   invoke <- function(task, correlation) {
+    owner <- if (is.null(tree)) caller else delegation_tree_root(tree)
     private <- owner$.__enclos_env__$private
     promises::then(
-      continue_conversation(owner, handle, task, usage_limits, correlation),
+      continue_conversation(
+        owner,
+        handle,
+        task,
+        usage_limits,
+        correlation,
+        caller
+      ),
       function(result) {
         record <- private$subagent_runs[[correlation$delegation_id]]
         delegation_json(S7::props(delegation_outcome(record, compact = TRUE)))
@@ -133,7 +163,7 @@ delegation_tool <- function(owner, handle, name, description, usage_limits) {
       idempotent_hint = FALSE
     )
   )
-  attr(tool, "deputy_composition_owner") <- owner
+  attr(tool, "deputy_composition_owner") <- caller
   attr(tool, "deputy_composition_invoke") <- invoke
   tool
 }

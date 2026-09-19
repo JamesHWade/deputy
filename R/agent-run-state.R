@@ -105,6 +105,7 @@ initialize_agent_run <- function(
   private$consecutive_tool_cycles <- 0L
   private$last_run_usage <- AgentUsage()
   private$current_run_checkpoint_id <- NULL
+  tree_run_started(agent)
 
   if (!is.null(private$.file_checkpoints)) {
     checkpoint_id <- private$.file_checkpoints$checkpoint(
@@ -162,11 +163,12 @@ initialize_agent_run <- function(
     )
   )
 
-  initial_limit_status <- usage_limit_status(
-    private$current_run_usage(),
-    private$current_usage_limits,
-    require_followup = TRUE
-  )
+  initial_limit_status <- tree_usage_status(agent) %||%
+    usage_limit_status(
+      private$current_run_usage(),
+      private$current_usage_limits,
+      require_followup = TRUE
+    )
   if (!is.null(initial_limit_status)) {
     private$mark_usage_limit(initial_limit_status)
     state$reason <- initial_limit_status$reason

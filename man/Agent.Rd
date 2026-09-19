@@ -120,6 +120,9 @@ agent$add_hook(HookMatcher(
   \itemize{
     \item \href{#method-Agent-initialize}{\code{Agent$new()}}
     \item \href{#method-Agent-retain_agent}{\code{Agent$retain_agent()}}
+    \item \href{#method-Agent-retain_agent_graph}{\code{Agent$retain_agent_graph()}}
+    \item \href{#method-Agent-delegation_graph_usage}{\code{Agent$delegation_graph_usage()}}
+    \item \href{#method-Agent-release_agent_graph}{\code{Agent$release_agent_graph()}}
     \item \href{#method-Agent-continue_agent_async}{\code{Agent$continue_agent_async()}}
     \item \href{#method-Agent-continue_agent}{\code{Agent$continue_agent()}}
     \item \href{#method-Agent-cancel_agent}{\code{Agent$cancel_agent()}}
@@ -306,6 +309,79 @@ allocation for one continuation. Both intersect the specialist and caller.}
   }
   \subsection{Returns}{
     An opaque handle belonging only to this Agent.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-retain_agent_graph"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-retain_agent_graph}{}}}
+\subsection{\code{Agent$retain_agent_graph()}}{
+  Retain a host-configured graph of curated Agents. One root owns all chats,
+budgets and descendant inspection. Limits accumulate until graph release.
+Root depth is zero; concurrency counts queued and running descendants,
+including callers waiting for their own children. Cycles may be configured,
+but calls into an active chat reject before dispatch.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$retain_agent_graph(
+  agents,
+  routes,
+  usage_limits,
+  max_depth,
+  max_delegations,
+  max_concurrency,
+  max_runs = 32L
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{agents}}{Named list of distinct standalone Agents. \code{root} is reserved.}
+      \item{\code{routes}}{Named list keyed by \code{root} or an agent name. Each value is a
+named list of tools, each with \code{target}, \code{description} and \code{usage_limits}.}
+      \item{\code{usage_limits}}{Cumulative graph UsageLimits; max_requests is required.}
+      \item{\code{max_depth}}{Maximum descendant depth, with direct children at one.}
+      \item{\code{max_delegations}}{Maximum admitted invocations over the graph lifetime.}
+      \item{\code{max_concurrency}}{Maximum simultaneously admitted child invocations.}
+      \item{\code{max_runs}}{Maximum invocations of each retained conversation.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Named conversation handles, usable for explicit host follow-ups.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-delegation_graph_usage"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-delegation_graph_usage}{}}}
+\subsection{\code{Agent$delegation_graph_usage()}}{
+  Read cumulative graph usage, including active descendants.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$delegation_graph_usage()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    An AgentUsage value. This trusted host API grants no disclosure.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-release_agent_graph"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-release_agent_graph}{}}}
+\subsection{\code{Agent$release_agent_graph()}}{
+  Release an idle graph, removing its route tools and handles.
+Borrowed tools and resources remain host-owned. Export inspection first.
+A new graph is a new host authorization; models cannot reset its budgets.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$release_agent_graph()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible NULL.
   }
 }
 

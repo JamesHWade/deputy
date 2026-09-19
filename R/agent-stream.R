@@ -218,6 +218,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
     request_stream_stop = function(reason) {
       private$should_stop <- TRUE
       private$stop_reason_from_hook <- reason
+      graph_cancel_descendants(self, reason)
       cancel_active_mcp_tools(
         c(private$.chat$get_tools(), private$active_owned_tools),
         self,
@@ -592,6 +593,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         return(invisible(NULL))
       }
       state$finished <- TRUE
+      graph_cancel_descendants(self, "parent_completed")
       on.exit(finish_run_trace(state), add = TRUE)
       on.exit(remove_request_callbacks(private$.chat), add = TRUE)
       on.exit(
@@ -648,7 +650,11 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             )
           }
           if (identical(state$reason, "complete") && !is.null(limits)) {
-            limit_status <- usage_limit_status(usage, limits)
+            limit_status <- tree_usage_status(
+              self,
+              require_followup = FALSE
+            ) %||%
+              usage_limit_status(usage, limits)
             if (!is.null(limit_status)) {
               private$last_limit_status <- limit_status
               state$reason <- limit_status$reason
@@ -746,7 +752,10 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           limit_status <- private$last_limit_status
           if (
             !is.null(limit_status) &&
-              identical(state$limits$on_exceed, "error") &&
+              identical(
+                limit_status$on_exceed %||% state$limits$on_exceed,
+                "error"
+              ) &&
               identical(state$reason, limit_status$reason)
           ) {
             private$abort_usage_limit(limit_status)
@@ -778,6 +787,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
     },
 
     finish_active_run = function() {
+      tree_run_finished(self)
       checkpoint_error <- NULL
       tryCatch(
         private$finalize_pending_checkpoints(),

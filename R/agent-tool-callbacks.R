@@ -33,11 +33,12 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
 
       usage <- private$current_run_usage()
       limits <- private$current_usage_limits %||% self$usage_limits
-      limit_status <- usage_limit_status(
-        usage,
-        limits,
-        require_followup = TRUE
-      )
+      limit_status <- tree_usage_status(self) %||%
+        usage_limit_status(
+          usage,
+          limits,
+          require_followup = TRUE
+        )
       if (!is.null(limit_status)) {
         if (!is.null(private$.approval_dir) && !restored_approval) {
           private$pause_for_approval(

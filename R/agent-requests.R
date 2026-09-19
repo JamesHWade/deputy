@@ -141,11 +141,12 @@ begin_model_request <- function(agent) {
   if (is.null(state)) {
     return(invisible(NULL))
   }
-  status <- usage_limit_status(
-    private$current_run_usage(),
-    state$limits,
-    require_followup = TRUE
-  )
+  status <- tree_usage_status(agent) %||%
+    usage_limit_status(
+      private$current_run_usage(),
+      state$limits,
+      require_followup = TRUE
+    )
   if (!is.null(status)) {
     private$mark_usage_limit(status)
   }

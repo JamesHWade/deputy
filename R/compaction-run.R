@@ -89,11 +89,12 @@ compaction_can_continue <- function(agent) {
   if (isTRUE(private$should_stop)) {
     return(FALSE)
   }
-  status <- usage_limit_status(
-    private$current_run_usage(),
-    private$current_usage_limits,
-    require_followup = TRUE
-  )
+  status <- tree_usage_status(agent) %||%
+    usage_limit_status(
+      private$current_run_usage(),
+      private$current_usage_limits,
+      require_followup = TRUE
+    )
   if (!is.null(status)) {
     private$mark_usage_limit(status)
     return(FALSE)

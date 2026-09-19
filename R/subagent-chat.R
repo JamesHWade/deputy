@@ -8,6 +8,47 @@ subagent_chat_dependencies <- function() {
   }
 }
 
+subagent_chat_lineage <- function(runtime, compact = FALSE) {
+  if (!is.list(runtime)) {
+    return("")
+  }
+  parts <- character()
+  depth <- runtime$depth
+  if (
+    is.numeric(depth) &&
+      length(depth) == 1L &&
+      !is.na(depth) &&
+      is.finite(depth)
+  ) {
+    parts <- c(parts, paste0("Depth ", as.integer(depth)))
+  }
+  if (isTRUE(compact)) {
+    return(paste(parts, collapse = " \u00b7 "))
+  }
+  parent_delegation_id <- runtime$parent_delegation_id
+  if (is_nonempty_string(parent_delegation_id)) {
+    parts <- c(
+      parts,
+      paste0(
+        "Parent delegation ",
+        inspection_text(parent_delegation_id, 80L)
+      )
+    )
+  } else if (is_nonempty_string(runtime$parent_agent_id)) {
+    parts <- c(
+      parts,
+      paste0("Parent agent ", inspection_text(runtime$parent_agent_id, 80L))
+    )
+  }
+  if (is_nonempty_string(runtime$root_agent_id)) {
+    parts <- c(
+      parts,
+      paste0("Root ", inspection_text(runtime$root_agent_id, 80L))
+    )
+  }
+  paste(parts, collapse = " \u00b7 ")
+}
+
 #' Inspect child conversations in an optional Shiny panel
 #'
 #' Compose this panel beside the host's lead chat. Activity cards select one
@@ -205,6 +246,7 @@ subagent_chat_server <- function(
         )
       }
       runtime <- view$outcome$runtime
+      lineage <- subagent_chat_lineage(runtime, compact = TRUE)
       notice(paste(
         "Child",
         runtime$agent_name,
@@ -214,7 +256,8 @@ subagent_chat_server <- function(
           paste0("(", runtime$stop_reason, ")")
         } else {
           ""
-        }
+        },
+        if (nzchar(lineage)) paste0("\u00b7 ", lineage) else ""
       ))
       TRUE
     }
@@ -490,6 +533,7 @@ subagent_chat_server <- function(
         `aria-label` = "Child activity",
         lapply(views(), function(view) {
           runtime <- view$outcome$runtime
+          lineage <- subagent_chat_lineage(runtime, compact = TRUE)
           onclick <- paste0(
             "Shiny.setInputValue(",
             delegation_json(session$ns("selected")),
@@ -511,9 +555,12 @@ subagent_chat_server <- function(
             inspection_text(view$task, 140L),
             shiny::tags$br(),
             shiny::tags$small(paste(
-              runtime$status,
-              runtime$stop_reason %||% "",
-              sep = " \u00b7 "
+              Filter(
+                function(value) !is.na(value) && nzchar(value),
+                c(runtime$status %||% "", runtime$stop_reason %||% "", lineage)
+              ),
+              sep = " \u00b7 ",
+              collapse = " \u00b7 "
             ))
           )
         })
@@ -549,6 +596,7 @@ subagent_chat_server <- function(
         return(NULL)
       }
       runtime <- view$outcome$runtime
+      lineage <- subagent_chat_lineage(runtime)
       cost <- view$usage$cost_usd
       cost_label <- if (is.null(cost) || is.na(cost)) {
         "Cost unknown"
@@ -565,6 +613,9 @@ subagent_chat_server <- function(
         )),
         shiny::tags$details(
           shiny::tags$summary("Identity and initial context"),
+          if (nzchar(lineage)) {
+            shiny::tags$p(paste("Ancestry:", lineage))
+          },
           shiny::tags$pre(delegation_json(list(
             runtime = runtime,
             manifest = view$manifest

@@ -45,6 +45,7 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="continue_agent"><a href='../../deputy/html/Agent.html#method-Agent-continue_agent'><code>Agent$continue_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="continue_agent_async"><a href='../../deputy/html/Agent.html#method-Agent-continue_agent_async'><code>Agent$continue_agent_async()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cost"><a href='../../deputy/html/Agent.html#method-Agent-cost'><code>Agent$cost()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="delegation_graph_usage"><a href='../../deputy/html/Agent.html#method-Agent-delegation_graph_usage'><code>Agent$delegation_graph_usage()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="export_subagents"><a href='../../deputy/html/Agent.html#method-Agent-export_subagents'><code>Agent$export_subagents()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_context_turns"><a href='../../deputy/html/Agent.html#method-Agent-get_context_turns'><code>Agent$get_context_turns()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="get_cost"><a href='../../deputy/html/Agent.html#method-Agent-get_cost'><code>Agent$get_cost()</code></a></span></li>
@@ -80,9 +81,11 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tool"><a href='../../deputy/html/Agent.html#method-Agent-register_tool'><code>Agent$register_tool()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="register_tools"><a href='../../deputy/html/Agent.html#method-Agent-register_tools'><code>Agent$register_tools()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="release_agent"><a href='../../deputy/html/Agent.html#method-Agent-release_agent'><code>Agent$release_agent()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="release_agent_graph"><a href='../../deputy/html/Agent.html#method-Agent-release_agent_graph'><code>Agent$release_agent_graph()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resolve_tool_result"><a href='../../deputy/html/Agent.html#method-Agent-resolve_tool_result'><code>Agent$resolve_tool_result()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resume_approval"><a href='../../deputy/html/Agent.html#method-Agent-resume_approval'><code>Agent$resume_approval()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="retain_agent"><a href='../../deputy/html/Agent.html#method-Agent-retain_agent'><code>Agent$retain_agent()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="retain_agent_graph"><a href='../../deputy/html/Agent.html#method-Agent-retain_agent_graph'><code>Agent$retain_agent_graph()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="rewind_files"><a href='../../deputy/html/Agent.html#method-Agent-rewind_files'><code>Agent$rewind_files()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run"><a href='../../deputy/html/Agent.html#method-Agent-run'><code>Agent$run()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_async"><a href='../../deputy/html/Agent.html#method-Agent-run_async'><code>Agent$run_async()</code></a></span></li>

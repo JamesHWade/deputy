@@ -289,6 +289,58 @@ Agent <- R6::R6Class(
     },
 
     #' @description
+    #' Retain a host-configured graph of curated Agents. One root owns all chats,
+    #' budgets and descendant inspection. Limits accumulate until graph release.
+    #' Root depth is zero; concurrency counts queued and running descendants,
+    #' including callers waiting for their own children. Cycles may be configured,
+    #' but calls into an active chat reject before dispatch.
+    #' @param agents Named list of distinct standalone Agents. `root` is reserved.
+    #' @param routes Named list keyed by `root` or an agent name. Each value is a
+    #'   named list of tools, each with `target`, `description` and `usage_limits`.
+    #' @param usage_limits Cumulative graph UsageLimits; max_requests is required.
+    #' @param max_depth Maximum descendant depth, with direct children at one.
+    #' @param max_delegations Maximum admitted invocations over the graph lifetime.
+    #' @param max_concurrency Maximum simultaneously admitted child invocations.
+    #' @param max_runs Maximum invocations of each retained conversation.
+    #' @return Named conversation handles, usable for explicit host follow-ups.
+    retain_agent_graph = function(
+      agents,
+      routes,
+      usage_limits,
+      max_depth,
+      max_delegations,
+      max_concurrency,
+      max_runs = 32L
+    ) {
+      retain_agent_graph(
+        self,
+        agents,
+        routes,
+        usage_limits,
+        max_depth,
+        max_delegations,
+        max_concurrency,
+        max_runs
+      )
+    },
+
+    #' @description Read cumulative graph usage, including active descendants.
+    #' @return An AgentUsage value. This trusted host API grants no disclosure.
+    delegation_graph_usage = function() {
+      tree <- private$.delegation_tree
+      if (is.null(tree) || !identical(delegation_tree_root(tree), self)) {
+        conversation_abort("This Agent does not own a delegation graph.")
+      }
+      tree_usage(tree)
+    },
+
+    #' @description Release an idle graph, removing its route tools and handles.
+    #' Borrowed tools and resources remain host-owned. Export inspection first.
+    #' A new graph is a new host authorization; models cannot reset its budgets.
+    #' @return Invisible NULL.
+    release_agent_graph = function() release_agent_graph(self),
+
+    #' @description
     #' Continue a retained specialist with a new brief and explicit allocation.
     #' Failed and cancelled conversations require this explicit call to restart.
     #' Busy, changed, released and foreign conversations reject before dispatch.
@@ -359,6 +411,9 @@ Agent <- R6::R6Class(
           agent_name = character(),
           agent_id = character(),
           parent_agent_id = character(),
+          parent_delegation_id = character(),
+          depth = integer(),
+          root_agent_id = character(),
           session_id = character(),
           run_id = character(),
           parent_run_id = character(),
@@ -386,6 +441,9 @@ Agent <- R6::R6Class(
             agent_name = run$agent_name,
             agent_id = run$agent_id %||% NA_character_,
             parent_agent_id = run$parent_agent_id %||% NA_character_,
+            parent_delegation_id = run$parent_delegation_id %||% NA_character_,
+            depth = run$depth %||% NA_integer_,
+            root_agent_id = run$root_agent_id %||% NA_character_,
             session_id = run$session_id %||% NA_character_,
             run_id = run$run_id %||% NA_character_,
             parent_run_id = run$parent_run_id %||% NA_character_,
@@ -505,21 +563,17 @@ Agent <- R6::R6Class(
     interrupt_subagent = function(delegation_id, reason = "interrupted") {
       delegation_id <- delegation_text(delegation_id, "delegation_id")
       reason <- delegation_text(reason, "reason")
-      record <- private$subagent_runs[[delegation_id]]
-      if (is.null(record) || !is.na(record$completed_at)) {
-        return(invisible(FALSE))
+      ids <- if (is.null(private$.delegation_tree)) {
+        delegation_id
+      } else {
+        graph_descendants(self, delegation_id)
       }
-      private$subagent_runs[[delegation_id]]$cancel_reason <- reason
-      child <- private$active_subagents[[delegation_id]]
-      if (!is.null(child)) {
-        if (!is.null(record$conversation_handle)) {
-          entry <- conversation_entry(self, record$conversation_handle)
-          child$.__enclos_env__$private$interrupt_run(reason, entry$token)
-        } else {
-          child$interrupt(reason)
-        }
+      interrupted <- FALSE
+      for (id in rev(ids)) {
+        interrupted <- isTRUE(interrupt_delegation(self, id, reason)) ||
+          interrupted
       }
-      invisible(TRUE)
+      invisible(interrupted)
     },
 
     #' @description
@@ -2288,6 +2342,8 @@ Agent <- R6::R6Class(
       delegation_max_bytes = 65536L,
       delegation_usage_reservations = list(),
       .conversation_owner = NULL,
+      .delegation_tree = NULL,
+      .delegation_ancestors = NULL,
       owned_conversations = list(),
       .chat = NULL,
       .fallback_chats = list(),
@@ -2358,7 +2414,7 @@ Agent <- R6::R6Class(
 
       interrupt_run = function(reason, conversation_token = NULL) {
         check_conversation_access(self, conversation_token)
-        interrupted <- FALSE
+        interrupted <- isTRUE(graph_cancel_descendants(self, reason))
         for (id in names(private$active_subagents)) {
           interrupted <- isTRUE(self$interrupt_subagent(id, reason)) ||
             interrupted
@@ -2708,7 +2764,7 @@ Agent <- R6::R6Class(
             add = TRUE
           )
         }
-        self$hooks$fire(event, tool_name = tool_name, ...)
+        graph_fire_hooks(self, event, tool_name = tool_name, ...)
       },
 
       record_run_event = function(event) {

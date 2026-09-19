@@ -39,6 +39,9 @@ lead_admit_delegation <- function(lead, definition, task, correlation) {
     agent_name = definition$name,
     agent_id = NULL,
     parent_agent_id = correlation$parent_agent_id,
+    parent_delegation_id = correlation$parent_delegation_id,
+    depth = correlation$depth,
+    root_agent_id = correlation$root_agent_id,
     task = delegation_task_label(task, private$delegation_max_bytes),
     session_id = NULL,
     run_id = NULL,
@@ -229,13 +232,15 @@ lead_run_delegation <- function(
   definition,
   task,
   limits = NULL,
-  run = NULL
+  run = NULL,
+  usage_owner = lead
 ) {
   private <- lead$.__enclos_env__$private
+  usage_private <- usage_owner$.__enclos_env__$private
   coro::async(function() {
     on.exit(
       {
-        private$release_delegation_usage(id)
+        usage_private$release_delegation_usage(id)
         private$active_subagents[[id]] <- NULL
         release_delegation_binding(lead, id)
       },
@@ -286,9 +291,10 @@ lead_run_delegation <- function(
         private$stop_reason_from_hook,
       observe = FALSE
     )
-    private$release_delegation_usage(id)
-    private$current_external_usage <- agent_usage_add(
-      private$current_external_usage %||% AgentUsage(),
+    usage_private$release_delegation_usage(id)
+    tree_child_usage(usage_owner, record$usage %||% AgentUsage())
+    usage_private$current_external_usage <- agent_usage_add(
+      usage_private$current_external_usage %||% AgentUsage(),
       record$usage %||% AgentUsage()
     )
     if (started) {

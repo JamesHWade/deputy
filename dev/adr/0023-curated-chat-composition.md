@@ -1,7 +1,7 @@
 # ADR-0023: Curated chat composition and bounded recursion
 
 Status: curated composition implemented in #168 with ADR-0024 ownership.
-Recursive execution remains tracked in #169.
+Recursive execution is implemented for #169 in ADR-0025.
 
 ## Problem
 
