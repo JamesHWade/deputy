@@ -103,14 +103,14 @@ applicable.
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-09-18 11:58:35
+#>   timestamp: 2026-09-19 02:07:00
 #>   task: Analyze data.csv
 
 # Create a text event
 AgentEvent("text", text = "Hello", is_complete = FALSE
 )
 #> <AgentEvent: text >
-#>   timestamp: 2026-09-18 11:58:35
+#>   timestamp: 2026-09-19 02:07:00
 #>   text: Hello
 #>   is_complete: FALSE
 ```

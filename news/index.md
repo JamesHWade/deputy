@@ -2,6 +2,37 @@
 
 ## deputy (development version)
 
+- [`subagent_chat_ui()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md)
+  and
+  [`subagent_chat_server()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md)
+  compose an optional read-only child conversation panel with native
+  shinychat tool cards, retained attachments, live activity, authorized
+  saved-history replay and separate host cancellation. A deterministic
+  local demo covers concurrent and repeated specialists
+  ([\#158](https://github.com/JamesHWade/deputy/issues/158)).
+
+- `LeadAgent$observe_subagents()` provides authorized snapshots and
+  bounded child event cursors without driving execution. Overflow and
+  omitted content are explicit, readers detach independently, and
+  targeted host cancellation uses the separate `interrupt_subagent()`
+  control ([\#157](https://github.com/JamesHWade/deputy/issues/157)).
+
+- `LeadAgent` returns compact `DelegationOutcome` values and offers
+  authorized, redacted child inspection through `DelegationDisclosure`.
+  Large answers use existing artifact offloading; settled native ellmer
+  history can be exported and replayed without executing tools or
+  changing the lead context
+  ([\#153](https://github.com/JamesHWade/deputy/issues/153)).
+
+- `LeadAgent` binds child governance and resource ownership through
+  [`DelegationPolicy()`](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
+  and records it in initial manifests. Shared closures remain explicit;
+  owned factories release child resources after settlement or failed
+  setup, and exclusive leases reject overlapping use. Child human input
+  requires a host handler, and unsupported delegated durable approvals
+  fail explicitly
+  ([\#151](https://github.com/JamesHWade/deputy/issues/151)).
+
 - `DelegationInput` supplies bounded task instructions and scoped
   evidence references for ordinary and parallel delegation. `LeadAgent`
   rejects invalid evidence before requests and retains immutable initial

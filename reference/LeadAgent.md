@@ -39,6 +39,16 @@ it to spawn sub-agents based on registered AgentDefinitions.
 
 - [`LeadAgent$get_subagent_contexts()`](#method-LeadAgent-get_subagent_contexts)
 
+- [`LeadAgent$observe_subagents()`](#method-LeadAgent-observe_subagents)
+
+- [`LeadAgent$interrupt_subagent()`](#method-LeadAgent-interrupt_subagent)
+
+- [`LeadAgent$inspect_subagents()`](#method-LeadAgent-inspect_subagents)
+
+- [`LeadAgent$export_subagents()`](#method-LeadAgent-export_subagents)
+
+- [`LeadAgent$read_subagent_result()`](#method-LeadAgent-read_subagent_result)
+
 - [`LeadAgent$print()`](#method-LeadAgent-print)
 
 - [`LeadAgent$clone()`](#method-LeadAgent-clone)
@@ -126,7 +136,11 @@ Create a new LeadAgent.
       fallback_chats = list(),
       delegation_sources = list(),
       delegation_scope = list(),
-      delegation_max_bytes = 65536L
+      delegation_max_bytes = 65536L,
+      delegation_policy = DelegationPolicy(),
+      delegation_disclosure = DelegationDisclosure(),
+      delegation_observation = DelegationObservation(),
+      approval_dir = NULL
     )
 
 #### Arguments
@@ -234,6 +248,28 @@ Create a new LeadAgent.
   `max_tokens`; unknown estimates remain `NULL` and rely on byte bounds.
   Sources are text only, with a 16 MiB catalogue ceiling.
 
+- `delegation_policy`:
+
+  Host-only
+  [DelegationPolicy](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
+  for child governance, resource ownership and interactive routing.
+
+- `delegation_disclosure`:
+
+  Host-only
+  [DelegationDisclosure](https://jameshwade.github.io/deputy/reference/DelegationDisclosure.md)
+  authorizing inspection and saved-history disclosure. Defaults to deny.
+
+- `delegation_observation`:
+
+  [DelegationObservation](https://jameshwade.github.io/deputy/reference/DelegationObservation.md)
+  bounds for the transient child activity stream.
+
+- `approval_dir`:
+
+  Optional standalone lead approval directory. Delegation rejects this
+  unsupported durable child-continuation combination.
+
 #### Returns
 
 A new `LeadAgent` object
@@ -328,7 +364,9 @@ Results preserve input order, including failures and unstarted tasks.
 
 A list with `mode`, named `results`
 ([AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
-or `NULL`), named `errors`, named `status`, and an aggregate `run`
+or `NULL`), named `outcomes`
+([DelegationOutcome](https://jameshwade.github.io/deputy/reference/DelegationOutcome.md)),
+`errors`, `status`, and an aggregate `run`
 ([AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)).
 `$last_run()` retains the aggregate run. The lead's conversation is
 unchanged. Failed responders do not discard successful siblings.
@@ -499,6 +537,162 @@ disclosure.
 A list; `NULL` entries mean no prepared context is available. Current
 context is retained at settlement; no matches returns
 [`list()`](https://rdrr.io/r/base/list.html).
+
+------------------------------------------------------------------------
+
+### `LeadAgent$observe_subagents()`
+
+Observe bounded child activity without consuming or driving its stream.
+
+#### Usage
+
+    LeadAgent$observe_subagents(requester, delegation_id = NULL, after = NULL)
+
+#### Arguments
+
+- `requester`:
+
+  Host-authenticated request context.
+
+- `delegation_id`:
+
+  Optional child locator filter.
+
+- `after`:
+
+  Optional cursor returned by a subscription on this lead.
+
+#### Returns
+
+A
+[DelegationSubscription](https://jameshwade.github.io/deputy/reference/DelegationSubscription.md).
+Snapshot, observation, cancellation and continuation are distinct
+operations. Closing it only detaches.
+
+------------------------------------------------------------------------
+
+### `LeadAgent$interrupt_subagent()`
+
+Ask one child to stop cooperatively. This trusted host control API is
+separate from disclosure authorization; hosts must authorize the action
+before routing a user request here. It is never exposed as an agent
+tool.
+
+#### Usage
+
+    LeadAgent$interrupt_subagent(delegation_id, reason = "interrupted")
+
+#### Arguments
+
+- `delegation_id`:
+
+  Exact admitted child locator.
+
+- `reason`:
+
+  Stable stop reason, default `"interrupted"`.
+
+#### Returns
+
+Invisible logical; FALSE for missing or already settled children.
+
+------------------------------------------------------------------------
+
+### `LeadAgent$inspect_subagents()`
+
+Inspect authorized child snapshots without executing or changing
+context. Runtime facts, model claims, per-run usage, retained transcript
+and initial manifest are separate. Cumulative child usage currently
+equals per-run usage because child continuation is unsupported. Unknown
+usage is NULL.
+
+#### Usage
+
+    LeadAgent$inspect_subagents(
+      requester,
+      delegation_id = NULL,
+      transcript = FALSE
+    )
+
+#### Arguments
+
+- `requester`:
+
+  Host-authenticated request context, never model arguments.
+
+- `delegation_id`:
+
+  Optional exact delegation locator, checked only after disclosure
+  authorization. Unknown IDs return an empty list.
+
+- `transcript`:
+
+  Include public ellmer content records and replayed `turns`. Hidden
+  thinking, provider JSON and display closures are omitted.
+
+#### Returns
+
+Authorized and redacted read-only view lists. These are snapshots;
+modifying a returned list never changes the child or lead context.
+
+------------------------------------------------------------------------
+
+### `LeadAgent$export_subagents()`
+
+Export authorized settled child history for host-owned durable storage.
+This is observation history, not a resumable Agent/session snapshot.
+
+#### Usage
+
+    LeadAgent$export_subagents(requester, delegation_id = NULL)
+
+#### Arguments
+
+- `requester, delegation_id`:
+
+  See `$inspect_subagents()`.
+
+#### Returns
+
+Portable versioned list for
+[`delegation_history()`](https://jameshwade.github.io/deputy/reference/delegation_history.md).
+Export rejects active selected children. The host supplies current
+disclosure policy when reading it back. Only public ellmer records are
+retained.
+
+------------------------------------------------------------------------
+
+### `LeadAgent$read_subagent_result()`
+
+Read an authorized retained delegation-answer artifact.
+
+#### Usage
+
+    LeadAgent$read_subagent_result(
+      requester,
+      delegation_id,
+      reference,
+      offset = 0L
+    )
+
+#### Arguments
+
+- `requester, delegation_id`:
+
+  See `$inspect_subagents()`.
+
+- `reference`:
+
+  An exact reference included in the redacted authorized child view.
+  Missing or expired artifacts fail explicitly.
+
+- `offset`:
+
+  Character offset for a bounded chunk, starting at zero.
+
+#### Returns
+
+Existing bounded tool-result chunk; no tool or model executes.
 
 ------------------------------------------------------------------------
 

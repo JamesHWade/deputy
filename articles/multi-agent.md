@@ -536,3 +536,292 @@ identical(restored, definitions$reviewer)
 #> [1] TRUE
 unlink(path)
 ```
+
+## Bind host policy and execution resources
+
+A child starts a fresh conversation, but a tool closure can still
+capture shared state.
+[`DelegationPolicy()`](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
+makes that ownership visible in its initial manifest. The default
+`resource_mode = "shared"` borrows definition and skill tools; Deputy
+does not close them. Choose `"exclusive"` with a shared host
+`resource_key` to reject overlapping delegations that use one resource
+in the same R process. This does not lock direct host access or isolate
+the filesystem.
+
+For an independent R worker per delegation, use the public resource
+factory:
+
+``` r
+
+policy <- DelegationPolicy(
+  resource_mode = "owned",
+  resources = function(agent, definition, context) {
+    worker <- RSession$new(agent)
+    DelegationResources(worker$tools(), cleanup = worker$close)
+  },
+  observers = c("Notification", "Stop")
+)
+lead <- LeadAgent$new(
+  chat = chat,
+  permissions = permissions_full(), # Trusted R uses this account's access
+  sub_agents = list(agent_definition("analyst", "Analyze data", "Check the data.")),
+  delegation_policy = policy
+)
+```
+
+The factory receives a fresh child before provider dispatch. It can bind
+an `RSession` or `McpConnection` using public Agent identity and
+workspace APIs. Return tools without running or mutating the child. A
+factory must clean up its own partial construction if it throws; once it
+returns `DelegationResources`, Deputy calls cleanup exactly once after
+settlement or subsequent setup failure. Cancellation is cooperative.
+Cleanup errors appear separately in
+`lead$list_subagents()$cleanup_error`.
+
+Owned mode rejects tools captured in definitions or skills. MCP
+selections in a definition require an owned factory, which resolves the
+host’s explicit config and server/tool allowances. The ordinary child
+permissions and definition denylist apply to all registered tool
+origins. Stateless parallel responders never call a resource factory or
+acquire tools, handlers or resource leases.
+
+Tool governance hooks (`PreToolUse`, `PostToolUse`,
+`PostToolUseFailure`) forward from the live lead registry. Other
+observers require explicit selection. Their callbacks remain shared host
+code; Deputy does not clone captured state. Children retain the initial
+permission ceiling and check current lead restrictions before each tool
+operation. Provider-native tools are unsupported for delegated runs
+because they bypass these execution gates.
+
+For a hosted child that asks questions, select the interactive tool in
+its definition (or return it from its owned factory) and bind a handler:
+
+``` r
+
+policy <- DelegationPolicy(human_input = function(questions, context) {
+  # The host authenticates the owner and supplies the UI routing function.
+  request_answers(
+    questions,
+    owner = context$scope$owner_id,
+    agent_id = context$agent_id,
+    run_id = context$run_id,
+    delegation_id = context$delegation_id
+  )
+})
+lead <- LeadAgent$new(
+  chat,
+  sub_agents = list(agent_definition(
+    "interviewer", "Clarify requirements", "Ask focused questions.",
+    tools = tools_interactive()
+  )),
+  delegation_scope = list(owner_id = "authenticated-owner", conversation_id = "chat-1"),
+  delegation_policy = policy
+)
+```
+
+The current routing context includes child, parent and session
+identifiers. An unbound `ask_user` fails preparation rather than falling
+back to a process-wide handler. Scope values are host assertions, not
+authentication. The host still controls access and redaction for
+manifests and retained transcripts.
+
+Human answers and delegation briefs never approve tool effects.
+Delegated durable approval is not yet supported: a lead configured with
+`approval_dir` rejects delegation before dispatch, and a child
+permission callback returning `PermissionResultPending` stops without
+executing the requested effect. Continue to use standalone `Agent`
+approval APIs where durable suspension is needed. Child continuation and
+durable job recovery are separate backlog work.
+
+## Compact outcomes and child history
+
+The `delegate_to_agent` tool returns a JSON `DelegationOutcome`
+projection. Its `runtime` contains execution status, exact stop reason,
+and stable child, run, parent tool-call and delegation identities. The
+`answer` and optional `claims` are model-authored. A normal stop never
+verifies a claim or approves an artifact. `missing_evidence` and
+`unresolved_work` are `NULL` when not supplied. `parallel_delegate()`
+also returns named `outcomes` beside its existing results.
+
+Answers are bounded to 8 KiB of UTF-8 text. Larger answers use the
+existing ContextPolicy offload store; a scoped reference retains
+provenance. The model projection includes at most eight references and
+reports omissions. `runtime$claim_omissions` reports omitted entries and
+text truncation for each structured claim, including in host inspection.
+Full child history is separate from the lead’s model context.
+
+Bind disclosure to the authenticated host session before exposing
+inspection:
+
+``` r
+
+owner_session <- new.env(parent = emptyenv()) # supplied by host authentication
+scope <- list(owner_id = "owner-1", conversation_id = "chat-1")
+disclosure <- DelegationDisclosure(
+  authorize = function(requester, scope) identical(requester, owner_session),
+  redact = function(view, requester) view # apply application-specific redaction
+)
+lead <- LeadAgent$new(
+  chat, sub_agents = definitions,
+  delegation_scope = scope, delegation_disclosure = disclosure
+)
+lead$parallel_delegate(c(analyst = "Analyze the evidence"))
+views <- lead$inspect_subagents(owner_session, transcript = TRUE)
+views[[1]]$outcome$runtime
+views[[1]]$turns # native public ellmer turns for optional rendering
+
+history <- lead$export_subagents(owner_session)
+saveRDS(history, "child-history.rds") # host-owned private storage
+restored <- delegation_history(
+  readRDS("child-history.rds"), owner_session, disclosure,
+  scope = history$scope # use the host's trusted ownership record on reload
+)
+```
+
+Authorization runs before lookup, even for nonexistent IDs. The default
+policy denies access. Redaction receives a child view, or a list with
+`kind = "artifact"` and `result` for `read_subagent_result()`. Remove
+references as well as text when an artifact must not be disclosed. Host
+callbacks are trusted application code; requester strings and saved
+scope do not authenticate a user. The low-level `get_subagent_*()`
+getters remain private-to-the-host inspection surfaces and do not
+perform end-user authorization.
+
+Snapshots include initial manifests, run and cumulative child usage,
+outcomes, errors and optionally transcripts. Child cumulative usage
+currently equals its single run; continuation is unsupported. Unknown
+usage/cost stays unknown. Public ellmer record/replay strips executable
+tools, raw provider payloads, hidden thinking and arbitrary display
+extras. General rich-widget persistence is separate work. Text remains
+untrusted content for the renderer to sanitize.
+
+Export accepts settled children only. Replay neither constructs an Agent
+nor runs a model or tool, and never grants permission, cancels or
+resumes execution. Restored artifact availability is explicitly
+unresolved until checked against host storage. Live inspection checks
+retained artifacts and reports missing ones. The default 16 MiB
+disclosure ceiling fails explicitly for larger views; select one child
+or omit its transcript. Storage retention and durable active-run
+recovery remain host responsibilities. Public content records carry a
+tool-value kind receipt so ordinary application objects are never
+interpreted as content constructors. Supported classed tool values (data
+frames, factors, dates, times, and durations) use a portable JSON text
+projection; native typed attachments retain their content
+representation. Unsupported application S7 values become an explicit
+omission notice without invoking their methods or exposing private
+fields. Other nonportable values still fail closed. The optional
+child-chat adapter builds on these headless records; Deputy core does
+not require shinychat.
+
+## Observe child activity
+
+Observation reads a transient, bounded buffer. The runtime remains the
+only consumer of each child stream. This supports concurrent subscribers
+without running tools twice or letting a slow view block a child.
+
+``` r
+
+reader <- lead$observe_subagents(owner_session)
+initial <- reader$snapshot(transcript = FALSE)
+# Start work through a separate host action; observation itself starts nothing.
+promise <- lead$parallel_delegate_async(c(analyst = "Analyze the evidence"))
+update <- reader$poll()
+update$events
+update$gaps # ranges lost to eviction; recover with reader$snapshot()
+reader$close() # detach only; the child continues
+
+reconnected <- lead$observe_subagents(owner_session, after = update$cursor)
+reconnected$poll()
+# A separately authorized host action may cancel one child:
+lead$interrupt_subagent(delegation_id, reason = "user_cancelled")
+```
+
+Each cursor contains a transient stream ID and sequence number.
+Sequences increase across the lead, while envelopes retain child
+conversation, delegation, run, parent and tool-call IDs. A snapshot
+returns its boundary cursor; subsequent polls return later events.
+Reconnecting with a previous cursor does not repeat events already
+acknowledged. Foreign and future cursors fail. A filtered subscription
+still reports gaps conservatively for the whole stream.
+
+The defaults retain at most 256 envelopes and 1 MiB. Individual events
+above 64 KiB become an explicit `content_omitted` envelope, recoverable
+from retained public history when available. These limits cover the
+observation buffer, not the separately retained conversation.
+[`DelegationObservation()`](https://jameshwade.github.io/deputy/reference/DelegationObservation.md)
+configures them. There are no per-reader queues and no subscriber
+callbacks inside execution.
+
+Every read reauthorizes the host request. Event redaction receives
+`list(kind = "event", event = envelope)`; returning a list without
+`event` hides it. Redaction errors leave the cursor unchanged and never
+fail the child. Host redactors must remain synchronous and must not
+drive execution. Internal observation errors appear separately as
+`observation_error`. Hidden thinking and private transport objects are
+excluded. Tool start events are deduplicated against the existing
+runtime tool-call identity; execution is unchanged.
+
+`settled` is the delegation terminal envelope; a child’s own `stop`
+event may precede it. The former includes setup/unstarted outcomes and
+final governance status. Closing, selecting and replaying a view do not
+cancel or resume a child. `interrupt_subagent()` is a trusted host
+control API requiring the host’s separate action authorization. Streams
+are in-process only: process restart needs host-owned saved history, and
+active-run recovery remains unsupported.
+
+## Inspect children in Shiny
+
+The optional adapter places an activity strip and selected child
+conversation beside the host’s lead chat. It requires shinychat 0.5.0,
+Shiny, bslib, commonmark and xml2. The core runtime has no UI
+dependency. Assistant Markdown is rendered then filtered to inert HTML
+so inline and fenced code retain their literal characters. Native tool
+code values and errors remain plain text.
+
+``` r
+
+ui <- bslib::page_fluid(
+  bslib::layout_columns(lead_chat_ui, subagent_chat_ui("children"))
+)
+server <- function(input, output, session) {
+  subagent_chat_server(
+    "children", lead,
+    requester = function() authenticated_owner_session,
+    # Optional: authorize this action separately from disclosure.
+    on_cancel = function(id, requester) {
+      authorize_child_cancellation(requester, id)
+      lead$interrupt_subagent(id, "user_cancelled")
+    }
+  )
+}
+```
+
+Activity cards and the keyboard-accessible selector identify individual
+delegations, including repeated calls to the same specialist. The
+selected view shows execution status, initial context, usage, unresolved
+claims and native tool cards with retained attachments. Completed
+execution does not establish task success, approval or evidence
+verification. Tool results remain untrusted.
+
+Selecting, closing and reopening a child only reads history. The panel
+has no prompt handler; it cannot resume a child. Closing detaches its
+reader while children continue. Cancellation appears only when the host
+supplies a separately authorized callback. Polling rechecks
+authorization and redaction; denial clears the displayed history. Buffer
+gaps recover from retained snapshots, while partial live text is
+bounded. The read-only composer is hidden with scoped presentation CSS
+tested against shinychat 0.5.0; no private runtime helpers are used.
+
+For saved history, provide a reactive `history` plus the current
+host-owned `disclosure` policy and trusted `scope`, obtained
+independently of the saved payload. Replay restores no execution, and
+unresolved artifact references stay unresolved. The module returns
+reactive selection, views, notice and closed state for host composition.
+
+Run `inst/examples/subagent-chats/app.R` for a deterministic local demo
+with native tool output and a plot, concurrent specialists, repeated
+names, a partial failure, optional cancellation, access revocation and
+saved-history replay. Its visible model/tool counters make extra
+execution detectable. It uses a local fixture service and needs no paid
+model credentials.

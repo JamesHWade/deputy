@@ -88,6 +88,15 @@
 <p><strong>DelegationManifest</strong>: An immutable receipt for a delegation’s prepared initial context, including resolved evidence and declarative policy fingerprints. It is distinct from the current working context, retained child transcript and provider wire framing.</p>
 </div>
 </div>
+<div class="section level2">
+<h2 id="delegation-host-binding">Delegation host binding<a class="anchor" aria-label="anchor" href="#delegation-host-binding"></a></h2>
+<p><code>DelegationPolicy</code> is host runtime configuration for child governance, interactive routing and shared, exclusive or owned resources. <code>DelegationResources</code> transfers cleanup responsibility for factory-created tools to one delegation. These runtime objects are separate from the portable binding receipt in <code>DelegationManifest</code>.</p>
+<div class="section level3">
+<h3 id="delegation-inspection">Delegation inspection<a class="anchor" aria-label="anchor" href="#delegation-inspection"></a></h3>
+<p><code>DelegationOutcome</code> separates bounded model answers and claims from execution facts. <code>DelegationDisclosure</code> is the host authorization/redaction boundary for child snapshots and artifacts. A saved child history is read-only public ellmer evidence, never a continuation or an access grant. See ADR-0020.</p>
+<p><code>DelegationObservation</code> bounds a lead’s transient event stream. A <code>DelegationSubscription</code> is an authorized read cursor, not a job, conversation owner or cancellation handle. Gaps require snapshot recovery.</p>
+</div>
+</div>
 </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

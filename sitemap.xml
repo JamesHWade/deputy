@@ -25,8 +25,14 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/ApprovalContinuation.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/CallbackResult.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/ContextPolicy.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/DelegationDisclosure.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/DelegationInput.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/DelegationManifest.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/DelegationObservation.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/DelegationOutcome.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/DelegationPolicy.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/DelegationResources.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/DelegationSubscription.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/DeputyCompaction.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/HookEvent.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/HookMatcher.html</loc></url>
@@ -48,6 +54,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/agent_definition_read.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/approval_read.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/ask_user_impl.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/delegation_history.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/deputy-errors.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/deputy-package.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/hook_block_dangerous_bash.html</loc></url>
@@ -77,6 +84,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_create.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_load.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skills_list.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/subagent_chat_ui.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_ask_user.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_edit_file.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_glob_files.html</loc></url>

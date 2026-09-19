@@ -90,6 +90,11 @@ sub-agents based on registered AgentDefinitions.</p>
 <li><p><a href="#method-LeadAgent-get_subagent_results"><code>LeadAgent$get_subagent_results()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-get_subagent_messages"><code>LeadAgent$get_subagent_messages()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-get_subagent_contexts"><code>LeadAgent$get_subagent_contexts()</code></a></p></li>
+<li><p><a href="#method-LeadAgent-observe_subagents"><code>LeadAgent$observe_subagents()</code></a></p></li>
+<li><p><a href="#method-LeadAgent-interrupt_subagent"><code>LeadAgent$interrupt_subagent()</code></a></p></li>
+<li><p><a href="#method-LeadAgent-inspect_subagents"><code>LeadAgent$inspect_subagents()</code></a></p></li>
+<li><p><a href="#method-LeadAgent-export_subagents"><code>LeadAgent$export_subagents()</code></a></p></li>
+<li><p><a href="#method-LeadAgent-read_subagent_result"><code>LeadAgent$read_subagent_result()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-print"><code>LeadAgent$print()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-clone"><code>LeadAgent$clone()</code></a></p></li>
 </ul></div><p><details><summary>Inherited methods</summary><ul><li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href="Agent.html#method-add_hook"><code>Agent$add_hook()</code></a></span></li>
@@ -168,7 +173,11 @@ sub-agents based on registered AgentDefinitions.</p>
 <span>  fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  delegation_sources <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  delegation_scope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  delegation_max_bytes <span class="op">=</span> <span class="fl">65536L</span></span>
+<span>  delegation_max_bytes <span class="op">=</span> <span class="fl">65536L</span>,</span>
+<span>  delegation_policy <span class="op">=</span> <span class="fu"><a href="../reference/DelegationPolicy.html">DelegationPolicy</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  delegation_disclosure <span class="op">=</span> <span class="fu"><a href="../reference/DelegationDisclosure.html">DelegationDisclosure</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  delegation_observation <span class="op">=</span> <span class="fu"><a href="../reference/DelegationObservation.html">DelegationObservation</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  approval_dir <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h4>
@@ -249,6 +258,22 @@ required when sources are supplied. Model arguments cannot override it.</p></dd>
 complete manifest. Known complete-context estimates also obey
 <a href="ContextPolicy.html">ContextPolicy</a> <code>max_tokens</code>; unknown estimates remain <code>NULL</code> and rely
 on byte bounds. Sources are text only, with a 16 MiB catalogue ceiling.</p></dd>
+
+      <dt><code>delegation_policy</code></dt>
+<dd><p>Host-only <a href="DelegationPolicy.html">DelegationPolicy</a> for child governance,
+resource ownership and interactive routing.</p></dd>
+
+      <dt><code>delegation_disclosure</code></dt>
+<dd><p>Host-only <a href="DelegationDisclosure.html">DelegationDisclosure</a> authorizing
+inspection and saved-history disclosure. Defaults to deny.</p></dd>
+
+      <dt><code>delegation_observation</code></dt>
+<dd><p><a href="DelegationObservation.html">DelegationObservation</a> bounds for the
+transient child activity stream.</p></dd>
+
+      <dt><code>approval_dir</code></dt>
+<dd><p>Optional standalone lead approval directory. Delegation
+rejects this unsupported durable child-continuation combination.</p></dd>
 
 
 </dl><p></p></div>
@@ -332,7 +357,8 @@ active responder.</p></dd>
 </div><p></p><div class="section">
 <h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
 <p>A list with <code>mode</code>, named <code>results</code> (<a href="AgentResult.html">AgentResult</a> or <code>NULL</code>),
-named <code>errors</code>, named <code>status</code>, and an aggregate <code>run</code> (<a href="AgentResult.html">AgentResult</a>).
+named <code>outcomes</code> (<a href="DelegationOutcome.html">DelegationOutcome</a>), <code>errors</code>, <code>status</code>, and an
+aggregate <code>run</code> (<a href="AgentResult.html">AgentResult</a>).
 <code>$last_run()</code> retains the aggregate run. The lead's conversation is
 unchanged. Failed responders do not discard successful siblings.</p>
 </div>
@@ -491,10 +517,148 @@ Current context is retained at settlement; no matches returns <code><a href="htt
 
 </div>
 
+<p></p><hr><a id="method-LeadAgent-observe_subagents"></a><div class="section">
+<h3 id="leadagent-observe-subagents-"><code>LeadAgent$observe_subagents()</code><a class="anchor" aria-label="anchor" href="#leadagent-observe-subagents-"></a></h3>
+<p>Observe bounded child activity without consuming or driving its stream.</p><div class="section">
+<h4 id="usage-10">Usage<a class="anchor" aria-label="anchor" href="#usage-10"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">observe_subagents</span><span class="op">(</span><span class="va">requester</span>, delegation_id <span class="op">=</span> <span class="cn">NULL</span>, after <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-8">Arguments<a class="anchor" aria-label="anchor" href="#arguments-8"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>requester</code></dt>
+<dd><p>Host-authenticated request context.</p></dd>
+
+      <dt><code>delegation_id</code></dt>
+<dd><p>Optional child locator filter.</p></dd>
+
+      <dt><code>after</code></dt>
+<dd><p>Optional cursor returned by a subscription on this lead.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-10">Returns<a class="anchor" aria-label="anchor" href="#returns-10"></a></h4>
+<p>A <a href="DelegationSubscription.html">DelegationSubscription</a>. Snapshot, observation, cancellation
+and continuation are distinct operations. Closing it only detaches.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-LeadAgent-interrupt_subagent"></a><div class="section">
+<h3 id="leadagent-interrupt-subagent-"><code>LeadAgent$interrupt_subagent()</code><a class="anchor" aria-label="anchor" href="#leadagent-interrupt-subagent-"></a></h3>
+<p>Ask one child to stop cooperatively. This trusted host control API is
+separate from disclosure authorization; hosts must authorize the action
+before routing a user request here. It is never exposed as an agent tool.</p><div class="section">
+<h4 id="usage-11">Usage<a class="anchor" aria-label="anchor" href="#usage-11"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">interrupt_subagent</span><span class="op">(</span><span class="va">delegation_id</span>, reason <span class="op">=</span> <span class="st">"interrupted"</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-9">Arguments<a class="anchor" aria-label="anchor" href="#arguments-9"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>delegation_id</code></dt>
+<dd><p>Exact admitted child locator.</p></dd>
+
+      <dt><code>reason</code></dt>
+<dd><p>Stable stop reason, default <code>"interrupted"</code>.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-11">Returns<a class="anchor" aria-label="anchor" href="#returns-11"></a></h4>
+<p>Invisible logical; FALSE for missing or already settled children.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-LeadAgent-inspect_subagents"></a><div class="section">
+<h3 id="leadagent-inspect-subagents-"><code>LeadAgent$inspect_subagents()</code><a class="anchor" aria-label="anchor" href="#leadagent-inspect-subagents-"></a></h3>
+<p>Inspect authorized child snapshots without executing or changing context.
+Runtime facts, model claims, per-run usage, retained transcript and initial
+manifest are separate. Cumulative child usage currently equals per-run
+usage because child continuation is unsupported. Unknown usage is NULL.</p><div class="section">
+<h4 id="usage-12">Usage<a class="anchor" aria-label="anchor" href="#usage-12"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">inspect_subagents</span><span class="op">(</span></span>
+<span>  <span class="va">requester</span>,</span>
+<span>  delegation_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  transcript <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-10">Arguments<a class="anchor" aria-label="anchor" href="#arguments-10"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>requester</code></dt>
+<dd><p>Host-authenticated request context, never model arguments.</p></dd>
+
+      <dt><code>delegation_id</code></dt>
+<dd><p>Optional exact delegation locator, checked only after
+disclosure authorization. Unknown IDs return an empty list.</p></dd>
+
+      <dt><code>transcript</code></dt>
+<dd><p>Include public ellmer content records and replayed
+<code>turns</code>. Hidden thinking, provider JSON and display closures are omitted.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-12">Returns<a class="anchor" aria-label="anchor" href="#returns-12"></a></h4>
+<p>Authorized and redacted read-only view lists. These are snapshots;
+modifying a returned list never changes the child or lead context.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-LeadAgent-export_subagents"></a><div class="section">
+<h3 id="leadagent-export-subagents-"><code>LeadAgent$export_subagents()</code><a class="anchor" aria-label="anchor" href="#leadagent-export-subagents-"></a></h3>
+<p>Export authorized settled child history for host-owned durable storage.
+This is observation history, not a resumable Agent/session snapshot.</p><div class="section">
+<h4 id="usage-13">Usage<a class="anchor" aria-label="anchor" href="#usage-13"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">export_subagents</span><span class="op">(</span><span class="va">requester</span>, delegation_id <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-11">Arguments<a class="anchor" aria-label="anchor" href="#arguments-11"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>requester, delegation_id</code></dt>
+<dd><p>See <code>$inspect_subagents()</code>.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-13">Returns<a class="anchor" aria-label="anchor" href="#returns-13"></a></h4>
+<p>Portable versioned list for <code><a href="delegation_history.html">delegation_history()</a></code>. Export rejects
+active selected children. The host supplies current disclosure policy
+when reading it back. Only public ellmer records are retained.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-LeadAgent-read_subagent_result"></a><div class="section">
+<h3 id="leadagent-read-subagent-result-"><code>LeadAgent$read_subagent_result()</code><a class="anchor" aria-label="anchor" href="#leadagent-read-subagent-result-"></a></h3>
+<p>Read an authorized retained delegation-answer artifact.</p><div class="section">
+<h4 id="usage-14">Usage<a class="anchor" aria-label="anchor" href="#usage-14"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">read_subagent_result</span><span class="op">(</span></span>
+<span>  <span class="va">requester</span>,</span>
+<span>  <span class="va">delegation_id</span>,</span>
+<span>  <span class="va">reference</span>,</span>
+<span>  offset <span class="op">=</span> <span class="fl">0L</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-12">Arguments<a class="anchor" aria-label="anchor" href="#arguments-12"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>requester, delegation_id</code></dt>
+<dd><p>See <code>$inspect_subagents()</code>.</p></dd>
+
+      <dt><code>reference</code></dt>
+<dd><p>An exact reference included in the redacted authorized
+child view. Missing or expired artifacts fail explicitly.</p></dd>
+
+      <dt><code>offset</code></dt>
+<dd><p>Character offset for a bounded chunk, starting at zero.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-14">Returns<a class="anchor" aria-label="anchor" href="#returns-14"></a></h4>
+<p>Existing bounded tool-result chunk; no tool or model executes.</p>
+</div>
+
+</div>
+
 <p></p><hr><a id="method-LeadAgent-print"></a><div class="section">
 <h3 id="leadagent-print-"><code>LeadAgent$print()</code><a class="anchor" aria-label="anchor" href="#leadagent-print-"></a></h3>
 <p>Print the lead agent.</p><div class="section">
-<h4 id="usage-10">Usage<a class="anchor" aria-label="anchor" href="#usage-10"></a></h4>
+<h4 id="usage-15">Usage<a class="anchor" aria-label="anchor" href="#usage-15"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -503,10 +667,10 @@ Current context is retained at settlement; no matches returns <code><a href="htt
 <p></p><hr><a id="method-LeadAgent-clone"></a><div class="section">
 <h3 id="leadagent-clone-"><code>LeadAgent$clone()</code><a class="anchor" aria-label="anchor" href="#leadagent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-11">Usage<a class="anchor" aria-label="anchor" href="#usage-11"></a></h4>
+<h4 id="usage-16">Usage<a class="anchor" aria-label="anchor" href="#usage-16"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-8">Arguments<a class="anchor" aria-label="anchor" href="#arguments-8"></a></h4>
+<h4 id="arguments-13">Arguments<a class="anchor" aria-label="anchor" href="#arguments-13"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

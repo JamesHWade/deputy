@@ -302,6 +302,23 @@ Coordinate multiple specialized agents
   : Describe a task-specific delegation input
 - [`DelegationManifest()`](https://jameshwade.github.io/deputy/reference/DelegationManifest.md)
   : Inspect the prepared initial context of a delegation
+- [`DelegationPolicy()`](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
+  : Bind host policy and resources to delegated agents
+- [`DelegationResources()`](https://jameshwade.github.io/deputy/reference/DelegationResources.md)
+  : Return resources owned by one delegation
+- [`DelegationDisclosure()`](https://jameshwade.github.io/deputy/reference/DelegationDisclosure.md)
+  : Authorize and redact child conversation inspection
+- [`DelegationOutcome()`](https://jameshwade.github.io/deputy/reference/DelegationOutcome.md)
+  : Inspect a compact delegation outcome
+- [`DelegationObservation()`](https://jameshwade.github.io/deputy/reference/DelegationObservation.md)
+  : Bound the child activity observation buffer
+- [`DelegationSubscription`](https://jameshwade.github.io/deputy/reference/DelegationSubscription.md)
+  : Read bounded child activity without driving execution
+- [`subagent_chat_ui()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md)
+  [`subagent_chat_server()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md)
+  : Inspect child conversations in an optional Shiny panel
+- [`delegation_history()`](https://jameshwade.github.io/deputy/reference/delegation_history.md)
+  : Replay authorized settled child history
 - [`AgentDefinition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
   [`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
   : Create an Agent Definition

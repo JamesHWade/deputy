@@ -115,3 +115,24 @@ instructions do not grant authority.
 initial context, including resolved evidence and declarative policy
 fingerprints. It is distinct from the current working context, retained
 child transcript and provider wire framing.
+
+## Delegation host binding
+
+`DelegationPolicy` is host runtime configuration for child governance,
+interactive routing and shared, exclusive or owned resources.
+`DelegationResources` transfers cleanup responsibility for
+factory-created tools to one delegation. These runtime objects are
+separate from the portable binding receipt in `DelegationManifest`.
+
+### Delegation inspection
+
+`DelegationOutcome` separates bounded model answers and claims from
+execution facts. `DelegationDisclosure` is the host
+authorization/redaction boundary for child snapshots and artifacts. A
+saved child history is read-only public ellmer evidence, never a
+continuation or an access grant. See ADR-0020.
+
+`DelegationObservation` bounds a lead’s transient event stream. A
+`DelegationSubscription` is an authorized read cursor, not a job,
+conversation owner or cancellation handle. Gaps require snapshot
+recovery.

@@ -767,6 +767,274 @@ installation leaves an existing definition intact.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
+<div class="section level2">
+<h2 id="bind-host-policy-and-execution-resources">Bind host policy and execution resources<a class="anchor" aria-label="anchor" href="#bind-host-policy-and-execution-resources"></a>
+</h2>
+<p>A child starts a fresh conversation, but a tool closure can still
+capture shared state. <code><a href="../reference/DelegationPolicy.html">DelegationPolicy()</a></code> makes that
+ownership visible in its initial manifest. The default
+<code>resource_mode = "shared"</code> borrows definition and skill
+tools; Deputy does not close them. Choose <code>"exclusive"</code> with
+a shared host <code>resource_key</code> to reject overlapping
+delegations that use one resource in the same R process. This does not
+lock direct host access or isolate the filesystem.</p>
+<p>For an independent R worker per delegation, use the public resource
+factory:</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationPolicy.html">DelegationPolicy</a></span><span class="op">(</span></span>
+<span>  resource_mode <span class="op">=</span> <span class="st">"owned"</span>,</span>
+<span>  resources <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">agent</span>, <span class="va">definition</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">worker</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/RSession.html">RSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="va">agent</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="../reference/DelegationResources.html">DelegationResources</a></span><span class="op">(</span><span class="va">worker</span><span class="op">$</span><span class="fu">tools</span><span class="op">(</span><span class="op">)</span>, cleanup <span class="op">=</span> <span class="va">worker</span><span class="op">$</span><span class="va">close</span><span class="op">)</span></span>
+<span>  <span class="op">}</span>,</span>
+<span>  observers <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Notification"</span>, <span class="st">"Stop"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_full.html">permissions_full</a></span><span class="op">(</span><span class="op">)</span>, <span class="co"># Trusted R uses this account's access</span></span>
+<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"analyst"</span>, <span class="st">"Analyze data"</span>, <span class="st">"Check the data."</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  delegation_policy <span class="op">=</span> <span class="va">policy</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The factory receives a fresh child before provider dispatch. It can
+bind an <code>RSession</code> or <code>McpConnection</code> using public
+Agent identity and workspace APIs. Return tools without running or
+mutating the child. A factory must clean up its own partial construction
+if it throws; once it returns <code>DelegationResources</code>, Deputy
+calls cleanup exactly once after settlement or subsequent setup failure.
+Cancellation is cooperative. Cleanup errors appear separately in
+<code>lead$list_subagents()$cleanup_error</code>.</p>
+<p>Owned mode rejects tools captured in definitions or skills. MCP
+selections in a definition require an owned factory, which resolves the
+host’s explicit config and server/tool allowances. The ordinary child
+permissions and definition denylist apply to all registered tool
+origins. Stateless parallel responders never call a resource factory or
+acquire tools, handlers or resource leases.</p>
+<p>Tool governance hooks (<code>PreToolUse</code>,
+<code>PostToolUse</code>, <code>PostToolUseFailure</code>) forward from
+the live lead registry. Other observers require explicit selection.
+Their callbacks remain shared host code; Deputy does not clone captured
+state. Children retain the initial permission ceiling and check current
+lead restrictions before each tool operation. Provider-native tools are
+unsupported for delegated runs because they bypass these execution
+gates.</p>
+<p>For a hosted child that asks questions, select the interactive tool
+in its definition (or return it from its owned factory) and bind a
+handler:</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationPolicy.html">DelegationPolicy</a></span><span class="op">(</span>human_input <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">questions</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="co"># The host authenticates the owner and supplies the UI routing function.</span></span>
+<span>  <span class="fu">request_answers</span><span class="op">(</span></span>
+<span>    <span class="va">questions</span>,</span>
+<span>    owner <span class="op">=</span> <span class="va">context</span><span class="op">$</span><span class="va">scope</span><span class="op">$</span><span class="va">owner_id</span>,</span>
+<span>    agent_id <span class="op">=</span> <span class="va">context</span><span class="op">$</span><span class="va">agent_id</span>,</span>
+<span>    run_id <span class="op">=</span> <span class="va">context</span><span class="op">$</span><span class="va">run_id</span>,</span>
+<span>    delegation_id <span class="op">=</span> <span class="va">context</span><span class="op">$</span><span class="va">delegation_id</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  <span class="va">chat</span>,</span>
+<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
+<span>    <span class="st">"interviewer"</span>, <span class="st">"Clarify requirements"</span>, <span class="st">"Ask focused questions."</span>,</span>
+<span>    tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_interactive.html">tools_interactive</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  <span class="op">)</span><span class="op">)</span>,</span>
+<span>  delegation_scope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>owner_id <span class="op">=</span> <span class="st">"authenticated-owner"</span>, conversation_id <span class="op">=</span> <span class="st">"chat-1"</span><span class="op">)</span>,</span>
+<span>  delegation_policy <span class="op">=</span> <span class="va">policy</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The current routing context includes child, parent and session
+identifiers. An unbound <code>ask_user</code> fails preparation rather
+than falling back to a process-wide handler. Scope values are host
+assertions, not authentication. The host still controls access and
+redaction for manifests and retained transcripts.</p>
+<p>Human answers and delegation briefs never approve tool effects.
+Delegated durable approval is not yet supported: a lead configured with
+<code>approval_dir</code> rejects delegation before dispatch, and a
+child permission callback returning <code>PermissionResultPending</code>
+stops without executing the requested effect. Continue to use standalone
+<code>Agent</code> approval APIs where durable suspension is needed.
+Child continuation and durable job recovery are separate backlog
+work.</p>
+</div>
+<div class="section level2">
+<h2 id="compact-outcomes-and-child-history">Compact outcomes and child history<a class="anchor" aria-label="anchor" href="#compact-outcomes-and-child-history"></a>
+</h2>
+<p>The <code>delegate_to_agent</code> tool returns a JSON
+<code>DelegationOutcome</code> projection. Its <code>runtime</code>
+contains execution status, exact stop reason, and stable child, run,
+parent tool-call and delegation identities. The <code>answer</code> and
+optional <code>claims</code> are model-authored. A normal stop never
+verifies a claim or approves an artifact. <code>missing_evidence</code>
+and <code>unresolved_work</code> are <code>NULL</code> when not
+supplied. <code>parallel_delegate()</code> also returns named
+<code>outcomes</code> beside its existing results.</p>
+<p>Answers are bounded to 8 KiB of UTF-8 text. Larger answers use the
+existing ContextPolicy offload store; a scoped reference retains
+provenance. The model projection includes at most eight references and
+reports omissions. <code>runtime$claim_omissions</code> reports omitted
+entries and text truncation for each structured claim, including in host
+inspection. Full child history is separate from the lead’s model
+context.</p>
+<p>Bind disclosure to the authenticated host session before exposing
+inspection:</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">owner_session</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">new.env</a></span><span class="op">(</span>parent <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">emptyenv</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="co"># supplied by host authentication</span></span>
+<span><span class="va">scope</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>owner_id <span class="op">=</span> <span class="st">"owner-1"</span>, conversation_id <span class="op">=</span> <span class="st">"chat-1"</span><span class="op">)</span></span>
+<span><span class="va">disclosure</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationDisclosure.html">DelegationDisclosure</a></span><span class="op">(</span></span>
+<span>  authorize <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">requester</span>, <span class="va">scope</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">requester</span>, <span class="va">owner_session</span><span class="op">)</span>,</span>
+<span>  redact <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">view</span>, <span class="va">requester</span><span class="op">)</span> <span class="va">view</span> <span class="co"># apply application-specific redaction</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  <span class="va">chat</span>, sub_agents <span class="op">=</span> <span class="va">definitions</span>,</span>
+<span>  delegation_scope <span class="op">=</span> <span class="va">scope</span>, delegation_disclosure <span class="op">=</span> <span class="va">disclosure</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">lead</span><span class="op">$</span><span class="fu">parallel_delegate</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>analyst <span class="op">=</span> <span class="st">"Analyze the evidence"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">views</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">inspect_subagents</span><span class="op">(</span><span class="va">owner_session</span>, transcript <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">views</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">outcome</span><span class="op">$</span><span class="va">runtime</span></span>
+<span><span class="va">views</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">turns</span> <span class="co"># native public ellmer turns for optional rendering</span></span>
+<span></span>
+<span><span class="va">history</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">export_subagents</span><span class="op">(</span><span class="va">owner_session</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">history</span>, <span class="st">"child-history.rds"</span><span class="op">)</span> <span class="co"># host-owned private storage</span></span>
+<span><span class="va">restored</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/delegation_history.html">delegation_history</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="st">"child-history.rds"</span><span class="op">)</span>, <span class="va">owner_session</span>, <span class="va">disclosure</span>,</span>
+<span>  scope <span class="op">=</span> <span class="va">history</span><span class="op">$</span><span class="va">scope</span> <span class="co"># use the host's trusted ownership record on reload</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Authorization runs before lookup, even for nonexistent IDs. The
+default policy denies access. Redaction receives a child view, or a list
+with <code>kind = "artifact"</code> and <code>result</code> for
+<code>read_subagent_result()</code>. Remove references as well as text
+when an artifact must not be disclosed. Host callbacks are trusted
+application code; requester strings and saved scope do not authenticate
+a user. The low-level <code>get_subagent_*()</code> getters remain
+private-to-the-host inspection surfaces and do not perform end-user
+authorization.</p>
+<p>Snapshots include initial manifests, run and cumulative child usage,
+outcomes, errors and optionally transcripts. Child cumulative usage
+currently equals its single run; continuation is unsupported. Unknown
+usage/cost stays unknown. Public ellmer record/replay strips executable
+tools, raw provider payloads, hidden thinking and arbitrary display
+extras. General rich-widget persistence is separate work. Text remains
+untrusted content for the renderer to sanitize.</p>
+<p>Export accepts settled children only. Replay neither constructs an
+Agent nor runs a model or tool, and never grants permission, cancels or
+resumes execution. Restored artifact availability is explicitly
+unresolved until checked against host storage. Live inspection checks
+retained artifacts and reports missing ones. The default 16 MiB
+disclosure ceiling fails explicitly for larger views; select one child
+or omit its transcript. Storage retention and durable active-run
+recovery remain host responsibilities. Public content records carry a
+tool-value kind receipt so ordinary application objects are never
+interpreted as content constructors. Supported classed tool values (data
+frames, factors, dates, times, and durations) use a portable JSON text
+projection; native typed attachments retain their content
+representation. Unsupported application S7 values become an explicit
+omission notice without invoking their methods or exposing private
+fields. Other nonportable values still fail closed. The optional
+child-chat adapter builds on these headless records; Deputy core does
+not require shinychat.</p>
+</div>
+<div class="section level2">
+<h2 id="observe-child-activity">Observe child activity<a class="anchor" aria-label="anchor" href="#observe-child-activity"></a>
+</h2>
+<p>Observation reads a transient, bounded buffer. The runtime remains
+the only consumer of each child stream. This supports concurrent
+subscribers without running tools twice or letting a slow view block a
+child.</p>
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">reader</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">observe_subagents</span><span class="op">(</span><span class="va">owner_session</span><span class="op">)</span></span>
+<span><span class="va">initial</span> <span class="op">&lt;-</span> <span class="va">reader</span><span class="op">$</span><span class="fu">snapshot</span><span class="op">(</span>transcript <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="co"># Start work through a separate host action; observation itself starts nothing.</span></span>
+<span><span class="va">promise</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">parallel_delegate_async</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>analyst <span class="op">=</span> <span class="st">"Analyze the evidence"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">update</span> <span class="op">&lt;-</span> <span class="va">reader</span><span class="op">$</span><span class="fu">poll</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">update</span><span class="op">$</span><span class="va">events</span></span>
+<span><span class="va">update</span><span class="op">$</span><span class="va">gaps</span> <span class="co"># ranges lost to eviction; recover with reader$snapshot()</span></span>
+<span><span class="va">reader</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span> <span class="co"># detach only; the child continues</span></span>
+<span></span>
+<span><span class="va">reconnected</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">observe_subagents</span><span class="op">(</span><span class="va">owner_session</span>, after <span class="op">=</span> <span class="va">update</span><span class="op">$</span><span class="va">cursor</span><span class="op">)</span></span>
+<span><span class="va">reconnected</span><span class="op">$</span><span class="fu">poll</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co"># A separately authorized host action may cancel one child:</span></span>
+<span><span class="va">lead</span><span class="op">$</span><span class="fu">interrupt_subagent</span><span class="op">(</span><span class="va">delegation_id</span>, reason <span class="op">=</span> <span class="st">"user_cancelled"</span><span class="op">)</span></span></code></pre></div>
+<p>Each cursor contains a transient stream ID and sequence number.
+Sequences increase across the lead, while envelopes retain child
+conversation, delegation, run, parent and tool-call IDs. A snapshot
+returns its boundary cursor; subsequent polls return later events.
+Reconnecting with a previous cursor does not repeat events already
+acknowledged. Foreign and future cursors fail. A filtered subscription
+still reports gaps conservatively for the whole stream.</p>
+<p>The defaults retain at most 256 envelopes and 1 MiB. Individual
+events above 64 KiB become an explicit <code>content_omitted</code>
+envelope, recoverable from retained public history when available. These
+limits cover the observation buffer, not the separately retained
+conversation. <code><a href="../reference/DelegationObservation.html">DelegationObservation()</a></code> configures them.
+There are no per-reader queues and no subscriber callbacks inside
+execution.</p>
+<p>Every read reauthorizes the host request. Event redaction receives
+<code>list(kind = "event", event = envelope)</code>; returning a list
+without <code>event</code> hides it. Redaction errors leave the cursor
+unchanged and never fail the child. Host redactors must remain
+synchronous and must not drive execution. Internal observation errors
+appear separately as <code>observation_error</code>. Hidden thinking and
+private transport objects are excluded. Tool start events are
+deduplicated against the existing runtime tool-call identity; execution
+is unchanged.</p>
+<p><code>settled</code> is the delegation terminal envelope; a child’s
+own <code>stop</code> event may precede it. The former includes
+setup/unstarted outcomes and final governance status. Closing, selecting
+and replaying a view do not cancel or resume a child.
+<code>interrupt_subagent()</code> is a trusted host control API
+requiring the host’s separate action authorization. Streams are
+in-process only: process restart needs host-owned saved history, and
+active-run recovery remains unsupported.</p>
+</div>
+<div class="section level2">
+<h2 id="inspect-children-in-shiny">Inspect children in Shiny<a class="anchor" aria-label="anchor" href="#inspect-children-in-shiny"></a>
+</h2>
+<p>The optional adapter places an activity strip and selected child
+conversation beside the host’s lead chat. It requires shinychat 0.5.0,
+Shiny, bslib, commonmark and xml2. The core runtime has no UI
+dependency. Assistant Markdown is rendered then filtered to inert HTML
+so inline and fenced code retain their literal characters. Native tool
+code values and errors remain plain text.</p>
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">ui</span> <span class="op">&lt;-</span> <span class="fu">bslib</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/bslib/reference/page.html" class="external-link">page_fluid</a></span><span class="op">(</span></span>
+<span>  <span class="fu">bslib</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/bslib/reference/layout_columns.html" class="external-link">layout_columns</a></span><span class="op">(</span><span class="va">lead_chat_ui</span>, <span class="fu"><a href="../reference/subagent_chat_ui.html">subagent_chat_ui</a></span><span class="op">(</span><span class="st">"children"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="../reference/subagent_chat_ui.html">subagent_chat_server</a></span><span class="op">(</span></span>
+<span>    <span class="st">"children"</span>, <span class="va">lead</span>,</span>
+<span>    requester <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="va">authenticated_owner_session</span>,</span>
+<span>    <span class="co"># Optional: authorize this action separately from disclosure.</span></span>
+<span>    on_cancel <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">id</span>, <span class="va">requester</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="fu">authorize_child_cancellation</span><span class="op">(</span><span class="va">requester</span>, <span class="va">id</span><span class="op">)</span></span>
+<span>      <span class="va">lead</span><span class="op">$</span><span class="fu">interrupt_subagent</span><span class="op">(</span><span class="va">id</span>, <span class="st">"user_cancelled"</span><span class="op">)</span></span>
+<span>    <span class="op">}</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p>Activity cards and the keyboard-accessible selector identify
+individual delegations, including repeated calls to the same specialist.
+The selected view shows execution status, initial context, usage,
+unresolved claims and native tool cards with retained attachments.
+Completed execution does not establish task success, approval or
+evidence verification. Tool results remain untrusted.</p>
+<p>Selecting, closing and reopening a child only reads history. The
+panel has no prompt handler; it cannot resume a child. Closing detaches
+its reader while children continue. Cancellation appears only when the
+host supplies a separately authorized callback. Polling rechecks
+authorization and redaction; denial clears the displayed history. Buffer
+gaps recover from retained snapshots, while partial live text is
+bounded. The read-only composer is hidden with scoped presentation CSS
+tested against shinychat 0.5.0; no private runtime helpers are used.</p>
+<p>For saved history, provide a reactive <code>history</code> plus the
+current host-owned <code>disclosure</code> policy and trusted
+<code>scope</code>, obtained independently of the saved payload. Replay
+restores no execution, and unresolved artifact references stay
+unresolved. The module returns reactive selection, views, notice and
+closed state for host composition.</p>
+<p>Run <code>inst/examples/subagent-chats/app.R</code> for a
+deterministic local demo with native tool output and a plot, concurrent
+specialists, repeated names, a partial failure, optional cancellation,
+access revocation and saved-history replay. Its visible model/tool
+counters make extra execution detectable. It uses a local fixture
+service and needs no paid model credentials.</p>
+</div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>
