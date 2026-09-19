@@ -87,6 +87,7 @@ Collate:
     'callback-result.R'
     'approval-record.R'
     'approval-store.R'
+    'chat-composition.R'
     'cli.R'
     'compaction-run.R'
     'context-estimation.R'

@@ -34,8 +34,8 @@ runtime_wrap_tool <- function(
   tool,
   resolve_arguments,
   process_result,
-  begin_execution = function(tool_name) NULL,
-  execute = function(tool, arguments) do.call(tool, arguments)
+  begin_execution = function(tool_name, tool_call_id = NULL) NULL,
+  execute = function(tool, arguments, execution_id) do.call(tool, arguments)
 ) {
   if (!inherits(tool, "ellmer::ToolDef")) {
     cli_abort("{.arg tool} must be an ellmer tool definition")
@@ -69,8 +69,9 @@ runtime_wrap_tool <- function(
         tool_name,
         arguments
       )
-      execution_id <- begin_execution(tool_name)
-      value <- execute(original, arguments)
+      invocation_id <- composition_invocation_id(original, arguments)
+      execution_id <- begin_execution(tool_name, invocation_id)
+      value <- execute(original, arguments, execution_id)
       if (promises::is.promising(value)) {
         return(promises::then(value, function(resolved) {
           process_result(tool_name, resolved, execution_id)

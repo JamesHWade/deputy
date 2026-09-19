@@ -2467,6 +2467,7 @@ Agent <- R6::R6Class(
       },
 
       adapt_tool = function(tool) {
+        validate_composition_tool_owner(tool, self)
         validate_mcp_tool_owner(tool, self)
         validate_r_session_tool_owner(tool, self)
         if (inherits(tool, "ellmer::ToolBuiltIn")) {
@@ -2553,7 +2554,24 @@ Agent <- R6::R6Class(
         )
       },
 
-      execute_tool = function(tool, arguments) {
+      execute_tool = function(tool, arguments, execution_id = NULL) {
+        validate_composition_tool_owner(tool, self)
+        if (!is.null(composition_tool_owner(tool))) {
+          if (
+            !isTRUE(private$run_active) || !is_nonempty_string(execution_id)
+          ) {
+            conversation_abort(
+              "Delegation tools require their owner's active governed run."
+            )
+          }
+          correlation <- private$claim_delegation(
+            tool_name = tool@name,
+            tool_call_id = execution_id,
+            required = TRUE
+          )
+          invoke <- attr(tool, "deputy_composition_invoke", exact = TRUE)
+          return(invoke(arguments$task, correlation))
+        }
         validate_mcp_tool_owner(tool, self, private$effective_run_context())
         validate_r_session_tool_owner(
           tool,

@@ -49,6 +49,8 @@ reference:
   desc: Run a task and inspect its response, tool calls, and usage.
   contents:
   - Agent
+  - adopt_chat
+  - delegation_tool
   - AgentResult
   - result_n_turns
   - result_tool_calls
