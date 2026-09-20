@@ -54,6 +54,141 @@ test_that("error records retain metadata within the serialized bound", {
   expect_lte(length(serialize(record, NULL, version = 3)), job_max_error_bytes)
 })
 
+test_that("event journals evict oldest entries within the store budget", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-event-budget-")
+  agent <- job_test_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "size probe",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L),
+    max_bytes = 2500000
+  )
+  record <- job_record_read(path)$record
+  for (index in seq_len(100L)) {
+    record <- job_event_append(
+      record,
+      list(
+        type = sprintf("event-%03d", index),
+        data = strrep("x", 30000L)
+      )
+    )
+  }
+  lock <- approval_store_lock(path)
+  on.exit(approval_store_unlock(lock), add = TRUE)
+  worker <- new.env(parent = emptyenv())
+  worker$path <- path
+  worker$lock <- lock
+  worker$record <- record
+  worker$finished <- FALSE
+  local_mocked_bindings(
+    job_runtime_snapshot = function(agent, event = NULL) list(),
+    .package = "deputy"
+  )
+
+  job_worker_checkpoint(
+    worker,
+    agent,
+    list(type = "event-101", data = strrep("x", 30000L))
+  )
+
+  persisted <- job_record_read(path)$record
+  expect_gt(worker$record$event_dropped, 0L)
+  expect_identical(worker$record$events, persisted$events)
+  expect_identical(worker$record$event_dropped, persisted$event_dropped)
+  expect_identical(
+    tail(worker$record$events, 1L)[[1L]]$type,
+    "event-101"
+  )
+  dropped <- worker$record$event_dropped
+
+  job_worker_finish(worker, "failed", error = simpleError("terminal"))
+  terminal <- job_record_read(path)$record
+  expect_identical(terminal$status, "failed")
+  expect_identical(terminal$events, persisted$events)
+  expect_identical(terminal$event_dropped, dropped)
+  expect_identical(
+    tail(terminal$events, 1L)[[1L]]$type,
+    "event-101"
+  )
+})
+
+test_that("non-size store errors are not retried or trimmed", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-event-error-")
+  agent <- job_test_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "size probe",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L),
+    max_bytes = 2500000
+  )
+  record <- job_record_read(path)$record
+  record <- job_event_append(
+    record,
+    list(type = "event-001", data = strrep("x", 30000L))
+  )
+  lock <- approval_store_lock(path)
+  on.exit(approval_store_unlock(lock), add = TRUE)
+  attempts <- 0L
+  local_mocked_bindings(
+    approval_store_write = function(path, record, lock, max_bytes) {
+      attempts <<- attempts + 1L
+      abort_deputy(
+        "simulated commit failure",
+        class = "approval_error",
+        reason = "commit_failed"
+      )
+    },
+    .package = "deputy"
+  )
+
+  error <- tryCatch(
+    job_record_write(path, record, lock),
+    error = identity
+  )
+  expect_s3_class(error, "deputy_approval_error")
+  expect_identical(error$reason, "commit_failed")
+  expect_identical(attempts, 1L)
+  expect_identical(record$event_dropped, 0L)
+  expect_identical(job_record_read(path)$envelope$revision, 1)
+  expect_length(job_record_read(path)$record$events, 0L)
+})
+
+test_that("non-event size overflow is propagated without changing revision", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-record-budget-")
+  agent <- job_test_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "size probe",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L),
+    max_bytes = 2500000
+  )
+  record <- job_record_read(path)$record
+  record$manifest$oversized <- strrep("m", 2600000L)
+  lock <- approval_store_lock(path)
+  on.exit(approval_store_unlock(lock), add = TRUE)
+
+  error <- tryCatch(
+    job_record_write(path, record, lock),
+    error = identity
+  )
+  expect_s3_class(error, "deputy_approval_error")
+  expect_identical(error$reason, "size_limit")
+  expect_identical(job_record_read(path)$envelope$revision, 1)
+  expect_length(job_record_read(path)$record$events, 0L)
+})
+
 test_that("job_create commits a bounded queued inspection", {
   directory <- withr::local_tempdir(pattern = "deputy-job-create-")
   agent <- job_test_agent()

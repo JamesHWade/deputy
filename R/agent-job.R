@@ -657,11 +657,52 @@ job_control_read <- function(path, record, missing_ok = FALSE) {
   control
 }
 
+job_record_trim_events <- function(record) {
+  events <- record$events %||% list()
+  count <- length(events)
+  if (!count) {
+    return(NULL)
+  }
+  dropped <- max(1L, ceiling(count / 2L))
+  record$events <- if (dropped >= count) {
+    list()
+  } else {
+    tail(events, count - dropped)
+  }
+  record$event_dropped <- as.integer(record$event_dropped %||% 0L) +
+    as.integer(dropped)
+  record
+}
+
 job_record_write <- function(path, record, lock) {
   job_record_validate(record)
   envelope <- approval_store_envelope(path)
-  approval_store_write(path, record, lock, max_bytes = envelope$max_bytes)
-  invisible(record)
+  candidate <- record
+  repeat {
+    write_error <- tryCatch(
+      {
+        approval_store_write(
+          path,
+          candidate,
+          lock,
+          max_bytes = envelope$max_bytes
+        )
+        NULL
+      },
+      error = identity
+    )
+    if (is.null(write_error)) {
+      return(invisible(candidate))
+    }
+    if (!identical(write_error$reason, "size_limit")) {
+      rlang::cnd_signal(write_error)
+    }
+    trimmed <- job_record_trim_events(candidate)
+    if (is.null(trimmed)) {
+      rlang::cnd_signal(write_error)
+    }
+    candidate <- trimmed
+  }
 }
 
 job_control_write <- function(path, record, status, reason = NULL) {
@@ -914,7 +955,7 @@ job_mark_recovery <- function(path, record, lock, reason) {
     message = "The previous worker ended before durable settlement.",
     reason = job_safe_string(reason)
   )
-  job_record_write(path, record, lock)
+  record <- job_record_write(path, record, lock)
   try(job_control_write(path, record, "acknowledged", reason), silent = TRUE)
   record
 }
@@ -1369,7 +1410,8 @@ job_worker_checkpoint <- function(worker, agent, event = NULL) {
     )
     record <- job_transition(record, status, reason)
     worker$record <- record
-    job_record_write(worker$path, record, worker$lock)
+    record <- job_record_write(worker$path, record, worker$lock)
+    worker$record <- record
     worker$terminal <- status
     try(
       job_control_write(worker$path, record, status, reason),
@@ -1381,7 +1423,8 @@ job_worker_checkpoint <- function(worker, agent, event = NULL) {
       reason = reason
     )
   }
-  job_record_write(worker$path, record, worker$lock)
+  record <- job_record_write(worker$path, record, worker$lock)
+  worker$record <- record
   invisible(NULL)
 }
 
@@ -1449,7 +1492,8 @@ job_worker_cleanup <- function(worker) {
     record$cleanup$owner <- "binder"
     ledger_error <- tryCatch(
       {
-        job_record_write(worker$path, record, worker$lock)
+        record <- job_record_write(worker$path, record, worker$lock)
+        worker$record <- record
         NULL
       },
       error = identity
@@ -1475,7 +1519,8 @@ job_worker_cleanup <- function(worker) {
     }
     post_error <- tryCatch(
       {
-        job_record_write(worker$path, record, worker$lock)
+        record <- job_record_write(worker$path, record, worker$lock)
+        worker$record <- record
         NULL
       },
       error = identity
@@ -1533,7 +1578,8 @@ job_worker_finish <- function(
     record <- job_release_reservation(record, release = TRUE, reason = reason)
   }
   worker$record <- record
-  job_record_write(worker$path, record, worker$lock)
+  record <- job_record_write(worker$path, record, worker$lock)
+  worker$record <- record
   worker$terminal <- status
   control_status <- if (identical(status, "cancelled")) {
     "cancelled"
@@ -1673,7 +1719,7 @@ job_run <- function(
       reason = control$reason %||% "cancelled"
     )
     record["pending_approval"] <- list(NULL)
-    job_record_write(path, record, lock)
+    record <- job_record_write(path, record, lock)
     job_control_write(
       path,
       record,
@@ -1707,7 +1753,7 @@ job_run <- function(
     )
   }
   record$runtime$attached <- FALSE
-  job_record_write(path, record, lock)
+  record <- job_record_write(path, record, lock)
 
   worker <- new.env(parent = emptyenv())
   worker$path <- path
@@ -1787,7 +1833,7 @@ job_run <- function(
       }
       worker$record$runtime$attached <- TRUE
       worker$record$runtime$attached_at <- as.numeric(Sys.time())
-      job_record_write(path, worker$record, lock)
+      worker$record <- job_record_write(path, worker$record, lock)
       job_worker_start_poller(worker)
       NULL
     },
@@ -1814,7 +1860,8 @@ job_run <- function(
       reason = "Agent job binding failed"
     )
     worker$record <- record
-    job_record_write(path, record, lock)
+    record <- job_record_write(path, record, lock)
+    worker$record <- record
     try(
       job_control_write(path, record, "acknowledged", "binding failed"),
       silent = TRUE
@@ -1875,7 +1922,7 @@ job_run <- function(
     {
       snapshot <- job_runtime_snapshot(worker$agent)
       worker$record <- job_merge_snapshot(worker$record, snapshot)
-      job_record_write(path, worker$record, lock)
+      worker$record <- job_record_write(path, worker$record, lock)
       NULL
     },
     error = identity
@@ -1907,7 +1954,7 @@ job_run <- function(
   worker$record$runtime$attached <- FALSE
   worker$record$runtime$detached_at <- as.numeric(Sys.time())
   if (!is.null(worker$terminal)) {
-    job_record_write(path, worker$record, lock)
+    worker$record <- job_record_write(path, worker$record, lock)
     return(job_job(
       path,
       worker$record,
@@ -1958,7 +2005,8 @@ job_run <- function(
     record["error"] <- list(NULL)
     record <- job_transition(record, "approval_pending", "approval requested")
     worker$record <- record
-    job_record_write(path, record, lock)
+    record <- job_record_write(path, record, lock)
+    worker$record <- record
   } else if (is.null(run_error) && S7::S7_inherits(result, AgentResult)) {
     worker$record <- record
     job_worker_finish(worker, "completed", result = result)
@@ -2120,7 +2168,7 @@ job_cancel <- function(path, authorize, reason = "cancelled") {
     record <- job_transition(record, "cancelled", reason)
     record <- job_release_reservation(record, release = TRUE, reason = reason)
     record["pending_approval"] <- list(NULL)
-    job_record_write(path, record, execution_lock)
+    record <- job_record_write(path, record, execution_lock)
     control <- job_control_acknowledge(path, record, reason)
     return(job_job(
       path,

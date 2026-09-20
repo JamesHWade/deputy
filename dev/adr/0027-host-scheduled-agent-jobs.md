@@ -21,6 +21,13 @@ promises, live leases or cleanup closures. The host reconstructs those resources
 Tool fingerprints describe public definitions, not captured closure state; the
 host's definition revision must also identify the configuration of those resources.
 
+Runtime event history is best-effort evidence. In addition to per-event and count
+limits, checkpoints evict older events when the complete record exceeds the
+shared store's atomic replacement budget. The committed drop count survives
+subsequent checkpoints. Event eviction never removes authority, usage, effect
+state, or the terminal outcome; if those fields alone cannot fit, persistence
+fails explicitly.
+
 For a configured graph, retain the route declarations, limits, cumulative usage,
 consumed admissions and continuation counts. Admission and reservation changes
 are checkpointed before a descendant can dispatch. Reconstructing the graph must
