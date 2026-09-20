@@ -591,6 +591,317 @@ test_that("payload record-shaped objects stay data and classed results project p
 })
 
 
+test_that("duration evidence keeps units and missing values through replay", {
+  duration <- as.difftime(c(1, NA, 3), units = "mins")
+  direct <- inspection_replay(inspection_record_turn(
+    ellmer::UserTurn(list(ellmer::ContentToolResult(duration)))
+  ))
+  direct_json <- jsonlite::fromJSON(direct@contents[[1L]]@value)
+  expect_identical(direct_json$units, "mins")
+  expect_equal(direct_json$value, c(1, NA, 3))
+
+  nested <- list(
+    label = "retained",
+    duration = duration,
+    deeper = list(duration = duration)
+  )
+  nested_replay <- inspection_replay(inspection_record_turn(
+    ellmer::UserTurn(list(ellmer::ContentToolResult(nested)))
+  ))
+  expect_identical(nested_replay@contents[[1L]]@value$label, "retained")
+  expect_equal(
+    jsonlite::fromJSON(nested_replay@contents[[1L]]@value$duration)$value,
+    c(1, NA, 3)
+  )
+  expect_identical(
+    jsonlite::fromJSON(
+      nested_replay@contents[[1L]]@value$deeper$duration
+    )$units,
+    "mins"
+  )
+
+  frame <- data.frame(
+    id = 1:3,
+    elapsed = duration,
+    label = factor(c("a", "b", "c"))
+  )
+  frame_replay <- inspection_replay(inspection_record_turn(
+    ellmer::UserTurn(list(ellmer::ContentToolResult(frame)))
+  ))
+  frame_json <- jsonlite::fromJSON(frame_replay@contents[[1L]]@value)
+  expect_equal(frame_json$elapsed$value, c(1, NA, 3))
+  expect_identical(frame_json$elapsed$units, rep("mins", 3))
+  expect_equal(frame_json$label, c("a", "b", "c"))
+})
+
+
+test_that("unsupported duration subclasses are explicitly omitted", {
+  duration <- structure(
+    c(1, NA),
+    class = c("application_duration", "difftime"),
+    units = "secs"
+  )
+  record <- inspection_record_turn(ellmer::UserTurn(list(
+    ellmer::ContentToolResult(list(
+      keep = "sibling",
+      duration = duration
+    ))
+  )))
+  value <- inspection_replay(record)@contents[[1L]]@value
+  expect_identical(value$keep, "sibling")
+  expect_identical(value$duration, inspection_duration_omission)
+})
+
+
+test_that("malformed durations are omitted without method dispatch", {
+  values <- list(
+    long_units = structure(
+      1,
+      class = "difftime",
+      units = strrep("x", 10000L)
+    ),
+    nonstandard_units = structure(
+      1,
+      class = "difftime",
+      units = "fortnights"
+    ),
+    classed_units = structure(
+      1,
+      class = "difftime",
+      units = structure("secs", class = "application_units")
+    ),
+    nonfinite = structure(
+      c(1, Inf, NA_real_),
+      class = "difftime",
+      units = "secs"
+    ),
+    named = structure(
+      c(1, NA_real_),
+      class = "difftime",
+      units = "secs",
+      names = c("first", "missing")
+    )
+  )
+  value <- inspection_replay(inspection_record_turn(
+    ellmer::UserTurn(list(ellmer::ContentToolResult(
+      list(before = "keep", values = values)
+    )))
+  ))@contents[[1L]]@value
+
+  expect_identical(value$before, "keep")
+  expect_true(all(vapply(
+    value$values,
+    identical,
+    logical(1),
+    inspection_duration_omission
+  )))
+})
+
+
+test_that("duration frame projection strips subclasses and preserves list columns", {
+  duration <- as.difftime(c(1, NA), units = "mins")
+  dim.application_frame <- function(...) {
+    stop("data frame subclass dispatch")
+  }
+  frame <- structure(
+    list(
+      id = 1:2,
+      elapsed = duration,
+      nested = structure(
+        list(duration, duration),
+        class = c("application_list", "AsIs")
+      )
+    ),
+    class = c("application_frame", "data.frame"),
+    row.names = c(NA_integer_, -2L)
+  )
+  value <- jsonlite::fromJSON(
+    inspection_duration_json(frame)
+  )
+
+  expect_equal(value$id, 1:2)
+  expect_equal(value$elapsed$value, c(1, NA))
+  expect_identical(value$elapsed$units, rep("mins", 2))
+  expect_equal(value$nested$value[[1L]], c(1, NA))
+})
+
+
+test_that("misaligned duration frame columns are omitted per row", {
+  frame <- structure(
+    list(
+      id = 1:3,
+      elapsed = as.difftime(1, units = "mins")
+    ),
+    class = "data.frame",
+    row.names = c(NA_integer_, -3L)
+  )
+  value <- jsonlite::fromJSON(
+    inspection_duration_json(frame),
+    simplifyVector = FALSE
+  )
+
+  expect_length(value, 3L)
+  expect_equal(
+    vapply(value, function(row) row$id, integer(1)),
+    1:3
+  )
+  expect_true(all(vapply(
+    value,
+    function(row) identical(row$elapsed, inspection_duration_omission),
+    logical(1)
+  )))
+})
+
+
+test_that("nested data frames and POSIXlt columns retain row layout", {
+  frame <- data.frame(id = 1:2)
+  frame$nested <- data.frame(x = 3:4, y = 5:6)
+  frame$when <- as.POSIXlt(
+    as.POSIXct(c("2024-01-01", "2024-01-02"), tz = "UTC")
+  )
+  value <- jsonlite::fromJSON(
+    inspection_duration_json(frame),
+    simplifyVector = FALSE
+  )
+
+  expect_equal(value[[1L]]$nested$x, 3L)
+  expect_equal(value[[1L]]$nested$y, 5L)
+  expect_equal(value[[2L]]$nested$x, 4L)
+  expect_equal(value[[2L]]$nested$y, 6L)
+  expect_identical(value[[1L]]$when, "2024-01-01")
+  expect_identical(value[[2L]]$when, "2024-01-02")
+  frame$when <- I(frame$when)
+  wrapped <- jsonlite::fromJSON(
+    inspection_duration_json(frame),
+    simplifyVector = FALSE
+  )
+  expect_identical(wrapped, value)
+  expect_identical(
+    inspection_duration_projection(list(when = frame$when))$when,
+    frame$when
+  )
+})
+
+
+test_that("compact duration frame rows are bounded before expansion", {
+  frame <- structure(
+    list(
+      elapsed = as.difftime(1, units = "mins"),
+      nested = structure(list(list(value = 1)), class = "AsIs")
+    ),
+    class = "data.frame",
+    row.names = c(NA_integer_, -1000000L)
+  )
+
+  expect_identical(
+    inspection_duration_json(frame),
+    inspection_duration_omission
+  )
+
+  many_durations <- rep(
+    list(as.difftime(1, units = "mins")),
+    20L
+  )
+  names(many_durations) <- paste0("elapsed", seq_along(many_durations))
+  wide <- structure(
+    many_durations,
+    class = "data.frame",
+    row.names = c(NA_integer_, -25000L)
+  )
+  expect_identical(
+    inspection_duration_json(wide),
+    inspection_duration_omission
+  )
+  nested <- structure(
+    many_durations[1:4],
+    class = "data.frame",
+    row.names = c(NA_integer_, -25000L)
+  )
+  siblings <- structure(
+    list(a = nested, b = nested, c = nested, d = nested),
+    class = "data.frame",
+    row.names = c(NA_integer_, -25000L)
+  )
+  expect_identical(
+    inspection_duration_json(siblings),
+    inspection_duration_omission
+  )
+})
+
+
+test_that("projection preflight rejects application methods without dispatch", {
+  called <- FALSE
+  rlang::local_bindings(
+    length.inspection_projection_hostile = function(...) {
+      called <<- TRUE
+      stop("application length method")
+    },
+    .env = globalenv()
+  )
+  frame <- structure(
+    list(value = structure(1, class = "inspection_projection_hostile")),
+    class = "data.frame",
+    row.names = c(NA_integer_, -1L)
+  )
+  expect_identical(
+    inspection_duration_json(frame),
+    inspection_duration_omission
+  )
+  expect_false(called)
+})
+
+
+test_that("ordinary bounded list columns keep their duration projection", {
+  frame <- data.frame(id = seq_len(5000L))
+  frame$values <- I(as.list(seq_len(5000L)))
+
+  restored <- inspection_replay(inspection_record_turn(
+    ellmer::UserTurn(list(ellmer::ContentToolResult(frame)))
+  ))@contents[[1L]]@value
+  value <- jsonlite::fromJSON(restored, simplifyVector = FALSE)
+
+  expect_length(value, 5000L)
+  expect_identical(value[[5000L]]$id, 5000L)
+  expect_identical(value[[5000L]]$values, 5000L)
+})
+
+
+test_that("supported classed containers retain typed content through replay", {
+  image <- ellmer::ContentImageRemote(
+    url = "https://example.com/evidence.png"
+  )
+  text <- ellmer::ContentText("wrapped typed")
+  frame <- data.frame(
+    ordinary = 1L,
+    attachment = I(list(image))
+  )
+  value <- list(
+    frame = frame,
+    wrapped = I(list(text)),
+    ordinary = list(
+      version = 1,
+      class = "invoice",
+      props = list(total = 42)
+    )
+  )
+  record <- inspection_record_turn(ellmer::UserTurn(list(
+    ellmer::ContentToolResult(value)
+  )))
+  result_record <- record$props$contents[[1L]]
+
+  expect_identical(result_record$deputy_value_kind, "marked")
+  expect_length(result_record$deputy_content_paths, 2L)
+
+  restored <- inspection_replay(record)@contents[[1L]]@value
+  expect_identical(restored$frame$ordinary, 1L)
+  expect_s7_class(restored$frame$attachment[[1L]], ellmer::ContentImageRemote)
+  expect_identical(restored$frame$attachment[[1L]]@url, image@url)
+  expect_s7_class(restored$wrapped[[1L]], ellmer::ContentText)
+  expect_identical(restored$wrapped[[1L]]@text, text@text)
+  expect_identical(restored$ordinary, value$ordinary)
+})
+
+
 test_that("mixed tool payloads retain typed content and literal record-shaped data", {
   lookalike <- list(
     version = 1,

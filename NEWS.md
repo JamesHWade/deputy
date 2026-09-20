@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* Child inspection and observation preserve duration values, units and missing
+  values, including data-frame columns. Child chat panels display nested native
+  content through shinychat with bounded path labels and explicit omissions,
+  while retaining the original payload for authorized replay (#166, #167).
+
 * `Agent$retain_agent_graph()` configures recursive specialist routes with
   shared lifetime budgets, bounded depth and concurrency, subtree cancellation,
   and root-authorized descendant chats. A deterministic three-level example

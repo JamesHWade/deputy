@@ -220,6 +220,9 @@ observation_payload <- function(event, max_bytes = 65536) {
         is.factor(value) ||
         inherits(value, c("Date", "POSIXt", "difftime"))
     ) {
+      if (inherits(value, "difftime") || is.data.frame(value)) {
+        return(inspection_duration_json(value))
+      }
       return(as.character(jsonlite::toJSON(
         value,
         dataframe = "rows",
@@ -231,8 +234,9 @@ observation_payload <- function(event, max_bytes = 65536) {
     if (inherits(value, "ellmer_dollars")) {
       return(as.numeric(value))
     }
-    if (is.list(value) && !is.object(value)) {
-      return(lapply(value, public))
+    if (is.list(value) && (!is.object(value) || inherits(value, "AsIs"))) {
+      raw_value <- if (inherits(value, "AsIs")) unclass(value) else value
+      return(lapply(raw_value, public))
     }
     value
   }
@@ -439,7 +443,11 @@ DelegationSubscription <- R6::R6Class(
 
 # Budget traversal itself as well as the data. Inspect shared values without
 # materializing public records or serializing large payloads on the runtime path.
-observation_payload_fits <- function(value, max_bytes) {
+observation_payload_fits <- function(
+  value,
+  max_bytes,
+  duration_projection = FALSE
+) {
   remaining <- max_bytes
   visit <- function(value, depth = 0L, json = FALSE) {
     # Classed values become JSON text before the final envelope is serialized.
@@ -449,11 +457,68 @@ observation_payload_fits <- function(value, max_bytes) {
     if (remaining < 0 || depth > 64L) {
       return(FALSE)
     }
+    if (duration_projection && is.object(value)) {
+      # Projection calls JSON only for known data shapes. Reject application
+      # classes before any generic length/format method can be dispatched.
+      classes <- class(value)
+      known <- list(
+        "factor",
+        c("ordered", "factor"),
+        "Date",
+        c("POSIXct", "POSIXt"),
+        c("POSIXlt", "POSIXt"),
+        c("AsIs", "POSIXct", "POSIXt"),
+        c("AsIs", "POSIXlt", "POSIXt")
+      )
+      container <- !inherits(value, c("Date", "POSIXt")) &&
+        (is.data.frame(value) ||
+          (inherits(value, "AsIs") && is.list(unclass(value))))
+      if (
+        !container &&
+          !inherits(value, "difftime") &&
+          !any(vapply(known, identical, logical(1), classes))
+      ) {
+        return(FALSE)
+      }
+    }
     if (is.null(value) || inherits(value, "ellmer::ContentThinking")) {
       return(TRUE)
     }
     if (inherits(value, "condition")) {
       return(visit(inspection_text(conditionMessage(value), 1024L), depth + 1L))
+    }
+    if (inherits(value, "difftime")) {
+      values <- unclass(value)
+      value_count <- length(values)
+      repeats <- if (json) max(1L, value_count) else 1L
+      if (!inspection_duration_shape_supported(value)) {
+        remaining <<- remaining -
+          nchar(inspection_duration_omission, type = "bytes") *
+            6 *
+            repeats
+        return(remaining >= 0)
+      }
+      units <- attr(value, "units", exact = TRUE)
+      # Duration values are projected as one numeric vector plus one units
+      # field. Data-frame rows repeat the units field, so charge the escaped
+      # units text once per value while still avoiding its materialization.
+      unit_bytes <- nchar(units, type = "bytes") * 6 + 16
+      value_bytes <- max(1L, value_count) * 32
+      if (json) {
+        unit_bytes <- unit_bytes * max(1L, value_count)
+      }
+      if (remaining - 128 - unit_bytes - value_bytes < 0) {
+        return(FALSE)
+      }
+      if (!inspection_duration_supported(value)) {
+        remaining <<- remaining -
+          nchar(inspection_duration_omission, type = "bytes") *
+            6 *
+            repeats
+        return(remaining >= 0)
+      }
+      remaining <<- remaining - 128 - unit_bytes - value_bytes
+      return(remaining >= 0)
     }
     if (inherits(value, "S7_object")) {
       fields <- setdiff(S7::prop_names(value), c("tool", "extra", "json"))
@@ -480,15 +545,35 @@ observation_payload_fits <- function(value, max_bytes) {
       return(remaining >= 0)
     }
     if (is.data.frame(value)) {
-      remaining <<- remaining -
-        nrow(value) * sum(6 * nchar(names(value), type = "bytes") + 8)
+      columns <- unclass(value)
+      row_bytes <- sum(6 * nchar(names(columns), type = "bytes") + 8)
+      if (duration_projection) {
+        # A malformed short column can repeat an omission for every declared
+        # row. Charge that expansion in this shared recursive budget before
+        # allocating it; nested frames and sibling columns share the allowance.
+        expands <- vapply(
+          columns,
+          function(column) {
+            inherits(column, "difftime") ||
+              is.data.frame(column) ||
+              (is.list(column) &&
+                (!is.object(column) || inherits(column, "AsIs")) &&
+                !inherits(column, "POSIXlt"))
+          },
+          logical(1)
+        )
+        row_bytes <- row_bytes + 128 * sum(expands)
+      }
+      remaining <<- remaining - inspection_data_frame_rows(value) * row_bytes
       if (remaining < 0) return(FALSE)
     }
-    if (is.list(value) && (!is.object(value) || is.data.frame(value))) {
-      if (length(value) * 64 > remaining) {
+    list_container <- is.data.frame(value) || inherits(value, "AsIs")
+    list_value <- if (list_container) unclass(value) else value
+    if (is.list(list_value) && (!is.object(list_value) || list_container)) {
+      if (length(list_value) * 64 > remaining) {
         return(FALSE)
       }
-      for (item in value) {
+      for (item in list_value) {
         if (!visit(item, depth + 1L, json = json)) return(FALSE)
       }
       return(TRUE)
