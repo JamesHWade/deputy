@@ -27,7 +27,7 @@ test_that("job_create commits a bounded queued inspection", {
   )
   job <- job_read(path)
 
-  expect_true(S7::S7_inherits(job, AgentJob))
+  expect_s7_class(job, AgentJob)
   expect_identical(job$status, "queued")
   expect_identical(job$owner_id, "owner-1")
   expect_identical(job$associations$conversation_id, "conversation-1")
@@ -123,7 +123,9 @@ test_that("binder cleanup is recorded and called once", {
     bind = function(job) {
       list(
         agent = agent,
-        cleanup = function() cleanups <<- cleanups + 1L
+        cleanup = function() {
+          cleanups <<- cleanups + 1L
+        }
       )
     },
     authorize = job_test_receipt
@@ -170,6 +172,64 @@ test_that("cleanup failure retains the successful task result", {
   expect_identical(failed$result$response, "done")
   expect_identical(failed$cleanup$status, "failed")
   expect_match(failed$cleanup$error$message, "cleanup failed")
+})
+
+test_that("abnormal worker exit persists cleanup before releasing its lock", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-abort-cleanup-")
+  interrupt_agent <- R6::R6Class(
+    "JobInterruptAgent",
+    inherit = Agent,
+    public = list(
+      run_sync = function(...) {
+        stop(structure(
+          list(message = "interrupt"),
+          class = c("interrupt", "condition")
+        ))
+      }
+    )
+  )$new(chat = create_mock_chat(responses = list("unused")))
+  path <- job_create(
+    directory,
+    interrupt_agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+  marker <- file.path(directory, "cleanup-lock.txt")
+
+  interrupted <- tryCatch(
+    job_run(
+      path,
+      bind = function(job) {
+        list(
+          agent = interrupt_agent,
+          cleanup = function() {
+            probe <- tryCatch(
+              approval_store_lock(path),
+              error = identity
+            )
+            if (inherits(probe, "error") && identical(probe$reason, "busy")) {
+              writeLines("locked", marker)
+            } else {
+              writeLines("unlocked", marker)
+              if (is.list(probe)) approval_store_unlock(probe)
+            }
+          }
+        )
+      },
+      authorize = job_test_receipt
+    ),
+    interrupt = identity
+  )
+  expect_s3_class(interrupted, "interrupt")
+
+  persisted <- job_read(path)
+  expect_identical(readLines(marker), "locked")
+  expect_identical(persisted$status, "running")
+  expect_identical(persisted$cleanup$status, "completed")
+  expect_identical(persisted$cleanup$attempts, 1L)
 })
 
 test_that("cancellation persists maximum-length UTF-8 reasons", {
@@ -219,6 +279,89 @@ test_that("cancellation returns the committed control when completion races it",
   expect_identical(cancelled$control$status, "acknowledged")
   expect_identical(cancelled$control, restored$control)
   expect_identical(cancelled$result$response, "done")
+})
+
+test_that("cancellation control lock contention is surfaced for retry", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-cancel-busy-")
+  agent <- job_test_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+  record <- job_record_read(path)$record
+  control_lock <- approval_store_lock(job_control_path(path, record))
+  on.exit(
+    if (!is.null(control_lock)) approval_store_unlock(control_lock),
+    add = TRUE
+  )
+
+  expect_error(
+    job_cancel(path, authorize = job_test_receipt),
+    class = "deputy_job_busy"
+  )
+
+  approval_store_unlock(control_lock)
+  control_lock <- NULL
+  cancelled <- job_cancel(path, authorize = job_test_receipt)
+  expect_identical(cancelled$status, "cancelled")
+  expect_identical(cancelled$control$status, "cancelled")
+})
+
+test_that("recovery marks an abandoned running job indeterminate", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-recovery-")
+  agent <- job_test_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+  record <- job_record_read(path)$record
+  record <- job_transition(record, "running", "worker started")
+  record$cleanup <- list(
+    owner = "binder",
+    required = FALSE,
+    status = "attached",
+    attempts = 0L
+  )
+  lock <- approval_store_lock(path)
+  on.exit(approval_store_unlock(lock), add = TRUE)
+  job_record_write(path, record, lock)
+  approval_store_unlock(lock)
+  lock <- NULL
+
+  bound <- 0L
+  recovered <- job_run(
+    path,
+    bind = function(job) {
+      bound <<- bound + 1L
+      stop("an abandoned running job must not bind")
+    },
+    authorize = job_test_receipt
+  )
+
+  expect_identical(recovered$status, "indeterminate")
+  expect_identical(recovered$cleanup$status, "unknown")
+  expect_true(recovered$cleanup$required)
+  expect_identical(recovered$reservations$status, "preserved")
+  expect_false(recovered$reservations$released)
+  expect_identical(bound, 0L)
+  expect_identical(
+    job_run(
+      path,
+      bind = function(job) stop("an indeterminate job must not rebind"),
+      authorize = job_test_receipt
+    )$status,
+    "indeterminate"
+  )
 })
 
 test_that("queued cancellation is durable and prevents binding", {

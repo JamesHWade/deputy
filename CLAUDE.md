@@ -487,6 +487,19 @@ power-loss durability. Indeterminate records require host reconciliation and
 cannot resume. See ADR-0016 and the Permissions vignette for ownership and
 limits. File storage uses the `filelock` package.
 
+### Host-scheduled durable jobs
+
+`job_create()` persists an admitted task and its source/definition revisions;
+`job_run()` reauthorizes and rebinds host resources before using the ordinary
+governed Agent kernel. `job_read()` exposes a read-only `AgentJob`, and
+`job_cancel()` records cooperative cancellation independently of the execution
+lock. `R/agent-job.R` reuses the approval revision store for job transitions;
+`R/agent-job-runtime.R` preserves effect evidence and cumulative graph budgets.
+Queued graphs and standalone pending approvals can recover across processes.
+Interrupted executions become indeterminate and retain their allocations rather
+than retrying uncertain effects. The host owns scheduling, resource factories
+and conversation storage; graph approvals remain unsupported. See ADR-0027.
+
 ### Retained specialist conversations
 
 `Agent$retain_agent()` transfers execution ownership of a standalone specialist.

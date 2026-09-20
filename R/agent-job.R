@@ -874,6 +874,7 @@ job_mark_recovery <- function(path, record, lock, reason) {
       attempts = 0L
     )
   record$cleanup$status <- "unknown"
+  record$cleanup$required <- TRUE
   record$cleanup$reason <- job_safe_string(reason)
   record <- job_release_reservation(record, release = FALSE, reason = reason)
   record <- job_transition(record, "indeterminate", reason)
@@ -1731,7 +1732,8 @@ job_run <- function(
         worker$finished <- TRUE
       }
     },
-    add = TRUE
+    add = TRUE,
+    after = FALSE
   )
 
   bound_error <- tryCatch(
@@ -2012,7 +2014,11 @@ job_cancel <- function(path, authorize, reason = "cancelled") {
     approval_store_lock(control_path),
     error = function(error) {
       if (identical(error$reason, "busy")) {
-        return(NULL)
+        job_abort(
+          "The Agent job cancellation record is already locked.",
+          class = "job_busy",
+          parent = error
+        )
       }
       job_abort(
         "The Agent job cancellation record could not be locked.",
@@ -2022,7 +2028,10 @@ job_cancel <- function(path, authorize, reason = "cancelled") {
     }
   )
   if (is.null(control_lock)) {
-    return(job_read(path))
+    job_abort(
+      "The Agent job cancellation record is already locked.",
+      class = "job_busy"
+    )
   }
   on.exit(approval_store_unlock(control_lock), add = TRUE)
   control <- job_control_read(path, record)
