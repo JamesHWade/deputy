@@ -599,6 +599,16 @@ test_that("job_run retains committed evidence after swallowed checkpoint failure
   expect_identical(persisted$runtime$effects, settled$runtime$effects)
   expect_identical(settled$reservations$status, "preserved")
   expect_false(settled$reservations$released)
+  expect_identical(settled$cleanup$owner, "host")
+  expect_identical(settled$cleanup$status, "not_required")
+  expect_false(settled$cleanup$required)
+
+  recovered <- job_run(
+    path,
+    bind = function(job) stop("an indeterminate job must not bind again"),
+    authorize = job_test_receipt
+  )
+  expect_identical(recovered$cleanup, settled$cleanup)
 })
 
 test_that("checkpoint cancellation settles executing effects as indeterminate", {
@@ -1006,6 +1016,78 @@ test_that("failed cleanup makes an approval pending run terminal", {
       expect_identical(first$runtime$pending_approval, pending_path)
     }
   }
+})
+
+test_that("prebind cleanup is unknown for fresh and resumed jobs", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-prebind-cleanup-")
+  pending_agent_class <- R6::R6Class(
+    "PrebindCleanupAgent",
+    inherit = Agent,
+    public = list(
+      pending_path = NULL,
+      run_sync = function(...) {
+        approval_abort(
+          "approval required",
+          class = "approval_pending",
+          path = self$pending_path
+        )
+      },
+      pending_approval = function() list(path = self$pending_path)
+    )
+  )
+  pending_agent <- pending_agent_class$new(
+    chat = create_mock_chat(responses = list("unused"))
+  )
+  pending_agent$pending_path <- file.path(directory, "approval")
+  path <- job_create(
+    directory,
+    pending_agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+
+  first_seen <- NULL
+  first <- job_run(
+    path,
+    bind = function(job) {
+      first_seen <<- job
+      list(
+        agent = pending_agent,
+        cleanup = function() invisible(NULL)
+      )
+    },
+    authorize = job_test_receipt
+  )
+
+  expect_identical(first$status, "approval_pending")
+  expect_identical(first$cleanup$status, "completed")
+  expect_false(first$cleanup$required)
+  expect_identical(first_seen$cleanup$owner, "unknown")
+  expect_identical(first_seen$cleanup$status, "unknown")
+  expect_true(first_seen$cleanup$required)
+  expect_null(first_seen$runtime$detached_at)
+  expect_null(first_seen$runtime$detach_error)
+
+  second_seen <- NULL
+  second <- job_run(
+    path,
+    bind = function(job) {
+      second_seen <<- job
+      stop("inspect the resumed bind record")
+    },
+    authorize = job_test_receipt,
+    decision = "approve"
+  )
+
+  expect_identical(second$status, "failed")
+  expect_identical(second_seen$cleanup$owner, "unknown")
+  expect_identical(second_seen$cleanup$status, "unknown")
+  expect_true(second_seen$cleanup$required)
+  expect_null(second_seen$runtime$detached_at)
+  expect_null(second_seen$runtime$detach_error)
 })
 
 test_that("fresh approval resume preserves exhausted usage and can deny", {
@@ -1544,7 +1626,31 @@ test_that("job_run recovers an abandoned running job without rebinding", {
 
 test_that("recovery preserves terminal cleanup evidence", {
   directory <- withr::local_tempdir(pattern = "deputy-job-cleanup-recovery-")
-  for (status in c("completed", "failed")) {
+  cleanup_states <- list(
+    completed = list(
+      owner = "binder",
+      required = FALSE,
+      status = "completed",
+      attempts = 1L,
+      completed_at = 123,
+      error = NULL
+    ),
+    failed = list(
+      owner = "binder",
+      required = TRUE,
+      status = "failed",
+      attempts = 1L,
+      completed_at = 123,
+      error = list(message = "cleanup failed")
+    ),
+    host_not_required = list(
+      owner = "host",
+      required = FALSE,
+      status = "not_required",
+      attempts = 0L
+    )
+  )
+  for (cleanup_state in cleanup_states) {
     for (recover in c("run", "cancel")) {
       path <- job_create(
         directory,
@@ -1557,18 +1663,7 @@ test_that("recovery preserves terminal cleanup evidence", {
       )
       record <- job_record_read(path)$record
       record <- job_transition(record, "running", "worker started")
-      record$cleanup <- list(
-        owner = "binder",
-        required = identical(status, "failed"),
-        status = status,
-        attempts = 1L,
-        completed_at = 123,
-        error = if (status == "failed") {
-          list(message = "cleanup failed")
-        } else {
-          NULL
-        }
-      )
+      record$cleanup <- cleanup_state
       lock <- approval_store_lock(path)
       tryCatch(
         job_record_write(path, record, lock),

@@ -968,6 +968,13 @@ job_release_reservation <- function(record, release = TRUE, reason = NULL) {
   record
 }
 
+job_cleanup_settled <- function(cleanup) {
+  isTRUE(cleanup$status %in% c("completed", "failed")) ||
+    (identical(cleanup$owner, "host") &&
+      identical(cleanup$status, "not_required") &&
+      identical(cleanup$required, FALSE))
+}
+
 job_mark_recovery <- function(path, record, lock, reason) {
   record$cleanup <- record$cleanup %||%
     list(
@@ -976,10 +983,7 @@ job_mark_recovery <- function(path, record, lock, reason) {
       required = TRUE,
       attempts = 0L
     )
-  if (
-    !identical(record$cleanup$status, "completed") &&
-      !identical(record$cleanup$status, "failed")
-  ) {
+  if (!job_cleanup_settled(record$cleanup)) {
     record$cleanup$status <- "unknown"
     record$cleanup$required <- TRUE
     record$cleanup$reason <- job_safe_string(reason)
@@ -1518,7 +1522,8 @@ job_worker_start_poller <- function(worker) {
 job_worker_cleanup <- function(worker) {
   record <- worker$record
   detach_error <- NULL
-  if (!is.null(worker$detach)) {
+  detaching <- !is.null(worker$detach)
+  if (detaching) {
     detach_error <- tryCatch(
       {
         worker$detach()
@@ -1530,6 +1535,14 @@ job_worker_cleanup <- function(worker) {
     if (is.null(detach_error)) {
       record$runtime$attached <- FALSE
       record$runtime$detached_at <- as.numeric(Sys.time())
+      if (is.null(worker$cleanup)) {
+        record$cleanup <- list(
+          owner = "host",
+          required = FALSE,
+          status = "not_required",
+          attempts = 0L
+        )
+      }
     } else {
       record$runtime$detach_error <- job_error_record(detach_error)
       record$cleanup$status <- "unknown"
@@ -1594,6 +1607,20 @@ job_worker_cleanup <- function(worker) {
     )
     cleanup_error <- cleanup_error %||% ledger_error %||% post_error
   }
+  if (detaching && is.null(worker$cleanup)) {
+    cleanup_error <- tryCatch(
+      {
+        record <- job_record_write(
+          worker$path,
+          record,
+          worker$lock,
+          settling = TRUE
+        )
+        NULL
+      },
+      error = identity
+    )
+  }
   worker$record <- record
   if (!is.null(detach_error) && is.null(cleanup_error)) {
     cleanup_error <- detach_error
@@ -1634,10 +1661,7 @@ job_worker_finish <- function(
   }
   if (identical(status, "indeterminate")) {
     record <- job_release_reservation(record, release = FALSE, reason = reason)
-    if (
-      !identical(record$cleanup$status, "completed") &&
-        !identical(record$cleanup$status, "failed")
-    ) {
+    if (!job_cleanup_settled(record$cleanup)) {
       record$cleanup$status <- "unknown"
       record$cleanup$required <- TRUE
     }
@@ -1818,7 +1842,19 @@ job_run <- function(
       recorded_at = as.numeric(Sys.time())
     )
   }
+  # A new bind attempt may acquire resources before returning its callback.
+  # Persist uncertainty before calling it, including on approval continuation;
+  # the preceding attempt's cleanup evidence must not describe this attempt.
+  record$cleanup <- list(
+    owner = "unknown",
+    required = TRUE,
+    status = "unknown",
+    attempts = 0L,
+    reason = "binding not settled"
+  )
   record$runtime$attached <- FALSE
+  record$runtime$detached_at <- NULL
+  record$runtime$detach_error <- NULL
   record <- job_record_write(path, record, lock)
 
   worker <- new.env(parent = emptyenv())
