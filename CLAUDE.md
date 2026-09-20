@@ -26,6 +26,8 @@ deputy/
 │   ├── agent.R             # Public Agent API and runtime wiring
 │   ├── agent-stream.R      # Shared governed stream and finalization
 │   ├── agent-approval.R     # Durable pending-tool suspension and governed resume
+│   ├── agent-job.R          # Host-scheduled durable jobs and recovery states
+│   ├── agent-job-runtime.R  # Job manifests, graph snapshots and checkpoints
 │   ├── approval-record.R    # S7 approval inspection and portable control records
 │   ├── approval-store.R     # Locked immutable approval revisions
 │   ├── agent-requests.R    # Public ellmer callbacks and explicit fallback
@@ -485,6 +487,19 @@ power-loss durability. Indeterminate records require host reconciliation and
 cannot resume. See ADR-0016 and the Permissions vignette for ownership and
 limits. File storage uses the `filelock` package.
 
+### Host-scheduled durable jobs
+
+`job_create()` persists an admitted task and its source/definition revisions;
+`job_run()` reauthorizes and rebinds host resources before using the ordinary
+governed Agent kernel. `job_read()` exposes a read-only `AgentJob`, and
+`job_cancel()` records cooperative cancellation independently of the execution
+lock. `R/agent-job.R` reuses the approval revision store for job transitions;
+`R/agent-job-runtime.R` preserves effect evidence and cumulative graph budgets.
+Queued graphs and standalone pending approvals can recover across processes.
+Interrupted executions become indeterminate and retain their allocations rather
+than retrying uncertain effects. The host owns scheduling, resource factories
+and conversation storage; graph approvals remain unsupported. See ADR-0027.
+
 ### Retained specialist conversations
 
 `Agent$retain_agent()` transfers execution ownership of a standalone specialist.
@@ -510,7 +525,7 @@ registry. Depth/count/concurrency and UsageLimits apply until explicit graph
 release; parents waiting on children occupy concurrency slots. See ADR-0025.
 `inst/examples/recursive-agents/` supplies the deterministic three-level browser
 fixture; test it with `devtools::test(filter = "recursive|delegation-graph|delegation-tree")`.
-Durable restart recovery remains #42.
+Host-scheduled durable recovery uses the job APIs described above and ADR-0027.
 
 ### Host-selected context forks
 

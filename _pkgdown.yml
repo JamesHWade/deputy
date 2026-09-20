@@ -30,6 +30,8 @@ navbar:
       - text: "Advanced"
       - text: Multi-Agent Orchestration
         href: articles/multi-agent.html
+      - text: Background Jobs
+        href: articles/background-jobs.html
       - text: Structured Output
         href: articles/structured-output.html
       - text: Runtime Integration and Evaluation
@@ -62,6 +64,15 @@ reference:
   - UsageLimits
   - ContextPolicy
   - DeputyCompaction
+
+- title: Background jobs
+  desc: Persist and dispatch governed work through a host-owned scheduler.
+  contents:
+  - AgentJob
+  - job_create
+  - job_read
+  - job_run
+  - job_cancel
 
 - title: Tools
   desc: Built-in tools and tool bundles
@@ -178,6 +189,7 @@ articles:
 - title: Advanced
   contents:
   - multi-agent
+  - background-jobs
   - structured-output
   - runtime-integration
 - title: Recipes

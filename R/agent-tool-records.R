@@ -128,6 +128,16 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       }
 
       index <- matches[[1L]]
+      if (is.function(private$.job_checkpoint)) {
+        private$.job_checkpoint(
+          self,
+          list(
+            type = "effect_start",
+            tool_name = tool_name,
+            tool_call_id = records[[index]]$tool_call_id
+          )
+        )
+      }
       private$approval_execution_start(tool_name, records[[index]]$tool_call_id)
       records[[index]]$execution_started <- TRUE
       private$tool_call_records <- records

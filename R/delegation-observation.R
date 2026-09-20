@@ -254,7 +254,21 @@ lead_observation_error <- function(lead, id, error) {
 }
 
 lead_observe_status <- function(lead, id, type) {
-  record <- lead$.__enclos_env__$private$subagent_runs[[id]]
+  private <- lead$.__enclos_env__$private
+  record <- private$subagent_runs[[id]]
+  if (is.function(private$.job_checkpoint)) {
+    private$.job_checkpoint(
+      lead,
+      list(
+        type = "delegation_status",
+        phase = type,
+        delegation_id = id,
+        status = record$status,
+        stop_reason = record$stop_reason,
+        run_id = record$run_id
+      )
+    )
+  }
   tryCatch(
     lead_observe_event(
       lead,

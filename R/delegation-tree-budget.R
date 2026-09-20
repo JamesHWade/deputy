@@ -421,6 +421,21 @@ tree_admit <- function(tree, id, parent_delegation_id = NULL) {
     settled = FALSE
   )
   tree$count <- as.integer(tree$count + 1L)
+  checkpoint <- root$.__enclos_env__$private$.job_checkpoint
+  if (is.function(checkpoint)) {
+    checkpointed <- FALSE
+    on.exit(
+      {
+        if (!checkpointed) {
+          tree$admissions[[id]]$active <- FALSE
+          tree$admissions[[id]]$settled <- TRUE
+        }
+      },
+      add = TRUE
+    )
+    checkpoint(root, list(type = "delegation_admitted", delegation_id = id))
+    checkpointed <- TRUE
+  }
   list(
     parent_delegation_id = parent_delegation_id,
     depth = as.integer(depth),
@@ -443,5 +458,10 @@ tree_settle <- function(tree, id) {
   admission$active <- FALSE
   admission$settled <- TRUE
   tree$admissions[[id]] <- admission
+  root <- delegation_tree_root(tree)
+  checkpoint <- root$.__enclos_env__$private$.job_checkpoint
+  if (is.function(checkpoint)) {
+    checkpoint(root, list(type = "delegation_settled", delegation_id = id))
+  }
   invisible(admission)
 }
