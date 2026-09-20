@@ -143,6 +143,8 @@ reference:
   - LeadAgent
   - DelegationInput
   - DelegationManifest
+  - ContextFork
+  - fork_agent
   - DelegationPolicy
   - DelegationResources
   - DelegationDisclosure

@@ -11,6 +11,8 @@ test_that("public API is deliberate", {
     "AgentUsage",
     "UsageLimits",
     "ContextPolicy",
+    "ContextFork",
+    "fork_agent",
     "DeputyCompaction",
     "LeadAgent",
     "DelegationInput",
