@@ -942,6 +942,190 @@ test_that("cleanup failure retains the successful task result", {
   expect_match(failed$cleanup$error$message, "cleanup failed")
 })
 
+test_that("cleanup ledger failures settle every worker mode", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-cleanup-ledger-")
+  original_record_write <- job_record_write
+  original_attach_runtime <- job_attach_runtime
+  original_runtime_snapshot <- job_runtime_snapshot
+  failure <- new.env(parent = emptyenv())
+  failure$active <- FALSE
+  failure$failed <- FALSE
+  failure$stage <- NULL
+  runtime <- new.env(parent = emptyenv())
+  runtime$mode <- NULL
+  runtime$callback <- NULL
+  local_mocked_bindings(
+    job_record_write = function(path, record, lock, settling = FALSE) {
+      if (
+        isTRUE(failure$active) &&
+          !isTRUE(failure$failed) &&
+          isTRUE(settling) &&
+          identical(record$cleanup$status, failure$stage)
+      ) {
+        failure$failed <- TRUE
+        abort_deputy(
+          "simulated cleanup ledger failure",
+          class = "approval_error",
+          reason = "cleanup_write"
+        )
+      }
+      original_record_write(path, record, lock, settling = settling)
+    },
+    job_attach_runtime = function(agent, checkpoint, record = NULL) {
+      if (identical(runtime$mode, "checkpointcancellation")) {
+        runtime$callback <- checkpoint
+        return(function() invisible(NULL))
+      }
+      original_attach_runtime(agent, checkpoint, record = record)
+    },
+    job_runtime_snapshot = function(agent, event = NULL) {
+      if (identical(runtime$mode, "checkpointcancellation")) {
+        return(list())
+      }
+      original_runtime_snapshot(agent, event = event)
+    },
+    .package = "deputy"
+  )
+
+  modes <- c(
+    "success",
+    "runerror",
+    "bindfailure",
+    "checkpointcancellation"
+  )
+  for (mode in modes) {
+    for (with_cleanup in c(TRUE, FALSE)) {
+      if (identical(mode, "bindfailure") && !with_cleanup) {
+        next
+      }
+      stages <- if (with_cleanup) c("running", "completed") else "not_required"
+      for (stage in stages) {
+        failure$active <- TRUE
+        failure$failed <- FALSE
+        failure$stage <- stage
+        runtime$mode <- mode
+        runtime$callback <- NULL
+        cleanup_calls <- 0L
+
+        if (identical(mode, "runerror")) {
+          mode_class <- R6::R6Class(
+            "CleanupLedgerRunErrorAgent",
+            inherit = Agent,
+            public = list(
+              run_sync = function(...) stop("simulated run failure")
+            )
+          )
+          agent <- mode_class$new(
+            chat = create_mock_chat(responses = list("unused"))
+          )
+        } else if (identical(mode, "checkpointcancellation")) {
+          mode_class <- R6::R6Class(
+            "CleanupLedgerCancellationAgent",
+            inherit = Agent,
+            public = list(
+              run_sync = function(...) {
+                record <- job_record_read(path)$record
+                job_control_write(
+                  path,
+                  record,
+                  "requested",
+                  "checkpoint stop"
+                )
+                runtime$callback(self, NULL)
+              }
+            )
+          )
+          agent <- mode_class$new(
+            chat = create_mock_chat(responses = list("unused"))
+          )
+        } else {
+          agent <- job_test_agent()
+        }
+        path <- job_create(
+          directory,
+          agent,
+          "answer once",
+          "owner-1",
+          "definition-1",
+          "context-1",
+          UsageLimits(max_requests = 2L)
+        )
+        wrong_agent <- if (identical(mode, "bindfailure")) {
+          job_test_agent()
+        } else {
+          NULL
+        }
+        bind <- if (identical(mode, "bindfailure")) {
+          function(job) {
+            list(
+              agent = wrong_agent,
+              cleanup = function() {
+                cleanup_calls <<- cleanup_calls + 1L
+              }
+            )
+          }
+        } else if (with_cleanup) {
+          function(job) {
+            list(
+              agent = agent,
+              cleanup = function() {
+                cleanup_calls <<- cleanup_calls + 1L
+              }
+            )
+          }
+        } else {
+          function(job) agent
+        }
+
+        settled <- job_run(
+          path,
+          bind = bind,
+          authorize = job_test_receipt
+        )
+        persisted <- job_read(path)
+
+        expect_true(
+          failure$failed,
+          info = sprintf(
+            "mode=%s cleanup=%s stage=%s",
+            mode,
+            with_cleanup,
+            stage
+          )
+        )
+        expect_identical(settled$status, "indeterminate")
+        expect_identical(persisted$status, "indeterminate")
+        expect_identical(settled$reservations$status, "preserved")
+        expect_false(settled$reservations$released)
+        expect_identical(persisted$reservations, settled$reservations)
+        expect_true("deputy_job_persistence" %in% settled$error$class)
+        if (identical(mode, "success")) {
+          expect_identical(settled$result$response, "done")
+        } else {
+          expect_null(settled$result)
+        }
+        if (with_cleanup) {
+          expect_identical(cleanup_calls, 1L)
+          expect_identical(settled$cleanup$owner, "binder")
+          expect_identical(settled$cleanup$status, "completed")
+          expect_false(settled$cleanup$required)
+        } else {
+          expect_identical(cleanup_calls, 0L)
+          expect_identical(settled$cleanup$owner, "host")
+          expect_identical(settled$cleanup$status, "not_required")
+          expect_false(settled$cleanup$required)
+        }
+        expect_identical(persisted$cleanup, settled$cleanup)
+        if (identical(mode, "checkpointcancellation")) {
+          expect_identical(settled$control$status, "acknowledged")
+          expect_true(settled$control$requested)
+        }
+        failure$active <- FALSE
+      }
+    }
+  }
+})
+
 test_that("failed cleanup makes an approval pending run terminal", {
   directory <- withr::local_tempdir(pattern = "deputy-job-pending-cleanup-")
   pending_agent_class <- R6::R6Class(

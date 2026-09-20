@@ -40,7 +40,9 @@ job_transition_targets <- list(
   approval_pending = c("resuming", "cancelled", "failed"),
   completed = character(),
   failed = character(),
-  cancelled = character(),
+  # The active worker can discover a cleanup persistence failure after its
+  # cancellation checkpoint. Public terminal entry points remain read-only.
+  cancelled = "indeterminate",
   indeterminate = character()
 )
 job_max_events <- 512L
@@ -1519,6 +1521,19 @@ job_worker_start_poller <- function(worker) {
   invisible(NULL)
 }
 
+job_cleanup_write <- function(worker, record) {
+  tryCatch(
+    job_record_write(worker$path, record, worker$lock, settling = TRUE),
+    error = function(error) {
+      job_abort(
+        "The Agent job cleanup ledger could not be persisted.",
+        class = "job_persistence",
+        parent = error
+      )
+    }
+  )
+}
+
 job_worker_cleanup <- function(worker) {
   record <- worker$record
   detach_error <- NULL
@@ -1559,12 +1574,7 @@ job_worker_cleanup <- function(worker) {
     record$cleanup$owner <- "binder"
     ledger_error <- tryCatch(
       {
-        record <- job_record_write(
-          worker$path,
-          record,
-          worker$lock,
-          settling = TRUE
-        )
+        record <- job_cleanup_write(worker, record)
         worker$record <- record
         NULL
       },
@@ -1594,28 +1604,18 @@ job_worker_cleanup <- function(worker) {
     }
     post_error <- tryCatch(
       {
-        record <- job_record_write(
-          worker$path,
-          record,
-          worker$lock,
-          settling = TRUE
-        )
+        record <- job_cleanup_write(worker, record)
         worker$record <- record
         NULL
       },
       error = identity
     )
-    cleanup_error <- cleanup_error %||% ledger_error %||% post_error
+    cleanup_error <- ledger_error %||% post_error %||% cleanup_error
   }
   if (detaching && is.null(worker$cleanup)) {
     cleanup_error <- tryCatch(
       {
-        record <- job_record_write(
-          worker$path,
-          record,
-          worker$lock,
-          settling = TRUE
-        )
+        record <- job_cleanup_write(worker, record)
         NULL
       },
       error = identity
@@ -1952,22 +1952,15 @@ job_run <- function(
     if (!is.null(cleanup_error)) {
       bound_error <- cleanup_error
     }
-    record <- worker$record
-    if (!identical(record$status, "failed")) {
-      record <- job_transition(record, "failed", "Agent job binding failed")
-    }
-    record$error <- job_error_record(bound_error)
-    record <- job_release_reservation(
-      record,
-      release = TRUE,
+    record <- job_worker_finish(
+      worker,
+      if (inherits(bound_error, "deputy_job_persistence")) {
+        "indeterminate"
+      } else {
+        "failed"
+      },
+      error = bound_error,
       reason = "Agent job binding failed"
-    )
-    worker$record <- record
-    record <- job_record_write(path, record, lock)
-    worker$record <- record
-    try(
-      job_control_write(path, record, "acknowledged", "binding failed"),
-      silent = TRUE
     )
     return(job_job(
       path,
@@ -2079,12 +2072,34 @@ job_run <- function(
   }
   if (
     cleanup_failed &&
-      (is.null(run_error) || job_is_pending_error(run_error))
+      (inherits(cleanup_error, "deputy_job_persistence") ||
+        is.null(run_error) ||
+        job_is_pending_error(run_error))
   ) {
     run_error <- cleanup_error
   }
+  persistence_error <- checkpoint_error %||%
+    snapshot_error %||%
+    if (inherits(cleanup_error, "deputy_job_persistence")) {
+      cleanup_error
+    } else if (inherits(run_error, "deputy_job_persistence")) {
+      run_error
+    } else {
+      NULL
+    }
+  persistence_failure <- !is.null(persistence_error)
   if (!is.null(worker$terminal)) {
-    worker$record <- job_record_write(path, worker$record, lock)
+    if (persistence_failure) {
+      job_worker_finish(
+        worker,
+        "indeterminate",
+        result = result,
+        error = persistence_error,
+        reason = "job settlement persistence failed"
+      )
+    } else {
+      worker$record <- job_record_write(path, worker$record, lock)
+    }
     return(job_job(
       path,
       worker$record,
@@ -2097,10 +2112,6 @@ job_run <- function(
   control <- job_control_read(path, record)
   requested <- isTRUE(control$requested)
   executing <- job_record_has_executing_effect(record)
-  persistence_failure <- !is.null(checkpoint_error) ||
-    !is.null(snapshot_error) ||
-    inherits(run_error, "deputy_job_persistence") ||
-    inherits(cleanup_error, "deputy_job_persistence")
   if (
     isTRUE(persistence_failure) ||
       isTRUE(requested) ||
@@ -2111,15 +2122,19 @@ job_run <- function(
     } else {
       "cancelled"
     }
-    reason <- control$reason %||%
-      run_error$reason %||%
-      "cancelled"
+    reason <- if (persistence_failure) {
+      "job persistence failed"
+    } else {
+      control$reason %||% run_error$reason %||% "cancelled"
+    }
     worker$record <- record
     job_worker_finish(
       worker,
       status,
       result = result,
-      error = run_error %||% simpleError("The Agent job was cancelled."),
+      error = persistence_error %||%
+        run_error %||%
+        simpleError("The Agent job was cancelled."),
       reason = reason
     )
   } else if (
