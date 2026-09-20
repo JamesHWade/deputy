@@ -247,7 +247,14 @@ context_fork_inert_content <- function(content) {
 context_fork_sanitize_turns <- function(turns, tool_ids) {
   upload_omitted <- FALSE
   sanitize <- function(content) {
-    if (inherits(content, "ellmer::ContentUploaded")) {
+    # Raw ellmer tool records do not mark which nested lists were Content.
+    # Conservatively omit upload-shaped records too, without reconstructing
+    # other ordinary record-shaped application data.
+    upload_record <- is.list(content) &&
+      !is.object(content) &&
+      all(c("version", "class", "props") %in% names(content)) &&
+      identical(content$class, "ellmer::ContentUploaded")
+    if (inherits(content, "ellmer::ContentUploaded") || upload_record) {
       upload_omitted <<- TRUE
       return(ellmer::ContentText(
         "[Provider upload omitted: supply portable content for this fork.]"

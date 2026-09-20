@@ -191,7 +191,7 @@ test_that("provider upload handles become inert fork evidence", {
     uri = "file-provider-secret",
     mime_type = "application/pdf",
     provider = "openai",
-    extra = list()
+    extra = list(private = "UPLOAD_EXTRA_SECRET")
   )
   turn <- ellmer::UserTurn(list(upload))
   for (selected in list(turn, ellmer::contents_record(turn))) {
@@ -216,18 +216,46 @@ test_that("provider upload handles become inert fork evidence", {
     request = request,
     value = list(report = list(upload = upload))
   )
-  fork <- context_fork_test_value(list(
+  turns <- list(
     ellmer::AssistantTurn(list(request)),
     ellmer::UserTurn(list(result))
-  ))
-  content <- context_fork_replay(fork)[[2L]]@contents[[1L]]@value$report$upload
-  expect_s7_class(content, ellmer::ContentText)
-  expect_match(content@text, "Provider upload omitted", fixed = TRUE)
-  expect_true("provider_upload" %in% fork$omissions)
+  )
+  portable <- lapply(turns, ellmer::contents_record)
+  # ellmer records immediate values; hosts can nest already-recorded content.
+  portable[[2L]]$props$contents[[1L]]$props$value$report$upload <-
+    ellmer::contents_record(upload)
+  for (selected in list(turns, portable)) {
+    fork <- context_fork_test_value(selected)
+    content <- context_fork_replay(fork)[[2L]]@contents[[
+      1L
+    ]]@value$report$upload
+    expect_s7_class(content, ellmer::ContentText)
+    expect_match(content@text, "Provider upload omitted", fixed = TRUE)
+    expect_true("provider_upload" %in% fork$omissions)
+    expect_false(grepl(
+      "file-provider-secret|UPLOAD_EXTRA_SECRET",
+      jsonlite::toJSON(fork$turns, auto_unbox = TRUE)
+    ))
+
+    orphan <- context_fork_test_value(selected[2L])
+    expect_true("provider_upload" %in% orphan$omissions)
+    expect_false(grepl(
+      "file-provider-secret|UPLOAD_EXTRA_SECRET",
+      jsonlite::toJSON(orphan$turns, auto_unbox = TRUE)
+    ))
+  }
+
+  direct <- ellmer::contents_record(ellmer::UserTurn(list(
+    ellmer::ContentToolResult(value = upload, request = request)
+  )))
+  fork <- context_fork_test_value(list(portable[[1L]], direct))
+  expect_s7_class(
+    context_fork_replay(fork)[[2L]]@contents[[1L]]@value,
+    ellmer::ContentText
+  )
   expect_false(grepl(
-    "file-provider-secret",
-    jsonlite::toJSON(fork$turns, auto_unbox = TRUE),
-    fixed = TRUE
+    "file-provider-secret|UPLOAD_EXTRA_SECRET",
+    jsonlite::toJSON(fork$turns, auto_unbox = TRUE)
   ))
 })
 

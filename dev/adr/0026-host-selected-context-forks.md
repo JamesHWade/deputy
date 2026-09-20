@@ -51,3 +51,6 @@ Fork snapshots replace provider-specific `ContentUploaded` handles with labelled
 inert text and report a `provider_upload` omission. This also applies inside tool
 results: a new child can use a different provider or credentials, and the source
 upload may expire. Hosts supply portable content when the child needs the file.
+Raw ellmer tool-result records lose nested content provenance, so upload-shaped
+records in opaque tool data are conservatively omitted as well. Other ordinary
+record-shaped application data remains opaque.
