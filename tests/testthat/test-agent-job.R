@@ -1931,6 +1931,50 @@ test_that("recovery preserves terminal cleanup evidence", {
   }
 })
 
+test_that("pending dispatch settles a committed cancellation without binding", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-pending-cancel-")
+  path <- job_create(
+    directory,
+    job_test_agent(),
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+  record <- job_record_read(path)$record
+  record <- job_transition(record, "running", "worker started")
+  record <- job_transition(record, "approval_pending", "approval requested")
+  record$pending_approval <- list(path = file.path(directory, "approval"))
+  lock <- approval_store_lock(path)
+  tryCatch(
+    job_record_write(path, record, lock),
+    finally = approval_store_unlock(lock)
+  )
+  # Simulate a host stopping after its durable control request, before it can
+  # acquire the execution lock and settle the pending job.
+  job_control_write(path, record, "requested", "host stopped waiting")
+  expect_identical(job_read(path)$status, "approval_pending")
+  expect_true(job_read(path)$control$requested)
+  bound <- 0L
+  cancelled <- job_run(
+    path,
+    bind = function(job) {
+      bound <<- bound + 1L
+      stop("cancelled pending work must not bind")
+    },
+    authorize = job_test_receipt
+  )
+  expect_identical(bound, 0L)
+  expect_identical(cancelled$status, "cancelled")
+  expect_null(cancelled$pending_approval)
+  expect_identical(cancelled$reservations$status, "released")
+  expect_true(cancelled$reservations$released)
+  expect_identical(cancelled$control$status, "cancelled")
+  expect_true(cancelled$control$requested)
+  expect_identical(job_read(path)$status, "cancelled")
+})
+
 test_that("queued cancellation is durable and prevents binding", {
   directory <- withr::local_tempdir(pattern = "deputy-job-cancel-")
   agent <- job_test_agent()

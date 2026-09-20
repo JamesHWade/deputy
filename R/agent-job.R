@@ -1783,9 +1783,6 @@ job_run <- function(
       job_control_read(path, record)
     ))
   }
-  if (identical(record$status, "approval_pending") && is.null(decision)) {
-    return(job_job(path, record, loaded$envelope, control))
-  }
   if (identical(record$status, "queued") && !is.null(decision)) {
     job_abort(
       "An approval decision requires a job in approval_pending status.",
@@ -1822,6 +1819,10 @@ job_run <- function(
       approval_store_envelope(path),
       job_control_read(path, record)
     ))
+  }
+
+  if (identical(record$status, "approval_pending") && is.null(decision)) {
+    return(job_job(path, record, loaded$envelope, control))
   }
 
   resuming <- identical(record$status, "approval_pending")
