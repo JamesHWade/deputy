@@ -408,6 +408,13 @@ test_that("abnormal worker exit persists cleanup before releasing its lock", {
   expect_identical(persisted$status, "running")
   expect_identical(persisted$cleanup$status, "completed")
   expect_identical(persisted$cleanup$attempts, 1L)
+  recovered <- job_run(
+    path,
+    bind = function(job) stop("interrupted jobs must not bind again"),
+    authorize = job_test_receipt
+  )
+  expect_identical(recovered$status, "indeterminate")
+  expect_identical(recovered$cleanup, persisted$cleanup)
 })
 
 test_that("cancellation persists maximum-length UTF-8 reasons", {
@@ -703,6 +710,55 @@ test_that("job_run recovers an abandoned running job without rebinding", {
   expect_identical(recovered$reservations$status, "preserved")
   expect_false(recovered$reservations$released)
   expect_identical(bound, 0L)
+})
+
+test_that("recovery preserves terminal cleanup evidence", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-cleanup-recovery-")
+  for (status in c("completed", "failed")) {
+    for (recover in c("run", "cancel")) {
+      path <- job_create(
+        directory,
+        job_test_agent(),
+        "interrupted task",
+        "owner-1",
+        "definition-1",
+        "context-1",
+        UsageLimits(max_requests = 2L)
+      )
+      record <- job_record_read(path)$record
+      record <- job_transition(record, "running", "worker started")
+      record$cleanup <- list(
+        owner = "binder",
+        required = TRUE,
+        status = status,
+        attempts = 1L,
+        completed_at = 123,
+        error = if (status == "failed") {
+          list(message = "cleanup failed")
+        } else {
+          NULL
+        }
+      )
+      lock <- approval_store_lock(path)
+      tryCatch(
+        job_record_write(path, record, lock),
+        finally = approval_store_unlock(lock)
+      )
+      recovered <- if (recover == "run") {
+        job_run(
+          path,
+          bind = function(job) stop("recovery must not bind"),
+          authorize = job_test_receipt
+        )
+      } else {
+        job_cancel(path, authorize = job_test_receipt)
+      }
+      expect_identical(recovered$status, "indeterminate")
+      expect_identical(recovered$cleanup, record$cleanup)
+      expect_identical(job_read(path)$cleanup, record$cleanup)
+      expect_false(recovered$reservations$released)
+    }
+  }
 })
 
 test_that("queued cancellation is durable and prevents binding", {

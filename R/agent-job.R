@@ -945,9 +945,14 @@ job_mark_recovery <- function(path, record, lock, reason) {
       required = TRUE,
       attempts = 0L
     )
-  record$cleanup$status <- "unknown"
-  record$cleanup$required <- TRUE
-  record$cleanup$reason <- job_safe_string(reason)
+  if (
+    !identical(record$cleanup$status, "completed") &&
+      !identical(record$cleanup$status, "failed")
+  ) {
+    record$cleanup$status <- "unknown"
+    record$cleanup$required <- TRUE
+    record$cleanup$reason <- job_safe_string(reason)
+  }
   record <- job_release_reservation(record, release = FALSE, reason = reason)
   record <- job_transition(record, "indeterminate", reason)
   record$error <- list(
