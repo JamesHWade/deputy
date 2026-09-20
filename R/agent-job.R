@@ -195,7 +195,9 @@ job_control_path <- function(path, record) {
   file.path(path, job_control_id(record))
 }
 
-job_control_limit <- function(max_bytes) min(max_bytes, 8192)
+# Leave room for both serialized revisions during atomic replacement, including
+# the bounded cancellation reason and envelope metadata.
+job_control_limit <- function(max_bytes) min(max_bytes, 64L * 1024L)
 
 job_safe_string <- function(value, max_bytes = job_max_error_bytes) {
   if (is.null(value)) {
@@ -2058,7 +2060,7 @@ job_cancel <- function(path, authorize, reason = "cancelled") {
   record <- loaded$record
   control <- job_control_read(path, record)
   if (record$status %in% job_terminal_statuses) {
-    job_control_set_locked(
+    control <- job_control_set_locked(
       path,
       record,
       control_lock,

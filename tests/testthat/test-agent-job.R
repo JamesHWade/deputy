@@ -172,6 +172,55 @@ test_that("cleanup failure retains the successful task result", {
   expect_match(failed$cleanup$error$message, "cleanup failed")
 })
 
+test_that("cancellation persists maximum-length UTF-8 reasons", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-long-cancel-")
+  for (reason in c(strrep("x", 4096L), strrep("\u00e9", 2048L))) {
+    path <- job_create(
+      directory,
+      job_test_agent(),
+      "answer once",
+      "owner-1",
+      "definition-1",
+      "context-1",
+      UsageLimits(max_requests = 2L)
+    )
+    cancelled <- job_cancel(path, job_test_receipt, reason = reason)
+    restored <- job_read(path)
+    expect_identical(cancelled$status, "cancelled")
+    expect_identical(restored$control$status, "cancelled")
+    expect_identical(restored$control$reason, reason)
+  }
+})
+
+test_that("cancellation returns the committed control when completion races it", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-cancel-race-")
+  agent <- job_test_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+  cancelled <- job_cancel(
+    path,
+    authorize = function(job) {
+      # Finish after cancellation reads the queued record but before it can
+      # acquire the execution lock, using the real governed job path.
+      job_run(path, bind = function(job) agent, authorize = job_test_receipt)
+      job_test_receipt(job)
+    },
+    reason = "finished during authorization"
+  )
+  restored <- job_read(path)
+  expect_identical(cancelled$status, "completed")
+  expect_identical(cancelled$control$status, "acknowledged")
+  expect_identical(cancelled$control, restored$control)
+  expect_identical(cancelled$result$response, "done")
+})
+
 test_that("queued cancellation is durable and prevents binding", {
   directory <- withr::local_tempdir(pattern = "deputy-job-cancel-")
   agent <- job_test_agent()

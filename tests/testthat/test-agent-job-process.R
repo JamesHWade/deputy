@@ -2,6 +2,66 @@ job_process_test_package <- function() {
   getNamespaceInfo(asNamespace("deputy"), "path")
 }
 
+# `test_check()` loads the package from its staged installation.  That path
+# contains the lazy-load database rather than source files, so `load_all()`
+# treats it as an empty source package and drops the public bindings.  Focused
+# tests still use the source tree; checked-package children attach the package
+# from the parent library instead.
+job_process_test_load <- (function() {
+  loader <- function(package_path) {
+    if (base::file.exists(base::file.path(package_path, "R", "agent.R"))) {
+      base::getExportedValue("pkgload", "load_all")(
+        package_path,
+        quiet = TRUE,
+        helpers = FALSE
+      )
+    } else {
+      package_lib <- base::dirname(package_path)
+      if (
+        !base::requireNamespace(
+          "deputy",
+          lib.loc = package_lib,
+          quietly = TRUE
+        )
+      ) {
+        base::stop(
+          "cannot load the installed deputy package from ",
+          package_lib,
+          call. = FALSE
+        )
+      }
+      base::library(
+        "deputy",
+        lib.loc = package_lib,
+        character.only = TRUE
+      )
+    }
+
+    required <- c(
+      "Agent",
+      "UsageLimits",
+      "job_create",
+      "job_read",
+      "job_run",
+      "job_cancel"
+    )
+    missing <- base::setdiff(
+      required,
+      base::getNamespaceExports("deputy")
+    )
+    if (base::length(missing) > 0L) {
+      base::stop(
+        "child deputy package is missing exported bindings: ",
+        base::paste(missing, collapse = ", "),
+        call. = FALSE
+      )
+    }
+    base::invisible(NULL)
+  }
+  base::environment(loader) <- baseenv()
+  loader
+})()
+
 job_process_test_record_field <- function(record, name) {
   value <- tryCatch(
     S7::prop(record, name),
@@ -55,8 +115,8 @@ test_that("a queued job survives its creator process and is consumed once", {
   package_path <- job_process_test_package()
 
   path <- callr::r(
-    function(package_path, directory, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, directory, url, load_package) {
+      load_package(package_path)
       agent <- deputy::Agent$new(
         chat = ellmer::chat_openai_compatible(
           base_url = url,
@@ -81,6 +141,7 @@ test_that("a queued job survives its creator process and is consumed once", {
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       directory = directory,
       url = server$url
     ),
@@ -90,8 +151,8 @@ test_that("a queued job survives its creator process and is consumed once", {
   expect_length(path, 1L)
 
   first <- callr::r(
-    function(package_path, path, directory, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, directory, url, load_package) {
+      load_package(package_path)
       bind <- function(...) {
         deputy::Agent$new(
           chat = ellmer::chat_openai_compatible(
@@ -121,6 +182,7 @@ test_that("a queued job survives its creator process and is consumed once", {
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       path = path,
       directory = directory,
       url = server$url
@@ -131,8 +193,8 @@ test_that("a queued job survives its creator process and is consumed once", {
   expect_length(server$requests(), 1L)
 
   second <- callr::r(
-    function(package_path, path) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, load_package) {
+      load_package(package_path)
       # A terminal job must be inspectable without recreating a provider,
       # binding an Agent, or dispatching another request.
       deputy::job_run(
@@ -149,7 +211,11 @@ test_that("a queued job survives its creator process and is consumed once", {
       )
       deputy::job_read(path)
     },
-    args = list(package_path = package_path, path = path),
+    args = list(
+      package_path = package_path,
+      path = path,
+      load_package = job_process_test_load
+    ),
     libpath = .libPaths()
   )
   expect_identical(job_process_test_status(second), "completed")
@@ -168,8 +234,8 @@ test_that("a killed worker leaves an indeterminate effect without retry", {
   package_path <- job_process_test_package()
 
   path <- callr::r(
-    function(package_path, directory, marker, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, directory, marker, url, load_package) {
+      load_package(package_path)
       kill_after <- FALSE
       tool <- ellmer::tool(
         function(value) {
@@ -217,6 +283,7 @@ test_that("a killed worker leaves an indeterminate effect without retry", {
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       directory = directory,
       marker = marker,
       url = server$url
@@ -225,17 +292,21 @@ test_that("a killed worker leaves an indeterminate effect without retry", {
   )
 
   allocation <- callr::r(
-    function(package_path, path) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, load_package) {
+      load_package(package_path)
       deputy::job_read(path)$allocation
     },
-    args = list(package_path = package_path, path = path),
+    args = list(
+      package_path = package_path,
+      path = path,
+      load_package = job_process_test_load
+    ),
     libpath = .libPaths()
   )
 
   worker <- callr::r_bg(
-    function(package_path, path, directory, marker, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, directory, marker, url, load_package) {
+      load_package(package_path)
       kill_after <- TRUE
       tool <- ellmer::tool(
         function(value) {
@@ -287,6 +358,7 @@ test_that("a killed worker leaves an indeterminate effect without retry", {
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       path = path,
       directory = directory,
       marker = marker,
@@ -304,8 +376,8 @@ test_that("a killed worker leaves an indeterminate effect without retry", {
   expect_identical(readLines(marker), "once")
 
   recovered <- callr::r(
-    function(package_path, path) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, load_package) {
+      load_package(package_path)
       deputy::job_run(
         path,
         bind = function(...) stop("indeterminate job unexpectedly rebound"),
@@ -320,7 +392,11 @@ test_that("a killed worker leaves an indeterminate effect without retry", {
       )
       deputy::job_read(path)
     },
-    args = list(package_path = package_path, path = path),
+    args = list(
+      package_path = package_path,
+      path = path,
+      load_package = job_process_test_load
+    ),
     libpath = .libPaths()
   )
   expect_identical(job_process_test_status(recovered), "indeterminate")
@@ -351,8 +427,8 @@ test_that("a pending approval resumes in a new process without replaying complet
   package_path <- job_process_test_package()
 
   path <- callr::r(
-    function(package_path, directory, approvals, marker, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, directory, approvals, marker, url, load_package) {
+      load_package(package_path)
       tool <- ellmer::tool(
         function(value) {
           cat(value, "\n", file = marker, append = TRUE, sep = "")
@@ -405,6 +481,7 @@ test_that("a pending approval resumes in a new process without replaying complet
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       directory = directory,
       approvals = approvals,
       marker = marker,
@@ -414,8 +491,16 @@ test_that("a pending approval resumes in a new process without replaying complet
   )
 
   first <- callr::r(
-    function(package_path, path, directory, approvals, marker, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(
+      package_path,
+      path,
+      directory,
+      approvals,
+      marker,
+      url,
+      load_package
+    ) {
+      load_package(package_path)
       tool <- ellmer::tool(
         function(value) {
           cat(value, "\n", file = marker, append = TRUE, sep = "")
@@ -473,6 +558,7 @@ test_that("a pending approval resumes in a new process without replaying complet
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       path = path,
       directory = directory,
       approvals = approvals,
@@ -486,8 +572,16 @@ test_that("a pending approval resumes in a new process without replaying complet
   expect_length(server$requests(), 2L)
 
   second <- callr::r(
-    function(package_path, path, directory, approvals, marker, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(
+      package_path,
+      path,
+      directory,
+      approvals,
+      marker,
+      url,
+      load_package
+    ) {
+      load_package(package_path)
       tool <- ellmer::tool(
         function(value) {
           cat(value, "\n", file = marker, append = TRUE, sep = "")
@@ -546,6 +640,7 @@ test_that("a pending approval resumes in a new process without replaying complet
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       path = path,
       directory = directory,
       approvals = approvals,
@@ -568,8 +663,8 @@ test_that("queued cancellation completes without provider IO during recovery", {
   directory <- withr::local_tempdir(pattern = "deputy-job-process-cancel-")
   package_path <- job_process_test_package()
   path <- callr::r(
-    function(package_path, directory, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, directory, url, load_package) {
+      load_package(package_path)
       agent <- deputy::Agent$new(
         chat = ellmer::chat_openai_compatible(
           base_url = url,
@@ -594,6 +689,7 @@ test_that("queued cancellation completes without provider IO during recovery", {
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       directory = directory,
       url = server$url
     ),
@@ -601,8 +697,8 @@ test_that("queued cancellation completes without provider IO during recovery", {
   )
 
   cancelled <- callr::r(
-    function(package_path, path) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, load_package) {
+      load_package(package_path)
       deputy::job_cancel(
         path,
         authorize = function(job) {
@@ -617,14 +713,18 @@ test_that("queued cancellation completes without provider IO during recovery", {
       )
       deputy::job_read(path)
     },
-    args = list(package_path = package_path, path = path),
+    args = list(
+      package_path = package_path,
+      path = path,
+      load_package = job_process_test_load
+    ),
     libpath = .libPaths()
   )
   expect_identical(job_process_test_status(cancelled), "cancelled")
 
   recovered <- callr::r(
-    function(package_path, path) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, load_package) {
+      load_package(package_path)
       deputy::job_run(
         path,
         bind = function(...) stop("cancelled job unexpectedly rebound"),
@@ -639,7 +739,11 @@ test_that("queued cancellation completes without provider IO during recovery", {
       )
       deputy::job_read(path)
     },
-    args = list(package_path = package_path, path = path),
+    args = list(
+      package_path = package_path,
+      path = path,
+      load_package = job_process_test_load
+    ),
     libpath = .libPaths()
   )
   expect_identical(job_process_test_status(recovered), "cancelled")
@@ -659,8 +763,8 @@ test_that("host cancellation uses the independent control store while a worker i
   package_path <- job_process_test_package()
 
   path <- callr::r(
-    function(package_path, directory, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, directory, url, load_package) {
+      load_package(package_path)
       agent <- deputy::Agent$new(
         chat = ellmer::chat_openai_compatible(
           base_url = url,
@@ -685,6 +789,7 @@ test_that("host cancellation uses the independent control store while a worker i
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       directory = directory,
       url = server$url
     ),
@@ -692,8 +797,8 @@ test_that("host cancellation uses the independent control store while a worker i
   )
 
   worker <- callr::r_bg(
-    function(package_path, path, directory, cleanup_marker, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, directory, cleanup_marker, url, load_package) {
+      load_package(package_path)
       bind <- function(...) {
         agent <- deputy::Agent$new(
           chat = ellmer::chat_openai_compatible(
@@ -725,6 +830,7 @@ test_that("host cancellation uses the independent control store while a worker i
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       path = path,
       directory = directory,
       cleanup_marker = cleanup_marker,
@@ -746,8 +852,8 @@ test_that("host cancellation uses the independent control store while a worker i
 
   started <- Sys.time()
   requested <- callr::r(
-    function(package_path, path) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, load_package) {
+      load_package(package_path)
       authorize <- function(job) {
         list(
           job_id = job$id,
@@ -762,7 +868,11 @@ test_that("host cancellation uses the independent control store while a worker i
         reason = "user_cancelled"
       )
     },
-    args = list(package_path = package_path, path = path),
+    args = list(
+      package_path = package_path,
+      path = path,
+      load_package = job_process_test_load
+    ),
     libpath = .libPaths()
   )
   elapsed <- as.numeric(difftime(Sys.time(), started, units = "secs"))
@@ -775,11 +885,15 @@ test_that("host cancellation uses the independent control store while a worker i
     worker$get_result()
   }
   settled <- callr::r(
-    function(package_path, path) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, load_package) {
+      load_package(package_path)
       deputy::job_read(path)
     },
-    args = list(package_path = package_path, path = path),
+    args = list(
+      package_path = package_path,
+      path = path,
+      load_package = job_process_test_load
+    ),
     libpath = .libPaths()
   )
   expect_true(settled$status %in% c("cancelled", "indeterminate"))
@@ -798,8 +912,8 @@ test_that("a binding failure is terminal and does not dispatch a provider reques
   directory <- withr::local_tempdir(pattern = "deputy-job-process-failure-")
   package_path <- job_process_test_package()
   path <- callr::r(
-    function(package_path, directory, url) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, directory, url, load_package) {
+      load_package(package_path)
       agent <- deputy::Agent$new(
         chat = ellmer::chat_openai_compatible(
           base_url = url,
@@ -824,6 +938,7 @@ test_that("a binding failure is terminal and does not dispatch a provider reques
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       directory = directory,
       url = server$url
     ),
@@ -831,8 +946,8 @@ test_that("a binding failure is terminal and does not dispatch a provider reques
   )
 
   failed <- callr::r(
-    function(package_path, path) {
-      pkgload::load_all(package_path, quiet = TRUE, helpers = FALSE)
+    function(package_path, path, load_package) {
+      load_package(package_path)
       try(
         deputy::job_run(
           path,
@@ -850,7 +965,11 @@ test_that("a binding failure is terminal and does not dispatch a provider reques
       )
       deputy::job_read(path)
     },
-    args = list(package_path = package_path, path = path),
+    args = list(
+      package_path = package_path,
+      path = path,
+      load_package = job_process_test_load
+    ),
     libpath = .libPaths()
   )
   expect_identical(job_process_test_status(failed), "failed")
