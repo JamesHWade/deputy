@@ -2309,11 +2309,29 @@ Agent <- R6::R6Class(
           function(field) S7::prop(limits, field) %||% 0,
           numeric(1)
         )
+        if (is.function(private$.job_checkpoint)) {
+          private$.job_checkpoint(
+            self,
+            list(
+              type = "delegation_reserved",
+              delegation_id = delegation_id
+            )
+          )
+        }
         invisible(NULL)
       },
 
       release_delegation_usage = function(delegation_id) {
         private$delegation_usage_reservations[[delegation_id]] <- NULL
+        if (is.function(private$.job_checkpoint)) {
+          private$.job_checkpoint(
+            self,
+            list(
+              type = "delegation_released",
+              delegation_id = delegation_id
+            )
+          )
+        }
         invisible(NULL)
       },
 
@@ -2771,6 +2789,9 @@ Agent <- R6::R6Class(
         if (is.null(event)) {
           return(invisible(NULL))
         }
+        if (is.function(private$.job_checkpoint)) {
+          private$.job_checkpoint(self, event)
+        }
         state <- private$current_run_state
         if (!is.null(state)) {
           state$events[[length(state$events) + 1L]] <- event
@@ -3033,6 +3054,8 @@ Agent <- R6::R6Class(
       .approval_ceilings = list(),
       .approval_tools = NULL,
       .approval_grant = NULL,
+      .job_checkpoint = NULL,
+      .job_state = NULL,
 
       # Storage for loaded MCP tool names
       loaded_mcp_tools = character(),

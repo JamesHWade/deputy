@@ -498,6 +498,7 @@ retain_agent_graph <- function(
   tree$handles <- stats::setNames(character(length(agents)), node_names)
   tree$base_tools <- member_tools
   tree$base_hooks <- member_hooks
+  tree$routes <- routes
   route_sources <- unique(c("root", names(routes)))
   tree$route_names <- stats::setNames(
     vector("list", length(route_sources)),

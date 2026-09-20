@@ -85,6 +85,17 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       # denylist, callback, mode, and capability checks still apply.
       permission_context <- context
       permission_context$.deputy_internal_tool <- extracted$internal_tool
+      if (is.function(private$.job_checkpoint)) {
+        private$.job_checkpoint(
+          self,
+          list(
+            type = "permission_check",
+            tool_name = tool_name,
+            tool_input = tool_input,
+            context = permission_context
+          )
+        )
+      }
       if (is.function(private$.delegation_guard)) {
         private$.delegation_guard(tool_name, tool_input, permission_context)
       }
@@ -245,6 +256,17 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       hook_tool_error <- original$error
 
       private$approval_execution_result(result, record)
+      if (is.function(private$.job_checkpoint)) {
+        private$.job_checkpoint(
+          self,
+          list(
+            type = "effect_result",
+            tool_name = extracted$tool_name,
+            tool_call_id = record$tool_call_id,
+            result = result
+          )
+        )
+      }
 
       # Finalize only captures started by this request. Remote tools never
       # enter the local journal, even when their names resemble file tools.

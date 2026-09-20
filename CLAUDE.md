@@ -26,6 +26,8 @@ deputy/
 │   ├── agent.R             # Public Agent API and runtime wiring
 │   ├── agent-stream.R      # Shared governed stream and finalization
 │   ├── agent-approval.R     # Durable pending-tool suspension and governed resume
+│   ├── agent-job.R          # Host-scheduled durable jobs and recovery states
+│   ├── agent-job-runtime.R  # Job manifests, graph snapshots and checkpoints
 │   ├── approval-record.R    # S7 approval inspection and portable control records
 │   ├── approval-store.R     # Locked immutable approval revisions
 │   ├── agent-requests.R    # Public ellmer callbacks and explicit fallback

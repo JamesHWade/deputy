@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* `job_create()`, `job_run()`, `job_read()` and `job_cancel()` persist governed
+  work for host-owned schedulers. Durable jobs preserve graph budgets, source
+  revisions, tool effects and standalone pending approvals across process
+  boundaries. Interrupted executions become indeterminate instead of silently
+  repeating side effects; cancellation remains cooperative (#42).
+
 * `ContextFork()` and `fork_agent()` initialize independent retained specialists
   from authorized host-selected native ellmer turns. Fork manifests record source
   identity, revision and bounds; continuations recheck source access and apply

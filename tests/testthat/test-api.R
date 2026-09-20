@@ -2,6 +2,11 @@ test_that("public API is deliberate", {
   expected <- c(
     "Agent",
     "AgentEvent",
+    "AgentJob",
+    "job_create",
+    "job_read",
+    "job_run",
+    "job_cancel",
     "AgentResult",
     "result_n_turns",
     "result_tool_calls",
