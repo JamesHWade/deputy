@@ -525,7 +525,7 @@ registry. Depth/count/concurrency and UsageLimits apply until explicit graph
 release; parents waiting on children occupy concurrency slots. See ADR-0025.
 `inst/examples/recursive-agents/` supplies the deterministic three-level browser
 fixture; test it with `devtools::test(filter = "recursive|delegation-graph|delegation-tree")`.
-Durable restart recovery remains #42.
+Host-scheduled durable recovery uses the job APIs described above and ADR-0027.
 
 ### Host-selected context forks
 
