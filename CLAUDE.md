@@ -821,7 +821,10 @@ GitHub Actions workflows in `.github/workflows/`:
 - `claude.yml` / `claude-code-review.yml` - Claude integration
 
 Tests use testthat's native file parallelism (`Config/testthat/parallel: true`),
-with four workers per CI job. Linux splits all discovered test files across eight
+with four workers per CI job. Set both setup-r's `Ncpus: 4` input and
+`TESTTHAT_CPUS=4`: the R option takes priority over the environment variable,
+and setup-r otherwise defaults it to one. The shard runner checks for mismatches.
+Linux splits all discovered test files across eight
 shards; new test files join automatically. `R CMD check` skips its duplicate test
 phase only on Linux, where every shard must pass. The existing `ubuntu-latest (release)` status
 aggregates both the Linux package check and every shard. Windows and macOS run the

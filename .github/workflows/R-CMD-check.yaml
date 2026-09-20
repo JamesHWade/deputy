@@ -34,6 +34,7 @@ jobs:
         with:
           r-version: release
           use-public-rspm: true
+          Ncpus: 4
 
       - name: Install ir resolver system requirements
         run: |
@@ -69,6 +70,7 @@ jobs:
         with:
           r-version: release
           use-public-rspm: true
+          Ncpus: 4
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
@@ -105,6 +107,7 @@ jobs:
         with:
           r-version: ${{ matrix.config.r }}
           use-public-rspm: true
+          Ncpus: 4
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
@@ -149,6 +152,7 @@ jobs:
         with:
           r-version: release
           use-public-rspm: true
+          Ncpus: 4
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:

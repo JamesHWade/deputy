@@ -32,6 +32,12 @@ The first shard completed in 27.7s locally (778 passing expectations); all 92
 files were verified to appear exactly once across the eight partitions.
 Deliberately failing, invalid-argument, and empty-test fixtures return nonzero.
 
+The first sharded GitHub run exposed an additional configuration bottleneck:
+`setup-r` defaults `options(Ncpus = 1)`, which testthat prioritizes over
+`TESTTHAT_CPUS=4`. Its logs showed only one worker per shard. The workflows now
+set the action's `Ncpus: 4` input explicitly, and the runner rejects a mismatch
+between the requested and configured worker limits.
+
 ## Execution policy
 
 - PRs: Air, documentation build, Linux package check, and eight test shards.

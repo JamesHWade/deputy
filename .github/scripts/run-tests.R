@@ -27,6 +27,21 @@ if (length(args) == 3L) {
   quit(status = 0L)
 }
 
+# setup-r defaults options(Ncpus = 1), which takes priority over TESTTHAT_CPUS.
+# Fail visibly if the workflow's requested pool and R's configured pool disagree.
+requested <- Sys.getenv("TESTTHAT_CPUS", "")
+if (nzchar(requested)) {
+  expected <- suppressWarnings(as.integer(requested))
+  configured <- getOption("Ncpus", expected)
+  if (
+    is.na(expected) ||
+      expected < 1L ||
+      !identical(as.integer(configured), expected)
+  ) {
+    stop("Configure setup-r's Ncpus input to match TESTTHAT_CPUS.")
+  }
+}
+
 # testthat's filter matches the filename without its test-/test_ prefix or .R.
 # Verify the public discovery API selects exactly our partition before execution.
 stems <- sub("[.][Rr]$", "", sub("^test[-_]", "", selected))
