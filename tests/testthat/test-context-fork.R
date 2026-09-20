@@ -284,6 +284,104 @@ test_that("nonportable tool arguments fail without revealing private content", {
   }
 })
 
+test_that("portable ellmer records scrub provider fields before replay", {
+  executed <- FALSE
+  tool <- ellmer::tool(
+    function() {
+      executed <<- TRUE
+      "executed"
+    },
+    name = "provider_tool",
+    description = "provider tool",
+    arguments = list()
+  )
+  request <- ellmer::ContentToolRequest(
+    id = "record-tool",
+    name = "provider_tool",
+    arguments = list(path = "safe"),
+    tool = tool,
+    extra = list(display_secret = "DISPLAY_SECRET")
+  )
+  record <- ellmer::contents_record(
+    ellmer::AssistantTurn(list(request))
+  )
+  record$props$json <- list(
+    hidden_reasoning = "HIDDEN_PROVIDER_REASONING"
+  )
+  record$props$contents[[1L]]$props$tool <- list(name = "provider_tool")
+  record$props$contents[[1L]]$props$extra <- list(
+    display_secret = "DISPLAY_SECRET"
+  )
+
+  fork <- context_fork_test_value(list(record))
+  serialized <- jsonlite::toJSON(fork$turns, auto_unbox = TRUE)
+  expect_identical(
+    grepl("HIDDEN_PROVIDER_REASONING", serialized, fixed = TRUE),
+    FALSE
+  )
+  expect_identical(
+    grepl("DISPLAY_SECRET", serialized, fixed = TRUE),
+    FALSE
+  )
+  expect_false(executed)
+  replayed <- context_fork_replay(fork)[[1L]]@contents[[1L]]
+  expect_identical(class(replayed)[[1L]], "ellmer::ContentText")
+})
+
+test_that("portable thinking is omitted only at typed content positions", {
+  record <- ellmer::contents_record(ellmer::AssistantTurn(list(
+    ellmer::ContentThinking("PRIVATE_THINKING"),
+    ellmer::ContentText("public answer")
+  )))
+  fork <- context_fork_test_value(list(record))
+  contents <- context_fork_replay(fork)[[1L]]@contents
+  expect_length(contents, 1L)
+  expect_identical(contents[[1L]]@text, "public answer")
+
+  ambiguous <- ellmer::contents_record(ellmer::UserTurn(list(
+    ellmer::ContentToolResult(
+      value = ellmer::ContentThinking("PRIVATE_THINKING")
+    )
+  )))
+  expect_error(
+    context_fork_test_value(list(ambiguous)),
+    class = "deputy_context_fork_error"
+  )
+  ambiguous$props$contents[[1L]]$deputy_value_kind <- "marked"
+  ambiguous$props$contents[[1L]]$deputy_content_paths <- list()
+  expect_error(
+    context_fork_test_value(list(ambiguous)),
+    class = "deputy_context_fork_error"
+  )
+})
+
+test_that("record-shaped tool values remain ordinary data", {
+  request <- ellmer::ContentToolRequest(
+    id = "ordinary-record",
+    name = "inspect",
+    arguments = list()
+  )
+  ordinary <- list(
+    version = 1L,
+    class = "ellmer::ContentText",
+    props = list(text = "ordinary value")
+  )
+  request_record <- ellmer::contents_record(
+    ellmer::AssistantTurn(list(request))
+  )
+  result_record <- ellmer::contents_record(
+    ellmer::UserTurn(list(
+      ellmer::ContentToolResult(value = ordinary, request = request)
+    ))
+  )
+
+  fork <- context_fork_test_value(list(request_record, result_record))
+  value <- context_fork_replay(fork)[[2L]]@contents[[1L]]@value
+  expect_true(is.list(value))
+  expect_identical(value$class, "ellmer::ContentText")
+  expect_identical(value$props$text, "ordinary value")
+})
+
 test_that("fork preflight does not dispatch hostile provider length methods", {
   hostile <- structure("provider-private", class = "context_fork_hostile")
   result <- ellmer::ContentToolResult(

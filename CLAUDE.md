@@ -527,6 +527,18 @@ release; parents waiting on children occupy concurrency slots. See ADR-0025.
 fixture; test it with `devtools::test(filter = "recursive|delegation-graph|delegation-tree")`.
 Durable restart recovery remains #42.
 
+### Host-selected context forks
+
+`ContextFork()` records a bounded, host-selected snapshot of native ellmer turns
+with owner, conversation, branch, revision and fork-point provenance. The host
+explicitly chooses retained transcript or current model context and supplies
+current authorization; Deputy does not create or select host branches.
+`fork_agent()` initializes an independent retained specialist and reauthorizes
+the source on every continuation. Copied history is inert: private provider
+data, tool bindings and incomplete tool rounds cannot restore execution or
+authority. Current parent and child governance still apply through the existing
+retained-conversation lifecycle. See ADR-0026 and `R/context-fork.R`.
+
 ### Human Input
 
 Concurrent and hosted Agents bind their own handler with

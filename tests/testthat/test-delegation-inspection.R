@@ -726,6 +726,63 @@ test_that("duration frame projection strips subclasses and preserves list column
 })
 
 
+test_that("misaligned duration frame columns are omitted per row", {
+  frame <- structure(
+    list(
+      id = 1:3,
+      elapsed = as.difftime(1, units = "mins")
+    ),
+    class = "data.frame",
+    row.names = c(NA_integer_, -3L)
+  )
+  value <- jsonlite::fromJSON(
+    inspection_duration_json(frame),
+    simplifyVector = FALSE
+  )
+
+  expect_length(value, 3L)
+  expect_equal(
+    vapply(value, function(row) row$id, integer(1)),
+    1:3
+  )
+  expect_true(all(vapply(
+    value,
+    function(row) identical(row$elapsed, inspection_duration_omission),
+    logical(1)
+  )))
+})
+
+
+test_that("nested data frames and POSIXlt columns retain row layout", {
+  frame <- data.frame(id = 1:2)
+  frame$nested <- data.frame(x = 3:4, y = 5:6)
+  frame$when <- as.POSIXlt(
+    as.POSIXct(c("2024-01-01", "2024-01-02"), tz = "UTC")
+  )
+  value <- jsonlite::fromJSON(
+    inspection_duration_json(frame),
+    simplifyVector = FALSE
+  )
+
+  expect_equal(value[[1L]]$nested$x, 3L)
+  expect_equal(value[[1L]]$nested$y, 5L)
+  expect_equal(value[[2L]]$nested$x, 4L)
+  expect_equal(value[[2L]]$nested$y, 6L)
+  expect_identical(value[[1L]]$when, "2024-01-01")
+  expect_identical(value[[2L]]$when, "2024-01-02")
+  frame$when <- I(frame$when)
+  wrapped <- jsonlite::fromJSON(
+    inspection_duration_json(frame),
+    simplifyVector = FALSE
+  )
+  expect_identical(wrapped, value)
+  expect_identical(
+    inspection_duration_projection(list(when = frame$when))$when,
+    frame$when
+  )
+})
+
+
 test_that("mixed tool payloads retain typed content and literal record-shaped data", {
   lookalike <- list(
     version = 1,
