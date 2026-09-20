@@ -569,20 +569,311 @@ test_that("snapshot refresh retains the current text batch and request boundarie
   )
 })
 
-test_that("deeply nested Content stays in native code display", {
+test_that("deeply nested Content keeps paths, data, and typed attachments", {
   skip_if_not_installed("shinychat", "0.5.0")
   request <- ellmer::ContentToolRequest(
     id = "nested",
     name = "fixture",
     arguments = list()
   )
-  value <- list(nested = list(ellmer::ContentText("<script>bad()</script>")))
-  block <- shinychat::contents_shinychat(subagent_chat_safe_content(ellmer::ContentToolResult(
-    value,
-    request = request
+  value <- list(
+    nested = list(
+      text = ellmer::ContentText("<script>bad()</script>"),
+      image = ellmer::content_image_url("https://example.com/nested.png"),
+      document = ellmer::ContentDocument(
+        "text/plain",
+        "aGVsbG8=",
+        "nested.txt"
+      ),
+      pdf = ellmer::ContentPDF("application/pdf", "aGVsbG8=", "nested.pdf")
+    ),
+    ordinary = list(label = "surrounding", count = 2L)
+  )
+  result <- ellmer::ContentToolResult(value, request = request)
+  retained <- ellmer::contents_record(result)
+  live <- shinychat::contents_shinychat(subagent_chat_safe_content(result))
+  saved_record <- inspection_record_turn(ellmer::UserTurn(list(result)))
+  saved_turn <- inspection_replay(saved_record)
+  saved <- shinychat::contents_shinychat(
+    subagent_chat_safe_content(saved_turn@contents[[1L]])
+  )
+  items <- jsonlite::fromJSON(live$value, simplifyVector = FALSE)
+  text <- paste(
+    vapply(
+      Filter(function(item) identical(item$type, "text"), items),
+      `[[`,
+      character(1),
+      "value"
+    ),
+    collapse = "\n"
+  )
+  expect_identical(live$value_type, "content_extra")
+  expect_identical(live$value, saved$value)
+  expect_identical(ellmer::contents_record(result), retained)
+  expect_match(text, "nested.text", fixed = TRUE)
+  expect_match(text, "ordinary.label", fixed = TRUE)
+  expect_match(text, "surrounding", fixed = TRUE)
+  expect_match(text, "&lt;script&gt;", fixed = TRUE)
+  expect_false(grepl("<script>", text, fixed = TRUE))
+  expect_true(any(vapply(
+    items,
+    function(item) {
+      identical(item$type, "image") &&
+        identical(item$src, "https://example.com/nested.png")
+    },
+    logical(1)
   )))
+  expect_true(any(vapply(
+    items,
+    function(item) {
+      identical(item$type, "pdf") && identical(item$filename, "nested.pdf")
+    },
+    logical(1)
+  )))
+  expect_match(text, "Document: nested.txt", fixed = TRUE)
+})
+
+test_that("record-shaped ordinary data is not restored as Content", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "ordinary",
+    name = "fixture",
+    arguments = list()
+  )
+  value <- list(
+    nested = list(
+      version = 1,
+      class = "ellmer::ContentText",
+      props = list(text = "ordinary record-shaped data")
+    )
+  )
+  result <- ellmer::ContentToolResult(value, request = request)
+  block <- shinychat::contents_shinychat(subagent_chat_safe_content(result))
   expect_identical(block$value_type, "code")
-  expect_false(grepl("<script>", block$value, fixed = TRUE))
+  expect_match(block$value, "ellmer::ContentText", fixed = TRUE)
+  expect_identical(result@value, value)
+})
+
+test_that("unsupported classed values cannot run display methods", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  method_name <- "length.application_object"
+  had_method <- exists(method_name, envir = globalenv(), inherits = FALSE)
+  old_method <- get0(method_name, envir = globalenv(), inherits = FALSE)
+  assign(
+    method_name,
+    function(value) stop("the display must not call length()"),
+    envir = globalenv()
+  )
+  on.exit(
+    if (had_method) {
+      assign(method_name, old_method, envir = globalenv())
+    } else {
+      rm(list = method_name, envir = globalenv())
+    },
+    add = TRUE
+  )
+  request <- ellmer::ContentToolRequest(
+    id = "method",
+    name = "fixture",
+    arguments = list()
+  )
+  value <- list(
+    nested = list(
+      text = ellmer::ContentText("small"),
+      ordinary = structure(1, class = "application_object")
+    )
+  )
+  block <- shinychat::contents_shinychat(
+    subagent_chat_safe_content(
+      ellmer::ContentToolResult(value, request = request)
+    )
+  )
+  expect_match(block$value, "application_object", fixed = TRUE)
+  expect_match(block$value, "omitted", fixed = TRUE)
+})
+
+test_that("classed nested data keeps live and saved displays identical", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "classed",
+    name = "fixture",
+    arguments = list()
+  )
+  duration <- as.difftime(c(1, NA), units = "hours")
+  value <- list(
+    nested = list(
+      note = ellmer::ContentText("small"),
+      duration = duration,
+      frame = data.frame(
+        label = c("first", "second"),
+        duration = duration,
+        stringsAsFactors = FALSE
+      )
+    )
+  )
+  result <- ellmer::ContentToolResult(value, request = request)
+  live <- shinychat::contents_shinychat(subagent_chat_safe_content(result))
+  saved_record <- inspection_record_turn(ellmer::UserTurn(list(result)))
+  saved_turn <- inspection_replay(saved_record)
+  saved <- shinychat::contents_shinychat(
+    subagent_chat_safe_content(saved_turn@contents[[1L]])
+  )
+  expect_identical(live$value, saved$value)
+  expect_match(live$value, "hours", fixed = TRUE)
+  expect_match(live$value, "first", fixed = TRUE)
+})
+
+test_that("nested Content display has explicit depth and size omissions", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "bounded",
+    name = "fixture",
+    arguments = list()
+  )
+  deep <- ellmer::ContentText("deep text")
+  for (index in seq_len(12L)) {
+    deep <- setNames(list(deep), paste0("level", index))
+  }
+  deep_result <- ellmer::ContentToolResult(
+    list(deep = deep),
+    request = request
+  )
+  deep_block <- shinychat::contents_shinychat(
+    subagent_chat_safe_content(deep_result)
+  )
+  expect_match(deep_block$value, "maximum depth", fixed = TRUE)
+
+  large_result <- ellmer::ContentToolResult(
+    list(large = list(text = ellmer::ContentText(strrep("x", 10000L)))),
+    request = request
+  )
+  large_block <- shinychat::contents_shinychat(
+    subagent_chat_safe_content(large_result)
+  )
+  expect_match(large_block$value, "content size limit", fixed = TRUE)
+})
+
+test_that("nested PDFs keep native metadata and later siblings", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "pdf-bound",
+    name = "fixture",
+    arguments = list()
+  )
+  result <- ellmer::ContentToolResult(
+    list(
+      nested = list(
+        pdf = ellmer::ContentPDF(
+          "application/pdf",
+          strrep("x", 20000L),
+          "nested.pdf"
+        ),
+        later = ellmer::ContentText("later sibling")
+      )
+    ),
+    request = request
+  )
+  block <- shinychat::contents_shinychat(subagent_chat_safe_content(result))
+  expect_match(block$value, '"type":"pdf"', fixed = TRUE)
+  expect_match(block$value, '"filename":"nested.pdf"', fixed = TRUE)
+  expect_match(block$value, "later sibling", fixed = TRUE)
+  expect_false(grepl(strrep("x", 20000L), block$value, fixed = TRUE))
+})
+
+test_that("long nested PDF filenames are bounded before native rendering", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "pdf-name-bound",
+    name = "fixture",
+    arguments = list()
+  )
+  long_name <- strrep("f", 20000L)
+  result <- ellmer::ContentToolResult(
+    list(
+      nested = list(
+        pdf = ellmer::ContentPDF("application/pdf", "small", long_name)
+      )
+    ),
+    request = request
+  )
+  block <- shinychat::contents_shinychat(subagent_chat_safe_content(result))
+  expect_match(block$value, "content size limit", fixed = TRUE)
+  expect_false(grepl(long_name, block$value, fixed = TRUE))
+})
+
+test_that("nested data frame support checks are bounded", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "frame-bound",
+    name = "fixture",
+    arguments = list()
+  )
+  deep_column <- 1L
+  for (index in seq_len(32L)) {
+    deep_column <- list(deep_column)
+  }
+  deep_frame <- structure(
+    list(column = deep_column),
+    class = "data.frame",
+    row.names = 1L
+  )
+  broad_frame <- structure(
+    list(column = as.list(seq_len(1000L))),
+    class = "data.frame",
+    row.names = seq_len(1000L)
+  )
+  result <- ellmer::ContentToolResult(
+    list(
+      nested = list(text = ellmer::ContentText("small")),
+      deep = deep_frame,
+      broad = broad_frame
+    ),
+    request = request
+  )
+  block <- shinychat::contents_shinychat(subagent_chat_safe_content(result))
+  expect_match(block$value, "data.frame", fixed = TRUE)
+  expect_match(block$value, "small", fixed = TRUE)
+})
+
+test_that("unsupported data frame columns cannot run display methods", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  method_name <- "length.appcol"
+  had_method <- exists(method_name, envir = globalenv(), inherits = FALSE)
+  old_method <- get0(method_name, envir = globalenv(), inherits = FALSE)
+  assign(
+    method_name,
+    function(value) stop("the display must not call column length()"),
+    envir = globalenv()
+  )
+  on.exit(
+    if (had_method) {
+      assign(method_name, old_method, envir = globalenv())
+    } else {
+      rm(list = method_name, envir = globalenv())
+    },
+    add = TRUE
+  )
+  request <- ellmer::ContentToolRequest(
+    id = "frame-method",
+    name = "fixture",
+    arguments = list()
+  )
+  frame <- structure(
+    list(a = structure(1, class = "appcol")),
+    class = "data.frame",
+    row.names = 1L
+  )
+  value <- list(
+    nested = list(text = ellmer::ContentText("small")),
+    frame = frame
+  )
+  block <- shinychat::contents_shinychat(
+    subagent_chat_safe_content(
+      ellmer::ContentToolResult(value, request = request)
+    )
+  )
+  expect_match(block$value, "data.frame", fixed = TRUE)
+  expect_match(block$value, "small", fixed = TRUE)
 })
 
 

@@ -169,6 +169,119 @@ inspection_text <- function(text, bytes = 8192L) {
   text
 }
 
+inspection_duration_omission <-
+  "[Unsupported duration payload omitted from retained history.]"
+
+inspection_data_frame_rows <- function(value) {
+  row_names <- unclass(attr(unclass(value), "row.names", exact = TRUE))
+  if (
+    length(row_names) == 2L &&
+      is.na(row_names[[1L]]) &&
+      is.numeric(row_names[[2L]]) &&
+      row_names[[2L]] < 0L
+  ) {
+    return(-row_names[[2L]])
+  }
+  length(row_names)
+}
+
+inspection_duration_shape_supported <- function(value) {
+  if (!inherits(value, "difftime") || length(class(value)) != 1L) {
+    return(FALSE)
+  }
+  units <- attr(value, "units", exact = TRUE)
+  if (
+    !is.character(units) ||
+      is.object(units) ||
+      length(units) != 1L ||
+      is.na(units)
+  ) {
+    return(FALSE)
+  }
+  if (!units %in% c("secs", "mins", "hours", "days", "weeks")) {
+    return(FALSE)
+  }
+  attributes <- attributes(value)
+  if (!all(names(attributes) %in% c("class", "units"))) {
+    return(FALSE)
+  }
+  values <- unclass(value)
+  is.numeric(values) && !is.object(values)
+}
+
+inspection_duration_supported <- function(value) {
+  if (!inspection_duration_shape_supported(value)) {
+    return(FALSE)
+  }
+  values <- unclass(value)
+  !any(is.nan(values) | is.infinite(values))
+}
+
+inspection_duration_projection <- function(value) {
+  if (inherits(value, "difftime")) {
+    if (!inspection_duration_supported(value)) {
+      return(inspection_duration_omission)
+    }
+    return(list(
+      value = as.double(unclass(value)),
+      units = attr(value, "units", exact = TRUE)
+    ))
+  }
+  if (is.data.frame(value)) {
+    columns <- unclass(value)
+    column_names <- unclass(attr(columns, "names", exact = TRUE))
+    row_names <- unclass(attr(columns, "row.names", exact = TRUE))
+    rows <- inspection_data_frame_rows(value)
+    columns <- lapply(columns, function(column) {
+      if (inherits(column, "difftime")) {
+        projected <- inspection_duration_projection(column)
+        if (identical(projected, inspection_duration_omission)) {
+          return(rep(inspection_duration_omission, rows))
+        }
+        values <- projected$value
+        units <- projected$units
+        return(lapply(seq_len(rows), function(index) {
+          list(
+            value = if (is.na(values[[index]])) NA_real_ else values[[index]],
+            units = units
+          )
+        }))
+      }
+      if (is.list(column)) {
+        raw_column <- unclass(column)
+        projected_column <- lapply(raw_column, inspection_duration_projection)
+        return(projected_column)
+      }
+      column
+    })
+    return(structure(
+      columns,
+      names = column_names,
+      row.names = row_names,
+      class = "data.frame"
+    ))
+  }
+  if (is.list(value) && (!is.object(value) || inherits(value, "AsIs"))) {
+    raw_value <- if (inherits(value, "AsIs")) unclass(value) else value
+    return(lapply(raw_value, inspection_duration_projection))
+  }
+  value
+}
+
+inspection_duration_json <- function(value) {
+  projected <- inspection_duration_projection(value)
+  if (identical(projected, inspection_duration_omission)) {
+    return(inspection_duration_omission)
+  }
+  as.character(jsonlite::toJSON(
+    projected,
+    dataframe = "rows",
+    auto_unbox = TRUE,
+    null = "null",
+    na = "null"
+  ))
+}
+
 lead_artifact_storage <- function(lead, record, reference) {
   route <- record$artifact_routing
   if (!is.null(route) && !identical(reference$source, "delegation_answer")) {
@@ -377,13 +490,17 @@ inspection_record_turn <- function(turn) {
         is.factor(content) ||
         inherits(content, c("Date", "POSIXt", "difftime"))
     ) {
-      content <- as.character(jsonlite::toJSON(
-        content,
-        dataframe = "rows",
-        auto_unbox = TRUE,
-        null = "null",
-        na = "null"
-      ))
+      if (inherits(content, "difftime") || is.data.frame(content)) {
+        content <- inspection_duration_json(content)
+      } else {
+        content <- as.character(jsonlite::toJSON(
+          content,
+          dataframe = "rows",
+          auto_unbox = TRUE,
+          null = "null",
+          na = "null"
+        ))
+      }
     } else if (is.object(content)) {
       # Unknown application classes have no portable public record contract.
       # Do not execute their format/record methods or lose sibling histories.

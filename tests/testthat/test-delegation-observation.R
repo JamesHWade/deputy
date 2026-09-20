@@ -433,6 +433,112 @@ test_that("small data frame observations retain a portable projection", {
 })
 
 
+test_that("duration observations retain units, missing values, and siblings", {
+  duration <- as.difftime(c(1, NA, 3), units = "hours")
+  direct <- observation_payload(AgentEvent("tool_end", value = duration))
+  direct_json <- jsonlite::fromJSON(direct$value)
+  expect_identical(direct_json$units, "hours")
+  expect_equal(direct_json$value, c(1, NA, 3))
+
+  nested <- observation_payload(AgentEvent(
+    "tool_end",
+    value = list(before = "keep", duration = duration)
+  ))
+  expect_identical(nested$value$before, "keep")
+  expect_equal(
+    jsonlite::fromJSON(nested$value$duration)$value,
+    c(1, NA, 3)
+  )
+
+  frame <- data.frame(id = 1:3, elapsed = duration)
+  frame_payload <- observation_payload(AgentEvent("tool_end", value = frame))
+  frame_json <- jsonlite::fromJSON(frame_payload$value)
+  expect_equal(frame_json$elapsed$value, c(1, NA, 3))
+  expect_identical(frame_json$elapsed$units, rep("hours", 3))
+
+  state <- new.env(parent = emptyenv())
+  lead <- observation_lead(state)
+  reader <- lead$observe_subagents("owner")
+  lead$parallel_delegate(c(a = "one", b = "two"))
+  runs <- lead$list_subagents()
+  lead_observe_event(
+    lead,
+    runs$delegation_id[[1L]],
+    AgentEvent("tool_end", value = duration)
+  )
+  expect_identical(runs$status, c("completed", "completed"))
+  expect_no_error(reader$poll())
+})
+
+
+test_that("duration observation bounds precede projection and reject unsupported shapes", {
+  local_mocked_bindings(inspection_duration_json = function(...) {
+    stop("must not project")
+  })
+  oversized <- as.difftime(rep(1, 10000), units = "secs")
+  expect_false(observation_payload_fits(oversized, 2048L))
+  expect_identical(
+    observation_payload(
+      AgentEvent("tool_end", value = oversized),
+      max_bytes = 2048L
+    )$content_omitted,
+    "oversized"
+  )
+})
+
+test_that("duration frame bounds account for omitted values per row", {
+  duration <- structure(
+    rep(1, 10000),
+    class = c("application_duration", "difftime"),
+    units = "secs"
+  )
+  frame <- structure(
+    list(duration = duration),
+    class = c("application_frame", "data.frame"),
+    row.names = c(NA_integer_, -10000L)
+  )
+  local_mocked_bindings(inspection_duration_json = function(...) {
+    stop("must not project")
+  })
+
+  expect_false(observation_payload_fits(frame, 200000L))
+  expect_identical(
+    observation_payload(
+      AgentEvent("tool_end", value = frame),
+      max_bytes = 200000L
+    )$content_omitted,
+    "oversized"
+  )
+})
+
+test_that("unsupported duration observations omit only their own value", {
+  unsupported <- structure(
+    c(1, NA),
+    class = c("application_duration", "difftime"),
+    units = "secs"
+  )
+  payload <- observation_payload(AgentEvent(
+    "tool_end",
+    value = list(keep = "sibling", duration = unsupported)
+  ))
+  expect_identical(payload$value$keep, "sibling")
+  expect_identical(payload$value$duration, inspection_duration_omission)
+})
+
+test_that("AsIs duration list columns remain portable observations", {
+  duration <- as.difftime(c(1, NA), units = "mins")
+  frame <- data.frame(id = 1:2)
+  frame$elapsed <- I(list(duration, duration))
+
+  payload <- observation_payload(AgentEvent("tool_end", value = frame))
+  value <- jsonlite::fromJSON(payload$value)
+
+  expect_equal(value$id, 1:2)
+  expect_equal(value$elapsed$value[[1L]], c(1, NA))
+  expect_identical(value$elapsed$units[[2L]], "mins")
+})
+
+
 test_that("JSON escaping is budgeted before classed payload materialization", {
   local_mocked_bindings(inspection_record_turn = function(...) {
     stop("must not materialize")

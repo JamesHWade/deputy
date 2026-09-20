@@ -591,6 +591,141 @@ test_that("payload record-shaped objects stay data and classed results project p
 })
 
 
+test_that("duration evidence keeps units and missing values through replay", {
+  duration <- as.difftime(c(1, NA, 3), units = "mins")
+  direct <- inspection_replay(inspection_record_turn(
+    ellmer::UserTurn(list(ellmer::ContentToolResult(duration)))
+  ))
+  direct_json <- jsonlite::fromJSON(direct@contents[[1L]]@value)
+  expect_identical(direct_json$units, "mins")
+  expect_equal(direct_json$value, c(1, NA, 3))
+
+  nested <- list(
+    label = "retained",
+    duration = duration,
+    deeper = list(duration = duration)
+  )
+  nested_replay <- inspection_replay(inspection_record_turn(
+    ellmer::UserTurn(list(ellmer::ContentToolResult(nested)))
+  ))
+  expect_identical(nested_replay@contents[[1L]]@value$label, "retained")
+  expect_equal(
+    jsonlite::fromJSON(nested_replay@contents[[1L]]@value$duration)$value,
+    c(1, NA, 3)
+  )
+  expect_identical(
+    jsonlite::fromJSON(
+      nested_replay@contents[[1L]]@value$deeper$duration
+    )$units,
+    "mins"
+  )
+
+  frame <- data.frame(
+    id = 1:3,
+    elapsed = duration,
+    label = factor(c("a", "b", "c"))
+  )
+  frame_replay <- inspection_replay(inspection_record_turn(
+    ellmer::UserTurn(list(ellmer::ContentToolResult(frame)))
+  ))
+  frame_json <- jsonlite::fromJSON(frame_replay@contents[[1L]]@value)
+  expect_equal(frame_json$elapsed$value, c(1, NA, 3))
+  expect_identical(frame_json$elapsed$units, rep("mins", 3))
+  expect_equal(frame_json$label, c("a", "b", "c"))
+})
+
+
+test_that("unsupported duration subclasses are explicitly omitted", {
+  duration <- structure(
+    c(1, NA),
+    class = c("application_duration", "difftime"),
+    units = "secs"
+  )
+  record <- inspection_record_turn(ellmer::UserTurn(list(
+    ellmer::ContentToolResult(list(
+      keep = "sibling",
+      duration = duration
+    ))
+  )))
+  value <- inspection_replay(record)@contents[[1L]]@value
+  expect_identical(value$keep, "sibling")
+  expect_identical(value$duration, inspection_duration_omission)
+})
+
+
+test_that("malformed durations are omitted without method dispatch", {
+  values <- list(
+    long_units = structure(
+      1,
+      class = "difftime",
+      units = strrep("x", 10000L)
+    ),
+    nonstandard_units = structure(
+      1,
+      class = "difftime",
+      units = "fortnights"
+    ),
+    classed_units = structure(
+      1,
+      class = "difftime",
+      units = structure("secs", class = "application_units")
+    ),
+    nonfinite = structure(
+      c(1, Inf, NA_real_),
+      class = "difftime",
+      units = "secs"
+    ),
+    named = structure(
+      c(1, NA_real_),
+      class = "difftime",
+      units = "secs",
+      names = c("first", "missing")
+    )
+  )
+  value <- inspection_replay(inspection_record_turn(
+    ellmer::UserTurn(list(ellmer::ContentToolResult(
+      list(before = "keep", values = values)
+    )))
+  ))@contents[[1L]]@value
+
+  expect_identical(value$before, "keep")
+  expect_true(all(vapply(
+    value$values,
+    identical,
+    logical(1),
+    inspection_duration_omission
+  )))
+})
+
+
+test_that("duration frame projection strips subclasses and preserves list columns", {
+  duration <- as.difftime(c(1, NA), units = "mins")
+  dim.application_frame <- function(...) {
+    stop("data frame subclass dispatch")
+  }
+  frame <- structure(
+    list(
+      id = 1:2,
+      elapsed = duration,
+      nested = structure(
+        list(duration, duration),
+        class = c("application_list", "AsIs")
+      )
+    ),
+    class = c("application_frame", "data.frame"),
+    row.names = c(NA_integer_, -2L)
+  )
+  value <- jsonlite::fromJSON(
+    inspection_duration_json(frame)
+  )
+
+  expect_equal(value$id, 1:2)
+  expect_equal(value$elapsed$value, c(1, NA))
+  expect_identical(value$elapsed$units, rep("mins", 2))
+  expect_equal(value$nested$value[[1L]], c(1, NA))
+})
+
+
 test_that("mixed tool payloads retain typed content and literal record-shaped data", {
   lookalike <- list(
     version = 1,

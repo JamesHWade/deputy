@@ -220,6 +220,9 @@ observation_payload <- function(event, max_bytes = 65536) {
         is.factor(value) ||
         inherits(value, c("Date", "POSIXt", "difftime"))
     ) {
+      if (inherits(value, "difftime") || is.data.frame(value)) {
+        return(inspection_duration_json(value))
+      }
       return(as.character(jsonlite::toJSON(
         value,
         dataframe = "rows",
@@ -231,8 +234,9 @@ observation_payload <- function(event, max_bytes = 65536) {
     if (inherits(value, "ellmer_dollars")) {
       return(as.numeric(value))
     }
-    if (is.list(value) && !is.object(value)) {
-      return(lapply(value, public))
+    if (is.list(value) && (!is.object(value) || inherits(value, "AsIs"))) {
+      raw_value <- if (inherits(value, "AsIs")) unclass(value) else value
+      return(lapply(raw_value, public))
     }
     value
   }
@@ -455,6 +459,39 @@ observation_payload_fits <- function(value, max_bytes) {
     if (inherits(value, "condition")) {
       return(visit(inspection_text(conditionMessage(value), 1024L), depth + 1L))
     }
+    if (inherits(value, "difftime")) {
+      values <- unclass(value)
+      value_count <- length(values)
+      repeats <- if (json) max(1L, value_count) else 1L
+      if (!inspection_duration_shape_supported(value)) {
+        remaining <<- remaining -
+          nchar(inspection_duration_omission, type = "bytes") *
+            6 *
+            repeats
+        return(remaining >= 0)
+      }
+      units <- attr(value, "units", exact = TRUE)
+      # Duration values are projected as one numeric vector plus one units
+      # field. Data-frame rows repeat the units field, so charge the escaped
+      # units text once per value while still avoiding its materialization.
+      unit_bytes <- nchar(units, type = "bytes") * 6 + 16
+      value_bytes <- max(1L, value_count) * 32
+      if (json) {
+        unit_bytes <- unit_bytes * max(1L, value_count)
+      }
+      if (remaining - 128 - unit_bytes - value_bytes < 0) {
+        return(FALSE)
+      }
+      if (!inspection_duration_supported(value)) {
+        remaining <<- remaining -
+          nchar(inspection_duration_omission, type = "bytes") *
+            6 *
+            repeats
+        return(remaining >= 0)
+      }
+      remaining <<- remaining - 128 - unit_bytes - value_bytes
+      return(remaining >= 0)
+    }
     if (inherits(value, "S7_object")) {
       fields <- setdiff(S7::prop_names(value), c("tool", "extra", "json"))
       if (inherits(value, "ellmer::Turn")) {
@@ -481,14 +518,17 @@ observation_payload_fits <- function(value, max_bytes) {
     }
     if (is.data.frame(value)) {
       remaining <<- remaining -
-        nrow(value) * sum(6 * nchar(names(value), type = "bytes") + 8)
+        inspection_data_frame_rows(value) *
+          sum(6 * nchar(names(unclass(value)), type = "bytes") + 8)
       if (remaining < 0) return(FALSE)
     }
-    if (is.list(value) && (!is.object(value) || is.data.frame(value))) {
-      if (length(value) * 64 > remaining) {
+    list_container <- is.data.frame(value) || inherits(value, "AsIs")
+    list_value <- if (list_container) unclass(value) else value
+    if (is.list(list_value) && (!is.object(list_value) || list_container)) {
+      if (length(list_value) * 64 > remaining) {
         return(FALSE)
       }
-      for (item in value) {
+      for (item in list_value) {
         if (!visit(item, depth + 1L, json = json)) return(FALSE)
       }
       return(TRUE)
