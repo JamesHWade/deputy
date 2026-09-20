@@ -36,7 +36,11 @@ not include GitHub runner queue or setup time.
   every test file and the standalone examples. There is no custom test runner,
   matrix sharding, changed-file filtering, or tests-free package-check result.
 - Testthat runs files in its supported native worker pool. The package declares
-  `Config/testthat/parallel: true`; CI configures four workers.
+  `Config/testthat/parallel: true`; CI configures four workers. The standard
+  `Config/testthat/start-first` setting starts the measured slow files first.
+  The exploratory run measured history recovery at 210s, compaction evidence
+  at 119s, trusted mini agents at 101s, recursive delegation at 94s, and
+  compaction runs at 84s. Starting these early reduces idle workers at the end.
 - Pushes to main/master and manual dispatch also run full Windows/macOS package
   checks, both executable installation modes, and full instrumented coverage.
 - New PR commits cancel obsolete validation runs. Main validations remain

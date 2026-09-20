@@ -820,7 +820,8 @@ GitHub Actions workflows in `.github/workflows/`:
 - `claude.yml` / `claude-code-review.yml` - Claude integration
 
 Tests use testthat's standard file parallelism (`Config/testthat/parallel: true`)
-inside ordinary R CMD check, with four workers per CI job. Set setup-r's
+inside ordinary R CMD check, with four workers per CI job. The standard
+`Config/testthat/start-first` field schedules measured slow files first. Set setup-r's
 `Ncpus: 4` input as well as `TESTTHAT_CPUS=4`: the R option takes priority over
 the environment variable, and setup-r otherwise defaults it to one. There is no
 custom test runner, sharding, or changed-file filtering. Every package check
