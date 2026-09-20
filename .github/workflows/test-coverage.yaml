@@ -3,7 +3,7 @@
 on:
   push:
     branches: [main, master]
-  pull_request:
+  workflow_dispatch:
 
 name: test-coverage.yaml
 
@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      TESTTHAT_CPUS: 4
+      NOT_CRAN: true
 
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +23,7 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           use-public-rspm: true
+          Ncpus: 4
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:

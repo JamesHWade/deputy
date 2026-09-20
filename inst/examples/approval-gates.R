@@ -17,7 +17,7 @@ approval_gate <- function(
         "Approve ",
         tool_name,
         " with these arguments?\n",
-        paste(capture.output(dput(tool_input)), collapse = "\n")
+        paste(utils::capture.output(dput(tool_input)), collapse = "\n")
       )
       response <- ask(list(list(
         question = question,

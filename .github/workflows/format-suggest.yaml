@@ -4,6 +4,11 @@ on:
 
 name: format-suggest.yaml
 
+# Stop obsolete branch runs; preserve every main-branch validation.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 

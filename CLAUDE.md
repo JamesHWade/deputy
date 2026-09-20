@@ -812,11 +812,26 @@ git worktree prune
 ## CI/CD
 
 GitHub Actions workflows in `.github/workflows/`:
-- `R-CMD-check.yaml` - Package check on multiple platforms
-- `test-coverage.yaml` - Code coverage to codecov
+- `R-CMD-check.yaml` - Complete Linux package check on PRs; after merge (or manual
+  dispatch), also Windows/macOS package checks and executable installation checks
+- `test-coverage.yaml` - Full-suite coverage to codecov after merge or manual dispatch
 - `pkgdown.yaml` - Documentation site
 - `format-suggest.yaml` - Code formatting suggestions
 - `claude.yml` / `claude-code-review.yml` - Claude integration
+
+Tests use testthat's standard file parallelism (`Config/testthat/parallel: true`)
+inside ordinary R CMD check, with four workers per CI job. The standard
+`Config/testthat/start-first` field schedules measured slow files first. Set setup-r's
+`Ncpus: 4` input as well as `TESTTHAT_CPUS=4`: the R option takes priority over
+the environment variable, and setup-r otherwise defaults it to one. There is no
+custom test runner, sharding, or changed-file filtering. Every package check
+runs the complete installed-package suite, including standalone examples.
+
+Coverage remains full-suite, including process tests; it runs after merge so
+instrumentation does not delay PR feedback. A newer commit cancels obsolete PR
+validation runs; main-branch validations are retained. For local debugging, set
+`TESTTHAT_PARALLEL=false` to run tests sequentially. See `dev/ci-performance.md`
+for measured timings and the remaining gap to the two-minute target.
 
 The automatic Claude review workflow runs only for PR branches in this
 repository. Fork PRs receive an explicit skip explanation in the workflow
