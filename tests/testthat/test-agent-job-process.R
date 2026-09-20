@@ -62,6 +62,19 @@ job_process_test_load <- (function() {
   loader
 })()
 
+job_process_test_wait_until <- function(predicate, label, timeout = 60) {
+  deadline <- Sys.time() + timeout
+  repeat {
+    if (isTRUE(predicate())) {
+      return(invisible(TRUE))
+    }
+    if (Sys.time() >= deadline) {
+      cli::cli_abort("Timed out waiting for {label}.")
+    }
+    Sys.sleep(0.02)
+  }
+}
+
 job_process_test_record_field <- function(record, name) {
   value <- tryCatch(
     S7::prop(record, name),
@@ -367,7 +380,12 @@ test_that("a killed worker leaves an indeterminate effect without retry", {
     libpath = .libPaths()
   )
   withr::defer(worker$kill())
-  worker$wait(timeout = 10000)
+  job_process_test_wait_until(
+    function() file.exists(marker) || !worker$is_alive(),
+    "the crash worker effect receipt"
+  )
+  expect_true(file.exists(marker))
+  worker$wait(timeout = 60000)
   expect_false(worker$is_alive())
   if (!identical(worker$get_exit_status(), -9L)) {
     worker$get_result()
@@ -753,12 +771,33 @@ test_that("queued cancellation completes without provider IO during recovery", {
 test_that("host cancellation uses the independent control store while a worker is active", {
   job_process_test_requirements()
   skip_on_os("windows")
-  delayed <- runtime_reply("late provider result")
-  attr(delayed, "fixture_delay") <- 5
-  server <- local_runtime_server(list(delayed))
   directory <- withr::local_tempdir(
     pattern = "deputy-job-process-active-cancel-"
   )
+  provider_release <- file.path(directory, "provider-release")
+  response_environment <- new.env(parent = baseenv())
+  list2env(
+    list(
+      provider_release = provider_release,
+      provider_response = runtime_reply("late provider result")
+    ),
+    envir = response_environment
+  )
+  gated_response <- function(request, count) {
+    promises::promise(function(resolve, reject) {
+      wait_for_release <- function() {
+        if (base::file.exists(provider_release)) {
+          resolve(provider_response)
+        } else {
+          later::later(wait_for_release, 0.02)
+        }
+      }
+      wait_for_release()
+    })
+  }
+  environment(gated_response) <- response_environment
+  server <- local_runtime_server(gated_response)
+  withr::defer(file.create(provider_release))
   cleanup_marker <- file.path(directory, "cleanup.txt")
   package_path <- job_process_test_package()
 
@@ -840,20 +879,23 @@ test_that("host cancellation uses the independent control store while a worker i
   )
   withr::defer(worker$kill())
 
-  deadline <- Sys.time() + 10
-  while (
-    length(server$requests()) < 1L &&
-      worker$is_alive() &&
-      Sys.time() < deadline
-  ) {
-    Sys.sleep(0.02)
-  }
-  expect_length(server$requests(), 1L)
-
-  started <- Sys.time()
-  requested <- callr::r(
-    function(package_path, path, load_package) {
+  cancel_ready <- file.path(directory, "cancel-ready")
+  cancel_go <- file.path(directory, "cancel-go")
+  cancel_result <- file.path(directory, "cancel-result.rds")
+  controller <- callr::r_bg(
+    function(
+      package_path,
+      path,
+      ready,
+      go,
+      result_path,
+      load_package
+    ) {
       load_package(package_path)
+      file.create(ready)
+      while (!file.exists(go)) {
+        Sys.sleep(0.02)
+      }
       authorize <- function(job) {
         list(
           job_id = job$id,
@@ -862,24 +904,62 @@ test_that("host cancellation uses the independent control store while a worker i
           context_revision = job$context_revision
         )
       }
-      deputy::job_cancel(
+      value <- deputy::job_cancel(
         path,
         authorize = authorize,
         reason = "user_cancelled"
       )
+      result_temp <- paste0(result_path, ".tmp")
+      saveRDS(
+        value,
+        result_temp
+      )
+      file.rename(result_temp, result_path)
     },
     args = list(
       package_path = package_path,
+      load_package = job_process_test_load,
       path = path,
-      load_package = job_process_test_load
+      ready = cancel_ready,
+      go = cancel_go,
+      result_path = cancel_result
     ),
     libpath = .libPaths()
   )
-  elapsed <- as.numeric(difftime(Sys.time(), started, units = "secs"))
-  expect_lt(elapsed, 4)
-  expect_true(requested$status %in% c("running", "cancelled", "indeterminate"))
+  withr::defer(controller$kill())
+  job_process_test_wait_until(
+    function() file.exists(cancel_ready) || !controller$is_alive(),
+    "the preloaded cancellation controller"
+  )
+  expect_true(file.exists(cancel_ready))
 
-  worker$wait(timeout = 15000)
+  job_process_test_wait_until(
+    function() length(server$requests()) >= 1L || !worker$is_alive(),
+    "the provider request before cancellation"
+  )
+  expect_length(server$requests(), 1L)
+
+  file.create(cancel_go)
+  job_process_test_wait_until(
+    function() file.exists(cancel_result) || !controller$is_alive(),
+    "the persisted cancellation result"
+  )
+  expect_true(file.exists(cancel_result))
+  requested <- readRDS(cancel_result)
+  controller$wait(timeout = 60000)
+  expect_false(controller$is_alive())
+  if (!identical(controller$get_exit_status(), 0L)) {
+    controller$get_result()
+  }
+  expect_true(requested$status %in% c("running", "cancelled", "indeterminate"))
+  expect_false(file.exists(provider_release))
+
+  file.create(provider_release)
+  job_process_test_wait_until(
+    function() !worker$is_alive(),
+    "the active cancellation worker to settle"
+  )
+  worker$wait(timeout = 60000)
   expect_false(worker$is_alive())
   if (!identical(worker$get_exit_status(), 0L)) {
     worker$get_result()
