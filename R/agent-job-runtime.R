@@ -151,8 +151,19 @@ job_graph_snapshot <- function(agent) {
   )
 }
 
-job_agent_manifest <- function(agent) {
+job_agent_manifest <- function(agent, pending_path = NULL) {
   nodes <- job_agents(agent)
+  for (name in names(nodes)) {
+    pending <- nodes[[name]]$.__enclos_env__$private$.pending_approval_path
+    if (
+      !is.null(pending) &&
+        !(identical(name, "root") && identical(pending, pending_path))
+    ) {
+      job_runtime_abort(
+        "Resolve or deny the Agent's pending approval before admitting another job."
+      )
+    }
+  }
   ids <- vapply(nodes, function(node) node$agent_id, character(1))
   sessions <- vapply(nodes, function(node) node$session_id(), character(1))
   if (anyDuplicated(ids) || anyDuplicated(sessions)) {
@@ -192,7 +203,12 @@ job_agent_manifest <- function(agent) {
 }
 
 job_bind_agent <- function(agent, record) {
-  current <- job_agent_manifest(agent)
+  pending_path <- if (identical(record$status, "approval_pending")) {
+    job_pending_path(record$pending_approval)
+  } else {
+    NULL
+  }
+  current <- job_agent_manifest(agent, pending_path = pending_path)
   saved <- record$manifest
   if (!identical(current$runtime, saved$runtime)) {
     job_runtime_abort(

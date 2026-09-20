@@ -801,6 +801,67 @@ test_that("job_create commits a bounded queued inspection", {
   expect_error(job$status <- "completed")
 })
 
+test_that("job_create rejects an Agent with an outstanding approval", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "effect", arguments = list(value = "b")),
+    runtime_reply(text = "finished")
+  ))
+  directory <- withr::local_tempdir(pattern = "deputy-job-pending-admission-")
+  approvals <- file.path(directory, "approvals")
+  jobs <- file.path(directory, "jobs")
+  dir.create(approvals)
+  effects <- new.env(parent = emptyenv())
+  effects$values <- character()
+  agent <- Agent$new(
+    chat = runtime_chat(server),
+    tools = list(ellmer::tool(
+      function(value) {
+        effects$values <- c(effects$values, value)
+        value
+      },
+      name = "effect",
+      description = "Record an observable effect",
+      arguments = list(value = ellmer::type_string()),
+      convert = FALSE
+    )),
+    permissions = Permissions(can_use_tool = function(...) {
+      PermissionResultPending("Review this operation")
+    }),
+    approval_dir = approvals,
+    working_dir = directory,
+    agent_id = "pending-admission-agent",
+    session_id = "pending-admission-session"
+  )
+
+  first <- agent$run_sync("Perform the operation")
+  pending_path <- agent$pending_approval()$source$path
+  expect_identical(first$stop_reason, "approval_pending")
+  expect_identical(approval_read(pending_path)$status, "pending")
+
+  error <- tryCatch(
+    job_create(
+      directory = jobs,
+      agent = agent,
+      task = "resume the operation",
+      owner_id = "owner-1",
+      definition_revision = "definition-1",
+      context_revision = "context-1",
+      usage_limits = UsageLimits(max_requests = 2L)
+    ),
+    error = identity
+  )
+  expect_s3_class(error, "deputy_job_invalid")
+  expect_true(dir.exists(jobs))
+  expect_length(list.dirs(jobs, recursive = FALSE), 0L)
+  expect_identical(approval_read(pending_path)$status, "pending")
+
+  denied <- agent$resume_approval(pending_path, "deny")
+  expect_identical(trimws(denied$response), "finished")
+  expect_identical(approval_read(pending_path)$status, "completed")
+  expect_false(approval_read(pending_path)$effects$call_fixture$executed)
+  expect_identical(effects$values, character())
+})
+
 test_that("terminal dispatch is durable and never binds twice", {
   directory <- withr::local_tempdir(pattern = "deputy-job-dispatch-")
   agent <- job_test_agent()
