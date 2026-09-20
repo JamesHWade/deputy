@@ -513,7 +513,19 @@ observation_payload_fits <- function(value, max_bytes) {
     if (inherits(value, c("Date", "POSIXt"))) {
       # Timestamp JSON needs quotes, separators, date/time, fractional seconds
       # and zone text. Charge a conservative rendered allowance before format().
-      remaining <<- remaining - 64 * length(value)
+      raw <- unclass(value)
+      count <- length(raw)
+      if (inherits(value, "POSIXlt")) {
+        # POSIXlt is a list of component vectors, not a vector of timestamps.
+        if (count * 64 > remaining) {
+          return(FALSE)
+        }
+        count <- 0L
+        for (component in raw) {
+          count <- max(count, length(unclass(component)))
+        }
+      }
+      remaining <<- remaining - 64 * count
       return(remaining >= 0)
     }
     if (is.data.frame(value)) {
@@ -534,7 +546,7 @@ observation_payload_fits <- function(value, max_bytes) {
       return(TRUE)
     }
     if (is.character(value)) {
-      if (length(value) * 16 > remaining) {
+      if (length(unclass(value)) * 16 > remaining) {
         return(FALSE)
       }
       for (item in value) {
@@ -550,10 +562,10 @@ observation_payload_fits <- function(value, max_bytes) {
       return(TRUE)
     }
     if (is.factor(value)) {
-      if (length(value) * 16 > remaining) {
+      if (length(unclass(value)) * 16 > remaining) {
         return(FALSE)
       }
-      labels <- levels(value)
+      labels <- attr(value, "levels", exact = TRUE)
       for (code in unclass(value)) {
         label <- if (is.na(code)) NA_character_ else labels[[code]]
         if (!visit(label, depth + 1L, json = TRUE)) return(FALSE)
@@ -561,7 +573,8 @@ observation_payload_fits <- function(value, max_bytes) {
       return(TRUE)
     }
     if (is.atomic(value)) {
-      remaining <<- remaining - length(value) * if (is.raw(value)) 1 else 16
+      remaining <<- remaining -
+        length(unclass(value)) * if (is.raw(value)) 1 else 16
       return(remaining >= 0)
     }
     FALSE

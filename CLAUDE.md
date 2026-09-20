@@ -32,6 +32,7 @@ deputy/
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
 │   ├── delegation-input.R # Immutable briefs and scoped source preparation
 │   ├── delegation-manifest.R # Initial receipts and context inspection
+│   ├── context-fork.R       # Authorized host-selected native history snapshots
 │   ├── delegation-binding.R # Host governance and child resource ownership
 │   ├── delegation-inspection.R # Compact outcomes, authorized history and replay
 │   ├── delegation-lifecycle.R # Shared live records and child settlement

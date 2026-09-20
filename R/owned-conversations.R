@@ -101,7 +101,17 @@ validate_conversation_candidate <- function(owner, agent) {
   invisible(NULL)
 }
 
-retain_conversation <- function(owner, agent, usage_limits, max_runs) {
+retain_conversation <- function(
+  owner,
+  agent,
+  usage_limits,
+  max_runs,
+  initial_turns = NULL,
+  fork = NULL,
+  authorize = NULL,
+  authorization = NULL,
+  manifest = NULL
+) {
   validate_conversation_candidate(owner, agent)
   op <- owner$.__enclos_env__$private
   cp <- agent$.__enclos_env__$private
@@ -120,6 +130,17 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
     normalize_usage_limits(usage_limits),
     agent$usage_limits
   )
+  previous_turns <- cp$.chat$get_turns()
+  committed <- FALSE
+  on.exit(
+    if (!committed && !is.null(initial_turns)) {
+      try(cp$.chat$set_turns(previous_turns), silent = TRUE)
+    },
+    add = TRUE
+  )
+  if (!is.null(initial_turns)) {
+    cp$.chat$set_turns(initial_turns)
+  }
   # A Chat may already be wrapped by another Agent. Retention transfers
   # execution authority to this Agent, so remove the other wrapper's callback
   # stacks and re-adapt the shared tools before recording the retained setup.
@@ -134,6 +155,10 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
   entry$ids <- character()
   entry$busy <- FALSE
   entry$configuration <- conversation_configuration(agent)
+  entry$fork <- fork
+  entry$authorize <- authorize
+  entry$authorization <- authorization
+  entry$manifest <- manifest
   handle <- new_deputy_id("conversation_")
   if (is.environment(cp$.chat)) {
     attr(cp$.chat, "deputy_conversation_owner") <- entry$token
@@ -141,6 +166,7 @@ retain_conversation <- function(owner, agent, usage_limits, max_runs) {
   cp$.conversation_owner <- entry$token
   cp$.hooks$.__enclos_env__$private$configuration_locked <- TRUE
   op$owned_conversations[[handle]] <- entry
+  committed <- TRUE
   handle
 }
 
@@ -188,6 +214,10 @@ continue_conversation <- function(
   if (!identical(caller, owner)) {
     check_graph_caller(tree, caller)
   }
+  # Recheck host source authority before any retained-run state is admitted.
+  # This must precede busy/run-slot checks and lifecycle admission so a denied
+  # or stale source cannot consume a run slot or leave a sticky reservation.
+  context_fork_reauthorize(entry)
   if (entry$busy || isTRUE(cp$run_active)) {
     conversation_abort("The conversation is busy.")
   }
@@ -361,7 +391,7 @@ continue_conversation <- function(
     op$should_stop <- FALSE
   }
   cp$.delegation_observe <- function(event) lead_observe_event(owner, id, event)
-  lead_bind_delegation(owner, id, child)
+  lead_bind_delegation(owner, id, child, entry$manifest)
   # Track work on the shared Chat too: another Agent wrapper must not adopt
   # this owner while its admitted child continuations are still outstanding.
   owner_chat <- op$.chat

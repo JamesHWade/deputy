@@ -525,6 +525,12 @@ inspection_record_turn <- function(turn) {
 # Mark genuinely typed tool values before serializing; application objects can
 # legitimately have the same field names as an ellmer record.
 inspection_record_content <- function(content) {
+  # Tool arguments are JSON data, never nested native content. Validate them
+  # before recording can turn an S7 object into an ordinary data record.
+  if (inherits(content, "ellmer::ContentToolRequest")) {
+    approval_portable(content@arguments)
+    approval_json_inputs(content@arguments)
+  }
   record <- ellmer::contents_record(content)
   for (field in names(record$props)) {
     value <- S7::prop(content, field)

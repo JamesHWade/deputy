@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* `ContextFork()` and `fork_agent()` initialize independent retained specialists
+  from authorized host-selected native ellmer turns. Fork manifests record source
+  identity, revision and bounds; continuations recheck source access and apply
+  current parent and child governance (#62).
+
 * Child inspection and observation preserve duration values, units and missing
   values, including data-frame columns. Child chat panels display nested native
   content through shinychat with bounded path labels and explicit omissions,

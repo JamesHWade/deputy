@@ -29,10 +29,8 @@ This fixes native persistence, not the separate headless API request below.
 
 ## What already works
 
-At shinychat development commit
-[`eb024589`](https://github.com/posit-dev/shinychat/tree/eb024589465f5227405d567854b96cc87e5bb9ac/pkg-r),
-`ConversationStore` and `FileConversationStore` are exported for framework-managed
-history. The private partition constructor is intentional: custom store subclasses
+In released shinychat R 0.5.0 (2026-09-13), `ConversationStore` and
+`FileConversationStore` are exported for framework-managed history. The private partition constructor is intentional: custom store subclasses
 receive framework-created partitions. That supported use case is valid.
 The record's `values` field already holds application state from `on_save()`.
 The managed conversation identity work in [#307](https://github.com/posit-dev/shinychat/issues/307)
@@ -83,11 +81,11 @@ or spend an approval. The host resolves those from its current execution state.
 
 ## Discussion and release gate
 
-Checked existing headless/history/branch issues on 2026-09-05; discussions are
-disabled. [#375](https://github.com/posit-dev/shinychat/issues/375) concerns attaching
-context to managed submissions, which is useful but does not provide this worker
-history boundary. The R development version is `0.4.0.9000`; the `r/v0.4.0` release
-does not contain the store API. Python release tags do not change the R gate.
+Rechecked the released R 0.5.0 exports and upstream issue on 2026-09-20.
+The stores are now released; the partition constructor and branch operations
+remain private. [#375](https://github.com/posit-dev/shinychat/issues/375) concerns
+attaching context to managed submissions, which does not supply this headless
+branch-editing contract. Python release tags do not change the R boundary.
 
 Await feedback on the existing upstream proposal and record the outcome in
 Deputy #66. If accepted, link the supported R release when implementing the
@@ -95,4 +93,5 @@ adapter. Work on #62 and the hosted part of #43 should use the host-owned bounda
 in ADR-0003 and assess their own requirements independently. Do not copy the
 shinychat store or use private APIs while the discussion is pending.
 
-Upstream proposal: [posit-dev/shinychat#391](https://github.com/posit-dev/shinychat/issues/391), opened 2026-09-05. The design outcome and public R release remain pending; Deputy #66 stays open.
+Upstream proposal: [posit-dev/shinychat#391](https://github.com/posit-dev/shinychat/issues/391), opened 2026-09-05. The requested headless design outcome remains pending; Deputy #66 stays open.
+The ordinary Shiny history/store API is already released.

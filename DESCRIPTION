@@ -91,6 +91,7 @@ Collate:
     'cli.R'
     'compaction-run.R'
     'context-estimation.R'
+    'context-fork.R'
     'context-policy.R'
     'delegation-graph.R'
     'delegation-lifecycle.R'
