@@ -14,6 +14,7 @@ formats remain unchanged by the moves.
 | Immutable briefs and bounded scoped evidence preparation | `R/delegation-input.R` |
 | Host governance forwarding, resource leases and owned cleanup | `R/delegation-binding.R` |
 | Initial context receipts and independent context views | `R/delegation-manifest.R` |
+| Authorized host-selected native history forks | `R/context-fork.R` |
 | Admitted delegation records, lifecycle hooks and child settlement | `R/delegation-lifecycle.R` |
 | Atomic host-curated graph setup and release | `R/delegation-graph.R` |
 | Graph lifetime budgets and structural admission | `R/delegation-tree-budget.R` |
@@ -25,6 +26,8 @@ formats remain unchanged by the moves.
 | Durable approval suspension and governed resume | `R/agent-approval.R` |
 | Portable approval control records and S7 inspection | `R/approval-record.R` |
 | Locked immutable approval storage revisions | `R/approval-store.R` |
+| Durable host-scheduled job records and recovery transitions | `R/agent-job.R` |
+| Job manifests, graph snapshots and governed runtime checkpoints | `R/agent-job-runtime.R` |
 | Session payload construction and restoration | `R/agent-session.R` |
 | Context estimation and compaction | `R/agent-context.R` |
 | Governed asynchronous compaction requests and recovery | `R/compaction-run.R` |
