@@ -812,31 +812,25 @@ git worktree prune
 ## CI/CD
 
 GitHub Actions workflows in `.github/workflows/`:
-- `R-CMD-check.yaml` - Linux package check plus eight complete-suite test shards on
-  PRs; after merge (or manual dispatch), also Windows/macOS package checks and
-  executable installation checks
+- `R-CMD-check.yaml` - Complete Linux package check on PRs; after merge (or manual
+  dispatch), also Windows/macOS package checks and executable installation checks
 - `test-coverage.yaml` - Full-suite coverage to codecov after merge or manual dispatch
 - `pkgdown.yaml` - Documentation site
 - `format-suggest.yaml` - Code formatting suggestions
 - `claude.yml` / `claude-code-review.yml` - Claude integration
 
-Tests use testthat's native file parallelism (`Config/testthat/parallel: true`),
-with four workers per CI job. Set both setup-r's `Ncpus: 4` input and
-`TESTTHAT_CPUS=4`: the R option takes priority over the environment variable,
-and setup-r otherwise defaults it to one. The shard runner checks for mismatches.
-Linux splits all discovered test files across eight
-shards; new test files join automatically. `R CMD check` skips its duplicate test
-phase only on Linux, where every shard must pass. The existing `ubuntu-latest (release)` status
-aggregates both the Linux package check and every shard. Windows and macOS run the
-full installed-package suite. The standalone examples belong to that suite and
-are not rerun in a separate precheck. Coverage remains full-suite, including
-process tests; it runs after merge so instrumentation does not delay PR feedback.
+Tests use testthat's standard file parallelism (`Config/testthat/parallel: true`)
+inside ordinary R CMD check, with four workers per CI job. Set setup-r's
+`Ncpus: 4` input as well as `TESTTHAT_CPUS=4`: the R option takes priority over
+the environment variable, and setup-r otherwise defaults it to one. There is no
+custom test runner, sharding, or changed-file filtering. Every package check
+runs the complete installed-package suite, including standalone examples.
 
-Run a shard locally with `Rscript .github/scripts/run-tests.R 1 8`. Set
-`TESTTHAT_CPUS=4` to match CI, or `TESTTHAT_PARALLEL=false` to debug sequentially.
-Shard results and timing CSVs are uploaded as Actions artifacts. A newer commit
-cancels obsolete PR validation runs; main-branch validations are retained. See
-`dev/ci-performance.md` for the measured baseline, tradeoffs, and remaining target.
+Coverage remains full-suite, including process tests; it runs after merge so
+instrumentation does not delay PR feedback. A newer commit cancels obsolete PR
+validation runs; main-branch validations are retained. For local debugging, set
+`TESTTHAT_PARALLEL=false` to run tests sequentially. See `dev/ci-performance.md`
+for measured timings and the remaining gap to the two-minute target.
 
 The automatic Claude review workflow runs only for PR branches in this
 repository. Fork PRs receive an explicit skip explanation in the workflow
