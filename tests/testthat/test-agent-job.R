@@ -78,6 +78,40 @@ test_that("large approval evidence retains its bounded resume path", {
   expect_identical(record$path, pending_path)
   expect_true("omitted" %in% names(record))
   expect_lte(length(serialize(record, NULL, version = 3)), 1024^2)
+
+  medium <- ApprovalContinuation(
+    id = "approval-2",
+    status = "pending",
+    request = list(
+      tool_call_id = "call-2",
+      name = "write",
+      tool_input = list(value = "y"),
+      reason = "review",
+      kind = "tool"
+    ),
+    source = list(
+      path = pending_path,
+      prior_evidence = strrep("m", 64L * 1024L)
+    )
+  )
+  first_record <- job_pending_record(medium)
+  repeated_record <- job_pending_record(first_record)
+  expect_identical(repeated_record$path, pending_path)
+  expect_identical(
+    nchar(repeated_record$source$prior_evidence, type = "bytes"),
+    64L * 1024L
+  )
+
+  oversized_list <- list(
+    source = list(
+      path = pending_path,
+      prior_evidence = strrep("z", 1024^2 + 1024L)
+    )
+  )
+  oversized_record <- job_pending_record(oversized_list)
+  expect_identical(oversized_record$path, pending_path)
+  expect_true("omitted" %in% names(oversized_record))
+  expect_lte(length(serialize(oversized_record, NULL, version = 3)), 1024^2)
 })
 
 test_that("event journals evict oldest entries within the store budget", {
@@ -213,6 +247,130 @@ test_that("non-event size overflow is propagated without changing revision", {
   expect_identical(error$reason, "size_limit")
   expect_identical(job_record_read(path)$envelope$revision, 1)
   expect_length(job_record_read(path)$record$events, 0L)
+})
+
+test_that("runtime snapshots use the configured store capacity", {
+  payloads <- lapply(seq_len(5L), function(index) {
+    strrep(intToUtf8(64L + index), 900L * 1024L)
+  })
+  make_snapshot <- function(agent) {
+    list(
+      effects = lapply(seq_along(payloads), function(index) {
+        list(
+          agent_id = agent$agent_id,
+          run_id = sprintf("run-%d", index),
+          tool_call_id = sprintf("call-%d", index),
+          request = list(name = "write", arguments = list(index = index)),
+          signature = sprintf("signature-%d", index),
+          executed = TRUE,
+          status = "completed",
+          result = list(payload = payloads[[index]])
+        )
+      })
+    )
+  }
+  make_worker <- function(path) {
+    record <- job_record_read(path)$record
+    record <- job_transition(record, "running", "worker started")
+    lock <- approval_store_lock(path)
+    record <- tryCatch(
+      job_record_write(path, record, lock),
+      finally = approval_store_unlock(lock)
+    )
+    lock <- approval_store_lock(path)
+    worker <- new.env(parent = emptyenv())
+    worker$path <- path
+    worker$lock <- lock
+    worker$record <- record
+    worker$finished <- FALSE
+    worker$terminal <- NULL
+    worker$detach <- NULL
+    worker$cleanup <- NULL
+    worker$cleanup_called <- FALSE
+    worker
+  }
+  directory <- withr::local_tempdir(pattern = "deputy-job-snapshot-budget-")
+  large_agent <- job_test_agent()
+  large_path <- job_create(
+    directory,
+    large_agent,
+    "large snapshot",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L),
+    max_bytes = 50 * 1024^2
+  )
+  local_mocked_bindings(
+    job_runtime_snapshot = function(agent, event = NULL) {
+      make_snapshot(agent)
+    },
+    .package = "deputy"
+  )
+  large_worker <- make_worker(large_path)
+  on.exit(
+    if (!is.null(large_worker$lock)) {
+      approval_store_unlock(large_worker$lock)
+    },
+    add = TRUE
+  )
+  job_worker_checkpoint(
+    large_worker,
+    large_agent,
+    list(type = "large-effects")
+  )
+  checkpointed <- job_read(large_path)
+  expect_identical(
+    lapply(checkpointed$runtime$effects, function(effect) {
+      effect$result$payload
+    }),
+    payloads
+  )
+
+  job_worker_finish(
+    large_worker,
+    "completed",
+    result = AgentResult(response = "settled")
+  )
+  settled <- job_read(large_path)
+  expect_identical(settled$status, "completed")
+  expect_identical(settled$result$response, "settled")
+  expect_identical(
+    lapply(settled$runtime$effects, function(effect) effect$result$payload),
+    payloads
+  )
+
+  small_agent <- job_test_agent()
+  small_path <- job_create(
+    directory,
+    small_agent,
+    "small snapshot",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L),
+    max_bytes = 8 * 1024^2
+  )
+  small_worker <- make_worker(small_path)
+  on.exit(
+    if (!is.null(small_worker$lock)) {
+      approval_store_unlock(small_worker$lock)
+    },
+    add = TRUE
+  )
+  before <- job_record_read(small_path)$envelope$revision
+  expect_error(
+    job_worker_checkpoint(
+      small_worker,
+      small_agent,
+      list(type = "large-effects")
+    ),
+    class = "deputy_job_persistence"
+  )
+  after <- job_record_read(small_path)
+  expect_identical(after$envelope$revision, before)
+  expect_identical(after$record$status, "running")
+  expect_length(after$record$runtime$effects, 0L)
 })
 
 test_that("checkpoint cancellation settles executing effects as indeterminate", {
@@ -620,6 +778,83 @@ test_that("failed cleanup makes an approval pending run terminal", {
       expect_identical(first$runtime$pending_approval, pending_path)
     }
   }
+})
+
+test_that("fresh approval resume preserves exhausted usage and can deny", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "effect", arguments = list(value = "b"))
+  ))
+  directory <- withr::local_tempdir(pattern = "deputy-job-budget-resume-")
+  approvals <- file.path(directory, "approvals")
+  dir.create(approvals)
+  effects <- new.env(parent = emptyenv())
+  effects$values <- character()
+  make_agent <- function() {
+    Agent$new(
+      chat = runtime_chat(server),
+      tools = list(ellmer::tool(
+        function(value) {
+          effects$values <- c(effects$values, value)
+          value
+        },
+        name = "effect",
+        description = "effect",
+        arguments = list(value = ellmer::type_string()),
+        convert = FALSE
+      )),
+      permissions = Permissions(can_use_tool = function(...) {
+        PermissionResultPending("Review this operation")
+      }),
+      approval_dir = approvals,
+      working_dir = directory,
+      agent_id = "a",
+      session_id = "s"
+    )
+  }
+  agent <- make_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "task",
+    "owner",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 1L)
+  )
+
+  first <- job_run(
+    path,
+    bind = function(job) agent,
+    authorize = job_test_receipt
+  )
+  approval_path <- first$pending_approval$path
+  expect_identical(first$status, "approval_pending")
+  expect_equal(first$usage$requests, 1)
+  expect_identical(effects$values, character())
+
+  approved <- job_run(
+    path,
+    bind = function(job) make_agent(),
+    authorize = job_test_receipt,
+    decision = "approve"
+  )
+  expect_identical(approved$status, "approval_pending")
+  expect_equal(approved$usage$requests, 1)
+  expect_identical(approved$pending_approval$path, approval_path)
+  expect_identical(approval_read(approval_path)$status, "pending")
+  expect_identical(effects$values, character())
+
+  denied <- job_run(
+    path,
+    bind = function(job) make_agent(),
+    authorize = job_test_receipt,
+    decision = "deny"
+  )
+  expect_identical(denied$status, "completed")
+  expect_equal(denied$usage$requests, 1)
+  expect_null(denied$pending_approval)
+  expect_identical(approval_read(approval_path)$status, "stopped")
+  expect_identical(effects$values, character())
 })
 
 test_that("a failing approval continuation binder clears pending approval", {

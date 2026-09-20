@@ -27,6 +27,8 @@ shared store's atomic replacement budget. The committed drop count survives
 subsequent checkpoints. Event eviction never removes authority, usage, effect
 state, or the terminal outcome; if those fields alone cannot fit, persistence
 fails explicitly.
+Runtime snapshot limits follow the configured store capacity; the complete
+record must still leave room for atomic replacement.
 
 For a configured graph, retain the route declarations, limits, cumulative usage,
 consumed admissions and continuation counts. Admission and reservation changes
@@ -45,6 +47,9 @@ effect history. Completed, failed or cancelled jobs are inspected without
 calling the provider or binding another tool execution. Only the standalone
 approval boundary is resumable; a pending approval inside a retained graph is
 not a supported recovery path.
+A rejected approval preflight preserves previously observed usage. If the
+approval remains pending, exhausting its continuation budget still allows the
+host to deny it with a newly reconstructed Agent.
 
 Once a provider request or tool effect may have begun, losing the worker creates
 an indeterminate job. The persisted allocation remains reserved and the terminal

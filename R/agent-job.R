@@ -425,23 +425,22 @@ job_pending_record <- function(pending) {
     return(list(path = job_safe_string(pending, 4096L)))
   }
   if (S7::S7_inherits(pending, ApprovalContinuation)) {
-    fields <- S7::props(pending)
-    path <- job_safe_string(fields$source$path, 4096L)
+    pending <- S7::props(pending)
     for (field in c("usage", "usage_limits", "budget_ceiling")) {
-      if (S7::S7_inherits(fields[[field]], AgentUsage)) {
-        fields[[field]] <- S7::props(fields[[field]])
-      } else if (S7::S7_inherits(fields[[field]], UsageLimits)) {
-        fields[[field]] <- S7::props(fields[[field]])
+      if (S7::S7_inherits(pending[[field]], AgentUsage)) {
+        pending[[field]] <- S7::props(pending[[field]])
+      } else if (S7::S7_inherits(pending[[field]], UsageLimits)) {
+        pending[[field]] <- S7::props(pending[[field]])
       }
     }
-    # Reserve room for the separately retained resume path and its metadata.
-    fields <- job_safe_value(fields, max_bytes = 1024L * 1024L - 8192L)
-    if (!is.null(path)) {
-      fields$path <- path
-    }
-    return(fields)
   }
-  job_bound_value(job_safe_value(pending), 1024L * 1024L)
+  path <- job_safe_string(job_pending_path(pending), 4096L)
+  # Reserve room for the separately retained resume path and its metadata.
+  pending <- job_safe_value(pending, max_bytes = 1024L * 1024L - 8192L)
+  if (!is.null(path)) {
+    pending$path <- path
+  }
+  pending
 }
 
 job_event_append <- function(record, event) {
@@ -863,7 +862,12 @@ job_authorize <- function(path, record, authorize) {
   receipt
 }
 
-job_merge_snapshot <- function(record, snapshot, event = NULL) {
+job_snapshot_limit <- function(worker) {
+  worker$snapshot_limit %||%
+    floor(approval_store_envelope(worker$path)$max_bytes / 2)
+}
+
+job_merge_snapshot <- function(record, snapshot, event = NULL, max_bytes) {
   if (!is.null(event)) {
     record <- job_event_append(record, event)
   }
@@ -876,7 +880,7 @@ job_merge_snapshot <- function(record, snapshot, event = NULL) {
       "job_persistence"
     )
   }
-  snapshot <- job_safe_value(snapshot, max_bytes = 4L * 1024L * 1024L)
+  snapshot <- job_safe_value(snapshot, max_bytes = max_bytes)
   if (!is.list(snapshot) || !is.null(snapshot$omitted)) {
     job_abort(
       "The Agent job runtime snapshot exceeded its persistence bound.",
@@ -895,7 +899,14 @@ job_merge_snapshot <- function(record, snapshot, event = NULL) {
   )) {
     if (field %in% names(snapshot)) runtime[[field]] <- snapshot[[field]]
   }
-  record$runtime <- job_bound_value(runtime, 4L * 1024L * 1024L)
+  runtime <- job_bound_value(runtime, max_bytes)
+  if (!is.null(runtime$omitted)) {
+    job_abort(
+      "The Agent job runtime snapshot exceeded its persistence bound.",
+      "job_persistence"
+    )
+  }
+  record$runtime <- runtime
   if ("usage" %in% names(snapshot) && is.list(snapshot$usage)) {
     record$usage <- snapshot$usage
   }
@@ -1394,7 +1405,12 @@ job_worker_checkpoint <- function(worker, agent, event = NULL) {
       )
     }
   )
-  record <- job_merge_snapshot(worker$record, snapshot, event)
+  record <- job_merge_snapshot(
+    worker$record,
+    snapshot,
+    event,
+    max_bytes = job_snapshot_limit(worker)
+  )
   worker$record <- record
   if (job_control_requested(worker$path, record)) {
     reason <- job_control_read(
@@ -1756,6 +1772,7 @@ job_run <- function(
 
   worker <- new.env(parent = emptyenv())
   worker$path <- path
+  worker$snapshot_limit <- floor(loaded$envelope$max_bytes / 2)
   worker$lock <- lock
   worker$record <- record
   worker$agent <- NULL
@@ -1875,6 +1892,7 @@ job_run <- function(
 
   result <- NULL
   run_error <- NULL
+  run_id_before <- worker$agent$.__enclos_env__$private$current_run_id
   if (resuming) {
     pending_path <- job_pending_path(worker$record$pending_approval)
     if (is.null(pending_path)) {
@@ -1917,21 +1935,41 @@ job_run <- function(
     run_error <- checkpoint_error
   }
 
-  snapshot_error <- tryCatch(
-    {
-      snapshot <- job_runtime_snapshot(worker$agent)
-      worker$record <- job_merge_snapshot(worker$record, snapshot)
-      worker$record <- job_record_write(path, worker$record, lock)
-      NULL
-    },
-    error = identity
-  )
+  # A fresh Agent has no resumed usage until its run actually starts. A
+  # preflight rejection must not replace the saved ledger with that empty state.
+  resume_not_started <- resuming &&
+    !is.null(run_error) &&
+    identical(
+      run_id_before,
+      worker$agent$.__enclos_env__$private$current_run_id
+    )
+  snapshot_error <- if (resume_not_started) {
+    NULL
+  } else {
+    tryCatch(
+      {
+        snapshot <- job_runtime_snapshot(worker$agent)
+        worker$record <- job_merge_snapshot(
+          worker$record,
+          snapshot,
+          max_bytes = job_snapshot_limit(worker)
+        )
+        worker$record <- job_record_write(path, worker$record, lock)
+        NULL
+      },
+      error = identity
+    )
+  }
   if (!is.null(snapshot_error) && is.null(run_error)) {
     run_error <- snapshot_error
   }
-  pending <- tryCatch(worker$agent$pending_approval(), error = function(error) {
-    NULL
-  })
+  pending <- if (resume_not_started && job_is_pending_error(run_error)) {
+    bind_record$pending_approval
+  } else {
+    tryCatch(worker$agent$pending_approval(), error = function(error) {
+      NULL
+    })
+  }
   pending_path <- if (!is.null(pending)) job_pending_path(pending) else NULL
   if (
     is.null(pending_path) &&
