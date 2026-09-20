@@ -1480,9 +1480,11 @@ job_worker_cleanup <- function(worker) {
       error = identity
     )
     worker$detach <- NULL
-    record$runtime$attached <- FALSE
-    record$runtime$detached_at <- as.numeric(Sys.time())
-    if (!is.null(detach_error)) {
+    if (is.null(detach_error)) {
+      record$runtime$attached <- FALSE
+      record$runtime$detached_at <- as.numeric(Sys.time())
+    } else {
+      record$runtime$detach_error <- job_error_record(detach_error)
       record$cleanup$status <- "unknown"
       record$cleanup$required <- TRUE
       record$cleanup$reason <- "runtime detach failed"
@@ -1511,16 +1513,19 @@ job_worker_cleanup <- function(worker) {
       error = identity
     )
     if (is.null(cleanup_error)) {
-      record$cleanup$status <- "completed"
-      record$cleanup$completed_at <- as.numeric(Sys.time())
+      if (is.null(detach_error)) {
+        record$cleanup$status <- "completed"
+        record$cleanup$required <- FALSE
+        record$cleanup$completed_at <- as.numeric(Sys.time())
+      } else {
+        record$cleanup$status <- "unknown"
+        record$cleanup$required <- TRUE
+        record$cleanup$reason <- "runtime detach failed"
+      }
     } else {
       record$cleanup$status <- "failed"
       record$cleanup$required <- TRUE
       record$cleanup$error <- job_error_record(cleanup_error)
-    }
-    if (is.null(cleanup_error)) {
-      record$cleanup$status <- "completed"
-      record$cleanup$completed_at <- as.numeric(Sys.time())
     }
     post_error <- tryCatch(
       {
@@ -1953,11 +1958,16 @@ job_run <- function(
     error = identity
   )
   worker$finished <- TRUE
-  if (!is.null(cleanup_error) && is.null(run_error)) {
+  cleanup_failed <- !is.null(cleanup_error)
+  if (cleanup_failed && !is.null(pending_path)) {
+    worker$record$runtime$pending_approval <- pending_path
+  }
+  if (
+    cleanup_failed &&
+      (is.null(run_error) || job_is_pending_error(run_error))
+  ) {
     run_error <- cleanup_error
   }
-  worker$record$runtime$attached <- FALSE
-  worker$record$runtime$detached_at <- as.numeric(Sys.time())
   if (!is.null(worker$terminal)) {
     worker$record <- job_record_write(path, worker$record, lock)
     return(job_job(
@@ -1998,7 +2008,8 @@ job_run <- function(
       reason = reason
     )
   } else if (
-    !is.null(pending_path) &&
+    !cleanup_failed &&
+      !is.null(pending_path) &&
       (is.null(run_error) || job_is_pending_error(run_error))
   ) {
     record$pending_approval <- if (!is.null(pending)) {

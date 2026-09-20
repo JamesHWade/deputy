@@ -312,6 +312,7 @@ test_that("binder cleanup is recorded and called once", {
   expect_identical(first$status, "completed")
   expect_identical(cleanups, 1L)
   expect_identical(first$cleanup$status, "completed")
+  expect_false(first$cleanup$required)
   expect_identical(first$cleanup$attempts, 1L)
   second <- job_run(
     path,
@@ -349,7 +350,84 @@ test_that("cleanup failure retains the successful task result", {
   expect_identical(failed$status, "failed")
   expect_identical(failed$result$response, "done")
   expect_identical(failed$cleanup$status, "failed")
+  expect_true(failed$cleanup$required)
   expect_match(failed$cleanup$error$message, "cleanup failed")
+})
+
+test_that("failed cleanup makes an approval pending run terminal", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-pending-cleanup-")
+  pending_agent_class <- R6::R6Class(
+    "PendingCleanupAgent",
+    inherit = Agent,
+    public = list(
+      pending_path = NULL,
+      run_sync = function(...) {
+        approval_abort(
+          "approval required",
+          class = "approval_pending",
+          path = self$pending_path
+        )
+      },
+      pending_approval = function() list(path = self$pending_path)
+    )
+  )
+  for (fails in c(FALSE, TRUE)) {
+    pending_path <- file.path(
+      directory,
+      if (fails) "pending-failed" else "pending-success"
+    )
+    pending_agent <- pending_agent_class$new(
+      chat = create_mock_chat(responses = list("unused"))
+    )
+    pending_agent$pending_path <- pending_path
+    path <- job_create(
+      directory,
+      pending_agent,
+      "answer once",
+      "owner-1",
+      "definition-1",
+      "context-1",
+      UsageLimits(max_requests = 2L)
+    )
+    bound <- 0L
+    cleanups <- 0L
+    first <- job_run(
+      path,
+      bind = function(job) {
+        bound <<- bound + 1L
+        list(
+          agent = pending_agent,
+          cleanup = function() {
+            cleanups <<- cleanups + 1L
+            if (fails) stop("cleanup failed")
+          }
+        )
+      },
+      authorize = job_test_receipt
+    )
+
+    expect_identical(cleanups, 1L)
+    expect_identical(bound, 1L)
+    if (fails) {
+      expect_identical(first$status, "failed")
+      expect_identical(first$cleanup$status, "failed")
+      expect_true(first$cleanup$required)
+      expect_null(first$pending_approval)
+      expect_identical(first$runtime$pending_approval, pending_path)
+      second <- job_run(
+        path,
+        bind = function(job) stop("failed cleanup must not rebind"),
+        authorize = job_test_receipt
+      )
+      expect_identical(second$status, "failed")
+      expect_identical(bound, 1L)
+    } else {
+      expect_identical(first$status, "approval_pending")
+      expect_identical(first$cleanup$status, "completed")
+      expect_false(first$cleanup$required)
+      expect_identical(first$runtime$pending_approval, pending_path)
+    }
+  }
 })
 
 test_that("abnormal worker exit persists cleanup before releasing its lock", {
@@ -407,6 +485,7 @@ test_that("abnormal worker exit persists cleanup before releasing its lock", {
   expect_identical(readLines(marker), "locked")
   expect_identical(persisted$status, "running")
   expect_identical(persisted$cleanup$status, "completed")
+  expect_false(persisted$cleanup$required)
   expect_identical(persisted$cleanup$attempts, 1L)
   recovered <- job_run(
     path,
@@ -415,6 +494,49 @@ test_that("abnormal worker exit persists cleanup before releasing its lock", {
   )
   expect_identical(recovered$status, "indeterminate")
   expect_identical(recovered$cleanup, persisted$cleanup)
+})
+
+test_that("failed detach keeps attachment uncertainty with successful cleanup", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-detach-failure-")
+  agent <- job_test_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+  record <- job_record_read(path)$record
+  record <- job_transition(record, "running", "worker started")
+  record$runtime$attached <- TRUE
+  lock <- approval_store_lock(path)
+  on.exit(approval_store_unlock(lock), add = TRUE)
+  job_record_write(path, record, lock)
+  cleanups <- 0L
+  worker <- new.env(parent = emptyenv())
+  worker$path <- path
+  worker$lock <- lock
+  worker$record <- record
+  worker$detach <- function() stop("detach failed")
+  worker$cleanup <- function() cleanups <<- cleanups + 1L
+  worker$cleanup_called <- FALSE
+
+  detach_error <- job_worker_cleanup(worker)
+  persisted <- job_read(path)
+
+  expect_match(conditionMessage(detach_error), "detach failed")
+  expect_identical(cleanups, 1L)
+  expect_true(worker$record$runtime$attached)
+  expect_null(worker$record$runtime$detached_at)
+  expect_identical(worker$record$cleanup$status, "unknown")
+  expect_true(worker$record$cleanup$required)
+  expect_true(persisted$runtime$attached)
+  expect_null(persisted$runtime$detached_at)
+  expect_identical(persisted$cleanup$status, "unknown")
+  expect_true(persisted$cleanup$required)
+  expect_match(persisted$runtime$detach_error$message, "detach failed")
 })
 
 test_that("cancellation persists maximum-length UTF-8 reasons", {
@@ -729,7 +851,7 @@ test_that("recovery preserves terminal cleanup evidence", {
       record <- job_transition(record, "running", "worker started")
       record$cleanup <- list(
         owner = "binder",
-        required = TRUE,
+        required = identical(status, "failed"),
         status = status,
         attempts = 1L,
         completed_at = 123,

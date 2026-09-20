@@ -59,6 +59,9 @@ existing cooperative interrupt path. Cleanup is recorded separately from task
 success: when a task result was produced but binder cleanup fails, the bounded
 result remains inspectable alongside the cleanup failure. A lost worker cannot
 certify that an owned external resource was closed.
+Successful cleanup clears its required flag; failed runtime detachment remains
+uncertain and still requires reconciliation. Cleanup failure also prevents an
+approval-pending job from becoming a resumable continuation.
 
 Durable approval inside a retained graph remains unsupported by the existing
 graph contract. A job must reject incompatible bindings rather than weaken that
