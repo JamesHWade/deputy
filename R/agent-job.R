@@ -684,6 +684,35 @@ job_control_write <- function(path, record, status, reason = NULL) {
   invisible(current)
 }
 
+job_control_acknowledge <- function(path, record, reason) {
+  tryCatch(
+    job_control_write(
+      path,
+      record,
+      status = if (identical(record$status, "cancelled")) {
+        "cancelled"
+      } else {
+        "acknowledged"
+      },
+      reason = reason
+    ),
+    error = function(error) {
+      if (identical(error$reason, "busy")) {
+        job_abort(
+          "The Agent job cancellation record is busy; retry cancellation.",
+          class = "job_busy",
+          parent = error
+        )
+      }
+      job_abort(
+        "The Agent job cancellation record could not be reconciled.",
+        class = "job_persistence",
+        parent = error
+      )
+    }
+  )
+}
+
 job_job <- function(path, record, envelope = NULL, control = NULL) {
   envelope <- envelope %||% approval_store_envelope(path)
   control <- control %||% job_control_read(path, record, missing_ok = TRUE)
@@ -1055,34 +1084,6 @@ S7::method(print, AgentJob) <- function(x, ...) {
     if (!is.null(x$error)) cli::cli_text("error: persisted")
   }))
   invisible(x)
-}
-
-job_control_set_locked <- function(
-  path,
-  record,
-  lock,
-  status = NULL,
-  requested = TRUE,
-  reason = NULL
-) {
-  control_path <- job_control_path(path, record)
-  approval_store_locked(control_path, lock)
-  current <- job_control_read(path, record)
-  if (!is.null(status)) {
-    current$status <- status
-  }
-  current$requested <- isTRUE(requested)
-  current$reason <- job_safe_string(reason)
-  current$updated_at <- as.numeric(Sys.time())
-  job_control_validate(current, record)
-  envelope <- approval_store_envelope(control_path)
-  approval_store_write(
-    control_path,
-    current,
-    lock,
-    max_bytes = envelope$max_bytes
-  )
-  current
 }
 
 job_control_requested <- function(path, record) {
@@ -2001,11 +2002,23 @@ job_cancel <- function(path, authorize, reason = "cancelled") {
   path <- loaded$path
   record <- loaded$record
   if (record$status %in% job_terminal_statuses) {
+    control <- job_control_read(path, record, missing_ok = TRUE)
+    if (identical(control$status, "requested")) {
+      # A previous reconciliation may have observed a terminal record while
+      # its control store was busy. Only an authorized retry may repair that
+      # requested control state; ordinary terminal inspection stays read-only.
+      job_authorize(path, record, authorize)
+      control <- job_control_acknowledge(
+        path,
+        record,
+        control$reason %||% reason
+      )
+    }
     return(job_job(
       path,
       record,
       loaded$envelope,
-      job_control_read(path, record, missing_ok = TRUE)
+      control
     ))
   }
   job_authorize(path, record, authorize)
@@ -2047,6 +2060,11 @@ job_cancel <- function(path, authorize, reason = "cancelled") {
     control_lock,
     max_bytes = envelope$max_bytes
   )
+  # Never hold the independent control lock while acquiring or inspecting the
+  # execution lock. A worker settles its terminal record while holding the
+  # execution lock and then needs this control lock to acknowledge a request.
+  approval_store_unlock(control_lock)
+  control_lock <- NULL
 
   execution_lock <- tryCatch(
     approval_store_lock(path),
@@ -2062,25 +2080,28 @@ job_cancel <- function(path, authorize, reason = "cancelled") {
     }
   )
   if (is.null(execution_lock)) {
-    return(job_read(path))
+    # The worker may have committed a terminal record just after the lock
+    # attempt became busy. Reconcile that immutable snapshot without holding
+    # the control lock across the execution-lock attempt. If it is still
+    # active, leave the durable request for the worker's checkpoint/poller.
+    latest <- job_record_read(path)
+    latest_record <- latest$record
+    if (latest_record$status %in% job_terminal_statuses) {
+      job_control_acknowledge(path, latest_record, reason)
+    }
+    return(job_job(
+      path,
+      latest_record,
+      latest$envelope,
+      job_control_read(path, latest_record)
+    ))
   }
   on.exit(approval_store_unlock(execution_lock), add = TRUE)
   loaded <- job_record_read(path)
   record <- loaded$record
   control <- job_control_read(path, record)
   if (record$status %in% job_terminal_statuses) {
-    control <- job_control_set_locked(
-      path,
-      record,
-      control_lock,
-      status = if (identical(record$status, "cancelled")) {
-        "cancelled"
-      } else {
-        "acknowledged"
-      },
-      requested = TRUE,
-      reason = reason
-    )
+    control <- job_control_acknowledge(path, record, reason)
     return(job_job(
       path,
       record,
@@ -2098,27 +2119,28 @@ job_cancel <- function(path, authorize, reason = "cancelled") {
     record <- job_release_reservation(record, release = TRUE, reason = reason)
     record["pending_approval"] <- list(NULL)
     job_record_write(path, record, execution_lock)
-    job_control_set_locked(
-      path,
-      record,
-      control_lock,
-      status = "cancelled",
-      requested = TRUE,
-      reason = reason
-    )
+    control <- job_control_acknowledge(path, record, reason)
     return(job_job(
       path,
       record,
       approval_store_envelope(path),
-      job_control_read(path, record)
+      control
     ))
   }
-  # A running worker owns the execution lock in another process. Leave the
-  # independent request durable and let its checkpoint/poller settle it.
+  # Acquiring the execution lock while a running/resuming record remains means
+  # no worker owns it anymore. Recover it under the held lock instead of
+  # leaving a requested record that can never settle.
+  reason <- control$reason %||%
+    "worker abandoned while cancellation was requested"
+  record <- job_mark_recovery(path, record, execution_lock, reason)
+  control <- job_control_read(path, record)
+  if (identical(control$status, "requested")) {
+    control <- job_control_acknowledge(path, record, reason)
+  }
   job_job(
     path,
     record,
-    loaded$envelope,
+    approval_store_envelope(path),
     control
   )
 }
