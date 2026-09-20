@@ -633,6 +633,118 @@ test_that("deeply nested Content keeps paths, data, and typed attachments", {
   expect_match(text, "Document: nested.txt", fixed = TRUE)
 })
 
+test_that("ordinary values stay on the native path when search bounds overflow", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "ordinary-bound",
+    name = "fixture",
+    arguments = list()
+  )
+  value <- setNames(as.list(seq_len(300L)), paste0("item", seq_len(300L)))
+  block <- shinychat::contents_shinychat(
+    subagent_chat_safe_content(
+      ellmer::ContentToolResult(value, request = request)
+    )
+  )
+  expect_identical(block$value_type, "code")
+  expect_match(block$value, "item300", fixed = TRUE)
+  expect_false(grepl("Path:", block$value, fixed = TRUE))
+})
+
+test_that("ordinary values stay on the native path when depth bounds overflow", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "ordinary-depth-bound",
+    name = "fixture",
+    arguments = list()
+  )
+  deep <- 1L
+  for (index in seq_len(12L)) {
+    deep <- setNames(list(deep), paste0("level", index))
+  }
+  value <- list(deep = deep)
+  expect_false(subagent_chat_has_nested_content(value))
+  block <- shinychat::contents_shinychat(
+    subagent_chat_safe_content(
+      ellmer::ContentToolResult(value, request = request)
+    )
+  )
+  expect_identical(block$value_type, "code")
+  expect_match(block$value, "level12", fixed = TRUE)
+})
+
+test_that("node overflow stops nested content search at every ancestor", {
+  fake_content <- structure(list(), class = "ellmer::Content")
+  value <- append(
+    as.list(seq_len(300L)),
+    list(list(fake_content))
+  )
+  expect_false(subagent_chat_has_nested_content(value, max_nodes = 4L))
+})
+
+test_that("safe classed list containers preserve nested Content", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "classed-container",
+    name = "fixture",
+    arguments = list()
+  )
+  value <- list(
+    frame = data.frame(
+      content = I(list(ellmer::ContentText("hello from a list column")))
+    )
+  )
+  block <- shinychat::contents_shinychat(
+    subagent_chat_safe_content(
+      ellmer::ContentToolResult(value, request = request)
+    )
+  )
+  expect_identical(block$value_type, "content_extra")
+  expect_match(block$value, "frame.content", fixed = TRUE)
+  expect_match(block$value, "hello from a list column", fixed = TRUE)
+})
+
+test_that("supported data image URLs use the native image renderer", {
+  skip_if_not_installed("shinychat", "0.5.0")
+  request <- ellmer::ContentToolRequest(
+    id = "data-image",
+    name = "fixture",
+    arguments = list()
+  )
+  data_uri <- "data:image/png;base64,aGVsbG8="
+  value <- list(
+    nested = list(
+      supported = ellmer::content_image_url(data_uri),
+      unsupported = ellmer::content_image_url(
+        "data:text/plain;base64,aGVsbG8="
+      )
+    )
+  )
+  block <- shinychat::contents_shinychat(
+    subagent_chat_safe_content(
+      ellmer::ContentToolResult(value, request = request)
+    )
+  )
+  items <- jsonlite::fromJSON(block$value, simplifyVector = FALSE)
+  expect_true(any(vapply(
+    items,
+    function(item) {
+      identical(item$type, "image") && identical(item$src, data_uri)
+    },
+    logical(1)
+  )))
+  text <- paste(
+    vapply(
+      Filter(function(item) identical(item$type, "text"), items),
+      `[[`,
+      character(1),
+      "value"
+    ),
+    collapse = "\n"
+  )
+  expect_match(text, "Image omitted", fixed = TRUE)
+})
+
 test_that("record-shaped ordinary data is not restored as Content", {
   skip_if_not_installed("shinychat", "0.5.0")
   request <- ellmer::ContentToolRequest(
@@ -723,6 +835,77 @@ test_that("classed nested data keeps live and saved displays identical", {
   expect_match(live$value, "first", fixed = TRUE)
 })
 
+test_that("classed nested values keep their structural JSON projection", {
+  duration <- as.difftime(c(1, NA), units = "hours")
+  frame <- data.frame(
+    label = c("first", "second"),
+    duration = duration,
+    stringsAsFactors = FALSE
+  )
+  expect_identical(
+    jsonlite::fromJSON(
+      subagent_chat_nested_value_text(duration),
+      simplifyVector = FALSE
+    ),
+    list(value = list(1L, NULL), units = "hours")
+  )
+  expect_identical(
+    jsonlite::fromJSON(
+      subagent_chat_nested_value_text(frame),
+      simplifyVector = FALSE
+    ),
+    list(
+      list(label = "first", duration = list(value = 1L, units = "hours")),
+      list(label = "second", duration = list(value = NULL, units = "hours"))
+    )
+  )
+  expect_identical(
+    jsonlite::fromJSON(
+      subagent_chat_nested_value_text(factor(c("a", NA))),
+      simplifyVector = FALSE
+    ),
+    list("a", NULL)
+  )
+  expect_identical(
+    jsonlite::fromJSON(
+      subagent_chat_nested_value_text(as.Date("2024-01-02")),
+      simplifyVector = FALSE
+    ),
+    "2024-01-02"
+  )
+  expect_identical(
+    jsonlite::fromJSON(
+      subagent_chat_nested_value_text(
+        as.POSIXct("2024-01-02 03:04:05", tz = "UTC")
+      ),
+      simplifyVector = FALSE
+    ),
+    "2024-01-02 03:04:05"
+  )
+})
+
+test_that("scalar character leaves are literal while vectors stay JSON", {
+  json_looking <- '{"value":[1,null],"units":"hours"}'
+  quoted <- '"literal"'
+  expect_identical(
+    subagent_chat_nested_value_text("ordinary text"),
+    "ordinary text"
+  )
+  expect_identical(
+    subagent_chat_nested_value_text(json_looking),
+    json_looking
+  )
+  expect_identical(subagent_chat_nested_value_text(quoted), quoted)
+  expect_identical(subagent_chat_nested_value_text(NA_character_), "null")
+  expect_identical(
+    jsonlite::fromJSON(
+      subagent_chat_nested_value_text(c("first", "second")),
+      simplifyVector = FALSE
+    ),
+    list("first", "second")
+  )
+})
+
 test_that("nested Content display has explicit depth and size omissions", {
   skip_if_not_installed("shinychat", "0.5.0")
   request <- ellmer::ContentToolRequest(
@@ -735,7 +918,10 @@ test_that("nested Content display has explicit depth and size omissions", {
     deep <- setNames(list(deep), paste0("level", index))
   }
   deep_result <- ellmer::ContentToolResult(
-    list(deep = deep),
+    list(
+      trigger = list(ellmer::ContentText("trigger")),
+      deep = deep
+    ),
     request = request
   )
   deep_block <- shinychat::contents_shinychat(

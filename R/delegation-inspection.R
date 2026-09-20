@@ -240,6 +240,9 @@ inspection_duration_projection <- function(value) {
         }
         values <- projected$value
         units <- projected$units
+        if (length(values) != rows) {
+          return(rep(inspection_duration_omission, rows))
+        }
         return(lapply(seq_len(rows), function(index) {
           list(
             value = if (is.na(values[[index]])) NA_real_ else values[[index]],
@@ -247,10 +250,22 @@ inspection_duration_projection <- function(value) {
           )
         }))
       }
-      if (is.list(column)) {
-        raw_column <- unclass(column)
-        projected_column <- lapply(raw_column, inspection_duration_projection)
-        return(projected_column)
+      if (is.data.frame(column)) {
+        if (inspection_data_frame_rows(column) != rows) {
+          return(rep(inspection_duration_omission, rows))
+        }
+        return(inspection_duration_projection(column))
+      }
+      as_is <- inherits(column, "AsIs")
+      if (is.list(column) && (!is.object(column) || as_is)) {
+        raw_column <- if (as_is) unclass(column) else column
+        if (length(raw_column) != rows) {
+          return(rep(inspection_duration_omission, rows))
+        }
+        return(lapply(
+          seq_len(rows),
+          function(index) inspection_duration_projection(raw_column[[index]])
+        ))
       }
       column
     })
@@ -261,8 +276,9 @@ inspection_duration_projection <- function(value) {
       class = "data.frame"
     ))
   }
-  if (is.list(value) && (!is.object(value) || inherits(value, "AsIs"))) {
-    raw_value <- if (inherits(value, "AsIs")) unclass(value) else value
+  as_is <- inherits(value, "AsIs")
+  if (is.list(value) && (!is.object(value) || as_is)) {
+    raw_value <- if (as_is) unclass(value) else value
     return(lapply(raw_value, inspection_duration_projection))
   }
   value
