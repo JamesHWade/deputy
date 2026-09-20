@@ -785,6 +785,22 @@ subagent_chat_markdown <- function(text) {
 # immediate value-list level. Keep the retained value as-is, but flatten a
 # nested presentation copy into labelled Content leaves so that native
 # attachments and Markdown still use shinychat's public conversion APIs.
+subagent_chat_nested_list_view <- function(value) {
+  if (!is.object(value)) {
+    return(if (is.list(value)) value else NULL)
+  }
+  classes <- class(value)
+  safe_container <-
+    identical(classes, "data.frame") ||
+    identical(classes, c("tbl_df", "tbl", "data.frame")) ||
+    identical(classes, "AsIs")
+  if (!safe_container) {
+    return(NULL)
+  }
+  value <- unclass(value)
+  if (is.list(value)) value else NULL
+}
+
 subagent_chat_has_nested_content <- function(
   value,
   depth = 0L,
@@ -793,23 +809,31 @@ subagent_chat_has_nested_content <- function(
 ) {
   state <- new.env(parent = emptyenv())
   state$nodes <- 0L
+  state$exhausted <- FALSE
   visit <- function(current, current_depth) {
     state$nodes <- state$nodes + 1L
     if (state$nodes > max_nodes) {
-      return(TRUE)
+      state$exhausted <- TRUE
+      return(FALSE)
+    }
+    if (current_depth > max_depth) {
+      state$exhausted <- TRUE
+      return(FALSE)
     }
     if (inherits(current, "ellmer::Content")) {
       return(current_depth >= 2L)
     }
-    if (!is.list(current) || is.object(current)) {
+    current_view <- subagent_chat_nested_list_view(current)
+    if (is.null(current_view)) {
       return(FALSE)
     }
-    if (current_depth > max_depth) {
-      return(TRUE)
-    }
-    for (item in current) {
-      if (visit(item, current_depth + 1L)) {
+    for (item in current_view) {
+      found <- visit(item, current_depth + 1L)
+      if (found) {
         return(TRUE)
+      }
+      if (isTRUE(state$exhausted)) {
+        break
       }
     }
     FALSE
@@ -860,7 +884,7 @@ subagent_chat_nested_value_text <- function(value) {
     subagent_chat_nested_value_supported(value) &&
       (inherits(value, "difftime") || is.data.frame(value))
   ) {
-    return(subagent_chat_nested_value_text(inspection_duration_json(value)))
+    return(subagent_chat_limit_text(inspection_duration_json(value), 4096L))
   }
   if (
     subagent_chat_nested_value_supported(value) &&
@@ -877,12 +901,19 @@ subagent_chat_nested_value_text <- function(value) {
       error = function(error) NULL
     )
     if (!is.null(out)) {
-      return(subagent_chat_nested_value_text(as.character(out)))
+      return(subagent_chat_limit_text(as.character(out), 4096L))
     }
   }
-  # Keep ordinary scalar data on a JSON path. Do not invoke format or print
-  # methods on arbitrary application objects while constructing a display.
+  # Keep ordinary character scalars literal and other atomic data on a bounded
+  # JSON path. Do not invoke format or print methods on arbitrary objects.
   if (is.atomic(value) && !is.object(value)) {
+    if (
+      is.character(value) &&
+        length(value) == 1L &&
+        !is.na(value[[1L]])
+    ) {
+      return(subagent_chat_limit_text(value, 4096L))
+    }
     out <- tryCatch(
       jsonlite::toJSON(
         value,
@@ -918,17 +949,22 @@ subagent_chat_nested_value_supported <- function(value) {
     if (state$nodes > 256L || depth > 8L) {
       return(FALSE)
     }
-    if (!is.object(value)) {
-      if (is.list(value)) {
-        if (length(value) > 64L) {
+    if (inherits(value, "ellmer::Content")) {
+      return(TRUE)
+    }
+    current_view <- subagent_chat_nested_list_view(value)
+    if (!is.null(current_view)) {
+      if (length(current_view) > 64L) {
+        return(FALSE)
+      }
+      for (item in current_view) {
+        if (!supported(item, depth + 1L)) {
           return(FALSE)
         }
-        for (item in value) {
-          if (!supported(item, depth + 1L)) {
-            return(FALSE)
-          }
-        }
       }
+      return(TRUE)
+    }
+    if (!is.object(value)) {
       return(TRUE)
     }
     classes <- class(value)
@@ -943,20 +979,6 @@ subagent_chat_nested_value_supported <- function(value) {
     )
     if (!any(vapply(known_classes, identical, logical(1), classes))) {
       return(FALSE)
-    }
-    if (
-      identical(classes, "data.frame") ||
-        identical(classes, c("tbl_df", "tbl", "data.frame"))
-    ) {
-      columns <- unclass(value)
-      if (length(columns) > 64L) {
-        return(FALSE)
-      }
-      for (column in columns) {
-        if (!supported(column, depth + 1L)) {
-          return(FALSE)
-        }
-      }
     }
     TRUE
   }
@@ -1010,13 +1032,30 @@ subagent_chat_nested_content_leaf <- function(content) {
       inherits(content, "ellmer::ContentImage") ||
       inherits(content, "ellmer::ContentPDF")
   ) {
+    if (inherits(content, "ellmer::ContentImageInline")) {
+      type <- S7::props(content)$type
+      if (
+        !is.character(type) ||
+          !length(type) ||
+          is.na(type[[1L]]) ||
+          !grepl("^image/[[:alnum:].+_-]+$", type[[1L]], ignore.case = TRUE)
+      ) {
+        return(ellmer::ContentText("[Image omitted: unsupported MIME type.]"))
+      }
+    }
     if (inherits(content, "ellmer::ContentImageRemote")) {
       url <- S7::props(content)$url
       scheme <- gsub("[[:space:][:cntrl:]]", "", url %||% "")
-      scheme <- sub("[/?#].*$", "", scheme)
+      is_data_image <- grepl(
+        "^data:image/[[:alnum:].+_-]+;base64,[A-Za-z0-9+/]*={0,2}$",
+        scheme,
+        ignore.case = TRUE
+      )
+      is_http_image <- grepl("^https?://", scheme, ignore.case = TRUE)
+      has_scheme <- grepl("^[A-Za-z][A-Za-z0-9+.-]*:", scheme)
       if (
-        grepl(":", scheme, fixed = TRUE) &&
-          !grepl("^(https?|data):$", scheme, ignore.case = TRUE)
+        (!is_data_image && grepl("^data:", scheme, ignore.case = TRUE)) ||
+          (has_scheme && !is_data_image && !is_http_image)
       ) {
         return(ellmer::ContentText("[Image omitted: unsupported URL.]"))
       }
@@ -1169,22 +1208,26 @@ subagent_chat_nested_projection <- function(
       emit(subagent_chat_nested_content_leaf(current), path)
       return(invisible(NULL))
     }
-    if (is.list(current) && !is.object(current)) {
-      if (!length(current)) {
+    current_view <- subagent_chat_nested_list_view(current)
+    traverse_view <- !is.null(current_view) &&
+      (!is.object(current) ||
+        subagent_chat_has_nested_content(current, depth = depth))
+    if (traverse_view) {
+      if (!length(current_view)) {
         emit(
           ellmer::ContentText(paste0(
             if (nzchar(path)) paste0("Path: ", path, "\n") else "",
-            if (is.null(names(current))) "[]" else "{}"
+            if (is.null(names(current_view))) "[]" else "{}"
           )),
           path
         )
         return(invisible(NULL))
       }
-      current_names <- names(current)
-      indexes <- seq_len(min(length(current), max_items))
+      current_names <- names(current_view)
+      indexes <- seq_len(min(length(current_view), max_items))
       for (index in indexes) {
         walk(
-          current[[index]],
+          current_view[[index]],
           subagent_chat_nested_path(path, current_names, index),
           depth + 1L
         )
@@ -1192,7 +1235,7 @@ subagent_chat_nested_projection <- function(
           break
         }
       }
-      if (!isTRUE(state$stopped) && length(current) > length(indexes)) {
+      if (!isTRUE(state$stopped) && length(current_view) > length(indexes)) {
         stop_with_omission(path, "the display size or item limit was reached")
       }
       return(invisible(NULL))
