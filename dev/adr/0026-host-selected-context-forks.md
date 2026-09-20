@@ -46,3 +46,8 @@ and presentation layers. Portable interactive artifacts from R workers (#144)
 are a separate producer/storage contract. Neither a fork nor a saved chat turns
 temporary widget dependencies, live render-hook closures or provider upload IDs
 into durable, universally accessible artifacts.
+
+Fork snapshots replace provider-specific `ContentUploaded` handles with labelled
+inert text and report a `provider_upload` omission. This also applies inside tool
+results: a new child can use a different provider or credentials, and the source
+upload may expire. Hosts supply portable content when the child needs the file.

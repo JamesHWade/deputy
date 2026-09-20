@@ -245,7 +245,14 @@ context_fork_inert_content <- function(content) {
 }
 
 context_fork_sanitize_turns <- function(turns, tool_ids) {
+  upload_omitted <- FALSE
   sanitize <- function(content) {
+    if (inherits(content, "ellmer::ContentUploaded")) {
+      upload_omitted <<- TRUE
+      return(ellmer::ContentText(
+        "[Provider upload omitted: supply portable content for this fork.]"
+      ))
+    }
     if (inherits(content, "ellmer::ContentToolRequest")) {
       id <- context_fork_content_id(content)
       if (is.null(id) || id %in% tool_ids$incomplete) {
@@ -254,6 +261,7 @@ context_fork_sanitize_turns <- function(turns, tool_ids) {
       return(content)
     }
     if (inherits(content, "ellmer::ContentToolResult")) {
+      content@value <- sanitize(content@value)
       request <- tryCatch(content@request, error = function(error) NULL)
       id <- context_fork_content_id(request)
       if (is.null(id) || id %in% tool_ids$incomplete) {
@@ -266,13 +274,17 @@ context_fork_sanitize_turns <- function(turns, tool_ids) {
     }
     content
   }
-  lapply(turns, function(turn) {
+  turns <- lapply(turns, function(turn) {
     if (!inherits(turn, "ellmer::Turn")) {
       return(turn)
     }
     turn@contents <- lapply(turn@contents, sanitize)
     turn
   })
+  list(
+    turns = turns,
+    omissions = if (upload_omitted) "provider_upload" else character()
+  )
 }
 
 context_fork_input_bound <- function(turns, max_bytes) {
@@ -389,7 +401,8 @@ context_fork_turn_records <- function(turns, max_bytes, max_turns) {
   })
   context_fork_input_bound(clean_native, max_bytes)
   tool_ids <- context_fork_tool_ids(clean_native)
-  clean_native <- context_fork_sanitize_turns(clean_native, tool_ids)
+  sanitized <- context_fork_sanitize_turns(clean_native, tool_ids)
+  clean_native <- sanitized$turns
   records <- lapply(clean_native, inspection_record_turn)
   bytes <- length(serialize(records, NULL, version = 3))
   if (bytes > max_bytes) {
@@ -401,11 +414,10 @@ context_fork_turn_records <- function(turns, max_bytes, max_turns) {
   list(
     records = records,
     bytes = as.integer(bytes),
-    omissions = if (tool_ids$replacements > 0L) {
-      "partial_tool_evidence"
-    } else {
-      character()
-    }
+    omissions = c(
+      sanitized$omissions,
+      if (tool_ids$replacements > 0L) "partial_tool_evidence"
+    )
   )
 }
 

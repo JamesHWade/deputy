@@ -186,6 +186,51 @@ test_that("public image and document content round trips without execution", {
   )
 })
 
+test_that("provider upload handles become inert fork evidence", {
+  upload <- ellmer::ContentUploaded(
+    uri = "file-provider-secret",
+    mime_type = "application/pdf",
+    provider = "openai",
+    extra = list()
+  )
+  turn <- ellmer::UserTurn(list(upload))
+  for (selected in list(turn, ellmer::contents_record(turn))) {
+    fork <- context_fork_test_value(list(selected))
+    content <- context_fork_replay(fork)[[1L]]@contents[[1L]]
+    expect_s7_class(content, ellmer::ContentText)
+    expect_match(content@text, "Provider upload omitted", fixed = TRUE)
+    expect_true("provider_upload" %in% fork$omissions)
+    expect_false(grepl(
+      "file-provider-secret",
+      jsonlite::toJSON(fork$turns, auto_unbox = TRUE),
+      fixed = TRUE
+    ))
+  }
+
+  request <- ellmer::ContentToolRequest(
+    id = "uploaded-tool",
+    name = "read_file",
+    arguments = list()
+  )
+  result <- ellmer::ContentToolResult(
+    request = request,
+    value = list(report = list(upload = upload))
+  )
+  fork <- context_fork_test_value(list(
+    ellmer::AssistantTurn(list(request)),
+    ellmer::UserTurn(list(result))
+  ))
+  content <- context_fork_replay(fork)[[2L]]@contents[[1L]]@value$report$upload
+  expect_s7_class(content, ellmer::ContentText)
+  expect_match(content@text, "Provider upload omitted", fixed = TRUE)
+  expect_true("provider_upload" %in% fork$omissions)
+  expect_false(grepl(
+    "file-provider-secret",
+    jsonlite::toJSON(fork$turns, auto_unbox = TRUE),
+    fixed = TRUE
+  ))
+})
+
 test_that("partial tool evidence is narrowed to inert text", {
   tool <- ellmer::tool(
     function() "side effect",

@@ -783,6 +783,125 @@ test_that("nested data frames and POSIXlt columns retain row layout", {
 })
 
 
+test_that("compact duration frame rows are bounded before expansion", {
+  frame <- structure(
+    list(
+      elapsed = as.difftime(1, units = "mins"),
+      nested = structure(list(list(value = 1)), class = "AsIs")
+    ),
+    class = "data.frame",
+    row.names = c(NA_integer_, -1000000L)
+  )
+
+  expect_identical(
+    inspection_duration_json(frame),
+    inspection_duration_omission
+  )
+
+  many_durations <- rep(
+    list(as.difftime(1, units = "mins")),
+    20L
+  )
+  names(many_durations) <- paste0("elapsed", seq_along(many_durations))
+  wide <- structure(
+    many_durations,
+    class = "data.frame",
+    row.names = c(NA_integer_, -25000L)
+  )
+  expect_identical(
+    inspection_duration_json(wide),
+    inspection_duration_omission
+  )
+  nested <- structure(
+    many_durations[1:4],
+    class = "data.frame",
+    row.names = c(NA_integer_, -25000L)
+  )
+  siblings <- structure(
+    list(a = nested, b = nested, c = nested, d = nested),
+    class = "data.frame",
+    row.names = c(NA_integer_, -25000L)
+  )
+  expect_identical(
+    inspection_duration_json(siblings),
+    inspection_duration_omission
+  )
+})
+
+
+test_that("projection preflight rejects application methods without dispatch", {
+  called <- FALSE
+  rlang::local_bindings(
+    length.inspection_projection_hostile = function(...) {
+      called <<- TRUE
+      stop("application length method")
+    },
+    .env = globalenv()
+  )
+  frame <- structure(
+    list(value = structure(1, class = "inspection_projection_hostile")),
+    class = "data.frame",
+    row.names = c(NA_integer_, -1L)
+  )
+  expect_identical(
+    inspection_duration_json(frame),
+    inspection_duration_omission
+  )
+  expect_false(called)
+})
+
+
+test_that("ordinary bounded list columns keep their duration projection", {
+  frame <- data.frame(id = seq_len(5000L))
+  frame$values <- I(as.list(seq_len(5000L)))
+
+  restored <- inspection_replay(inspection_record_turn(
+    ellmer::UserTurn(list(ellmer::ContentToolResult(frame)))
+  ))@contents[[1L]]@value
+  value <- jsonlite::fromJSON(restored, simplifyVector = FALSE)
+
+  expect_length(value, 5000L)
+  expect_identical(value[[5000L]]$id, 5000L)
+  expect_identical(value[[5000L]]$values, 5000L)
+})
+
+
+test_that("supported classed containers retain typed content through replay", {
+  image <- ellmer::ContentImageRemote(
+    url = "https://example.com/evidence.png"
+  )
+  text <- ellmer::ContentText("wrapped typed")
+  frame <- data.frame(
+    ordinary = 1L,
+    attachment = I(list(image))
+  )
+  value <- list(
+    frame = frame,
+    wrapped = I(list(text)),
+    ordinary = list(
+      version = 1,
+      class = "invoice",
+      props = list(total = 42)
+    )
+  )
+  record <- inspection_record_turn(ellmer::UserTurn(list(
+    ellmer::ContentToolResult(value)
+  )))
+  result_record <- record$props$contents[[1L]]
+
+  expect_identical(result_record$deputy_value_kind, "marked")
+  expect_length(result_record$deputy_content_paths, 2L)
+
+  restored <- inspection_replay(record)@contents[[1L]]@value
+  expect_identical(restored$frame$ordinary, 1L)
+  expect_s7_class(restored$frame$attachment[[1L]], ellmer::ContentImageRemote)
+  expect_identical(restored$frame$attachment[[1L]]@url, image@url)
+  expect_s7_class(restored$wrapped[[1L]], ellmer::ContentText)
+  expect_identical(restored$wrapped[[1L]]@text, text@text)
+  expect_identical(restored$ordinary, value$ordinary)
+})
+
+
 test_that("mixed tool payloads retain typed content and literal record-shaped data", {
   lookalike <- list(
     version = 1,

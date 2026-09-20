@@ -786,19 +786,7 @@ subagent_chat_markdown <- function(text) {
 # nested presentation copy into labelled Content leaves so that native
 # attachments and Markdown still use shinychat's public conversion APIs.
 subagent_chat_nested_list_view <- function(value) {
-  if (!is.object(value)) {
-    return(if (is.list(value)) value else NULL)
-  }
-  classes <- class(value)
-  safe_container <-
-    identical(classes, "data.frame") ||
-    identical(classes, c("tbl_df", "tbl", "data.frame")) ||
-    identical(classes, "AsIs")
-  if (!safe_container) {
-    return(NULL)
-  }
-  value <- unclass(value)
-  if (is.list(value)) value else NULL
+  inspection_safe_list_view(value)
 }
 
 subagent_chat_has_nested_content <- function(
