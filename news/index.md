@@ -2,6 +2,35 @@
 
 ## deputy (development version)
 
+- [`job_create()`](https://jameshwade.github.io/deputy/reference/job_create.md),
+  [`job_run()`](https://jameshwade.github.io/deputy/reference/job_run.md),
+  [`job_read()`](https://jameshwade.github.io/deputy/reference/job_read.md)
+  and
+  [`job_cancel()`](https://jameshwade.github.io/deputy/reference/job_cancel.md)
+  persist governed work for host-owned schedulers. Durable jobs preserve
+  graph budgets, source revisions, tool effects and standalone pending
+  approvals across process boundaries. Interrupted executions become
+  indeterminate instead of silently repeating side effects; cancellation
+  remains cooperative
+  ([\#42](https://github.com/JamesHWade/deputy/issues/42)).
+
+- [`ContextFork()`](https://jameshwade.github.io/deputy/reference/ContextFork.md)
+  and
+  [`fork_agent()`](https://jameshwade.github.io/deputy/reference/fork_agent.md)
+  initialize independent retained specialists from authorized
+  host-selected native ellmer turns. Fork manifests record source
+  identity, revision and bounds; continuations recheck source access and
+  apply current parent and child governance
+  ([\#62](https://github.com/JamesHWade/deputy/issues/62)).
+
+- Child inspection and observation preserve duration values, units and
+  missing values, including data-frame columns. Child chat panels
+  display nested native content through shinychat with bounded path
+  labels and explicit omissions, while retaining the original payload
+  for authorized replay
+  ([\#166](https://github.com/JamesHWade/deputy/issues/166),
+  [\#167](https://github.com/JamesHWade/deputy/issues/167)).
+
 - `Agent$retain_agent_graph()` configures recursive specialist routes
   with shared lifetime budgets, bounded depth and concurrency, subtree
   cancellation, and root-authorized descendant chats. A deterministic

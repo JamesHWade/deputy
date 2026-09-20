@@ -33,6 +33,21 @@ Run a task and inspect its response, tool calls, and usage.
 - [`DeputyCompaction()`](https://jameshwade.github.io/deputy/reference/DeputyCompaction.md)
   : Record a conversation compaction outcome
 
+## Background jobs
+
+Persist and dispatch governed work through a host-owned scheduler.
+
+- [`AgentJob()`](https://jameshwade.github.io/deputy/reference/AgentJob.md)
+  : AgentJob read-only durable inspection
+- [`job_create()`](https://jameshwade.github.io/deputy/reference/job_create.md)
+  : Create a durable host-owned Agent job
+- [`job_read()`](https://jameshwade.github.io/deputy/reference/job_read.md)
+  : Read a durable Agent job without binding or executing it
+- [`job_run()`](https://jameshwade.github.io/deputy/reference/job_run.md)
+  : Consume one durable Agent job
+- [`job_cancel()`](https://jameshwade.github.io/deputy/reference/job_cancel.md)
+  : Request durable cooperative cancellation of an Agent job
+
 ## Tools
 
 Built-in tools and tool bundles
@@ -176,6 +191,10 @@ Coordinate multiple specialized agents
   : Describe a task-specific delegation input
 - [`DelegationManifest()`](https://jameshwade.github.io/deputy/reference/DelegationManifest.md)
   : Inspect the prepared initial context of a delegation
+- [`ContextFork()`](https://jameshwade.github.io/deputy/reference/ContextFork.md)
+  : Describe a host-selected conversation fork
+- [`fork_agent()`](https://jameshwade.github.io/deputy/reference/fork_agent.md)
+  : Retain a host-authorized context fork for explicit continuation
 - [`DelegationPolicy()`](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
   : Bind host policy and resources to delegated agents
 - [`DelegationResources()`](https://jameshwade.github.io/deputy/reference/DelegationResources.md)

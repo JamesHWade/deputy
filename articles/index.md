@@ -22,6 +22,8 @@
 
 - [Multi-Agent
   Orchestration](https://jameshwade.github.io/deputy/articles/multi-agent.md):
+- [Host-scheduled background
+  jobs](https://jameshwade.github.io/deputy/articles/background-jobs.md):
 - [Structured
   output](https://jameshwade.github.io/deputy/articles/structured-output.md):
 - [Runtime integration and

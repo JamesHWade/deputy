@@ -33,7 +33,9 @@ DelegationDisclosure(
   Maximum serialized content-payload bytes in one disclosed snapshot or
   saved history, including replayed turn content but excluding shared R
   class/method metadata. Oversized disclosures fail explicitly; select
-  fewer children or omit transcripts. Defaults to 16 MiB.
+  fewer children or omit transcripts. Defaults to 16 MiB. Rich table
+  projections also have a separate conservative 16 MiB size estimate
+  limit; larger projections receive an explicit omission marker.
 
 ## Value
 

@@ -91,6 +91,66 @@ The example’s requester token scopes disclosure; shared applications
 must supply authenticated identities and independent action
 authorization.
 
+## Copying selected context into a specialist
+
+Fresh delegation gives each child its own context. When a specialist
+needs prior conversation material, the host can explicitly select and
+authorize a snapshot:
+
+``` r
+
+# The application authenticates the user and selects a revision from its store.
+selected <- host_selected_context()
+fork <- ContextFork(
+  owner_id = selected$owner_id,
+  conversation_id = selected$conversation_id,
+  branch_id = selected$branch_id,
+  revision = selected$revision,
+  fork_point = selected$fork_point,
+  view = "context",
+  turns = selected$turns,
+  max_bytes = 1024 * 1024
+)
+
+# specialist is an independently configured Agent with an empty Chat.
+handle <- fork_agent(
+  root, specialist, fork,
+  authorize = host_authorize_current_source,
+  usage_limits = UsageLimits(max_requests = 4),
+  max_runs = 2
+)
+root$continue_agent(handle, "Review the selected evidence.",
+  UsageLimits(max_requests = 2))
+```
+
+The `host_*` functions above belong to the application. The
+authorization function receives the selected snapshot, checks the
+current user’s access and source revision, and returns `owner_id`,
+`conversation_id`, `branch_id`, and `revision`. Deputy requires an exact
+match and rechecks it before each continuation.
+
+Choose `view = "transcript"` for selected retained history or
+`view = "context"` for selected model input after compaction. The host
+supplies the corresponding turns and any summary material it intends to
+include. Deputy never silently replaces a bounded selection with the
+full transcript. An oversized selection fails before dispatch.
+
+ellmer’s native turns preserve text, images, documents and settled tool
+evidence. Copied tool bindings are removed; incomplete tool evidence
+becomes explicitly labelled inert text. The specialist keeps its own
+configured prompt, tools and permissions, subject to the current
+parent’s restrictions. Parent and child messages diverge after the
+snapshot, and continuing the child does not copy later parent messages.
+
+Selecting or creating a branch remains an operation on the host’s
+conversation store.
+[`fork_agent()`](https://jameshwade.github.io/deputy/reference/fork_agent.md)
+copies context and retains an independent child; it does not create a
+persistent branch. shinychat supplies its managed history UI and
+rich-content rendering. A headless adapter requires its supported public
+branch contract; native host-supplied forks need no private shinychat
+APIs.
+
 ## Defining Sub-Agents
 
 Use

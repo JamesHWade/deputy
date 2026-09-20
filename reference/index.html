@@ -28,6 +28,7 @@
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
     <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
     <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
@@ -157,6 +158,50 @@
 
         </dt>
         <dd>Record a conversation compaction outcome</dd>
+      </dl></div><div class="section level2">
+      <h2 id="background-jobs">Background jobs<a class="anchor" aria-label="anchor" href="#background-jobs"></a></h2>
+
+      <div class="section-desc"><p>Persist and dispatch governed work through a host-owned scheduler.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="AgentJob.html">AgentJob()</a></code>
+
+        </dt>
+        <dd>AgentJob read-only durable inspection</dd>
+
+        <dt>
+
+          <code><a href="job_create.html">job_create()</a></code>
+
+        </dt>
+        <dd>Create a durable host-owned Agent job</dd>
+
+        <dt>
+
+          <code><a href="job_read.html">job_read()</a></code>
+
+        </dt>
+        <dd>Read a durable Agent job without binding or executing it</dd>
+
+        <dt>
+
+          <code><a href="job_run.html">job_run()</a></code>
+
+        </dt>
+        <dd>Consume one durable Agent job</dd>
+
+        <dt>
+
+          <code><a href="job_cancel.html">job_cancel()</a></code>
+
+        </dt>
+        <dd>Request durable cooperative cancellation of an Agent job</dd>
       </dl></div><div class="section level2">
       <h2 id="tools">Tools<a class="anchor" aria-label="anchor" href="#tools"></a></h2>
 
@@ -615,6 +660,20 @@
 
         </dt>
         <dd>Inspect the prepared initial context of a delegation</dd>
+
+        <dt>
+
+          <code><a href="ContextFork.html">ContextFork()</a></code>
+
+        </dt>
+        <dd>Describe a host-selected conversation fork</dd>
+
+        <dt>
+
+          <code><a href="fork_agent.html">fork_agent()</a></code>
+
+        </dt>
+        <dd>Retain a host-authorized context fork for explicit continuation</dd>
 
         <dt>
 
