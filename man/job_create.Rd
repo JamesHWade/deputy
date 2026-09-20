@@ -33,7 +33,9 @@ job_create(
 
 \item{associations}{Portable host conversation associations.}
 
-\item{max_bytes}{Maximum bytes for each immutable store.}
+\item{max_bytes}{Maximum bytes for each immutable store. Active job revisions
+must also leave 1 MiB + 128 KiB per revision for cleanup and terminal
+settlement; admission fails if the initial record and reserve cannot fit.}
 }
 \value{
 The committed job directory.

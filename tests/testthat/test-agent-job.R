@@ -198,7 +198,13 @@ test_that("non-size store errors are not retried or trimmed", {
   on.exit(approval_store_unlock(lock), add = TRUE)
   attempts <- 0L
   local_mocked_bindings(
-    approval_store_write = function(path, record, lock, max_bytes) {
+    approval_store_write = function(
+      path,
+      record,
+      lock,
+      max_bytes,
+      reserve_bytes = 0
+    ) {
       attempts <<- attempts + 1L
       abort_deputy(
         "simulated commit failure",
@@ -249,12 +255,15 @@ test_that("non-event size overflow is propagated without changing revision", {
   expect_length(job_record_read(path)$record$events, 0L)
 })
 
-test_that("runtime snapshots use the configured store capacity", {
-  payloads <- lapply(seq_len(5L), function(index) {
-    strrep(intToUtf8(64L + index), 900L * 1024L)
+test_that("over-capacity snapshots preserve committed worker evidence", {
+  accepted_payloads <- lapply(seq_len(5L), function(index) {
+    strrep(intToUtf8(96L + index), 900L * 1024L)
   })
-  make_snapshot <- function(agent) {
-    list(
+  payloads <- lapply(seq_len(5L), function(index) {
+    strrep(intToUtf8(64L + index), 2600L * 1024L)
+  })
+  make_snapshot <- function(agent, payloads, usage = NULL) {
+    snapshot <- list(
       effects = lapply(seq_along(payloads), function(index) {
         list(
           agent_id = agent$agent_id,
@@ -268,6 +277,10 @@ test_that("runtime snapshots use the configured store capacity", {
         )
       })
     )
+    if (!is.null(usage)) {
+      snapshot$usage <- usage
+    }
+    snapshot
   }
   make_worker <- function(path) {
     record <- job_record_read(path)$record
@@ -287,13 +300,14 @@ test_that("runtime snapshots use the configured store capacity", {
     worker$detach <- NULL
     worker$cleanup <- NULL
     worker$cleanup_called <- FALSE
+    worker$persistence_error <- NULL
     worker
   }
   directory <- withr::local_tempdir(pattern = "deputy-job-snapshot-budget-")
-  large_agent <- job_test_agent()
-  large_path <- job_create(
+  agent <- job_test_agent()
+  path <- job_create(
     directory,
-    large_agent,
+    agent,
     "large snapshot",
     "owner-1",
     "definition-1",
@@ -301,76 +315,290 @@ test_that("runtime snapshots use the configured store capacity", {
     UsageLimits(max_requests = 2L),
     max_bytes = 50 * 1024^2
   )
+  snapshot_state <- new.env(parent = emptyenv())
+  snapshot_state$current <- make_snapshot(
+    agent,
+    accepted_payloads,
+    usage = S7::props(AgentUsage(requests = 1L))
+  )
   local_mocked_bindings(
     job_runtime_snapshot = function(agent, event = NULL) {
-      make_snapshot(agent)
+      snapshot_state$current
     },
     .package = "deputy"
   )
-  large_worker <- make_worker(large_path)
+  worker <- make_worker(path)
   on.exit(
-    if (!is.null(large_worker$lock)) {
-      approval_store_unlock(large_worker$lock)
-    },
+    if (!is.null(worker$lock)) approval_store_unlock(worker$lock),
     add = TRUE
   )
-  job_worker_checkpoint(
-    large_worker,
-    large_agent,
-    list(type = "large-effects")
-  )
-  checkpointed <- job_read(large_path)
+  job_worker_checkpoint(worker, agent, list(type = "accepted-effects"))
+  accepted <- job_read(path)
   expect_identical(
-    lapply(checkpointed$runtime$effects, function(effect) {
+    lapply(accepted$runtime$effects, function(effect) {
       effect$result$payload
     }),
-    payloads
+    accepted_payloads
+  )
+  snapshot_state$current <- make_snapshot(
+    agent,
+    payloads,
+    usage = S7::props(AgentUsage(requests = 2L))
+  )
+  expect_error(
+    job_worker_checkpoint(worker, agent, list(type = "large-effects")),
+    class = "deputy_job_persistence"
   )
 
-  job_worker_finish(
-    large_worker,
-    "completed",
-    result = AgentResult(response = "settled")
-  )
-  settled <- job_read(large_path)
-  expect_identical(settled$status, "completed")
-  expect_identical(settled$result$response, "settled")
+  persisted <- job_record_read(path)
+  expect_true(!is.null(worker$persistence_error))
+  expect_identical(worker$record, persisted$record)
+  expect_equal(persisted$record$usage$requests, 1L)
   expect_identical(
-    lapply(settled$runtime$effects, function(effect) effect$result$payload),
-    payloads
+    lapply(persisted$record$effects, function(effect) effect$result$payload),
+    accepted_payloads
   )
+  expect_identical(
+    persisted$record$runtime$effects,
+    persisted$record$effects
+  )
+  expect_identical(persisted$envelope$revision, 3)
 
-  small_agent <- job_test_agent()
-  small_path <- job_create(
+  expect_no_error(
+    job_worker_finish(
+      worker,
+      "indeterminate",
+      error = worker$persistence_error,
+      reason = "snapshot persistence failed"
+    )
+  )
+  settled <- job_read(path)
+  expect_identical(worker$record, job_record_read(path)$record)
+  expect_identical(settled$status, "indeterminate")
+  expect_identical(settled$reservations$status, "preserved")
+  expect_false(settled$reservations$released)
+  expect_equal(settled$usage$requests, 1L)
+  expect_identical(
+    settled$runtime$effects,
+    job_record_read(path)$record$effects
+  )
+})
+
+test_that("near-capacity active jobs settle bounded result and cleanup", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-near-capacity-")
+  agent <- job_test_agent()
+  path <- job_create(
     directory,
-    small_agent,
-    "small snapshot",
+    agent,
+    "near capacity",
     "owner-1",
     "definition-1",
     "context-1",
     UsageLimits(max_requests = 2L),
     max_bytes = 8 * 1024^2
   )
-  small_worker <- make_worker(small_path)
-  on.exit(
-    if (!is.null(small_worker$lock)) {
-      approval_store_unlock(small_worker$lock)
-    },
-    add = TRUE
+  record <- job_record_read(path)$record
+  record <- job_transition(record, "running", "worker started")
+  lock <- approval_store_lock(path)
+  record <- tryCatch(
+    job_record_write(path, record, lock),
+    finally = approval_store_unlock(lock)
   )
-  before <- job_record_read(small_path)$envelope$revision
-  expect_error(
-    job_worker_checkpoint(
-      small_worker,
-      small_agent,
-      list(type = "large-effects")
+  lock <- approval_store_lock(path)
+  worker <- new.env(parent = emptyenv())
+  worker$path <- path
+  worker$lock <- lock
+  worker$record <- record
+  worker$finished <- FALSE
+  worker$terminal <- NULL
+  worker$detach <- NULL
+  worker$cleanup <- NULL
+  worker$cleanup_called <- FALSE
+  worker$persistence_error <- NULL
+  payload <- strrep("x", 1400L * 1024L)
+  snapshot <- list(
+    effects = list(
+      list(
+        agent_id = agent$agent_id,
+        run_id = "near-run",
+        tool_call_id = "near-call",
+        request = list(name = "write", arguments = list()),
+        signature = "near-signature",
+        executed = TRUE,
+        status = "completed",
+        result = list(payload = payload)
+      )
+    )
+  )
+  local_mocked_bindings(
+    job_runtime_snapshot = function(agent, event = NULL) snapshot,
+    .package = "deputy"
+  )
+  on.exit(approval_store_unlock(lock), add = TRUE)
+  expect_no_error(
+    job_worker_checkpoint(worker, agent, list(type = "near-effects"))
+  )
+  expect_identical(job_read(path)$runtime$effects[[1L]]$result$payload, payload)
+
+  worker$record$cleanup <- list(
+    owner = "binder",
+    required = TRUE,
+    status = "attached",
+    attempts = 0L
+  )
+  cleanups <- 0L
+  worker$cleanup <- function() cleanups <<- cleanups + 1L
+  expect_no_error(job_worker_cleanup(worker))
+  expect_identical(cleanups, 1L)
+  expect_identical(job_read(path)$cleanup$status, "completed")
+  expect_false(job_read(path)$cleanup$required)
+
+  expect_no_error(
+    job_worker_finish(
+      worker,
+      "failed",
+      result = AgentResult(response = strrep("r", 900L * 1024L)),
+      error = simpleError(strrep("e", 4096L)),
+      reason = "bounded settlement"
+    )
+  )
+  settled <- job_read(path)
+  expect_identical(settled$status, "failed")
+  expect_equal(nchar(settled$result$response, type = "bytes"), 900L * 1024L)
+  expect_true(!is.null(settled$error))
+  expect_identical(settled$cleanup$status, "completed")
+  expect_false(settled$cleanup$required)
+  expect_identical(settled$reservations$status, "released")
+  expect_true(settled$reservations$released)
+})
+
+test_that("job admission rejects a store without settlement reserve", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-tiny-store-")
+  error <- tryCatch(
+    job_create(
+      directory,
+      job_test_agent(),
+      "tiny store",
+      "owner-1",
+      "definition-1",
+      "context-1",
+      UsageLimits(max_requests = 1L),
+      max_bytes = 2 * 1024^2
     ),
-    class = "deputy_job_persistence"
+    error = identity
   )
-  after <- job_record_read(small_path)
-  expect_identical(after$envelope$revision, before)
-  expect_identical(after$record$status, "running")
-  expect_length(after$record$runtime$effects, 0L)
+  expect_s3_class(error, "deputy_approval_error")
+  expect_identical(error$reason, "size_limit")
+  expect_length(list.dirs(directory, recursive = FALSE), 0L)
+})
+
+test_that("job_run retains committed evidence after swallowed checkpoint failure", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-run-persistence-")
+  holder <- new.env(parent = emptyenv())
+  holder$callback <- NULL
+  holder$snapshot_calls <- 0L
+  holder$swallowed <- FALSE
+  make_effect <- function(payload, index = 1L) {
+    list(
+      agent_id = "job-agent",
+      run_id = "run-1",
+      tool_call_id = sprintf("call-%d", index),
+      request = list(name = "write", arguments = list(index = index)),
+      signature = sprintf("signature-%d", index),
+      executed = TRUE,
+      status = "executing",
+      result = NULL,
+      payload = payload
+    )
+  }
+  saved_snapshot <- list(
+    effects = list(make_effect("saved")),
+    usage = S7::props(AgentUsage(requests = 1L))
+  )
+  oversized_snapshot <- list(
+    effects = lapply(seq_len(5L), function(index) {
+      make_effect(
+        strrep(intToUtf8(64L + index), 2600L * 1024L),
+        index
+      )
+    }),
+    usage = S7::props(AgentUsage(requests = 2L))
+  )
+  local_snapshot <- list(
+    effects = list(make_effect("local")),
+    usage = S7::props(AgentUsage(requests = 3L))
+  )
+  swallowed_agent_class <- R6::R6Class(
+    "JobSwallowedCheckpointAgent",
+    inherit = Agent,
+    public = list(
+      run_sync = function(...) {
+        holder$callback(self, list(type = "saved"))
+        tryCatch(
+          holder$callback(self, list(type = "oversized")),
+          deputy_job_persistence = function(error) {
+            holder$swallowed <- TRUE
+          }
+        )
+        expect_identical(holder$swallowed, TRUE)
+        AgentResult(response = "local result")
+      }
+    )
+  )
+  agent <- swallowed_agent_class$new(
+    chat = create_mock_chat(responses = list("unused"))
+  )
+  path <- job_create(
+    directory,
+    agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 3L),
+    max_bytes = 50 * 1024^2
+  )
+  local_mocked_bindings(
+    job_attach_runtime = function(agent, checkpoint, record = NULL) {
+      holder$callback <- checkpoint
+      function() invisible(NULL)
+    },
+    job_runtime_snapshot = function(agent, event = NULL) {
+      holder$snapshot_calls <- holder$snapshot_calls + 1L
+      switch(
+        as.character(holder$snapshot_calls),
+        `1` = saved_snapshot,
+        `2` = oversized_snapshot,
+        local_snapshot
+      )
+    },
+    .package = "deputy"
+  )
+
+  settled <- job_run(
+    path,
+    bind = function(job) agent,
+    authorize = job_test_receipt
+  )
+  persisted <- job_read(path)
+
+  expect_true(holder$swallowed)
+  expect_identical(holder$snapshot_calls, 2L)
+  expect_identical(settled$status, "indeterminate")
+  expect_identical(persisted$status, settled$status)
+  expect_identical(settled$result$response, "local result")
+  expect_identical(
+    settled$runtime$effects[[1L]]$payload,
+    "saved"
+  )
+  expect_false(any(vapply(
+    settled$runtime$effects,
+    function(effect) identical(effect$payload, "local"),
+    logical(1)
+  )))
+  expect_identical(persisted$runtime$effects, settled$runtime$effects)
+  expect_identical(settled$reservations$status, "preserved")
+  expect_false(settled$reservations$released)
 })
 
 test_that("checkpoint cancellation settles executing effects as indeterminate", {

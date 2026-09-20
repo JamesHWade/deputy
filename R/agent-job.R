@@ -678,7 +678,12 @@ job_record_trim_events <- function(record) {
   record
 }
 
-job_record_write <- function(path, record, lock) {
+# Active revisions leave room for the bounded result (1 MiB), cleanup evidence,
+# and terminal diagnostics. The store applies this to the complete serialized
+# envelope and its atomic replacement, without lowering its persisted limit.
+job_settlement_reserve <- 1024^2 + 128 * 1024
+
+job_record_write <- function(path, record, lock, settling = FALSE) {
   job_record_validate(record)
   envelope <- approval_store_envelope(path)
   candidate <- record
@@ -689,7 +694,14 @@ job_record_write <- function(path, record, lock) {
           path,
           candidate,
           lock,
-          max_bytes = envelope$max_bytes
+          max_bytes = envelope$max_bytes,
+          reserve_bytes = if (
+            settling || candidate$status %in% job_terminal_statuses
+          ) {
+            0
+          } else {
+            job_settlement_reserve
+          }
         )
         NULL
       },
@@ -1254,7 +1266,9 @@ job_control_record <- function(id, control_id) {
 #' @param context_revision Host revision for source context.
 #' @param usage_limits [UsageLimits] reserved for this job.
 #' @param associations Portable host conversation associations.
-#' @param max_bytes Maximum bytes for each immutable store.
+#' @param max_bytes Maximum bytes for each immutable store. Active job revisions
+#'   must also leave 1 MiB + 128 KiB per revision for cleanup and terminal
+#'   settlement; admission fails if the initial record and reserve cannot fit.
 #' @return The committed job directory.
 #' @export
 job_create <- function(
@@ -1348,7 +1362,12 @@ job_create <- function(
     manifest = manifest
   )
   job_record_validate(record)
-  path <- approval_store_create(directory, record, max_bytes = max_bytes)
+  path <- approval_store_create(
+    directory,
+    record,
+    max_bytes = max_bytes,
+    reserve_bytes = job_settlement_reserve
+  )
   control <- job_control_record(id, control_id)
   committed <- FALSE
   tryCatch(
@@ -1392,6 +1411,30 @@ job_read <- function(path) {
 }
 
 job_worker_checkpoint <- function(worker, agent, event = NULL) {
+  if (!is.null(worker$persistence_error)) {
+    rlang::cnd_signal(worker$persistence_error)
+  }
+  tryCatch(
+    job_worker_checkpoint_commit(worker, agent, event),
+    error = function(error) {
+      if (inherits(error, "deputy_job_cancelled")) {
+        rlang::cnd_signal(error)
+      }
+      failure <- tryCatch(
+        job_abort(
+          "The Agent job checkpoint could not be persisted.",
+          class = "job_persistence",
+          parent = error
+        ),
+        error = identity
+      )
+      worker$persistence_error <- worker$persistence_error %||% failure
+      rlang::cnd_signal(worker$persistence_error)
+    }
+  )
+}
+
+job_worker_checkpoint_commit <- function(worker, agent, event = NULL) {
   if (isTRUE(worker$finished)) {
     return(invisible(NULL))
   }
@@ -1411,6 +1454,7 @@ job_worker_checkpoint <- function(worker, agent, event = NULL) {
     event,
     max_bytes = job_snapshot_limit(worker)
   )
+  record <- job_record_write(worker$path, record, worker$lock)
   worker$record <- record
   if (job_control_requested(worker$path, record)) {
     reason <- job_control_read(
@@ -1433,8 +1477,6 @@ job_worker_checkpoint <- function(worker, agent, event = NULL) {
       reason = reason
     )
   }
-  record <- job_record_write(worker$path, record, worker$lock)
-  worker$record <- record
   invisible(NULL)
 }
 
@@ -1504,7 +1546,12 @@ job_worker_cleanup <- function(worker) {
     record$cleanup$owner <- "binder"
     ledger_error <- tryCatch(
       {
-        record <- job_record_write(worker$path, record, worker$lock)
+        record <- job_record_write(
+          worker$path,
+          record,
+          worker$lock,
+          settling = TRUE
+        )
         worker$record <- record
         NULL
       },
@@ -1534,7 +1581,12 @@ job_worker_cleanup <- function(worker) {
     }
     post_error <- tryCatch(
       {
-        record <- job_record_write(worker$path, record, worker$lock)
+        record <- job_record_write(
+          worker$path,
+          record,
+          worker$lock,
+          settling = TRUE
+        )
         worker$record <- record
         NULL
       },
@@ -1592,7 +1644,6 @@ job_worker_finish <- function(
   } else {
     record <- job_release_reservation(record, release = TRUE, reason = reason)
   }
-  worker$record <- record
   record <- job_record_write(worker$path, record, worker$lock)
   worker$record <- record
   worker$terminal <- status
@@ -1931,6 +1982,7 @@ job_run <- function(
     },
     error = function(error) NULL
   )
+  checkpoint_error <- worker$persistence_error %||% checkpoint_error
   if (!is.null(checkpoint_error) && is.null(run_error)) {
     run_error <- checkpoint_error
   }
@@ -1943,18 +1995,18 @@ job_run <- function(
       run_id_before,
       worker$agent$.__enclos_env__$private$current_run_id
     )
-  snapshot_error <- if (resume_not_started) {
+  snapshot_error <- if (resume_not_started || !is.null(checkpoint_error)) {
     NULL
   } else {
     tryCatch(
       {
         snapshot <- job_runtime_snapshot(worker$agent)
-        worker$record <- job_merge_snapshot(
+        candidate <- job_merge_snapshot(
           worker$record,
           snapshot,
           max_bytes = job_snapshot_limit(worker)
         )
-        worker$record <- job_record_write(path, worker$record, lock)
+        worker$record <- job_record_write(path, candidate, lock)
         NULL
       },
       error = identity
@@ -2047,9 +2099,23 @@ job_run <- function(
     record$runtime$pending_approval <- pending_path
     record["error"] <- list(NULL)
     record <- job_transition(record, "approval_pending", "approval requested")
-    worker$record <- record
-    record <- job_record_write(path, record, lock)
-    worker$record <- record
+    pending_error <- tryCatch(
+      {
+        worker$record <- job_record_write(path, record, lock)
+        NULL
+      },
+      error = identity
+    )
+    if (!is.null(pending_error)) {
+      # The pending evidence must fit with its own future settlement reserve.
+      # If it does not, retain the committed ledger and settle uncertainty.
+      job_worker_finish(
+        worker,
+        "indeterminate",
+        error = pending_error,
+        reason = "approval checkpoint could not be persisted"
+      )
+    }
   } else if (is.null(run_error) && S7::S7_inherits(result, AgentResult)) {
     worker$record <- record
     job_worker_finish(worker, "completed", result = result)

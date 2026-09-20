@@ -240,7 +240,13 @@ approval_store_unlock <- function(lock) {
   invisible(NULL)
 }
 
-approval_store_commit <- function(path, record, revision, max_bytes) {
+approval_store_commit <- function(
+  path,
+  record,
+  revision,
+  max_bytes,
+  reserve_bytes = 0
+) {
   approval_store_record(record)
   if (!identical(record$id, basename(path))) {
     approval_store_abort("Approval record does not match its directory.")
@@ -272,8 +278,8 @@ approval_store_commit <- function(path, record, revision, max_bytes) {
   auxiliary <- !files %in% approval_store_files(path)
   if (
     anyNA(sizes) ||
-      2 * length(bytes) + sum(sizes[auxiliary]) > max_bytes ||
-      length(bytes) + sum(sizes) > max_bytes
+      2 * (length(bytes) + reserve_bytes) + sum(sizes[auxiliary]) > max_bytes ||
+      length(bytes) + reserve_bytes + sum(sizes) > max_bytes
   ) {
     approval_store_abort(
       "Approval snapshot must leave room for an atomic replacement within the storage limit.",
@@ -341,7 +347,12 @@ approval_store_write_revision <- function(bytes, connection) {
   writeBin(bytes, connection)
 }
 
-approval_store_create <- function(directory, record, max_bytes = 50 * 1024^2) {
+approval_store_create <- function(
+  directory,
+  record,
+  max_bytes = 50 * 1024^2,
+  reserve_bytes = 0
+) {
   approval_store_record(record)
   max_bytes <- approval_store_limit(max_bytes)
   directory <- approval_store_path(directory)
@@ -365,12 +376,24 @@ approval_store_create <- function(directory, record, max_bytes = 50 * 1024^2) {
   )
   path <- approval_store_path(path)
   lock <- approval_store_lock(path)
-  approval_store_commit(path, record, 1, max_bytes)
+  approval_store_commit(
+    path,
+    record,
+    1,
+    max_bytes,
+    reserve_bytes = reserve_bytes
+  )
   committed <- TRUE
   path
 }
 
-approval_store_write <- function(path, record, lock, max_bytes = 50 * 1024^2) {
+approval_store_write <- function(
+  path,
+  record,
+  lock,
+  max_bytes = 50 * 1024^2,
+  reserve_bytes = 0
+) {
   path <- approval_store_path(path)
   approval_store_locked(path, lock)
   envelope <- approval_store_envelope(path)
@@ -379,5 +402,11 @@ approval_store_write <- function(path, record, lock, max_bytes = 50 * 1024^2) {
   if (envelope$revision >= 9999999999) {
     approval_store_abort("Approval revision limit reached.")
   }
-  approval_store_commit(path, record, envelope$revision + 1, max_bytes)
+  approval_store_commit(
+    path,
+    record,
+    envelope$revision + 1,
+    max_bytes,
+    reserve_bytes = reserve_bytes
+  )
 }
