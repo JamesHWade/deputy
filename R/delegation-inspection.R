@@ -565,7 +565,7 @@ inspection_record_content <- function(content) {
   record
 }
 
-inspection_replay <- function(record) {
+inspection_replay <- function(record, sanitize = FALSE) {
   allowed <- paste0(
     "ellmer::",
     c(
@@ -592,6 +592,21 @@ inspection_replay <- function(record) {
     )
   )
   inspection_portable(record)
+  reject_hidden_record <- function(value) {
+    if (!is.list(value)) {
+      return(invisible(NULL))
+    }
+    if (
+      identical(value$class, "ellmer::ContentThinking") &&
+        all(c("version", "class", "props") %in% names(value))
+    ) {
+      cli::cli_abort(
+        "Untyped tool data cannot contain private thinking records."
+      )
+    }
+    lapply(value, reject_hidden_record)
+    invisible(NULL)
+  }
   replay <- function(x) {
     if (!is.list(x) || !all(c("version", "class", "props") %in% names(x))) {
       cli::cli_abort("Invalid inspection content record.")
@@ -599,12 +614,29 @@ inspection_replay <- function(record) {
     if (!identical(x$version, 1) && !identical(x$version, 1L)) {
       cli::cli_abort("Unsupported ellmer content record version.")
     }
+    if (isTRUE(sanitize) && identical(x$class, "ellmer::ContentThinking")) {
+      return(NULL)
+    }
     if (
       !is.character(x$class) || length(x$class) != 1L || !x$class %in% allowed
     ) {
       cli::cli_abort("Unsupported inspection content class.")
     }
     props <- x$props
+    if (isTRUE(sanitize)) {
+      # Only typed content positions reach replay(). Opaque tool data keeps its
+      # meaning, while executable/private properties are never reconstructed.
+      props$tool <- NULL
+      if ("extra" %in% names(props)) {
+        props$extra <- list()
+      }
+      if ("json" %in% names(props)) {
+        props$json <- list()
+      }
+      if (identical(x$class, "ellmer::ContentToolRequest")) {
+        reject_hidden_record(props$arguments)
+      }
+    }
     if (
       !is.null(props$tool) ||
         length(props$extra) > 0L ||
@@ -621,7 +653,7 @@ inspection_replay <- function(record) {
           c("UserTurn", "AssistantTurn", "AssistantPartialTurn", "SystemTurn")
         )
     ) {
-      props$contents <- lapply(props$contents, replay)
+      props$contents <- Filter(Negate(is.null), lapply(props$contents, replay))
     }
     if (identical(x$class, "ellmer::ContentToolResult")) {
       if (!is.null(props$request)) {
@@ -663,6 +695,11 @@ inspection_replay <- function(record) {
           value
         }
       )
+      if (isTRUE(sanitize)) {
+        # Resolve typed positions first, then reject private record shapes left
+        # in opaque data. Caller-supplied markers cannot exempt unmarked data.
+        reject_hidden_record(props$value)
+      }
     }
     if (
       identical(x$class, "ellmer::ContentCitation") && !is.null(props$source)
@@ -676,6 +713,7 @@ inspection_replay <- function(record) {
     # record envelopes. Restore list-valued properties only after construction.
     safe <- x
     safe$version <- 1
+    safe$props <- props
     for (field in names(props)) {
       if (is.list(props[[field]]) || inherits(props[[field]], "S7_object")) {
         safe$props[field] <- list(

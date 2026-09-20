@@ -328,9 +328,8 @@ context_fork_turn_records <- function(turns, max_bytes, max_turns) {
           "A selected portable fork turn exceeds max_bytes."
         )
       }
-      inspection_portable(turn)
       replayed <- tryCatch(
-        inspection_replay(turn),
+        inspection_replay(turn, sanitize = TRUE),
         error = function(error) {
           context_fork_abort(
             "invalid",
