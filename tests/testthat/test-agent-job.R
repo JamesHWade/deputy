@@ -54,6 +54,32 @@ test_that("error records retain metadata within the serialized bound", {
   expect_lte(length(serialize(record, NULL, version = 3)), job_max_error_bytes)
 })
 
+test_that("large approval evidence retains its bounded resume path", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-pending-record-")
+  pending_path <- file.path(directory, "approval")
+  pending <- ApprovalContinuation(
+    id = "approval-1",
+    status = "pending",
+    request = list(
+      tool_call_id = "call-1",
+      name = "write",
+      tool_input = list(value = "x"),
+      reason = "review",
+      kind = "tool"
+    ),
+    source = list(
+      path = pending_path,
+      prior_evidence = strrep("x", 1024^2 + 1024L)
+    )
+  )
+
+  record <- job_pending_record(pending)
+
+  expect_identical(record$path, pending_path)
+  expect_true("omitted" %in% names(record))
+  expect_lte(length(serialize(record, NULL, version = 3)), 1024^2)
+})
+
 test_that("event journals evict oldest entries within the store budget", {
   directory <- withr::local_tempdir(pattern = "deputy-job-event-budget-")
   agent <- job_test_agent()
@@ -296,6 +322,65 @@ test_that("checkpoint cancellation clears a pending approval snapshot", {
   expect_true(persisted$reservations$released)
 })
 
+test_that("full job_run clears pending approval after checkpoint cancellation", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-run-approval-cancel-")
+  pending_path <- file.path(directory, "approval")
+  checkpoint_holder <- new.env(parent = emptyenv())
+  checkpoint_holder$callback <- NULL
+  checkpoint_holder$called <- FALSE
+  cancellable_agent_class <- R6::R6Class(
+    "JobCheckpointCancellationAgent",
+    inherit = Agent,
+    public = list(
+      run_sync = function(...) {
+        checkpoint_holder$called <- TRUE
+        record <- job_record_read(path)$record
+        job_control_write(path, record, "requested", "checkpoint stop")
+        checkpoint_holder$callback(self, NULL)
+      }
+    )
+  )
+  agent <- cancellable_agent_class$new(
+    chat = create_mock_chat(responses = list("unused"))
+  )
+  path <- job_create(
+    directory,
+    agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+  local_mocked_bindings(
+    job_attach_runtime = function(agent, checkpoint, record = NULL) {
+      checkpoint_holder$callback <- checkpoint
+      function() invisible(NULL)
+    },
+    job_runtime_snapshot = function(agent, event = NULL) {
+      list(pending_approval = pending_path)
+    },
+    .package = "deputy"
+  )
+
+  cancelled <- job_run(
+    path,
+    bind = function(job) agent,
+    authorize = job_test_receipt
+  )
+  persisted <- job_read(path)
+
+  expect_true(checkpoint_holder$called)
+  expect_identical(cancelled$status, "cancelled")
+  expect_null(cancelled$pending_approval)
+  expect_identical(cancelled$runtime$pending_approval, pending_path)
+  expect_identical(persisted$status, "cancelled")
+  expect_null(persisted$pending_approval)
+  expect_identical(persisted$runtime$pending_approval, pending_path)
+  expect_identical(persisted$control$status, "cancelled")
+  expect_true(persisted$control$requested)
+})
+
 test_that("job_create commits a bounded queued inspection", {
   directory <- withr::local_tempdir(pattern = "deputy-job-create-")
   agent <- job_test_agent()
@@ -535,6 +620,59 @@ test_that("failed cleanup makes an approval pending run terminal", {
       expect_identical(first$runtime$pending_approval, pending_path)
     }
   }
+})
+
+test_that("a failing approval continuation binder clears pending approval", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-pending-bind-")
+  agent <- job_test_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+  pending_path <- file.path(directory, "approval")
+  record <- job_record_read(path)$record
+  record <- job_transition(record, "running", "worker started")
+  record <- job_transition(record, "approval_pending", "approval requested")
+  record$pending_approval <- list(path = pending_path)
+  record$runtime$pending_approval <- pending_path
+  lock <- approval_store_lock(path)
+  tryCatch(
+    job_record_write(path, record, lock),
+    finally = approval_store_unlock(lock)
+  )
+
+  bound <- 0L
+  failed <- job_run(
+    path,
+    bind = function(job) {
+      bound <<- bound + 1L
+      stop("binder failed while resuming approval")
+    },
+    authorize = job_test_receipt,
+    decision = "approve"
+  )
+
+  expect_identical(bound, 1L)
+  expect_identical(failed$status, "failed")
+  expect_null(failed$pending_approval)
+  expect_null(job_read(path)$pending_approval)
+  expect_identical(job_read(path)$runtime$pending_approval, pending_path)
+
+  terminal <- job_run(
+    path,
+    bind = function(job) {
+      bound <<- bound + 1L
+      stop("a failed continuation must not bind again")
+    },
+    authorize = job_test_receipt
+  )
+  expect_identical(terminal$status, "failed")
+  expect_identical(bound, 1L)
 })
 
 test_that("abnormal worker exit persists cleanup before releasing its lock", {

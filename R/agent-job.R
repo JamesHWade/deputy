@@ -426,6 +426,7 @@ job_pending_record <- function(pending) {
   }
   if (S7::S7_inherits(pending, ApprovalContinuation)) {
     fields <- S7::props(pending)
+    path <- job_safe_string(fields$source$path, 4096L)
     for (field in c("usage", "usage_limits", "budget_ceiling")) {
       if (S7::S7_inherits(fields[[field]], AgentUsage)) {
         fields[[field]] <- S7::props(fields[[field]])
@@ -433,9 +434,10 @@ job_pending_record <- function(pending) {
         fields[[field]] <- S7::props(fields[[field]])
       }
     }
-    fields <- job_safe_value(fields, max_bytes = 1024L * 1024L)
-    if (!is.null(fields$source$path)) {
-      fields$path <- job_safe_string(fields$source$path, 4096L)
+    # Reserve room for the separately retained resume path and its metadata.
+    fields <- job_safe_value(fields, max_bytes = 1024L * 1024L - 8192L)
+    if (!is.null(path)) {
+      fields$path <- path
     }
     return(fields)
   }
@@ -457,6 +459,9 @@ job_event_append <- function(record, event) {
 job_transition <- function(record, status, reason = NULL) {
   if (!is_nonempty_string(status) || !status %in% job_status_values) {
     job_abort("Invalid Agent job status.", "job_corrupt")
+  }
+  if (status %in% job_terminal_statuses) {
+    record["pending_approval"] <- list(NULL)
   }
   previous <- record$status
   if (identical(previous, status)) {
@@ -903,7 +908,10 @@ job_merge_snapshot <- function(record, snapshot, event = NULL) {
   if ("source" %in% names(snapshot) && is.list(snapshot$source)) {
     record$source <- snapshot$source
   }
-  if ("pending_approval" %in% names(snapshot)) {
+  if (
+    !record$status %in% job_terminal_statuses &&
+      "pending_approval" %in% names(snapshot)
+  ) {
     record["pending_approval"] <- list(
       if (is.null(snapshot$pending_approval)) {
         NULL
