@@ -1396,32 +1396,13 @@ job_worker_checkpoint <- function(worker, agent, event = NULL) {
       "cancelled"
     executing <- job_record_has_executing_effect(record)
     status <- if (executing) "indeterminate" else "cancelled"
-    if (identical(status, "indeterminate")) {
-      record$cleanup$status <- "unknown"
-      record$cleanup$required <- TRUE
-      record$cleanup$reason <- "worker interrupted during an effect"
-      record <- job_release_reservation(
-        record,
-        release = FALSE,
-        reason = reason
-      )
-    } else {
-      record <- job_release_reservation(record, release = TRUE, reason = reason)
-    }
     record$error <- list(
       class = "job_cancelled",
       message = "The host requested cancellation.",
       reason = job_safe_string(reason)
     )
-    record <- job_transition(record, status, reason)
     worker$record <- record
-    record <- job_record_write(worker$path, record, worker$lock)
-    worker$record <- record
-    worker$terminal <- status
-    try(
-      job_control_write(worker$path, record, status, reason),
-      silent = TRUE
-    )
+    job_worker_finish(worker, status, reason = reason)
     job_abort(
       "The Agent job was cancelled.",
       class = "job_cancelled",

@@ -189,6 +189,113 @@ test_that("non-event size overflow is propagated without changing revision", {
   expect_length(job_record_read(path)$record$events, 0L)
 })
 
+test_that("checkpoint cancellation settles executing effects as indeterminate", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-checkpoint-effect-")
+  agent <- job_test_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+  record <- job_record_read(path)$record
+  record <- job_transition(record, "running", "worker started")
+  lock <- approval_store_lock(path)
+  on.exit(approval_store_unlock(lock), add = TRUE)
+  record <- job_record_write(path, record, lock)
+  job_control_write(path, record, "requested", "host stop")
+  worker <- new.env(parent = emptyenv())
+  worker$path <- path
+  worker$lock <- lock
+  worker$record <- record
+  worker$finished <- FALSE
+  snapshot <- list(
+    effects = list(
+      list(
+        agent_id = agent$agent_id,
+        run_id = "run-1",
+        tool_call_id = "call-1",
+        request = list(name = "write", arguments = list()),
+        signature = "signature",
+        executed = TRUE,
+        status = "executing",
+        result = NULL
+      )
+    ),
+    pending_approval = NULL
+  )
+  local_mocked_bindings(
+    job_runtime_snapshot = function(agent, event = NULL) snapshot,
+    .package = "deputy"
+  )
+
+  expect_error(
+    job_worker_checkpoint(worker, agent),
+    class = "deputy_job_cancelled"
+  )
+
+  persisted <- job_read(path)
+  expect_identical(worker$record$status, "indeterminate")
+  expect_identical(persisted$status, worker$record$status)
+  expect_identical(persisted$runtime$effects, worker$record$runtime$effects)
+  expect_identical(persisted$runtime$effects[[1L]]$status, "executing")
+  expect_identical(worker$record$reservations$status, "preserved")
+  expect_false(worker$record$reservations$released)
+  expect_identical(persisted$reservations, worker$record$reservations)
+  expect_identical(persisted$control$status, "acknowledged")
+  expect_true(persisted$control$requested)
+})
+
+test_that("checkpoint cancellation clears a pending approval snapshot", {
+  directory <- withr::local_tempdir(pattern = "deputy-job-checkpoint-approval-")
+  agent <- job_test_agent()
+  path <- job_create(
+    directory,
+    agent,
+    "answer once",
+    "owner-1",
+    "definition-1",
+    "context-1",
+    UsageLimits(max_requests = 2L)
+  )
+  record <- job_record_read(path)$record
+  record <- job_transition(record, "running", "worker started")
+  lock <- approval_store_lock(path)
+  on.exit(approval_store_unlock(lock), add = TRUE)
+  record <- job_record_write(path, record, lock)
+  job_control_write(path, record, "requested", "host stop")
+  worker <- new.env(parent = emptyenv())
+  worker$path <- path
+  worker$lock <- lock
+  worker$record <- record
+  worker$finished <- FALSE
+  pending_path <- file.path(directory, "pending-approval")
+  snapshot <- list(pending_approval = pending_path)
+  local_mocked_bindings(
+    job_runtime_snapshot = function(agent, event = NULL) snapshot,
+    .package = "deputy"
+  )
+
+  expect_error(
+    job_worker_checkpoint(worker, agent),
+    class = "deputy_job_cancelled"
+  )
+
+  persisted <- job_read(path)
+  expect_identical(worker$record$status, "cancelled")
+  expect_identical(persisted$status, worker$record$status)
+  expect_identical(persisted$runtime$pending_approval, pending_path)
+  expect_null(worker$record$pending_approval)
+  expect_null(persisted$pending_approval)
+  expect_identical(persisted$control$status, "cancelled")
+  expect_true(persisted$control$requested)
+  expect_identical(persisted$reservations, worker$record$reservations)
+  expect_true(persisted$reservations$released)
+})
+
 test_that("job_create commits a bounded queued inspection", {
   directory <- withr::local_tempdir(pattern = "deputy-job-create-")
   agent <- job_test_agent()
