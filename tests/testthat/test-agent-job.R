@@ -11,6 +11,49 @@ job_test_agent <- function(responses = list("done")) {
   Agent$new(chat = create_mock_chat(responses = responses))
 }
 
+test_that("job strings stay within UTF-8 byte boundaries", {
+  one <- "a"
+  two <- intToUtf8(0x00e9)
+  three <- intToUtf8(0x20ac)
+  four <- intToUtf8(0x1f600)
+
+  expect_identical(job_safe_string(one, 0L), "")
+  expect_identical(job_safe_string(two, 1L), "")
+  expect_identical(job_safe_string(three, 2L), "")
+  expect_identical(job_safe_string(four, 3L), "")
+  expect_identical(job_safe_string(two, 2L), two)
+  expect_identical(job_safe_string(three, 3L), three)
+  expect_identical(job_safe_string(four, 4L), four)
+})
+
+test_that("error records retain metadata within the serialized bound", {
+  two <- intToUtf8(0x00e9)
+  three <- intToUtf8(0x20ac)
+  four <- intToUtf8(0x1f600)
+  error <- structure(
+    list(
+      message = strrep(two, 10000L),
+      reason = strrep(three, 10000L),
+      phase = strrep(four, 10000L)
+    ),
+    class = c("job_test_error", strrep("x", 300L), "condition")
+  )
+
+  record <- job_error_record(error)
+
+  expect_named(record, c("class", "message", "reason", "phase"))
+  expect_identical(record$class[[1L]], "job_test_error")
+  expect_lte(nchar(record$class[[2L]], type = "bytes"), 256L)
+  expect_lte(
+    nchar(record$message, type = "bytes"),
+    job_max_error_bytes / 2L
+  )
+  expect_lte(nchar(record$reason, type = "bytes"), 1024L)
+  expect_lte(nchar(record$phase, type = "bytes"), 1024L)
+  expect_lt(nchar(record$message, type = "chars"), 10000L)
+  expect_lte(length(serialize(record, NULL, version = 3)), job_max_error_bytes)
+})
+
 test_that("job_create commits a bounded queued inspection", {
   directory <- withr::local_tempdir(pattern = "deputy-job-create-")
   agent <- job_test_agent()

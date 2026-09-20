@@ -207,11 +207,7 @@ job_safe_string <- function(value, max_bytes = job_max_error_bytes) {
   if (is.null(value) || is.na(value)) {
     return(NULL)
   }
-  value <- enc2utf8(value)
-  if (nchar(value, type = "bytes") > max_bytes) {
-    value <- substr(value, 1L, max_bytes)
-  }
-  value
+  inspection_text(value, max_bytes)
 }
 
 job_bound_value <- function(value, max_bytes) {
@@ -341,13 +337,19 @@ job_safe_event <- function(event, max_bytes = job_max_event_bytes) {
 job_error_record <- function(error) {
   classes <- as.character(class(error))
   classes <- classes[nzchar(classes)]
+  classes <- unname(unlist(
+    lapply(utils::head(unique(classes), 4L), job_safe_string, max_bytes = 256L),
+    use.names = FALSE
+  ))
   message <- tryCatch(conditionMessage(error), error = function(e) "job error")
+  reason <- tryCatch(error$reason, error = function(e) NULL)
+  phase <- tryCatch(error$phase, error = function(e) NULL)
   job_bound_value(
     list(
-      class = unique(utils::head(classes, 4L)),
-      message = job_safe_string(message),
-      reason = job_safe_string(error$reason),
-      phase = job_safe_string(error$phase)
+      class = classes,
+      message = job_safe_string(message, max_bytes = job_max_error_bytes / 2L),
+      reason = job_safe_string(reason, max_bytes = 1024L),
+      phase = job_safe_string(phase, max_bytes = 1024L)
     ),
     job_max_error_bytes
   )
