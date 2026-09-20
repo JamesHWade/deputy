@@ -443,7 +443,11 @@ DelegationSubscription <- R6::R6Class(
 
 # Budget traversal itself as well as the data. Inspect shared values without
 # materializing public records or serializing large payloads on the runtime path.
-observation_payload_fits <- function(value, max_bytes) {
+observation_payload_fits <- function(
+  value,
+  max_bytes,
+  duration_projection = FALSE
+) {
   remaining <- max_bytes
   visit <- function(value, depth = 0L, json = FALSE) {
     # Classed values become JSON text before the final envelope is serialized.
@@ -452,6 +456,30 @@ observation_payload_fits <- function(value, max_bytes) {
     remaining <<- remaining - 64
     if (remaining < 0 || depth > 64L) {
       return(FALSE)
+    }
+    if (duration_projection && is.object(value)) {
+      # Projection calls JSON only for known data shapes. Reject application
+      # classes before any generic length/format method can be dispatched.
+      classes <- class(value)
+      known <- list(
+        "factor",
+        c("ordered", "factor"),
+        "Date",
+        c("POSIXct", "POSIXt"),
+        c("POSIXlt", "POSIXt"),
+        c("AsIs", "POSIXct", "POSIXt"),
+        c("AsIs", "POSIXlt", "POSIXt")
+      )
+      container <- !inherits(value, c("Date", "POSIXt")) &&
+        (is.data.frame(value) ||
+          (inherits(value, "AsIs") && is.list(unclass(value))))
+      if (
+        !container &&
+          !inherits(value, "difftime") &&
+          !any(vapply(known, identical, logical(1), classes))
+      ) {
+        return(FALSE)
+      }
     }
     if (is.null(value) || inherits(value, "ellmer::ContentThinking")) {
       return(TRUE)
@@ -517,9 +545,26 @@ observation_payload_fits <- function(value, max_bytes) {
       return(remaining >= 0)
     }
     if (is.data.frame(value)) {
-      remaining <<- remaining -
-        inspection_data_frame_rows(value) *
-          sum(6 * nchar(names(unclass(value)), type = "bytes") + 8)
+      columns <- unclass(value)
+      row_bytes <- sum(6 * nchar(names(columns), type = "bytes") + 8)
+      if (duration_projection) {
+        # A malformed short column can repeat an omission for every declared
+        # row. Charge that expansion in this shared recursive budget before
+        # allocating it; nested frames and sibling columns share the allowance.
+        expands <- vapply(
+          columns,
+          function(column) {
+            inherits(column, "difftime") ||
+              is.data.frame(column) ||
+              (is.list(column) &&
+                (!is.object(column) || inherits(column, "AsIs")) &&
+                !inherits(column, "POSIXlt"))
+          },
+          logical(1)
+        )
+        row_bytes <- row_bytes + 128 * sum(expands)
+      }
+      remaining <<- remaining - inspection_data_frame_rows(value) * row_bytes
       if (remaining < 0) return(FALSE)
     }
     list_container <- is.data.frame(value) || inherits(value, "AsIs")

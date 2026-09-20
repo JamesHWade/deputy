@@ -22,6 +22,8 @@ delegation_disclosure_abort <- function() {
 #'   snapshot or saved history, including replayed turn content but excluding
 #'   shared R class/method metadata. Oversized disclosures fail explicitly;
 #'   select fewer children or omit transcripts. Defaults to 16 MiB.
+#'   Rich table projections also have a separate conservative 16 MiB size
+#'   estimate limit; larger projections receive an explicit omission marker.
 #' @return Read-only `DelegationDisclosure` host configuration.
 #' @export
 DelegationDisclosure <- S7::new_class(
@@ -185,6 +187,63 @@ inspection_data_frame_rows <- function(value) {
   length(row_names)
 }
 
+inspection_safe_list_view <- function(value) {
+  if (!is.object(value)) {
+    return(if (is.list(value)) value else NULL)
+  }
+  classes <- class(value)
+  if (
+    !identical(classes, "data.frame") &&
+      !identical(classes, c("tbl_df", "tbl", "data.frame")) &&
+      !identical(classes, "AsIs")
+  ) {
+    return(NULL)
+  }
+  value <- unclass(value)
+  if (!is.list(value)) {
+    return(NULL)
+  }
+  attributes(value) <- list(names = names(value))
+  value
+}
+
+inspection_duration_projection_budget <- 16 * 1024^2
+
+inspection_content_scan <- function(
+  value,
+  max_depth = 64L,
+  max_nodes = floor(inspection_duration_projection_budget / 64)
+) {
+  state <- new.env(parent = emptyenv())
+  state$nodes <- 0L
+  state$exhausted <- FALSE
+  visit <- function(current, depth) {
+    state$nodes <- state$nodes + 1L
+    if (state$nodes > max_nodes || depth > max_depth) {
+      state$exhausted <- TRUE
+      return(FALSE)
+    }
+    if (inherits(current, "ellmer::Content")) {
+      return(TRUE)
+    }
+    current_view <- inspection_safe_list_view(current)
+    if (is.null(current_view)) {
+      return(FALSE)
+    }
+    for (item in current_view) {
+      found <- visit(item, depth + 1L)
+      if (found || isTRUE(state$exhausted)) {
+        return(found)
+      }
+    }
+    FALSE
+  }
+  list(
+    found = visit(value, 0L),
+    exhausted = state$exhausted
+  )
+}
+
 inspection_duration_shape_supported <- function(value) {
   if (!inherits(value, "difftime") || length(class(value)) != 1L) {
     return(FALSE)
@@ -232,6 +291,21 @@ inspection_duration_projection <- function(value) {
     column_names <- unclass(attr(columns, "names", exact = TRUE))
     row_names <- unclass(attr(columns, "row.names", exact = TRUE))
     rows <- inspection_data_frame_rows(value)
+    # Compact row names can claim an arbitrary number of rows without
+    # allocating the row names vector. Apply the disclosure-sized observation
+    # preflight before any row-wise repetition or lapply().
+    if (
+      !isTRUE(tryCatch(
+        observation_payload_fits(
+          value,
+          inspection_duration_projection_budget,
+          duration_projection = TRUE
+        ),
+        error = function(error) FALSE
+      ))
+    ) {
+      return(inspection_duration_omission)
+    }
     columns <- lapply(columns, function(column) {
       if (inherits(column, "difftime")) {
         projected <- inspection_duration_projection(column)
@@ -509,31 +583,45 @@ inspection_record_turn <- function(turn) {
         }
         content@value <- clean(content@value)
       }
-    } else if (
-      is.data.frame(content) ||
-        is.factor(content) ||
-        inherits(content, c("Date", "POSIXt", "difftime"))
-    ) {
-      if (inherits(content, "difftime") || is.data.frame(content)) {
-        content <- inspection_duration_json(content)
-      } else {
-        content <- as.character(jsonlite::toJSON(
-          content,
-          dataframe = "rows",
-          auto_unbox = TRUE,
-          null = "null",
-          na = "null"
-        ))
+    } else {
+      safe_view <- inspection_safe_list_view(content)
+      if (!is.null(safe_view) && is.object(content)) {
+        scan <- inspection_content_scan(content)
+        if (isTRUE(scan$found)) {
+          return(lapply(safe_view, clean))
+        }
+        if (isTRUE(scan$exhausted)) {
+          return(
+            "[Unsupported tool payload omitted from retained history.]"
+          )
+        }
       }
-    } else if (is.object(content)) {
-      # Unknown application classes have no portable public record contract.
-      # Do not execute their format/record methods or lose sibling histories.
-      content <- "[Unsupported tool payload omitted from retained history.]"
-    } else if (is.list(content) && !is.object(content)) {
-      content <- lapply(
-        Filter(function(x) !inherits(x, "ellmer::ContentThinking"), content),
-        clean
-      )
+      if (
+        is.data.frame(content) ||
+          is.factor(content) ||
+          inherits(content, c("Date", "POSIXt", "difftime"))
+      ) {
+        if (inherits(content, "difftime") || is.data.frame(content)) {
+          content <- inspection_duration_json(content)
+        } else {
+          content <- as.character(jsonlite::toJSON(
+            content,
+            dataframe = "rows",
+            auto_unbox = TRUE,
+            null = "null",
+            na = "null"
+          ))
+        }
+      } else if (is.object(content)) {
+        # Unknown application classes have no portable public record contract.
+        # Do not execute their format/record methods or lose sibling histories.
+        content <- "[Unsupported tool payload omitted from retained history.]"
+      } else if (is.list(content) && !is.object(content)) {
+        content <- lapply(
+          Filter(function(x) !inherits(x, "ellmer::ContentThinking"), content),
+          clean
+        )
+      }
     }
     content
   }
@@ -568,6 +656,10 @@ inspection_record_content <- function(content) {
       if (inherits(value, "ellmer::Content")) {
         paths[[length(paths) + 1L]] <<- path
         return(inspection_record_content(value))
+      }
+      current_view <- inspection_safe_list_view(value)
+      if (!is.null(current_view)) {
+        value <- current_view
       }
       if (is.list(value) && !is.object(value)) {
         for (i in seq_along(value)) {
