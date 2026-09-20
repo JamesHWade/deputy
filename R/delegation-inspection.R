@@ -257,7 +257,11 @@ inspection_duration_projection <- function(value) {
         return(inspection_duration_projection(column))
       }
       as_is <- inherits(column, "AsIs")
-      if (is.list(column) && (!is.object(column) || as_is)) {
+      if (
+        is.list(column) &&
+          (!is.object(column) || as_is) &&
+          !inherits(column, "POSIXlt")
+      ) {
         raw_column <- if (as_is) unclass(column) else column
         if (length(raw_column) != rows) {
           return(rep(inspection_duration_omission, rows))
@@ -277,7 +281,11 @@ inspection_duration_projection <- function(value) {
     ))
   }
   as_is <- inherits(value, "AsIs")
-  if (is.list(value) && (!is.object(value) || as_is)) {
+  if (
+    is.list(value) &&
+      (!is.object(value) || as_is) &&
+      !inherits(value, "POSIXlt")
+  ) {
     raw_value <- if (as_is) unclass(value) else value
     return(lapply(raw_value, inspection_duration_projection))
   }

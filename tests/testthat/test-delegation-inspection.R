@@ -770,6 +770,16 @@ test_that("nested data frames and POSIXlt columns retain row layout", {
   expect_equal(value[[2L]]$nested$y, 6L)
   expect_identical(value[[1L]]$when, "2024-01-01")
   expect_identical(value[[2L]]$when, "2024-01-02")
+  frame$when <- I(frame$when)
+  wrapped <- jsonlite::fromJSON(
+    inspection_duration_json(frame),
+    simplifyVector = FALSE
+  )
+  expect_identical(wrapped, value)
+  expect_identical(
+    inspection_duration_projection(list(when = frame$when))$when,
+    frame$when
+  )
 })
 
 
