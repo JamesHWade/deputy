@@ -9,6 +9,17 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       if (!is.null(extracted$tool_identity_error)) {
         ellmer::tool_reject(extracted$tool_identity_error)
       }
+      nested_context <- r_session_tool_context()
+      if (!is.null(nested_context)) {
+        extracted$parent_tool_call_id <- nested_context$parent_tool_call_id
+        extracted$r_session_execution_id <- nested_context$execution_id
+        extracted$r_session_generation <- nested_context$generation
+        if (!is.null(private$.approval_dir)) {
+          ellmer::tool_reject(
+            "Nested R session tools cannot suspend for durable approval; the active R expression has no resumable stack."
+          )
+        }
+      }
       tool_name <- extracted$tool_name
       tool_input <- extracted$tool_input
       tool_annotations <- extracted$tool_annotations
@@ -79,6 +90,11 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         usage_limits = limits,
         delegation_id = record$delegation_id
       )
+      context <- utils::modifyList(
+        context,
+        r_session_tool_record_context(record),
+        keep.null = FALSE
+      )
 
       # Deputy's session-local result reader is not part of the configured tool
       # surface. Its private marker exempts only the allowlist gate; ordinary
@@ -112,6 +128,11 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       )
 
       if (S7::S7_inherits(perm_result, PermissionResultPending)) {
+        if (!is.null(nested_context)) {
+          ellmer::tool_reject(
+            "Nested R session tools cannot suspend for approval; the active R expression has no resumable stack."
+          )
+        }
         signature <- tool_request_signature(tool_name, tool_input)
         if (
           identical(signature, private$.approval_grant) &&
@@ -148,16 +169,20 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       }
 
       if (S7::S7_inherits(perm_result, PermissionResultDeny)) {
-        private$record_run_event(private$agent_event(
+        private$record_run_event(r_session_tool_agent_event(
+          private,
           "permission",
+          record,
           tool_call_id = record$tool_call_id,
           decision = "deny"
         ))
         if (isTRUE(perm_result$interrupt)) {
           private$request_stream_stop("permission_denied")
         }
-        private$notify(
+        r_session_tool_notify(
+          private,
           perm_result$reason,
+          record,
           level = "warning",
           code = "permission_denied",
           tool_name = tool_name,
@@ -186,8 +211,10 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           )
         }
         if (hook_result$permission == "deny") {
-          private$record_run_event(private$agent_event(
+          private$record_run_event(r_session_tool_agent_event(
+            private,
             "permission",
+            record,
             tool_call_id = record$tool_call_id,
             decision = "deny"
           ))
@@ -224,8 +251,10 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
 
       # Emit authorization only after Deputy's policy and hook gates have
       # accepted the request. An intermediate allow can still be denied.
-      private$record_run_event(private$agent_event(
+      private$record_run_event(r_session_tool_agent_event(
+        private,
         "permission",
+        record,
         tool_call_id = record$tool_call_id,
         decision = "allow"
       ))
@@ -259,11 +288,14 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       if (is.function(private$.job_checkpoint)) {
         private$.job_checkpoint(
           self,
-          list(
-            type = "effect_result",
-            tool_name = extracted$tool_name,
-            tool_call_id = record$tool_call_id,
-            result = result
+          c(
+            list(
+              type = "effect_result",
+              tool_name = extracted$tool_name,
+              tool_call_id = record$tool_call_id,
+              result = result
+            ),
+            r_session_tool_record_context(record)
           )
         )
       }
@@ -304,6 +336,11 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         usage = private$current_run_usage(),
         usage_limits = private$current_usage_limits,
         delegation_id = record$delegation_id
+      )
+      context <- utils::modifyList(
+        context,
+        r_session_tool_record_context(record),
+        keep.null = FALSE
       )
 
       # Fire PostToolUse hooks
@@ -384,7 +421,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         }
       }
 
-      invisible(NULL)
+      invisible(hook_tool_result)
     },
 
     # Safely extract data from an ellmer tool request.

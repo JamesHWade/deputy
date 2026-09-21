@@ -46,6 +46,8 @@ formats remain unchanged by the moves.
 | Document conversion helpers and tool | `R/tools-documents.R` |
 | Trusted one-shot R and shell execution | `R/tools-execution.R` |
 | Conversation R owner, queue and process lifecycle | `R/r-session.R` |
+| Bounded worker data bridge to explicitly selected tools | `R/r-session-tools.R` |
+| Governed nested tool invocation and enclosing execution identity | `R/tool-invocation.R` |
 | Ordered R output and static plot capture | `R/r-session-worker.R` |
 | Portable R execution evidence and display content | `R/r-session-result.R` |
 | Model-facing native text and image bounds | `R/tool-rich-results.R` |

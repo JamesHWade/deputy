@@ -80,6 +80,12 @@
   preserves both views; earlier development snapshot schemas are rejected
   (#146).
 
+* `RSession$new(agent, tools = ...)` lets R code call selected registered tools
+  through `tools$...` and retain their results as ordinary R data. Nested calls
+  use Agent permissions, hooks, limits and enclosing execution provenance.
+  Tools must use `convert = FALSE`; the worker remains explicitly trusted and
+  nested durable approvals are unsupported (#186).
+
 * `RSession` provides conversation-scoped trusted R workers with persistent
   variables, ordered console and plot results, queued calls, cancellation and
   explicit state-loss recovery. Native rich tool results now obey separate

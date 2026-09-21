@@ -80,6 +80,9 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
             new_deputy_id("tool_"),
           provider_tool_call_id = provider_tool_call_id,
           tool_name = tool_name,
+          parent_tool_call_id = extracted$parent_tool_call_id %||% NULL,
+          r_session_execution_id = extracted$r_session_execution_id %||% NULL,
+          r_session_generation = extracted$r_session_generation %||% NULL,
           delegation_id = if (
             identical(tool_name, "delegate_to_agent") ||
               !is.null(composition_tool_owner(private$.chat$get_tools()[[
@@ -100,6 +103,15 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       }
 
       record <- records[[index]]
+      for (field in c(
+        "parent_tool_call_id",
+        "r_session_execution_id",
+        "r_session_generation"
+      )) {
+        if (!is.null(extracted[[field]])) {
+          record[[field]] <- extracted[[field]]
+        }
+      }
       phase_seen_before <- isTRUE(record[[paste0(phase, "_seen")]])
       record[[paste0(phase, "_seen")]] <- TRUE
       records[[index]] <- record
@@ -131,10 +143,13 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       if (is.function(private$.job_checkpoint)) {
         private$.job_checkpoint(
           self,
-          list(
-            type = "effect_start",
-            tool_name = tool_name,
-            tool_call_id = records[[index]]$tool_call_id
+          c(
+            list(
+              type = "effect_start",
+              tool_name = tool_name,
+              tool_call_id = records[[index]]$tool_call_id
+            ),
+            r_session_tool_record_context(records[[index]])
           )
         )
       }
@@ -220,8 +235,10 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
         return(NULL)
       }
       private$tool_started_at[[record$tool_call_id]] <- Sys.time()
-      private$agent_event(
+      r_session_tool_agent_event(
+        private,
         "tool_start",
+        record,
         delegation_id = record$delegation_id,
         tool_call_id = record$tool_call_id,
         tool_name = extracted$tool_name,
@@ -249,8 +266,10 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
         override$updated_tool_output %||% extracted$tool_result
       }
 
-      private$agent_event(
+      r_session_tool_agent_event(
+        private,
         "tool_end",
+        record,
         delegation_id = record$delegation_id,
         tool_call_id = record$tool_call_id,
         tool_name = extracted$tool_name,
