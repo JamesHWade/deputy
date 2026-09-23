@@ -444,9 +444,13 @@ test_that("aborted compaction removes only provisional evidence files", {
   withr::local_options(ellmer_max_tries = 1)
   check_case <- function(mode) {
     failure <- if (mode == "cancel") {
-      reply <- runtime_reply("A summary that will be cancelled.")
-      attr(reply, "fixture_delay") <- 0.5
-      reply
+      # Streaming: the gate opens itself and `when_gate()` interrupts before
+      # the summary stream is consumed (see `fixture_gate()`).
+      fixture_gate(
+        runtime_reply("A summary that will be cancelled."),
+        "summary",
+        open_after = 0.1
+      )
     } else {
       runtime_failure(401L)
     }
@@ -509,15 +513,7 @@ test_that("aborted compaction removes only provisional evidence files", {
     } else {
       chat$token_count <- function(...) 1000
       if (mode == "cancel") {
-        deadline <- Sys.time() + 5
-        cancel <- function() {
-          if (length(server$requests()) >= 3L) {
-            agent$interrupt()
-          } else if (Sys.time() < deadline) {
-            later::later(cancel, 0.01)
-          }
-        }
-        timer <- later::later(cancel, 0.01)
+        timer <- server$when_gate("summary", function() agent$interrupt())
         agent$run_sync("Continue.")
         timer()
         expect_identical(agent$last_run()$stop_reason, "interrupted")

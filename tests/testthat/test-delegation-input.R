@@ -328,8 +328,10 @@ test_that("released ellmer model arguments use the same prepared input and fresh
   )
   expect_identical(manifest$input$constraints, "Preserve units")
   expect_identical(manifest$input$stop_conditions, "Missing identity")
+  # The fixture credential must not leak. Match it as a whole JSON string so
+  # a workspace path or fixture URL containing the word cannot trip this.
   expect_identical(
-    grepl("fixture", jsonlite::toJSON(S7::props(manifest))),
+    grepl('"fixture"', jsonlite::toJSON(S7::props(manifest)), fixed = TRUE),
     FALSE
   )
 })

@@ -345,7 +345,9 @@ test_that("stopped compaction retains settled results through save, load, and re
       runtime_reply("Export completed.")
     }
     if (outcome == "cancel") {
-      attr(summary, "fixture_delay") <- 0.5
+      # Streaming: the gate opens itself and `when_gate()` interrupts before
+      # the summary stream is consumed (see `fixture_gate()`).
+      summary <- fixture_gate(summary, "summary", open_after = 0.1)
     }
     server <- local_runtime_server(list(
       runtime_reply(tool = "export_findings"),
@@ -386,15 +388,7 @@ test_that("stopped compaction retains settled results through save, load, and re
       )
     )
     if (outcome == "cancel") {
-      deadline <- Sys.time() + 5
-      cancel_summary <- function() {
-        if (length(server$requests()) >= 2L) {
-          agent$interrupt()
-        } else if (Sys.time() < deadline) {
-          later::later(cancel_summary, 0.01)
-        }
-      }
-      cancel_timer <- later::later(cancel_summary, 0.01)
+      cancel_timer <- server$when_gate("summary", function() agent$interrupt())
     }
     error <- tryCatch(
       agent$run_sync("Perform the approved export"),
@@ -523,8 +517,11 @@ test_that("stopped compaction retains settled results through save, load, and re
 
 test_that("host edits during an asynchronous summary reject stale replacement", {
   for (edit in c("turns", "system_prompt")) {
-    reply <- runtime_reply("Stale summary")
-    attr(reply, "fixture_delay") <- 0.2
+    reply <- fixture_gate(
+      runtime_reply("Stale summary"),
+      "summary",
+      open_after = 0.1
+    )
     server <- local_runtime_server(list(reply))
     agent <- Agent$new(
       runtime_compaction_chat(server),
@@ -532,20 +529,15 @@ test_that("host edits during an asynchronous summary reject stale replacement", 
     )
     replacement <- list(ellmer::UserTurn("Host replacement"))
     changed <- FALSE
-    deadline <- Sys.time() + 5
-    edit_host <- function() {
-      if (length(server$requests())) {
-        if (edit == "turns") {
-          agent$set_turns(replacement)
-        } else {
-          agent$set_system_prompt("New host policy")
-        }
-        changed <<- TRUE
-      } else if (Sys.time() < deadline) {
-        later::later(edit_host, 0.01)
+    # Edit while the summary is in flight, before its stream is consumed.
+    timer <- server$when_gate("summary", function() {
+      if (edit == "turns") {
+        agent$set_turns(replacement)
+      } else {
+        agent$set_system_prompt("New host policy")
       }
-    }
-    timer <- later::later(edit_host, 0.01)
+      changed <<- TRUE
+    })
     error <- tryCatch(agent$run_sync("Continue"), error = identity)
     timer()
     expect_true(changed)
@@ -563,8 +555,11 @@ test_that("host edits during an asynchronous summary reject stale replacement", 
 })
 
 test_that("host history replacement preserves accrued task and summary usage", {
-  reply <- runtime_reply("Stale summary")
-  attr(reply, "fixture_delay") <- 0.2
+  reply <- fixture_gate(
+    runtime_reply("Stale summary"),
+    "summary",
+    open_after = 0.1
+  )
   server <- local_runtime_server(list(
     runtime_reply(tool = "export_findings"),
     reply
@@ -583,15 +578,8 @@ test_that("host history replacement preserves accrued task and summary usage", {
     context_policy = ContextPolicy(max_tokens = 50)
   )
   replacement <- list(ellmer::UserTurn("Host reset"))
-  deadline <- Sys.time() + 5
-  edit_host <- function() {
-    if (length(server$requests()) >= 2L) {
-      agent$set_turns(replacement)
-    } else if (Sys.time() < deadline) {
-      later::later(edit_host, 0.01)
-    }
-  }
-  timer <- later::later(edit_host, 0.01)
+  # Replace history while the summary is in flight, before it is consumed.
+  timer <- server$when_gate("summary", function() agent$set_turns(replacement))
   withr::defer(timer())
   error <- tryCatch(agent$run_sync("Export"), error = identity)
 
@@ -770,8 +758,11 @@ test_that("a summary cannot unlock task replay after a completed tool", {
 })
 
 test_that("cancelling an asynchronous summary preserves history and releases the Agent", {
-  reply <- runtime_reply("A late summary must not be installed.")
-  attr(reply, "fixture_delay") <- 0.5
+  reply <- fixture_gate(
+    runtime_reply("A late summary must not be installed."),
+    "summary",
+    open_after = 0.1
+  )
   server <- local_runtime_server(list(reply))
   backup <- local_runtime_server(list(runtime_reply("unexpected")))
   chat <- runtime_compaction_chat(server)
@@ -786,16 +777,12 @@ test_that("cancelling an asynchronous summary preserves history and releases the
   )
   hooks <- compaction_hook_log(agent)
   event_loop_progress <- FALSE
-  deadline <- Sys.time() + 5
-  interrupt_in_flight <- function() {
-    if (length(server$requests())) {
-      event_loop_progress <<- TRUE
-      agent$interrupt()
-    } else if (Sys.time() < deadline) {
-      later::later(interrupt_in_flight, 0.01)
-    }
-  }
-  cancel_timer <- later::later(interrupt_in_flight, 0.01)
+  # Interrupts in the first event-loop turn after the summary arrives, before
+  # its stream is consumed (see `fixture_gate()`).
+  cancel_timer <- server$when_gate("summary", function() {
+    event_loop_progress <<- TRUE
+    agent$interrupt()
+  })
   withr::defer(cancel_timer())
 
   promise <- agent$run_async("Continue")
