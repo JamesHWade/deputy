@@ -34,25 +34,7 @@ install_request_callbacks <- function(agent) {
   }
   callbacks <- list(
     on_request_start = function(turns) {
-      coro::async(function() {
-        tryCatch(
-          {
-            # All tool results have settled; ellmer has not stored or dispatched
-            # the pending user turn yet. Count its contents without appending it.
-            if (private$current_run_state$task_requests > 0L) {
-              pending <- utils::tail(turns, 1L)[[1L]]
-              coro::await(private$maybe_auto_compact(
-                messages = pending@contents
-              ))
-            }
-            begin_model_request(agent)
-          },
-          error = function(error) {
-            retain_pending_tool_results(agent, turns)
-            rlang::cnd_signal(error)
-          }
-        )
-      })()
+      request_start_async(agent, private, turns)
     },
     on_request_end = function(turn) end_model_request(agent, turn)
   )
@@ -69,6 +51,27 @@ install_request_callbacks <- function(agent) {
   chat$conversation_id <- private$.session_id
   invisible(NULL)
 }
+
+# Defined once so coro reuses its state machine for every model request.
+request_start_async <- coro::async(function(agent, private, turns) {
+  tryCatch(
+    {
+      # All tool results have settled; ellmer has not stored or dispatched
+      # the pending user turn yet. Count its contents without appending it.
+      if (private$current_run_state$task_requests > 0L) {
+        pending <- utils::tail(turns, 1L)[[1L]]
+        coro::await(private$maybe_auto_compact(
+          messages = pending@contents
+        ))
+      }
+      begin_model_request(agent)
+    },
+    error = function(error) {
+      retain_pending_tool_results(agent, turns)
+      rlang::cnd_signal(error)
+    }
+  )
+})
 
 retain_pending_tool_results <- function(agent, request_turns) {
   pending <- utils::tail(request_turns, 1L)[[1L]]

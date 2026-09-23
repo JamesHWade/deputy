@@ -108,21 +108,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
     },
 
     collect_governed_stream = function(governed_run) {
-      stream <- governed_run$stream
-      state <- governed_run$state
-      coro::async(function() {
-        repeat {
-          chunk <- coro::await(stream())
-          if (coro::is_exhausted(chunk)) {
-            break
-          }
-        }
-        result <- state$result
-        if (is.null(result)) {
-          cli_abort("The governed run ended without an AgentResult")
-        }
-        result
-      })()
+      collect_governed_stream_async(governed_run$stream, governed_run$state)
     },
 
     echo_chat_result = function(response, echo) {
@@ -169,50 +155,19 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
     },
 
     sync_stream_generator = function(async_stream) {
-      agent <- self
-      coro::generator(function() {
-        repeat {
-          chunk <- agent$.__enclos_env__$private$resolve_promise(
-            async_stream()
-          )
-          if (coro::is_exhausted(chunk)) {
-            break
-          }
-          coro::yield(chunk)
-        }
-      })()
+      sync_stream_adapter(agent = self, async_stream = async_stream)
     },
 
     event_generator = function(
       governed_run,
       include_partial_messages
     ) {
-      agent <- self
-      async_stream <- governed_run$stream
-      state <- governed_run$state
-      coro::generator(function() {
-        next_event <- 1L
-        exhausted <- FALSE
-        repeat {
-          while (next_event <= length(state$events)) {
-            event <- state$events[[next_event]]
-            next_event <- next_event + 1L
-            if (
-              isTRUE(include_partial_messages) ||
-                !identical(event$type, "text")
-            ) {
-              coro::yield(event)
-            }
-          }
-          if (isTRUE(exhausted)) {
-            break
-          }
-          chunk <- agent$.__enclos_env__$private$resolve_promise(
-            async_stream()
-          )
-          exhausted <- coro::is_exhausted(chunk)
-        }
-      })()
+      event_stream_generator(
+        agent = self,
+        async_stream = governed_run$stream,
+        state = governed_run$state,
+        include_partial_messages = include_partial_messages
+      )
     },
 
     request_stream_stop = function(reason) {
@@ -319,265 +274,20 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       state,
       conversation_token = NULL
     ) {
-      agent <- self
-      stream_state <- state
-      effective_run_context <- run_context
-      run_limits <- limits
-
-      coro::async_generator(function() {
-        check_conversation_lease(agent, conversation_token)
-        if (isTRUE(agent$.__enclos_env__$private$run_active)) {
-          cli::cli_abort(
-            "This agent already has an active run",
-            class = c("deputy_run_active", "deputy_error")
-          )
-        }
-
-        on.exit(
-          agent$.__enclos_env__$private$finish_callback_run(stream_state),
-          add = TRUE
-        )
-        tryCatch(
-          initialize_agent_run(
-            agent,
-            stream_state,
-            messages,
-            run_limits,
-            effective_run_context,
-            controller,
-            stream_mode
-          ),
-          error = function(error) {
-            stream_state$reason <- "error"
-            record_run_failure(agent, "initialization", error)
-            rlang::cnd_signal(error)
-          }
-        )
-        if (
-          !agent$.__enclos_env__$private$should_stop ||
-            identical(
-              agent$.__enclos_env__$private$.approval_resume$record$decision$decision,
-              "deny"
-            )
-        ) {
-          tryCatch(
-            agent$.__enclos_env__$private$execute_approval_resume(),
-            error = function(error) {
-              stream_state$reason <- "error"
-              record_run_failure(agent, "approval_resume", error)
-              rlang::cnd_signal(error)
-            }
-          )
-        }
-        tryCatch(
-          coro::await(agent$.__enclos_env__$private$maybe_auto_compact(
-            messages
-          )),
-          error = function(error) {
-            if (!agent$.__enclos_env__$private$should_stop) {
-              stream_state$reason <- "error"
-              record_run_failure(agent, "compaction", error)
-              rlang::cnd_signal(error)
-            }
-          }
-        )
-        active_run_id <- stream_state$active_run_id
-
-        if (agent$.__enclos_env__$private$should_stop) {
-          stream <- coro::async_generator(function() {
-            if (FALSE) coro::yield("unreachable")
-          })()
-        } else {
-          stream <- tryCatch(
-            agent$.__enclos_env__$private$start_async_stream(
-              messages = messages,
-              tool_mode = tool_mode,
-              stream = stream_mode,
-              controller = agent$.__enclos_env__$private$current_stream_controller,
-              structured = structured,
-              stream_type = stream_type
-            ),
-            error = function(error) {
-              promises::promise_reject(error)
-            }
-          )
-        }
-        is_generator <- inherits(stream, "coro_generator_instance")
-
-        repeat {
-          if (agent$.__enclos_env__$private$should_stop) {
-            stream_state$reason <-
-              agent$.__enclos_env__$private$stop_reason_from_hook %||%
-              "interrupted"
-            break
-          }
-
-          stream_error <- NULL
-          chunk <- NULL
-          if (isTRUE(is_generator)) {
-            chunk <- tryCatch(
-              with_run_trace(stream_state, stream()),
-              error = function(error) {
-                stream_error <<- error
-                NULL
-              }
-            )
-          } else {
-            chunk <- stream
-          }
-
-          if (is.null(stream_error) && promises::is.promising(chunk)) {
-            chunk <- tryCatch(
-              coro::await(chunk),
-              error = function(error) {
-                stream_error <<- error
-                NULL
-              }
-            )
-          }
-
-          if (!is.null(stream_error)) {
-            if (agent$.__enclos_env__$private$should_stop) {
-              stream_state$reason <-
-                agent$.__enclos_env__$private$stop_reason_from_hook %||%
-                "interrupted"
-              break
-            }
-            stream_state$reason <- "error"
-            # Structured requests record dispatch errors before applying
-            # validation; a rejected value is a separate run outcome.
-            if (is.null(structured) && is.null(stream_state$failure_phase)) {
-              record_model_failure(agent, stream_error)
-            }
-            if (
-              is.null(stream_state$failure_phase) &&
-                try_chat_fallback(agent, stream_error)
-            ) {
-              stream <- tryCatch(
-                agent$.__enclos_env__$private$start_async_stream(
-                  messages,
-                  tool_mode,
-                  stream_mode,
-                  agent$.__enclos_env__$private$current_stream_controller,
-                  structured,
-                  stream_type
-                ),
-                error = function(error) promises::promise_reject(error)
-              )
-              stream_state$reason <- "complete"
-              is_generator <- inherits(stream, "coro_generator_instance")
-              next
-            }
-            if (agent$.__enclos_env__$private$should_stop) {
-              stream_state$reason <- agent$.__enclos_env__$private$stop_reason_from_hook
-              break
-            }
-            stream_state$reason <- "error"
-            record_run_failure(
-              agent,
-              stream_state$failure_phase %||%
-                if (is.null(structured)) "stream" else "structured_output",
-              stream_error
-            )
-            rlang::cnd_signal(stream_error)
-          }
-
-          if (agent$.__enclos_env__$private$should_stop) {
-            stream_state$reason <-
-              agent$.__enclos_env__$private$stop_reason_from_hook %||%
-              "interrupted"
-            break
-          }
-
-          if (coro::is_exhausted(chunk)) {
-            break
-          }
-
-          stream_state$response_seen <- TRUE
-          if (!is.null(structured)) {
-            stream_state$structured_output <- chunk
-          }
-
-          if (inherits(chunk, "ellmer::ContentToolRequest")) {
-            extracted <- agent$.__enclos_env__$private$extract_tool_request_data(
-              chunk
-            )
-            agent$.__enclos_env__$private$record_run_event(
-              agent$.__enclos_env__$private$tool_start_event(extracted)
-            )
-          } else if (inherits(chunk, "ellmer::ContentToolResult")) {
-            stream_state$response_parts <- character()
-          } else if (inherits(chunk, "ellmer::ContentText")) {
-            stream_state$response_parts <- c(
-              stream_state$response_parts,
-              chunk@text
-            )
-            agent$.__enclos_env__$private$record_run_event(
-              AgentEvent(
-                "text",
-                run_id = active_run_id,
-                text = chunk@text,
-                is_complete = FALSE
-              )
-            )
-          } else if (is.character(chunk) && length(chunk) == 1L) {
-            stream_state$response_parts <- c(
-              stream_state$response_parts,
-              chunk
-            )
-            agent$.__enclos_env__$private$record_run_event(
-              AgentEvent(
-                "text",
-                run_id = active_run_id,
-                text = chunk,
-                is_complete = FALSE
-              )
-            )
-          } else if (
-            !inherits(chunk, "ellmer::ContentToolRequest") &&
-              !inherits(chunk, "ellmer::ContentToolResult")
-          ) {
-            agent$.__enclos_env__$private$record_run_event(
-              AgentEvent(
-                "content",
-                run_id = active_run_id,
-                content = chunk,
-                content_type = class(chunk)[[1L]] %||% "unknown"
-              )
-            )
-          }
-
-          coro::yield(chunk)
-          if (!isTRUE(is_generator)) {
-            break
-          }
-        }
-        if (
-          !is.null(extraction) &&
-            !agent$.__enclos_env__$private$should_stop &&
-            agent$.__enclos_env__$private$current_tool_calls <=
-              agent$.__enclos_env__$private$current_tool_results
-        ) {
-          extracted_output <- tryCatch(
-            coro::await(governed_structured_request(
-              agent,
-              list(
-                "Extract the requested structured result from the completed task and conversation."
-              ),
-              extraction
-            )),
-            error = function(error) {
-              if (!agent$.__enclos_env__$private$should_stop) {
-                record_run_failure(agent, "extraction", error)
-                stream_state$reason <- "error"
-                rlang::cnd_signal(error)
-              }
-              NULL
-            }
-          )
-          stream_state$structured_output <- extracted_output
-        }
-      })()
+      governed_run_stream(
+        agent = self,
+        stream_state = state,
+        messages = messages,
+        run_limits = limits,
+        effective_run_context = run_context,
+        tool_mode = tool_mode,
+        stream_mode = stream_mode,
+        controller = controller,
+        structured = structured,
+        extraction = extraction,
+        stream_type = stream_type,
+        conversation_token = conversation_token
+      )
     },
 
     # Terminal accounting for a callback-driven run: settles the stop reason,
@@ -826,3 +536,332 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
     }
   )
 }
+
+# coro caches each factory's state machine, so these factories are defined once
+# and receive per-run values as arguments instead of closing over a method
+# frame. Their bodies reference only arguments and namespace functions.
+
+collect_governed_stream_async <- coro::async(function(stream, state) {
+  repeat {
+    chunk <- coro::await(stream())
+    if (coro::is_exhausted(chunk)) {
+      break
+    }
+  }
+  result <- state$result
+  if (is.null(result)) {
+    cli_abort("The governed run ended without an AgentResult")
+  }
+  result
+})
+
+sync_stream_adapter <- coro::generator(function(agent, async_stream) {
+  repeat {
+    chunk <- agent$.__enclos_env__$private$resolve_promise(
+      async_stream()
+    )
+    if (coro::is_exhausted(chunk)) {
+      break
+    }
+    coro::yield(chunk)
+  }
+})
+
+event_stream_generator <- coro::generator(function(
+  agent,
+  async_stream,
+  state,
+  include_partial_messages
+) {
+  next_event <- 1L
+  exhausted <- FALSE
+  repeat {
+    while (next_event <= length(state$events)) {
+      event <- state$events[[next_event]]
+      next_event <- next_event + 1L
+      if (
+        isTRUE(include_partial_messages) ||
+          !identical(event$type, "text")
+      ) {
+        coro::yield(event)
+      }
+    }
+    if (isTRUE(exhausted)) {
+      break
+    }
+    chunk <- agent$.__enclos_env__$private$resolve_promise(
+      async_stream()
+    )
+    exhausted <- coro::is_exhausted(chunk)
+  }
+})
+
+# The single run kernel. Every public run interface is an adapter over this
+# lazily-started governed stream.
+governed_run_stream <- coro::async_generator(function(
+  agent,
+  stream_state,
+  messages,
+  run_limits,
+  effective_run_context,
+  tool_mode,
+  stream_mode,
+  controller,
+  structured,
+  extraction,
+  stream_type,
+  conversation_token
+) {
+  check_conversation_lease(agent, conversation_token)
+  if (isTRUE(agent$.__enclos_env__$private$run_active)) {
+    cli::cli_abort(
+      "This agent already has an active run",
+      class = c("deputy_run_active", "deputy_error")
+    )
+  }
+
+  on.exit(
+    agent$.__enclos_env__$private$finish_callback_run(stream_state),
+    add = TRUE
+  )
+  tryCatch(
+    initialize_agent_run(
+      agent,
+      stream_state,
+      messages,
+      run_limits,
+      effective_run_context,
+      controller,
+      stream_mode
+    ),
+    error = function(error) {
+      stream_state$reason <- "error"
+      record_run_failure(agent, "initialization", error)
+      rlang::cnd_signal(error)
+    }
+  )
+  if (
+    !agent$.__enclos_env__$private$should_stop ||
+      identical(
+        agent$.__enclos_env__$private$.approval_resume$record$decision$decision,
+        "deny"
+      )
+  ) {
+    tryCatch(
+      agent$.__enclos_env__$private$execute_approval_resume(),
+      error = function(error) {
+        stream_state$reason <- "error"
+        record_run_failure(agent, "approval_resume", error)
+        rlang::cnd_signal(error)
+      }
+    )
+  }
+  tryCatch(
+    coro::await(agent$.__enclos_env__$private$maybe_auto_compact(
+      messages
+    )),
+    error = function(error) {
+      if (!agent$.__enclos_env__$private$should_stop) {
+        stream_state$reason <- "error"
+        record_run_failure(agent, "compaction", error)
+        rlang::cnd_signal(error)
+      }
+    }
+  )
+  active_run_id <- stream_state$active_run_id
+
+  if (agent$.__enclos_env__$private$should_stop) {
+    stream <- coro::async_generator(function() {
+      if (FALSE) coro::yield("unreachable")
+    })()
+  } else {
+    stream <- tryCatch(
+      agent$.__enclos_env__$private$start_async_stream(
+        messages = messages,
+        tool_mode = tool_mode,
+        stream = stream_mode,
+        controller = agent$.__enclos_env__$private$current_stream_controller,
+        structured = structured,
+        stream_type = stream_type
+      ),
+      error = function(error) {
+        promises::promise_reject(error)
+      }
+    )
+  }
+  is_generator <- inherits(stream, "coro_generator_instance")
+
+  repeat {
+    if (agent$.__enclos_env__$private$should_stop) {
+      stream_state$reason <-
+        agent$.__enclos_env__$private$stop_reason_from_hook %||%
+        "interrupted"
+      break
+    }
+
+    stream_error <- NULL
+    chunk <- NULL
+    if (isTRUE(is_generator)) {
+      chunk <- tryCatch(
+        with_run_trace(stream_state, stream()),
+        error = function(error) {
+          stream_error <<- error
+          NULL
+        }
+      )
+    } else {
+      chunk <- stream
+    }
+
+    if (is.null(stream_error) && promises::is.promising(chunk)) {
+      chunk <- tryCatch(
+        coro::await(chunk),
+        error = function(error) {
+          stream_error <<- error
+          NULL
+        }
+      )
+    }
+
+    if (!is.null(stream_error)) {
+      if (agent$.__enclos_env__$private$should_stop) {
+        stream_state$reason <-
+          agent$.__enclos_env__$private$stop_reason_from_hook %||%
+          "interrupted"
+        break
+      }
+      stream_state$reason <- "error"
+      # Structured requests record dispatch errors before applying
+      # validation; a rejected value is a separate run outcome.
+      if (is.null(structured) && is.null(stream_state$failure_phase)) {
+        record_model_failure(agent, stream_error)
+      }
+      if (
+        is.null(stream_state$failure_phase) &&
+          try_chat_fallback(agent, stream_error)
+      ) {
+        stream <- tryCatch(
+          agent$.__enclos_env__$private$start_async_stream(
+            messages,
+            tool_mode,
+            stream_mode,
+            agent$.__enclos_env__$private$current_stream_controller,
+            structured,
+            stream_type
+          ),
+          error = function(error) promises::promise_reject(error)
+        )
+        stream_state$reason <- "complete"
+        is_generator <- inherits(stream, "coro_generator_instance")
+        next
+      }
+      if (agent$.__enclos_env__$private$should_stop) {
+        stream_state$reason <- agent$.__enclos_env__$private$stop_reason_from_hook
+        break
+      }
+      stream_state$reason <- "error"
+      record_run_failure(
+        agent,
+        stream_state$failure_phase %||%
+          if (is.null(structured)) "stream" else "structured_output",
+        stream_error
+      )
+      rlang::cnd_signal(stream_error)
+    }
+
+    if (agent$.__enclos_env__$private$should_stop) {
+      stream_state$reason <-
+        agent$.__enclos_env__$private$stop_reason_from_hook %||%
+        "interrupted"
+      break
+    }
+
+    if (coro::is_exhausted(chunk)) {
+      break
+    }
+
+    stream_state$response_seen <- TRUE
+    if (!is.null(structured)) {
+      stream_state$structured_output <- chunk
+    }
+
+    if (inherits(chunk, "ellmer::ContentToolRequest")) {
+      extracted <- agent$.__enclos_env__$private$extract_tool_request_data(
+        chunk
+      )
+      agent$.__enclos_env__$private$record_run_event(
+        agent$.__enclos_env__$private$tool_start_event(extracted)
+      )
+    } else if (inherits(chunk, "ellmer::ContentToolResult")) {
+      stream_state$response_parts <- character()
+    } else if (inherits(chunk, "ellmer::ContentText")) {
+      stream_state$response_parts <- c(
+        stream_state$response_parts,
+        chunk@text
+      )
+      agent$.__enclos_env__$private$record_run_event(
+        AgentEvent(
+          "text",
+          run_id = active_run_id,
+          text = chunk@text,
+          is_complete = FALSE
+        )
+      )
+    } else if (is.character(chunk) && length(chunk) == 1L) {
+      stream_state$response_parts <- c(
+        stream_state$response_parts,
+        chunk
+      )
+      agent$.__enclos_env__$private$record_run_event(
+        AgentEvent(
+          "text",
+          run_id = active_run_id,
+          text = chunk,
+          is_complete = FALSE
+        )
+      )
+    } else if (
+      !inherits(chunk, "ellmer::ContentToolRequest") &&
+        !inherits(chunk, "ellmer::ContentToolResult")
+    ) {
+      agent$.__enclos_env__$private$record_run_event(
+        AgentEvent(
+          "content",
+          run_id = active_run_id,
+          content = chunk,
+          content_type = class(chunk)[[1L]] %||% "unknown"
+        )
+      )
+    }
+
+    coro::yield(chunk)
+    if (!isTRUE(is_generator)) {
+      break
+    }
+  }
+  if (
+    !is.null(extraction) &&
+      !agent$.__enclos_env__$private$should_stop &&
+      agent$.__enclos_env__$private$current_tool_calls <=
+        agent$.__enclos_env__$private$current_tool_results
+  ) {
+    extracted_output <- tryCatch(
+      coro::await(governed_structured_request(
+        agent,
+        list(
+          "Extract the requested structured result from the completed task and conversation."
+        ),
+        extraction
+      )),
+      error = function(error) {
+        if (!agent$.__enclos_env__$private$should_stop) {
+          record_run_failure(agent, "extraction", error)
+          stream_state$reason <- "error"
+          rlang::cnd_signal(error)
+        }
+        NULL
+      }
+    )
+    stream_state$structured_output <- extracted_output
+  }
+})

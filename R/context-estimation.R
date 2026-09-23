@@ -49,11 +49,98 @@ context_count_after_unpaired_result <- function(chat, messages) {
       } else {
         list()
       }
-      do.call(
-        estimate$token_count,
-        c(pending, messages, list(include = "complete"))
-      )
+      chat_token_count(estimate, c(pending, messages))
     },
     error = function(error) NULL
   )
+}
+
+# Ask a Chat for its complete context size, or NULL when it cannot count.
+# Calls to ellmer's own token_count() skip failures already observed: the
+# unpaired token table, and providers without a token-counting method.
+chat_token_count <- function(chat, messages) {
+  ellmer_count <- is_ellmer_token_count(chat)
+  turns <- NULL
+  if (ellmer_count) {
+    if (ellmer_token_count_unsupported(chat)) {
+      return(NULL)
+    }
+    turns <- tryCatch(chat$get_turns(), error = function(e) NULL)
+    if (!is.null(turns) && ellmer_token_table_fails(turns)) {
+      return(NULL)
+    }
+  }
+  tryCatch(
+    do.call(chat$token_count, c(messages, list(include = "complete"))),
+    error = function(error) {
+      if (ellmer_count) {
+        ellmer_token_count_observe(chat, error)
+        ellmer_token_table_observe(turns, error)
+      }
+      NULL
+    }
+  )
+}
+
+is_ellmer_token_count <- function(chat) {
+  is_ellmer_chat_method(chat, "token_count") &&
+    is_ellmer_chat_method(chat, "get_tokens") &&
+    is_ellmer_chat_method(chat, "get_provider")
+}
+
+# ellmer dispatches token counting on the provider's S7 class; its base method
+# reports every provider without a specialised method as unsupported. Methods
+# are registered when a package loads, so an observation is kept only while
+# the same namespaces and ellmer Chat method remain.
+ellmer_token_count_provider <- function(chat) {
+  provider <- tryCatch(chat$get_provider(), error = function(e) NULL)
+  if (is.null(provider)) {
+    return(NULL)
+  }
+  paste(class(provider), collapse = "/")
+}
+
+ellmer_token_count_current <- function(observed) {
+  !is.null(observed) &&
+    identical(observed$body, body(ellmer::Chat$public_methods$token_count)) &&
+    identical(observed$namespaces, loadedNamespaces())
+}
+
+ellmer_token_count_unsupported <- function(chat) {
+  observed <- ellmer_observations$token_count
+  if (!length(observed$unsupported) || !is_ellmer_token_count(chat)) {
+    return(FALSE)
+  }
+  provider <- ellmer_token_count_provider(chat)
+  !is.null(provider) &&
+    provider %in% observed$unsupported &&
+    ellmer_token_count_current(observed)
+}
+
+ellmer_token_count_observe <- function(chat, error) {
+  if (
+    !inherits(error, "not_implemented") ||
+      !grepl(
+        "doesn't support token counting",
+        conditionMessage(error),
+        fixed = TRUE
+      )
+  ) {
+    return(invisible(NULL))
+  }
+  provider <- ellmer_token_count_provider(chat)
+  if (is.null(provider)) {
+    return(invisible(NULL))
+  }
+  observed <- ellmer_observations$token_count
+  if (!ellmer_token_count_current(observed)) {
+    observed <- list(
+      body = body(ellmer::Chat$public_methods$token_count),
+      namespaces = loadedNamespaces(),
+      unsupported = character()
+    )
+  }
+  observed$unsupported <- union(observed$unsupported, provider)
+  ellmer_observations$token_count <- observed
+  invisible(NULL)
 }

@@ -29,7 +29,27 @@ r_session_tool_abandoned_condition <- function(reason) {
   )
 }
 
+# Deputy is the only producer of nested R session tool contexts. Counting the
+# dynamic extents in which it has pushed one lets ordinary tool requests skip
+# ellmer::tool_context(), which signals an error outside tool invocations.
+r_session_nested_contexts <- new.env(parent = emptyenv())
+r_session_nested_contexts$depth <- 0L
+
+with_r_session_tool_context <- function(context, code) {
+  r_session_nested_contexts$depth <- r_session_nested_contexts$depth + 1L
+  on.exit(
+    {
+      r_session_nested_contexts$depth <- r_session_nested_contexts$depth - 1L
+    },
+    add = TRUE
+  )
+  ellmer::with_tool_context(context, code)
+}
+
 r_session_tool_context <- function() {
+  if (r_session_nested_contexts$depth < 1L) {
+    return(NULL)
+  }
   context <- tryCatch(
     ellmer::tool_context(),
     error = function(error) NULL
@@ -83,13 +103,16 @@ r_session_tool_agent_event <- function(private, type, record, ...) {
 
 r_session_tool_notify_observers <- function(private, phase, payload) {
   callbacks <- private[[paste0(".tool_", phase, "_observers")]]
-  coro::async(function() {
-    for (callback in callbacks) {
-      coro::await(callback(payload))
-    }
-    invisible(NULL)
-  })()
+  r_session_tool_notify_async(callbacks, payload)
 }
+
+# Defined once so coro reuses its state machine for every notification.
+r_session_tool_notify_async <- coro::async(function(callbacks, payload) {
+  for (callback in callbacks) {
+    coro::await(callback(payload))
+  }
+  invisible(NULL)
+})
 
 r_session_tool_notify <- function(private, message, record, ...) {
   do.call(
@@ -464,7 +487,7 @@ r_session_tool_dispatcher <- function(
       value <- tryCatch(
         {
           live()
-          ellmer::with_tool_context(
+          with_r_session_tool_context(
             tool_context,
             private$handle_tool_request(request)
           )
@@ -490,7 +513,7 @@ r_session_tool_dispatcher <- function(
           ) {
             resolved <- private$resolve_tool_arguments(name, arguments)
           }
-          coro::await(ellmer::with_tool_context(
+          coro::await(with_r_session_tool_context(
             tool_context,
             private$execute_tool(selected[[name]]$source, resolved, execution)
           ))
