@@ -6,13 +6,17 @@ local_r_tool_journey <- function(
   timeout = 30,
   .local_envir = parent.frame()
 ) {
-  server <- local_runtime_server(
-    list(
-      runtime_reply(tool = "run_r_code", arguments = list(code = code)),
-      runtime_reply("done")
-    ),
-    .local_envir = .local_envir
+  # Each code string is one model run: a run_r_code call, then a final reply.
+  replies <- unlist(
+    lapply(code, function(step) {
+      list(
+        runtime_reply(tool = "run_r_code", arguments = list(code = step)),
+        runtime_reply("done")
+      )
+    }),
+    recursive = FALSE
   )
+  server <- local_runtime_server(replies, .local_envir = .local_envir)
   agent <- Agent$new(
     chat = runtime_chat(server),
     tools = list(tool),
@@ -78,19 +82,31 @@ r_bridge_run_later <- function(seconds) {
 }
 
 test_that("an execution timeout settles the pending nested request", {
+  # The tool never resolves on its own: the test releases the late result
+  # itself after the run, so no timer races the execution deadline.
   calls <- 0L
+  resolve_late <- NULL
   fixture <- local_r_tool_journey(
     r_bridge_test_tool(function() {
       calls <<- calls + 1L
       promises::promise(function(resolve, reject) {
-        later::later(function() resolve("late result"), 2)
+        resolve_late <<- resolve
       })
     }),
-    "x <- tools$fetch(); cat('unreachable')",
-    timeout = 1
+    c(
+      "invisible(jsonlite::toJSON(1)); cat('warm')",
+      "x <- tools$fetch(); cat('unreachable')"
+    ),
+    timeout = 5
   )
+  # A first governed run starts the worker and loads the bridge's
+  # dependencies, so the timed execution only has to send its request.
+  fixture$agent$chat("Warm up the session.")
+  expect_identical(fixture$agent$last_run()$stop_reason, "complete")
+  expect_identical(calls, 0L)
   fixture$agent$chat("Fetch slowly.")
   run <- fixture$agent$last_run()
+  expect_identical(calls, 1L)
   expect_identical(run$stop_reason, "complete")
   expect_identical(run$usage$tool_calls, 2L)
   expect_identical(fixture$session$status()$last_reset, "timed_out")
@@ -103,9 +119,10 @@ test_that("an execution timeout settles the pending nested request", {
     "ended before the nested tool result arrived (reason: timed_out)",
     fixed = TRUE
   )
-  expect_identical(calls, 1L)
 
-  r_bridge_run_later(2.5)
+  expect_true(is.function(resolve_late))
+  resolve_late("late result")
+  r_bridge_run_later(0.5)
   expect_identical(fixture$agent$last_run(), run)
   expect_identical(fixture$session$status()$queued, 0L)
 })
