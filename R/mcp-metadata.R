@@ -1,13 +1,26 @@
-# Compatibility bridge for mcptools 1.0.2 ----------------------------------
+# Compatibility bridge for qualified mcptools releases ---------------------
 # mcptools::mcp_tools() owns connections, schemas and invocation. Its released
 # converter discards annotations and origin. Read its existing descriptors;
 # never reconnect just to fetch metadata or mutate its namespace.
 
-mcp_metadata_state <- function() {
-  version <- as.character(utils::packageVersion("mcptools"))
-  if (!identical(version, "1.0.2")) {
+# Exact releases whose internals the bridge and client worker were checked
+# against. 1.0.3 changed only DESCRIPTION, NEWS.md and one upstream test; its
+# R/ sources are identical to 1.0.2. Add a release only after reviewing it.
+mcptools_qualified_versions <- c("1.0.2", "1.0.3")
+
+mcptools_version_qualified <- function(
+  version = as.character(utils::packageVersion("mcptools"))
+) {
+  version %in% mcptools_qualified_versions
+}
+
+mcp_metadata_state <- function(
+  version = as.character(utils::packageVersion("mcptools"))
+) {
+  if (!mcptools_version_qualified(version)) {
+    qualified <- mcptools_qualified_versions
     abort_deputy(
-      "MCP metadata requires the qualified {.pkg mcptools} 1.0.2 release; found {version}.",
+      "MCP metadata requires a qualified {.pkg mcptools} release ({.val {qualified}}); found {.val {version}}.",
       class = "mcp_metadata"
     )
   }
@@ -106,11 +119,17 @@ mcp_tool_with_metadata <- function(tool, state, servers) {
           class = "mcp_metadata"
         )
       }
-      do.call(original, arguments)
+      mcp_check_stdio_server(transport, server_name)
+      result <- do.call(original, arguments)
+      if (is.null(result)) {
+        mcp_abort_lost_response(transport, server_name)
+      }
+      result
     }),
     rlang::env(
       original = tool,
       server_name = server_name,
+      transport = transport,
       is_current = is_current
     )
   )
@@ -136,6 +155,46 @@ mcp_tool_with_metadata <- function(tool, state, servers) {
   )
   attr(result, "deputy_mcp_connection_current") <- is_current
   result
+}
+
+# mcptools' converted tool returns NULL only when no JSON-RPC response for the
+# call was read: the stdio transport gave up after its polling window, or the
+# first line read carried neither `result` nor `error`. A legitimate empty
+# CallToolResult converts to "" or an empty list, never NULL. This path cannot
+# see the reply's id, so it fails closed on the first lost reply and stops the
+# server; no later line can then be read as another call's answer.
+mcp_abort_lost_response <- function(transport, server_name) {
+  if (identical(transport$type, "stdio")) {
+    process <- transport$process
+    if (!isTRUE(process$is_alive())) {
+      mcp_check_stdio_server(transport, server_name)
+    }
+    try(process$kill(), silent = TRUE)
+  }
+  abort_deputy(
+    c(
+      "MCP server {.val {server_name}} did not respond within the client's response window.",
+      "x" = "The server was stopped; its session state is lost.",
+      "i" = "Reconnect with {.fn tools_mcp} and register its tools again."
+    ),
+    class = "mcp_desynchronized"
+  )
+}
+
+mcp_check_stdio_server <- function(transport, server_name) {
+  if (
+    identical(transport$type, "stdio") &&
+      !isTRUE(transport$process$is_alive())
+  ) {
+    abort_deputy(
+      c(
+        "MCP server {.val {server_name}} is not running; its session state is lost.",
+        "i" = "Reconnect with {.fn tools_mcp} and register its tools again."
+      ),
+      class = "mcp_server_exit"
+    )
+  }
+  invisible(NULL)
 }
 
 mcp_tool_is_current <- function(tool) {

@@ -5,8 +5,8 @@
 #' mcptools' connection registry independent of other connections. mcptools owns
 #' transport and authentication; the selected server owns execution.
 #'
-#' This temporary adapter is qualified for mcptools 1.0.2 and uses its internal
-#' request and shutdown functions. Public replacements are tracked upstream in
+#' This temporary adapter is qualified for mcptools 1.0.2 and 1.0.3 and uses
+#' their internal request and shutdown functions. Public replacements are tracked upstream in
 #' issues 129 and 130. Other versions fail explicitly.
 #'
 #' @details
@@ -22,6 +22,13 @@
 #' `$cancel()` terminates the connection and its process tree, discarding server
 #' session state. It does not promise a state-preserving interpreter interrupt.
 #' Timeouts also close the connection; old tools cannot reconnect implicitly.
+#'
+#' The qualified mcptools releases wait about 4 seconds for a stdio reply and
+#' do not match replies to requests. If a server does not answer in that
+#' window, or a reply does not match its request, the call fails with a
+#' `deputy_mcp_desynchronized` error and the connection closes, because a late
+#' reply would otherwise answer the next request. The server's session state is
+#' lost; create a new connection to continue.
 #'
 #' Owner identifiers and run context prevent accidental cross-Agent reuse; the
 #' host remains responsible for authentication and assigning those identifiers.
@@ -86,6 +93,10 @@ McpConnection <- R6::R6Class(
       rlang::check_installed("mcptools", reason = "to create an MCP connection")
       mcp_metadata_state()
       private$server <- server
+      private$adapter_version <- paste(
+        "mcptools",
+        utils::packageVersion("mcptools")
+      )
       private$timeout <- timeout
       private$id <- new_deputy_id("mcp_")
       private$worker <- callr::r_session$new(
@@ -119,7 +130,8 @@ McpConnection <- R6::R6Class(
           config = selected,
           server = server,
           working_dir = agent$working_dir,
-          load_tools = length(tools) > 0L
+          load_tools = length(tools) > 0L,
+          qualified_versions = mcptools_qualified_versions
         )
       )
       startup <- NULL
@@ -190,7 +202,7 @@ McpConnection <- R6::R6Class(
         reason = private$reason,
         allowed = private$allowed,
         execution = attr(self, "deputy_mcp_repl", exact = TRUE),
-        adapter_version = "mcptools 1.0.2"
+        adapter_version = private$adapter_version
       )
     },
 
@@ -274,8 +286,13 @@ McpConnection <- R6::R6Class(
       private$check_current()
       result <- lapply(private$allowed$tools, function(name) {
         descriptor <- private$descriptors[[name]]
+        repl <- !is.null(attr(self, "deputy_mcp_repl", exact = TRUE)) &&
+          identical(name, "repl")
         invoke <- function(arguments) {
           private$check_allowed(name, "tools")
+          if (repl) {
+            arguments <- mcp_repl_bound_arguments(arguments)
+          }
           private$request("tool", list(name = name, arguments = arguments))
         }
         fun <- rlang::new_function(
@@ -291,7 +308,11 @@ McpConnection <- R6::R6Class(
         tool <- ellmer::tool(
           fun,
           name = name,
-          description = descriptor$description,
+          description = if (repl) {
+            mcp_repl_tool_description(descriptor$description)
+          } else {
+            descriptor$description
+          },
           arguments = descriptor$arguments,
           convert = descriptor$convert,
           annotations = mcp_ellmer_annotations(descriptor$annotations, name)
@@ -396,6 +417,7 @@ McpConnection <- R6::R6Class(
     allowed = NULL,
     descriptors = NULL,
     timeout = NULL,
+    adapter_version = NULL,
     state = "starting",
     reason = NULL,
     pending_reject = NULL,
@@ -534,6 +556,9 @@ McpConnection <- R6::R6Class(
                   private$terminate("response_failed")
                 } else if (mcp_connection_server_exited(e)) {
                   private$terminate("server_exited")
+                } else if (mcp_connection_desynchronized(e)) {
+                  private$terminate("desynchronized")
+                  e <- mcp_desynchronized_error(private$server, e)
                 }
                 reject(e)
               }
