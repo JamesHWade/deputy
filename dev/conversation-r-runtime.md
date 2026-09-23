@@ -26,6 +26,67 @@ not ask Agent permission. This is process isolation with the local account's
 access, not an OS security sandbox. Hosts needing untrusted multi-user execution
 must provide a suitable external isolation boundary.
 
+## Compose selected tools from R
+
+A host can select tools that R code may request through Deputy:
+
+```r
+fetch_measurements <- ellmer::tool(
+  function(project) {
+    if (!identical(project, "pilot")) stop("Unknown project")
+    data.frame(temperature = c(10, 20, 30), yield = c(2, 4, 6))
+  },
+  name = "fetch_measurements",
+  description = "Fetch measurements for a project.",
+  arguments = list(project = ellmer::type_string("Project name.")),
+  convert = FALSE,
+  annotations = ellmer::tool_annotations(
+    read_only_hint = TRUE, destructive_hint = FALSE, open_world_hint = FALSE
+  )
+)
+agent$register_tool(fetch_measurements)
+r_session <- deputy::RSession$new(agent, tools = "fetch_measurements")
+agent$register_tools(r_session$tools(), replace = TRUE)
+```
+
+During governed `run_r_code` execution, generated R can then use:
+
+```r
+measurements <- tools$fetch_measurements(project = "pilot")
+fit <- lm(yield ~ temperature, data = measurements)
+# A later run_r_code call can use the same objects:
+summary(fit)
+```
+
+The host retains the executable tool and permission policy. The worker gets a
+data bridge and callable stubs, without serialized host closures. Its existing
+trusted account and environment access still applies. Selection limits the available
+names; it does not grant permission. Every nested invocation passes through
+Agent governance, counts toward tool limits, and records its own call ID with
+`parent_tool_call_id` identifying the enclosing `run_r_code` call. The tool's
+ordinary R data result is available for subsequent computation.
+
+Selected tools must use `convert = FALSE` and validate their inputs. The bridge
+passes raw JSON-compatible arguments; it does not use ellmer's private argument
+converter. Recursive execution and delegation tools are unsupported. Direct
+host `$run()` cannot invoke selected tools outside a governed execution.
+Sessions with selected tools cannot be created when the Agent has `approval_dir`
+configured. A permission callback that requests pending approval also fails
+before the nested effect: the R stack cannot be suspended and restored. Use a
+separate direct tool call for that approval.
+
+The bridge supports asynchronous tools, but arbitrary synchronous host tools
+can still block the host. A nested tool must return within the remaining
+execution `timeout`; otherwise the execution times out, the session resets and
+its variables are lost, and the nested call is recorded as a tool error under
+its own call ID. R receives the tool's original value: a `PostToolUse` hook's
+`updated_tool_output` changes the event and transcript, not the R result.
+Cancellation discards the worker channel and prevents
+a late response from reaching another execution; it cannot undo a service
+effect already performed. This is still trusted local execution, not sandbox
+enforcement or automatic recovery. See ADR-0028 and issues #187 and #188 for
+those follow-ups.
+
 ## Execution and recovery
 
 Variables, functions, options and loaded packages persist in the worker. Calls

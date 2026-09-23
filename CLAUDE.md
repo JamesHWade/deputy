@@ -58,6 +58,8 @@ deputy/
 │   ├── tools-documents.R   # Document conversion
 │   ├── r-session.R        # Conversation-scoped trusted R worker owner
 │   ├── r-session-worker.R # Ordered evaluate output and plot capture
+│   ├── r-session-tools.R  # Bounded data bridge to selected host tools
+│   ├── tool-invocation.R  # Governed nested tool admission and invocation
 │   ├── r-session-result.R # Native ellmer content and portable display evidence
 │   ├── tool-rich-results.R # Independent native text and image context bounds
 │   ├── tools-execution.R   # Trusted one-shot R and shell tools
@@ -559,6 +561,17 @@ mutable S7 class environments; legacy value digests remain supported.
 See `dev/conversation-r-runtime.md` for host lifecycle and recovery contracts.
 `evaluate`, `grDevices` and `htmltools` support capture and escaped displays;
 shinychat remains optional. This is not an OS security sandbox.
+
+`RSession$new(agent, tools = c("fetch_measurements"))` opts into worker calls
+to selected registered tools through `tools$fetch_measurements(...)`. Selected
+tools use `convert = FALSE` and validate their raw arguments. The bridge does
+not transfer host closures; trusted account/environment access still applies.
+The bridge requires the exact active governed
+R execution; direct `$run()` does not borrow its authority. Nested calls reuse
+Agent permissions, hooks, limits and tool evidence, with enclosing tool-call
+correlation. Nested durable approvals and recursive execution are unsupported.
+See ADR-0028; sandbox integration and explicit durable recovery remain separate
+backlog stages.
 
 ### Tool Presets
 

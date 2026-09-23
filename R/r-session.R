@@ -8,6 +8,21 @@
 #' The worker executes with the local account's access. It provides process
 #' isolation, not an OS security sandbox. Agent permissions gate the registered
 #' tool; `$run()` is an explicit trusted host operation, not a governed Agent run.
+#' With selected `tools`, code calls `tools$<name>(...)` during a governed
+#' `run_r_code` call. Selected tools must use `convert = FALSE` and validate raw
+#' JSON arguments. Calls pass Agent permissions, hooks and usage limits; their
+#' events carry `parent_tool_call_id`. Direct `$run()` is unavailable when tools
+#' are selected. A nested tool must return within the remaining execution
+#' `timeout`; otherwise the execution times out, the session resets and its
+#' variables are lost, and the nested call is recorded as a tool error. R
+#' receives the tool's original value; a `PostToolUse` hook's
+#' `updated_tool_output` applies only to the event and transcript.
+#' Recursive execution and nested durable approvals are unsupported.
+#' Sessions with selected tools cannot be created when `approval_dir` is configured.
+#' Requests are limited to 256 KiB and ordinary data results to 8 MiB serialized.
+#' The bridge never transfers host tool closures. Trusted account and environment
+#' access still applies, and cancellation cannot undo an external effect.
+#'
 #' Each call starts in the Agent's immutable working directory. A `setwd()` in
 #' evaluated code applies only until the next call.
 #'
@@ -34,6 +49,9 @@ RSession <- R6::R6Class(
   public = list(
     #' @description Create a lazy R worker owner. No code is executed here.
     #' @param agent Agent owning the session and its conversation identity.
+    #' @param tools Character vector of explicitly selected Agent tool names
+    #'   that generated R may call through `tools$<name>(...)`. The default
+    #'   keeps the worker's existing behavior and exposes no Agent tools.
     #' @param timeout Maximum seconds for each dispatched execution.
     #' @param startup_timeout Maximum seconds for worker startup.
     #' @param queue_limit Maximum waiting calls, excluding the active call.
@@ -47,10 +65,26 @@ RSession <- R6::R6Class(
       queue_limit = 16L,
       max_output_bytes = 8 * 1024 * 1024,
       plot_width = 1000L,
-      plot_height = 650L
+      plot_height = 650L,
+      tools = character()
     ) {
       private$owner <- r_session_owner(agent)
       private$agent <- agent
+      private$tool_names <- r_session_tool_names(tools)
+      if (
+        length(private$tool_names) &&
+          !is.null(r_session_tool_agent_private(agent)$.approval_dir)
+      ) {
+        abort_deputy(
+          "R sessions with selected tools cannot use an Agent with durable approvals configured.",
+          class = "r_session_tool"
+        )
+      }
+      private$tool_specs <- if (length(private$tool_names)) {
+        r_session_tool_specs(agent, private$tool_names)
+      } else {
+        list()
+      }
       for (name in c("timeout", "startup_timeout")) {
         value <- get(name)
         if (
@@ -97,6 +131,7 @@ RSession <- R6::R6Class(
       private$id <- new_deputy_id("r_session_")
       private$resource <- new.env(parent = emptyenv())
       private$resource$worker <- NULL
+      private$bridge_root <- NULL
       invisible(self)
     },
 
@@ -105,17 +140,21 @@ RSession <- R6::R6Class(
     tools = function() {
       private$check_current()
       tool <- ellmer::tool(
-        function(code) self$run(code),
+        function(code) private$enqueue(code, execution_id = NULL),
         name = "run_r_code",
         description = paste(
-          "Run R code in this conversation's persistent trusted R session.",
-          "Variables and loaded packages persist between ordered calls.",
-          "You and the user receive output, warnings, errors and rendered plots.",
-          "Create static base, ggplot2, grid or patchwork figures normally; print plots inside loops.",
-          "Interactive htmlwidgets and rich HTML tables are not supported; print underlying data for tables.",
-          "Perform follow-up calculations and revisions yourself.",
-          "After a reported reset, rerun required setup; old variables are gone.",
-          "The session uses the local account's files and network access; it is not an OS sandbox."
+          c(
+            "Run R code in this conversation's persistent trusted R session.",
+            "Variables and loaded packages persist between ordered calls.",
+            "You and the user receive output, warnings, errors and rendered plots.",
+            "Create static base, ggplot2, grid or patchwork figures normally; print plots inside loops.",
+            "Interactive htmlwidgets and rich HTML tables are not supported; print underlying data for tables.",
+            "Perform follow-up calculations and revisions yourself.",
+            "After a reported reset, rerun required setup; old variables are gone.",
+            "The session uses the local account's files and network access; it is not an OS sandbox.",
+            r_session_tool_description(private$tool_specs)
+          ),
+          collapse = " "
         ),
         arguments = list(code = ellmer::type_string("R code to execute.")),
         annotations = ellmer::tool_annotations(
@@ -126,6 +165,12 @@ RSession <- R6::R6Class(
         )
       )
       attr(tool, "deputy_r_session_owner") <- private$owner
+      if (length(private$tool_names)) {
+        attr(tool, "deputy_r_session_invoke") <- function(code, execution_id) {
+          private$enqueue(code, execution_id = execution_id)
+        }
+        attr(tool, "deputy_r_session_tool_names") <- private$tool_names
+      }
       attr(tool, "deputy_r_session_cancel_active") <- function() {
         if (!is.null(private$active) || length(private$queue)) {
           self$cancel()
@@ -141,36 +186,7 @@ RSession <- R6::R6Class(
     #'   worker failures and cancelled queued calls are retained as result evidence.
     run = function(code) {
       private$check_current()
-      if (!is_nonempty_string(code) || nchar(code, "bytes") > 256 * 1024) {
-        abort_deputy(
-          "{.arg code} must be one non-empty string of at most 256 KiB.",
-          class = "r_session"
-        )
-      }
-      if (
-        is.null(private$active) &&
-          !is.null(private$resource$worker) &&
-          !private$resource$worker$is_alive()
-      ) {
-        private$reset("worker_exited")
-      }
-      if (length(private$queue) >= private$settings$queue_limit) {
-        abort_deputy(
-          "The R session waiting queue is full.",
-          class = "r_session_busy"
-        )
-      }
-      promises::promise(function(resolve, reject) {
-        private$queue <- c(
-          private$queue,
-          list(list(
-            id = new_deputy_id("r_call_"),
-            code = code,
-            resolve = resolve
-          ))
-        )
-        private$drain()
-      })
+      private$enqueue(code, execution_id = NULL)
     },
 
     #' @description Inspect local worker state without executing R code.
@@ -217,8 +233,11 @@ RSession <- R6::R6Class(
   private = list(
     agent = NULL,
     owner = NULL,
+    tool_names = character(),
+    tool_specs = list(),
     settings = NULL,
     resource = NULL,
+    bridge_root = NULL,
     id = NULL,
     state = "new",
     generation = 0L,
@@ -236,7 +255,285 @@ RSession <- R6::R6Class(
         )
       }
     },
+    enqueue = function(code, execution_id = NULL) {
+      private$check_current()
+      if (!is_nonempty_string(code) || nchar(code, "bytes") > 256 * 1024) {
+        abort_deputy(
+          "{.arg code} must be one non-empty string of at most 256 KiB.",
+          class = "r_session"
+        )
+      }
+      run_id <- NULL
+      if (length(private$tool_names)) {
+        if (!is_nonempty_string(execution_id)) {
+          abort_deputy(
+            "R code with bridged Agent tools must run inside its active governed tool execution.",
+            class = "r_session_tool_context"
+          )
+        }
+        agent_private <- r_session_tool_agent_private(private$agent)
+        run_id <- if (
+          !is.null(agent_private) && isTRUE(agent_private$run_active)
+        ) {
+          agent_private$current_run_id
+        } else {
+          NULL
+        }
+        if (!is_nonempty_string(run_id)) {
+          abort_deputy(
+            "R session tool calls require the owning Agent's active governed run.",
+            class = "r_session_tool_context"
+          )
+        }
+      }
+      dispatch <- NULL
+      if (length(private$tool_names)) {
+        dispatch <- r_session_tool_dispatcher(
+          private$agent,
+          private$tool_names,
+          parent_tool_call_id = execution_id,
+          run_id = run_id
+        )
+      }
+      if (
+        is.null(private$active) &&
+          !is.null(private$resource$worker) &&
+          !private$resource$worker$is_alive()
+      ) {
+        private$reset("worker_exited")
+      }
+      if (length(private$queue) >= private$settings$queue_limit) {
+        abort_deputy(
+          "The R session waiting queue is full.",
+          class = "r_session_busy"
+        )
+      }
+      promises::promise(function(resolve, reject) {
+        private$queue <- c(
+          private$queue,
+          list(list(
+            id = new_deputy_id("r_call_"),
+            code = code,
+            resolve = resolve,
+            governed_execution_id = execution_id,
+            run_id = run_id,
+            dispatch = dispatch,
+            tool_requests = new.env(parent = emptyenv())
+          ))
+        )
+        private$drain()
+      })
+    },
+    bridge_directory = function(job) {
+      if (is.null(private$bridge_root)) {
+        private$bridge_root <- tempfile("deputy-r-tools-")
+        if (!dir.create(private$bridge_root, recursive = TRUE, mode = "0700")) {
+          abort_deputy(
+            "Could not create the R session tool mailbox.",
+            class = "r_session_tool_mailbox"
+          )
+        }
+      }
+      directory <- file.path(
+        private$bridge_root,
+        paste0("generation-", private$generation),
+        paste0("call-", job$id)
+      )
+      if (!dir.create(directory, recursive = TRUE, mode = "0700")) {
+        abort_deputy(
+          "Could not create the R session execution mailbox.",
+          class = "r_session_tool_mailbox"
+        )
+      }
+      directory
+    },
+    cleanup_bridge = function() {
+      if (!is.null(private$bridge_root)) {
+        unlink(private$bridge_root, recursive = TRUE, force = TRUE)
+        private$bridge_root <- NULL
+      }
+      invisible(NULL)
+    },
+    active_job = function(job) {
+      !is.null(private$active) && identical(private$active$id, job$id)
+    },
+    write_tool_response = function(
+      job,
+      request,
+      status,
+      value = NULL,
+      error = NULL
+    ) {
+      if (!private$active_job(job)) {
+        return(invisible(NULL))
+      }
+      request_id <- request$request_id
+      if (
+        exists(request_id, envir = job$tool_requests, inherits = FALSE) &&
+          identical(get(request_id, envir = job$tool_requests), "settled")
+      ) {
+        return(invisible(NULL))
+      }
+      response <- tryCatch(
+        r_session_tool_response(
+          request,
+          status = status,
+          value = value,
+          error = error,
+          session_id = private$id,
+          call_id = job$id,
+          generation = job$generation
+        ),
+        error = function(condition) {
+          list(
+            protocol = r_session_tool_protocol_version,
+            request_id = request_id,
+            session_id = private$id,
+            call_id = job$id,
+            execution_id = job$governed_execution_id,
+            generation = job$generation,
+            tool_name = request$tool_name %||% "unknown",
+            status = "error",
+            error = r_session_tool_error_message(condition)
+          )
+        }
+      )
+      path <- file.path(job$mailbox_dir, paste0(request_id, ".response.json"))
+      tryCatch(
+        r_session_tool_atomic_write(
+          path,
+          r_session_tool_json(
+            response,
+            r_session_tool_max_result_bytes * 2L,
+            context = "response"
+          )
+        ),
+        error = function(condition) {
+          # The worker may have timed out or the owner may be resetting.  In
+          # either case there is no later execution to which this response may
+          # be delivered.
+          invisible(NULL)
+        }
+      )
+      assign(request_id, "settled", envir = job$tool_requests)
+      invisible(NULL)
+    },
+    poll_tool_mailbox = function(job) {
+      if (
+        !length(private$tool_names) ||
+          is.null(job$mailbox_dir) ||
+          !dir.exists(job$mailbox_dir)
+      ) {
+        return(invisible(NULL))
+      }
+      paths <- list.files(
+        job$mailbox_dir,
+        pattern = "\\.request\\.json$",
+        full.names = TRUE,
+        no.. = TRUE
+      )
+      for (path in paths) {
+        request_id <- sub("\\.request\\.json$", "", basename(path))
+        if (exists(request_id, envir = job$tool_requests, inherits = FALSE)) {
+          next
+        }
+        assign(request_id, "processing", envir = job$tool_requests)
+        request <- tryCatch(
+          r_session_tool_read_json(
+            path,
+            r_session_tool_max_request_bytes,
+            context = "request"
+          ),
+          error = function(condition) condition
+        )
+        if (inherits(request, "condition")) {
+          # A malformed request cannot be safely associated with an execution;
+          # mark it consumed and leave the worker to report its bounded timeout.
+          assign(request_id, "settled", envir = job$tool_requests)
+          next
+        }
+        validated <- tryCatch(
+          r_session_tool_validate_request(
+            request,
+            session_id = private$id,
+            call_id = job$id,
+            execution_id = job$governed_execution_id,
+            generation = job$generation,
+            tool_names = private$tool_names,
+            request_basename = basename(path)
+          ),
+          error = function(condition) condition
+        )
+        if (inherits(validated, "condition")) {
+          if (
+            is.list(request) &&
+              is_nonempty_string(request$request_id) &&
+              r_session_tool_valid_request_id(request$request_id) &&
+              identical(request$request_id, request_id)
+          ) {
+            private$write_tool_response(
+              job,
+              request,
+              status = "error",
+              error = r_session_tool_error_message(validated)
+            )
+          } else {
+            assign(request_id, "settled", envir = job$tool_requests)
+          }
+          next
+        }
+        value <- tryCatch(
+          job$dispatch(
+            validated$tool_name,
+            validated$arguments,
+            execution_id = job$id,
+            generation = as.character(job$generation)
+          ),
+          error = function(condition) condition
+        )
+        if (inherits(value, "condition")) {
+          private$write_tool_response(
+            job,
+            request,
+            status = "error",
+            error = r_session_tool_error_message(value)
+          )
+          next
+        }
+        if (promises::is.promising(value)) {
+          local({
+            pending_request <- request
+            promises::then(
+              value,
+              function(result) {
+                private$write_tool_response(
+                  job,
+                  pending_request,
+                  "ok",
+                  value = result
+                )
+                invisible(NULL)
+              },
+              function(condition) {
+                private$write_tool_response(
+                  job,
+                  pending_request,
+                  "error",
+                  error = r_session_tool_error_message(condition)
+                )
+                invisible(NULL)
+              }
+            )
+          })
+          assign(request_id, "pending", envir = job$tool_requests)
+        } else {
+          private$write_tool_response(job, request, "ok", value = value)
+        }
+      }
+      invisible(NULL)
+    },
     reset = function(reason) {
+      private$cleanup_bridge()
       worker <- private$resource$worker
       private$resource$worker <- NULL
       if (!is.null(worker)) {
@@ -281,6 +578,18 @@ RSession <- R6::R6Class(
       invisible(NULL)
     },
     settle = function(job, segments, outcome) {
+      if (!is.null(job$mailbox_dir)) {
+        unlink(job$mailbox_dir, recursive = TRUE)
+      }
+      # Record any nested tool request still in flight before the enclosing
+      # run_r_code result is released, so its record is still open. A late
+      # nested result is then dropped rather than reaching a later execution.
+      if (!is.null(job$dispatch)) {
+        abandon <- attr(job$dispatch, "deputy_r_session_abandon", exact = TRUE)
+        if (is.function(abandon)) {
+          tryCatch(abandon(outcome), error = function(condition) NULL)
+        }
+      }
       job$resolve(r_session_result(
         code = job$code,
         segments = segments,
@@ -328,6 +637,12 @@ RSession <- R6::R6Class(
             private$resource$worker <- worker
             private$generation <- private$generation + 1L
           }
+          job$fresh <- fresh
+          job$generation <- private$generation
+          if (length(private$tool_names)) {
+            job$mailbox_dir <- private$bridge_directory(job)
+          }
+          private$active <- job
           private$active$fresh <- fresh
           private$active$generation <- private$generation
           private$active$reset_reason <- if (fresh) private$last_reset else NULL
@@ -364,7 +679,14 @@ RSession <- R6::R6Class(
                         working_dir = private$owner$working_dir,
                         max_output_bytes = private$settings$max_output_bytes,
                         plot_width = private$settings$plot_width,
-                        plot_height = private$settings$plot_height
+                        plot_height = private$settings$plot_height,
+                        mailbox_dir = job$mailbox_dir,
+                        session_id = private$id,
+                        call_id = job$id,
+                        execution_id = job$governed_execution_id,
+                        generation = job$generation,
+                        tool_specs = private$tool_specs,
+                        tool_timeout = private$settings$timeout
                       )
                     )
                     dispatched <<- TRUE
@@ -396,7 +718,10 @@ RSession <- R6::R6Class(
                     return(invisible(NULL))
                   }
                 }
-                later::later(poll, 0.01)
+                if (dispatched && private$active_job(job)) {
+                  private$poll_tool_mailbox(job)
+                }
+                if (private$active_job(job)) later::later(poll, 0.01)
               },
               error = function(e) private$reset("worker_failed")
             )

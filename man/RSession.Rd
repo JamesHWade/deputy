@@ -12,6 +12,21 @@ Calls queue in order and return promises without blocking other conversations.
 The worker executes with the local account's access. It provides process
 isolation, not an OS security sandbox. Agent permissions gate the registered
 tool; \verb{$run()} is an explicit trusted host operation, not a governed Agent run.
+With selected \code{tools}, code calls \verb{tools$<name>(...)} during a governed
+\code{run_r_code} call. Selected tools must use \code{convert = FALSE} and validate raw
+JSON arguments. Calls pass Agent permissions, hooks and usage limits; their
+events carry \code{parent_tool_call_id}. Direct \verb{$run()} is unavailable when tools
+are selected. A nested tool must return within the remaining execution
+\code{timeout}; otherwise the execution times out, the session resets and its
+variables are lost, and the nested call is recorded as a tool error. R
+receives the tool's original value; a \code{PostToolUse} hook's
+\code{updated_tool_output} applies only to the event and transcript.
+Recursive execution and nested durable approvals are unsupported.
+Sessions with selected tools cannot be created when \code{approval_dir} is configured.
+Requests are limited to 256 KiB and ordinary data results to 8 MiB serialized.
+The bridge never transfers host tool closures. Trusted account and environment
+access still applies, and cancellation cannot undo an external effect.
+
 Each call starts in the Agent's immutable working directory. A \code{setwd()} in
 evaluated code applies only until the next call.
 
@@ -56,7 +71,8 @@ Owners and executable tools cannot be cloned or transferred between Agents.
   queue_limit = 16L,
   max_output_bytes = 8 * 1024 * 1024,
   plot_width = 1000L,
-  plot_height = 650L
+  plot_height = 650L,
+  tools = character()
 )}
     \if{html}{\out{</div>}}
   }
@@ -70,6 +86,9 @@ Owners and executable tools cannot be cloned or transferred between Agents.
       \item{\code{max_output_bytes}}{Maximum retained output bytes per execution.
 This bounds captured evidence, not arbitrary R allocations or effects.}
       \item{\code{plot_width, plot_height}}{PNG plot dimensions in pixels.}
+      \item{\code{tools}}{Character vector of explicitly selected Agent tool names
+that generated R may call through \verb{tools$<name>(...)}. The default
+keeps the worker's existing behavior and exposes no Agent tools.}
     }
     \if{html}{\out{</div>}}
   }

@@ -2675,7 +2675,12 @@ Agent <- R6::R6Class(
             private$active_owned_tools[[id]] <- NULL
           }
         })
-        value <- do.call(tool, arguments)
+        invoke <- attr(source, "deputy_r_session_invoke", exact = TRUE)
+        value <- if (is.function(invoke)) {
+          invoke(arguments$code, execution_id)
+        } else {
+          do.call(tool, arguments)
+        }
         if (!promises::is.promising(value)) {
           return(value)
         }
