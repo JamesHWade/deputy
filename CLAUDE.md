@@ -857,49 +857,16 @@ validation runs; main-branch validations are retained. For local debugging, set
 `TESTTHAT_PARALLEL=false` to run tests sequentially. See `dev/ci-performance.md`
 for measured timings and the remaining gap to the two-minute target.
 
-The automatic Claude review workflow runs only for PR branches in this
-repository. Fork PRs receive an explicit skip explanation in the workflow
-summary and require maintainer review; their ordinary CI still runs. The fork
-notice has no token permissions, checkout, or secrets. Keep this workflow on
-`pull_request`; do not use a privileged fork checkout to bypass authentication
-restrictions. This policy applies to automatic review, not the separate
-mention-triggered Claude workflow.
-
-The same-repository job passes the action its supported `github_token` input with
-`contents: read`, `issues: read`, and `pull-requests: write`; it does not request
-OIDC or an App token. Reviews post as `github-actions[bot]`.
-Draft PRs explicitly skip automatic review until ready. Ready reviews check out the
-exact PR head and preserve the upstream plugin's skip policy. Its successful,
-denial-free invocation can explicitly skip a trivial change, a now-closed/draft PR,
-or a PR with a prior Claude review comment. Closed/draft state and prior bot review comments
-are checked against GitHub. A skip explicitly states that this run did not review
-the current head; an older review never counts as current-run completion.
-Before starting the SDK, the workflow checks for a prior bot review comment with
-the established provenance marker from a different run or attempt. A prior run
-can publish while this run starts; the current run's own marker never qualifies.
-That confirmed upstream skip needs no model
-call and emits an eligibility-stage result. PRs without that evidence invoke the
-existing plugin normally; GitHub eligibility lookup failures fail the job.
-This eligibility decision follows the upstream comment-presence rule. It does
-not validate the earlier run's conclusion or certify it as a completed review.
-Current-run completion remains subject to all SDK and GitHub evidence checks.
-Completed reviews require a current-run `github-actions[bot]` summary tied to that SHA; findings
-also require exact-commit inline comments linking the same workflow run and attempt
-(the upstream sanitizer strips HTML comments from inline bodies). Missing evidence
-fails the review job; recovered tool denials remain visible diagnostics when
-completion is verified. Cancelled runs remain cancelled. The only uploaded diagnostic is `claude-review-outcome.json`: fixed
-outcome/reason values, the target SHA, a denial count, allowlisted operation
-names, plugin/agent attempt and success counts, whether the successful plugin received `--comment`,
-and the reviewer's enum-only outcome/reason report. The report never substitutes
-for verified completion evidence. Never upload the raw SDK execution file or enable full-output logging.
-Completed outcomes require a successful plugin invocation with `--comment` and
-agent execution, matched to non-error SDK tool results and excluding denied calls.
-The verifier is copied out of the model workspace before review and its digest is
-checked before execution. This protects against model-workspace changes; it is not
-an immutable security boundary against repository writers, who can also edit the
-workflow. This workflow trusts same-repository writers, and the action retains its
-actor write-access check. Fork contributions remain excluded.
-Run workflow evidence tests with `node --test .github/scripts/claude-review-outcome.test.cjs`.
+`claude-code-review.yml` follows Anthropic's documented setup: the official
+`anthropics/claude-code-action@v1` runs the `code-review` plugin with
+`/code-review:code-review --comment`. The plugin posts only high-confidence
+findings (inline and as a summary) and skips closed, draft and already-reviewed
+PRs. There is no custom verifier or outcome protocol; the job fails only when the
+action itself fails. It runs for same-repository, non-draft PRs. Fork PRs never
+receive reviewer credentials and need maintainer review; keep this workflow on
+`pull_request` and never check out fork code with secrets. The mention-triggered
+`claude.yml` workflow is separate. To review a later commit on an
+already-reviewed PR, comment `@claude review` or run `/code-review` locally.
 
 See `dev/runtime-modules.md` for internal module boundaries and the documented
 size exception for the public Agent facade.
