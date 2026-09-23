@@ -101,7 +101,8 @@ hooks, budgets and execution provenance.</p>
 
 <dt id="arg-timeout">timeout<a class="anchor" aria-label="anchor" href="#arg-timeout"></a></dt>
 <dd><p>Maximum seconds for one MCP request. This is distinct from
-mcp-repl's <code>timeout_ms</code>, which can return a busy result while code continues.</p></dd>
+mcp-repl's <code>timeout_ms</code>, which can return a busy result while code continues.
+Deputy forwards at most 3000 ms as <code>timeout_ms</code> (see Details).</p></dd>
 
 
 <dt id="arg-startup-timeout">startup_timeout<a class="anchor" aria-label="anchor" href="#arg-startup-timeout"></a></dt>
@@ -114,11 +115,18 @@ mcp-repl's <code>timeout_ms</code>, which can return a busy result while code co
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>The producer contract is qualified with mcptools 1.0.2 and mcp-repl 0.3.0.
+    <p>The producer contract is qualified with mcptools 1.0.2 or 1.0.3 and mcp-repl 0.3.0.
 The executable must be installed and configured by the host. mcp-repl owns
 interpreter startup, sandbox enforcement, reset, interrupt, rich content and
 oversized-output artifacts. The client requires its <code>repl(input, timeout_ms)</code>
 tool contract; it does not infer a binary version from the executable name.</p>
+<p>Each <code>repl</code> call forwards <code>timeout_ms</code> capped at 3000 ms, and 3000 ms when
+it is omitted (mcp-repl would otherwise wait up to 60 s). The qualified
+mcptools releases wait only about 4 seconds for a stdio reply, and a reply
+that misses that window would desynchronize the connection. Work that takes
+longer keeps running in the interpreter: the call returns mcp-repl's busy
+result, and a later call with empty <code>input</code> retrieves the remaining output.
+The registered tool description tells the model this.</p>
 <p>A busy interpreter result is upstream output, not a completed calculation.
 After such a response, <code><a href="mcp_repl_control.html">mcp_repl_control()</a></code> can request an interrupt or reset.
 An active client request cannot accept a second request: use <code>$cancel()</code> to

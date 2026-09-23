@@ -5,9 +5,10 @@ keeps mcptools' connection registry independent of other connections.
 mcptools owns transport and authentication; the selected server owns
 execution.
 
-This temporary adapter is qualified for mcptools 1.0.2 and uses its
-internal request and shutdown functions. Public replacements are tracked
-upstream in issues 129 and 130. Other versions fail explicitly.
+This temporary adapter is qualified for mcptools 1.0.2 and 1.0.3 and
+uses their internal request and shutdown functions. Public replacements
+are tracked upstream in issues 129 and 130. Other versions fail
+explicitly.
 
 ## Details
 
@@ -24,6 +25,13 @@ conversation ends. `$cancel()` terminates the connection and its process
 tree, discarding server session state. It does not promise a
 state-preserving interpreter interrupt. Timeouts also close the
 connection; old tools cannot reconnect implicitly.
+
+The qualified mcptools releases wait about 4 seconds for a stdio reply
+and do not match replies to requests. If a server does not answer in
+that window, or a reply does not match its request, the call fails with
+a `deputy_mcp_desynchronized` error and the connection closes, because a
+late reply would otherwise answer the next request. The server's session
+state is lost; create a new connection to continue.
 
 Owner identifiers and run context prevent accidental cross-Agent reuse;
 the host remains responsible for authentication and assigning those

@@ -467,12 +467,13 @@ see the mcptools documentation for setup.</p>
 </h3>
 <p>For service tools,
 <code>tools_mcp(config, servers = "evidence")</code> selects an exact
-configured server name before connecting. The qualified mcptools 1.0.2
-bridge retains annotations from the server and records
-<code>source$type = "mcp"</code>, its server name, and tool name. It
-reports missing metadata rather than inventing safe effects. Other
-mcptools versions fail explicitly pending qualification. The caller must
-trust the configured service; metadata does not establish trust.</p>
+configured server name before connecting. The bridge, qualified for
+mcptools 1.0.2 and 1.0.3, retains annotations from the server and
+records <code>source$type = "mcp"</code>, its server name, and tool
+name. It reports missing metadata rather than inventing safe effects.
+Other mcptools versions fail explicitly pending qualification. The
+caller must trust the configured service; metadata does not establish
+trust.</p>
 <p>Pass these objects to <code>Agent$new(tools = ...)</code>,
 <code>register_tools()</code>, or an explicit tool registry used by
 <code><a href="../reference/agent_definition_read.html">agent_definition_read()</a></code>. The same metadata survives YAML
@@ -543,7 +544,14 @@ Shiny session’s end callback. <code>$cancel()</code> terminates the
 connection and discards its server session state. A timeout does the
 same; old tool handles never start a replacement connection
 implicitly.</p>
-<p>This is a temporary, version-checked mcptools 1.0.2 adapter. It uses
+<p>A stdio server must answer each request within mcptools’ response
+window of about 4 seconds. If it does not, or a reply does not match its
+request, the call fails with a <code>deputy_mcp_desynchronized</code>
+error and the connection closes. Its session state is lost, and a late
+reply can never become the answer to a later call. Create a new
+connection to continue.</p>
+<p>This is a temporary adapter checked against an explicit list of
+qualified mcptools releases (currently 1.0.2 and 1.0.3). It uses
 upstream transport, authentication, tool conversion and shutdown with a
 small internal request bridge. Public replacements are requested in <a href="https://github.com/posit-dev/mcptools/issues/129" class="external-link">mcptools
 #129</a>, <a href="https://github.com/posit-dev/mcptools/issues/130" class="external-link">#130</a>, and <a href="https://github.com/posit-dev/mcptools/issues/109" class="external-link">#109</a>.</p>
@@ -604,7 +612,11 @@ request. <code>connection$cancel()</code> or interruption of the owning
 Agent terminates that connection and discards its state. mcp-repl’s
 <code>timeout_ms</code> can instead return control while interpreter
 work continues; the client’s <code>timeout</code> closes the connection
-when the MCP request itself takes too long.</p>
+when the MCP request itself takes too long. Deputy forwards
+<code>timeout_ms</code> capped at 3000 ms, and 3000 ms when it is
+omitted, to stay inside mcptools’ stdio response window. Longer cells
+return mcp-repl’s busy status; the model retrieves their output with a
+later call whose <code>input</code> is empty.</p>
 <p>Plots retain ellmer image content. Oversized transcripts retain
 mcp-repl’s bounded previews and artifact references, and ordinary Deputy
 result offloading still applies when configured. These paths are
@@ -612,7 +624,8 @@ upstream-owned session artifacts; the host must preserve anything it
 needs durably before closing the session. Deputy does not create another
 spill store or automatically read every linked artifact.</p>
 <p>The tested producer combination is mcptools 1.0.2 with mcp-repl 0.3.0
-on macOS. The executable name does not establish its version. Install
+on macOS; mcptools 1.0.3 has identical client sources and is also
+qualified. The executable name does not establish its version. Install
 the qualified runtime explicitly; unsupported host sandboxing remains an
 upstream startup error. Put the sandbox mode in <code>--sandbox</code>;
 a <code>--config sandbox_mode=...</code> override is rejected so it

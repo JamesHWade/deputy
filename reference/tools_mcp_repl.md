@@ -43,7 +43,11 @@ tools_mcp_repl(
 
 ## Value
 
-A list of ellmer-compatible tools from the selected mcp-repl server.
+A list of ellmer-compatible tools from the selected mcp-repl server. The
+`repl` tool forwards `timeout_ms` capped at 3000 ms, as described in
+[`mcp_repl_connection()`](https://jameshwade.github.io/deputy/reference/mcp_repl_connection.md);
+longer work returns a busy result and a later call with empty `input`
+retrieves its output.
 
 ## Examples
 

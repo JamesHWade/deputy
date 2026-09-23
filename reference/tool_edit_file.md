@@ -43,6 +43,6 @@ replacement count.
 path <- tempfile(fileext = ".txt")
 writeLines("alpha", path)
 tool_edit_file(path, "alpha", "beta")
-#> [1] "Successfully edited /tmp/Rtmp3SBWkP/file1ae04a7feb22.txt (1 replacement)"
+#> [1] "Successfully edited /tmp/RtmpoXacEh/file1a964ab9db8f.txt (1 replacement)"
 unlink(path)
 ```

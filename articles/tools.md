@@ -311,12 +311,12 @@ setup.
 ### Server metadata and reconnection
 
 For service tools, `tools_mcp(config, servers = "evidence")` selects an
-exact configured server name before connecting. The qualified mcptools
-1.0.2 bridge retains annotations from the server and records
-`source$type = "mcp"`, its server name, and tool name. It reports
-missing metadata rather than inventing safe effects. Other mcptools
-versions fail explicitly pending qualification. The caller must trust
-the configured service; metadata does not establish trust.
+exact configured server name before connecting. The bridge, qualified
+for mcptools 1.0.2 and 1.0.3, retains annotations from the server and
+records `source$type = "mcp"`, its server name, and tool name. It
+reports missing metadata rather than inventing safe effects. Other
+mcptools versions fail explicitly pending qualification. The caller must
+trust the configured service; metadata does not establish trust.
 
 Pass these objects to `Agent$new(tools = ...)`, `register_tools()`, or
 an explicit tool registry used by
@@ -394,7 +394,14 @@ session’s end callback. `$cancel()` terminates the connection and
 discards its server session state. A timeout does the same; old tool
 handles never start a replacement connection implicitly.
 
-This is a temporary, version-checked mcptools 1.0.2 adapter. It uses
+A stdio server must answer each request within mcptools’ response window
+of about 4 seconds. If it does not, or a reply does not match its
+request, the call fails with a `deputy_mcp_desynchronized` error and the
+connection closes. Its session state is lost, and a late reply can never
+become the answer to a later call. Create a new connection to continue.
+
+This is a temporary adapter checked against an explicit list of
+qualified mcptools releases (currently 1.0.2 and 1.0.3). It uses
 upstream transport, authentication, tool conversion and shutdown with a
 small internal request bridge. Public replacements are requested in
 [mcptools \#129](https://github.com/posit-dev/mcptools/issues/129),
@@ -468,7 +475,10 @@ An active client request cannot accept an overlapping control request.
 that connection and discards its state. mcp-repl’s `timeout_ms` can
 instead return control while interpreter work continues; the client’s
 `timeout` closes the connection when the MCP request itself takes too
-long.
+long. Deputy forwards `timeout_ms` capped at 3000 ms, and 3000 ms when
+it is omitted, to stay inside mcptools’ stdio response window. Longer
+cells return mcp-repl’s busy status; the model retrieves their output
+with a later call whose `input` is empty.
 
 Plots retain ellmer image content. Oversized transcripts retain
 mcp-repl’s bounded previews and artifact references, and ordinary Deputy
@@ -478,8 +488,9 @@ needs durably before closing the session. Deputy does not create another
 spill store or automatically read every linked artifact.
 
 The tested producer combination is mcptools 1.0.2 with mcp-repl 0.3.0 on
-macOS. The executable name does not establish its version. Install the
-qualified runtime explicitly; unsupported host sandboxing remains an
+macOS; mcptools 1.0.3 has identical client sources and is also
+qualified. The executable name does not establish its version. Install
+the qualified runtime explicitly; unsupported host sandboxing remains an
 upstream startup error. Put the sandbox mode in `--sandbox`; a
 `--config sandbox_mode=...` override is rejected so it cannot change the
 policy Deputy checked.

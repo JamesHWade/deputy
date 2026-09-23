@@ -43,6 +43,7 @@ mcp_repl_connection(
 
   Maximum seconds for one MCP request. This is distinct from mcp-repl's
   `timeout_ms`, which can return a busy result while code continues.
+  Deputy forwards at most 3000 ms as `timeout_ms` (see Details).
 
 - startup_timeout:
 
@@ -56,12 +57,21 @@ The host must close it when the conversation ends.
 
 ## Details
 
-The producer contract is qualified with mcptools 1.0.2 and mcp-repl
-0.3.0. The executable must be installed and configured by the host.
-mcp-repl owns interpreter startup, sandbox enforcement, reset,
+The producer contract is qualified with mcptools 1.0.2 or 1.0.3 and
+mcp-repl 0.3.0. The executable must be installed and configured by the
+host. mcp-repl owns interpreter startup, sandbox enforcement, reset,
 interrupt, rich content and oversized-output artifacts. The client
 requires its `repl(input, timeout_ms)` tool contract; it does not infer
 a binary version from the executable name.
+
+Each `repl` call forwards `timeout_ms` capped at 3000 ms, and 3000 ms
+when it is omitted (mcp-repl would otherwise wait up to 60 s). The
+qualified mcptools releases wait only about 4 seconds for a stdio reply,
+and a reply that misses that window would desynchronize the connection.
+Work that takes longer keeps running in the interpreter: the call
+returns mcp-repl's busy result, and a later call with empty `input`
+retrieves the remaining output. The registered tool description tells
+the model this.
 
 A busy interpreter result is upstream output, not a completed
 calculation. After such a response,

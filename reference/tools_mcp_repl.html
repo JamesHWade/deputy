@@ -106,7 +106,10 @@ also controls network access according to its server configuration.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A list of ellmer-compatible tools from the selected mcp-repl server.</p>
+    <p>A list of ellmer-compatible tools from the selected mcp-repl server.
+The <code>repl</code> tool forwards <code>timeout_ms</code> capped at 3000 ms, as described in
+<code><a href="mcp_repl_connection.html">mcp_repl_connection()</a></code>; longer work returns a busy result and a later
+call with empty <code>input</code> retrieves its output.</p>
     </div>
 
     <div class="section level2">
