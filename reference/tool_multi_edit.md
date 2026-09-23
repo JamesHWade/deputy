@@ -37,6 +37,6 @@ tool_multi_edit(
   path,
   list(list(old_text = "alpha", new_text = "gamma"))
 )
-#> [1] "Successfully applied 1 edit(s) to /tmp/RtmphIqCz7/file1aad7d3ce6a.txt (1 total replacement)"
+#> [1] "Successfully applied 1 edit(s) to /tmp/RtmpKZcW4n/file1ad2388bdd2c.txt (1 total replacement)"
 unlink(path)
 ```
