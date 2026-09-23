@@ -53,3 +53,23 @@ without a compatibility shim or Deputy validator dependency.
 
 Evidence: [ellmer on CRAN](https://cran.r-project.org/package=ellmer) and
 [ellmer 0.5.0 source](https://github.com/tidyverse/ellmer/tree/v0.5.0).
+
+## Temporary GitHub coro dependency (2026-09-24)
+
+CRAN coro 1.1.0 builds each generator and async instance with a unique closure
+body, so R's JIT recompiles the whole state machine on every instance
+(r-lib/coro#71). In Deputy that was 73 to 85% of main-process test CPU and about
+0.3 to 0.7 s of CPU per model request (#185, #192). The fix, r-lib/coro#72, is
+merged but unreleased.
+
+The maintainer accepted a GitHub dependency until coro releases the fix.
+`DESCRIPTION` requires `coro (>= 1.1.0.9000)` with `Remotes:` pinned to commit
+a8efdec, so CI stays reproducible. This is a deliberate, time-limited exception
+to this ADR's release policy:
+
+- The required CI matrix installs that pinned commit; no other dependency comes
+  from GitHub.
+- CRAN submission (#86) is blocked until a coro release includes #72. At that
+  point remove `Remotes:` and require the released version.
+- The pinned commit also contains coro's unreleased 2025 generator-environment
+  changes (r-lib/coro#67). The full suite and R CMD check qualify it.
