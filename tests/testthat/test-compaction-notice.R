@@ -17,7 +17,13 @@ test_that("the Shiny notice clears busy status after failed or cancelled compact
       response <- if (outcome == "failure") {
         runtime_failure(401L)
       } else {
-        structure(runtime_reply("Unaccepted summary"), fixture_delay = 0.5)
+        # Streaming: the gate opens itself and `when_gate()` interrupts before
+        # the summary stream is consumed (see `fixture_gate()`).
+        fixture_gate(
+          runtime_reply("Unaccepted summary"),
+          "summary",
+          open_after = 0.1
+        )
       }
       server <- local_runtime_server(list(response))
       agent <- Agent$new(
@@ -51,7 +57,7 @@ test_that("the Shiny notice clears busy status after failed or cancelled compact
           session$flushReact()
           busy <<- session$getOutput("compaction")$html
           if (outcome == "cancel") {
-            later::later(function() agent$interrupt(), 0.05)
+            server$when_gate("summary", function() agent$interrupt())
           }
           NULL
         }

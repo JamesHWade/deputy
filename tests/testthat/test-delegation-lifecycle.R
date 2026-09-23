@@ -143,8 +143,7 @@ test_that("budget-stopped batches retain all selected records", {
 })
 
 test_that("released ellmer exposes ordinary child identity during a request", {
-  reply <- runtime_reply("child reply")
-  attr(reply, "fixture_delay") <- 0.1
+  reply <- fixture_gate(runtime_reply("child reply"), "child")
   server <- local_runtime_server(list(reply))
   chat <- ellmer::chat_openai_compatible(
     base_url = server$url,
@@ -162,8 +161,14 @@ test_that("released ellmer exposes ordinary child identity during a request", {
   expect_match(running$run_id, "^run_")
   expect_match(running$session_id, "^session_")
   expect_identical(lead$get_subagent_results(), list(NULL))
+  # The reply is withheld until the running state has been observed.
+  server$release("child")
   expect_identical(
-    trimws(jsonlite::fromJSON(resolve_async_value(promise))$answer),
+    trimws(
+      jsonlite::fromJSON(
+        resolve_async_value(promise, max_polls = 6000L)
+      )$answer
+    ),
     "child reply"
   )
   complete <- lead$list_subagents()
@@ -178,8 +183,13 @@ test_that("released ellmer exposes ordinary child identity during a request", {
 })
 
 test_that("lead interruption settles its ordinary child and balances hooks", {
-  child_reply <- runtime_reply("child reply")
-  attr(child_reply, "fixture_delay") <- 0.3
+  # Streaming: the gate opens itself and `when_gate()` interrupts before the
+  # child's stream is consumed (see `fixture_gate()`).
+  child_reply <- fixture_gate(
+    runtime_reply("child reply"),
+    "child",
+    open_after = 0.1
+  )
   server <- local_runtime_server(list(
     runtime_reply(
       tool = "delegate_to_agent",
@@ -211,15 +221,20 @@ test_that("lead interruption settles its ordinary child and balances hooks", {
     stops <<- stops + 1L
     NULL
   }))
+  in_flight <- NULL
+  cancel_timer <- server$when_gate("child", function() {
+    in_flight <<- list(
+      requests = length(server$requests()),
+      status = lead$list_subagents()$status,
+      interrupted = lead$interrupt("cancelled_by_host")
+    )
+  })
+  withr::defer(cancel_timer())
   promise <- lead$run_async("Delegate this task")
-  deadline <- Sys.time() + 5
-  while (length(server$requests()) < 2L && Sys.time() < deadline) {
-    later::run_now(0.02)
-  }
-  expect_length(server$requests(), 2L)
-  expect_identical(lead$list_subagents()$status, "running")
-  expect_identical(lead$interrupt("cancelled_by_host"), TRUE)
-  result <- resolve_async_value(promise)
+  result <- resolve_async_value(promise, max_polls = 6000L)
+  expect_identical(in_flight$requests, 2L)
+  expect_identical(in_flight$status, "running")
+  expect_identical(in_flight$interrupted, TRUE)
   expect_identical(result$stop_reason, "cancelled_by_host")
   record <- lead$list_subagents()
   expect_identical(record$status, "stopped")
@@ -336,8 +351,7 @@ test_that("status polling does not materialize active Subagent transcripts", {
 })
 
 test_that("direct delegation can be interrupted without an active lead run", {
-  reply <- runtime_reply("partial")
-  attr(reply, "fixture_delay") <- 0.2
+  reply <- fixture_gate(runtime_reply("partial"), "child")
   server <- local_runtime_server(list(reply))
   lead <- LeadAgent$new(
     runtime_chat(server),
@@ -345,11 +359,16 @@ test_that("direct delegation can be interrupted without an active lead run", {
   )
   promise <- lead$get_tools()$delegate_to_agent("a", "task")
   expect_identical(lead$interrupt("host_cancelled"), TRUE)
-  resolve_async_value(promise)
+  # The reply can only arrive after the interrupt.
+  server$release("child")
+  resolve_async_value(promise, max_polls = 6000L)
   expect_identical(lead$list_subagents()$stop_reason, "host_cancelled")
   expect_identical(lead$list_subagents()$status, "stopped")
   expect_identical(lead$interrupt(), FALSE)
-  resolve_async_value(lead$get_tools()$delegate_to_agent("a", "next"))
+  resolve_async_value(
+    lead$get_tools()$delegate_to_agent("a", "next"),
+    max_polls = 6000L
+  )
   expect_identical(tail(lead$list_subagents()$status, 1L), "completed")
 })
 
