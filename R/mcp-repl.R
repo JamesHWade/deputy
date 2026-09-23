@@ -88,9 +88,11 @@ mcp_repl_connection <- function(
       class = "mcp_repl"
     )
   }
-  attr(connection, "deputy_mcp_repl") <- list(
-    backend = "mcp-repl",
-    sandbox = sandbox
+  attr(connection, "deputy_mcp_adapter") <- list(
+    tool = "repl",
+    execution = list(backend = "mcp-repl", sandbox = sandbox),
+    arguments = mcp_repl_bound_arguments,
+    description = mcp_repl_tool_description
   )
   ok <- TRUE
   connection
@@ -112,7 +114,10 @@ mcp_repl_control <- function(connection, action = c("interrupt", "reset")) {
   action <- match.arg(action)
   if (
     !inherits(connection, "McpConnection") ||
-      is.null(attr(connection, "deputy_mcp_repl", exact = TRUE))
+      !identical(
+        attr(connection, "deputy_mcp_adapter", exact = TRUE)$execution$backend,
+        "mcp-repl"
+      )
   ) {
     abort_deputy(
       "Use a connection created by {.fn mcp_repl_connection}.",

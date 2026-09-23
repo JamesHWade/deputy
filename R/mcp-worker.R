@@ -200,7 +200,26 @@ mcp_worker_request <- function(operation, arguments) {
     return(upstream$mcp_tool_result_as_ellmer(exchange(request)))
   }
   if (identical(operation, "close")) {
-    upstream$mcp_transport_close(entry()$transport)
+    transport <- entry()$transport
+    grace <- arguments$grace
+    # mcptools kills a stdio server outright. An adapter can first close the
+    # server's input, the MCP shutdown signal, so it can retire its own
+    # descendants and flush records before the kill.
+    if (
+      is.numeric(grace) &&
+        length(grace) == 1L &&
+        !is.na(grace) &&
+        grace > 0 &&
+        identical(transport$type, "stdio")
+    ) {
+      process <- transport$process
+      try(close(process$get_input_connection()), silent = TRUE)
+      deadline <- Sys.time() + grace
+      while (isTRUE(process$is_alive()) && Sys.time() < deadline) {
+        Sys.sleep(0.05)
+      }
+    }
+    upstream$mcp_transport_close(transport)
     return(invisible(NULL))
   }
   # One protocol request. Cursor traversal remains explicit in the host;

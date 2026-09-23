@@ -93,6 +93,8 @@ test_that("public API is deliberate", {
     "tools_interactive",
     "tools_mcp",
     "tools_mcp_repl",
+    "mcp_console_connection",
+    "mcp_console_control",
     "mcp_repl_connection",
     "mcp_repl_control",
     "set_ask_user_callback"

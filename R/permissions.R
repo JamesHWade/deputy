@@ -235,6 +235,24 @@ S7::method(permissions_check, Permissions) <- function(
     return(PermissionResultAllow())
   }
 
+  # MCP Console executes code whatever annotations its server supplies.
+  if (
+    permissions@mode %in%
+      c("readonly", "plan") &&
+      identical(
+        context$tool_metadata$source$execution$backend,
+        "mcp-console"
+      )
+  ) {
+    return(PermissionResultDeny(
+      reason = paste0(
+        "Permission denied: MCP Console executes code and ",
+        permissions@mode,
+        " mode is active"
+      )
+    ))
+  }
+
   # Extract tool annotations from context if available
   annotations <- context$tool_annotations
   if (

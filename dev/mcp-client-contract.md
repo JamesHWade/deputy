@@ -157,3 +157,44 @@ reset, OS confinement, preview truncation and spill artifacts. ellmer owns
 ordered text/image content. Deputy's usual offloading can bound a resulting
 Agent context without copying the upstream artifact store. The host owns any
 durable artifact retention before the upstream session is closed.
+
+## Persistent workbench with MCP Console
+
+`mcp_console_connection()` follows the mcp-repl pattern with an explicit
+executable instead of a configuration entry (ADR-0029). It checks the
+executable's `--version` against `mcp_console_qualified_versions` (0.0.4)
+before launch, builds `serve` and the admitted arguments itself, and writes a
+private frozen configuration for one server named `console`. The server
+starts in the Agent's working directory, which is its sandbox workspace,
+project-configuration location and recording location. A
+`.agents/console/config.yaml` there blocks launch unless the host opts in.
+
+After initialization the adapter checks the `send` field names and the
+security sentence that MCP Console derives from its effective sandbox policy.
+Only native enforcement with restricted networking is accepted. The adapter
+then attaches a producer adapter to the connection. `McpConnection$tools()`
+uses it to bound `send` arguments and extend the description, `status()` and
+tool metadata report its `execution` record (backend, version, sandbox
+profile, dependency decision, workspace and recordings path), and `close()`
+closes the server's input and waits up to 2 seconds before mcptools kills the
+process. mcp-repl uses the same adapter hook for `repl`.
+
+`send` forwards `timeout_ms` capped at 2500 ms (also when omitted). MCP Console
+starts that wait after admission, and interrupt adds a 100 ms grace, so replies
+stay inside the 4 second window and long cells return
+`[running; poll with an empty send]`. The model-facing tool refuses
+`control = "restart"`; `mcp_console_control()` sends it as a host operation
+and turns a desynchronized reply into `deputy_mcp_console_restart`. Explicit
+dependency preparation and stdin sent to a stopped worker also have no
+upstream deadline; if they outlast the window the connection closes as
+desynchronized, as for any other server.
+
+Permission evaluation recognizes the `mcp-console` execution backend. Standard
+mode requires `bash`, calls with `requirements` require `install_packages`,
+and readonly and plan modes deny `send`. The connection's `dependencies`
+setting is enforced before dispatch whatever the permission mode.
+
+`tests/testthat/test-mcp-console.R` runs against a stdio fixture that serves
+the released 0.0.4 `tools/list` result (`fixtures/mcp-console-tools.json`) and
+emulates polling, interrupt, restart and plot output. The live journey runs
+when `DEPUTY_MCP_CONSOLE_BIN` names a qualified executable.

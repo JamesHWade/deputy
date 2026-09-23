@@ -201,7 +201,7 @@ McpConnection <- R6::R6Class(
         state = private$state,
         reason = private$reason,
         allowed = private$allowed,
-        execution = attr(self, "deputy_mcp_repl", exact = TRUE),
+        execution = attr(self, "deputy_mcp_adapter", exact = TRUE)$execution,
         adapter_version = private$adapter_version
       )
     },
@@ -286,12 +286,16 @@ McpConnection <- R6::R6Class(
       private$check_current()
       result <- lapply(private$allowed$tools, function(name) {
         descriptor <- private$descriptors[[name]]
-        repl <- !is.null(attr(self, "deputy_mcp_repl", exact = TRUE)) &&
-          identical(name, "repl")
+        # A producer adapter (mcp-repl, MCP Console) governs its one tool's
+        # arguments and description; other tools pass through unchanged.
+        adapter <- attr(self, "deputy_mcp_adapter", exact = TRUE)
+        if (!identical(adapter$tool, name)) {
+          adapter <- NULL
+        }
         invoke <- function(arguments) {
           private$check_allowed(name, "tools")
-          if (repl) {
-            arguments <- mcp_repl_bound_arguments(arguments)
+          if (!is.null(adapter)) {
+            arguments <- adapter$arguments(arguments)
           }
           private$request("tool", list(name = name, arguments = arguments))
         }
@@ -308,8 +312,8 @@ McpConnection <- R6::R6Class(
         tool <- ellmer::tool(
           fun,
           name = name,
-          description = if (repl) {
-            mcp_repl_tool_description(descriptor$description)
+          description = if (!is.null(adapter)) {
+            adapter$description(descriptor$description)
           } else {
             descriptor$description
           },
@@ -389,11 +393,13 @@ McpConnection <- R6::R6Class(
       if (identical(private$state, "idle") && private$worker$is_alive()) {
         tryCatch(
           {
+            grace <- attr(self, "deputy_mcp_adapter", exact = TRUE)$close_grace
+            grace <- if (is.null(grace)) 0 else grace
             private$worker$call(
               mcp_worker_function(mcp_worker_request),
-              list(operation = "close", arguments = list())
+              list(operation = "close", arguments = list(grace = grace))
             )
-            deadline <- Sys.time() + min(private$timeout, 2)
+            deadline <- Sys.time() + min(private$timeout, 2) + grace
             response <- NULL
             while (is.null(response) && Sys.time() < deadline) {
               if (identical(private$worker$poll_process(10), "ready")) {
@@ -473,7 +479,7 @@ McpConnection <- R6::R6Class(
         connection_id = private$id
       )
       attr(tool, "deputy_mcp_owner") <- private$owner
-      execution <- attr(self, "deputy_mcp_repl", exact = TRUE)
+      execution <- attr(self, "deputy_mcp_adapter", exact = TRUE)$execution
       if (!is.null(execution)) {
         attr(tool, "deputy_tool_source")$execution <- execution
       }
