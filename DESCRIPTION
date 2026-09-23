@@ -67,7 +67,7 @@ Imports:
     utils
 Config/roxygen2/version: 8.1.0
 Remotes:
-    r-lib/coro@a8efdec66ec547e4697c78286135255429c326ae
+    r-lib/coro
 Collate:
     'agent-approval.R'
     'agent-context.R'

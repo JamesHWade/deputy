@@ -63,13 +63,16 @@ body, so R's JIT recompiles the whole state machine on every instance
 merged but unreleased.
 
 The maintainer accepted a GitHub dependency until coro releases the fix.
-`DESCRIPTION` requires `coro (>= 1.1.0.9000)` with `Remotes:` pinned to commit
-a8efdec, so CI stays reproducible. This is a deliberate, time-limited exception
-to this ADR's release policy:
+`DESCRIPTION` requires `coro (>= 1.1.0.9000)` with `Remotes: r-lib/coro`, which
+tracks coro's main branch. GitHub dependencies are deliberately not pinned to a
+commit: the maintainer prefers following upstream development over freezing a
+revision, and CI surfaces any upstream break. This is a deliberate, time-limited
+exception to this ADR's release policy:
 
-- The required CI matrix installs that pinned commit; no other dependency comes
-  from GitHub.
+- The required CI matrix installs coro's current main branch; no other
+  dependency comes from GitHub.
 - CRAN submission (#86) is blocked until a coro release includes #72. At that
   point remove `Remotes:` and require the released version.
-- The pinned commit also contains coro's unreleased 2025 generator-environment
-  changes (r-lib/coro#67). The full suite and R CMD check qualify it.
+- coro's main branch also contains unreleased 2025 generator-environment
+  changes (r-lib/coro#67). The full suite and R CMD check qualified main at
+  a8efdec; later upstream changes are qualified by ordinary CI runs.

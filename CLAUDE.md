@@ -100,7 +100,7 @@ The repository includes a SessionStart hook (`.claude/setup-r.sh`) that automati
 # Install dependencies
 Rscript -e "devtools::install_deps(dependencies = TRUE)"
 
-# Install the dependency set used by CI (includes the pinned GitHub coro).
+# Install the dependency set used by CI (includes GitHub coro via Remotes).
 Rscript -e "pak::pak()"
 
 # Load package for development
@@ -202,10 +202,11 @@ from CRAN; see `dev/adr/0004-track-upstream-development-versions.md`. Test
 upstream development versions in focused compatibility work before raising a
 minimum version or adopting an unreleased API.
 
-Temporary exception (2026-09-24, #192): coro is installed from GitHub at a
-pinned commit through `Remotes:` because CRAN coro 1.1.0 recompiles every
-generator instance. Remove `Remotes:` and require the released version once coro
-ships the fix; CRAN submission is blocked until then.
+Temporary exception (2026-09-24, #192): coro is installed from its GitHub main
+branch through `Remotes: r-lib/coro` because CRAN coro 1.1.0 recompiles every
+generator instance. GitHub dependencies are not pinned to commits. Remove
+`Remotes:` and require the released version once coro ships the fix; CRAN
+submission is blocked until then.
 
 ## Code Conventions
 
