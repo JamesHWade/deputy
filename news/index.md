@@ -2,6 +2,12 @@
 
 ## deputy (development version)
 
+- Deputy temporarily requires coro from GitHub (commit a8efdec,
+  `>= 1.1.0.9000`). CRAN coro 1.1.0 recompiles every generator instance,
+  which cost about 0.3 to 0.7 s of CPU per model request. The dependency
+  returns to CRAN once coro releases the fix
+  ([\#192](https://github.com/JamesHWade/deputy/issues/192)).
+
 - MCP stdio calls fail closed when a reply is lost. The qualified
   mcptools releases wait about 4 seconds for a stdio reply and take the
   next output line without checking its JSON-RPC id, so a slow reply
