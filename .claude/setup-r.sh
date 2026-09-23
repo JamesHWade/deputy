@@ -40,40 +40,24 @@ fi
 # (CRAN is blocked in Claude Code web environments)
 echo "Installing R packages from GitHub..."
 
-# An optional third argument installs a specific commit instead of main.
 install_from_github() {
   local repo="$1"
   local name="$2"
-  local ref="${3:-}"
   local tarball="/tmp/${name}.tar.gz"
-  local url="https://github.com/${repo}/archive/refs/heads/main.tar.gz"
-  local dir="${name}-main"
-  if [ -n "$ref" ]; then
-    url="https://github.com/${repo}/archive/${ref}.tar.gz"
-    dir="${name}-${ref}"
-  fi
 
-  echo "  Installing ${name}${ref:+ at ${ref}}..."
-  if curl -LSsf -o "$tarball" "$url"; then
-    cd /tmp && tar -xzf "$tarball" && R CMD INSTALL "$dir" --quiet 2>/dev/null
-    rm -rf "/tmp/${dir}" "$tarball"
+  echo "  Installing ${name}..."
+  if curl -LSsf -o "$tarball" "https://github.com/${repo}/archive/refs/heads/main.tar.gz"; then
+    cd /tmp && tar -xzf "$tarball" && R CMD INSTALL "${name}-main" --quiet 2>/dev/null
+    rm -rf "/tmp/${name}-main" "$tarball"
   else
     echo "  Warning: Failed to install ${name}" >&2
   fi
 }
 
-# coro is pinned by DESCRIPTION's Remotes field (ADR-0004, #192). Read the
-# commit from there so remote sessions test the same revision as CI.
-project_dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-coro_ref="$(sed -n 's|^[[:space:]]*r-lib/coro@\([0-9a-f]\{40\}\).*|\1|p' "${project_dir}/DESCRIPTION" 2>/dev/null | head -1)"
-if [ -z "$coro_ref" ]; then
-  echo "  Warning: coro pin not found in DESCRIPTION; installing coro main" >&2
-fi
-
 # Install dependencies in order (httr2 -> S7 -> coro -> ellmer)
 install_from_github "r-lib/httr2" "httr2"
 install_from_github "RConsortium/S7" "S7"
-install_from_github "r-lib/coro" "coro" "$coro_ref"
+install_from_github "r-lib/coro" "coro"
 install_from_github "tidyverse/ellmer" "ellmer"
 
 # Persist PATH for subsequent bash commands in this session

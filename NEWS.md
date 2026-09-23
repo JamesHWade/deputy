@@ -17,7 +17,7 @@
   under `.agents/console/sessions/` in the Agent's working directory, reported
   in `status()$execution`. See ADR-0029.
 
-* Deputy temporarily requires coro from GitHub (commit a8efdec, `>= 1.1.0.9000`).
+* Deputy temporarily requires the GitHub development version of coro (`>= 1.1.0.9000`).
   CRAN coro 1.1.0 recompiles every generator instance, which cost about 0.3 to
   0.7 s of CPU per model request. The dependency returns to CRAN once coro
   releases the fix (#192).
