@@ -225,8 +225,7 @@ test_that("released mcp-repl preserves state, content, isolation and explicit co
     !nzchar(executable),
     "Set DEPUTY_MCP_REPL_BIN to a qualified mcp-repl 0.3.0 executable"
   )
-  skip_if_not_installed("mcptools", "1.0.2")
-  skip_if(as.character(utils::packageVersion("mcptools")) != "1.0.2")
+  skip_if_mcptools_unqualified()
   workspace <- tempfile("deputy-repl-")
   dir.create(workspace)
   config <- tempfile(fileext = ".json")

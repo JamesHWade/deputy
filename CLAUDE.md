@@ -335,9 +335,11 @@ test_that("descriptive test name", {
 
 ## Architecture
 
-`McpConnection` is the temporary mcptools 1.0.2 client integration for independent
-host-owned connections and resource/prompt access. Its isolated R process owns
-only the mcptools registry, not an interpreter or transport implementation.
+`McpConnection` is the temporary client integration, qualified for an explicit
+list of mcptools releases (`mcptools_qualified_versions`: 1.0.2, 1.0.3), for
+independent host-owned connections and resource/prompt access. Its isolated R
+process owns only the mcptools registry, not an interpreter or transport
+implementation.
 Admission lists and Agent/session/run-context ownership are fixed. Discovery
 does not authorize access. Read `dev/mcp-client-contract.md` before changing the
 bridge or making lifecycle claims. #99 remains the public-API replacement work.
@@ -588,8 +590,9 @@ The complete batch is validated before changing the Chat's tools, including
 constructor and `set_tools()` paths. Missing custom-tool annotations remain
 absent on the source but use conservative permission defaults (ADR-0007).
 `tool_metadata()` exposes origin and missing annotations after wrapping or
-delegation. MCP uses mcptools 1.0.2 for transport/schema/invocation and a narrow
-read-only descriptor bridge because that release drops annotations. Exact
+delegation. MCP uses qualified mcptools releases (1.0.2, 1.0.3; an exact list,
+not a minimum) for transport/schema/invocation and a narrow read-only descriptor
+bridge because those releases drop annotations. Exact
 server selection happens before connection. Reconnecting invalidates old
 tool handles. MCP names never acquire native file or approval-tool privileges.
 Inherited child Chats retain provider configuration but clear parent tools;

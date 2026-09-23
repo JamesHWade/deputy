@@ -1,6 +1,20 @@
+skip_if_mcptools_unqualified <- function() {
+  skip_if_not_installed("mcptools")
+  version <- as.character(utils::packageVersion("mcptools"))
+  skip_if_not(
+    mcptools_version_qualified(version),
+    paste0(
+      "mcptools ",
+      version,
+      " is not a qualified release (",
+      paste(mcptools_qualified_versions, collapse = ", "),
+      ")"
+    )
+  )
+}
+
 mcp_test_config <- function(capabilities = c("tools", "resources", "prompts")) {
-  skip_if_not_installed("mcptools", "1.0.2")
-  skip_if(as.character(utils::packageVersion("mcptools")) != "1.0.2")
+  skip_if_mcptools_unqualified()
   path <- tempfile(fileext = ".json")
   log <- tempfile()
   file.create(log)

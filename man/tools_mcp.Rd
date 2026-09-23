@@ -17,7 +17,7 @@ performed on exact configuration names before connecting servers.}
 \value{
 A list of tool definitions compatible with \code{Agent$register_tools()}.
 \code{\link[=tool_metadata]{tool_metadata()}} reports exact MCP origin, supplied annotations, and gaps.
-The metadata bridge is qualified for mcptools 1.0.2; other versions fail
+The metadata bridge is qualified for mcptools 1.0.2 and 1.0.3; other versions fail
 explicitly rather than silently losing annotations. Reconnecting a server
 invalidates tools loaded from its previous connection. Reload and explicitly
 replace those tools on the Agent. Load failures warn and return an empty list.

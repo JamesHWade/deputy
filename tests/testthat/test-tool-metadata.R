@@ -145,11 +145,7 @@ test_that("tool arguments cannot shadow runtime adapter bindings", {
 })
 
 test_that("released MCP transport preserves origin, annotations and connection identity", {
-  skip_if_not_installed("mcptools", "1.0.2")
-  skip_if(
-    as.character(utils::packageVersion("mcptools")) != "1.0.2",
-    "The MCP descriptor bridge is qualified for exactly mcptools 1.0.2"
-  )
+  skip_if_mcptools_unqualified()
   skip_if_not_installed("yaml")
   fixture <- normalizePath(test_path("fixtures", "mcp-annotations.R"))
   # Isolate mcptools' process-global connection registry from other tests.

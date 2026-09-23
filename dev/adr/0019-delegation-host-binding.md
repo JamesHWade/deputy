@@ -77,4 +77,4 @@ lead hook vetoes, current-policy narrowing, shared closure state, cross-lead
 exclusive contention/recovery, owned resource cleanup on setup failure and
 cancellation, stateless non-acquisition, real ellmer R worker calls, owned MCP
 selection, and unapproved effects. Tests use ellmer 0.5.0; MCP worker integration
-uses the adapter's explicitly qualified mcptools 1.0.2 version.
+uses one of the adapter's explicitly qualified mcptools releases (1.0.2, 1.0.3).

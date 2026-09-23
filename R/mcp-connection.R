@@ -5,8 +5,8 @@
 #' mcptools' connection registry independent of other connections. mcptools owns
 #' transport and authentication; the selected server owns execution.
 #'
-#' This temporary adapter is qualified for mcptools 1.0.2 and uses its internal
-#' request and shutdown functions. Public replacements are tracked upstream in
+#' This temporary adapter is qualified for mcptools 1.0.2 and 1.0.3 and uses
+#' their internal request and shutdown functions. Public replacements are tracked upstream in
 #' issues 129 and 130. Other versions fail explicitly.
 #'
 #' @details
@@ -86,6 +86,10 @@ McpConnection <- R6::R6Class(
       rlang::check_installed("mcptools", reason = "to create an MCP connection")
       mcp_metadata_state()
       private$server <- server
+      private$adapter_version <- paste(
+        "mcptools",
+        utils::packageVersion("mcptools")
+      )
       private$timeout <- timeout
       private$id <- new_deputy_id("mcp_")
       private$worker <- callr::r_session$new(
@@ -119,7 +123,8 @@ McpConnection <- R6::R6Class(
           config = selected,
           server = server,
           working_dir = agent$working_dir,
-          load_tools = length(tools) > 0L
+          load_tools = length(tools) > 0L,
+          qualified_versions = mcptools_qualified_versions
         )
       )
       startup <- NULL
@@ -190,7 +195,7 @@ McpConnection <- R6::R6Class(
         reason = private$reason,
         allowed = private$allowed,
         execution = attr(self, "deputy_mcp_repl", exact = TRUE),
-        adapter_version = "mcptools 1.0.2"
+        adapter_version = private$adapter_version
       )
     },
 
@@ -396,6 +401,7 @@ McpConnection <- R6::R6Class(
     allowed = NULL,
     descriptors = NULL,
     timeout = NULL,
+    adapter_version = NULL,
     state = "starting",
     reason = NULL,
     pending_reject = NULL,

@@ -1,12 +1,15 @@
 # Temporary MCP client contract
 
-Deputy uses mcptools 1.0.2 as its minimum and current released compatibility
-target. The public client remains `mcp_tools(config)`. The development client
-inspected at `079e011e6f2a515565f903dc8a5b7c4d793746f1` has no public descriptor,
-resource, prompt or independently owned connection API. An unreleased API is
+Deputy uses mcptools 1.0.2 as its minimum and qualifies an explicit list of
+releases, `mcptools_qualified_versions` (currently 1.0.2 and 1.0.3). CRAN
+1.0.3 changed only DESCRIPTION, NEWS.md and one upstream test; its `R/`
+sources are identical to 1.0.2. The public client remains `mcp_tools(config)`.
+The development client inspected at
+`079e011e6f2a515565f903dc8a5b7c4d793746f1` has no public descriptor, resource,
+prompt or independently owned connection API. An unreleased API is
 not inferred from the server-side embedding work.
 
-| Capability | mcptools 1.0.2 public surface | Temporary Deputy integration |
+| Capability | mcptools 1.0.2/1.0.3 public surface | Temporary Deputy integration |
 |---|---|---|
 | Configuration, stdio, HTTP, authentication, tool conversion | `mcp_tools()` | Reused without another transport or OAuth implementation |
 | Tool annotations and origin | Dropped during public conversion | Existing descriptors, qualified version, connection-bound handles |
@@ -43,7 +46,7 @@ parent's package library paths, and the Agent's working directory. It does not
 load the host project's R profile. Each worker loads mcptools once and converts
 the allowed tool catalogue from that connection. When no tools are allowed,
 the adapter composes mcptools' transport and initialization helpers without
-calling `tools/list`, which mcptools 1.0.2 otherwise requests unconditionally.
+calling `tools/list`, which mcptools otherwise requests unconditionally.
 This permits resource-only and prompt-only servers without a tool catalogue.
 Metadata inspection makes no second connection.
 
@@ -64,7 +67,9 @@ Deputy creates neither an interpreter nor a second output-artifact store.
 
 ## Failure and qualification
 
-Only mcptools 1.0.2 is accepted. Tool descriptions, schemas and annotations are
+Only the listed mcptools releases are accepted; the metadata bridge, the
+client worker and the producer-test skips share the one list. A new release is
+added only after its client sources are reviewed. Tool descriptions, schemas and annotations are
 validated before handles become available. A connection has at most one active
 call; overlap returns a busy error. Cancellation, timeout, shutdown and detected
 server exit invalidate every handle. No operation silently reconnects with old
@@ -96,7 +101,7 @@ validated local executable even when both fields appear in the configuration.
 Other transport/authentication configuration stays with mcptools; upstream
 sandbox configuration remains the host's responsibility.
 
-The qualified producer is mcp-repl 0.3.0 with mcptools 1.0.2. The convenience
+The qualified producer is mcp-repl 0.3.0 with mcptools 1.0.2 or 1.0.3. The convenience
 function validates the tool shape, not the binary version. Its R journey on
 macOS demonstrates persistent values, isolation across two Agents using the
 same server name, ellmer image content, bounded output with a full transcript

@@ -1,13 +1,26 @@
-# Compatibility bridge for mcptools 1.0.2 ----------------------------------
+# Compatibility bridge for qualified mcptools releases ---------------------
 # mcptools::mcp_tools() owns connections, schemas and invocation. Its released
 # converter discards annotations and origin. Read its existing descriptors;
 # never reconnect just to fetch metadata or mutate its namespace.
 
-mcp_metadata_state <- function() {
-  version <- as.character(utils::packageVersion("mcptools"))
-  if (!identical(version, "1.0.2")) {
+# Exact releases whose internals the bridge and client worker were checked
+# against. 1.0.3 changed only DESCRIPTION, NEWS.md and one upstream test; its
+# R/ sources are identical to 1.0.2. Add a release only after reviewing it.
+mcptools_qualified_versions <- c("1.0.2", "1.0.3")
+
+mcptools_version_qualified <- function(
+  version = as.character(utils::packageVersion("mcptools"))
+) {
+  version %in% mcptools_qualified_versions
+}
+
+mcp_metadata_state <- function(
+  version = as.character(utils::packageVersion("mcptools"))
+) {
+  if (!mcptools_version_qualified(version)) {
+    qualified <- mcptools_qualified_versions
     abort_deputy(
-      "MCP metadata requires the qualified {.pkg mcptools} 1.0.2 release; found {version}.",
+      "MCP metadata requires a qualified {.pkg mcptools} release ({.val {qualified}}); found {.val {version}}.",
       class = "mcp_metadata"
     )
   }

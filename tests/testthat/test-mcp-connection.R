@@ -535,3 +535,31 @@ test_that("a run context override cannot dispatch through another owner binding"
     "empty"
   )
 })
+
+test_that("both gates accept exactly the shared list of qualified releases", {
+  expect_identical(mcptools_qualified_versions, c("1.0.2", "1.0.3"))
+  expect_true(all(mcptools_version_qualified(c("1.0.2", "1.0.3"))))
+  expect_false(any(mcptools_version_qualified(c("1.0.1", "1.0.4", "1.1.0"))))
+  expect_error(
+    mcp_metadata_state("1.0.4"),
+    "1.0.2.*1.0.3.*found.*1.0.4",
+    class = "deputy_mcp_metadata"
+  )
+  skip_if_not_installed("mcptools")
+  # The worker gate receives the list from the host because it runs with
+  # baseenv() in the callr worker; it must reject an unlisted installation.
+  installed <- as.character(utils::packageVersion("mcptools"))
+  expect_error(
+    mcp_worker_function(mcp_worker_start)(
+      config = list(),
+      server = "unused",
+      working_dir = tempdir(),
+      load_tools = FALSE,
+      qualified_versions = "0.0.0"
+    ),
+    paste0(
+      "qualified.*0\\.0\\.0.*found.*",
+      gsub(".", "\\.", installed, fixed = TRUE)
+    )
+  )
+})

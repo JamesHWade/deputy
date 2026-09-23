@@ -1,4 +1,5 @@
-# Temporary mcptools 1.0.2 client adapter. The worker isolates its global
+# Temporary client adapter for the qualified mcptools releases listed in
+# `mcptools_qualified_versions`. The worker isolates its global
 # connection registry; mcptools still owns transport, authentication, IDs,
 # conversion and shutdown. No interpreter runs in this R worker.
 
@@ -24,11 +25,22 @@ mcp_worker_read_result <- function(worker) {
   NULL
 }
 
-mcp_worker_start <- function(config, server, working_dir, load_tools) {
-  setwd(working_dir)
-  if (!identical(as.character(utils::packageVersion("mcptools")), "1.0.2")) {
-    cli::cli_abort("The client adapter requires qualified mcptools 1.0.2.")
+# The worker function runs with baseenv() as its environment, so the host
+# passes the qualified release list instead of the worker reading Deputy.
+mcp_worker_start <- function(
+  config,
+  server,
+  working_dir,
+  load_tools,
+  qualified_versions
+) {
+  version <- as.character(utils::packageVersion("mcptools"))
+  if (!version %in% qualified_versions) {
+    cli::cli_abort(
+      "The client adapter requires a qualified {.pkg mcptools} release ({.val {qualified_versions}}); found {.val {version}}."
+    )
   }
+  setwd(working_dir)
   path <- tempfile(fileext = ".json")
   on.exit(unlink(path))
   file.create(path)
@@ -43,7 +55,7 @@ mcp_worker_start <- function(config, server, working_dir, load_tools) {
   if (load_tools) {
     tools <- mcptools::mcp_tools(config = path)
   } else {
-    # mcp_tools() always calls tools/list in 1.0.2, even for resource-only
+    # mcp_tools() always calls tools/list in 1.0.2 and 1.0.3, even for resource-only
     # servers. Compose its transport/handshake helpers without that discovery.
     upstream <- asNamespace("mcptools")
     selected <- upstream$read_mcp_config(path)[[server]]

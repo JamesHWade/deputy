@@ -8,8 +8,8 @@ A host-owned connection to one configured server. A separate R worker keeps
 mcptools' connection registry independent of other connections. mcptools owns
 transport and authentication; the selected server owns execution.
 
-This temporary adapter is qualified for mcptools 1.0.2 and uses its internal
-request and shutdown functions. Public replacements are tracked upstream in
+This temporary adapter is qualified for mcptools 1.0.2 and 1.0.3 and uses
+their internal request and shutdown functions. Public replacements are tracked upstream in
 issues 129 and 130. Other versions fail explicitly.
 }
 \details{

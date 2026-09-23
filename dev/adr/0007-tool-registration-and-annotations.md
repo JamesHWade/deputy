@@ -28,11 +28,13 @@ authorization mechanisms.
 
 ## MCP descriptor compatibility
 
-CRAN mcptools 1.0.2 owns transport, authentication, schema conversion, pagination,
+CRAN mcptools (1.0.2 and 1.0.3) owns transport, authentication, schema
+conversion, pagination,
 and invocation. Its public `mcp_tools()` converter omits server annotations and
 origin; ellmer 0.5.0 exposes no replacement MCP client. Until mcptools exposes
 descriptors publicly, Deputy reads its existing connection registry through a
-bridge qualified for exactly 1.0.2. The bridge checks descriptor cardinality,
+bridge qualified for an explicit list of releases (1.0.2 and 1.0.3, whose
+`R/` sources are identical); it is not a version minimum. The bridge checks descriptor cardinality,
 the tool closure's exact server/name, and transport identity. It neither
 patches the namespace nor makes a second discovery connection. Unsupported
 versions and malformed metadata fail explicitly. The existing `tools_mcp()`

@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* MCP connections, `tools_mcp()` and `mcp_repl_connection()` accept CRAN
+  mcptools 1.0.3, whose client sources are identical to 1.0.2. Both runtime
+  gates and the producer-test skips share one explicit list of qualified
+  releases; other versions still fail closed and the error names the
+  qualified releases (#195).
+
 * Model requests and tool calls spend less CPU on internal probes. Usage
   snapshots reuse ellmer's token table until the conversation changes. Deputy
   no longer repeats calls it has already seen fail (token tables for unpaired

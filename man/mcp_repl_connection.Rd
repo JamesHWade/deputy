@@ -38,7 +38,7 @@ Register its \verb{$tools()} on the supplied Agent to retain normal permissions,
 hooks, budgets and execution provenance.
 }
 \details{
-The producer contract is qualified with mcptools 1.0.2 and mcp-repl 0.3.0.
+The producer contract is qualified with mcptools 1.0.2 or 1.0.3 and mcp-repl 0.3.0.
 The executable must be installed and configured by the host. mcp-repl owns
 interpreter startup, sandbox enforcement, reset, interrupt, rich content and
 oversized-output artifacts. The client requires its \code{repl(input, timeout_ms)}

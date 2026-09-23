@@ -17,7 +17,7 @@
 #' @return A [McpConnection]. The host must close it when the conversation ends.
 #'
 #' @details
-#' The producer contract is qualified with mcptools 1.0.2 and mcp-repl 0.3.0.
+#' The producer contract is qualified with mcptools 1.0.2 or 1.0.3 and mcp-repl 0.3.0.
 #' The executable must be installed and configured by the host. mcp-repl owns
 #' interpreter startup, sandbox enforcement, reset, interrupt, rich content and
 #' oversized-output artifacts. The client requires its `repl(input, timeout_ms)`
