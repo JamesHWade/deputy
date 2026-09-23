@@ -63,10 +63,9 @@ local_fixture_registration <- function(
     }
   }
   if (httr2::resp_status(response) != 200L) {
-    cli::cli_abort(c(
-      failure,
-      x = httr2::resp_body_string(response)
-    ))
+    # The server's JSON error body is data, not a cli template.
+    body <- httr2::resp_body_string(response)
+    cli::cli_abort(c(failure, x = "{.val {body}}"))
   }
   withr::defer(
     fixture_server_release(server, id),
