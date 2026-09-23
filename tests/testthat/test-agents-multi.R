@@ -870,3 +870,42 @@ test_that("delegation handles sub-agent execution failure", {
     0L
   )
 })
+
+test_that("a bare model id runs the sub-agent on the lead's provider", {
+  mock_chat <- create_mock_chat()
+  chosen <- NULL
+  mock_chat$clone <- function(deep = FALSE) {
+    sub_mock <- create_mock_chat(responses = list("Cheap answer"))
+    sub_mock$set_model <- function(model) {
+      chosen <<- model
+      invisible(sub_mock)
+    }
+    sub_mock$stream <- function(prompt = NULL) {
+      yielded <- FALSE
+      function() {
+        if (yielded) {
+          return(coro::exhausted())
+        }
+        yielded <<- TRUE
+        "Cheap answer"
+      }
+    }
+    sub_mock$last_turn <- function(role = "assistant") {
+      create_mock_assistant_turn(text = "Cheap answer")
+    }
+    sub_mock
+  }
+  lead <- LeadAgent$new(
+    chat = mock_chat,
+    sub_agents = list(agent_definition(
+      name = "helper",
+      description = "A helper agent",
+      prompt = "You help with tasks",
+      model = "cheap-model"
+    ))
+  )
+  delegate_tool <- mock_chat$get_tools()[["delegate_to_agent"]]
+  result <- resolve_async_value(delegate_tool("helper", "Do a task"))
+  expect_equal(chosen, "cheap-model")
+  expect_match(paste(format(result), collapse = "\n"), "Cheap answer")
+})

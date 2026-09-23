@@ -108,7 +108,10 @@ normalize_agent_definitions <- function(definitions, arg = "sub_agents") {
 #' @param description Brief description of what this agent does (shown to lead agent)
 #' @param prompt System prompt for this agent
 #' @param tools Optional list of tools for this agent
-#' @param model Model to use (default: "inherit" uses parent's model)
+#' @param model Model to use. `"inherit"` (the default) uses the parent's
+#'   chat as it is. A bare model id such as `"gpt-5.6-luna"` uses the parent's
+#'   provider, endpoint and credentials with that model. A `"provider/model"`
+#'   string builds a new chat with [ellmer::chat()].
 #' @param skills Optional list of skills to load
 #' @param disallowed_tools Optional tool denylist for this sub-agent
 #' @param memory Optional memory text appended to this sub-agent's prompt
