@@ -49,7 +49,7 @@ local_fixture_registration <- function(
       NULL
     )
     response <- tryCatch(
-      fixture_server_control(server$port, "register", payload),
+      fixture_server_control(server, "register", payload),
       error = function(error) error
     )
     if (!inherits(response, "error")) {
@@ -103,14 +103,21 @@ fixture_server_ensure <- function(failure) {
   }
   directory <- tempfile("deputy-fixture-server-")
   dir.create(directory)
+  # Control requests carry serialized R objects, so only this test worker may
+  # send them. The token is derived without R's RNG to leave test seeds alone.
+  token <- digest::digest(
+    list(directory, format(Sys.time(), "%OS6"), Sys.getpid()),
+    algo = "sha256"
+  )
   process <- callr::r_bg(
     fixture_server_main,
-    args = list(directory = directory),
+    args = list(directory = directory, token = token),
     supervise = TRUE
   )
   server <- new.env(parent = emptyenv())
   server$process <- process
   server$directory <- directory
+  server$token <- token
   state$server <- server
   withr::defer(fixture_server_stop(server), envir = testthat::teardown_env())
   deadline <- Sys.time() + 30
@@ -142,7 +149,7 @@ fixture_server_release <- function(server, id) {
     return(invisible())
   }
   tryCatch(
-    fixture_server_control(server$port, "unregister", charToRaw(id)),
+    fixture_server_control(server, "unregister", charToRaw(id)),
     error = function(error) NULL
   )
   invisible()
@@ -152,13 +159,14 @@ fixture_server_release <- function(server, id) {
 # complete before its response returns and before any fixture request is sent.
 # Bodies are serialized R objects, preserving response attributes, functions
 # and arbitrary JSON text exactly.
-fixture_server_control <- function(port, action, payload) {
+fixture_server_control <- function(server, action, payload) {
   withr::with_options(list(httr2_mock = NULL), {
     httr2::request(sprintf(
       "http://127.0.0.1:%d/__control/%s",
-      port,
+      server$port,
       action
     )) |>
+      httr2::req_headers(`X-Fixture-Token` = server$token) |>
       httr2::req_body_raw(payload, type = "application/octet-stream") |>
       httr2::req_timeout(30) |>
       httr2::req_error(is_error = function(response) FALSE) |>
@@ -168,7 +176,7 @@ fixture_server_control <- function(port, action, payload) {
 
 # Runs in the server process. callr resets the function environment, so this
 # must be self-contained.
-fixture_server_main <- function(directory) {
+fixture_server_main <- function(directory, token) {
   fixtures <- new.env(parent = emptyenv())
   error_response <- function(status, message) {
     list(
@@ -181,6 +189,10 @@ fixture_server_main <- function(directory) {
     )
   }
   control <- function(req, action) {
+    # Reject before reading or unserializing anything from another process.
+    if (!identical(req$HTTP_X_FIXTURE_TOKEN, token)) {
+      return(error_response(403L, "Invalid fixture control token"))
+    }
     body <- req$rook.input$read()
     if (identical(action, "register")) {
       spec <- tryCatch(unserialize(body), error = function(error) error)
