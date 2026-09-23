@@ -53,8 +53,11 @@ clinical evidence or an evaluation of model quality.
 ## Trust and ownership
 
 - The analyst's proposal and both model summaries are untrusted commentary.
-- Only `compute_summary` can publish the authoritative result. Its registry has no
-  general R execution or file-writing tool and cannot be extended by model input.
+- Only `compute_summary` can publish the authoritative result. The executor
+  declares it with `TrustedResults(study_summary = "compute_summary")`, so
+  Deputy rejects any code-execution, delegation, write or open-world tool
+  registered beside it. The registry cannot be extended by model input. The
+  result also appears as a `"trusted_result"` event on the executor's run.
 - The host checks requester authorization for proposing, preparing, deciding,
   cancelling and reading. The child viewer applies its own disclosure checks.
 - The receipt includes the canonical inputs and their revision, data revision,

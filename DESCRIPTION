@@ -133,6 +133,7 @@ Collate:
     'stall-detection.R'
     'structured-run.R'
     'subagent-chat.R'
+    'tool-input-review.R'
     'tool-invocation.R'
     'tool-metadata.R'
     'tool-registration.R'
@@ -146,4 +147,5 @@ Collate:
     'tools-interactive.R'
     'tools-mcp.R'
     'tools-web.R'
+    'trusted-results.R'
     'utils.R'

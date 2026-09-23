@@ -13,11 +13,20 @@ approval_gate <- function(
     timeout = 0,
     callback = function(tool_name, tool_input, context) {
       ask <- tools_interactive(callback = callback, context = context)[[1]]
+      # One line per argument, with the tool's declared type when available.
+      review <- tool_input_review(tool_input, context$tool_arguments)
       question <- paste0(
         "Approve ",
         tool_name,
         " with these arguments?\n",
-        paste(utils::capture.output(dput(tool_input)), collapse = "\n")
+        paste0(
+          "- ",
+          review$argument,
+          ifelse(is.na(review$type), "", paste0(" (", review$type, ")")),
+          ": ",
+          review$value,
+          collapse = "\n"
+        )
       )
       response <- ask(list(list(
         question = question,

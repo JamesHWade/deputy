@@ -1,5 +1,21 @@
 # deputy (development version)
 
+* `TrustedResults()` supports
+  [trusted mini-agents](https://trustedminiagents.dev) (#197). Pass it as
+  `Agent$new(trusted_results = )` to name the single local tool that produces
+  each kind of result. Its verbatim return value reaches the host as a
+  `"trusted_result"` event, read with `result_trusted_results()`, and through
+  an optional `on_result` callback, all before the model sees any output.
+  Every published tool registry is checked. Code execution, delegation, and
+  tools that may write or reach the open world are rejected unless a local
+  tool is explicitly listed in `exempt_tools`. With `model_receipt = TRUE`
+  the model gets a receipt instead of the values. See ADR-0030.
+
+* Permission callbacks and PreToolUse hooks receive the registered tool's
+  argument types as `context$tool_arguments`. `tool_input_review()` turns a
+  proposed input into a per-field table of type, description, and value.
+  The approval-gates recipe now uses it instead of `dput()` (#197).
+
 * `mcp_console_connection()` connects an Agent to one
   [MCP Console](https://github.com/t-kalinowski/mcp-console) server, a
   sandboxed workbench that keeps R, Python and DuckDB SQL state for a
