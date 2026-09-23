@@ -326,6 +326,12 @@ ends, for example from a Shiny session's end callback. `$cancel()` terminates
 the connection and discards its server session state. A timeout does the same;
 old tool handles never start a replacement connection implicitly.
 
+A stdio server must answer each request within mcptools' response window of
+about 4 seconds. If it does not, or a reply does not match its request, the
+call fails with a `deputy_mcp_desynchronized` error and the connection closes.
+Its session state is lost, and a late reply can never become the answer to a
+later call. Create a new connection to continue.
+
 This is a temporary adapter checked against an explicit list of qualified
 mcptools releases (currently 1.0.2 and 1.0.3). It uses upstream
 transport, authentication, tool conversion and shutdown with a small internal
@@ -393,7 +399,10 @@ An active client request cannot accept an overlapping control request.
 `connection$cancel()` or interruption of the owning Agent terminates that
 connection and discards its state. mcp-repl's `timeout_ms` can instead return
 control while interpreter work continues; the client's `timeout` closes the
-connection when the MCP request itself takes too long.
+connection when the MCP request itself takes too long. Deputy forwards
+`timeout_ms` capped at 3000 ms, and 3000 ms when it is omitted, to stay inside
+mcptools' stdio response window. Longer cells return mcp-repl's busy status;
+the model retrieves their output with a later call whose `input` is empty.
 
 Plots retain ellmer image content. Oversized transcripts retain mcp-repl's
 bounded previews and artifact references, and ordinary Deputy result offloading

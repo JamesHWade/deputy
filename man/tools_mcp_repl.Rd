@@ -23,6 +23,9 @@ also controls network access according to its server configuration.}
 }
 \value{
 A list of ellmer-compatible tools from the selected mcp-repl server.
+The \code{repl} tool forwards \code{timeout_ms} capped at 3000 ms, as described in
+\code{\link[=mcp_repl_connection]{mcp_repl_connection()}}; longer work returns a busy result and a later
+call with empty \code{input} retrieves its output.
 }
 \description{
 Loads one explicitly configured \href{https://github.com/posit-dev/mcp-repl}{mcp-repl}

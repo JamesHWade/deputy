@@ -73,7 +73,23 @@ added only after its client sources are reviewed. Tool descriptions, schemas and
 validated before handles become available. A connection has at most one active
 call; overlap returns a busy error. Cancellation, timeout, shutdown and detected
 server exit invalidate every handle. No operation silently reconnects with old
-annotations. Unsupported protocol methods return their upstream error and never
+annotations.
+
+The qualified mcptools releases read a stdio reply by polling 20 times at
+0.2 s. They return `NULL` when nothing arrived and otherwise parse the first
+output line without checking its JSON-RPC id, so a late reply answers the next
+request. The worker therefore sends every request, including tool calls,
+through one exchange. Tool calls use mcptools' own request constructor and
+result converter, so the converted tool closure is not called. A `NULL`
+reply, or one whose id differs from the request, stops the server and fails
+with `deputy_mcp_desynchronized`. The host then closes the connection
+(`status()$reason` is `"desynchronized"`); later calls fail as closed. A
+server that exited is still reported as an exit. `tools_mcp()` handles cannot
+see the reply id. They treat a `NULL` tool result as a lost reply, which the
+converter returns only when no response was read (a legitimate empty result
+converts to `""` or a list), stop the server, and fail on the first lost
+reply so no later line is read as another answer. Correlation by id belongs
+upstream; the guard stays until a qualified release provides it. Unsupported protocol methods return their upstream error and never
 pretend to have read a resource or retrieved a prompt.
 
 `status()` is a local ownership/process record, not a remote health probe. A
@@ -110,6 +126,13 @@ Ctrl-D reset, interpreter exit/state loss, and cleanup with invalid old handles.
 `tests/testthat/test-mcp-repl-lifecycle.R` runs that journey when
 `DEPUTY_MCP_REPL_BIN` names the qualified executable. Ordinary CI retains the
 deterministic real MCP producer without requiring an installed REPL binary.
+
+The `repl` tool forwards `timeout_ms` capped at 3000 ms, and sends 3000 ms
+when the caller omits it (mcp-repl's own default is 60 s). mcp-repl answers
+shortly before that deadline with its busy status while the work continues,
+which keeps the reply inside the transport window. A later call with empty
+`input` retrieves the remaining output. The registered tool description says
+so. `tools_mcp_repl()` applies the same bound.
 
 `mcp_repl_control()` sends the documented Ctrl-C or Ctrl-D input and returns
 the actual upstream result. It does not infer success from dispatch, invent a

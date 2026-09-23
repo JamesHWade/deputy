@@ -343,6 +343,9 @@ implementation.
 Admission lists and Agent/session/run-context ownership are fixed. Discovery
 does not authorize access. Read `dev/mcp-client-contract.md` before changing the
 bridge or making lifecycle claims. #99 remains the public-API replacement work.
+The worker verifies every stdio reply's JSON-RPC id and fails closed with
+`deputy_mcp_desynchronized` when mcptools drops a slow reply (#196); mcp-repl
+`timeout_ms` is capped at 3000 ms to stay inside that window.
 `mcp_repl_connection()` uses that owner boundary for persistent execution.
 Set `DEPUTY_MCP_REPL_BIN` to a qualified mcp-repl 0.3.0 executable to run the
 real lifecycle test. Agent interruption closes active owned MCP connections;

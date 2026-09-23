@@ -106,15 +106,22 @@ mcp_worker_start <- function(
   )
 }
 
+# mcptools 1.0.2/1.0.3 stdio requests poll about 4 seconds, return NULL when
+# nothing arrived, and otherwise parse the first output line without checking
+# its JSON-RPC id. A late reply would then answer the next request. Every
+# request, including tool calls, therefore goes through one exchange that
+# requires a response carrying this request's id. Anything else closes the
+# server so no later line can be read as another request's answer.
 mcp_worker_request <- function(operation, arguments) {
   client <- getOption("deputy.mcp_client")
+  upstream <- asNamespace("mcptools")
+  entry <- function() upstream$the$mcp_servers[[client$server]]
+  lost <- FALSE
   check_alive <- function() {
-    entry <- utils::getFromNamespace("the", "mcptools")$mcp_servers[[
-      client$server
-    ]]
+    transport <- entry()$transport
     if (
-      identical(entry$transport$type, "stdio") &&
-        !isTRUE(entry$transport$process$is_alive())
+      identical(transport$type, "stdio") &&
+        !isTRUE(transport$process$is_alive())
     ) {
       cli::cli_abort(
         "The MCP server process exited; its session state is lost.",
@@ -122,44 +129,90 @@ mcp_worker_request <- function(operation, arguments) {
       )
     }
   }
+  desynchronized <- function(problem) {
+    lost <<- TRUE
+    client$desynchronized <- TRUE
+    options(deputy.mcp_client = client)
+    try(upstream$mcp_transport_close(entry()$transport), silent = TRUE)
+    cli::cli_abort(
+      c(
+        problem,
+        "x" = "The server was closed; its session state is lost.",
+        "i" = "Create a new connection to continue."
+      ),
+      class = "deputy_mcp_desynchronized"
+    )
+  }
+  exchange <- function(request) {
+    response <- upstream$mcp_server_request_cancellable(client$server, request)
+    if (is.null(response)) {
+      # A server that exited is reported as an exit, not as a slow reply.
+      check_alive()
+      desynchronized(
+        "The MCP server did not respond within the client's response window."
+      )
+    }
+    id <- if (is.list(response)) response$id
+    matches <- if (is.character(request$id)) {
+      identical(id, request$id)
+    } else {
+      is.numeric(id) && length(id) == 1L && isTRUE(id == request$id)
+    }
+    if (!matches) {
+      desynchronized(
+        "The MCP server's reply did not match the request it was read for."
+      )
+    }
+    response
+  }
   if (!identical(operation, "close")) {
+    if (isTRUE(client$desynchronized)) {
+      cli::cli_abort(
+        "The MCP connection lost request/response synchronization; its session state is lost.",
+        class = "deputy_mcp_desynchronized"
+      )
+    }
     check_alive()
   }
   # Check liveness even when mcptools raises a transport error while reading.
-  on.exit(if (!identical(operation, "close")) check_alive(), add = TRUE)
+  on.exit(
+    if (!identical(operation, "close") && !lost) check_alive(),
+    add = TRUE
+  )
   if (identical(operation, "tool")) {
     tool <- client$tools[[arguments$name]]
     if (is.null(tool)) {
       cli::cli_abort("Unknown MCP tool.")
     }
-    return(do.call(tool, arguments$arguments))
+    values <- arguments$arguments
+    if (!all(names(values) %in% names(formals(tool)))) {
+      cli::cli_abort("Unknown MCP tool argument.")
+    }
+    # The converted tool closure would send this same request, but it hides
+    # the raw response. Build it with mcptools' constructor, verify the reply
+    # and convert it with the converter that closure uses.
+    request <- upstream$mcp_request_tool_call(
+      id = upstream$jsonrpc_id(client$server),
+      tool = arguments$name,
+      arguments = values
+    )
+    return(upstream$mcp_tool_result_as_ellmer(exchange(request)))
   }
   if (identical(operation, "close")) {
-    entry <- utils::getFromNamespace("the", "mcptools")$mcp_servers[[
-      client$server
-    ]]
-    utils::getFromNamespace("mcp_transport_close", "mcptools")(entry$transport)
+    upstream$mcp_transport_close(entry()$transport)
     return(invisible(NULL))
   }
   # One protocol request. Cursor traversal remains explicit in the host;
   # this adapter does not implement a second discovery or pagination engine.
   request <- list(
     jsonrpc = "2.0",
-    id = utils::getFromNamespace("jsonrpc_id", "mcptools")(client$server),
+    id = upstream$jsonrpc_id(client$server),
     method = operation,
     params = arguments
   )
-  response <- utils::getFromNamespace(
-    "mcp_server_request_cancellable",
-    "mcptools"
-  )(
-    client$server,
-    request
-  )
+  response <- exchange(request)
   if (!is.null(response$error)) {
-    utils::getFromNamespace("mcp_abort_jsonrpc_error", "mcptools")(
-      response$error
-    )
+    upstream$mcp_abort_jsonrpc_error(response$error)
   }
   if (!is.list(response$result)) {
     cli::cli_abort("MCP returned no result object.")
@@ -235,14 +288,37 @@ validate_mcp_tool_owner <- function(
   invisible(NULL)
 }
 
-mcp_connection_server_exited <- function(condition) {
+mcp_condition_inherits <- function(condition, class) {
   while (inherits(condition, "condition")) {
-    if (inherits(condition, "deputy_mcp_server_exit")) {
+    if (inherits(condition, class)) {
       return(TRUE)
     }
     condition <- condition$parent
   }
   FALSE
+}
+
+mcp_connection_server_exited <- function(condition) {
+  mcp_condition_inherits(condition, "deputy_mcp_server_exit")
+}
+
+mcp_connection_desynchronized <- function(condition) {
+  mcp_condition_inherits(condition, "deputy_mcp_desynchronized")
+}
+
+mcp_desynchronized_error <- function(server, parent) {
+  rlang::catch_cnd(
+    abort_deputy(
+      c(
+        "MCP server {.val {server}} lost request/response synchronization.",
+        "x" = "The connection was closed; its server session state is lost.",
+        "i" = "Create a new connection to continue."
+      ),
+      class = "mcp_desynchronized",
+      parent = parent
+    ),
+    classes = "error"
+  )
 }
 
 cancel_active_mcp_tools <- function(tools, agent, run_context) {

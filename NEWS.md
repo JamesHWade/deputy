@@ -1,5 +1,18 @@
 # deputy (development version)
 
+* MCP stdio calls fail closed when a reply is lost. The qualified mcptools
+  releases wait about 4 seconds for a stdio reply and take the next output
+  line without checking its JSON-RPC id, so a slow reply used to become the
+  next call's answer. `McpConnection` now sends every request, tool calls
+  included, through one exchange that requires the reply for that request's
+  id. A missing or mismatched reply stops the server, closes the connection
+  and raises a `deputy_mcp_desynchronized` error saying its session state is
+  lost. `tools_mcp()` tools, which cannot see the reply id, stop the server
+  on the first lost reply. `mcp_repl_connection()` and `tools_mcp_repl()`
+  forward mcp-repl's `timeout_ms` capped at 3000 ms (also when omitted), so
+  long cells return mcp-repl's busy result and the model polls with a later
+  call (#196).
+
 * MCP connections, `tools_mcp()` and `mcp_repl_connection()` accept CRAN
   mcptools 1.0.3, whose client sources are identical to 1.0.2. Both runtime
   gates and the producer-test skips share one explicit list of qualified

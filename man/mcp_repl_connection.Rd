@@ -24,7 +24,8 @@ mcp_repl_connection(
 \item{sandbox}{Required explicit upstream sandbox policy.}
 
 \item{timeout}{Maximum seconds for one MCP request. This is distinct from
-mcp-repl's \code{timeout_ms}, which can return a busy result while code continues.}
+mcp-repl's \code{timeout_ms}, which can return a busy result while code continues.
+Deputy forwards at most 3000 ms as \code{timeout_ms} (see Details).}
 
 \item{startup_timeout}{Maximum seconds for client/server startup.}
 }
@@ -43,6 +44,14 @@ The executable must be installed and configured by the host. mcp-repl owns
 interpreter startup, sandbox enforcement, reset, interrupt, rich content and
 oversized-output artifacts. The client requires its \code{repl(input, timeout_ms)}
 tool contract; it does not infer a binary version from the executable name.
+
+Each \code{repl} call forwards \code{timeout_ms} capped at 3000 ms, and 3000 ms when
+it is omitted (mcp-repl would otherwise wait up to 60 s). The qualified
+mcptools releases wait only about 4 seconds for a stdio reply, and a reply
+that misses that window would desynchronize the connection. Work that takes
+longer keeps running in the interpreter: the call returns mcp-repl's busy
+result, and a later call with empty \code{input} retrieves the remaining output.
+The registered tool description tells the model this.
 
 A busy interpreter result is upstream output, not a completed calculation.
 After such a response, \code{\link[=mcp_repl_control]{mcp_repl_control()}} can request an interrupt or reset.

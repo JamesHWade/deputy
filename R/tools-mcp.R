@@ -144,6 +144,9 @@ validate_mcp_repl_sandbox_server <- function(server, sandbox) {
 #'   also controls network access according to its server configuration.
 #'
 #' @return A list of ellmer-compatible tools from the selected mcp-repl server.
+#'   The `repl` tool forwards `timeout_ms` capped at 3000 ms, as described in
+#'   [mcp_repl_connection()]; longer work returns a busy result and a later
+#'   call with empty `input` retrieves its output.
 #' @export
 #'
 #' @examples
@@ -219,7 +222,7 @@ tools_mcp_repl <- function(
   if (length(tools) == 0L) {
     cli_abort("The sandboxed mcp-repl server returned no tools")
   }
-  tools
+  lapply(tools, mcp_repl_bound_tool)
 }
 
 #' Get tools from MCP servers
