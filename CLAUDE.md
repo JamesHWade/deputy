@@ -66,6 +66,7 @@ deputy/
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
 │   ├── tools-mcp.R         # MCP discovery and sandboxed mcp-repl boundary
+│   ├── mcp-console.R       # Sandboxed MCP Console workbench connection
 │   ├── tool-registration.R # Batch validation and annotation defaults
 │   ├── tool-metadata.R     # Origin and annotation coverage inspection
 │   ├── mcp-metadata.R      # Qualified mcptools descriptor bridge
@@ -603,6 +604,11 @@ not a minimum) for transport/schema/invocation and a narrow read-only descriptor
 bridge because those releases drop annotations. Exact
 server selection happens before connection. Reconnecting invalidates old
 tool handles. MCP names never acquire native file or approval-tool privileges.
+`mcp_console_connection()` adapts MCP Console 0.0.4 through the same
+`McpConnection`: an explicit, version-checked executable, sandbox-widening
+arguments and unreviewed project config refused, `send` governed as
+shell-class execution, dependency preparation (outside the sandbox) opt-in,
+and restart as a host control (ADR-0029).
 Inherited child Chats retain provider configuration but clear parent tools;
 the AgentDefinition supplies the child's executable registry.
 

@@ -175,7 +175,10 @@ permission_check_tool_specific <- function(
 ) {
   tool_id <- normalize_native_tool_id(tool_name)
   if (is_mcp_tool_context(context)) {
-    return(permission_check_annotation_capabilities(permissions, context))
+    return(
+      permission_check_mcp_console(permissions, tool_input, context) %||%
+        permission_check_annotation_capabilities(permissions, context)
+    )
   }
 
   # File read tools
@@ -311,6 +314,35 @@ permission_check_tool_specific <- function(
   }
 
   permission_check_annotation_capabilities(permissions, context)
+}
+
+# MCP Console submits code with shell-class capability. Its dependency
+# preparation runs outside the worker sandbox with server permissions, so a
+# call that declares requirements also needs the package-installation grant.
+permission_check_mcp_console <- function(permissions, tool_input, context) {
+  execution <- context$tool_metadata$source$execution
+  if (!identical(execution$backend, "mcp-console")) {
+    return(NULL)
+  }
+  if (!isTRUE(permissions@bash)) {
+    return(PermissionResultDeny(
+      reason = paste(
+        "MCP Console runs code with shell-class capability;",
+        "shell execution (bash) is not allowed"
+      )
+    ))
+  }
+  if (mcp_console_has_requirements(tool_input)) {
+    if (!isTRUE(permissions@install_packages)) {
+      return(PermissionResultDeny(
+        reason = paste(
+          "MCP Console dependency preparation runs outside its sandbox;",
+          "package installation is not allowed"
+        )
+      ))
+    }
+  }
+  NULL
 }
 
 permission_check_annotation_capabilities <- function(permissions, context) {

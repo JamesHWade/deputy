@@ -103,3 +103,41 @@ mcp_slow_config <- function(repl = FALSE) {
 mcp_slow_calls <- function(config) {
   grep("^call ", readLines(config$log), value = TRUE)
 }
+
+# An executable that answers `--version` like MCP Console and otherwise serves
+# the MCP Console fixture. The version is read from the launch environment.
+mcp_console_fixture <- function() {
+  skip_if_mcptools_unqualified()
+  skip_on_os("windows")
+  log <- tempfile()
+  file.create(log)
+  fixture <- normalizePath(test_path("fixtures", "mcp-console.R"))
+  bin <- tempfile("mcp-console-bin-")
+  dir.create(bin)
+  command <- file.path(bin, "mcp-console")
+  writeLines(
+    c(
+      "#!/bin/sh",
+      "if [ \"$1\" = \"--version\" ]; then",
+      "  echo \"mcp-console ${DEPUTY_CONSOLE_FIXTURE_VERSION:-0.0.4}\"",
+      "  exit 0",
+      "fi",
+      paste(
+        "exec",
+        shQuote(file.path(R.home("bin"), "Rscript")),
+        shQuote(fixture),
+        shQuote(log),
+        "\"$@\""
+      )
+    ),
+    command
+  )
+  Sys.chmod(command, "0755")
+  workspace <- tempfile("mcp-console-workspace-")
+  dir.create(workspace)
+  list(command = command, log = log, workspace = workspace)
+}
+
+mcp_console_log <- function(fixture, prefix = "") {
+  grep(paste0("^", prefix), readLines(fixture$log), value = TRUE)
+}

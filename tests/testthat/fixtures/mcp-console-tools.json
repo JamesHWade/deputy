@@ -1,0 +1,99 @@
+{
+  "tools": [
+    {
+      "name": "send",
+      "description": "Persistent R, Python, and SQL workbench for exact computation, file and data inspection, transformation, visualization, statistics, simulation, and modeling. State persists across calls. Choose the language best suited to each cell and reuse live state when switching: Python reads R globals through `r.name`, R reads Python globals through `py$name`, and managed DuckDB SQL can query R data frames by name. R accesses its SQL connection through `sql_connection()`; R or Python can select a user-owned connection with `console_sql_connection(connection)`.\n\nSend one complete `r`, `python`, or `sql` cell per call. Code-bearing calls must be sequential; a control-only interrupt may overlap a pending `send`. Inspect intermediate results before submitting dependent cells. Cells are not transactional; changes made before an error may remain.\n\nOmit code to poll, supply stdin, control the session, or prepare requirements when available. If a response ends in `[running; poll with an empty send]`, call `send` again without code or stdin; do not resubmit the cell. Send `stdin` alone to answer an active prompt or debugger. Field descriptions specify preparation, control, and timeout ordering.\n\nEach result has at most 8 KiB of UTF-8 text, including notices; oversized output keeps its beginning and latest tail. Images have separate limits. Retained raw-log paths are relative to the Console server recording workspace (the controller for remote targets). Full retained text requires filesystem access there through existing tools; Console provides no read/search interface.\n\nEvaluated code can read host files, cannot directly access the network, and can write in the worker's private temporary directory and to paths explicitly allowed by the launcher. Dependency resolution, when available, runs outside the sandbox and may execute installation or build code; use only trusted dependencies.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {
+          "r": {
+            "description": "One complete R cell evaluated in persistent global state. Its final visible expression\nautoprints through R's normal console display; R also autoprints earlier visible top-level\nexpressions. Leave the primary result last and print only when additional output is needed.\nWhen dynamic resolution is available, the built-in worker resolves missing plain CRAN\npackage names on demand through `library()`, `require()`, `requireNamespace()`,\n`loadNamespace()`, `::`, or `:::`. Use packages directly; do not probe package availability\nor call `install.packages()`. Resolution makes a package available but attaches it only\nthrough the original `library()` or `require()` call. In a bare runtime, packages must\nalready be installed and these operations keep their ordinary R behavior. R source is not\nscanned in advance. Read Python globals through `py$name`. With managed DuckDB active, R data\nframes are directly queryable by name from later SQL cells. `sql_connection()` returns the\nR-owned SQL connection for DBI or dplyr use. Select a user-owned DBI connection for later SQL\ncells with `console_sql_connection(connection)` and restore managed DuckDB with\n`console_sql_connection(NULL)`. Do not disconnect the managed DuckDB connection, and restore a\nselected connection before disconnecting it. Default-device plots return as PNG images. Keep\nall drawing operations for one plot in the same cell. Set persistent dimensions with\n`options(console.plot.width = ..., console.plot.height = ..., console.plot.dpi = ...)`;\nwidth and height are in inches. Omit this field for polling or stdin-only calls.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "python": {
+            "description": "One complete Python cell evaluated in persistent `__main__` state. Its final visible expression\nautoprints through Python's normal display hook. Leave the primary result last and print only\nwhen additional output is needed. When dynamic resolution is available and an import is\nmissing, the built-in managed worker resolves a PyPI distribution on demand, using a curated mapping for well-known\nimport/distribution differences and otherwise assuming the distribution matches the top-level\nmodule. Python source is not scanned; resolution starts only when execution reaches the import.\nUse `requirements.python` when the distribution differs from the inferred name, exact registry\nmetadata is needed, or the package should be prepared before the cell. A user-selected Python\nenvironment or bare runtime disables both automatic resolution and managed requirements;\nimport packages already installed there directly. Read R globals and call R functions through\n`r.name`. Select a user-owned DB-API connection for later SQL cells with\n`console_sql_connection(connection)` and restore managed DuckDB with\n`console_sql_connection(None)`. Python data frames are not automatically visible to managed\nDuckDB SQL; bind them to an R name before querying them there. At cell end, including after a\nPython error, every open `matplotlib.pyplot` figure returns once as a PNG image and is closed.\n`show()` is optional. R plots called through `r` follow the R plot rules. Omit this field for\npolling or stdin-only calls.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sql": {
+            "description": "One complete SQL cell evaluated through the active connection. The managed DuckDB backend is\nactive by default and keeps a persistent catalog. A result with columns returns a bounded\npreview. With managed DuckDB, an unqualified relation name can query a data frame in R global\nstate, and a DuckDB table or view with the same name takes precedence. A user-selected R\nconnection receives cells through `DBI::dbSendQuery()`; a Python DB-API connection executes\nthem through its connection or cursor protocol. The selected driver supplies its own SQL\ndialect and type mappings. Use DBI from an R cell for commands that require the statement\ninterface. Managed DuckDB conveniences and extension requirements apply only to the managed\nbackend. With the sandbox enabled, use `ATTACH 'path' AS name (READ_ONLY)` for existing DuckDB\ndatabases outside the sandbox's writable paths; the sandbox blocks DuckDB's\ndefault writable mode for those paths. Use `SHOW TABLES`, `DESCRIBE`, `SUMMARIZE`, and `EXPLAIN`\nfor DuckDB discovery. DuckDB CLI dot commands are not supported. Omit this field for polling\nor stdin-only calls.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "control": {
+            "description": "Applies lifecycle control alone or before compatible same-call fields. `interrupt` requests\nSIGINT from the active host resolver or live worker and preserves in-memory state. After\nsuccessful delivery, stdin is queued and `send` waits 100 milliseconds before observing the\nearlier evaluation or attempting an optional following cell; the cell is not run if the\ninterrupted evaluation remains active. When `requirements` is available, restart resolves\nsame-call requirements before replacement. It then discards R, Python, DuckDB, debugger,\nand unread-stdin state and sends same-call stdin and code only to the replacement.",
+            "type": "string",
+            "enum": [
+              "interrupt",
+              "restart"
+            ]
+          },
+          "requirements": {
+            "description": "Additive R packages, Python packages, or DuckDB extensions to retain for later calls.\nRequirements alone perform standalone preparation. With one cell, they are preconditions of\nthat cell. With `control = \"restart\"`, they are part of the restart transaction, with or\nwithout a cell. Requirements are not accepted with interrupt unless a cell follows.\nPreparation does not import, attach, or load dependencies. On a code-bearing call without\ncontrol, preparation completes before same-call nonempty stdin is queued. Standalone\npreparation cannot queue nonempty stdin. With restart, failure leaves the current worker\nunchanged and sends neither stdin nor code. With interrupt and a following cell, signal\ndelivery and stdin enqueue happen before requirements are validated or prepared and are not\nrolled back if that later work fails. Ordinary CRAN packages used by the built-in R worker need\nnot be declared here; use `requirements.r` to stage packages ahead of evaluation or provide\nexplicit `ir` references. In the built-in managed Python environment, missing imports normally\nresolve at runtime. Use `requirements.python` to stage a distribution before the cell, provide\na version, extra, or marker, or correct automatic inference. Python source is not pre-scanned,\nand SQL does not trigger package discovery. A cell is not run if explicit preparation fails or\nfurther changes require restart. Resolution runs with server permissions and may download\npackages or extensions or execute installation or build code. Use only trusted requirements.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "duckdb": {
+                "description": "Additive DuckDB extension names for the managed DuckDB backend, for standalone preparation,\npreparation before a cell, or a restart transaction, for example `fts`, `spatial`, or `excel`.\nJSON and ICU are included in built-in defaults. Names must start with a lowercase ASCII\nletter and contain only lowercase ASCII letters, digits, and underscores. The host resolver\nuses DuckDB's own `INSTALL`, with DuckDB's default extension repository and\nnative cache. Preparation does not load extension code; `LOAD` and automatic loading happen\nlater inside the worker.",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "maxItems": 64,
+                "default": []
+              },
+              "r": {
+                "description": "Additive, single-line `ir` package references for standalone preparation, preparation before a\ncell, or a restart transaction, for example `data.table`, `sf`, or `yaml12`. Use this field\nto stage packages ahead of evaluation or supply an explicit supported remote `ir` reference.\nAutomatic R discovery accepts only plain package names. An idle worker that implements R\npreparation can add requirements without losing live state. Local package sources are\nrejected because resolution runs with server permissions.",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxItems": 64,
+                "default": []
+              },
+              "python": {
+                "description": "Additive, named PEP 508 registry requirements for standalone preparation, preparation before a\ncell, or a restart transaction, for example `polars>=1`, `scikit-learn`, or\n`matplotlib; python_version >= '3.10'`. Use explicit requirements when automatic import\ninference needs a different distribution, a version, an extra, or an environment marker, or\nwhen the distribution should be prepared before the cell. Automatic imports infer bare\ndistribution names only. Paths, file URLs, editable requirements, direct references, local\narchives, and local projects are rejected. Preparation does not import the package. An idle\nserver-managed worker may activate compatible additions without losing state. A nonempty\nuser-selected `RETICULATE_PYTHON` disables automatic resolution and managed Python\nrequirements.",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxItems": 64,
+                "default": []
+              }
+            },
+            "additionalProperties": false
+          },
+          "stdin": {
+            "description": "Input for an active read, prompt, or debugger. When responding to active input, omit R, Python,\nand SQL code and send stdin on its own. Its UTF-8 encoding is queued exactly; no newline is added.\nLine-oriented input therefore normally needs a trailing `\\n`. On a code-bearing call without\ncontrol, available requirements are prepared before nonempty stdin is queued. Standalone\npreparation cannot queue nonempty stdin. After `interrupt`, nonempty stdin is queued before the\n100-millisecond grace and may be consumed while the earlier operation unwinds. After `restart`,\nsame-call stdin is sent only to the replacement. When sent with a cell, nonempty text is queued\nbefore the code is run; an already waiting interactive read may consume it before the new cell\nbegins. Empty text queues nothing. If output ends in `[waiting for stdin]`, send the requested\ninput here. Unread text can satisfy later reads and is discarded by restart.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timeout_ms": {
+            "description": "Maximum time this call waits once a cell has been dispatched or the call has attached to an\nactive evaluation, including one automatic worker replacement attempt. Reaching the timeout\ndoes not cancel evaluation, resolution, or startup. Inline control, interrupt grace, restart,\nand explicit requirement preparation happen before dispatch and may make the complete call take\nlonger. This value does not limit standalone preparation. Automatic R and Python import\nresolution are part of the running evaluation and count toward this wait. On expiry, the call\nreturns available output and a state marker, such as\n`[running; poll with an empty send]` or `[worker starting]`. If evaluation remains active, poll\nwith an empty `send` call; do not resubmit the cell.",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "default": 60000
+          }
+        }
+      }
+    }
+  ]
+}
