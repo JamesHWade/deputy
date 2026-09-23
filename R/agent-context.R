@@ -463,14 +463,8 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         }
       }
 
-      count <- tryCatch(
-        do.call(
-          chat$token_count,
-          c(messages, list(include = "complete"))
-        ),
-        error = function(e) NULL
-      )
-      if (is.null(count)) {
+      count <- chat_token_count(chat, messages)
+      if (is.null(count) && !ellmer_token_count_unsupported(chat)) {
         count <- context_count_after_unpaired_result(chat, messages)
       }
       if (!is.numeric(count) || length(count) == 0L || anyNA(count)) {

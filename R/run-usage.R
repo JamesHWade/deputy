@@ -271,20 +271,55 @@ provider_cost_summary <- function(tokens, expected_records = NULL) {
 }
 
 provider_usage_summary <- function(chat) {
-  turns <- tryCatch(chat$get_turns(), error = function(e) list())
+  turns_read <- TRUE
+  turns <- tryCatch(chat$get_turns(), error = function(e) {
+    turns_read <<- FALSE
+    list()
+  })
+  # ellmer's own get_tokens() is a pure function of the turns, so its summary
+  # can be reused until the turn list changes. Replaced methods (subclasses
+  # and test doubles) may report other state and are always asked again.
+  cacheable <- turns_read && is_ellmer_chat_method(chat, "get_tokens")
+  if (cacheable) {
+    cached <- attr(chat, "deputy_usage_summary", exact = TRUE)
+    if (!is.null(cached) && identical(cached$turns, turns)) {
+      return(cached$summary)
+    }
+  }
+  summary <- provider_usage_summary_for(chat, turns, cacheable)
+  if (cacheable) {
+    # An environment attribute updates the Chat in place, as the request
+    # callback registry does. The cache holds the turn list it describes, so
+    # identical() compares retained objects (shared elements by pointer).
+    attr(chat, "deputy_usage_summary") <- list(
+      turns = turns,
+      summary = summary
+    )
+  }
+  summary
+}
+
+provider_usage_summary_for <- function(chat, turns, ellmer_tokens) {
   requests <- sum(vapply(
     turns,
     inherits,
     logical(1),
     what = "ellmer::AssistantTurn"
   ))
-  tokens <- tryCatch(chat$get_tokens(), error = function(e) {
-    # ellmer 0.5.0's token table assumes paired user/assistant turns. A
-    # retained, undispatched tool-result turn breaks its input-preview column.
-    # These public producer properties retain the actual usage without adding
-    # a fictitious assistant response or changing provider serialization.
+  # ellmer 0.5.0's token table assumes paired user/assistant turns. A
+  # retained, undispatched tool-result turn breaks its input-preview column.
+  # These public producer properties retain the actual usage without adding
+  # a fictitious assistant response or changing provider serialization.
+  tokens <- if (ellmer_tokens && ellmer_token_table_fails(turns)) {
     assistant_turn_tokens(turns)
-  })
+  } else {
+    tryCatch(chat$get_tokens(), error = function(e) {
+      if (ellmer_tokens) {
+        ellmer_token_table_observe(turns, e)
+      }
+      assistant_turn_tokens(turns)
+    })
+  }
   token_sum <- function(name) {
     if (is.null(tokens) || !name %in% names(tokens)) {
       return(0)
@@ -310,6 +345,65 @@ provider_usage_summary <- function(chat) {
     missing = cost$missing,
     cost_records = cost_records
   )
+}
+
+# Whether `chat[[name]]` is ellmer's own Chat method rather than a replacement.
+# R6 copies share the method body, so the comparison is a pointer check.
+is_ellmer_chat_method <- function(chat, name) {
+  if (!is.environment(chat) || !inherits(chat, "Chat")) {
+    return(FALSE)
+  }
+  method <- chat[[name]]
+  reference <- ellmer::Chat$public_methods[[name]]
+  is.function(method) &&
+    is.function(reference) &&
+    identical(body(method), body(reference)) &&
+    identical(formals(method), formals(reference))
+}
+
+# Process-wide observations of ellmer behavior. Each records the method body
+# it was learned from, so a different ellmer method is observed afresh.
+ellmer_observations <- new.env(parent = emptyenv())
+
+# ellmer 0.5.0 adds one input preview per user turn to a table with one row
+# per completed assistant turn, and tibble recycles only length-one columns.
+ellmer_token_table_unpaired <- function(turns) {
+  users <- 0L
+  completed <- 0L
+  for (turn in turns) {
+    if (inherits(turn, "ellmer::UserTurn")) {
+      users <- users + 1L
+    } else if (
+      inherits(turn, "ellmer::AssistantTurn") &&
+        !inherits(turn, "ellmer::AssistantPartialTurn")
+    ) {
+      completed <- completed + 1L
+    }
+  }
+  users != completed && users != 1L
+}
+
+# TRUE only once this ellmer's get_tokens() has been observed to reject an
+# unpaired table. Skipping the call then avoids building and discarding the
+# same error, with its backtrace, on every usage snapshot.
+ellmer_token_table_fails <- function(turns) {
+  observed <- ellmer_observations$token_table
+  isTRUE(observed$unpaired_fails) &&
+    identical(observed$body, body(ellmer::Chat$public_methods$get_tokens)) &&
+    ellmer_token_table_unpaired(turns)
+}
+
+ellmer_token_table_observe <- function(turns, error) {
+  if (
+    inherits(error, "tibble_error_assign_incompatible_size") &&
+      ellmer_token_table_unpaired(turns)
+  ) {
+    ellmer_observations$token_table <- list(
+      unpaired_fails = TRUE,
+      body = body(ellmer::Chat$public_methods$get_tokens)
+    )
+  }
+  invisible(NULL)
 }
 
 assistant_turn_tokens <- function(turns) {
