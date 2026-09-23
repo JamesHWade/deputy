@@ -189,8 +189,9 @@ mcp_worker_request <- function(operation, arguments) {
       cli::cli_abort("Unknown MCP tool argument.")
     }
     # The converted tool closure would send this same request, but it hides
-    # the raw response. Build it with mcptools' constructor, verify the reply
-    # and convert it with the converter that closure uses.
+    # the raw response. Mirror its call_tool(): the ignored-tool check, the
+    # request constructor, a verified reply and the same converter.
+    upstream$mcp_check_tool_not_ignored(client$server, arguments$name)
     request <- upstream$mcp_request_tool_call(
       id = upstream$jsonrpc_id(client$server),
       tool = arguments$name,
