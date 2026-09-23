@@ -9,9 +9,26 @@ in order and return promises without blocking other conversations.
 The worker executes with the local account's access. It provides process
 isolation, not an OS security sandbox. Agent permissions gate the
 registered tool; `$run()` is an explicit trusted host operation, not a
-governed Agent run. Each call starts in the Agent's immutable working
-directory. A [`setwd()`](https://rdrr.io/r/base/getwd.html) in evaluated
-code applies only until the next call.
+governed Agent run. With selected `tools`, code calls
+`tools$<name>(...)` during a governed `run_r_code` call. Selected tools
+must use `convert = FALSE` and validate raw JSON arguments. Calls pass
+Agent permissions, hooks and usage limits; their events carry
+`parent_tool_call_id`. Direct `$run()` is unavailable when tools are
+selected. A nested tool must return within the remaining execution
+`timeout`; otherwise the execution times out, the session resets and its
+variables are lost, and the nested call is recorded as a tool error. R
+receives the tool's original value; a `PostToolUse` hook's
+`updated_tool_output` applies only to the event and transcript.
+Recursive execution and nested durable approvals are unsupported.
+Sessions with selected tools cannot be created when `approval_dir` is
+configured. Requests are limited to 256 KiB and ordinary data results to
+8 MiB serialized. The bridge never transfers host tool closures. Trusted
+account and environment access still applies, and cancellation cannot
+undo an external effect.
+
+Each call starts in the Agent's immutable working directory. A
+[`setwd()`](https://rdrr.io/r/base/getwd.html) in evaluated code applies
+only until the next call.
 
 `$cancel()` and timeouts terminate the worker and discard its variables
 and queued calls. Later calls start fresh and report that fact. External
@@ -62,7 +79,8 @@ Create a lazy R worker owner. No code is executed here.
       queue_limit = 16L,
       max_output_bytes = 8 * 1024 * 1024,
       plot_width = 1000L,
-      plot_height = 650L
+      plot_height = 650L,
+      tools = character()
     )
 
 #### Arguments
@@ -91,6 +109,12 @@ Create a lazy R worker owner. No code is executed here.
 - `plot_width, plot_height`:
 
   PNG plot dimensions in pixels.
+
+- `tools`:
+
+  Character vector of explicitly selected Agent tool names that
+  generated R may call through `tools$<name>(...)`. The default keeps
+  the worker's existing behavior and exposes no Agent tools.
 
 ------------------------------------------------------------------------
 
