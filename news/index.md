@@ -2,6 +2,14 @@
 
 ## deputy (development version)
 
+- Model requests and tool calls spend less CPU on internal probes. Usage
+  snapshots reuse ellmer’s token table until the conversation changes.
+  Deputy no longer repeats calls it has already seen fail (token tables
+  for unpaired tool-result turns, token counting for providers without
+  it) and skips tool-context lookups outside nested R session calls. Run
+  generators are defined once per package, not once per run. Results are
+  unchanged ([\#185](https://github.com/JamesHWade/deputy/issues/185)).
+
 - [`job_create()`](https://jameshwade.github.io/deputy/reference/job_create.md),
   [`job_run()`](https://jameshwade.github.io/deputy/reference/job_run.md),
   [`job_read()`](https://jameshwade.github.io/deputy/reference/job_read.md)
