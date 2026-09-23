@@ -49,7 +49,7 @@ Config/testthat/start-first: history-recovery-example, compaction-evidence,
 Imports:
     callr,
     cli,
-    coro,
+    coro (>= 1.1.0.9000),
     digest,
     ellmer (>= 0.5.0),
     filelock (>= 1.0.3),
@@ -65,6 +65,8 @@ Imports:
     S7 (>= 0.2.2),
     utils
 Config/roxygen2/version: 8.1.0
+Remotes:
+    r-lib/coro@a8efdec66ec547e4697c78286135255429c326ae
 Collate:
     'agent-approval.R'
     'agent-context.R'
