@@ -495,6 +495,84 @@ upstream startup error. Put the sandbox mode in `--sandbox`; a
 `--config sandbox_mode=...` override is rejected so it cannot change the
 policy Deputy checked.
 
+### R, Python and SQL with MCP Console
+
+[MCP Console](https://github.com/t-kalinowski/mcp-console) grew out of
+mcp-repl. One `send` tool runs R, Python and DuckDB SQL cells in a
+single sandboxed worker, so a data frame created in R can be queried in
+SQL and read from Python in the same conversation.
+[`mcp_console_connection()`](https://jameshwade.github.io/deputy/reference/mcp_console_connection.md)
+starts one server per conversation, owned by one Agent:
+
+``` r
+
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  permissions = Permissions(bash = TRUE, web = TRUE)
+)
+console <- mcp_console_connection(
+  agent,
+  command = Sys.getenv("DEPUTY_MCP_CONSOLE_BIN"),
+  dependencies = "allow"
+)
+agent$register_tools(console$tools())
+# ...
+console$close()
+```
+
+Install a qualified executable yourself (MCP Console 0.0.4, for example
+with `uv tool install mcp-console==0.0.4`) and pass its path. Deputy
+checks its `--version` before launch and refuses other versions.
+
+MCP Console enforces a native sandbox by default: code can read host
+files, cannot reach the network directly, and writes only to private
+temporary storage and paths the host allows. Deputy keeps it that way.
+It refuses `--no-sandbox` and any `-c` override that could widen the
+filesystem, add a proxy or select a remote or container target. It
+admits only `--writable-root PATH`, `-c extends=:workspace` (writes in
+the Agent’s working directory), `-c extends=:read-only` and
+`-c sandbox.network=restricted`. A project file,
+`.agents/console/config.yaml`, can change the policy, so Deputy will not
+start when one exists unless you review it and pass
+`project_config = TRUE`. After launch, Deputy checks the sandbox
+description the server reports and closes the connection unless it shows
+the native sandbox with restricted networking.
+
+`send` runs code, so the Agent governs it like a shell command. Standard
+mode needs `bash = TRUE`, and `web = TRUE` because the server supplies
+no annotations. Readonly and plan modes deny it.
+
+Dependency preparation is different. It runs outside the sandbox, with
+the server’s permissions, and can download and build packages. MCP
+Console does it for explicit `requirements` and also automatically when
+code calls [`library()`](https://rdrr.io/r/base/library.html) or imports
+a missing Python module. Deputy cannot switch off the automatic path, so
+`dependencies = "deny"`, the default, refuses a server that offers
+preparation. With `dependencies = "allow"`, a call that declares
+`requirements` also needs `install_packages = TRUE`. Resolvers write to
+their usual caches under `HOME` (R packages, uv environments and DuckDB
+extensions). mcptools passes the server only a few inherited variables,
+so set cache locations such as `UV_CACHE_DIR` or `XDG_CACHE_HOME`
+through `env`.
+
+Each call waits at most 2500 ms, to stay inside mcptools’ stdio response
+window. Longer work keeps running and returns
+`[running; poll with an empty send]`; the model then calls `send` with
+no code to collect the output. Use
+`mcp_console_control(console, "interrupt")` to interrupt a running cell
+and keep state. Restart is a host control:
+`mcp_console_control(console, "restart")` discards R, Python and SQL
+state. Upstream gives restart no deadline, so if the new worker is not
+ready within the window, Deputy closes the connection and reports it;
+start a new connection then. `console$close()` asks the server to shut
+down and stops it.
+
+MCP Console records every call, its output and plots, without redaction,
+under `.agents/console/sessions/` in the Agent’s working directory.
+Version 0.0.4 cannot move or expire these recordings, so
+`console$status()$execution` reports the path and retention is up to
+you.
+
 ## Human-in-the-Loop
 
 The `tool_ask_user` tool lets an agent ask the user a question during

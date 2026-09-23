@@ -2,6 +2,29 @@
 
 ## deputy (development version)
 
+- [`mcp_console_connection()`](https://jameshwade.github.io/deputy/reference/mcp_console_connection.md)
+  connects an Agent to one [MCP
+  Console](https://github.com/t-kalinowski/mcp-console) server, a
+  sandboxed workbench that keeps R, Python and DuckDB SQL state for a
+  conversation
+  ([\#190](https://github.com/JamesHWade/deputy/issues/190)). The host
+  names a qualified executable (MCP Console 0.0.4, checked with
+  `--version`). Deputy refuses `--no-sandbox`, overrides that could
+  widen the filesystem, add a proxy or select a remote target, and an
+  unreviewed `.agents/console/config.yaml`, and closes the connection
+  unless the server reports its native sandbox with restricted
+  networking. `send` is governed as shell-class code execution.
+  Dependency preparation runs outside the sandbox, so it needs
+  `dependencies = "allow"` on the connection and `install_packages` in
+  the Agent’s permissions. `timeout_ms` is capped at 2500 ms; long cells
+  return a running marker and the model polls.
+  [`mcp_console_control()`](https://jameshwade.github.io/deputy/reference/mcp_console_control.md)
+  interrupts or restarts the session, and
+  [`close()`](https://rdrr.io/r/base/connections.html) asks the server
+  to shut down before stopping it. Recordings stay under
+  `.agents/console/sessions/` in the Agent’s working directory, reported
+  in `status()$execution`. See ADR-0029.
+
 - Deputy temporarily requires coro from GitHub (commit a8efdec,
   `>= 1.1.0.9000`). CRAN coro 1.1.0 recompiles every generator instance,
   which cost about 0.3 to 0.7 s of CPU per model request. The dependency

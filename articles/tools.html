@@ -631,6 +631,80 @@ upstream startup error. Put the sandbox mode in <code>--sandbox</code>;
 a <code>--config sandbox_mode=...</code> override is rejected so it
 cannot change the policy Deputy checked.</p>
 </div>
+<div class="section level3">
+<h3 id="r-python-and-sql-with-mcp-console">R, Python and SQL with MCP Console<a class="anchor" aria-label="anchor" href="#r-python-and-sql-with-mcp-console"></a>
+</h3>
+<p><a href="https://github.com/t-kalinowski/mcp-console" class="external-link">MCP Console</a>
+grew out of mcp-repl. One <code>send</code> tool runs R, Python and
+DuckDB SQL cells in a single sandboxed worker, so a data frame created
+in R can be queried in SQL and read from Python in the same
+conversation. <code><a href="../reference/mcp_console_connection.html">mcp_console_connection()</a></code> starts one server
+per conversation, owned by one Agent:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>bash <span class="op">=</span> <span class="cn">TRUE</span>, web <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">console</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mcp_console_connection.html">mcp_console_connection</a></span><span class="op">(</span></span>
+<span>  <span class="va">agent</span>,</span>
+<span>  command <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.getenv.html" class="external-link">Sys.getenv</a></span><span class="op">(</span><span class="st">"DEPUTY_MCP_CONSOLE_BIN"</span><span class="op">)</span>,</span>
+<span>  dependencies <span class="op">=</span> <span class="st">"allow"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">agent</span><span class="op">$</span><span class="fu">register_tools</span><span class="op">(</span><span class="va">console</span><span class="op">$</span><span class="fu">tools</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co"># ...</span></span>
+<span><span class="va">console</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>Install a qualified executable yourself (MCP Console 0.0.4, for
+example with <code>uv tool install mcp-console==0.0.4</code>) and pass
+its path. Deputy checks its <code>--version</code> before launch and
+refuses other versions.</p>
+<p>MCP Console enforces a native sandbox by default: code can read host
+files, cannot reach the network directly, and writes only to private
+temporary storage and paths the host allows. Deputy keeps it that way.
+It refuses <code>--no-sandbox</code> and any <code>-c</code> override
+that could widen the filesystem, add a proxy or select a remote or
+container target. It admits only <code>--writable-root PATH</code>,
+<code>-c extends=:workspace</code> (writes in the Agent’s working
+directory), <code>-c extends=:read-only</code> and
+<code>-c sandbox.network=restricted</code>. A project file,
+<code>.agents/console/config.yaml</code>, can change the policy, so
+Deputy will not start when one exists unless you review it and pass
+<code>project_config = TRUE</code>. After launch, Deputy checks the
+sandbox description the server reports and closes the connection unless
+it shows the native sandbox with restricted networking.</p>
+<p><code>send</code> runs code, so the Agent governs it like a shell
+command. Standard mode needs <code>bash = TRUE</code>, and
+<code>web = TRUE</code> because the server supplies no annotations.
+Readonly and plan modes deny it.</p>
+<p>Dependency preparation is different. It runs outside the sandbox,
+with the server’s permissions, and can download and build packages. MCP
+Console does it for explicit <code>requirements</code> and also
+automatically when code calls <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> or imports a
+missing Python module. Deputy cannot switch off the automatic path, so
+<code>dependencies = "deny"</code>, the default, refuses a server that
+offers preparation. With <code>dependencies = "allow"</code>, a call
+that declares <code>requirements</code> also needs
+<code>install_packages = TRUE</code>. Resolvers write to their usual
+caches under <code>HOME</code> (R packages, uv environments and DuckDB
+extensions). mcptools passes the server only a few inherited variables,
+so set cache locations such as <code>UV_CACHE_DIR</code> or
+<code>XDG_CACHE_HOME</code> through <code>env</code>.</p>
+<p>Each call waits at most 2500 ms, to stay inside mcptools’ stdio
+response window. Longer work keeps running and returns
+<code>[running; poll with an empty send]</code>; the model then calls
+<code>send</code> with no code to collect the output. Use
+<code>mcp_console_control(console, "interrupt")</code> to interrupt a
+running cell and keep state. Restart is a host control:
+<code>mcp_console_control(console, "restart")</code> discards R, Python
+and SQL state. Upstream gives restart no deadline, so if the new worker
+is not ready within the window, Deputy closes the connection and reports
+it; start a new connection then. <code>console$close()</code> asks the
+server to shut down and stops it.</p>
+<p>MCP Console records every call, its output and plots, without
+redaction, under <code>.agents/console/sessions/</code> in the Agent’s
+working directory. Version 0.0.4 cannot move or expire these recordings,
+so <code>console$status()$execution</code> reports the path and
+retention is up to you.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="human-in-the-loop">Human-in-the-Loop<a class="anchor" aria-label="anchor" href="#human-in-the-loop"></a>
@@ -638,7 +712,7 @@ cannot change the policy Deputy checked.</p>
 <p>The <code>tool_ask_user</code> tool lets an agent ask the user a
 question during execution. This is useful for confirmations,
 clarifications, or collecting input:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent_id</span> <span class="op">&lt;-</span> <span class="st">"agent-analysis"</span></span>
 <span><span class="va">session_id</span> <span class="op">&lt;-</span> <span class="st">"session-analysis"</span></span>
 <span></span>

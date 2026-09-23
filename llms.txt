@@ -238,6 +238,10 @@ Built-in tools and tool bundles
   : Connect an Agent to an independent sandboxed REPL
 - [`mcp_repl_control()`](https://jameshwade.github.io/deputy/reference/mcp_repl_control.md)
   : Request an upstream REPL interrupt or reset
+- [`mcp_console_connection()`](https://jameshwade.github.io/deputy/reference/mcp_console_connection.md)
+  : Connect an Agent to a sandboxed MCP Console workbench
+- [`mcp_console_control()`](https://jameshwade.github.io/deputy/reference/mcp_console_control.md)
+  : Interrupt or restart an MCP Console session
 - [`set_ask_user_callback()`](https://jameshwade.github.io/deputy/reference/set_ask_user_callback.md)
   : Set callback for non-interactive user input
 
