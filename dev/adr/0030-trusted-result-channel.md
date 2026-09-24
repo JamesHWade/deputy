@@ -31,8 +31,10 @@ the event is built.
   tools that neither execute code nor delegate. Other tools are rejected if
   they execute model-supplied code or delegate (`run_r_code`, `run_bash`,
   R session tools, composition, delegation and graph route tools), or if
-  their effective annotations allow writes or the open world. Unannotated
-  tools get ADR-0007's conservative defaults and so are rejected. The host
+  their effective annotations allow writes (including an explicit
+  `destructive_hint = TRUE` beside `read_only_hint = TRUE`) or the open
+  world. Unannotated tools get ADR-0007's conservative defaults and so are
+  rejected. The host
   may list local function tools in `exempt_tools`. That is an explicit
   assertion, never inferred. MCP, provider-native, code-execution and
   delegation tools cannot be exempted.

@@ -53,8 +53,8 @@ MCP), executes code, or delegates to another Agent;
 (\code{run_r_code}, \code{run_bash}, R session tools, delegation and graph route
 tools). These tools could produce a result of any kind;
 \item any other tool's effective annotations permit writes
-(\code{read_only_hint} not \code{TRUE}) or the open world (\code{open_world_hint} not
-\code{FALSE}), unless the host names it in \code{exempt_tools}. Unannotated tools,
+(\code{read_only_hint} not \code{TRUE}, or an explicit \code{destructive_hint = TRUE})
+or the open world (\code{open_world_hint} not \code{FALSE}), unless the host names it in \code{exempt_tools}. Unannotated tools,
 including MCP REPL and console tools, use the conservative defaults from
 ADR-0007 and are rejected.
 }

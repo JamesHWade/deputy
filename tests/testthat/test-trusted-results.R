@@ -79,6 +79,11 @@ test_that("the complete registry is checked at every publication", {
     agent$set_tools(list(trusted_forecast_tool(), tool_write_file)),
     "may write or reach the open world"
   )
+  # An explicit destructive claim stays restrictive despite read_only_hint.
+  expect_error(
+    agent$register_tool(trusted_closed_tool("purge", destructive_hint = TRUE)),
+    "may write or reach the open world"
+  )
   expect_identical(names(agent$get_tools()), before)
 
   # A replacement cannot sneak a bypass under an existing trusted name.

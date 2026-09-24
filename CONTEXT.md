@@ -85,7 +85,7 @@ call and arguments. It is host evidence, not model text; a receipt may stand
 in for it in the conversation.
 _Avoid_: answer, model result, summary
 
-
+**OS sandbox**:
 A platform-enforced boundary that constrains an already authorized process.
 Deputy delegates this boundary to mcp-repl and verifies the requested policy;
 permission modes do not substitute for it.

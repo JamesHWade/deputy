@@ -22,8 +22,8 @@ NULL
 #'   (`run_r_code`, `run_bash`, R session tools, delegation and graph route
 #'   tools). These tools could produce a result of any kind;
 #' * any other tool's effective annotations permit writes
-#'   (`read_only_hint` not `TRUE`) or the open world (`open_world_hint` not
-#'   `FALSE`), unless the host names it in `exempt_tools`. Unannotated tools,
+#'   (`read_only_hint` not `TRUE`, or an explicit `destructive_hint = TRUE`)
+#'   or the open world (`open_world_hint` not `FALSE`), unless the host names it in `exempt_tools`. Unannotated tools,
 #'   including MCP REPL and console tools, use the conservative defaults from
 #'   ADR-0007 and are rejected.
 #'
@@ -268,6 +268,7 @@ check_trusted_registry <- function(policy, tools) {
     }
     if (
       !isTRUE(effective$read_only_hint) ||
+        !isFALSE(effective$destructive_hint) ||
         !isFALSE(effective$open_world_hint)
     ) {
       trusted_registry_abort(
