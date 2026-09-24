@@ -31,6 +31,10 @@
 * `inst/examples/trusted-results/` is a three-area chat, review and results
   app, adapted from Landau and Parmar's R template and weather example. Only the trusted forecast tool can fill the results panel (#197).
 
+* New article, `vignette("trusted-mini-agents")`, explains Landau and
+  Parmar's trusted mini-agent pattern and how Deputy enforces each of its
+  rules (#197).
+
 * `mcp_console_connection()` connects an Agent to one
   [MCP Console](https://github.com/t-kalinowski/mcp-console) server, a
   sandboxed workbench that keeps R, Python and DuckDB SQL state for a

@@ -188,6 +188,7 @@ articles:
   contents:
   - tools
   - permissions
+  - trusted-mini-agents
   - hooks
 - title: Apps
   contents:

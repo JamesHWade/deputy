@@ -42,15 +42,18 @@
 #'   current [ApprovalContinuation] or `NULL`), `outcome()` (a list with
 #'   `decision`, `tool_input`, and `result` or `error` after the last decision),
 #'   and a `refresh()` function.
-#' @seealso [tool_input_review()], [TrustedResults], [approval_read()]
+#' @seealso `vignette("trusted-mini-agents")`, [tool_input_review()],
+#'   [TrustedResults], [approval_read()]
 #' @examples
 #' if (interactive() && rlang::is_installed("bslib")) {
 #'   library(shiny)
 #'   ui <- bslib::page_fluid(approval_review_ui("review"))
 #'   server <- function(input, output, session) {
+#'     approval_dir <- tempfile("approvals-")
+#'     dir.create(approval_dir)
 #'     agent <- Agent$new(
 #'       ellmer::chat("openai/gpt-5.6-luna"),
-#'       approval_dir = tempfile()
+#'       approval_dir = approval_dir
 #'     )
 #'     approval_review_server("review", agent)
 #'   }

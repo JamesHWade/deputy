@@ -67,4 +67,5 @@ The trusted mini-agent definition, the three-area layout and the idea of
 replacing "are these results correct?" with "is the agent solving the right
 problem?" come from Will Landau and Sam Parmar's
 [*Trusted Mini-Agents*](https://trustedminiagents.dev). Deputy contributes
-the runtime enforcement. See also ADR-0030.
+the runtime enforcement. See also `vignette("trusted-mini-agents")` and
+ADR-0030.

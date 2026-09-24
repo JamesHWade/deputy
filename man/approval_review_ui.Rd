@@ -68,14 +68,17 @@ if (interactive() && rlang::is_installed("bslib")) {
   library(shiny)
   ui <- bslib::page_fluid(approval_review_ui("review"))
   server <- function(input, output, session) {
+    approval_dir <- tempfile("approvals-")
+    dir.create(approval_dir)
     agent <- Agent$new(
       ellmer::chat("openai/gpt-5.6-luna"),
-      approval_dir = tempfile()
+      approval_dir = approval_dir
     )
     approval_review_server("review", agent)
   }
 }
 }
 \seealso{
-\code{\link[=tool_input_review]{tool_input_review()}}, \link{TrustedResults}, \code{\link[=approval_read]{approval_read()}}
+\code{vignette("trusted-mini-agents")}, \code{\link[=tool_input_review]{tool_input_review()}},
+\link{TrustedResults}, \code{\link[=approval_read]{approval_read()}}
 }
