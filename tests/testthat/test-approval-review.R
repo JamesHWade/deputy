@@ -545,3 +545,27 @@ test_that("stale clicks, failed decisions and odd inputs stay safe", {
     error = function(e) NULL
   ))
 })
+
+test_that("multiline strings keep their line breaks", {
+  field <- function(value) {
+    approval_review_field(
+      list(note = value),
+      ellmer::type_object(note = ellmer::type_string()),
+      "note"
+    )
+  }
+  multiline <- field("first\nsecond")
+  expect_identical(multiline$mode, "edit")
+  editor <- as.character(approval_review_editor(
+    shiny::NS("r"),
+    "k",
+    1L,
+    data.frame(argument = "note", value = "first\nsecond"),
+    multiline
+  ))
+  expect_match(editor, "<textarea", fixed = TRUE)
+  expect_match(editor, "first\nsecond", fixed = TRUE)
+  expect_identical(field("a\r\nb")$mode, "readonly")
+  expect_identical(field("\nleading")$mode, "readonly")
+  expect_identical(field("plain")$mode, "edit")
+})

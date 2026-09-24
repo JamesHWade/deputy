@@ -103,3 +103,4 @@ policy$results
 \describe{
 \item{\code{@results}}{Named character vector mapping result types to tool names.}
 }}
+

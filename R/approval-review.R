@@ -384,8 +384,14 @@ approval_review_field <- function(input, arguments, path) {
   shown <- if (present && scalar) {
     switch(
       kind %||% "none",
-      enum = ,
-      string = if (is.character(raw)) raw,
+      enum = if (is.character(raw)) raw,
+      # Browsers rewrite carriage returns and a leading newline in form
+      # controls, so those strings are read-only.
+      string = if (
+        is.character(raw) && !grepl("\r", raw) && !startsWith(raw, "\n")
+      ) {
+        raw
+      },
       number = ,
       integer = if (is.numeric(raw) && is.finite(raw)) {
         approval_review_number_text(raw)
@@ -436,6 +442,12 @@ approval_review_editor <- function(ns, key, index, row, field) {
     field$kind,
     enum = select(field$type@values),
     boolean = select(c("true", "false")),
+    string = if (grepl("\n", field$shown %||% "", fixed = TRUE)) {
+      # A single-line input drops line breaks; a text area keeps them.
+      shiny::textAreaInput(id, label, field$shown, rows = 3)
+    } else {
+      shiny::textInput(id, label, field$shown %||% "")
+    },
     shiny::textInput(id, label, field$shown %||% "")
   )
   if (!identical(field$mode, "optin")) {
