@@ -46,7 +46,10 @@ letters, numbers, underscores, or hyphens.}
 
 \item{tools}{Optional list of tools for this agent}
 
-\item{model}{Model to use (default: "inherit" uses parent's model)}
+\item{model}{Model to use. \code{"inherit"} (the default) uses the parent's
+chat as it is. A bare model id such as \code{"gpt-5.6-luna"} uses the parent's
+provider, endpoint and credentials with that model. A \code{"provider/model"}
+string builds a new chat with \code{\link[ellmer:chat]{ellmer::chat()}}.}
 
 \item{skills}{Optional list of skills to load}
 
