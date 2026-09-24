@@ -60,7 +60,11 @@ agent_definition(
 
 - model:
 
-  Model to use (default: "inherit" uses parent's model)
+  Model to use. `"inherit"` (the default) uses the parent's chat as it
+  is. A bare model id such as `"gpt-5.6-luna"` uses the parent's
+  provider, endpoint and credentials with that model. A
+  `"provider/model"` string builds a new chat with
+  [`ellmer::chat()`](https://ellmer.tidyverse.org/reference/chat-any.html).
 
 - skills:
 

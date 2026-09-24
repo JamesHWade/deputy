@@ -186,7 +186,7 @@ Fields:
 | `description` | What this agent does (shown to the lead LLM) |
 | `prompt` | System prompt for the sub-agent |
 | `tools` | Tools available to the sub-agent |
-| `model` | `"inherit"` (default) or a specific model name |
+| `model` | `"inherit"` (default), a bare model id such as `"gpt-5.6-luna"` to use that model on the lead’s provider, or `"provider/model"` for a new chat |
 | `skills` | Optional list of skills to load |
 | `disallowed_tools` | Additional tool names that the child must not use |
 | `memory` | Optional context appended to the child’s system prompt |

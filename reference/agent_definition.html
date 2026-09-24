@@ -119,7 +119,10 @@ letters, numbers, underscores, or hyphens.</p></dd>
 
 
 <dt id="arg-model">model<a class="anchor" aria-label="anchor" href="#arg-model"></a></dt>
-<dd><p>Model to use (default: "inherit" uses parent's model)</p></dd>
+<dd><p>Model to use. <code>"inherit"</code> (the default) uses the parent's
+chat as it is. A bare model id such as <code>"gpt-5.6-luna"</code> uses the parent's
+provider, endpoint and credentials with that model. A <code>"provider/model"</code>
+string builds a new chat with <code><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">ellmer::chat()</a></code>.</p></dd>
 
 
 <dt id="arg-skills">skills<a class="anchor" aria-label="anchor" href="#arg-skills"></a></dt>

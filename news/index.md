@@ -2,6 +2,13 @@
 
 ## deputy (development version)
 
+- An `AgentDefinition` `model` given as a bare model id, such as
+  `"gpt-5.6-luna"`, now runs the sub-agent on the lead’s provider,
+  endpoint and credentials with that model. This lets a child use a
+  cheaper model on a gateway client built outside ellmer. `"inherit"`
+  and `"provider/model"` strings behave as before. Model ids that
+  themselves contain `/` still need the `"provider/model"` form.
+
 - [`TrustedResults()`](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
   implements the trusted mini-agent pattern from Will Landau and Sam
   Parmar’s [*Trusted Mini-Agents*](https://trustedminiagents.dev)
