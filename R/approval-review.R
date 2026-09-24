@@ -49,9 +49,11 @@
 #'   library(shiny)
 #'   ui <- bslib::page_fluid(approval_review_ui("review"))
 #'   server <- function(input, output, session) {
+#'     approval_dir <- tempfile("approvals-")
+#'     dir.create(approval_dir)
 #'     agent <- Agent$new(
 #'       ellmer::chat("openai/gpt-5.6-luna"),
-#'       approval_dir = tempfile()
+#'       approval_dir = approval_dir
 #'     )
 #'     approval_review_server("review", agent)
 #'   }

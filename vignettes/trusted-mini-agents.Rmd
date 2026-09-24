@@ -239,10 +239,12 @@ ui <- bslib::page_fluid(
 
 server <- function(input, output, session) {
   latest <- shiny::reactiveVal(NULL)
+  approval_dir <- tempfile("approvals-")
+  dir.create(approval_dir)
   agent <- Agent$new(
     chat = ellmer::chat("openai/gpt-5.6-luna"),
     tools = list(get_forecast),
-    approval_dir = tempfile(),
+    approval_dir = approval_dir,
     permissions = Permissions(
       can_use_tool = function(tool_name, tool_input, context) {
         PermissionResultPending("Check the city and days.")
