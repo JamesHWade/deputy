@@ -653,13 +653,15 @@ LeadAgent <- R6::R6Class(
         sub_agent$.__enclos_env__$private$.file_checkpoints <-
           private$.file_checkpoints
       }
-      private$inherit_trusted_results(sub_agent)
       # Load any skills
       for (skill in def$skills) {
         sub_agent$load_skill(skill)
       }
 
       bind_delegation_host(self, sub_agent, def, correlation, stateless)
+      # Check the final registry, after binding has applied the denylist to
+      # skill and host tools. A failure here still releases the binding.
+      private$inherit_trusted_results(sub_agent)
       bound <- TRUE
       sub_agent
     },

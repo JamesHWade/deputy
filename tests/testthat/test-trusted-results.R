@@ -669,3 +669,37 @@ test_that("skills can supply a child's trusted tool", {
   expect_false(called)
   expect_length(result_trusted_results(result), 0L)
 })
+
+test_that("denied skill tools do not block trusted delegation", {
+  forecast <- trusted_forecast_tool()
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "delegate_to_agent",
+      arguments = list(agent_name = "forecaster", task = "Oslo")
+    ),
+    runtime_reply(tool = "get_forecast", arguments = list(city = "Oslo")),
+    runtime_reply("Child done."),
+    runtime_reply("Lead done.")
+  ))
+  delivered <- 0L
+  lead <- LeadAgent$new(
+    runtime_chat(server),
+    sub_agents = list(AgentDefinition(
+      "forecaster",
+      "Produce forecasts",
+      "FORECASTER.",
+      tools = list(forecast),
+      # The skill brings an unannotated tool that the definition denies.
+      skills = list(Skill("notes", tools = list(trusted_unannotated_tool()))),
+      disallowed_tools = "note",
+      max_requests = 3L
+    )),
+    trusted_results = TrustedResults(
+      forecast = "get_forecast",
+      on_result = function(event) delivered <<- delivered + 1L
+    )
+  )
+  result <- lead$run_sync("Forecast")
+  expect_identical(delivered, 1L)
+  expect_length(result_trusted_results(result), 1L)
+})
