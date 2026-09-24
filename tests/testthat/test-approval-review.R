@@ -641,3 +641,12 @@ test_that("an empty-string enum choice is distinct from not provided", {
   )
   expect_identical(collide$none, "(not provided)_")
 })
+
+test_that("enum values that browsers rewrite are read-only", {
+  field <- approval_review_field(
+    list(unit = "a\rb"),
+    ellmer::type_object(unit = ellmer::type_enum(c("a", "b"))),
+    "unit"
+  )
+  expect_identical(field$mode, "readonly")
+})

@@ -408,9 +408,9 @@ approval_review_field <- function(input, arguments, path) {
   shown <- if (present && scalar) {
     switch(
       kind %||% "none",
-      enum = if (is.character(raw)) raw,
       # Browsers rewrite carriage returns and a leading newline in form
       # controls, so those strings are read-only.
+      enum = ,
       string = if (
         is.character(raw) && !grepl("\r", raw) && !startsWith(raw, "\n")
       ) {
