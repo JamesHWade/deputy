@@ -1360,11 +1360,19 @@ Agent <- R6::R6Class(
       role <- match.arg(role)
       current <- private$.chat$last_turn(role = role)
       if (!is.null(current)) {
-        # ellmer returns the final turn for "assistant" and the one before it
-        # for "user"; restore it at that position.
-        n <- length(private$.chat$get_turns())
-        position <- length(private$.compacted_turns) +
-          switch(role, assistant = n, user = n - 1L, NA_integer_)
+        # Restore the returned turn at its actual position in the context,
+        # without assuming how the Chat chose it.
+        context <- private$.chat$get_turns()
+        matches <- which(vapply(
+          context,
+          function(turn) identical(turn, current),
+          logical(1)
+        ))
+        position <- if (length(matches)) {
+          length(private$.compacted_turns) + max(matches)
+        } else {
+          NA_integer_
+        }
         return(restore_cleared_tool_results(
           list(current),
           private$.cleared_tool_results,

@@ -277,3 +277,22 @@ test_that("originals survive a later compaction into the retained prefix", {
     result_values(microcompact_turns())
   )
 })
+
+test_that("last_turn() restores a trailing tool-result turn", {
+  chat <- ellmer::chat_openai(credentials = function() "unused", echo = "none")
+  # History that ends with a user turn holding a tool result.
+  chat$set_turns(microcompact_turns()[1:3])
+  agent <- Agent$new(chat = chat)
+  agent$microcompact(keep_last = 0L, marker = "[cleared]")
+  returned <- agent$last_turn("user")
+  expected <- restore_cleared_tool_results(
+    agent$get_context_turns(),
+    agent$.__enclos_env__$private$.cleared_tool_results
+  )
+  expect_true(any(vapply(
+    expected,
+    function(turn) identical(turn, returned),
+    logical(1)
+  )))
+  expect_false("[cleared]" %in% result_values(list(returned)))
+})
