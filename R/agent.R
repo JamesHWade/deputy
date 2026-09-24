@@ -1080,7 +1080,10 @@ Agent <- R6::R6Class(
     #' @param include_system_prompt Include the system prompt as a turn.
     #' @return A list of ellmer turns.
     get_turns = function(include_system_prompt = FALSE) {
-      turns <- c(private$.compacted_turns, private$.chat$get_turns())
+      turns <- restore_cleared_tool_results(
+        c(private$.compacted_turns, private$.chat$get_turns()),
+        private$.cleared_tool_results
+      )
       if (isTRUE(include_system_prompt)) {
         context <- self$get_context_turns(include_system_prompt = TRUE)
         system <- Filter(
@@ -1137,6 +1140,7 @@ Agent <- R6::R6Class(
       preserve_run_usage(self, usage)
       private$.compaction_summary <- NULL
       private$.compacted_turns <- list()
+      private$.cleared_tool_results <- list()
       invisible(self)
     },
 
@@ -1356,13 +1360,23 @@ Agent <- R6::R6Class(
       role <- match.arg(role)
       current <- private$.chat$last_turn(role = role)
       if (!is.null(current)) {
-        return(current)
+        return(restore_cleared_tool_results(
+          list(current),
+          private$.cleared_tool_results
+        )[[1L]])
       }
       turns <- Filter(
         function(turn) identical(turn@role, role),
         private$.compacted_turns
       )
-      if (length(turns)) tail(turns, 1L)[[1L]] else NULL
+      if (length(turns)) {
+        restore_cleared_tool_results(
+          tail(turns, 1L),
+          private$.cleared_tool_results
+        )[[1L]]
+      } else {
+        NULL
+      }
     },
 
     #' @description
@@ -1787,9 +1801,15 @@ Agent <- R6::R6Class(
     #' `/microcompact` does.
     #'
     #' Every tool result before the last `keep_last` turns has its value
-    #' replaced by `marker`, unless its tool is named in `keep_tools`. Nothing
-    #' is summarised and no model call is made. Unlike `$set_turns()`, an
+    #' replaced by `marker` in the model's context, unless its tool is named in
+    #' `keep_tools`. Nothing is summarised and no model call is made. An
     #' earlier compaction summary and the compacted prefix are kept.
+    #'
+    #' Like compaction, this changes only what the model sees. `$get_turns()`,
+    #' `$last_turn()` and saved sessions keep the original results, so a host's
+    #' conversation history is unchanged. `$get_context_turns()` shows the
+    #' markers. Results whose tool call has no ID are left in place, because
+    #' they could not be matched back to their originals.
     #'
     #' @param keep_last Number of recent turns whose tool results are left as
     #'   they are.
@@ -1815,10 +1835,19 @@ Agent <- R6::R6Class(
           keep_last < 0 ||
           keep_last != floor(keep_last)
       ) {
-        cli::cli_abort("{.arg keep_last} must be a whole number of turns, 0 or more.")
+        cli::cli_abort(
+          "{.arg keep_last} must be a whole number of turns, 0 or more."
+        )
+      }
+      if (!is.character(keep_tools) || anyNA(keep_tools)) {
+        cli::cli_abort("{.arg keep_tools} must be a character vector.")
+      }
+      if (!is_nonempty_string(marker)) {
+        cli::cli_abort("{.arg marker} must be one non-empty string.")
       }
       turns <- private$.chat$get_turns()
       upto <- max(0L, length(turns) - as.integer(keep_last))
+      originals <- private$.cleared_tool_results
       cleared <- 0L
       for (i in seq_len(upto)) {
         contents <- turns[[i]]@contents
@@ -1832,8 +1861,17 @@ Agent <- R6::R6Class(
           if (!is.null(name) && name %in% keep_tools) {
             next
           }
+          id <- tryCatch(content@request@id, error = function(e) NULL)
+          if (!is_nonempty_string(id)) {
+            next
+          }
           if (identical(content@value, marker) && is.null(content@error)) {
             next
+          }
+          # Keep the first original; a repeat microcompact must not replace
+          # it with an earlier marker.
+          if (is.null(originals[[id]])) {
+            originals[[id]] <- content
           }
           content@value <- marker
           content@error <- NULL
@@ -1847,6 +1885,7 @@ Agent <- R6::R6Class(
       }
       if (cleared > 0L) {
         private$.chat$set_turns(turns)
+        private$.cleared_tool_results <- originals
       }
       list(cleared = cleared)
     },
@@ -2515,6 +2554,9 @@ Agent <- R6::R6Class(
       .last_compaction = NULL,
       .compaction_summary = NULL,
       .compacted_turns = list(),
+      # Original tool results cleared from model context by microcompact(),
+      # keyed by tool call ID, so the conversation view keeps them.
+      .cleared_tool_results = list(),
       .compaction_catalog_registry = NULL,
       .compaction_artifacts = NULL,
       .tool_result_reader_registered = FALSE,

@@ -7,6 +7,11 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
         schema_version = 3L,
         turns = portable_session_turns(private$.chat$get_turns()),
         compacted_turns = portable_session_turns(private$.compacted_turns),
+        # Optional: originals of results cleared by microcompact(), stored as
+        # one user turn so they share the turn serializers.
+        cleared_tool_results = cleared_tool_results_turns(
+          private$.cleared_tool_results
+        ),
         system_prompt = private$.chat$get_system_prompt(),
         compaction_summary = private$.compaction_summary,
         tool_result_envelopes = collect_tool_result_envelopes(
@@ -109,6 +114,19 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       }
       restored_compacted_turns <- portable_session_turns(
         session$compacted_turns
+      )
+      restored_cleared <- tryCatch(
+        cleared_tool_results_from_turns(session$cleared_tool_results),
+        error = function(error) {
+          abort_session_load(
+            c(
+              "Invalid session file - cleared tool results are malformed",
+              "x" = conditionMessage(error)
+            ),
+            path = source,
+            parent = error
+          )
+        }
       )
       if (
         !is.null(session$system_prompt) &&
@@ -254,6 +272,7 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       private$appended_hook_context_hashes <- restored_hashes
       private$.compaction_summary <- session$compaction_summary
       private$.compacted_turns <- restored_compacted_turns
+      private$.cleared_tool_results <- restored_cleared
     }
   )
 }
@@ -275,4 +294,38 @@ portable_session_turns <- function(turns) {
     turn@contents <- lapply(turn@contents, strip_tool)
     turn
   })
+}
+
+cleared_tool_results_turns <- function(originals) {
+  if (length(originals) == 0L) {
+    return(list())
+  }
+  portable_session_turns(list(ellmer::UserTurn(contents = unname(originals))))
+}
+
+# Older schema 3 snapshots have no field, which means nothing was cleared.
+cleared_tool_results_from_turns <- function(turns) {
+  if (is.null(turns) || length(turns) == 0L) {
+    return(list())
+  }
+  if (!is.list(turns)) {
+    cli_abort("Expected a list of turns.")
+  }
+  originals <- list()
+  for (turn in turns) {
+    if (!S7::S7_inherits(turn, ellmer::UserTurn)) {
+      cli_abort("Expected user turns.")
+    }
+    for (content in turn@contents) {
+      id <- tryCatch(content@request@id, error = function(e) NULL)
+      if (
+        !S7::S7_inherits(content, ellmer::ContentToolResult) ||
+          !is_nonempty_string(id)
+      ) {
+        cli_abort("Expected tool results with tool call IDs.")
+      }
+      originals[[id]] <- content
+    }
+  }
+  originals
 }
