@@ -1783,6 +1783,75 @@ Agent <- R6::R6Class(
     },
 
     #' @description
+    #' Clear old tool results from the model's context, as Posit Assistant's
+    #' `/microcompact` does.
+    #'
+    #' Every tool result before the last `keep_last` turns has its value
+    #' replaced by `marker`, unless its tool is named in `keep_tools`. Nothing
+    #' is summarised and no model call is made. Unlike `$set_turns()`, an
+    #' earlier compaction summary and the compacted prefix are kept.
+    #'
+    #' @param keep_last Number of recent turns whose tool results are left as
+    #'   they are.
+    #' @param keep_tools Names of tools whose results are never cleared.
+    #' @param marker The text that replaces a cleared result.
+    #' @return A list with `cleared`, the number of tool results replaced.
+    microcompact = function(
+      keep_last = 2L,
+      keep_tools = character(),
+      marker = "[Old tool result cleared to save context.]"
+    ) {
+      check_conversation_lease(self, NULL)
+      if (isTRUE(private$run_active)) {
+        cli::cli_abort(
+          "Cannot microcompact conversation state while this agent has an active run",
+          class = c("deputy_run_active", "deputy_error")
+        )
+      }
+      if (
+        !is.numeric(keep_last) ||
+          length(keep_last) != 1L ||
+          is.na(keep_last) ||
+          keep_last < 0 ||
+          keep_last != floor(keep_last)
+      ) {
+        cli::cli_abort("{.arg keep_last} must be a whole number of turns, 0 or more.")
+      }
+      turns <- private$.chat$get_turns()
+      upto <- max(0L, length(turns) - as.integer(keep_last))
+      cleared <- 0L
+      for (i in seq_len(upto)) {
+        contents <- turns[[i]]@contents
+        changed <- FALSE
+        for (j in seq_along(contents)) {
+          content <- contents[[j]]
+          if (!S7::S7_inherits(content, ellmer::ContentToolResult)) {
+            next
+          }
+          name <- tryCatch(content@request@name, error = function(e) NULL)
+          if (!is.null(name) && name %in% keep_tools) {
+            next
+          }
+          if (identical(content@value, marker) && is.null(content@error)) {
+            next
+          }
+          content@value <- marker
+          content@error <- NULL
+          contents[[j]] <- content
+          changed <- TRUE
+          cleared <- cleared + 1L
+        }
+        if (changed) {
+          turns[[i]]@contents <- contents
+        }
+      }
+      if (cleared > 0L) {
+        private$.chat$set_turns(turns)
+      }
+      list(cleared = cleared)
+    },
+
+    #' @description
     #' Print the agent configuration.
     print = function() {
       cli::cat_line(cli::cli_format_method({

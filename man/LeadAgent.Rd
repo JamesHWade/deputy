@@ -72,6 +72,7 @@ sub-agents based on registered AgentDefinitions.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="load_skill"><a href='../../deputy/html/Agent.html#method-Agent-load_skill'><code>Agent$load_skill()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_status"><a href='../../deputy/html/Agent.html#method-Agent-mcp_status'><code>Agent$mcp_status()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="mcp_tools"><a href='../../deputy/html/Agent.html#method-Agent-mcp_tools'><code>Agent$mcp_tools()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="microcompact"><a href='../../deputy/html/Agent.html#method-Agent-microcompact'><code>Agent$microcompact()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="observe_subagents"><a href='../../deputy/html/Agent.html#method-Agent-observe_subagents'><code>Agent$observe_subagents()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="on_tool_request"><a href='../../deputy/html/Agent.html#method-Agent-on_tool_request'><code>Agent$on_tool_request()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="on_tool_result"><a href='../../deputy/html/Agent.html#method-Agent-on_tool_result'><code>Agent$on_tool_result()</code></a></span></li>
