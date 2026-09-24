@@ -46,6 +46,12 @@
   example. Only the trusted forecast tool can fill the results panel
   ([\#197](https://github.com/JamesHWade/deputy/issues/197)).
 
+- New article,
+  [`vignette("trusted-mini-agents")`](https://jameshwade.github.io/deputy/articles/trusted-mini-agents.md),
+  explains Landau and Parmar’s trusted mini-agent pattern and how Deputy
+  enforces each of its rules
+  ([\#197](https://github.com/JamesHWade/deputy/issues/197)).
+
 - [`mcp_console_connection()`](https://jameshwade.github.io/deputy/reference/mcp_console_connection.md)
   connects an Agent to one [MCP
   Console](https://github.com/t-kalinowski/mcp-console) server, a

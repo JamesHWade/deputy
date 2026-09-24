@@ -515,107 +515,18 @@ for the control-state contract.
 
 ## Trusted results
 
-This section implements the trusted mini-agent pattern from [*Trusted
-Mini-Agents*](https://trustedminiagents.dev) by Will Landau and Sam
-Parmar. Their
-[definition](https://trustedminiagents.dev/definition.html) sets three
-rules. Trusted tools produce every result, and none comes from the
-model. Each kind of result comes from exactly one trusted tool, and
-nothing can bypass it. A human reviews the model-generated inputs to
-trusted tools. The aim, in their framing, is to change the user’s
-question from “are these results correct?” to “is the agent solving the
-right problem?” Deputy’s contribution is to enforce those rules in the
-runtime rather than by hand in each app.
+Permissions decide whether a tool may run. For a [trusted
+mini-agent](https://trustedminiagents.dev), in Will Landau and Sam
+Parmar’s sense, you also want a guarantee about where results come from:
+
+- only a designated tool produces them;
+- no other tool can bypass it;
+- a person reviews its inputs.
 
 [`TrustedResults()`](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
-names the single tool that produces each kind of result:
-
-``` r
-
-get_forecast <- ellmer::tool(
-  function(city) forecast_json(city),
-  name = "get_forecast",
-  description = "Compute the forecast for one supported city.",
-  arguments = list(city = ellmer::type_enum(c("Oslo", "Lima"))),
-  annotations = ellmer::tool_annotations(
-    read_only_hint = TRUE,
-    open_world_hint = FALSE
-  )
-)
-
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  tools = list(get_forecast),
-  trusted_results = TrustedResults(
-    forecast = "get_forecast",
-    # Called before the model sees any output. In Shiny, update the results
-    # card's reactiveValues here.
-    on_result = function(event) results$forecast <- event$value,
-    model_receipt = TRUE
-  )
-)
-
-result <- agent$run_sync("What is the forecast for Oslo?")
-result_trusted_results(result, "forecast")[[1]]$value
-```
-
-The value comes back exactly as the tool returned it, together with the
-arguments, result ID and tool call ID. PostToolUse hooks and result
-offloading cannot change it. With `model_receipt = TRUE` the model
-receives only a receipt naming the result ID, so it cannot restate the
-numbers wrongly later in the chat. If `on_result` fails, the model gets
-a tool error instead of the value.
-
-The Agent checks its whole tool registry each time tools are registered.
-Code execution tools (`run_r_code`, `run_bash`, R sessions) and
-delegation tools could produce any result, so they are always rejected.
-The one exception is a `LeadAgent`’s own delegation tool: with
-`LeadAgent$new(trusted_results = )`, every child inherits the policy and
-each definition’s tools must pass the same check. The trusted tool may
-live in a child, and its results still reach the lead’s `on_result`. Any
-other tool must be annotated read-only and closed-world, or be a local
-function tool the host names in `exempt_tools`. Unannotated tools use
-the conservative defaults and are rejected. The policy is fixed at
-construction. It limits which tools may sit beside the trusted ones; it
-does not grant permission to call anything.
-
-For input review, permission callbacks and hooks receive the tool’s
-declared argument types as `context$tool_arguments`.
-[`tool_input_review()`](https://jameshwade.github.io/deputy/reference/tool_input_review.md)
-turns the proposed input into a table the reviewer can check quickly:
-
-``` r
-
-permissions <- Permissions(can_use_tool = function(tool_name, tool_input, context) {
-  if (tool_name != "get_forecast") {
-    return(PermissionResultAllow())
-  }
-  review <- tool_input_review(tool_input, context$tool_arguments)
-  # review has argument, type, required, declared, description and value.
-  PermissionResultPending("Review the forecast inputs.")
-})
-```
-
-Combined with `approval_dir`, the host can approve, deny or edit the
-inputs through `$resume_approval()`. The trusted tool then runs with the
-reviewed arguments. In Shiny,
-[`approval_review_ui()`](https://jameshwade.github.io/deputy/reference/approval_review_ui.md)
-and
-[`approval_review_server()`](https://jameshwade.github.io/deputy/reference/approval_review_ui.md)
-render that review as a table with editors and Approve and Deny buttons:
-
-``` r
-
-ui <- bslib::page_fluid(approval_review_ui("review"))
-server <- function(input, output, session) {
-  review <- approval_review_server("review", agent)
-}
-```
-
-`inst/examples/trusted-results/` is a runnable app with a chat, a review
-card and a result card. It is adapted from Landau and Parmar’s [R
-template](https://trustedminiagents.dev/r-template.html) and weather
-example. `inst/examples/trusted-mini-agent/` is a larger scientific
-workflow with delegation and a result receipt. See
-[ADR-0030](https://github.com/JamesHWade/deputy/blob/main/dev/adr/0030-trusted-result-channel.md)
-for the design.
+adds that guarantee on top of permissions. It fixes which tools may be
+registered beside the trusted one. It does not grant permission to call
+anything, and the callbacks, hooks and approvals above still govern
+every call. See
+[`vignette("trusted-mini-agents")`](https://jameshwade.github.io/deputy/articles/trusted-mini-agents.md)
+for the pattern, a worked example and the Shiny review module.

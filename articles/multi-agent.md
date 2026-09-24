@@ -985,7 +985,7 @@ appropriate inputs and effective review are still required.
 
 `LeadAgent$new(trusted_results = TrustedResults(...))` applies one
 [trusted-results
-policy](https://jameshwade.github.io/deputy/articles/permissions.html#trusted-results)
+policy](https://jameshwade.github.io/deputy/articles/trusted-mini-agents.md)
 to the whole delegation tree. The policy implements Will Landau and Sam
 Parmar’s [trusted mini-agent](https://trustedminiagents.dev) rules;
 delegation is Deputy’s extension of them. Every child inherits it, so

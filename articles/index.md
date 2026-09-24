@@ -11,6 +11,8 @@
   Bundles](https://jameshwade.github.io/deputy/articles/tools.md):
 - [Permissions and
   Safety](https://jameshwade.github.io/deputy/articles/permissions.md):
+- [Trusted
+  mini-agents](https://jameshwade.github.io/deputy/articles/trusted-mini-agents.md):
 - [Hooks](https://jameshwade.github.io/deputy/articles/hooks.md):
 
 ### Apps

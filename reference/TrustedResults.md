@@ -108,7 +108,9 @@ A read-only `TrustedResults` S7 value.
 
 ## See also
 
+[`vignette("trusted-mini-agents")`](https://jameshwade.github.io/deputy/articles/trusted-mini-agents.md),
 [`result_trusted_results()`](https://jameshwade.github.io/deputy/reference/result_trusted_results.md),
+[`approval_review_ui()`](https://jameshwade.github.io/deputy/reference/approval_review_ui.md),
 [Agent](https://jameshwade.github.io/deputy/reference/Agent.md),
 [`tool_metadata()`](https://jameshwade.github.io/deputy/reference/tool_metadata.md)
 
