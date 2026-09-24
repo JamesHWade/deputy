@@ -203,8 +203,8 @@ test_that("untouched approval never fills missing or out-of-range fields", {
       session,
       pending(),
       field_1 = "turbo",
-      field_2 = "",
-      field_3 = ""
+      field_2 = "(not provided)",
+      field_3 = "(not provided)"
     )
     review_set(session, pending(), approve = 1)
     expect_null(outcome()$tool_input)
@@ -256,7 +256,7 @@ test_that("untouched invalid values and edits inside absent objects are kept", {
   agent$run_sync("Configure")
   shiny::testServer(approval_review_server, args = list(agent = agent), {
     expect_identical(output$review$html |> grepl(pattern = "yes"), TRUE)
-    review_set(session, pending(), field_1 = "yes", field_2 = "")
+    review_set(session, pending(), field_1 = "yes", field_2 = "(not provided)")
     review_set(session, pending(), approve = 1)
     expect_null(outcome()$tool_input)
   })
@@ -620,4 +620,24 @@ test_that("asynchronous decisions refresh on success and allow retry on failure"
     }
   )
   expect_identical(attempts, 2L)
+})
+
+test_that("an empty-string enum choice is distinct from not provided", {
+  field <- approval_review_field(
+    list(),
+    ellmer::type_object(
+      unit = ellmer::type_enum(c("", "c"), required = FALSE)
+    ),
+    "unit"
+  )
+  expect_identical(field$mode, "choose")
+  expect_false(field$none %in% c("", "c"))
+  collide <- approval_review_field(
+    list(),
+    ellmer::type_object(
+      unit = ellmer::type_enum(c("(not provided)", "c"), required = FALSE)
+    ),
+    "unit"
+  )
+  expect_identical(collide$none, "(not provided)_")
 })

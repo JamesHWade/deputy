@@ -240,7 +240,7 @@ approval_review_server <- function(
               next
             }
           } else if (identical(field$mode, "choose")) {
-            if (identical(new, "")) next
+            if (identical(new, field$none)) next
           } else if (identical(new, field$shown)) {
             # Untouched: keep the proposed value exactly.
             next
@@ -433,7 +433,25 @@ approval_review_field <- function(input, arguments, path) {
   } else {
     "optin"
   }
-  list(path = path, type = type, kind = kind, shown = shown, mode = mode)
+  # "Not provided" needs a value that no declared choice can share.
+  choices <- switch(
+    kind %||% "none",
+    enum = type@values,
+    boolean = c("true", "false"),
+    character()
+  )
+  none <- "(not provided)"
+  while (none %in% choices) {
+    none <- paste0(none, "_")
+  }
+  list(
+    path = path,
+    type = type,
+    kind = kind,
+    shown = shown,
+    mode = mode,
+    none = none
+  )
 }
 
 approval_review_editor <- function(ns, key, index, row, field) {
@@ -451,7 +469,7 @@ approval_review_editor <- function(ns, key, index, row, field) {
   select <- function(values) {
     # An out-of-range proposed enum value stays selectable, shown as proposed.
     values <- if (choose) {
-      c("Not provided" = "", values)
+      c(stats::setNames(field$none, "Not provided"), values)
     } else {
       unique(c(field$shown, values))
     }
@@ -459,7 +477,7 @@ approval_review_editor <- function(ns, key, index, row, field) {
       id,
       label,
       choices = values,
-      selected = if (choose) "" else field$shown
+      selected = if (choose) field$none else field$shown
     )
   }
   editor <- switch(
