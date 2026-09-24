@@ -74,6 +74,18 @@ code with the current user’s authority. A separate process may improve
 fault isolation, but does not make the code untrusted or confined.
 *Avoid*: sandboxed tool, safe execution
 
+**Trusted tool**: The one tool an Agent’s `TrustedResults` policy
+designates to produce a named kind of result. Its verbatim return value
+reaches the host as a `trusted_result` event and callback before any
+model output. Registration fails when another tool could bypass it
+(ADR-0030). *Avoid*: safe tool, verified tool, authoritative model
+output
+
+**Trusted result**: The value a trusted tool returned, together with its
+result ID, type, tool call and arguments. It is host evidence, not model
+text; a receipt may stand in for it in the conversation. *Avoid*:
+answer, model result, summary
+
 **OS sandbox**: A platform-enforced boundary that constrains an already
 authorized process. Deputy delegates this boundary to mcp-repl and
 verifies the requested policy; permission modes do not substitute for

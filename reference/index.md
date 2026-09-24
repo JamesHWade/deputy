@@ -18,6 +18,8 @@ Run a task and inspect its response, tool calls, and usage.
   : Inspect tool calls
 - [`result_tool_results()`](https://jameshwade.github.io/deputy/reference/result_tool_results.md)
   : Inspect completed tool calls
+- [`result_trusted_results()`](https://jameshwade.github.io/deputy/reference/result_trusted_results.md)
+  : Inspect trusted results
 - [`result_text_chunks()`](https://jameshwade.github.io/deputy/reference/result_text_chunks.md)
   : Inspect streamed text
 - [`result_is_success()`](https://jameshwade.github.io/deputy/reference/result_is_success.md)
@@ -102,6 +104,8 @@ Built-in tools and tool bundles
   : Own an isolated MCP client connection
 - [`tool_metadata()`](https://jameshwade.github.io/deputy/reference/tool_metadata.md)
   : Inspect a tool's origin and annotation coverage
+- [`tool_input_review()`](https://jameshwade.github.io/deputy/reference/tool_input_review.md)
+  : Tabulate tool arguments for human review
 - [`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md)
   : Load an R REPL with an enforced OS sandbox
 - [`mcp_repl_connection()`](https://jameshwade.github.io/deputy/reference/mcp_repl_connection.md)
@@ -121,6 +125,8 @@ Control what agents can do
 
 - [`Permissions()`](https://jameshwade.github.io/deputy/reference/Permissions.md)
   : Create a permission policy
+- [`TrustedResults()`](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+  : Designate trusted tools as the only producers of host results
 - [`permissions_check()`](https://jameshwade.github.io/deputy/reference/permissions_check.md)
   : Evaluate a tool call against a permission policy
 - [`PermissionMode`](https://jameshwade.github.io/deputy/reference/PermissionMode.md)

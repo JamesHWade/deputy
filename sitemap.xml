@@ -52,6 +52,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/Permissions.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/RSession.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/Skill.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/TrustedResults.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/UsageLimits.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/adopt_chat.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/agent_definition.html</loc></url>
@@ -91,6 +92,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/result_text_chunks.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/result_tool_calls.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/result_tool_results.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/result_trusted_results.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/set_ask_user_callback.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_check_requirements.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_create.html</loc></url>
@@ -101,6 +103,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_edit_file.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_glob_files.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_grep_files.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/tool_input_review.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_list_files.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_metadata.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_multi_edit.html</loc></url>

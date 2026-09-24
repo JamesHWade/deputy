@@ -74,6 +74,12 @@ for writes made through its native file tools.
 
   Default canonical product context. Read-only.
 
+- `trusted_results`:
+
+  The
+  [TrustedResults](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+  policy, or `NULL`. Read-only.
+
 - `permissions`:
 
   Permission policy for the agent. Read-only after construction.
@@ -275,7 +281,8 @@ Create a new Agent.
       approval_dir = NULL,
       delegation_scope = list(),
       delegation_disclosure = DelegationDisclosure(),
-      delegation_observation = DelegationObservation()
+      delegation_observation = DelegationObservation(),
+      trusted_results = NULL
     )
 
 #### Arguments
@@ -393,6 +400,14 @@ Create a new Agent.
 - `delegation_observation`:
 
   Child activity bounds.
+
+- `trusted_results`:
+
+  Optional
+  [TrustedResults](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+  policy designating the only tools that produce each kind of host
+  result. Fixed at construction; every published tool registry is
+  checked against it.
 
 #### Returns
 

@@ -140,6 +140,10 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <dd><p>Default canonical product context. Read-only.</p></dd>
 
 
+    <dt><code>trusted_results</code></dt>
+<dd><p>The <a href="TrustedResults.html">TrustedResults</a> policy, or <code>NULL</code>. Read-only.</p></dd>
+
+
     <dt><code>permissions</code></dt>
 <dd><p>Permission policy for the agent. Read-only after construction.</p></dd>
 
@@ -264,7 +268,8 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <span>  approval_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delegation_scope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  delegation_disclosure <span class="op">=</span> <span class="fu"><a href="../reference/DelegationDisclosure.html">DelegationDisclosure</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  delegation_observation <span class="op">=</span> <span class="fu"><a href="../reference/DelegationObservation.html">DelegationObservation</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  delegation_observation <span class="op">=</span> <span class="fu"><a href="../reference/DelegationObservation.html">DelegationObservation</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  trusted_results <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h4>
@@ -348,6 +353,11 @@ See <code><a href="approval_read.html">approval_read()</a></code> and <code>$res
 
       <dt><code>delegation_observation</code></dt>
 <dd><p>Child activity bounds.</p></dd>
+
+      <dt><code>trusted_results</code></dt>
+<dd><p>Optional <a href="TrustedResults.html">TrustedResults</a> policy designating the
+only tools that produce each kind of host result. Fixed at construction;
+every published tool registry is checked against it.</p></dd>
 
 
 </dl><p></p></div>

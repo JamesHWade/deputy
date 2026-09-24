@@ -512,3 +512,80 @@ its released public contract; it is not required for this headless
 workflow. See
 [ADR-0016](https://github.com/JamesHWade/deputy/blob/main/dev/adr/0016-durable-approval-continuations.md)
 for the control-state contract.
+
+## Trusted results
+
+A [trusted mini-agent](https://trustedminiagents.dev) never lets the
+model report a result. A designated tool produces it, the host shows it
+directly, and a person reviews the tool’s inputs.
+[`TrustedResults()`](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+names the single tool that produces each kind of result:
+
+``` r
+
+get_forecast <- ellmer::tool(
+  function(city) forecast_json(city),
+  name = "get_forecast",
+  description = "Compute the forecast for one supported city.",
+  arguments = list(city = ellmer::type_enum(c("Oslo", "Lima"))),
+  annotations = ellmer::tool_annotations(
+    read_only_hint = TRUE,
+    open_world_hint = FALSE
+  )
+)
+
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  tools = list(get_forecast),
+  trusted_results = TrustedResults(
+    forecast = "get_forecast",
+    # Called before the model sees any output. In Shiny, update the results
+    # card's reactiveValues here.
+    on_result = function(event) results$forecast <- event$value,
+    model_receipt = TRUE
+  )
+)
+
+result <- agent$run_sync("What is the forecast for Oslo?")
+result_trusted_results(result, "forecast")[[1]]$value
+```
+
+The value comes back exactly as the tool returned it, together with the
+arguments, result ID and tool call ID. PostToolUse hooks and result
+offloading cannot change it. With `model_receipt = TRUE` the model
+receives only a receipt naming the result ID, so it cannot restate the
+numbers wrongly later in the chat. If `on_result` fails, the model gets
+a tool error instead of the value.
+
+The Agent checks its whole tool registry each time tools are registered.
+Code execution tools (`run_r_code`, `run_bash`, R sessions) and
+delegation tools could produce any result, so they are always rejected.
+Any other tool must be annotated read-only and closed-world, or be a
+local function tool the host names in `exempt_tools`. Unannotated tools
+use the conservative defaults and are rejected. The policy is fixed at
+construction. It limits which tools may sit beside the trusted ones; it
+does not grant permission to call anything.
+
+For input review, permission callbacks and hooks receive the tool’s
+declared argument types as `context$tool_arguments`.
+[`tool_input_review()`](https://jameshwade.github.io/deputy/reference/tool_input_review.md)
+turns the proposed input into a table the reviewer can check quickly:
+
+``` r
+
+permissions <- Permissions(can_use_tool = function(tool_name, tool_input, context) {
+  if (tool_name != "get_forecast") {
+    return(PermissionResultAllow())
+  }
+  review <- tool_input_review(tool_input, context$tool_arguments)
+  # review has argument, type, required, declared, description and value.
+  PermissionResultPending("Review the forecast inputs.")
+})
+```
+
+Combined with `approval_dir`, the host can approve, deny or edit the
+inputs through `$resume_approval()`. The trusted tool then runs with the
+reviewed arguments. `inst/examples/trusted-mini-agent/` is a complete
+Shiny example with proposal, review and result panels. See
+[ADR-0030](https://github.com/JamesHWade/deputy/blob/main/dev/adr/0030-trusted-result-channel.md)
+for the design.
