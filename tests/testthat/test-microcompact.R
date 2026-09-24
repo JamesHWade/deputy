@@ -165,3 +165,50 @@ test_that("last_turn() and results without a call id keep their values", {
   expect_identical(agent$microcompact(keep_last = 0L)$cleared, 0L)
   expect_identical(result_values(agent$get_context_turns()), "no id")
 })
+
+test_that("durable approvals carry cleared originals through resume", {
+  directory <- withr::local_tempdir()
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "effect", arguments = list(value = "x")),
+    runtime_reply("done")
+  ))
+  effect <- ellmer::tool(
+    function(value) "ok",
+    name = "effect",
+    description = "Effect.",
+    arguments = list(value = ellmer::type_string()),
+    convert = FALSE,
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  chat <- runtime_chat(server)
+  chat$set_turns(microcompact_turns())
+  agent <- Agent$new(
+    chat = chat,
+    tools = list(effect),
+    working_dir = directory,
+    approval_dir = directory,
+    permissions = Permissions(
+      can_use_tool = function(tool_name, tool_input, context) {
+        PermissionResultPending("Review.")
+      }
+    )
+  )
+  agent$microcompact(keep_last = 0L, marker = "[cleared]")
+  agent$run_sync("Do it")
+  pending <- agent$pending_approval()
+  agent$resume_approval(pending$source$path, "approve")
+  values <- result_values(agent$get_turns())
+  expect_true(all(
+    c(
+      "a long search result",
+      "the user's answer",
+      "the latest search result"
+    ) %in%
+      values
+  ))
+  expect_false("[cleared]" %in% values)
+  expect_true("[cleared]" %in% result_values(agent$get_context_turns()))
+})

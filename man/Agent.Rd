@@ -1959,9 +1959,15 @@ and usage.
 \verb{/microcompact} does.
 
 Every tool result before the last \code{keep_last} turns has its value
-replaced by \code{marker}, unless its tool is named in \code{keep_tools}. Nothing
-is summarised and no model call is made. Unlike \verb{$set_turns()}, an
+replaced by \code{marker} in the model's context, unless its tool is named in
+\code{keep_tools}. Nothing is summarised and no model call is made. An
 earlier compaction summary and the compacted prefix are kept.
+
+Like compaction, this changes only what the model sees. \verb{$get_turns()},
+\verb{$last_turn()} and saved sessions keep the original results, so a host's
+conversation history is unchanged. \verb{$get_context_turns()} shows the
+markers. Results whose tool call has no ID are left in place, because
+they could not be matched back to their originals.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$microcompact(

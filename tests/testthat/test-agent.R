@@ -200,6 +200,7 @@ test_that("Agent save_session creates file", {
       "schema_version",
       "turns",
       "compacted_turns",
+      "cleared_tool_results",
       "system_prompt",
       "compaction_summary",
       "tool_result_envelopes",
