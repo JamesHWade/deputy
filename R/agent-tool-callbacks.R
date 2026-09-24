@@ -83,6 +83,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
 
       context <- private$hook_context(
         tool_annotations = tool_annotations,
+        tool_arguments = extracted$tool_arguments,
         tool_metadata = extracted$tool_metadata,
         tool_call_id = record$tool_call_id,
         permission_mode = self$permissions$mode,
@@ -277,6 +278,8 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       private$current_tool_results <- private$current_tool_results + 1L
       record <- private$tool_call_record(extracted, "result")
       extracted$tool_call_id <- record$tool_call_id
+      # A failed trusted tool never reaches delivery; drop its captured input.
+      private$trusted_arguments[[record$tool_call_id]] <- NULL
       original <- private$claim_original_tool_result(
         record$tool_call_id,
         list(value = extracted$tool_result, error = extracted$tool_error)
@@ -517,10 +520,18 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         error = function(e) NULL
       )
 
+      tool_arguments <- tryCatch(
+        if (inherits(registered_tool, "ellmer::ToolDef")) {
+          registered_tool@arguments
+        },
+        error = function(e) NULL
+      )
+
       list(
         tool_name = tool_name,
         tool_input = tool_input,
         tool_annotations = tool_annotations,
+        tool_arguments = tool_arguments,
         tool_metadata = metadata,
         internal_tool = internal_tool,
         provider_tool_call_id = provider_tool_call_id,

@@ -57,6 +57,7 @@ reference:
   - result_n_turns
   - result_tool_calls
   - result_tool_results
+  - result_trusted_results
   - result_text_chunks
   - result_is_success
   - AgentEvent
@@ -102,6 +103,7 @@ reference:
   - tools_mcp
   - McpConnection
   - tool_metadata
+  - tool_input_review
   - tools_mcp_repl
   - mcp_repl_connection
   - mcp_repl_control
@@ -114,6 +116,7 @@ reference:
   desc: Control what agents can do
   contents:
   - Permissions
+  - TrustedResults
   - permissions_check
   - PermissionMode
   - PermissionResultAllow

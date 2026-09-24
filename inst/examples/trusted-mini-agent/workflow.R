@@ -351,6 +351,10 @@ study_workflow <- function(
       executor <- deputy::Agent$new(
         chat = chat_factory("executor"),
         tools = list(compute_tool),
+        # Deputy rejects any later tool that could bypass compute_summary.
+        trusted_results = deputy::TrustedResults(
+          study_summary = "compute_summary"
+        ),
         system_prompt = "STUDY_EXECUTOR. Request compute_summary with the supplied inputs exactly. All subsequent text is commentary.",
         working_dir = directory,
         approval_dir = approval_dir,

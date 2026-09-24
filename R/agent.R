@@ -125,6 +125,9 @@ Agent <- R6::R6Class(
     #' @param delegation_scope Plain host-owned scope for child disclosure.
     #' @param delegation_disclosure Host-only [DelegationDisclosure], deny by default.
     #' @param delegation_observation Child activity bounds.
+    #' @param trusted_results Optional [TrustedResults] policy designating the
+    #'   only tools that produce each kind of host result. Fixed at construction;
+    #'   every published tool registry is checked against it.
     #' @return A new `Agent` object
     initialize = function(
       chat,
@@ -145,7 +148,8 @@ Agent <- R6::R6Class(
       approval_dir = NULL,
       delegation_scope = list(),
       delegation_disclosure = DelegationDisclosure(),
-      delegation_observation = DelegationObservation()
+      delegation_observation = DelegationObservation(),
+      trusted_results = NULL
     ) {
       if (!is.null(private$.chat)) {
         check_conversation_initialization(self)
@@ -199,6 +203,7 @@ Agent <- R6::R6Class(
       }
       private$.chat <- chat
       private$.permissions <- permissions
+      private$.trusted_results <- normalize_trusted_results(trusted_results)
       private$.usage_limits <- normalize_usage_limits(usage_limits)
       private$.context_policy <- normalize_context_policy(context_policy)
       private$.working_dir <- working_dir
@@ -244,6 +249,7 @@ Agent <- R6::R6Class(
         preserve_reader = TRUE
       )
       tools <- validate_tool_batch(tools, existing = backend_tools)
+      check_trusted_registry(private$.trusted_results, c(backend_tools, tools))
       wrapped <- lapply(c(backend_tools, tools), private$adapt_tool)
       private$.chat$set_tools(wrapped)
 
@@ -1174,6 +1180,7 @@ Agent <- R6::R6Class(
       check_conversation_lease(self, NULL)
       had_result_reader <- isTRUE(private$.tool_result_reader_registered)
       tools <- validate_tool_batch(tools, preserve_reader = TRUE)
+      check_trusted_registry(private$.trusted_results, tools)
       wrapped <- lapply(tools, private$adapt_tool)
       if (had_result_reader) {
         wrapped[["deputy_read_tool_result"]] <-
@@ -1276,6 +1283,9 @@ Agent <- R6::R6Class(
       check_conversation_lease(self, NULL)
       existing <- private$.chat$get_tools()
       tools <- validate_tool_batch(tools, existing, replace = replace)
+      merged <- existing
+      merged[names(tools)] <- tools
+      check_trusted_registry(private$.trusted_results, merged)
       wrapped <- lapply(tools, private$adapt_tool)
       existing[names(wrapped)] <- wrapped
       private$.chat$set_tools(existing)
@@ -2201,6 +2211,16 @@ Agent <- R6::R6Class(
       )
     },
 
+    #' @field trusted_results The [TrustedResults] policy, or `NULL`. Read-only.
+    trusted_results = function(value) {
+      if (missing(value)) {
+        return(private$.trusted_results)
+      }
+      cli_abort(
+        "Cannot modify agent: trusted_results are immutable after construction"
+      )
+    },
+
     #' @field permissions Permission policy for the agent. Read-only after construction.
     permissions = function(value) {
       if (missing(value)) {
@@ -2367,6 +2387,7 @@ Agent <- R6::R6Class(
       .fallback_chats = list(),
       .fallback_position = 0L,
       .permissions = NULL,
+      .trusted_results = NULL,
       .usage_limits = NULL,
       .context_policy = NULL,
       .working_dir = NULL,
@@ -2411,6 +2432,7 @@ Agent <- R6::R6Class(
       tool_call_records = list(),
       pending_delegations = list(),
       original_tool_results = list(),
+      trusted_arguments = list(),
       delegation_artifacts = list(),
       last_run_usage = NULL,
       .last_run_result = NULL,
@@ -2496,6 +2518,7 @@ Agent <- R6::R6Class(
         had_result_reader <- "deputy_read_tool_result" %in% names(tools)
         tools[["deputy_read_tool_result"]] <- NULL
         tools <- validate_tool_batch(tools)
+        check_trusted_registry(private$.trusted_results, tools)
         private$.chat$set_tools(lapply(tools, private$prepare_cloned_tool))
         private$.tool_result_reader_registered <- FALSE
         if (isTRUE(had_result_reader)) {
@@ -2622,14 +2645,32 @@ Agent <- R6::R6Class(
           } else {
             private$resolve_tool_arguments
           },
-          process_result = private$offload_tool_result,
+          process_result = private$process_tool_result,
           begin_execution = private$begin_tool_execution,
-          execute = private$execute_tool
+          execute = private$execute_tool,
+          invocation_id = private$tool_invocation_id
         )
+      },
+
+      # Trusted tools run only as the tool of ellmer's active request, so host
+      # code or another tool cannot claim a pending governed call or publish.
+      tool_invocation_id = function(tool, arguments) {
+        if (is.null(trusted_result_type(private$.trusted_results, tool@name))) {
+          return(composition_invocation_id(tool, arguments))
+        }
+        trusted_invocation_id(tool)
       },
 
       execute_tool = function(tool, arguments, execution_id = NULL) {
         validate_composition_tool_owner(tool, self)
+        if (
+          !is.null(trusted_result_type(private$.trusted_results, tool@name))
+        ) {
+          if (!is_nonempty_string(execution_id)) {
+            trusted_invocation_abort(tool@name)
+          }
+          private$trusted_arguments[[execution_id]] <- arguments
+        }
         if (!is.null(composition_tool_owner(tool))) {
           if (
             !isTRUE(private$run_active) || !is_nonempty_string(execution_id)
@@ -2689,6 +2730,78 @@ Agent <- R6::R6Class(
         })
         pending <- TRUE
         result
+      },
+
+      process_tool_result = function(tool_name, value, execution_id = NULL) {
+        type <- trusted_result_type(private$.trusted_results, tool_name)
+        if (!is.null(type)) {
+          value <- private$deliver_trusted_result(
+            type,
+            tool_name,
+            value,
+            execution_id
+          )
+        }
+        private$offload_tool_result(tool_name, value, execution_id)
+      },
+
+      # The trusted tool's return value reaches the host before any model
+      # output, independently of offloading and PostToolUse event rewrites.
+      deliver_trusted_result = function(type, tool_name, value, execution_id) {
+        arguments <- NULL
+        if (is_nonempty_string(execution_id)) {
+          arguments <- private$trusted_arguments[[execution_id]]
+          private$trusted_arguments[[execution_id]] <- NULL
+        }
+        if (
+          inherits(value, "ellmer::ContentToolResult") && !is.null(value@error)
+        ) {
+          return(value)
+        }
+        policy <- private$.trusted_results
+        result_id <- new_deputy_id("result_")
+        event <- private$agent_event(
+          "trusted_result",
+          result_id = result_id,
+          result_type = type,
+          tool_name = tool_name,
+          tool_call_id = execution_id,
+          arguments = arguments,
+          value = value
+        )
+        private$record_run_event(event)
+        if (is.function(policy@on_result)) {
+          delivered <- tryCatch(
+            {
+              policy@on_result(event)
+              TRUE
+            },
+            error = function(error) error
+          )
+          if (!isTRUE(delivered)) {
+            private$notify(
+              paste0(
+                "Trusted result ",
+                result_id,
+                " was produced but the host callback failed: ",
+                conditionMessage(delivered)
+              ),
+              level = "warning",
+              code = "trusted_result_delivery_failed",
+              tool_name = tool_name,
+              result_id = result_id,
+              result_type = type
+            )
+            abort_tool_execution(
+              "Trusted result {result_id} was produced but could not be delivered to the user.",
+              tool_name = tool_name
+            )
+          }
+        }
+        if (isTRUE(policy@model_receipt)) {
+          return(trusted_result_receipt(result_id, type))
+        }
+        value
       },
 
       offload_tool_result = function(tool_name, value, execution_id = NULL) {

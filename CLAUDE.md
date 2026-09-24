@@ -52,6 +52,8 @@ deputy/
 │   ├── permission-evaluation.R # Internal tool gating and capability evaluation
 │   ├── hooks.R             # HookRegistry for lifecycle events
 │   ├── callback-result.R   # S7 hook and permission decisions
+│   ├── trusted-results.R   # TrustedResults policy and no-bypass registry check
+│   ├── tool-input-review.R # Typed per-field tables for input review
 │   ├── skill.R             # S7 Skill values and requirement inspection
 │   ├── skills.R            # Explicit Skill file and tool loading
 │   ├── tools-files.R       # Native filesystem tools
@@ -552,6 +554,17 @@ the source on every continuation. Copied history is inert: private provider
 data, tool bindings and incomplete tool rounds cannot restore execution or
 authority. Current parent and child governance still apply through the existing
 retained-conversation lifecycle. See ADR-0026 and `R/context-fork.R`.
+
+### Trusted results
+
+`Agent$new(trusted_results = TrustedResults(type = "tool"))` designates the
+single local tool producing each result type (ADR-0030). Every tool
+publication checks the complete registry: code execution and delegation are
+always rejected, and other tools must be read-only and closed-world or listed
+in `exempt_tools`. The runtime wrapper captures the verbatim value before
+offloading and hooks, records a `trusted_result` event and calls `on_result`
+before the model sees output. LeadAgent does not accept the policy.
+`context$tool_arguments` and `tool_input_review()` support typed input review.
 
 ### Human Input
 

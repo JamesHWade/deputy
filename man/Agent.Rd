@@ -103,6 +103,8 @@ agent$add_hook(HookMatcher(
 
     \item{\code{run_context}}{Default canonical product context. Read-only.}
 
+    \item{\code{trusted_results}}{The \link{TrustedResults} policy, or \code{NULL}. Read-only.}
+
     \item{\code{permissions}}{Permission policy for the agent. Read-only after construction.}
 
     \item{\code{usage_limits}}{Default per-run \link{UsageLimits}. Read-only after construction.}
@@ -220,7 +222,8 @@ agent$add_hook(HookMatcher(
   approval_dir = NULL,
   delegation_scope = list(),
   delegation_disclosure = DelegationDisclosure(),
-  delegation_observation = DelegationObservation()
+  delegation_observation = DelegationObservation(),
+  trusted_results = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -270,6 +273,9 @@ See \code{\link[=approval_read]{approval_read()}} and \verb{$resume_approval()}.
       \item{\code{delegation_scope}}{Plain host-owned scope for child disclosure.}
       \item{\code{delegation_disclosure}}{Host-only \link{DelegationDisclosure}, deny by default.}
       \item{\code{delegation_observation}}{Child activity bounds.}
+      \item{\code{trusted_results}}{Optional \link{TrustedResults} policy designating the
+only tools that produce each kind of host result. Fixed at construction;
+every published tool registry is checked against it.}
     }
     \if{html}{\out{</div>}}
   }
