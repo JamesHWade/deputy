@@ -76,6 +76,7 @@ Inherited methods
 - [`Agent$load_skill()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-load_skill)
 - [`Agent$mcp_status()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-mcp_status)
 - [`Agent$mcp_tools()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-mcp_tools)
+- [`Agent$microcompact()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-microcompact)
 - [`Agent$observe_subagents()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-observe_subagents)
 - [`Agent$on_tool_request()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-on_tool_request)
 - [`Agent$on_tool_result()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-on_tool_result)

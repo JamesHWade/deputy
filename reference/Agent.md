@@ -238,6 +238,8 @@ for writes made through its native file tools.
 
 - [`Agent$compact()`](#method-Agent-compact)
 
+- [`Agent$microcompact()`](#method-Agent-microcompact)
+
 - [`Agent$print()`](#method-Agent-print)
 
 - [`Agent$load_skill()`](#method-Agent-load_skill)
@@ -2228,6 +2230,50 @@ explicitly configured. The returned object records that degraded method.
 A read-only
 [DeputyCompaction](https://jameshwade.github.io/deputy/reference/DeputyCompaction.md)
 S7 value describing the method and usage.
+
+------------------------------------------------------------------------
+
+### `Agent$microcompact()`
+
+Clear old tool results from the model's context, as Posit Assistant's
+`/microcompact` does.
+
+Every tool result before the last `keep_last` turns has its value
+replaced by `marker` in the model's context, unless its tool is named in
+`keep_tools`. Nothing is summarised and no model call is made. An
+earlier compaction summary and the compacted prefix are kept.
+
+Like compaction, this changes only what the model sees. `$get_turns()`,
+`$last_turn()` and saved sessions keep the original results, so a host's
+conversation history is unchanged. `$get_context_turns()` shows the
+markers.
+
+#### Usage
+
+    Agent$microcompact(
+      keep_last = 2L,
+      keep_tools = character(),
+      marker = "[Old tool result cleared to save context.]"
+    )
+
+#### Arguments
+
+- `keep_last`:
+
+  Number of recent turns whose tool results are left as they are. `Inf`
+  keeps every turn.
+
+- `keep_tools`:
+
+  Names of tools whose results are never cleared.
+
+- `marker`:
+
+  The text that replaces a cleared result.
+
+#### Returns
+
+A list with `cleared`, the number of tool results replaced.
 
 ------------------------------------------------------------------------
 

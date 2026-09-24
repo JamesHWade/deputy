@@ -237,6 +237,7 @@ invalidate later file history. Conversation history is not changed.</p></dd>
 <li><p><a href="#method-Agent-list_checkpoints"><code>Agent$list_checkpoints()</code></a></p></li>
 <li><p><a href="#method-Agent-rewind_files"><code>Agent$rewind_files()</code></a></p></li>
 <li><p><a href="#method-Agent-compact"><code>Agent$compact()</code></a></p></li>
+<li><p><a href="#method-Agent-microcompact"><code>Agent$microcompact()</code></a></p></li>
 <li><p><a href="#method-Agent-print"><code>Agent$print()</code></a></p></li>
 <li><p><a href="#method-Agent-load_skill"><code>Agent$load_skill()</code></a></p></li>
 <li><p><a href="#method-Agent-skills"><code>Agent$skills()</code></a></p></li>
@@ -1967,10 +1968,49 @@ and usage.</p>
 
 </div>
 
+<p></p><hr><a id="method-Agent-microcompact"></a><div class="section">
+<h3 id="agent-microcompact-"><code>Agent$microcompact()</code><a class="anchor" aria-label="anchor" href="#agent-microcompact-"></a></h3>
+<p>Clear old tool results from the model's context, as Posit Assistant's
+<code>/microcompact</code> does.</p>
+<p>Every tool result before the last <code>keep_last</code> turns has its value
+replaced by <code>marker</code> in the model's context, unless its tool is named in
+<code>keep_tools</code>. Nothing is summarised and no model call is made. An
+earlier compaction summary and the compacted prefix are kept.</p>
+<p>Like compaction, this changes only what the model sees. <code>$get_turns()</code>,
+<code>$last_turn()</code> and saved sessions keep the original results, so a host's
+conversation history is unchanged. <code>$get_context_turns()</code> shows the
+markers.</p><div class="section">
+<h4 id="usage-66">Usage<a class="anchor" aria-label="anchor" href="#usage-66"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">microcompact</span><span class="op">(</span></span>
+<span>  keep_last <span class="op">=</span> <span class="fl">2L</span>,</span>
+<span>  keep_tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  marker <span class="op">=</span> <span class="st">"[Old tool result cleared to save context.]"</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-48">Arguments<a class="anchor" aria-label="anchor" href="#arguments-48"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>keep_last</code></dt>
+<dd><p>Number of recent turns whose tool results are left as
+they are. <code>Inf</code> keeps every turn.</p></dd>
+
+      <dt><code>keep_tools</code></dt>
+<dd><p>Names of tools whose results are never cleared.</p></dd>
+
+      <dt><code>marker</code></dt>
+<dd><p>The text that replaces a cleared result.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-66">Returns<a class="anchor" aria-label="anchor" href="#returns-66"></a></h4>
+<p>A list with <code>cleared</code>, the number of tool results replaced.</p>
+</div>
+
+</div>
+
 <p></p><hr><a id="method-Agent-print"></a><div class="section">
 <h3 id="agent-print-"><code>Agent$print()</code><a class="anchor" aria-label="anchor" href="#agent-print-"></a></h3>
 <p>Print the agent configuration.</p><div class="section">
-<h4 id="usage-66">Usage<a class="anchor" aria-label="anchor" href="#usage-66"></a></h4>
+<h4 id="usage-67">Usage<a class="anchor" aria-label="anchor" href="#usage-67"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -1979,10 +2019,10 @@ and usage.</p>
 <p></p><hr><a id="method-Agent-load_skill"></a><div class="section">
 <h3 id="agent-load-skill-"><code>Agent$load_skill()</code><a class="anchor" aria-label="anchor" href="#agent-load-skill-"></a></h3>
 <p>Load a <a href="Skill.html">Skill</a> into the agent.</p><div class="section">
-<h4 id="usage-67">Usage<a class="anchor" aria-label="anchor" href="#usage-67"></a></h4>
+<h4 id="usage-68">Usage<a class="anchor" aria-label="anchor" href="#usage-68"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_skill</span><span class="op">(</span><span class="va">skill</span>, allow_conflicts <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-48">Arguments<a class="anchor" aria-label="anchor" href="#arguments-48"></a></h4>
+<h4 id="arguments-49">Arguments<a class="anchor" aria-label="anchor" href="#arguments-49"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>skill</code></dt>
 <dd><p>A <a href="Skill.html">Skill</a> object or path to a skill directory.</p></dd>
 
@@ -1993,7 +2033,7 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-66">Returns<a class="anchor" aria-label="anchor" href="#returns-66"></a></h4>
+<h4 id="returns-67">Returns<a class="anchor" aria-label="anchor" href="#returns-67"></a></h4>
 <p>Invisible self for chaining.</p>
 </div>
 
@@ -2002,10 +2042,10 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 <p></p><hr><a id="method-Agent-skills"></a><div class="section">
 <h3 id="agent-skills-"><code>Agent$skills()</code><a class="anchor" aria-label="anchor" href="#agent-skills-"></a></h3>
 <p>Get loaded skills.</p><div class="section">
-<h4 id="usage-68">Usage<a class="anchor" aria-label="anchor" href="#usage-68"></a></h4>
+<h4 id="usage-69">Usage<a class="anchor" aria-label="anchor" href="#usage-69"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">skills</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-67">Returns<a class="anchor" aria-label="anchor" href="#returns-67"></a></h4>
+<h4 id="returns-68">Returns<a class="anchor" aria-label="anchor" href="#returns-68"></a></h4>
 <p>Named list of loaded <a href="Skill.html">Skill</a> objects.</p>
 </div>
 
@@ -2016,10 +2056,10 @@ Set TRUE to allow overwriting existing tools.</p></dd>
 <p>Load tools from MCP (Model Context Protocol) servers.</p>
 <p>Requires the mcptools package. Issues a warning if not installed or if
 tool fetching fails.</p><div class="section">
-<h4 id="usage-69">Usage<a class="anchor" aria-label="anchor" href="#usage-69"></a></h4>
+<h4 id="usage-70">Usage<a class="anchor" aria-label="anchor" href="#usage-70"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">load_mcp</span><span class="op">(</span>config <span class="op">=</span> <span class="cn">NULL</span>, servers <span class="op">=</span> <span class="cn">NULL</span>, replace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-49">Arguments<a class="anchor" aria-label="anchor" href="#arguments-49"></a></h4>
+<h4 id="arguments-50">Arguments<a class="anchor" aria-label="anchor" href="#arguments-50"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>config</code></dt>
 <dd><p>Path to MCP configuration file. If NULL (default), uses
 the mcptools default location (<code>~/.config/mcptools/config.json</code>).</p></dd>
@@ -2036,7 +2076,7 @@ tools whose connections were invalidated are removed; working tools remain.</p><
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-68">Returns<a class="anchor" aria-label="anchor" href="#returns-68"></a></h4>
+<h4 id="returns-69">Returns<a class="anchor" aria-label="anchor" href="#returns-69"></a></h4>
 <p>Invisible self for chaining</p>
 </div>
 
@@ -2045,10 +2085,10 @@ tools whose connections were invalidated are removed; working tools remain.</p><
 <p></p><hr><a id="method-Agent-mcp_tools"></a><div class="section">
 <h3 id="agent-mcp-tools-"><code>Agent$mcp_tools()</code><a class="anchor" aria-label="anchor" href="#agent-mcp-tools-"></a></h3>
 <p>Get names of loaded MCP tools.</p><div class="section">
-<h4 id="usage-70">Usage<a class="anchor" aria-label="anchor" href="#usage-70"></a></h4>
+<h4 id="usage-71">Usage<a class="anchor" aria-label="anchor" href="#usage-71"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">mcp_tools</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-69">Returns<a class="anchor" aria-label="anchor" href="#returns-69"></a></h4>
+<h4 id="returns-70">Returns<a class="anchor" aria-label="anchor" href="#returns-70"></a></h4>
 <p>Character vector of MCP tool names</p>
 </div>
 
@@ -2057,10 +2097,10 @@ tools whose connections were invalidated are removed; working tools remain.</p><
 <p></p><hr><a id="method-Agent-mcp_status"></a><div class="section">
 <h3 id="agent-mcp-status-"><code>Agent$mcp_status()</code><a class="anchor" aria-label="anchor" href="#agent-mcp-status-"></a></h3>
 <p>Get MCP runtime status records.</p><div class="section">
-<h4 id="usage-71">Usage<a class="anchor" aria-label="anchor" href="#usage-71"></a></h4>
+<h4 id="usage-72">Usage<a class="anchor" aria-label="anchor" href="#usage-72"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">mcp_status</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-70">Returns<a class="anchor" aria-label="anchor" href="#returns-70"></a></h4>
+<h4 id="returns-71">Returns<a class="anchor" aria-label="anchor" href="#returns-71"></a></h4>
 <p>Data frame describing MCP load attempts and registered tools</p>
 </div>
 
@@ -2076,7 +2116,7 @@ than returning the content stream.</p>
 example a delegated sub-agent executed from the tool of a parent chat
 that is itself streaming. Supply <code>type</code> to extract structured output
 after the tool-using task within the same run budget.</p><div class="section">
-<h4 id="usage-72">Usage<a class="anchor" aria-label="anchor" href="#usage-72"></a></h4>
+<h4 id="usage-73">Usage<a class="anchor" aria-label="anchor" href="#usage-73"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">run_async</span><span class="op">(</span></span>
 <span>  <span class="va">task</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -2086,7 +2126,7 @@ after the tool-using task within the same run budget.</p><div class="section">
 <span>  max_corrections <span class="op">=</span> <span class="fl">0L</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-50">Arguments<a class="anchor" aria-label="anchor" href="#arguments-50"></a></h4>
+<h4 id="arguments-51">Arguments<a class="anchor" aria-label="anchor" href="#arguments-51"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>task</code></dt>
 <dd><p>The task for the agent to perform</p></dd>
 
@@ -2116,7 +2156,7 @@ invalid output. Defaults to zero; all attempts share the run budget.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-71">Returns<a class="anchor" aria-label="anchor" href="#returns-71"></a></h4>
+<h4 id="returns-72">Returns<a class="anchor" aria-label="anchor" href="#returns-72"></a></h4>
 <p>A <code><a href="https://rstudio.github.io/promises/reference/promise.html" class="external-link">promises::promise</a></code> resolving to an <a href="AgentResult.html">AgentResult</a>. It is
 rejected if the provider stream fails or a limit configured with
 <code>on_exceed = "error"</code> is reached.</p>
@@ -2127,10 +2167,10 @@ rejected if the provider stream fails or a limit configured with
 <p></p><hr><a id="method-Agent-clone"></a><div class="section">
 <h3 id="agent-clone-"><code>Agent$clone()</code><a class="anchor" aria-label="anchor" href="#agent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-73">Usage<a class="anchor" aria-label="anchor" href="#usage-73"></a></h4>
+<h4 id="usage-74">Usage<a class="anchor" aria-label="anchor" href="#usage-74"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-51">Arguments<a class="anchor" aria-label="anchor" href="#arguments-51"></a></h4>
+<h4 id="arguments-52">Arguments<a class="anchor" aria-label="anchor" href="#arguments-52"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

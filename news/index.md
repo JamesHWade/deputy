@@ -2,6 +2,15 @@
 
 ## deputy (development version)
 
+- `Agent$microcompact()` clears old tool results from the model’s
+  context, as Posit Assistant’s `/microcompact` does: results before the
+  last `keep_last` turns become a marker unless their tool is in
+  `keep_tools`. No model call is made, and an earlier compaction summary
+  is kept, which `$set_turns()` would drop. As with compaction, only the
+  model’s context changes: `$get_turns()`, `$last_turn()` and saved
+  sessions keep the original results
+  ([\#209](https://github.com/JamesHWade/deputy/issues/209)).
+
 - An `AgentDefinition` `model` given as a bare model id, such as
   `"gpt-5.6-luna"`, now runs the sub-agent on the lead’s provider,
   endpoint and credentials with that model. This lets a child use a
