@@ -573,7 +573,8 @@ LeadAgent <- R6::R6Class(
       # way to run a child on a cheaper model of a provider that
       # ellmer::chat() cannot name, such as a gateway client built outside
       # ellmer.
-      same_provider <- def$model == "inherit" || !grepl("/", def$model, fixed = TRUE)
+      same_provider <- def$model == "inherit" ||
+        !grepl("/", def$model, fixed = TRUE)
       if (same_provider) {
         # Clone the parent chat to get the same provider/model config,
         # then clear conversation history so the sub-agent starts fresh.
