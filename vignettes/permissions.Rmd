@@ -514,7 +514,11 @@ chat. If `on_result` fails, the model gets a tool error instead of the value.
 
 The Agent checks its whole tool registry each time tools are registered. Code
 execution tools (`run_r_code`, `run_bash`, R sessions) and delegation tools
-could produce any result, so they are always rejected. Any other tool must be
+could produce any result, so they are always rejected. The one exception is a
+`LeadAgent`'s own delegation tool: with `LeadAgent$new(trusted_results = )`,
+every child inherits the policy and each definition's tools must pass the same
+check. The trusted tool may live in a child, and its results still reach the
+lead's `on_result`. Any other tool must be
 annotated read-only and closed-world, or be a local function tool the host
 names in `exempt_tools`. Unannotated tools use the conservative defaults and are
 rejected. The policy is fixed at construction. It limits which tools may sit
@@ -537,7 +541,18 @@ permissions <- Permissions(can_use_tool = function(tool_name, tool_input, contex
 
 Combined with `approval_dir`, the host can approve, deny or edit the inputs
 through `$resume_approval()`. The trusted tool then runs with the reviewed
-arguments. `inst/examples/trusted-mini-agent/` is a complete Shiny example with
-proposal, review and result panels. See
+arguments. In Shiny, `approval_review_ui()` and `approval_review_server()`
+render that review as a table with editors and Approve and Deny buttons:
+
+```{r, eval = FALSE}
+ui <- bslib::page_fluid(approval_review_ui("review"))
+server <- function(input, output, session) {
+  review <- approval_review_server("review", agent)
+}
+```
+
+`inst/examples/trusted-results/` is a runnable app with a chat, a review card
+and a result card, following Landau's template. `inst/examples/trusted-mini-agent/`
+is a larger scientific workflow with delegation and a result receipt. See
 [ADR-0030](https://github.com/JamesHWade/deputy/blob/main/dev/adr/0030-trusted-result-channel.md)
 for the design.

@@ -563,8 +563,12 @@ publication checks the complete registry: code execution and delegation are
 always rejected, and other tools must be read-only and closed-world or listed
 in `exempt_tools`. The runtime wrapper captures the verbatim value before
 offloading and hooks, records a `trusted_result` event and calls `on_result`
-before the model sees output. LeadAgent does not accept the policy.
-`context$tool_arguments` and `tool_input_review()` support typed input review.
+before the model sees output. A LeadAgent policy covers the delegation tree:
+children inherit it, definitions are checked when registered and when built,
+designated names must be the same tool across the tree, and child results are
+forwarded to the lead. `context$tool_arguments` and `tool_input_review()`
+support typed input review; `approval_review_ui()`/`_server()` is the Shiny
+review module. `inst/examples/trusted-results/` is the three-area app.
 
 ### Human Input
 

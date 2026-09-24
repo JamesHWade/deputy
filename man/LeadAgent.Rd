@@ -135,7 +135,8 @@ sub-agents based on registered AgentDefinitions.
   delegation_policy = DelegationPolicy(),
   delegation_disclosure = DelegationDisclosure(),
   delegation_observation = DelegationObservation(),
-  approval_dir = NULL
+  approval_dir = NULL,
+  trusted_results = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -190,6 +191,12 @@ inspection and saved-history disclosure. Defaults to deny.}
 transient child activity stream.}
       \item{\code{approval_dir}}{Optional standalone lead approval directory. Delegation
 rejects this unsupported durable child-continuation combination.}
+      \item{\code{trusted_results}}{Optional \link{TrustedResults} policy for the whole
+delegation tree. Every child inherits it, so each definition's tools
+must pass the same no-bypass check. A designated tool may live in the
+lead or in children, but must be the same tool everywhere. Child
+trusted results are recorded in the lead's run and sent to its
+\code{on_result}.}
     }
     \if{html}{\out{</div>}}
   }

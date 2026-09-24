@@ -249,7 +249,7 @@ Agent <- R6::R6Class(
         preserve_reader = TRUE
       )
       tools <- validate_tool_batch(tools, existing = backend_tools)
-      check_trusted_registry(private$.trusted_results, c(backend_tools, tools))
+      private$check_trusted_tools(c(backend_tools, tools))
       wrapped <- lapply(c(backend_tools, tools), private$adapt_tool)
       private$.chat$set_tools(wrapped)
 
@@ -1180,7 +1180,7 @@ Agent <- R6::R6Class(
       check_conversation_lease(self, NULL)
       had_result_reader <- isTRUE(private$.tool_result_reader_registered)
       tools <- validate_tool_batch(tools, preserve_reader = TRUE)
-      check_trusted_registry(private$.trusted_results, tools)
+      private$check_trusted_tools(tools)
       wrapped <- lapply(tools, private$adapt_tool)
       if (had_result_reader) {
         wrapped[["deputy_read_tool_result"]] <-
@@ -1285,7 +1285,7 @@ Agent <- R6::R6Class(
       tools <- validate_tool_batch(tools, existing, replace = replace)
       merged <- existing
       merged[names(tools)] <- tools
-      check_trusted_registry(private$.trusted_results, merged)
+      private$check_trusted_tools(merged)
       wrapped <- lapply(tools, private$adapt_tool)
       existing[names(wrapped)] <- wrapped
       private$.chat$set_tools(existing)
@@ -2388,6 +2388,10 @@ Agent <- R6::R6Class(
       .fallback_position = 0L,
       .permissions = NULL,
       .trusted_results = NULL,
+      # Delegated children receive the lead's tree view: designated tools may
+      # live elsewhere in the tree but must be the same executables.
+      .trusted_tree_member = FALSE,
+      .trusted_sources = NULL,
       .usage_limits = NULL,
       .context_policy = NULL,
       .working_dir = NULL,
@@ -2518,7 +2522,7 @@ Agent <- R6::R6Class(
         had_result_reader <- "deputy_read_tool_result" %in% names(tools)
         tools[["deputy_read_tool_result"]] <- NULL
         tools <- validate_tool_batch(tools)
-        check_trusted_registry(private$.trusted_results, tools)
+        private$check_trusted_tools(tools)
         private$.chat$set_tools(lapply(tools, private$prepare_cloned_tool))
         private$.tool_result_reader_registered <- FALSE
         if (isTRUE(had_result_reader)) {
@@ -2730,6 +2734,20 @@ Agent <- R6::R6Class(
         })
         pending <- TRUE
         result
+      },
+
+      check_trusted_tools = function(tools) {
+        policy <- private$.trusted_results
+        check_trusted_registry(
+          policy,
+          tools,
+          available = if (isTRUE(private$.trusted_tree_member)) {
+            policy@results
+          } else {
+            names(tools)
+          },
+          sources = private$.trusted_sources
+        )
       },
 
       process_tool_result = function(tool_name, value, execution_id = NULL) {

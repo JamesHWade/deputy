@@ -59,15 +59,28 @@ the event is built.
 
 ## Consequences
 
-- LeadAgent does not accept the policy, and graph routes cannot be installed
-  on a trusted Agent, because child text reaches the model. Hosts run trusted
-  tools in a separate executor Agent, as the study recipe does. Delivering
-  child trusted results through delegation observation is future work.
+- **Delegation extends the policy to the tree.** `LeadAgent` accepts the
+  policy, and every child inherits it. The lead's own `delegate_to_agent`
+  tool is admitted only because of that inheritance. Each definition's tools
+  are checked when the definition is registered and again when the child is
+  built, which covers skills and host resource factories. A designated name
+  must refer to the same tool object in the lead and in every definition, so
+  each result type keeps one producer. A child's trusted result is recorded
+  in the child's run and in the lead's run, and delivered to the lead's
+  `on_result` with the child's `delegation_id` and agent identity. Children
+  cannot delegate further, and graph routes and other composition tools stay
+  rejected everywhere. A separate executor Agent, as in the study recipe,
+  remains a valid alternative.
 - Durable approval composes with the policy unchanged. The approved tool
   runs through the same wrapper on `resume_approval()`, so edited inputs
   appear in the event's `arguments`.
 - The policy constrains registration; it grants no permission. Permissions,
   hooks and approvals still govern every call. It is not an OS sandbox and
   does not protect against a malicious host R process.
-- A Shiny review module and a three-area chat/review/results example remain
-  follow-up work.
+- `approval_review_ui()` / `approval_review_server()` present a pending
+  durable approval as a typed table with editors for simple fields, and
+  approve or deny through `resume_approval()` or a host `decide` function.
+  The call stays blocked until the reviewer acts.
+- `inst/examples/trusted-results/` is the three-area chat / review / results
+  app. Its tests show that the result panel updates only from the trusted
+  tool's `on_result`, after review, and never from model text.

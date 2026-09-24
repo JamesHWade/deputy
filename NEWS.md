@@ -16,6 +16,20 @@
   proposed input into a per-field table of type, description, and value.
   The approval-gates recipe now uses it instead of `dput()` (#197).
 
+* `LeadAgent$new(trusted_results = )` applies a trusted-results policy to the
+  whole delegation tree. Every child inherits it, each definition's tools must
+  pass the no-bypass check, and a designated tool must be the same tool
+  wherever it appears. Child trusted results reach the lead's `on_result` and
+  run events (#197).
+
+* `approval_review_ui()` and `approval_review_server()` are a Shiny module
+  for reviewing a pending durable approval. They show each argument's type,
+  description and value, let the reviewer edit simple fields, and approve or
+  deny. A host `decide` function can run the continuation elsewhere (#197).
+
+* `inst/examples/trusted-results/` is a three-area chat, review and results
+  app. Only the trusted forecast tool can fill the results panel (#197).
+
 * `mcp_console_connection()` connects an Agent to one
   [MCP Console](https://github.com/t-kalinowski/mcp-console) server, a
   sandboxed workbench that keeps R, Python and DuckDB SQL state for a
