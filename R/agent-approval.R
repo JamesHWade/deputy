@@ -46,6 +46,11 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
       session <- private$build_session_payload()
       session$turns <- approval_record_turns(session$turns)
       session$compacted_turns <- approval_record_turns(session$compacted_turns)
+      if (length(session$cleared_tool_results)) {
+        session$cleared_tool_results$turns <- approval_record_turns(
+          session$cleared_tool_results$turns
+        )
+      }
       session$metadata$saved_at <- as.numeric(session$metadata$saved_at)
       policy <- approval_policy_record(self$permissions)
       record <- list(
@@ -504,6 +509,12 @@ approval_resume <- function(
     session$compacted_turns,
     tools = list()
   )
+  if (length(session$cleared_tool_results)) {
+    session$cleared_tool_results$turns <- approval_replay_turns(
+      session$cleared_tool_results$turns,
+      tools = list()
+    )
+  }
   private$restore_session_payload(session, source = path)
   record$status <- "resuming"
   approval_store_write(path, record, lock)

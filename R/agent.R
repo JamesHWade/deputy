@@ -1080,7 +1080,10 @@ Agent <- R6::R6Class(
     #' @param include_system_prompt Include the system prompt as a turn.
     #' @return A list of ellmer turns.
     get_turns = function(include_system_prompt = FALSE) {
-      turns <- c(private$.compacted_turns, private$.chat$get_turns())
+      turns <- restore_cleared_tool_results(
+        c(private$.compacted_turns, private$.chat$get_turns()),
+        private$.cleared_tool_results
+      )
       if (isTRUE(include_system_prompt)) {
         context <- self$get_context_turns(include_system_prompt = TRUE)
         system <- Filter(
@@ -1137,6 +1140,7 @@ Agent <- R6::R6Class(
       preserve_run_usage(self, usage)
       private$.compaction_summary <- NULL
       private$.compacted_turns <- list()
+      private$.cleared_tool_results <- list()
       invisible(self)
     },
 
@@ -1356,13 +1360,43 @@ Agent <- R6::R6Class(
       role <- match.arg(role)
       current <- private$.chat$last_turn(role = role)
       if (!is.null(current)) {
-        return(current)
+        # Restore the returned turn at its actual position in the context,
+        # without assuming how the Chat chose it.
+        context <- private$.chat$get_turns()
+        matches <- which(vapply(
+          context,
+          function(turn) identical(turn, current),
+          logical(1)
+        ))
+        position <- if (length(matches)) {
+          length(private$.compacted_turns) + max(matches)
+        } else {
+          NA_integer_
+        }
+        return(restore_cleared_tool_results(
+          list(current),
+          private$.cleared_tool_results,
+          positions = position
+        )[[1L]])
       }
       turns <- Filter(
         function(turn) identical(turn@role, role),
         private$.compacted_turns
       )
-      if (length(turns)) tail(turns, 1L)[[1L]] else NULL
+      if (length(turns)) {
+        roles <- vapply(
+          private$.compacted_turns,
+          function(turn) turn@role,
+          character(1)
+        )
+        restore_cleared_tool_results(
+          tail(turns, 1L),
+          private$.cleared_tool_results,
+          positions = max(which(roles == role))
+        )[[1L]]
+      } else {
+        NULL
+      }
     },
 
     #' @description
@@ -1780,6 +1814,101 @@ Agent <- R6::R6Class(
         generated$method,
         generated$usage
       )
+    },
+
+    #' @description
+    #' Clear old tool results from the model's context, as Posit Assistant's
+    #' `/microcompact` does.
+    #'
+    #' Every tool result before the last `keep_last` turns has its value
+    #' replaced by `marker` in the model's context, unless its tool is named in
+    #' `keep_tools`. Nothing is summarised and no model call is made. An
+    #' earlier compaction summary and the compacted prefix are kept.
+    #'
+    #' Like compaction, this changes only what the model sees. `$get_turns()`,
+    #' `$last_turn()` and saved sessions keep the original results, so a host's
+    #' conversation history is unchanged. `$get_context_turns()` shows the
+    #' markers.
+    #'
+    #' @param keep_last Number of recent turns whose tool results are left as
+    #'   they are. `Inf` keeps every turn.
+    #' @param keep_tools Names of tools whose results are never cleared.
+    #' @param marker The text that replaces a cleared result.
+    #' @return A list with `cleared`, the number of tool results replaced.
+    microcompact = function(
+      keep_last = 2L,
+      keep_tools = character(),
+      marker = "[Old tool result cleared to save context.]"
+    ) {
+      check_conversation_lease(self, NULL)
+      if (isTRUE(private$run_active)) {
+        cli::cli_abort(
+          "Cannot microcompact conversation state while this agent has an active run",
+          class = c("deputy_run_active", "deputy_error")
+        )
+      }
+      if (
+        !is.numeric(keep_last) ||
+          length(keep_last) != 1L ||
+          is.na(keep_last) ||
+          keep_last < 0 ||
+          (is.finite(keep_last) && keep_last != floor(keep_last))
+      ) {
+        cli::cli_abort(
+          "{.arg keep_last} must be a whole number of turns, 0 or more."
+        )
+      }
+      if (!is.character(keep_tools) || anyNA(keep_tools)) {
+        cli::cli_abort("{.arg keep_tools} must be a character vector.")
+      }
+      if (!is_nonempty_string(marker)) {
+        cli::cli_abort("{.arg marker} must be one non-empty string.")
+      }
+      turns <- private$.chat$get_turns()
+      # keep_last may be Inf or larger than the conversation: keep everything.
+      upto <- if (keep_last >= length(turns)) {
+        0L
+      } else {
+        length(turns) - as.integer(keep_last)
+      }
+      # Originals are keyed by position in the complete conversation, which
+      # compaction and new turns do not shift. Tool call IDs can repeat.
+      offset <- length(private$.compacted_turns)
+      originals <- private$.cleared_tool_results
+      cleared <- 0L
+      for (i in seq_len(upto)) {
+        contents <- turns[[i]]@contents
+        changed <- FALSE
+        for (j in seq_along(contents)) {
+          content <- contents[[j]]
+          if (!S7::S7_inherits(content, ellmer::ContentToolResult)) {
+            next
+          }
+          name <- tryCatch(content@request@name, error = function(e) NULL)
+          if (!is.null(name) && name %in% keep_tools) {
+            next
+          }
+          key <- cleared_result_key(offset + i, j)
+          # Already cleared: keep its first original and marker.
+          if (!is.null(originals[[key]])) {
+            next
+          }
+          originals[[key]] <- list(marker = marker, content = content)
+          content@value <- marker
+          content@error <- NULL
+          contents[[j]] <- content
+          changed <- TRUE
+          cleared <- cleared + 1L
+        }
+        if (changed) {
+          turns[[i]]@contents <- contents
+        }
+      }
+      if (cleared > 0L) {
+        private$.chat$set_turns(turns)
+        private$.cleared_tool_results <- originals
+      }
+      list(cleared = cleared)
     },
 
     #' @description
@@ -2446,6 +2575,9 @@ Agent <- R6::R6Class(
       .last_compaction = NULL,
       .compaction_summary = NULL,
       .compacted_turns = list(),
+      # Original tool results cleared from model context by microcompact(),
+      # keyed by tool call ID, so the conversation view keeps them.
+      .cleared_tool_results = list(),
       .compaction_catalog_registry = NULL,
       .compaction_artifacts = NULL,
       .tool_result_reader_registered = FALSE,

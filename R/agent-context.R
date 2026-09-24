@@ -1088,3 +1088,44 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
     }
   )
 }
+
+cleared_result_key <- function(turn, content) {
+  paste0(turn, ":", content)
+}
+
+# Swap microcompact markers back to the original tool results for the
+# conversation view. `positions` gives each turn's index in the complete
+# conversation. A result is restored only while it still holds its marker.
+restore_cleared_tool_results <- function(
+  turns,
+  originals,
+  positions = seq_along(turns)
+) {
+  if (length(originals) == 0L) {
+    return(turns)
+  }
+  for (i in seq_along(turns)) {
+    if (is.na(positions[[i]])) {
+      next
+    }
+    contents <- turns[[i]]@contents
+    changed <- FALSE
+    for (j in seq_along(contents)) {
+      entry <- originals[[cleared_result_key(positions[[i]], j)]]
+      content <- contents[[j]]
+      if (
+        !is.null(entry) &&
+          S7::S7_inherits(content, ellmer::ContentToolResult) &&
+          identical(content@value, entry$marker) &&
+          is.null(content@error)
+      ) {
+        contents[[j]] <- entry$content
+        changed <- TRUE
+      }
+    }
+    if (changed) {
+      turns[[i]]@contents <- contents
+    }
+  }
+  turns
+}

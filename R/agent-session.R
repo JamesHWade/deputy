@@ -7,6 +7,11 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
         schema_version = 3L,
         turns = portable_session_turns(private$.chat$get_turns()),
         compacted_turns = portable_session_turns(private$.compacted_turns),
+        # Optional: originals of results cleared by microcompact(), stored as
+        # one user turn so they share the turn serializers.
+        cleared_tool_results = cleared_tool_results_turns(
+          private$.cleared_tool_results
+        ),
         system_prompt = private$.chat$get_system_prompt(),
         compaction_summary = private$.compaction_summary,
         tool_result_envelopes = collect_tool_result_envelopes(
@@ -109,6 +114,19 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       }
       restored_compacted_turns <- portable_session_turns(
         session$compacted_turns
+      )
+      restored_cleared <- tryCatch(
+        cleared_tool_results_from_turns(session$cleared_tool_results),
+        error = function(error) {
+          abort_session_load(
+            c(
+              "Invalid session file - cleared tool results are malformed",
+              "x" = conditionMessage(error)
+            ),
+            path = source,
+            parent = error
+          )
+        }
       )
       if (
         !is.null(session$system_prompt) &&
@@ -254,6 +272,7 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       private$appended_hook_context_hashes <- restored_hashes
       private$.compaction_summary <- session$compaction_summary
       private$.compacted_turns <- restored_compacted_turns
+      private$.cleared_tool_results <- restored_cleared
     }
   )
 }
@@ -275,4 +294,66 @@ portable_session_turns <- function(turns) {
     turn@contents <- lapply(turn@contents, strip_tool)
     turn
   })
+}
+
+# Saved as positions and markers plus one user turn holding the originals in
+# the same order, so the originals share the turn serializers.
+cleared_tool_results_turns <- function(originals) {
+  if (length(originals) == 0L) {
+    return(list())
+  }
+  list(
+    keys = names(originals),
+    markers = vapply(
+      originals,
+      function(x) x$marker,
+      character(1),
+      USE.NAMES = FALSE
+    ),
+    turns = portable_session_turns(list(ellmer::UserTurn(
+      contents = unname(lapply(originals, function(x) x$content))
+    )))
+  )
+}
+
+# Older schema 3 snapshots have no field, which means nothing was cleared.
+cleared_tool_results_from_turns <- function(saved) {
+  if (is.null(saved) || length(saved) == 0L) {
+    return(list())
+  }
+  keys <- saved$keys
+  markers <- saved$markers
+  turns <- saved$turns
+  if (
+    !is.character(keys) ||
+      !is.character(markers) ||
+      length(keys) != length(markers) ||
+      anyDuplicated(keys) ||
+      !is.list(turns) ||
+      length(turns) != 1L ||
+      !S7::S7_inherits(turns[[1L]], ellmer::UserTurn)
+  ) {
+    cli_abort("Expected positions, markers and one user turn.")
+  }
+  contents <- turns[[1L]]@contents
+  if (
+    length(contents) != length(keys) ||
+      !all(vapply(
+        contents,
+        function(x) S7::S7_inherits(x, ellmer::ContentToolResult),
+        logical(1)
+      ))
+  ) {
+    cli_abort("Expected one tool result per saved position.")
+  }
+  stats::setNames(
+    Map(
+      function(marker, content) {
+        list(marker = marker, content = content)
+      },
+      markers,
+      contents
+    ),
+    keys
+  )
 }

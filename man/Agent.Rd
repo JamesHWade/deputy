@@ -186,6 +186,7 @@ agent$add_hook(HookMatcher(
     \item \href{#method-Agent-list_checkpoints}{\code{Agent$list_checkpoints()}}
     \item \href{#method-Agent-rewind_files}{\code{Agent$rewind_files()}}
     \item \href{#method-Agent-compact}{\code{Agent$compact()}}
+    \item \href{#method-Agent-microcompact}{\code{Agent$microcompact()}}
     \item \href{#method-Agent-print}{\code{Agent$print()}}
     \item \href{#method-Agent-load_skill}{\code{Agent$load_skill()}}
     \item \href{#method-Agent-skills}{\code{Agent$skills()}}
@@ -1947,6 +1948,46 @@ explicitly configured. The returned object records that degraded method.
   \subsection{Returns}{
     A read-only \link{DeputyCompaction} S7 value describing the method
 and usage.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-microcompact"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-microcompact}{}}}
+\subsection{\code{Agent$microcompact()}}{
+  Clear old tool results from the model's context, as Posit Assistant's
+\verb{/microcompact} does.
+
+Every tool result before the last \code{keep_last} turns has its value
+replaced by \code{marker} in the model's context, unless its tool is named in
+\code{keep_tools}. Nothing is summarised and no model call is made. An
+earlier compaction summary and the compacted prefix are kept.
+
+Like compaction, this changes only what the model sees. \verb{$get_turns()},
+\verb{$last_turn()} and saved sessions keep the original results, so a host's
+conversation history is unchanged. \verb{$get_context_turns()} shows the
+markers.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$microcompact(
+  keep_last = 2L,
+  keep_tools = character(),
+  marker = "[Old tool result cleared to save context.]"
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{keep_last}}{Number of recent turns whose tool results are left as
+they are. \code{Inf} keeps every turn.}
+      \item{\code{keep_tools}}{Names of tools whose results are never cleared.}
+      \item{\code{marker}}{The text that replaces a cleared result.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list with \code{cleared}, the number of tool results replaced.
   }
 }
 
