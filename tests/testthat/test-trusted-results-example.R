@@ -58,7 +58,8 @@ test_that("the three-area app fills the result panel only from the trusted tool"
   shiny::testServer(app, {
     expect_match(output$result$html, "No trusted result yet")
 
-    session$setInputs(chat_user_input = "Forecast for Oslo")
+    # shinychat delivers a list of contents, not a bare string.
+    session$setInputs(chat_user_input = list("Forecast for Oslo"))
     expect_null(result())
     expect_match(output$result$html, "No trusted result yet")
     expect_false(is.null(agent$pending_approval()))
@@ -73,6 +74,14 @@ test_that("the three-area app fills the result panel only from the trusted tool"
     expect_match(html, result()$result_id, fixed = TRUE)
     expect_no_match(html, "99 degrees", fixed = TRUE)
     expect_identical(fixture$requests(), 2L)
+    # The continuation finished instead of proposing another call.
+    expect_null(review$pending())
+    expect_identical(review$outcome()$result$stop_reason, "complete")
+    expect_match(
+      review$outcome()$result$response,
+      "Model commentary",
+      fixed = TRUE
+    )
 
     retained <- approval_dir
     session$close()

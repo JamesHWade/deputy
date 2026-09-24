@@ -43,9 +43,15 @@ proposed value, using \code{\link[=tool_input_review]{tool_input_review()}}. The
 fields, then approve or deny.
 
 Enum, string, number, integer, and boolean fields are editable. Arrays,
-undeclared fields, and other types are shown read-only. Approval with
+undeclared fields, and other types are shown read-only. Editors start at
+the proposed value; a missing optional field starts as "Not provided" and
+stays missing unless the reviewer sets it. Approval with
 edits resumes with the edited input, which the tool must validate. Approval
 without edits resumes with the original input. Deny executes nothing.
+
+This is the input review step of Will Landau and Sam Parmar's
+\href{https://trustedminiagents.dev/definition.html}{trusted mini-agent} pattern:
+a person checks the model-generated inputs before a trusted tool runs.
 
 The server registers a \code{Stop} hook on \code{agent}, so the review refreshes when
 a run suspends. Call it once per Agent, while no run is active.

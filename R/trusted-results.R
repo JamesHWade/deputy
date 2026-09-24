@@ -4,7 +4,9 @@ NULL
 #' Designate trusted tools as the only producers of host results
 #'
 #' @description
-#' A read-only S7 policy for [trusted mini-agents](https://trustedminiagents.dev).
+#' A read-only S7 policy implementing the trusted mini-agent pattern of Will
+#' Landau and Sam Parmar ([*Trusted Mini-Agents*](https://trustedminiagents.dev);
+#' see their [definition](https://trustedminiagents.dev/definition.html)).
 #' Each named result type is produced by exactly one registered local tool.
 #' When that tool returns successfully, Deputy delivers its value verbatim to
 #' the host through a `"trusted_result"` [AgentEvent], [result_trusted_results()],

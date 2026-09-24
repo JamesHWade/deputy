@@ -473,10 +473,17 @@ for the control-state contract.
 
 ## Trusted results
 
-A [trusted mini-agent](https://trustedminiagents.dev) never lets the model
-report a result. A designated tool produces it, the host shows it directly, and
-a person reviews the tool's inputs. `TrustedResults()` names the single tool
-that produces each kind of result:
+This section implements the trusted mini-agent pattern from
+[*Trusted Mini-Agents*](https://trustedminiagents.dev) by Will Landau and Sam
+Parmar. Their [definition](https://trustedminiagents.dev/definition.html) sets
+three rules. Trusted tools produce every result, and none comes from the model.
+Each kind of result comes from exactly one trusted tool, and nothing can bypass
+it. A human reviews the model-generated inputs to trusted tools. The aim, in
+their framing, is to change the user's question from "are these results
+correct?" to "is the agent solving the right problem?" Deputy's contribution is
+to enforce those rules in the runtime rather than by hand in each app.
+
+`TrustedResults()` names the single tool that produces each kind of result:
 
 ```{r, eval = FALSE}
 get_forecast <- ellmer::tool(
@@ -552,7 +559,9 @@ server <- function(input, output, session) {
 ```
 
 `inst/examples/trusted-results/` is a runnable app with a chat, a review card
-and a result card, following Landau's template. `inst/examples/trusted-mini-agent/`
+and a result card. It is adapted from Landau and Parmar's
+[R template](https://trustedminiagents.dev/r-template.html) and weather
+example. `inst/examples/trusted-mini-agent/`
 is a larger scientific workflow with delegation and a result receipt. See
 [ADR-0030](https://github.com/JamesHWade/deputy/blob/main/dev/adr/0030-trusted-result-channel.md)
 for the design.

@@ -5,8 +5,8 @@ Builds on ADR-0007 (tool registration) and ADR-0002 (shinychat as host).
 
 ## Context
 
-Will Landau's [trusted mini-agents](https://trustedminiagents.dev/definition.html)
-require that (1) trusted tools produce every result, (2) each kind of result
+Will Landau and Sam Parmar's
+[trusted mini-agents](https://trustedminiagents.dev/definition.html) require that (1) trusted tools produce every result, (2) each kind of result
 comes from exactly one tool that nothing can bypass, and (3) a human reviews
 the model-generated inputs. The recipe in `inst/examples/trusted-mini-agent/`
 (#170) enforced all three by hand: host closures held the receipt and a
@@ -51,7 +51,7 @@ the event is built.
   value nor the host's error text.
 - **Receipts are opt-in.** With `model_receipt = TRUE` the model receives a
   receipt naming the result ID and type instead of the value. The default
-  still sends the value, as Landau's examples do.
+  still sends the value, as the guide's examples do.
 - **Review gets types.** Permission callbacks and PreToolUse hooks receive
   `context$tool_arguments`, the registered tool's ellmer `TypeObject`.
   `tool_input_review()` turns an input and its declaration into a

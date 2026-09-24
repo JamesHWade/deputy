@@ -1,5 +1,9 @@
 # Trusted mini-agent: reviewed plant-weight analysis
 
+An application of the trusted mini-agent pattern from
+[*Trusted Mini-Agents*](https://trustedminiagents.dev) by Will Landau and Sam
+Parmar to a descriptive scientific computation.
+
 Run from a development checkout:
 
 ```r
@@ -96,5 +100,6 @@ unauthorized requests, duplicate decisions, cancellation, false model summaries,
 an attempted unregistered file-writing tool,
 partial failure after a completed effect, and observation without execution.
 
-See issue #154, ADR-0023, and
-<https://trustedminiagents.dev/definition.html> for the intended contract.
+See issue #154, ADR-0023, ADR-0030, and Landau and Parmar's
+[definition](https://trustedminiagents.dev/definition.html) for the intended
+contract.

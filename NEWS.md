@@ -1,7 +1,8 @@
 # deputy (development version)
 
-* `TrustedResults()` supports
-  [trusted mini-agents](https://trustedminiagents.dev) (#197). Pass it as
+* `TrustedResults()` implements the trusted mini-agent pattern from Will
+  Landau and Sam Parmar's
+  [*Trusted Mini-Agents*](https://trustedminiagents.dev) (#197). Pass it as
   `Agent$new(trusted_results = )` to name the single local tool that produces
   each kind of result. Its verbatim return value reaches the host as a
   `"trusted_result"` event, read with `result_trusted_results()`, and through
@@ -28,7 +29,7 @@
   deny. A host `decide` function can run the continuation elsewhere (#197).
 
 * `inst/examples/trusted-results/` is a three-area chat, review and results
-  app. Only the trusted forecast tool can fill the results panel (#197).
+  app, adapted from Landau and Parmar's R template and weather example. Only the trusted forecast tool can fill the results panel (#197).
 
 * `mcp_console_connection()` connects an Agent to one
   [MCP Console](https://github.com/t-kalinowski/mcp-console) server, a

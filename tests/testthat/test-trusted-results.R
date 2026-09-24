@@ -593,3 +593,37 @@ test_that("every definition in a trusted tree obeys the no-bypass rule", {
   expect_setequal(lead$available_sub_agents(), c("forecaster", "lister"))
   expect_error(lead$register_tool(tool_run_bash), "executes model-supplied")
 })
+
+test_that("skills can supply a child's trusted tool", {
+  forecast <- trusted_forecast_tool()
+  skill <- Skill("forecasting", tools = list(forecast))
+  definition <- AgentDefinition(
+    "forecaster",
+    "Produce forecasts",
+    "FORECASTER.",
+    skills = list(skill),
+    max_requests = 3L
+  )
+  policy <- TrustedResults(forecast = "get_forecast")
+  lead <- LeadAgent$new(
+    trusted_test_chat(),
+    sub_agents = list(definition),
+    trusted_results = policy
+  )
+  expect_identical(lead$available_sub_agents(), "forecaster")
+
+  # A skill directory is loaded only when the child is built, so the lead
+  # cannot prove the producer is missing and defers to the child's check.
+  deferred <- AgentDefinition(
+    "later",
+    "Produce forecasts later",
+    "LATER.",
+    skills = list(withr::local_tempdir()),
+    max_requests = 3L
+  )
+  expect_no_error(LeadAgent$new(
+    trusted_test_chat(),
+    sub_agents = list(deferred),
+    trusted_results = policy
+  ))
+})

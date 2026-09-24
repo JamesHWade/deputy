@@ -204,7 +204,7 @@ LeadAgent <- R6::R6Class(
         private$check_trusted_tools(private$.chat$get_tools()),
         error = function(error) {
           private$.sub_agent_defs[[definition$name]] <- NULL
-          stop(error)
+          rlang::cnd_signal(error)
         }
       )
 
@@ -671,20 +671,37 @@ LeadAgent <- R6::R6Class(
       if (is.null(policy)) {
         return(invisible(NULL))
       }
+      # Skill values declare their tools; skills named by path load only when
+      # the child is built, where the child's own registry check applies.
       definitions <- lapply(private$.sub_agent_defs, function(def) {
+        skill_tools <- unlist(
+          lapply(def$skills, function(skill) {
+            if (S7::S7_inherits(skill, Skill)) skill$tools else list()
+          }),
+          recursive = FALSE
+        )
         validate_tool_batch(private$filter_disallowed_tools(
-          def$tools,
+          c(def$tools, skill_tools),
           def$disallowed_tools
         ))
       })
+      deferred <- any(vapply(
+        private$.sub_agent_defs,
+        function(def) any(vapply(def$skills, is.character, logical(1))),
+        logical(1)
+      ))
       sources <- trusted_tree_sources(policy, c(list(tools), definitions))
       check_trusted_registry(
         policy,
         tools,
-        available = unique(c(
-          names(tools),
-          unlist(lapply(definitions, names), use.names = FALSE)
-        )),
+        available = if (deferred) {
+          policy@results
+        } else {
+          unique(c(
+            names(tools),
+            unlist(lapply(definitions, names), use.names = FALSE)
+          ))
+        },
         allow_delegation = TRUE,
         sources = sources
       )

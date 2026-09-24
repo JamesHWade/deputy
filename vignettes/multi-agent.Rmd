@@ -885,7 +885,9 @@ fixture service and needs no paid model credentials.
 
 ## A trusted scientific result
 
-The runnable `inst/examples/trusted-mini-agent` example delegates proposal
+The runnable `inst/examples/trusted-mini-agent` example applies Will Landau
+and Sam Parmar's [trusted mini-agent](https://trustedminiagents.dev) pattern
+to a scientific workflow. It delegates proposal
 writing to a specialist, then uses a separate host-owned Agent for durable
 approval and a fixed descriptive computation. The reviewer sees the dataset
 revision, groups, units and method, and can edit or deny the inputs. The
@@ -908,7 +910,9 @@ required.
 
 `LeadAgent$new(trusted_results = TrustedResults(...))` applies one
 [trusted-results policy](permissions.html#trusted-results) to the whole
-delegation tree. Every child inherits it, so each definition's tools must pass
+delegation tree. The policy implements Will Landau and Sam Parmar's
+[trusted mini-agent](https://trustedminiagents.dev) rules; delegation is
+Deputy's extension of them. Every child inherits it, so each definition's tools must pass
 the same no-bypass check: no code execution, no further delegation, and only
 read-only, closed-world tools unless exempted. A designated tool can live in a
 child, but it must be the same tool object wherever it appears. When a child

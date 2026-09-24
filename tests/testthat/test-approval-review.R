@@ -141,3 +141,53 @@ test_that("unchanged approval passes no edit and errors are reported", {
     "must be a deputy Agent"
   )
 })
+
+test_that("untouched approval never fills missing or out-of-range fields", {
+  skip_if_not_installed("shiny")
+  directory <- withr::local_tempdir()
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "configure", arguments = list(mode = "turbo")),
+    runtime_reply("ok")
+  ))
+  seen <- NULL
+  configure <- ellmer::tool(
+    fun = function(mode, units = NULL, verbose = NULL) {
+      seen <<- list(mode = mode, units = units, verbose = verbose)
+      "configured"
+    },
+    name = "configure",
+    description = "Configure.",
+    arguments = list(
+      mode = ellmer::type_enum(c("fast", "slow")),
+      units = ellmer::type_enum(c("c", "f"), required = FALSE),
+      verbose = ellmer::type_boolean(required = FALSE)
+    ),
+    convert = FALSE,
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = list(configure),
+    working_dir = directory,
+    approval_dir = directory,
+    permissions = Permissions(
+      can_use_tool = function(tool_name, tool_input, context) {
+        PermissionResultPending("Review.")
+      }
+    )
+  )
+  agent$run_sync("Configure")
+  shiny::testServer(approval_review_server, args = list(agent = agent), {
+    html <- output$review$html
+    expect_match(html, "Not provided", fixed = TRUE)
+    expect_match(html, "turbo", fixed = TRUE)
+    # Shiny reports each editor's initial selection.
+    session$setInputs(field_1 = "turbo", field_2 = "", field_3 = "")
+    session$setInputs(approve = 1)
+    expect_null(outcome()$tool_input)
+  })
+  expect_identical(seen, list(mode = "turbo", units = NULL, verbose = NULL))
+})

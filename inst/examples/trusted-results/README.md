@@ -1,7 +1,13 @@
 # Trusted forecast: chat, review, result
 
-A three-area app following Will Landau's
-[trusted mini-agent template](https://trustedminiagents.dev/r-template.html):
+A three-area app implementing the trusted mini-agent pattern from
+[*Trusted Mini-Agents*](https://trustedminiagents.dev) by Will Landau and Sam
+Parmar. The layout and the forecast task are adapted from their
+[R template](https://trustedminiagents.dev/r-template.html) and
+[weather example](https://trustedminiagents.dev/r-weather.html). Their
+versions enforce the rules by hand in plain ellmer, shinychat and bslib. This
+one uses Deputy's `TrustedResults()` and `approval_review_ui()` for the same
+guarantees.
 
 1. **Chat.** Model text. It is commentary, never a result.
 2. **Review.** `approval_review_ui()` shows the inputs the model proposed for
@@ -54,4 +60,10 @@ with `shiny::ExtendedTask`, so one session does not block others.
 devtools::test(filter = "trusted-results-example")
 ```
 
-See ADR-0030 and <https://trustedminiagents.dev/definition.html>.
+## Credit
+
+The trusted mini-agent definition, the three-area layout and the idea of
+replacing "are these results correct?" with "is the agent solving the right
+problem?" come from Will Landau and Sam Parmar's
+[*Trusted Mini-Agents*](https://trustedminiagents.dev). Deputy contributes
+the runtime enforcement. See also ADR-0030.

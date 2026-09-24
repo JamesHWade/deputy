@@ -73,8 +73,12 @@ forecast_fixture <- function() {
             rawToChar(req$rook.input$read()),
             simplifyVector = FALSE
           )
-          last <- body$messages[[length(body$messages)]]
-          response <- if (identical(last$role, "tool")) {
+          has_result <- any(vapply(
+            body$messages,
+            function(x) identical(x$role, "tool"),
+            logical(1)
+          ))
+          response <- if (has_result) {
             reply(paste(
               "Model commentary, not a result: Oslo will reach 99 degrees.",
               "The forecast panel shows the tool's actual output."

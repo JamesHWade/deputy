@@ -9,9 +9,15 @@
 #' fields, then approve or deny.
 #'
 #' Enum, string, number, integer, and boolean fields are editable. Arrays,
-#' undeclared fields, and other types are shown read-only. Approval with
+#' undeclared fields, and other types are shown read-only. Editors start at
+#' the proposed value; a missing optional field starts as "Not provided" and
+#' stays missing unless the reviewer sets it. Approval with
 #' edits resumes with the edited input, which the tool must validate. Approval
 #' without edits resumes with the original input. Deny executes nothing.
+#'
+#' This is the input review step of Will Landau and Sam Parmar's
+#' [trusted mini-agent](https://trustedminiagents.dev/definition.html) pattern:
+#' a person checks the model-generated inputs before a trusted tool runs.
 #'
 #' The server registers a `Stop` hook on `agent`, so the review refreshes when
 #' a run suspends. Call it once per Agent, while no run is active.
@@ -147,22 +153,24 @@ approval_review_server <- function(
             )
           )
         })
+        reason <- current$record$request$reason
         shiny::tagList(
           shiny::tags$p(
-            shiny::tags$strong(current$tool_name),
-            if (is_nonempty_string(current$record$request$reason)) {
-              paste0(": ", current$record$request$reason)
-            }
+            shiny::tags$strong(current$tool_name, .noWS = "after"),
+            if (is_nonempty_string(reason)) paste0(": ", reason)
           ),
-          shiny::tags$table(
-            class = "table table-sm",
-            shiny::tags$thead(shiny::tags$tr(
-              shiny::tags$th(scope = "col", "Argument"),
-              shiny::tags$th(scope = "col", "Type"),
-              shiny::tags$th(scope = "col", "Value"),
-              shiny::tags$th(scope = "col", "Description")
-            )),
-            shiny::tags$tbody(rows)
+          shiny::tags$div(
+            class = "table-responsive",
+            shiny::tags$table(
+              class = "table table-sm align-middle",
+              shiny::tags$thead(shiny::tags$tr(
+                shiny::tags$th(scope = "col", "Argument"),
+                shiny::tags$th(scope = "col", "Type"),
+                shiny::tags$th(scope = "col", "Value"),
+                shiny::tags$th(scope = "col", "Description")
+              )),
+              shiny::tags$tbody(rows)
+            )
           ),
           shiny::actionButton(
             ns("approve"),
@@ -260,27 +268,43 @@ approval_review_kind <- function(type) {
   NULL
 }
 
+# Editors start at the proposed value. A missing field starts empty, and an
+# out-of-range enum value stays selectable, so approving without edits never
+# substitutes a value the reviewer did not choose.
 approval_review_editor <- function(ns, index, row, type) {
   id <- ns(paste0("field_", index))
   value <- row$value
-  label <- paste("Value for", row$argument)
+  missing <- is.na(value)
+  label <- shiny::tags$span(
+    class = "visually-hidden",
+    paste("Value for", row$argument)
+  )
+  choices <- function(values) {
+    values <- unique(c(if (!missing) value, values))
+    if (missing) c("Not provided" = "", values) else values
+  }
   switch(
     approval_review_kind(type) %||% "readonly",
     enum = shiny::selectInput(
       id,
       label,
-      choices = type@values,
-      selected = if (is.na(value)) NULL else value
+      choices = choices(type@values),
+      selected = if (missing) "" else value
     ),
-    string = shiny::textInput(id, label, if (is.na(value)) "" else value),
+    boolean = shiny::selectInput(
+      id,
+      label,
+      choices = choices(c("true", "false")),
+      selected = if (missing) "" else value
+    ),
+    string = shiny::textInput(id, label, if (missing) "" else value),
     number = ,
     integer = shiny::numericInput(
       id,
       label,
-      if (is.na(value)) NA else as.numeric(value)
+      if (missing) NA else as.numeric(value)
     ),
-    boolean = shiny::checkboxInput(id, label, identical(value, "true")),
-    shiny::tags$code(if (is.na(value)) "(missing)" else value)
+    shiny::tags$code(if (missing) "(missing)" else value)
   )
 }
 
@@ -289,7 +313,7 @@ approval_review_coerce <- function(value, type) {
     approval_review_kind(type),
     integer = as.integer(value),
     number = as.numeric(value),
-    boolean = isTRUE(value),
+    boolean = identical(value, "true"),
     value
   )
 }

@@ -13,6 +13,15 @@ ui <- page_fluid(
     "Local deterministic demonstration with a synthetic forecast table. No paid model calls.",
     class = "text-muted"
   ),
+  tags$p(
+    "Pattern from ",
+    tags$a(
+      href = "https://trustedminiagents.dev",
+      tags$em("Trusted Mini-Agents")
+    ),
+    " by Will Landau and Sam Parmar.",
+    class = "text-muted small"
+  ),
   layout_columns(
     col_widths = c(4, 4, 4),
     card(
@@ -53,9 +62,18 @@ server <- function(input, output, session) {
     }
   }
 
+  # shinychat sends the message as text plus any attachment contents. This
+  # example uses only the text.
+  user_text <- function(value) {
+    if (is.list(value) && !is.null(value$text)) {
+      return(value$text)
+    }
+    paste(unlist(Filter(is.character, as.list(value))), collapse = "\n")
+  }
+
   # Runs block this R process; see the README for running them elsewhere.
   observeEvent(input$chat_user_input, {
-    run <- agent$run_sync(input$chat_user_input)
+    run <- agent$run_sync(user_text(input$chat_user_input))
     if (!is.null(agent$pending_approval())) {
       say("I proposed a forecast request. Review its inputs to continue.")
     } else {
@@ -63,7 +81,7 @@ server <- function(input, output, session) {
     }
   })
 
-  deputy::approval_review_server(
+  review <- deputy::approval_review_server(
     "review",
     agent,
     decide = function(path, decision, tool_input) {

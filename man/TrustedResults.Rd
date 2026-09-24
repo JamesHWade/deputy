@@ -35,7 +35,9 @@ Defaults to \code{FALSE}, which sends the model the same value as the host.}
 A read-only \code{TrustedResults} S7 value.
 }
 \description{
-A read-only S7 policy for \href{https://trustedminiagents.dev}{trusted mini-agents}.
+A read-only S7 policy implementing the trusted mini-agent pattern of Will
+Landau and Sam Parmar (\href{https://trustedminiagents.dev}{\emph{Trusted Mini-Agents}};
+see their \href{https://trustedminiagents.dev/definition.html}{definition}).
 Each named result type is produced by exactly one registered local tool.
 When that tool returns successfully, Deputy delivers its value verbatim to
 the host through a \code{"trusted_result"} \link{AgentEvent}, \code{\link[=result_trusted_results]{result_trusted_results()}},
@@ -65,8 +67,15 @@ cannot produce a trusted kind of result. MCP, provider-native, code-execution,
 and delegation tools cannot be exempted. The policy is fixed at construction;
 it constrains which tools may be registered alongside trusted ones and does
 not grant permission to call any tool. Permissions, hooks, and durable
-approvals still govern every call. LeadAgent delegation is rejected because
-child text reaches the lead model; run trusted tools in a separate Agent.
+approvals still govern every call.
+
+A \link{LeadAgent} accepts the policy for its whole delegation tree. Its own
+\code{delegate_to_agent} tool is allowed because every child inherits the policy:
+each definition's tools must pass the same check, and a designated tool may
+live in the lead or in children but must be the same tool everywhere. Child
+trusted results are recorded in the lead's run and delivered to its
+\code{on_result}, with the child's correlation fields. Graph routes and other
+composition tools are still rejected.
 
 A trusted tool runs only as the tool of the Agent's own governed request, so
 permissions, hooks, and approvals always precede it. Calls from host code or
