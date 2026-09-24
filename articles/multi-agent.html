@@ -1160,13 +1160,15 @@ service and needs no paid model credentials.</p>
 <h2 id="a-trusted-scientific-result">A trusted scientific result<a class="anchor" aria-label="anchor" href="#a-trusted-scientific-result"></a>
 </h2>
 <p>The runnable <code>inst/examples/trusted-mini-agent</code> example
-delegates proposal writing to a specialist, then uses a separate
-host-owned Agent for durable approval and a fixed descriptive
-computation. The reviewer sees the dataset revision, groups, units and
-method, and can edit or deny the inputs. The computed result panel reads
-only the designated tool’s host receipt; deliberately false model
-commentary cannot replace it. The example uses clearly synthetic plant
-weights and a local deterministic provider, with no paid calls.</p>
+applies Will Landau and Sam Parmar’s <a href="https://trustedminiagents.dev" class="external-link">trusted mini-agent</a> pattern to a
+scientific workflow. It delegates proposal writing to a specialist, then
+uses a separate host-owned Agent for durable approval and a fixed
+descriptive computation. The reviewer sees the dataset revision, groups,
+units and method, and can edit or deny the inputs. The computed result
+panel reads only the designated tool’s host receipt; deliberately false
+model commentary cannot replace it. The example uses clearly synthetic
+plant weights and a local deterministic provider, with no paid
+calls.</p>
 <p><code>r eval=FALSE shiny::runApp(system.file("examples", "trusted-mini-agent", package = "deputy"))</code></p>
 <p>The explicit handoff is necessary because delegated child approval
 continuation is not yet supported. The receipt keeps the source child
@@ -1174,6 +1176,29 @@ delegation separate from the execution Agent. Reading a child remains
 observational. This example demonstrates the execution and output
 contract, not scientific correctness or model quality; trusted code,
 appropriate inputs and effective review are still required.</p>
+<div class="section level3">
+<h3 id="trusted-results-across-delegation">Trusted results across delegation<a class="anchor" aria-label="anchor" href="#trusted-results-across-delegation"></a>
+</h3>
+<p><code>LeadAgent$new(trusted_results = TrustedResults(...))</code>
+applies one <a href="permissions.html#trusted-results">trusted-results
+policy</a> to the whole delegation tree. The policy implements Will
+Landau and Sam Parmar’s <a href="https://trustedminiagents.dev" class="external-link">trusted
+mini-agent</a> rules; delegation is Deputy’s extension of them. Every
+child inherits it, so each definition’s tools must pass the same
+no-bypass check: no code execution, no further delegation, and only
+read-only, closed-world tools unless exempted. A designated tool can
+live in a child, but it must be the same tool object wherever it
+appears, declared in the definition’s <code>tools</code> or in a
+<code>Skill</code> value rather than a skill directory. When a child
+runs it, the result is recorded in the lead’s run and sent to the lead’s
+<code>on_result</code>, carrying the child’s
+<code>delegation_id</code>:</p>
+<p><code>r eval=FALSE forecast &lt;- get_forecast_tool() lead &lt;- LeadAgent$new(   chat = ellmer::chat("openai/gpt-5.6-luna"),   sub_agents = list(agent_definition(     "forecaster",     "Produce forecasts",     "Call get_forecast.",     tools = list(forecast)   )),   trusted_results = TrustedResults(     forecast = "get_forecast",     on_result = function(event) show_forecast(event$value)   ) )</code></p>
+<p>Definitions that break the rule are rejected by
+<code>register_sub_agent()</code> and at construction. Children cannot
+suspend for durable approval, so input review of a child’s trusted tool
+still needs the separate executor pattern above.</p>
+</div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

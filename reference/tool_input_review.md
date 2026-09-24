@@ -36,7 +36,9 @@ tool_input_review(tool_input, tool_arguments = NULL)
 A data frame with character columns `argument`, `type`, `description`,
 and `value`, and logical columns `required` and `declared`. Undeclared
 input fields are kept with `declared = FALSE`; declared fields missing
-from the input have value `NA`.
+from the input have value `NA`. Argument names are paths joined with
+dots for display; the `"paths"` attribute holds each row's path as a
+character vector, which stays exact when a name itself contains a dot.
 
 ## Examples
 

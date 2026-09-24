@@ -961,14 +961,16 @@ model credentials.
 
 ## A trusted scientific result
 
-The runnable `inst/examples/trusted-mini-agent` example delegates
-proposal writing to a specialist, then uses a separate host-owned Agent
-for durable approval and a fixed descriptive computation. The reviewer
-sees the dataset revision, groups, units and method, and can edit or
-deny the inputs. The computed result panel reads only the designated
-tool’s host receipt; deliberately false model commentary cannot replace
-it. The example uses clearly synthetic plant weights and a local
-deterministic provider, with no paid calls.
+The runnable `inst/examples/trusted-mini-agent` example applies Will
+Landau and Sam Parmar’s [trusted
+mini-agent](https://trustedminiagents.dev) pattern to a scientific
+workflow. It delegates proposal writing to a specialist, then uses a
+separate host-owned Agent for durable approval and a fixed descriptive
+computation. The reviewer sees the dataset revision, groups, units and
+method, and can edit or deny the inputs. The computed result panel reads
+only the designated tool’s host receipt; deliberately false model
+commentary cannot replace it. The example uses clearly synthetic plant
+weights and a local deterministic provider, with no paid calls.
 
 `r eval=FALSE shiny::runApp(system.file("examples", "trusted-mini-agent", package = "deputy"))`
 
@@ -978,3 +980,26 @@ delegation separate from the execution Agent. Reading a child remains
 observational. This example demonstrates the execution and output
 contract, not scientific correctness or model quality; trusted code,
 appropriate inputs and effective review are still required.
+
+### Trusted results across delegation
+
+`LeadAgent$new(trusted_results = TrustedResults(...))` applies one
+[trusted-results
+policy](https://jameshwade.github.io/deputy/articles/permissions.html#trusted-results)
+to the whole delegation tree. The policy implements Will Landau and Sam
+Parmar’s [trusted mini-agent](https://trustedminiagents.dev) rules;
+delegation is Deputy’s extension of them. Every child inherits it, so
+each definition’s tools must pass the same no-bypass check: no code
+execution, no further delegation, and only read-only, closed-world tools
+unless exempted. A designated tool can live in a child, but it must be
+the same tool object wherever it appears, declared in the definition’s
+`tools` or in a `Skill` value rather than a skill directory. When a
+child runs it, the result is recorded in the lead’s run and sent to the
+lead’s `on_result`, carrying the child’s `delegation_id`:
+
+`r eval=FALSE forecast <- get_forecast_tool() lead <- LeadAgent$new( chat = ellmer::chat("openai/gpt-5.6-luna"), sub_agents = list(agent_definition( "forecaster", "Produce forecasts", "Call get_forecast.", tools = list(forecast) )), trusted_results = TrustedResults( forecast = "get_forecast", on_result = function(event) show_forecast(event$value) ) )`
+
+Definitions that break the rule are rejected by `register_sub_agent()`
+and at construction. Children cannot suspend for durable approval, so
+input review of a child’s trusted tool still needs the separate executor
+pattern above.

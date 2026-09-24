@@ -515,9 +515,18 @@ for the control-state contract.
 
 ## Trusted results
 
-A [trusted mini-agent](https://trustedminiagents.dev) never lets the
-model report a result. A designated tool produces it, the host shows it
-directly, and a person reviews the tool’s inputs.
+This section implements the trusted mini-agent pattern from [*Trusted
+Mini-Agents*](https://trustedminiagents.dev) by Will Landau and Sam
+Parmar. Their
+[definition](https://trustedminiagents.dev/definition.html) sets three
+rules. Trusted tools produce every result, and none comes from the
+model. Each kind of result comes from exactly one trusted tool, and
+nothing can bypass it. A human reviews the model-generated inputs to
+trusted tools. The aim, in their framing, is to change the user’s
+question from “are these results correct?” to “is the agent solving the
+right problem?” Deputy’s contribution is to enforce those rules in the
+runtime rather than by hand in each app.
+
 [`TrustedResults()`](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
 names the single tool that produces each kind of result:
 
@@ -560,9 +569,13 @@ a tool error instead of the value.
 The Agent checks its whole tool registry each time tools are registered.
 Code execution tools (`run_r_code`, `run_bash`, R sessions) and
 delegation tools could produce any result, so they are always rejected.
-Any other tool must be annotated read-only and closed-world, or be a
-local function tool the host names in `exempt_tools`. Unannotated tools
-use the conservative defaults and are rejected. The policy is fixed at
+The one exception is a `LeadAgent`’s own delegation tool: with
+`LeadAgent$new(trusted_results = )`, every child inherits the policy and
+each definition’s tools must pass the same check. The trusted tool may
+live in a child, and its results still reach the lead’s `on_result`. Any
+other tool must be annotated read-only and closed-world, or be a local
+function tool the host names in `exempt_tools`. Unannotated tools use
+the conservative defaults and are rejected. The policy is fixed at
 construction. It limits which tools may sit beside the trusted ones; it
 does not grant permission to call anything.
 
@@ -585,7 +598,24 @@ permissions <- Permissions(can_use_tool = function(tool_name, tool_input, contex
 
 Combined with `approval_dir`, the host can approve, deny or edit the
 inputs through `$resume_approval()`. The trusted tool then runs with the
-reviewed arguments. `inst/examples/trusted-mini-agent/` is a complete
-Shiny example with proposal, review and result panels. See
+reviewed arguments. In Shiny,
+[`approval_review_ui()`](https://jameshwade.github.io/deputy/reference/approval_review_ui.md)
+and
+[`approval_review_server()`](https://jameshwade.github.io/deputy/reference/approval_review_ui.md)
+render that review as a table with editors and Approve and Deny buttons:
+
+``` r
+
+ui <- bslib::page_fluid(approval_review_ui("review"))
+server <- function(input, output, session) {
+  review <- approval_review_server("review", agent)
+}
+```
+
+`inst/examples/trusted-results/` is a runnable app with a chat, a review
+card and a result card. It is adapted from Landau and Parmar’s [R
+template](https://trustedminiagents.dev/r-template.html) and weather
+example. `inst/examples/trusted-mini-agent/` is a larger scientific
+workflow with delegation and a result receipt. See
 [ADR-0030](https://github.com/JamesHWade/deputy/blob/main/dev/adr/0030-trusted-result-channel.md)
 for the design.

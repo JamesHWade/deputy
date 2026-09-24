@@ -271,6 +271,9 @@ Control what agents can do
   : Durable approval inspection value
 - [`approval_read()`](https://jameshwade.github.io/deputy/reference/approval_read.md)
   : Inspect a durable approval continuation
+- [`approval_review_ui()`](https://jameshwade.github.io/deputy/reference/approval_review_ui.md)
+  [`approval_review_server()`](https://jameshwade.github.io/deputy/reference/approval_review_ui.md)
+  : Review a pending tool call in Shiny
 - [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md)
   : Create a standard permission policy
 - [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md)

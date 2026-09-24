@@ -106,7 +106,9 @@ declaration is available.</p></dd>
     <p>A data frame with character columns <code>argument</code>, <code>type</code>,
 <code>description</code>, and <code>value</code>, and logical columns <code>required</code> and <code>declared</code>.
 Undeclared input fields are kept with <code>declared = FALSE</code>; declared fields
-missing from the input have value <code>NA</code>.</p>
+missing from the input have value <code>NA</code>. Argument names are paths joined
+with dots for display; the <code>"paths"</code> attribute holds each row's path as a
+character vector, which stays exact when a name itself contains a dot.</p>
     </div>
 
     <div class="section level2">

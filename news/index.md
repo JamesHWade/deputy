@@ -3,7 +3,8 @@
 ## deputy (development version)
 
 - [`TrustedResults()`](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
-  supports [trusted mini-agents](https://trustedminiagents.dev)
+  implements the trusted mini-agent pattern from Will Landau and Sam
+  Parmar’s [*Trusted Mini-Agents*](https://trustedminiagents.dev)
   ([\#197](https://github.com/JamesHWade/deputy/issues/197)). Pass it as
   `Agent$new(trusted_results = )` to name the single local tool that
   produces each kind of result. Its verbatim return value reaches the
@@ -22,6 +23,27 @@
   turns a proposed input into a per-field table of type, description,
   and value. The approval-gates recipe now uses it instead of
   [`dput()`](https://rdrr.io/r/base/dput.html)
+  ([\#197](https://github.com/JamesHWade/deputy/issues/197)).
+
+- `LeadAgent$new(trusted_results = )` applies a trusted-results policy
+  to the whole delegation tree. Every child inherits it, each
+  definition’s tools must pass the no-bypass check, and a designated
+  tool must be the same tool wherever it appears. Child trusted results
+  reach the lead’s `on_result` and run events
+  ([\#197](https://github.com/JamesHWade/deputy/issues/197)).
+
+- [`approval_review_ui()`](https://jameshwade.github.io/deputy/reference/approval_review_ui.md)
+  and
+  [`approval_review_server()`](https://jameshwade.github.io/deputy/reference/approval_review_ui.md)
+  are a Shiny module for reviewing a pending durable approval. They show
+  each argument’s type, description and value, let the reviewer edit
+  simple fields, and approve or deny. A host `decide` function can run
+  the continuation elsewhere
+  ([\#197](https://github.com/JamesHWade/deputy/issues/197)).
+
+- `inst/examples/trusted-results/` is a three-area chat, review and
+  results app, adapted from Landau and Parmar’s R template and weather
+  example. Only the trusted forecast tool can fill the results panel
   ([\#197](https://github.com/JamesHWade/deputy/issues/197)).
 
 - [`mcp_console_connection()`](https://jameshwade.github.io/deputy/reference/mcp_console_connection.md)

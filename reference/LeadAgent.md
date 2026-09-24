@@ -139,7 +139,8 @@ Create a new LeadAgent.
       delegation_policy = DelegationPolicy(),
       delegation_disclosure = DelegationDisclosure(),
       delegation_observation = DelegationObservation(),
-      approval_dir = NULL
+      approval_dir = NULL,
+      trusted_results = NULL
     )
 
 #### Arguments
@@ -268,6 +269,16 @@ Create a new LeadAgent.
 
   Optional standalone lead approval directory. Delegation rejects this
   unsupported durable child-continuation combination.
+
+- `trusted_results`:
+
+  Optional
+  [TrustedResults](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+  policy for the whole delegation tree. Every child inherits it, so each
+  definition's tools must pass the same no-bypass check. A designated
+  tool may live in the lead or in children, but must be the same tool
+  everywhere. Child trusted results are recorded in the lead's run and
+  sent to its `on_result`.
 
 #### Returns
 

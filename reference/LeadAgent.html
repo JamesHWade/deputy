@@ -186,7 +186,8 @@ sub-agents based on registered AgentDefinitions.</p>
 <span>  delegation_policy <span class="op">=</span> <span class="fu"><a href="../reference/DelegationPolicy.html">DelegationPolicy</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  delegation_disclosure <span class="op">=</span> <span class="fu"><a href="../reference/DelegationDisclosure.html">DelegationDisclosure</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  delegation_observation <span class="op">=</span> <span class="fu"><a href="../reference/DelegationObservation.html">DelegationObservation</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  approval_dir <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  approval_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  trusted_results <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h4>
@@ -283,6 +284,14 @@ transient child activity stream.</p></dd>
       <dt><code>approval_dir</code></dt>
 <dd><p>Optional standalone lead approval directory. Delegation
 rejects this unsupported durable child-continuation combination.</p></dd>
+
+      <dt><code>trusted_results</code></dt>
+<dd><p>Optional <a href="TrustedResults.html">TrustedResults</a> policy for the whole
+delegation tree. Every child inherits it, so each definition's tools
+must pass the same no-bypass check. A designated tool may live in the
+lead or in children, but must be the same tool everywhere. Child
+trusted results are recorded in the lead's run and sent to its
+<code>on_result</code>.</p></dd>
 
 
 </dl><p></p></div>

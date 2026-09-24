@@ -1,10 +1,12 @@
 # Designate trusted tools as the only producers of host results
 
-A read-only S7 policy for [trusted
-mini-agents](https://trustedminiagents.dev). Each named result type is
-produced by exactly one registered local tool. When that tool returns
-successfully, Deputy delivers its value verbatim to the host through a
-`"trusted_result"`
+A read-only S7 policy implementing the trusted mini-agent pattern of
+Will Landau and Sam Parmar ([*Trusted
+Mini-Agents*](https://trustedminiagents.dev); see their
+[definition](https://trustedminiagents.dev/definition.html)). Each named
+result type is produced by exactly one registered local tool. When that
+tool returns successfully, Deputy delivers its value verbatim to the
+host through a `"trusted_result"`
 [AgentEvent](https://jameshwade.github.io/deputy/reference/AgentEvent.md),
 [`result_trusted_results()`](https://jameshwade.github.io/deputy/reference/result_trusted_results.md),
 and the optional `on_result` callback. The value does not have to pass
@@ -37,8 +39,20 @@ code-execution, and delegation tools cannot be exempted. The policy is
 fixed at construction; it constrains which tools may be registered
 alongside trusted ones and does not grant permission to call any tool.
 Permissions, hooks, and durable approvals still govern every call.
-LeadAgent delegation is rejected because child text reaches the lead
-model; run trusted tools in a separate Agent.
+
+A
+[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
+accepts the policy for its whole delegation tree. Its own
+`delegate_to_agent` tool is allowed because every child inherits the
+policy: each definition's tools must pass the same check, and a
+designated tool may live in the lead or in children but must be the same
+tool everywhere. A child's designated tool must be declared in its
+definition's `tools` or in
+[Skill](https://jameshwade.github.io/deputy/reference/Skill.md) values;
+skill directories load when the child is built and cannot supply one.
+Child trusted results are recorded in the lead's run and delivered to
+its `on_result`, with the child's correlation fields. Graph routes and
+other composition tools are still rejected.
 
 A trusted tool runs only as the tool of the Agent's own governed
 request, so permissions, hooks, and approvals always precede it. Calls
