@@ -333,7 +333,7 @@ graph_route_install <- function(tree, source_name, source, route_name, spec) {
   attr(adapted, "deputy_graph_route_tree") <- tree
   tools <- private$.chat$get_tools()
   tools[[route_name]] <- adapted
-  check_trusted_registry(private$.trusted_results, tools)
+  private$check_trusted_tools(tools)
   private$.chat$set_tools(tools)
   tree$route_names[[source_name]] <- c(
     tree$route_names[[source_name]] %||% character(),

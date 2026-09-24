@@ -79,6 +79,8 @@ test_that("public API is deliberate", {
     "tool_list_files",
     "tool_metadata",
     "tool_input_review",
+    "approval_review_ui",
+    "approval_review_server",
     "tool_glob_files",
     "tool_grep_files",
     "tool_run_r_code",

@@ -18,7 +18,9 @@ declaration is available.}
 A data frame with character columns \code{argument}, \code{type},
 \code{description}, and \code{value}, and logical columns \code{required} and \code{declared}.
 Undeclared input fields are kept with \code{declared = FALSE}; declared fields
-missing from the input have value \code{NA}.
+missing from the input have value \code{NA}. Argument names are paths joined
+with dots for display; the \code{"paths"} attribute holds each row's path as a
+character vector, which stays exact when a name itself contains a dot.
 }
 \description{
 Builds a data frame with one row per argument field, pairing the model's

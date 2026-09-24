@@ -124,6 +124,7 @@ reference:
   - PermissionResultPending
   - ApprovalContinuation
   - approval_read
+  - approval_review_ui
   - permissions_standard
   - permissions_readonly
   - permissions_plan

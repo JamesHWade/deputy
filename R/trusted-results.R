@@ -4,7 +4,9 @@ NULL
 #' Designate trusted tools as the only producers of host results
 #'
 #' @description
-#' A read-only S7 policy for [trusted mini-agents](https://trustedminiagents.dev).
+#' A read-only S7 policy implementing the trusted mini-agent pattern of Will
+#' Landau and Sam Parmar ([*Trusted Mini-Agents*](https://trustedminiagents.dev);
+#' see their [definition](https://trustedminiagents.dev/definition.html)).
 #' Each named result type is produced by exactly one registered local tool.
 #' When that tool returns successfully, Deputy delivers its value verbatim to
 #' the host through a `"trusted_result"` [AgentEvent], [result_trusted_results()],
@@ -33,8 +35,18 @@ NULL
 #' and delegation tools cannot be exempted. The policy is fixed at construction;
 #' it constrains which tools may be registered alongside trusted ones and does
 #' not grant permission to call any tool. Permissions, hooks, and durable
-#' approvals still govern every call. LeadAgent delegation is rejected because
-#' child text reaches the lead model; run trusted tools in a separate Agent.
+#' approvals still govern every call.
+#'
+#' A [LeadAgent] accepts the policy for its whole delegation tree. Its own
+#' `delegate_to_agent` tool is allowed because every child inherits the policy:
+#' each definition's tools must pass the same check, and a designated tool may
+#' live in the lead or in children but must be the same tool everywhere. A
+#' child's designated tool must be declared in its definition's `tools` or in
+#' [Skill] values; skill directories load when the child is built and cannot
+#' supply one. Child
+#' trusted results are recorded in the lead's run and delivered to its
+#' `on_result`, with the child's correlation fields. Graph routes and other
+#' composition tools are still rejected.
 #'
 #' A trusted tool runs only as the tool of the Agent's own governed request, so
 #' permissions, hooks, and approvals always precede it. Calls from host code or
@@ -225,12 +237,46 @@ trusted_registry_abort <- function(
   )
 }
 
+trusted_tool_source <- function(tool) {
+  attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+}
+
+# Each designated name must refer to one executable across a delegation tree,
+# so a result type keeps exactly one producer. Returns the sources by name.
+trusted_tree_sources <- function(policy, registries) {
+  sources <- list()
+  for (tools in registries) {
+    for (name in intersect(names(tools), policy@results)) {
+      source <- trusted_tool_source(tools[[name]])
+      if (is.null(sources[[name]])) {
+        sources[[name]] <- source
+      } else if (!identical(sources[[name]], source)) {
+        trusted_registry_abort(
+          "Trusted tool {.val {name}} must be the same tool everywhere in the delegation tree.",
+          tool_name = name
+        )
+      }
+    }
+  }
+  sources
+}
+
 # Validate a complete registry (named list of ellmer tools) against the policy.
-check_trusted_registry <- function(policy, tools) {
+# `available` names the designated tools reachable elsewhere in the same tree;
+# `allow_delegation` admits only a LeadAgent's own delegate tool, whose
+# children inherit the policy; `sources` pins designated names to one tool.
+check_trusted_registry <- function(
+  policy,
+  tools,
+  available = names(tools),
+  allow_delegation = FALSE,
+  sources = NULL,
+  require_source = FALSE
+) {
   if (is.null(policy)) {
     return(invisible(NULL))
   }
-  missing <- setdiff(policy@results, names(tools))
+  missing <- setdiff(policy@results, available)
   if (length(missing) > 0L) {
     trusted_registry_abort(
       "Trusted tool {.val {missing}} must remain registered.",
@@ -247,12 +293,41 @@ check_trusted_registry <- function(policy, tools) {
     }
     trusted_type <- trusted_result_type(policy, name)
     native <- inherits(tool, "ellmer::ToolBuiltIn")
+    if (
+      !native &&
+        isTRUE(allow_delegation) &&
+        is.null(trusted_type) &&
+        isTRUE(attr(
+          trusted_tool_source(tool),
+          "deputy_delegation_tool",
+          exact = TRUE
+        )) &&
+        is.null(composition_tool_owner(tool)) &&
+        is.null(attr(tool, "deputy_graph_route_tree", exact = TRUE))
+    ) {
+      next
+    }
     source_type <- if (native) "provider" else tool_metadata(tool)$source$type
     bypass <- if (native) NULL else trusted_bypass_reason(tool)
     if (!is.null(trusted_type)) {
       if (!is.null(bypass) || !source_type %in% c("function", "package")) {
         trusted_registry_abort(
           "Trusted tool {.val {name}} for {.val {trusted_type}} must be a local function tool that neither executes code nor delegates.",
+          tool_name = name
+        )
+      }
+      if (isTRUE(require_source) && is.null(sources[[name]])) {
+        trusted_registry_abort(
+          "Trusted tool {.val {name}} must be declared in an AgentDefinition's tools or Skill values, not loaded from a skill directory.",
+          tool_name = name
+        )
+      }
+      if (
+        !is.null(sources[[name]]) &&
+          !identical(sources[[name]], trusted_tool_source(tool))
+      ) {
+        trusted_registry_abort(
+          "Trusted tool {.val {name}} must be the same tool everywhere in the delegation tree.",
           tool_name = name
         )
       }

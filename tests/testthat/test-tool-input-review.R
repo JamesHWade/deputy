@@ -30,6 +30,9 @@ test_that("tool_input_review pairs values with declared types", {
     c("trt2", "g", NA, "[\"Oslo\",\"Lima\"]", "true")
   )
   expect_identical(review$description[[1L]], "Treatment group")
+  expect_identical(attr(review, "paths")[[1L]], c("plan", "treatment"))
+  dotted <- tool_input_review(list(postal.code = "0150"))
+  expect_identical(attr(dotted, "paths"), list("postal.code"))
 })
 
 test_that("tool_input_review works without a declaration and validates input", {

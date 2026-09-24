@@ -1,7 +1,8 @@
 # deputy (development version)
 
-* `TrustedResults()` supports
-  [trusted mini-agents](https://trustedminiagents.dev) (#197). Pass it as
+* `TrustedResults()` implements the trusted mini-agent pattern from Will
+  Landau and Sam Parmar's
+  [*Trusted Mini-Agents*](https://trustedminiagents.dev) (#197). Pass it as
   `Agent$new(trusted_results = )` to name the single local tool that produces
   each kind of result. Its verbatim return value reaches the host as a
   `"trusted_result"` event, read with `result_trusted_results()`, and through
@@ -15,6 +16,20 @@
   argument types as `context$tool_arguments`. `tool_input_review()` turns a
   proposed input into a per-field table of type, description, and value.
   The approval-gates recipe now uses it instead of `dput()` (#197).
+
+* `LeadAgent$new(trusted_results = )` applies a trusted-results policy to the
+  whole delegation tree. Every child inherits it, each definition's tools must
+  pass the no-bypass check, and a designated tool must be the same tool
+  wherever it appears. Child trusted results reach the lead's `on_result` and
+  run events (#197).
+
+* `approval_review_ui()` and `approval_review_server()` are a Shiny module
+  for reviewing a pending durable approval. They show each argument's type,
+  description and value, let the reviewer edit simple fields, and approve or
+  deny. A host `decide` function can run the continuation elsewhere (#197).
+
+* `inst/examples/trusted-results/` is a three-area chat, review and results
+  app, adapted from Landau and Parmar's R template and weather example. Only the trusted forecast tool can fill the results panel (#197).
 
 * `mcp_console_connection()` connects an Agent to one
   [MCP Console](https://github.com/t-kalinowski/mcp-console) server, a

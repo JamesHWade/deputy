@@ -20,7 +20,9 @@
 #' @return A data frame with character columns `argument`, `type`,
 #'   `description`, and `value`, and logical columns `required` and `declared`.
 #'   Undeclared input fields are kept with `declared = FALSE`; declared fields
-#'   missing from the input have value `NA`.
+#'   missing from the input have value `NA`. Argument names are paths joined
+#'   with dots for display; the `"paths"` attribute holds each row's path as a
+#'   character vector, which stays exact when a name itself contains a dot.
 #' @examples
 #' arguments <- ellmer::type_object(
 #'   city = ellmer::type_string("City to forecast"),
@@ -41,7 +43,7 @@ tool_input_review <- function(tool_input, tool_arguments = NULL) {
   ) {
     cli_abort("{.arg tool_arguments} must be NULL or an ellmer TypeObject.")
   }
-  rows <- review_rows(tool_input, tool_arguments, prefix = "")
+  rows <- review_rows(tool_input, tool_arguments, path = character())
   if (length(rows) == 0L) {
     return(data.frame(
       argument = character(),
@@ -53,15 +55,24 @@ tool_input_review <- function(tool_input, tool_arguments = NULL) {
       stringsAsFactors = FALSE
     ))
   }
-  do.call(rbind, lapply(rows, as.data.frame, stringsAsFactors = FALSE))
+  paths <- lapply(rows, `[[`, "path")
+  rows <- lapply(rows, function(row) {
+    row$path <- NULL
+    as.data.frame(row, stringsAsFactors = FALSE)
+  })
+  table <- do.call(rbind, rows)
+  # Display names join path components with dots, which argument names may
+  # also contain. Keep the structural path for callers that edit values.
+  attr(table, "paths") <- paths
+  table
 }
 
-review_rows <- function(input, declaration, prefix) {
+review_rows <- function(input, declaration, path) {
   properties <- if (is.null(declaration)) list() else declaration@properties
   fields <- union(names(properties), names(input) %||% character())
   rows <- list()
   for (field in fields) {
-    path <- paste0(prefix, field)
+    field_path <- c(path, field)
     type <- properties[[field]]
     present <- field %in% names(input)
     value <- if (present) input[[field]] else NULL
@@ -69,11 +80,12 @@ review_rows <- function(input, declaration, prefix) {
       inherits(type, "ellmer::TypeObject") &&
         (!present || (is.list(value) && rlang::is_named(value)))
     ) {
-      rows <- c(rows, review_rows(value %||% list(), type, paste0(path, ".")))
+      rows <- c(rows, review_rows(value %||% list(), type, field_path))
       next
     }
     rows[[length(rows) + 1L]] <- list(
-      argument = path,
+      path = field_path,
+      argument = paste(field_path, collapse = "."),
       type = review_type_label(type),
       required = if (is.null(type)) NA else isTRUE(type@required),
       declared = !is.null(type),

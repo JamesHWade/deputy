@@ -67,6 +67,12 @@ LeadAgent <- R6::R6Class(
     #'   transient child activity stream.
     #' @param approval_dir Optional standalone lead approval directory. Delegation
     #'   rejects this unsupported durable child-continuation combination.
+    #' @param trusted_results Optional [TrustedResults] policy for the whole
+    #'   delegation tree. Every child inherits it, so each definition's tools
+    #'   must pass the same no-bypass check. A designated tool may live in the
+    #'   lead or in children, but must be the same tool everywhere. Child
+    #'   trusted results are recorded in the lead's run and sent to its
+    #'   `on_result`.
     #' @param delegation_max_bytes Positive finite admission ceiling, default
     #'   64 KiB, applied separately to the UTF-8 system/message text and serialized
     #'   complete manifest. Known complete-context estimates also obey
@@ -96,7 +102,8 @@ LeadAgent <- R6::R6Class(
       delegation_policy = DelegationPolicy(),
       delegation_disclosure = DelegationDisclosure(),
       delegation_observation = DelegationObservation(),
-      approval_dir = NULL
+      approval_dir = NULL,
+      trusted_results = NULL
     ) {
       if (!is.null(private$.chat)) {
         check_conversation_initialization(self)
@@ -170,7 +177,8 @@ LeadAgent <- R6::R6Class(
         agent_id = agent_id,
         agent_name = agent_name,
         fallback_chats = fallback_chats,
-        approval_dir = approval_dir
+        approval_dir = approval_dir,
+        trusted_results = trusted_results
       )
     },
 
@@ -192,6 +200,13 @@ LeadAgent <- R6::R6Class(
         )
       }
       private$.sub_agent_defs[[definition$name]] <- definition
+      tryCatch(
+        private$check_trusted_tools(private$.chat$get_tools()),
+        error = function(error) {
+          private$.sub_agent_defs[[definition$name]] <- NULL
+          rlang::cnd_signal(error)
+        }
+      )
 
       # Replace only the generated routing section so compaction summaries,
       # skills, and hook-provided context remain intact.
@@ -644,8 +659,105 @@ LeadAgent <- R6::R6Class(
       }
 
       bind_delegation_host(self, sub_agent, def, correlation, stateless)
+      # Check the final registry, after binding has applied the denylist to
+      # skill and host tools. A failure here still releases the binding.
+      private$inherit_trusted_results(sub_agent)
       bound <- TRUE
       sub_agent
+    },
+
+    # The whole delegation tree obeys one no-bypass rule: the lead may keep its
+    # own delegate tool only because every child inherits the policy.
+    check_trusted_tools = function(tools) {
+      policy <- private$.trusted_results
+      if (is.null(policy)) {
+        return(invisible(NULL))
+      }
+      # Designated producers must be declared statically, in tools or Skill
+      # values. Skills named by path load fresh objects when each child is
+      # built, so they may add other checked tools but never a producer.
+      definitions <- lapply(private$.sub_agent_defs, function(def) {
+        skill_tools <- unlist(
+          lapply(def$skills, function(skill) {
+            if (S7::S7_inherits(skill, Skill)) skill$tools else list()
+          }),
+          recursive = FALSE
+        )
+        validate_tool_batch(private$filter_disallowed_tools(
+          c(def$tools, skill_tools),
+          def$disallowed_tools
+        ))
+      })
+      sources <- trusted_tree_sources(policy, c(list(tools), definitions))
+      check_trusted_registry(
+        policy,
+        tools,
+        available = unique(c(
+          names(tools),
+          unlist(lapply(definitions, names), use.names = FALSE)
+        )),
+        allow_delegation = TRUE,
+        sources = sources
+      )
+      for (name in names(definitions)) {
+        withCallingHandlers(
+          check_trusted_registry(
+            policy,
+            definitions[[name]],
+            available = policy@results,
+            sources = sources
+          ),
+          deputy_tool_registration = function(error) {
+            rlang::abort(
+              paste0(
+                "AgentDefinition '",
+                name,
+                "' violates the trusted-results policy."
+              ),
+              class = setdiff(
+                class(error),
+                c("rlang_error", "error", "condition")
+              ),
+              parent = error
+            )
+          }
+        )
+      }
+      invisible(sources)
+    },
+
+    # Children inherit the lead policy. Their trusted results are recorded in
+    # the lead's run and delivered to the lead's callback, with the child's
+    # correlation fields intact.
+    inherit_trusted_results = function(child) {
+      policy <- private$.trusted_results
+      if (is.null(policy)) {
+        return(invisible(NULL))
+      }
+      sources <- private$check_trusted_tools(private$.chat$get_tools())
+      forward <- function(event) {
+        private$record_run_event(event)
+        if (is.function(policy@on_result)) {
+          policy@on_result(event)
+        }
+        invisible(NULL)
+      }
+      child_private <- child$.__enclos_env__$private
+      child_private$.trusted_results <- do.call(
+        TrustedResults,
+        c(
+          as.list(policy@results),
+          list(
+            on_result = forward,
+            exempt_tools = policy@exempt_tools,
+            model_receipt = policy@model_receipt
+          )
+        )
+      )
+      child_private$.trusted_tree_member <- TRUE
+      child_private$.trusted_sources <- sources
+      child_private$check_trusted_tools(child$get_tools())
+      invisible(NULL)
     },
 
     derive_subagent_permissions = function(def) {
