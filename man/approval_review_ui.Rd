@@ -77,5 +77,6 @@ if (interactive() && rlang::is_installed("bslib")) {
 }
 }
 \seealso{
-\code{\link[=tool_input_review]{tool_input_review()}}, \link{TrustedResults}, \code{\link[=approval_read]{approval_read()}}
+\code{vignette("trusted-mini-agents")}, \code{\link[=tool_input_review]{tool_input_review()}},
+\link{TrustedResults}, \code{\link[=approval_read]{approval_read()}}
 }

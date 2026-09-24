@@ -72,7 +72,8 @@ NULL
 #'   Defaults to `FALSE`, which sends the model the same value as the host.
 #' @prop results Named character vector mapping result types to tool names.
 #' @return A read-only `TrustedResults` S7 value.
-#' @seealso [result_trusted_results()], [Agent], [tool_metadata()]
+#' @seealso `vignette("trusted-mini-agents")`, [result_trusted_results()],
+#'   [approval_review_ui()], [Agent], [tool_metadata()]
 #' @examples
 #' policy <- TrustedResults(
 #'   forecast = "get_forecast",

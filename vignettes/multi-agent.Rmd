@@ -909,7 +909,7 @@ required.
 ### Trusted results across delegation
 
 `LeadAgent$new(trusted_results = TrustedResults(...))` applies one
-[trusted-results policy](permissions.html#trusted-results) to the whole
+[trusted-results policy](trusted-mini-agents.html) to the whole
 delegation tree. The policy implements Will Landau and Sam Parmar's
 [trusted mini-agent](https://trustedminiagents.dev) rules; delegation is
 Deputy's extension of them. Every child inherits it, so each definition's tools must pass

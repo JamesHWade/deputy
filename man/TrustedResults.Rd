@@ -96,7 +96,8 @@ policy <- TrustedResults(
 policy$results
 }
 \seealso{
-\code{\link[=result_trusted_results]{result_trusted_results()}}, \link{Agent}, \code{\link[=tool_metadata]{tool_metadata()}}
+\code{vignette("trusted-mini-agents")}, \code{\link[=result_trusted_results]{result_trusted_results()}},
+\code{\link[=approval_review_ui]{approval_review_ui()}}, \link{Agent}, \code{\link[=tool_metadata]{tool_metadata()}}
 }
 \section{Additional properties}{
 

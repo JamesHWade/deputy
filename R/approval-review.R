@@ -42,7 +42,8 @@
 #'   current [ApprovalContinuation] or `NULL`), `outcome()` (a list with
 #'   `decision`, `tool_input`, and `result` or `error` after the last decision),
 #'   and a `refresh()` function.
-#' @seealso [tool_input_review()], [TrustedResults], [approval_read()]
+#' @seealso `vignette("trusted-mini-agents")`, [tool_input_review()],
+#'   [TrustedResults], [approval_read()]
 #' @examples
 #' if (interactive() && rlang::is_installed("bslib")) {
 #'   library(shiny)
