@@ -47,7 +47,9 @@ undeclared fields, and other types are shown read-only. Editors start at
 the proposed value; a missing optional field starts as "Not provided" and
 stays missing unless the reviewer sets it. Approval with
 edits resumes with the edited input, which the tool must validate. Approval
-without edits resumes with the original input. Deny executes nothing.
+without edits resumes with the original input. Clearing a number removes
+the field. Deny executes nothing. Each pending approval is submitted at
+most once.
 
 This is the input review step of Will Landau and Sam Parmar's
 \href{https://trustedminiagents.dev/definition.html}{trusted mini-agent} pattern:

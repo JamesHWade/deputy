@@ -254,3 +254,76 @@ test_that("untouched invalid values and edits inside absent objects are kept", {
   })
   expect_identical(seen[[2L]]$options, list(units = "f"))
 })
+
+test_that("edits keep dotted names and fractional integers exactly", {
+  skip_if_not_installed("shiny")
+  directory <- withr::local_tempdir()
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "locate",
+      arguments = list(postal.code = "0150", days = 3L)
+    ),
+    runtime_reply("ok")
+  ))
+  locate <- ellmer::tool(
+    fun = function(postal.code, days) "located",
+    name = "locate",
+    description = "Locate.",
+    arguments = list(
+      postal.code = ellmer::type_string(),
+      days = ellmer::type_integer()
+    ),
+    convert = FALSE,
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = list(locate),
+    working_dir = directory,
+    approval_dir = directory,
+    permissions = Permissions(
+      can_use_tool = function(tool_name, tool_input, context) {
+        PermissionResultPending("Review.")
+      }
+    )
+  )
+  agent$run_sync("Locate")
+  decided <- NULL
+  shiny::testServer(
+    approval_review_server,
+    args = list(
+      agent = agent,
+      decide = function(path, decision, tool_input) {
+        decided <<- tool_input
+        NULL
+      }
+    ),
+    {
+      session$setInputs(field_1 = "0151", field_2 = 2.5)
+      session$setInputs(approve = 1)
+      expect_identical(decided, list(postal.code = "0151", days = 2.5))
+      # decide() returned without resolving the approval; a repeat click is
+      # ignored rather than submitted twice.
+      decided <<- NULL
+      session$setInputs(approve = 2)
+      expect_null(decided)
+    }
+  )
+})
+
+test_that("clearing a number removes the field", {
+  expect_identical(
+    approval_review_set(list(a = 1, b = 2), "a", NULL),
+    list(b = 2)
+  )
+  expect_identical(
+    approval_review_set(list(), c("x", "y"), "v"),
+    list(x = list(y = "v"))
+  )
+  expect_null(approval_review_coerce(NA, ellmer::type_integer()))
+  expect_identical(approval_review_coerce(2, ellmer::type_integer()), 2L)
+  expect_identical(approval_review_coerce(2.5, ellmer::type_integer()), 2.5)
+})

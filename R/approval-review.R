@@ -13,7 +13,9 @@
 #' the proposed value; a missing optional field starts as "Not provided" and
 #' stays missing unless the reviewer sets it. Approval with
 #' edits resumes with the edited input, which the tool must validate. Approval
-#' without edits resumes with the original input. Deny executes nothing.
+#' without edits resumes with the original input. Clearing a number removes
+#' the field. Deny executes nothing. Each pending approval is submitted at
+#' most once.
 #'
 #' This is the input review step of Will Landau and Sam Parmar's
 #' [trusted mini-agent](https://trustedminiagents.dev/definition.html) pattern:
@@ -84,6 +86,8 @@ approval_review_server <- function(
       ns <- session$ns
       version <- shiny::reactiveVal(0L)
       outcome <- shiny::reactiveVal(NULL)
+      # A host decide() may finish later; never submit one approval twice.
+      submitted <- character()
       refresh <- function() {
         version(shiny::isolate(version()) + 1L)
         invisible(NULL)
@@ -145,7 +149,10 @@ approval_review_server <- function(
               ns,
               i,
               row,
-              approval_review_leaf_type(current$arguments, row$argument)
+              approval_review_leaf_type(
+                current$arguments,
+                attr(table, "paths")[[i]]
+              )
             )),
             shiny::tags$td(
               if (is.na(row$description)) "" else row$description,
@@ -185,10 +192,8 @@ approval_review_server <- function(
         value <- current$input
         table <- current$table
         for (i in seq_len(nrow(table))) {
-          type <- approval_review_leaf_type(
-            current$arguments,
-            table$argument[[i]]
-          )
+          path <- attr(table, "paths")[[i]]
+          type <- approval_review_leaf_type(current$arguments, path)
           if (is.null(approval_review_kind(type))) {
             next
           }
@@ -206,7 +211,6 @@ approval_review_server <- function(
           if (approval_review_unchanged(new, table$value[[i]], type)) {
             next
           }
-          path <- strsplit(table$argument[[i]], ".", fixed = TRUE)[[1L]]
           value <- approval_review_set(
             value,
             path,
@@ -229,6 +233,10 @@ approval_review_server <- function(
           }
         }
         path <- current$record$source$path
+        if (path %in% submitted) {
+          return(invisible(NULL))
+        }
+        submitted <<- c(submitted, path)
         result <- tryCatch(
           list(result = decide(path, decision, tool_input)),
           error = function(error) list(error = conditionMessage(error))
@@ -251,7 +259,7 @@ approval_review_server <- function(
 
 approval_review_leaf_type <- function(arguments, path) {
   type <- arguments
-  for (part in strsplit(path, ".", fixed = TRUE)[[1L]]) {
+  for (part in path) {
     if (!inherits(type, "ellmer::TypeObject")) {
       return(NULL)
     }
@@ -324,10 +332,11 @@ approval_review_unchanged <- function(new, label, type) {
   identical(as.character(new), label)
 }
 
-# Assign a nested leaf, creating absent parent objects.
+# Assign a nested leaf, creating absent parent objects. A NULL leaf removes
+# the field.
 approval_review_set <- function(value, path, leaf) {
   if (length(path) == 1L) {
-    value[[path]] <- leaf
+    value[path] <- if (is.null(leaf)) NULL else list(leaf)
     return(value)
   }
   child <- value[[path[[1L]]]]
@@ -339,9 +348,16 @@ approval_review_set <- function(value, path, leaf) {
 }
 
 approval_review_coerce <- function(value, type) {
+  # A cleared number removes the field; the tool reports it as missing.
+  if (
+    approval_review_kind(type) %in% c("number", "integer") && all(is.na(value))
+  ) {
+    return(NULL)
+  }
   switch(
     approval_review_kind(type),
-    integer = as.integer(value),
+    # A fractional entry stays numeric so the tool can reject it.
+    integer = if (isTRUE(value == round(value))) as.integer(value) else value,
     number = as.numeric(value),
     boolean = identical(value, "true"),
     value
