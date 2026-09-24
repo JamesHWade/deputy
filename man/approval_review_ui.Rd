@@ -42,10 +42,12 @@ The module shows each argument with its declared type, description, and
 proposed value, using \code{\link[=tool_input_review]{tool_input_review()}}. The reviewer can edit simple
 fields, then approve or deny.
 
-Enum, string, number, integer, and boolean fields are editable. Arrays,
-undeclared fields, and other types are shown read-only. Editors start at
-the proposed value; a missing optional field starts as "Not provided" and
-stays missing unless the reviewer sets it. Approval with
+A field is editable when its declared type is enum, string, number,
+integer, or boolean and its editor can show the proposed value exactly.
+Anything else, including a proposed value that does not fit its type (a
+boolean \code{"yes"}, a number \code{"abc"}), is shown read-only as proposed; deny the
+call if it is wrong. An absent optional field stays absent unless the
+reviewer picks a value, or ticks "Provide a value" for text and numbers. Approval with
 edits resumes with the edited input, which the tool must validate. Approval
 without edits resumes with the original input. Clearing a number removes
 the field. Deny executes nothing. Each pending approval is submitted at

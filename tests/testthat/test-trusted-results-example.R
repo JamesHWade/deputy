@@ -66,8 +66,15 @@ test_that("the three-area app fills the result panel only from the trusted tool"
     expect_identical(fixture$requests(), 1L)
 
     # Review: shorten the forecast to two days, then approve.
-    session$setInputs(`review-field_2` = 2)
-    session$setInputs(`review-approve` = 1)
+    key <- approval_review_key(agent$pending_approval()$id)
+    do.call(
+      session$setInputs,
+      stats::setNames(list("2"), paste0("review-field_", key, "_2"))
+    )
+    do.call(
+      session$setInputs,
+      stats::setNames(list(1), paste0("review-approve_", key))
+    )
     expect_identical(result()$tool_name, "get_forecast")
     html <- output$result$html
     expect_match(html, "Oslo, 2 days", fixed = TRUE)

@@ -8,10 +8,12 @@
 #' proposed value, using [tool_input_review()]. The reviewer can edit simple
 #' fields, then approve or deny.
 #'
-#' Enum, string, number, integer, and boolean fields are editable. Arrays,
-#' undeclared fields, and other types are shown read-only. Editors start at
-#' the proposed value; a missing optional field starts as "Not provided" and
-#' stays missing unless the reviewer sets it. Approval with
+#' A field is editable when its declared type is enum, string, number,
+#' integer, or boolean and its editor can show the proposed value exactly.
+#' Anything else, including a proposed value that does not fit its type (a
+#' boolean `"yes"`, a number `"abc"`), is shown read-only as proposed; deny the
+#' call if it is wrong. An absent optional field stays absent unless the
+#' reviewer picks a value, or ticks "Provide a value" for text and numbers. Approval with
 #' edits resumes with the edited input, which the tool must validate. Approval
 #' without edits resumes with the original input. Clearing a number removes
 #' the field. Deny executes nothing. Each pending approval is submitted at
@@ -88,15 +90,25 @@ approval_review_server <- function(
       outcome <- shiny::reactiveVal(NULL)
       # A host decide() may finish later; never submit one approval twice.
       submitted <- character()
+      observed <- character()
       refresh <- function() {
         version(shiny::isolate(version()) + 1L)
         invisible(NULL)
       }
+      # The hook outlives this session, so it reaches refresh() only through
+      # a holder that is cleared when the session ends.
+      holder <- new.env(parent = emptyenv())
+      holder$refresh <- refresh
+      session$onSessionEnded(function() {
+        holder$refresh <- NULL
+      })
       agent$add_hook(HookMatcher(
         "Stop",
         timeout = 0,
         callback = function(...) {
-          refresh()
+          if (is.function(holder$refresh)) {
+            holder$refresh()
+          }
           NULL
         }
       ))
@@ -120,12 +132,24 @@ approval_review_server <- function(
           (attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||%
             tool)@arguments
         }
+        tool_input <- request$tool_input %||% list()
+        # An input that cannot be tabulated is shown as submitted and can
+        # still be approved unchanged or denied.
+        table <- tryCatch(
+          tool_input_review(tool_input, arguments),
+          error = function(error) NULL
+        )
         list(
           record = record,
+          key = approval_review_key(record$id),
           tool_name = tool_name,
-          input = request$tool_input %||% list(),
-          arguments = arguments,
-          table = tool_input_review(request$tool_input %||% list(), arguments)
+          input = tool_input,
+          table = table,
+          fields = if (!is.null(table)) {
+            lapply(attr(table, "paths"), function(path) {
+              approval_review_field(tool_input, arguments, path)
+            })
+          }
         )
       })
 
@@ -137,35 +161,36 @@ approval_review_server <- function(
             class = "text-muted"
           ))
         }
+        key <- current$key
         table <- current$table
-        rows <- lapply(seq_len(nrow(table)), function(i) {
-          row <- table[i, , drop = FALSE]
-          shiny::tags$tr(
-            shiny::tags$th(scope = "row", row$argument),
-            shiny::tags$td(shiny::tags$code(
-              if (is.na(row$type)) "undeclared" else row$type
-            )),
-            shiny::tags$td(approval_review_editor(
-              ns,
-              i,
-              row,
-              approval_review_leaf_type(
-                current$arguments,
-                attr(table, "paths")[[i]]
-              )
-            )),
-            shiny::tags$td(
-              if (is.na(row$description)) "" else row$description,
-              class = "text-muted"
-            )
+        body <- if (is.null(table)) {
+          shiny::tagList(
+            shiny::tags$p(
+              "These inputs cannot be shown as a table. They are shown as submitted and cannot be edited."
+            ),
+            shiny::tags$pre(review_value_label(current$input))
           )
-        })
-        reason <- current$record$request$reason
-        shiny::tagList(
-          shiny::tags$p(
-            shiny::tags$strong(current$tool_name, .noWS = "after"),
-            if (is_nonempty_string(reason)) paste0(": ", reason)
-          ),
+        } else {
+          rows <- lapply(seq_len(nrow(table)), function(i) {
+            row <- table[i, , drop = FALSE]
+            shiny::tags$tr(
+              shiny::tags$th(scope = "row", row$argument),
+              shiny::tags$td(shiny::tags$code(
+                if (is.na(row$type)) "undeclared" else row$type
+              )),
+              shiny::tags$td(approval_review_editor(
+                ns,
+                key,
+                i,
+                row,
+                current$fields[[i]]
+              )),
+              shiny::tags$td(
+                if (is.na(row$description)) "" else row$description,
+                class = "text-muted"
+              )
+            )
+          })
           shiny::tags$div(
             class = "table-responsive",
             shiny::tags$table(
@@ -178,78 +203,114 @@ approval_review_server <- function(
               )),
               shiny::tags$tbody(rows)
             )
+          )
+        }
+        reason <- current$record$request$reason
+        shiny::tagList(
+          shiny::tags$p(
+            shiny::tags$strong(current$tool_name, .noWS = "after"),
+            if (is_nonempty_string(reason)) paste0(": ", reason)
           ),
+          body,
           shiny::actionButton(
-            ns("approve"),
+            ns(paste0("approve_", key)),
             "Approve these inputs",
             class = "btn-primary"
           ),
-          shiny::actionButton(ns("deny"), "Deny")
+          shiny::actionButton(ns(paste0("deny_", key)), "Deny")
         )
       })
 
       edited_input <- function(current) {
         value <- current$input
-        table <- current$table
-        for (i in seq_len(nrow(table))) {
-          path <- attr(table, "paths")[[i]]
-          type <- approval_review_leaf_type(current$arguments, path)
-          if (is.null(approval_review_kind(type))) {
+        for (i in seq_along(current$fields)) {
+          field <- current$fields[[i]]
+          if (identical(field$mode, "readonly")) {
             next
           }
-          new <- input[[paste0("field_", i)]]
-          # Leaving a missing field blank keeps it missing.
-          if (
-            is.null(new) ||
-              (is.na(table$value[[i]]) &&
-                (identical(new, "") || all(is.na(new))))
-          ) {
+          new <- input[[approval_review_id("field", current$key, i)]]
+          if (is.null(new)) {
             next
           }
-          # Compare before coercing, so an untouched invalid value such as a
-          # boolean "yes" reaches the tool unchanged for it to reject.
-          if (approval_review_unchanged(new, table$value[[i]], type)) {
+          if (identical(field$mode, "optin")) {
+            if (!isTRUE(input[[approval_review_id("set", current$key, i)]])) {
+              next
+            }
+          } else if (identical(field$mode, "choose")) {
+            if (identical(new, "")) next
+          } else if (identical(new, field$shown)) {
+            # Untouched: keep the proposed value exactly.
             next
           }
           value <- approval_review_set(
             value,
-            path,
-            approval_review_coerce(new, type)
+            field$path,
+            approval_review_coerce(new, field$kind)
           )
         }
         value
       }
 
-      act <- function(decision) {
-        current <- shiny::isolate(review())
-        if (is.null(current)) {
+      act <- function(decision, key) {
+        record <- shiny::isolate(pending())
+        # Ignore clicks from a screen showing an earlier approval.
+        if (
+          is.null(record) || !identical(approval_review_key(record$id), key)
+        ) {
+          return(invisible(NULL))
+        }
+        path <- record$source$path
+        if (path %in% submitted) {
           return(invisible(NULL))
         }
         tool_input <- NULL
         if (identical(decision, "approve")) {
-          edited <- shiny::isolate(edited_input(current))
-          if (!identical(edited, current$input)) {
-            tool_input <- edited
+          current <- shiny::isolate(review())
+          if (!is.null(current$fields)) {
+            edited <- shiny::isolate(edited_input(current))
+            if (!identical(edited, current$input)) {
+              tool_input <- edited
+            }
           }
-        }
-        path <- current$record$source$path
-        if (path %in% submitted) {
-          return(invisible(NULL))
         }
         submitted <<- c(submitted, path)
         result <- tryCatch(
           list(result = decide(path, decision, tool_input)),
           error = function(error) list(error = conditionMessage(error))
         )
-        outcome(c(
-          list(decision = decision, tool_input = tool_input),
-          result
-        ))
+        # A decision that failed before consuming the approval may be retried.
+        if (!is.null(result$error)) {
+          status <- tryCatch(approval_read(path)$status, error = function(e) {
+            NULL
+          })
+          if (identical(status, "pending")) {
+            submitted <<- setdiff(submitted, path)
+          }
+        }
+        outcome(c(list(decision = decision, tool_input = tool_input), result))
         refresh()
         invisible(NULL)
       }
-      shiny::observeEvent(input$approve, act("approve"))
-      shiny::observeEvent(input$deny, act("deny"))
+
+      # Buttons carry the approval key, so each approval has its own
+      # observers and a stale click cannot act on a newer approval.
+      shiny::observe({
+        record <- pending()
+        if (is.null(record)) {
+          return()
+        }
+        key <- approval_review_key(record$id)
+        if (key %in% observed) {
+          return()
+        }
+        observed <<- c(observed, key)
+        shiny::observeEvent(input[[paste0("approve_", key)]], {
+          act("approve", key)
+        })
+        shiny::observeEvent(input[[paste0("deny_", key)]], {
+          act("deny", key)
+        })
+      })
 
       list(pending = pending, outcome = outcome, refresh = refresh)
     },
@@ -281,55 +342,113 @@ approval_review_kind <- function(type) {
   NULL
 }
 
-# Editors start at the proposed value. A missing field starts empty, and an
-# out-of-range enum value stays selectable, so approving without edits never
-# substitutes a value the reviewer did not choose.
-approval_review_editor <- function(ns, index, row, type) {
-  id <- ns(paste0("field_", index))
-  value <- row$value
-  missing <- is.na(value)
+approval_review_key <- function(id) {
+  gsub("[^A-Za-z0-9]", "_", id)
+}
+
+approval_review_id <- function(kind, key, index) {
+  paste0(kind, "_", key, "_", index)
+}
+
+# Numbers are edited as text showing every significant digit, so the editor
+# shows the proposed value exactly and change detection compares strings.
+approval_review_number_text <- function(value) {
+  text <- trimws(format(value, digits = 17, scientific = FALSE))
+  if (!identical(as.numeric(text), as.numeric(value))) {
+    return(NULL)
+  }
+  text
+}
+
+# Describe how one reviewed field can be edited. A field is editable only
+# when its editor can show the proposed value exactly; otherwise it is shown
+# read-only, as proposed, and the reviewer can deny. Absent optional fields
+# need an explicit choice ("Not provided" or "Provide a value").
+approval_review_field <- function(input, arguments, path) {
+  type <- approval_review_leaf_type(arguments, path)
+  kind <- approval_review_kind(type)
+  raw <- input
+  present <- TRUE
+  ambiguous <- FALSE
+  for (part in path) {
+    if (!is.list(raw) || !part %in% names(raw)) {
+      present <- FALSE
+      raw <- NULL
+      break
+    }
+    # Duplicate keys cannot be shown or edited one at a time.
+    ambiguous <- ambiguous || anyDuplicated(names(raw)) > 0L
+    raw <- raw[[part]]
+  }
+  scalar <- length(raw) == 1L && !is.list(raw) && !anyNA(raw)
+  shown <- if (present && scalar) {
+    switch(
+      kind %||% "none",
+      enum = ,
+      string = if (is.character(raw)) raw,
+      number = ,
+      integer = if (is.numeric(raw) && is.finite(raw)) {
+        approval_review_number_text(raw)
+      },
+      boolean = if (is.logical(raw)) tolower(as.character(raw)),
+      NULL
+    )
+  }
+  mode <- if (is.null(kind) || ambiguous || (present && is.null(shown))) {
+    "readonly"
+  } else if (present) {
+    "edit"
+  } else if (kind %in% c("enum", "boolean")) {
+    "choose"
+  } else {
+    "optin"
+  }
+  list(path = path, type = type, kind = kind, shown = shown, mode = mode)
+}
+
+approval_review_editor <- function(ns, key, index, row, field) {
+  id <- ns(approval_review_id("field", key, index))
   label <- shiny::tags$span(
     class = "visually-hidden",
     paste("Value for", row$argument)
   )
-  choices <- function(values) {
-    values <- unique(c(if (!missing) value, values))
-    if (missing) c("Not provided" = "", values) else values
+  if (identical(field$mode, "readonly")) {
+    return(shiny::tags$code(
+      if (is.na(row$value)) "(not provided)" else row$value
+    ))
   }
-  switch(
-    approval_review_kind(type) %||% "readonly",
-    enum = shiny::selectInput(
+  choose <- identical(field$mode, "choose")
+  select <- function(values) {
+    # An out-of-range proposed enum value stays selectable, shown as proposed.
+    values <- if (choose) {
+      c("Not provided" = "", values)
+    } else {
+      unique(c(field$shown, values))
+    }
+    shiny::selectInput(
       id,
       label,
-      choices = choices(type@values),
-      selected = if (missing) "" else value
-    ),
-    boolean = shiny::selectInput(
-      id,
-      label,
-      choices = choices(c("true", "false")),
-      selected = if (missing) "" else value
-    ),
-    string = shiny::textInput(id, label, if (missing) "" else value),
-    number = ,
-    integer = shiny::numericInput(
-      id,
-      label,
-      if (missing) NA else as.numeric(value)
-    ),
-    shiny::tags$code(if (missing) "(missing)" else value)
+      choices = values,
+      selected = if (choose) "" else field$shown
+    )
+  }
+  editor <- switch(
+    field$kind,
+    enum = select(field$type@values),
+    boolean = select(c("true", "false")),
+    shiny::textInput(id, label, field$shown %||% "")
   )
-}
-
-approval_review_unchanged <- function(new, label, type) {
-  if (is.na(label)) {
-    return(FALSE)
+  if (!identical(field$mode, "optin")) {
+    return(editor)
   }
-  if (approval_review_kind(type) %in% c("number", "integer")) {
-    original <- suppressWarnings(as.numeric(label))
-    return(isTRUE(all.equal(original, as.numeric(new))))
-  }
-  identical(as.character(new), label)
+  shiny::tagList(
+    shiny::checkboxInput(
+      ns(approval_review_id("set", key, index)),
+      paste("Provide a value for", row$argument),
+      FALSE
+    ),
+    editor
+  )
 }
 
 # Assign a nested leaf, creating absent parent objects. A NULL leaf removes
@@ -347,19 +466,30 @@ approval_review_set <- function(value, path, leaf) {
   value
 }
 
-approval_review_coerce <- function(value, type) {
+approval_review_coerce <- function(value, kind) {
+  if (identical(kind, "boolean")) {
+    return(identical(value, "true"))
+  }
+  if (!kind %in% c("number", "integer")) {
+    return(value)
+  }
+  text <- trimws(value)
   # A cleared number removes the field; the tool reports it as missing.
-  if (
-    approval_review_kind(type) %in% c("number", "integer") && all(is.na(value))
-  ) {
+  if (!nzchar(text)) {
     return(NULL)
   }
-  switch(
-    approval_review_kind(type),
-    # A fractional entry stays numeric so the tool can reject it.
-    integer = if (isTRUE(value == round(value))) as.integer(value) else value,
-    number = as.numeric(value),
-    boolean = identical(value, "true"),
-    value
-  )
+  number <- suppressWarnings(as.numeric(text))
+  # Unparseable text reaches the tool as typed, for it to reject.
+  if (is.na(number)) {
+    return(value)
+  }
+  # Fractional or out-of-range integers stay numeric for the tool to reject.
+  if (
+    identical(kind, "integer") &&
+      number == round(number) &&
+      abs(number) <= .Machine$integer.max
+  ) {
+    return(as.integer(number))
+  }
+  number
 }
