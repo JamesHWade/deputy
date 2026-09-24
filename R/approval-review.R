@@ -31,8 +31,11 @@
 #' @param decide Optional function `(path, decision, tool_input)` that carries
 #'   out the decision. The default calls `agent$resume_approval()`
 #'   synchronously, which runs the model continuation in this R process.
-#'   Supply your own function to run it elsewhere, for example with
-#'   `shiny::ExtendedTask`. Its return value is available from `outcome()`.
+#'   Supply your own function to run it elsewhere and return a promise, for
+#'   example from `mirai` or `promises::future_promise()`. The module waits for
+#'   a returned promise: on success it records the result and refreshes; on
+#'   failure it records the error and allows a retry while the approval is
+#'   still pending. The result is available from `outcome()`.
 #' @param session Shiny session.
 #' @return `approval_review_ui()` returns a UI tag list.
 #'   `approval_review_server()` returns a list of reactives: `pending()` (the
@@ -274,22 +277,43 @@ approval_review_server <- function(
           }
         }
         submitted <<- c(submitted, path)
-        result <- tryCatch(
-          list(result = decide(path, decision, tool_input)),
-          error = function(error) list(error = conditionMessage(error))
-        )
-        # A decision that failed before consuming the approval may be retried.
-        if (!is.null(result$error)) {
-          status <- tryCatch(approval_read(path)$status, error = function(e) {
-            NULL
-          })
-          if (identical(status, "pending")) {
-            submitted <<- setdiff(submitted, path)
+        finish <- function(result) {
+          # A decision that failed before consuming the approval may be
+          # retried.
+          if (!is.null(result$error)) {
+            status <- tryCatch(approval_read(path)$status, error = function(e) {
+              NULL
+            })
+            if (identical(status, "pending")) {
+              submitted <<- setdiff(submitted, path)
+            }
           }
+          outcome(c(
+            list(decision = decision, tool_input = tool_input),
+            result
+          ))
+          refresh()
+          invisible(NULL)
         }
-        outcome(c(list(decision = decision, tool_input = tool_input), result))
-        refresh()
-        invisible(NULL)
+        value <- tryCatch(
+          decide(path, decision, tool_input),
+          error = function(error) structure(list(error), class = "review_error")
+        )
+        if (inherits(value, "review_error")) {
+          return(finish(list(error = conditionMessage(value[[1L]]))))
+        }
+        # An asynchronous decision finishes when its promise settles.
+        if (promises::is.promising(value)) {
+          promises::then(
+            value,
+            onFulfilled = function(result) finish(list(result = result)),
+            onRejected = function(error) {
+              finish(list(error = conditionMessage(error)))
+            }
+          )
+          return(invisible(NULL))
+        }
+        finish(list(result = value))
       }
 
       # Buttons carry the approval key, so each approval has its own

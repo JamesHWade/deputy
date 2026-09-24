@@ -569,3 +569,55 @@ test_that("multiline strings keep their line breaks", {
   expect_identical(field("\nleading")$mode, "readonly")
   expect_identical(field("plain")$mode, "edit")
 })
+
+test_that("asynchronous decisions refresh on success and allow retry on failure", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("later")
+  directory <- withr::local_tempdir()
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "measure", arguments = list(n = 1L, x = 2)),
+    runtime_reply("ok")
+  ))
+  agent <- review_numbers_agent(server, directory)
+  agent$run_sync("Measure")
+  attempts <- 0L
+  shiny::testServer(
+    approval_review_server,
+    args = list(
+      agent = agent,
+      decide = function(path, decision, tool_input) {
+        attempts <<- attempts + 1L
+        if (attempts == 1L) {
+          return(promises::promise_reject(simpleError("worker lost")))
+        }
+        promises::promise(function(resolve, reject) {
+          later::later(function() {
+            resolve(agent$resume_approval(
+              path,
+              decision,
+              tool_input = tool_input
+            ))
+          })
+        })
+      }
+    ),
+    {
+      review_set(session, pending(), approve = 1)
+      later::run_now(1)
+      session$flushReact()
+      expect_identical(outcome()$error, "worker lost")
+      expect_false(is.null(pending()))
+
+      # The failed asynchronous attempt did not lock the approval.
+      review_set(session, pending(), approve = 2)
+      deadline <- Sys.time() + 10
+      while (is.null(outcome()$result) && Sys.time() < deadline) {
+        later::run_now(0.1)
+        session$flushReact()
+      }
+      expect_s7_class(outcome()$result, AgentResult)
+      expect_null(pending())
+    }
+  )
+  expect_identical(attempts, 2L)
+})

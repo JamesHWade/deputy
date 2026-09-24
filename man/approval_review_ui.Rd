@@ -22,8 +22,11 @@ approval_review_server(
 \item{decide}{Optional function \verb{(path, decision, tool_input)} that carries
 out the decision. The default calls \code{agent$resume_approval()}
 synchronously, which runs the model continuation in this R process.
-Supply your own function to run it elsewhere, for example with
-\code{shiny::ExtendedTask}. Its return value is available from \code{outcome()}.}
+Supply your own function to run it elsewhere and return a promise, for
+example from \code{mirai} or \code{promises::future_promise()}. The module waits for
+a returned promise: on success it records the result and refreshes; on
+failure it records the error and allows a retry while the approval is
+still pending. The result is available from \code{outcome()}.}
 
 \item{session}{Shiny session.}
 }

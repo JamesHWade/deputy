@@ -51,8 +51,9 @@ result panel shows what the tool actually returned.
 The data is a small synthetic table bundled with the example, not a real
 forecast. Runs and approvals execute synchronously in the Shiny process for
 simplicity. In a deployed app, pass a `decide` function to
-`approval_review_server()` and run the continuation elsewhere, for example
-with `shiny::ExtendedTask`, so one session does not block others.
+`approval_review_server()` that runs the continuation elsewhere and returns a
+promise, for example with `mirai`, so one session does not block others. The
+module waits for that promise before refreshing.
 
 ## Verification
 
