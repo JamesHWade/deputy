@@ -1966,8 +1966,7 @@ earlier compaction summary and the compacted prefix are kept.
 Like compaction, this changes only what the model sees. \verb{$get_turns()},
 \verb{$last_turn()} and saved sessions keep the original results, so a host's
 conversation history is unchanged. \verb{$get_context_turns()} shows the
-markers. Results whose tool call has no ID are left in place, because
-they could not be matched back to their originals.
+markers.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$microcompact(
@@ -1981,7 +1980,7 @@ they could not be matched back to their originals.
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{keep_last}}{Number of recent turns whose tool results are left as
-they are.}
+they are. \code{Inf} keeps every turn.}
       \item{\code{keep_tools}}{Names of tools whose results are never cleared.}
       \item{\code{marker}}{The text that replaces a cleared result.}
     }

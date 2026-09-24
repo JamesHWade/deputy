@@ -1360,9 +1360,15 @@ Agent <- R6::R6Class(
       role <- match.arg(role)
       current <- private$.chat$last_turn(role = role)
       if (!is.null(current)) {
+        # ellmer returns the final turn for "assistant" and the one before it
+        # for "user"; restore it at that position.
+        n <- length(private$.chat$get_turns())
+        position <- length(private$.compacted_turns) +
+          switch(role, assistant = n, user = n - 1L, NA_integer_)
         return(restore_cleared_tool_results(
           list(current),
-          private$.cleared_tool_results
+          private$.cleared_tool_results,
+          positions = position
         )[[1L]])
       }
       turns <- Filter(
@@ -1370,9 +1376,15 @@ Agent <- R6::R6Class(
         private$.compacted_turns
       )
       if (length(turns)) {
+        roles <- vapply(
+          private$.compacted_turns,
+          function(turn) turn@role,
+          character(1)
+        )
         restore_cleared_tool_results(
           tail(turns, 1L),
-          private$.cleared_tool_results
+          private$.cleared_tool_results,
+          positions = max(which(roles == role))
         )[[1L]]
       } else {
         NULL
@@ -1808,11 +1820,10 @@ Agent <- R6::R6Class(
     #' Like compaction, this changes only what the model sees. `$get_turns()`,
     #' `$last_turn()` and saved sessions keep the original results, so a host's
     #' conversation history is unchanged. `$get_context_turns()` shows the
-    #' markers. Results whose tool call has no ID are left in place, because
-    #' they could not be matched back to their originals.
+    #' markers.
     #'
     #' @param keep_last Number of recent turns whose tool results are left as
-    #'   they are.
+    #'   they are. `Inf` keeps every turn.
     #' @param keep_tools Names of tools whose results are never cleared.
     #' @param marker The text that replaces a cleared result.
     #' @return A list with `cleared`, the number of tool results replaced.
@@ -1833,7 +1844,7 @@ Agent <- R6::R6Class(
           length(keep_last) != 1L ||
           is.na(keep_last) ||
           keep_last < 0 ||
-          keep_last != floor(keep_last)
+          (is.finite(keep_last) && keep_last != floor(keep_last))
       ) {
         cli::cli_abort(
           "{.arg keep_last} must be a whole number of turns, 0 or more."
@@ -1846,7 +1857,15 @@ Agent <- R6::R6Class(
         cli::cli_abort("{.arg marker} must be one non-empty string.")
       }
       turns <- private$.chat$get_turns()
-      upto <- max(0L, length(turns) - as.integer(keep_last))
+      # keep_last may be Inf or larger than the conversation: keep everything.
+      upto <- if (keep_last >= length(turns)) {
+        0L
+      } else {
+        length(turns) - as.integer(keep_last)
+      }
+      # Originals are keyed by position in the complete conversation, which
+      # compaction and new turns do not shift. Tool call IDs can repeat.
+      offset <- length(private$.compacted_turns)
       originals <- private$.cleared_tool_results
       cleared <- 0L
       for (i in seq_len(upto)) {
@@ -1861,18 +1880,12 @@ Agent <- R6::R6Class(
           if (!is.null(name) && name %in% keep_tools) {
             next
           }
-          id <- tryCatch(content@request@id, error = function(e) NULL)
-          if (!is_nonempty_string(id)) {
+          key <- cleared_result_key(offset + i, j)
+          # Already cleared: keep its first original and marker.
+          if (!is.null(originals[[key]])) {
             next
           }
-          if (identical(content@value, marker) && is.null(content@error)) {
-            next
-          }
-          # Keep the first original; a repeat microcompact must not replace
-          # it with an earlier marker.
-          if (is.null(originals[[id]])) {
-            originals[[id]] <- content
-          }
+          originals[[key]] <- list(marker = marker, content = content)
           content@value <- marker
           content@error <- NULL
           contents[[j]] <- content

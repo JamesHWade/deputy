@@ -296,36 +296,64 @@ portable_session_turns <- function(turns) {
   })
 }
 
+# Saved as positions and markers plus one user turn holding the originals in
+# the same order, so the originals share the turn serializers.
 cleared_tool_results_turns <- function(originals) {
   if (length(originals) == 0L) {
     return(list())
   }
-  portable_session_turns(list(ellmer::UserTurn(contents = unname(originals))))
+  list(
+    keys = names(originals),
+    markers = vapply(
+      originals,
+      function(x) x$marker,
+      character(1),
+      USE.NAMES = FALSE
+    ),
+    turns = portable_session_turns(list(ellmer::UserTurn(
+      contents = unname(lapply(originals, function(x) x$content))
+    )))
+  )
 }
 
 # Older schema 3 snapshots have no field, which means nothing was cleared.
-cleared_tool_results_from_turns <- function(turns) {
-  if (is.null(turns) || length(turns) == 0L) {
+cleared_tool_results_from_turns <- function(saved) {
+  if (is.null(saved) || length(saved) == 0L) {
     return(list())
   }
-  if (!is.list(turns)) {
-    cli_abort("Expected a list of turns.")
+  keys <- saved$keys
+  markers <- saved$markers
+  turns <- saved$turns
+  if (
+    !is.character(keys) ||
+      !is.character(markers) ||
+      length(keys) != length(markers) ||
+      anyDuplicated(keys) ||
+      !is.list(turns) ||
+      length(turns) != 1L ||
+      !S7::S7_inherits(turns[[1L]], ellmer::UserTurn)
+  ) {
+    cli_abort("Expected positions, markers and one user turn.")
   }
-  originals <- list()
-  for (turn in turns) {
-    if (!S7::S7_inherits(turn, ellmer::UserTurn)) {
-      cli_abort("Expected user turns.")
-    }
-    for (content in turn@contents) {
-      id <- tryCatch(content@request@id, error = function(e) NULL)
-      if (
-        !S7::S7_inherits(content, ellmer::ContentToolResult) ||
-          !is_nonempty_string(id)
-      ) {
-        cli_abort("Expected tool results with tool call IDs.")
-      }
-      originals[[id]] <- content
-    }
+  contents <- turns[[1L]]@contents
+  if (
+    length(contents) != length(keys) ||
+      !all(vapply(
+        contents,
+        function(x) S7::S7_inherits(x, ellmer::ContentToolResult),
+        logical(1)
+      ))
+  ) {
+    cli_abort("Expected one tool result per saved position.")
   }
-  originals
+  stats::setNames(
+    Map(
+      function(marker, content) {
+        list(marker = marker, content = content)
+      },
+      markers,
+      contents
+    ),
+    keys
+  )
 }

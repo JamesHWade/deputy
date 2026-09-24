@@ -107,6 +107,54 @@ test_that("microcompact refuses a keep_last that is not a whole number", {
   expect_error(agent$microcompact(marker = ""), "non-empty")
 })
 
+test_that("keep_last = Inf keeps every turn", {
+  chat <- create_compaction_mock_chat()
+  chat$set_turns(microcompact_turns())
+  agent <- Agent$new(chat = chat)
+  expect_identical(agent$microcompact(keep_last = Inf)$cleared, 0L)
+  expect_identical(agent$microcompact(keep_last = 1e12)$cleared, 0L)
+})
+
+test_that("a reused tool call id restores only the cleared occurrence", {
+  exchange <- function(value) {
+    request <- ellmer::ContentToolRequest(
+      id = "same",
+      name = "search",
+      arguments = list()
+    )
+    list(
+      ellmer::AssistantTurn(contents = list(request)),
+      ellmer::UserTurn(
+        contents = list(
+          ellmer::ContentToolResult(value = value, request = request)
+        )
+      )
+    )
+  }
+  turns <- c(
+    list(create_mock_user_turn("Q1")),
+    exchange("older result"),
+    list(create_mock_assistant_turn("A1"), create_mock_user_turn("Q2")),
+    exchange("newer result"),
+    list(create_mock_assistant_turn("A2"))
+  )
+  chat <- create_compaction_mock_chat()
+  chat$set_turns(turns)
+  agent <- Agent$new(chat = chat)
+  expect_identical(
+    agent$microcompact(keep_last = 3L, marker = "[cleared]")$cleared,
+    1L
+  )
+  expect_identical(
+    result_values(agent$get_context_turns()),
+    c("[cleared]", "newer result")
+  )
+  expect_identical(
+    result_values(agent$get_turns()),
+    c("older result", "newer result")
+  )
+})
+
 test_that("saved sessions keep cleared originals and set_turns() drops them", {
   chat <- create_compaction_mock_chat()
   chat$set_turns(microcompact_turns())
@@ -143,7 +191,8 @@ test_that("last_turn() and results without a call id keep their values", {
     "the latest search result"
   )
 
-  # A result whose call has no id cannot be restored, so it is not cleared.
+  # Results are tracked by position, so a result without a call id is
+  # cleared from context and still restored in the conversation view.
   request <- ellmer::ContentToolRequest(
     id = "",
     name = "search",
@@ -162,8 +211,12 @@ test_that("last_turn() and results without a call id keep their values", {
   chat <- ellmer::chat_openai(credentials = function() "unused", echo = "none")
   chat$set_turns(turns)
   agent <- Agent$new(chat = chat)
-  expect_identical(agent$microcompact(keep_last = 0L)$cleared, 0L)
-  expect_identical(result_values(agent$get_context_turns()), "no id")
+  expect_identical(agent$microcompact(keep_last = 0L)$cleared, 1L)
+  expect_identical(
+    result_values(agent$get_context_turns()),
+    "[Old tool result cleared to save context.]"
+  )
+  expect_identical(result_values(agent$get_turns()), "no id")
 })
 
 test_that("durable approvals carry cleared originals through resume", {
@@ -211,4 +264,16 @@ test_that("durable approvals carry cleared originals through resume", {
   ))
   expect_false("[cleared]" %in% values)
   expect_true("[cleared]" %in% result_values(agent$get_context_turns()))
+})
+
+test_that("originals survive a later compaction into the retained prefix", {
+  chat <- create_compaction_mock_chat()
+  chat$set_turns(microcompact_turns())
+  agent <- Agent$new(chat = chat)
+  agent$microcompact(keep_last = 0L, marker = "[cleared]")
+  agent$compact(keep_last = 2L, summary = "Summary of earlier work")
+  expect_identical(
+    result_values(agent$get_turns()),
+    result_values(microcompact_turns())
+  )
 })
