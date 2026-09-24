@@ -72,7 +72,10 @@ approvals still govern every call.
 A \link{LeadAgent} accepts the policy for its whole delegation tree. Its own
 \code{delegate_to_agent} tool is allowed because every child inherits the policy:
 each definition's tools must pass the same check, and a designated tool may
-live in the lead or in children but must be the same tool everywhere. Child
+live in the lead or in children but must be the same tool everywhere. A
+child's designated tool must be declared in its definition's \code{tools} or in
+\link{Skill} values; skill directories load when the child is built and cannot
+supply one. Child
 trusted results are recorded in the lead's run and delivered to its
 \code{on_result}, with the child's correlation fields. Graph routes and other
 composition tools are still rejected.

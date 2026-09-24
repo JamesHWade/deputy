@@ -65,7 +65,10 @@ the event is built.
   are checked when the definition is registered and again when the child is
   built, which covers skills and host resource factories. A designated name
   must refer to the same tool object in the lead and in every definition, so
-  each result type keeps one producer. A child's trusted result is recorded
+  each result type keeps one producer. Producers must therefore be declared
+  statically, in `tools` or `Skill` values: a skill directory loads fresh
+  objects each time a child is built, so it may add other checked tools but
+  never a producer. A child's trusted result is recorded
   in the child's run and in the lead's run, and delivered to the lead's
   `on_result` with the child's `delegation_id` and agent identity. Children
   cannot delegate further, and graph routes and other composition tools stay

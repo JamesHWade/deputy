@@ -671,8 +671,9 @@ LeadAgent <- R6::R6Class(
       if (is.null(policy)) {
         return(invisible(NULL))
       }
-      # Skill values declare their tools; skills named by path load only when
-      # the child is built, where the child's own registry check applies.
+      # Designated producers must be declared statically, in tools or Skill
+      # values. Skills named by path load fresh objects when each child is
+      # built, so they may add other checked tools but never a producer.
       definitions <- lapply(private$.sub_agent_defs, function(def) {
         skill_tools <- unlist(
           lapply(def$skills, function(skill) {
@@ -685,23 +686,14 @@ LeadAgent <- R6::R6Class(
           def$disallowed_tools
         ))
       })
-      deferred <- any(vapply(
-        private$.sub_agent_defs,
-        function(def) any(vapply(def$skills, is.character, logical(1))),
-        logical(1)
-      ))
       sources <- trusted_tree_sources(policy, c(list(tools), definitions))
       check_trusted_registry(
         policy,
         tools,
-        available = if (deferred) {
-          policy@results
-        } else {
-          unique(c(
-            names(tools),
-            unlist(lapply(definitions, names), use.names = FALSE)
-          ))
-        },
+        available = unique(c(
+          names(tools),
+          unlist(lapply(definitions, names), use.names = FALSE)
+        )),
         allow_delegation = TRUE,
         sources = sources
       )

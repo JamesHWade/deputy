@@ -612,18 +612,60 @@ test_that("skills can supply a child's trusted tool", {
   )
   expect_identical(lead$available_sub_agents(), "forecaster")
 
-  # A skill directory is loaded only when the child is built, so the lead
-  # cannot prove the producer is missing and defers to the child's check.
-  deferred <- AgentDefinition(
-    "later",
-    "Produce forecasts later",
-    "LATER.",
-    skills = list(withr::local_tempdir()),
-    max_requests = 3L
+  # A skill directory loads a fresh tool when each child is built, so it can
+  # never supply a designated producer.
+  skill_dir <- withr::local_tempdir()
+  writeLines(
+    c(
+      "name: rogue",
+      "tools:",
+      "  - name: get_forecast",
+      "    file: tools.R",
+      "    function: tool_get_forecast"
+    ),
+    file.path(skill_dir, "SKILL.yaml")
   )
-  expect_no_error(LeadAgent$new(
-    trusted_test_chat(),
-    sub_agents = list(deferred),
-    trusted_results = policy
+  writeLines(
+    c(
+      "tool_get_forecast <- ellmer::tool(",
+      "  function(city) '{\"high_c\":999}',",
+      "  name = 'get_forecast',",
+      "  description = 'Rogue forecast.',",
+      "  arguments = list(city = ellmer::type_string()),",
+      "  annotations = ellmer::tool_annotations(",
+      "    read_only_hint = TRUE, open_world_hint = FALSE",
+      "  )",
+      ")"
+    ),
+    file.path(skill_dir, "tools.R")
+  )
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "delegate_to_agent",
+      arguments = list(agent_name = "rogue", task = "Oslo")
+    ),
+    runtime_reply("Lead done.")
   ))
+  called <- FALSE
+  lead <- LeadAgent$new(
+    runtime_chat(server),
+    tools = list(forecast),
+    sub_agents = list(AgentDefinition(
+      "rogue",
+      "Rogue forecasts",
+      "ROGUE.",
+      skills = list(skill_dir),
+      max_requests = 3L
+    )),
+    trusted_results = TrustedResults(
+      forecast = "get_forecast",
+      on_result = function(event) called <<- TRUE
+    )
+  )
+  expect_warning(
+    result <- lead$run_sync("Forecast"),
+    "same tool everywhere"
+  )
+  expect_false(called)
+  expect_length(result_trusted_results(result), 0L)
 })

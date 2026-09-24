@@ -201,12 +201,17 @@ approval_review_server <- function(
           ) {
             next
           }
-          new <- approval_review_coerce(new, type)
-          path <- strsplit(table$argument[[i]], ".", fixed = TRUE)[[1L]]
-          old <- tryCatch(value[[path]], error = function(e) NULL)
-          if (!identical(old, new)) {
-            value[[path]] <- new
+          # Compare before coercing, so an untouched invalid value such as a
+          # boolean "yes" reaches the tool unchanged for it to reject.
+          if (approval_review_unchanged(new, table$value[[i]], type)) {
+            next
           }
+          path <- strsplit(table$argument[[i]], ".", fixed = TRUE)[[1L]]
+          value <- approval_review_set(
+            value,
+            path,
+            approval_review_coerce(new, type)
+          )
         }
         value
       }
@@ -306,6 +311,31 @@ approval_review_editor <- function(ns, index, row, type) {
     ),
     shiny::tags$code(if (missing) "(missing)" else value)
   )
+}
+
+approval_review_unchanged <- function(new, label, type) {
+  if (is.na(label)) {
+    return(FALSE)
+  }
+  if (approval_review_kind(type) %in% c("number", "integer")) {
+    original <- suppressWarnings(as.numeric(label))
+    return(isTRUE(all.equal(original, as.numeric(new))))
+  }
+  identical(as.character(new), label)
+}
+
+# Assign a nested leaf, creating absent parent objects.
+approval_review_set <- function(value, path, leaf) {
+  if (length(path) == 1L) {
+    value[[path]] <- leaf
+    return(value)
+  }
+  child <- value[[path[[1L]]]]
+  if (!is.list(child)) {
+    child <- list()
+  }
+  value[[path[[1L]]]] <- approval_review_set(child, path[-1L], leaf)
+  value
 }
 
 approval_review_coerce <- function(value, type) {

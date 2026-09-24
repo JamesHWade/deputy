@@ -40,7 +40,10 @@ NULL
 #' A [LeadAgent] accepts the policy for its whole delegation tree. Its own
 #' `delegate_to_agent` tool is allowed because every child inherits the policy:
 #' each definition's tools must pass the same check, and a designated tool may
-#' live in the lead or in children but must be the same tool everywhere. Child
+#' live in the lead or in children but must be the same tool everywhere. A
+#' child's designated tool must be declared in its definition's `tools` or in
+#' [Skill] values; skill directories load when the child is built and cannot
+#' supply one. Child
 #' trusted results are recorded in the lead's run and delivered to its
 #' `on_result`, with the child's correlation fields. Graph routes and other
 #' composition tools are still rejected.
@@ -267,7 +270,8 @@ check_trusted_registry <- function(
   tools,
   available = names(tools),
   allow_delegation = FALSE,
-  sources = NULL
+  sources = NULL,
+  require_source = FALSE
 ) {
   if (is.null(policy)) {
     return(invisible(NULL))
@@ -309,6 +313,12 @@ check_trusted_registry <- function(
       if (!is.null(bypass) || !source_type %in% c("function", "package")) {
         trusted_registry_abort(
           "Trusted tool {.val {name}} for {.val {trusted_type}} must be a local function tool that neither executes code nor delegates.",
+          tool_name = name
+        )
+      }
+      if (isTRUE(require_source) && is.null(sources[[name]])) {
+        trusted_registry_abort(
+          "Trusted tool {.val {name}} must be declared in an AgentDefinition's tools or Skill values, not loaded from a skill directory.",
           tool_name = name
         )
       }

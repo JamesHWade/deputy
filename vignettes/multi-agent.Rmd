@@ -915,7 +915,8 @@ delegation tree. The policy implements Will Landau and Sam Parmar's
 Deputy's extension of them. Every child inherits it, so each definition's tools must pass
 the same no-bypass check: no code execution, no further delegation, and only
 read-only, closed-world tools unless exempted. A designated tool can live in a
-child, but it must be the same tool object wherever it appears. When a child
+child, but it must be the same tool object wherever it appears, declared in the
+definition's `tools` or in a `Skill` value rather than a skill directory. When a child
 runs it, the result is recorded in the lead's run and sent to the lead's
 `on_result`, carrying the child's `delegation_id`:
 

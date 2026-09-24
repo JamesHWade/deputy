@@ -191,3 +191,66 @@ test_that("untouched approval never fills missing or out-of-range fields", {
   })
   expect_identical(seen, list(mode = "turbo", units = NULL, verbose = NULL))
 })
+
+test_that("untouched invalid values and edits inside absent objects are kept", {
+  skip_if_not_installed("shiny")
+  directory <- withr::local_tempdir()
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "configure", arguments = list(verbose = "yes")),
+    runtime_reply("ok"),
+    runtime_reply(tool = "configure", arguments = list(verbose = TRUE)),
+    runtime_reply("ok")
+  ))
+  seen <- list()
+  configure <- ellmer::tool(
+    fun = function(verbose, options = NULL) {
+      seen[[length(seen) + 1L]] <<- list(verbose = verbose, options = options)
+      "configured"
+    },
+    name = "configure",
+    description = "Configure.",
+    arguments = list(
+      verbose = ellmer::type_boolean(),
+      options = ellmer::type_object(
+        units = ellmer::type_enum(c("c", "f")),
+        .required = FALSE
+      )
+    ),
+    convert = FALSE,
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = list(configure),
+    working_dir = directory,
+    approval_dir = directory,
+    permissions = Permissions(
+      can_use_tool = function(tool_name, tool_input, context) {
+        PermissionResultPending("Review.")
+      }
+    )
+  )
+  agent$run_sync("Configure")
+  shiny::testServer(approval_review_server, args = list(agent = agent), {
+    expect_identical(output$review$html |> grepl(pattern = "yes"), TRUE)
+    session$setInputs(field_1 = "yes", field_2 = "")
+    session$setInputs(approve = 1)
+    expect_null(outcome()$tool_input)
+  })
+  expect_identical(seen[[1L]]$verbose, "yes")
+
+  agent$run_sync("Configure again")
+  shiny::testServer(approval_review_server, args = list(agent = agent), {
+    session$setInputs(field_1 = "true", field_2 = "f")
+    session$setInputs(approve = 1)
+    expect_null(outcome()$error)
+    expect_identical(
+      outcome()$tool_input,
+      list(verbose = TRUE, options = list(units = "f"))
+    )
+  })
+  expect_identical(seen[[2L]]$options, list(units = "f"))
+})

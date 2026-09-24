@@ -2746,7 +2746,8 @@ Agent <- R6::R6Class(
           } else {
             names(tools)
           },
-          sources = private$.trusted_sources
+          sources = private$.trusted_sources,
+          require_source = isTRUE(private$.trusted_tree_member)
         )
       },
 
