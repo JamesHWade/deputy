@@ -567,8 +567,15 @@ LeadAgent <- R6::R6Class(
         add = TRUE
       )
 
-      # Get the model to use
-      if (def$model == "inherit") {
+      # Get the model to use. "inherit" clones the parent chat. A bare model
+      # id (no "provider/" prefix) also clones it, keeping the lead's
+      # provider, endpoint and credentials, and switches only the model: the
+      # way to run a child on a cheaper model of a provider that
+      # ellmer::chat() cannot name, such as a gateway client built outside
+      # ellmer.
+      same_provider <- def$model == "inherit" ||
+        !grepl("/", def$model, fixed = TRUE)
+      if (same_provider) {
         # Clone the parent chat to get the same provider/model config,
         # then clear conversation history so the sub-agent starts fresh.
         sub_chat <- tryCatch(
@@ -582,11 +589,18 @@ LeadAgent <- R6::R6Class(
             # The child definition chooses its tools. Inherited provider
             # configuration must not import the parent's executable registry.
             cloned$set_tools(list())
+            if (def$model != "inherit") {
+              cloned$set_model(def$model)
+            }
             cloned
           },
           error = function(e) {
             cli_abort(c(
-              "Could not inherit model from parent for sub-agent {.val {def$name}}",
+              if (def$model == "inherit") {
+                "Could not inherit model from parent for sub-agent {.val {def$name}}"
+              } else {
+                "Could not use model {.val {def$model}} on the parent's provider for sub-agent {.val {def$name}}"
+              },
               "x" = e$message,
               "i" = "Please specify an explicit {.arg model} in {.fn agent_definition}"
             ))
