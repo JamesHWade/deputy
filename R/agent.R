@@ -2647,16 +2647,28 @@ Agent <- R6::R6Class(
           },
           process_result = private$process_tool_result,
           begin_execution = private$begin_tool_execution,
-          execute = private$execute_tool
+          execute = private$execute_tool,
+          invocation_id = private$tool_invocation_id
         )
+      },
+
+      # Trusted tools run only as the tool of ellmer's active request, so host
+      # code or another tool cannot claim a pending governed call or publish.
+      tool_invocation_id = function(tool, arguments) {
+        if (is.null(trusted_result_type(private$.trusted_results, tool@name))) {
+          return(composition_invocation_id(tool, arguments))
+        }
+        trusted_invocation_id(tool)
       },
 
       execute_tool = function(tool, arguments, execution_id = NULL) {
         validate_composition_tool_owner(tool, self)
         if (
-          is_nonempty_string(execution_id) &&
-            !is.null(trusted_result_type(private$.trusted_results, tool@name))
+          !is.null(trusted_result_type(private$.trusted_results, tool@name))
         ) {
+          if (!is_nonempty_string(execution_id)) {
+            trusted_invocation_abort(tool@name)
+          }
           private$trusted_arguments[[execution_id]] <- arguments
         }
         if (!is.null(composition_tool_owner(tool))) {

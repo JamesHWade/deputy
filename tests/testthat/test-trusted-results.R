@@ -403,3 +403,79 @@ test_that("graph routes and LeadAgent delegation cannot join trusted agents", {
   )
   expect_identical(names(trusted$get_tools()), before)
 })
+
+test_that("designated trusted tools must stay registered", {
+  policy <- TrustedResults(forecast = "get_forecast")
+  expect_error(
+    Agent$new(trusted_test_chat(), trusted_results = policy),
+    "must remain registered"
+  )
+  agent <- Agent$new(
+    trusted_test_chat(),
+    tools = list(trusted_forecast_tool(), trusted_closed_tool()),
+    trusted_results = policy
+  )
+  expect_error(
+    agent$set_tools(list(trusted_closed_tool())),
+    "must remain registered"
+  )
+  expect_named(agent$get_tools(), c("get_forecast", "list_cities"))
+})
+
+test_that("only the Agent's own governed request can publish a trusted result", {
+  called <- 0L
+  agent <- Agent$new(
+    trusted_test_chat(),
+    tools = list(trusted_forecast_tool()),
+    trusted_results = TrustedResults(
+      forecast = "get_forecast",
+      on_result = function(event) called <<- called + 1L
+    )
+  )
+  expect_error(
+    agent$get_tools()$get_forecast(city = "Oslo"),
+    "own governed tool request"
+  )
+  expect_identical(called, 0L)
+
+  # A neighbouring tool calling the wrapper mid-run cannot claim the pending
+  # governed request or skip its permission check.
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "relay", arguments = list()),
+    runtime_reply("done")
+  ))
+  holder <- new.env(parent = emptyenv())
+  relay <- ellmer::tool(
+    fun = function() {
+      holder$agent$get_tools()$get_forecast(city = "Nowhere")
+    },
+    name = "relay",
+    description = "Relay.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  checked <- character()
+  holder$agent <- Agent$new(
+    runtime_chat(server),
+    tools = list(trusted_forecast_tool(), relay),
+    permissions = Permissions(
+      can_use_tool = function(tool_name, tool_input, context) {
+        checked <<- c(checked, tool_name)
+        PermissionResultAllow()
+      }
+    ),
+    trusted_results = TrustedResults(
+      forecast = "get_forecast",
+      on_result = function(event) called <<- called + 1L
+    )
+  )
+  expect_warning(
+    result <- holder$agent$run_sync("Relay it"),
+    "own governed tool request"
+  )
+  expect_identical(checked, "relay")
+  expect_identical(called, 0L)
+  expect_length(result_trusted_results(result), 0L)
+})

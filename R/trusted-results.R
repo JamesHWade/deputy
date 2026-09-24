@@ -16,6 +16,7 @@ NULL
 #' skill and MCP loading, cloning, and graph route installation. Registration
 #' fails, leaving the previous registry intact, when:
 #'
+#' * a designated trusted tool is missing from the registry;
 #' * a trusted tool is not a local function tool (it is provider-native or
 #'   MCP), executes code, or delegates to another Agent;
 #' * any other tool executes model-supplied code or delegates to another Agent
@@ -34,6 +35,10 @@ NULL
 #' not grant permission to call any tool. Permissions, hooks, and durable
 #' approvals still govern every call. LeadAgent delegation is rejected because
 #' child text reaches the lead model; run trusted tools in a separate Agent.
+#'
+#' A trusted tool runs only as the tool of the Agent's own governed request, so
+#' permissions, hooks, and approvals always precede it. Calls from host code or
+#' from inside another tool fail without publishing a result.
 #'
 #' Tool argument values given to the trusted tool are recorded in the event
 #' after ellmer's argument conversion and Deputy's path resolution.
@@ -225,6 +230,13 @@ check_trusted_registry <- function(policy, tools) {
   if (is.null(policy)) {
     return(invisible(NULL))
   }
+  missing <- setdiff(policy@results, names(tools))
+  if (length(missing) > 0L) {
+    trusted_registry_abort(
+      "Trusted tool {.val {missing}} must remain registered.",
+      tool_name = missing[[1L]]
+    )
+  }
   for (name in names(tools)) {
     tool <- tools[[name]]
     if (
@@ -281,6 +293,33 @@ check_trusted_registry <- function(policy, tools) {
     }
   }
   invisible(NULL)
+}
+
+trusted_invocation_abort <- function(tool_name) {
+  abort_tool_execution(
+    "Trusted tool {.val {tool_name}} can only run through its own governed tool request.",
+    tool_name = tool_name
+  )
+}
+
+# Return the provider request ID for the trusted tool's own active request.
+# NULL means the provider omitted an ID; name correlation then applies.
+trusted_invocation_id <- function(tool) {
+  context <- tryCatch(ellmer::tool_context(), error = function(error) NULL)
+  request <- context$request
+  source <- if (!is.null(request) && !is.null(request@tool)) {
+    attr(request@tool, "deputy_runtime_source_tool", exact = TRUE) %||%
+      request@tool
+  }
+  if (
+    is.null(request) ||
+      !identical(request@name, tool@name) ||
+      (!is.null(source) && !identical(source, tool))
+  ) {
+    trusted_invocation_abort(tool@name)
+  }
+  id <- tryCatch(request@id, error = function(error) NULL)
+  if (is_nonempty_string(id)) id else NULL
 }
 
 trusted_result_receipt <- function(id, type) {

@@ -47,6 +47,7 @@ tools are published: at construction, \verb{$set_tools()}, \verb{$register_tools
 skill and MCP loading, cloning, and graph route installation. Registration
 fails, leaving the previous registry intact, when:
 \itemize{
+\item a designated trusted tool is missing from the registry;
 \item a trusted tool is not a local function tool (it is provider-native or
 MCP), executes code, or delegates to another Agent;
 \item any other tool executes model-supplied code or delegates to another Agent
@@ -66,6 +67,10 @@ it constrains which tools may be registered alongside trusted ones and does
 not grant permission to call any tool. Permissions, hooks, and durable
 approvals still govern every call. LeadAgent delegation is rejected because
 child text reaches the lead model; run trusted tools in a separate Agent.
+
+A trusted tool runs only as the tool of the Agent's own governed request, so
+permissions, hooks, and approvals always precede it. Calls from host code or
+from inside another tool fail without publishing a result.
 
 Tool argument values given to the trusted tool are recorded in the event
 after ellmer's argument conversion and Deputy's path resolution.
