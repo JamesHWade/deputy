@@ -79,13 +79,14 @@ provider and otherwise estimates locally: the usage reported by the most
 recent completed response (input, cached input and output tokens) plus a
 conservative character estimate of later content and the pending request,
 and of any growth in the system prompt or tool definitions since that
-response's request was estimated. Without reported usage, the system
-prompt, tool definitions, turns and pending request are estimated by
+response's request was estimated (or, for turns installed by \verb{$set_turns()}
+or a session load, since they were installed). Without reported usage, the
+system prompt, tool definitions, turns and pending request are estimated by
 characters. \code{"provider"} uses only the provider's count, so automatic
 compaction does not run when it cannot count. Character estimates assume
 three UTF-8 bytes per token (so CJK text and emoji count about a token per
-character) and a fixed allowance per image; they are deliberately high for
-typical text and JSON.}
+character), a fixed allowance per image and per document page; they are
+deliberately high for typical text and JSON.}
 }
 \value{
 A read-only \code{ContextPolicy} S7 object.

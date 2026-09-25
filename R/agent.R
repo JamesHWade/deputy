@@ -269,6 +269,7 @@ Agent <- R6::R6Class(
         private$.context_policy,
         private$.session_id
       )
+      private$reset_frame_snapshots()
 
       reg.finalizer(self, finalize_owned_conversations, onexit = TRUE)
       invisible(self)
@@ -1142,7 +1143,7 @@ Agent <- R6::R6Class(
       private$.compacted_turns <- list()
       private$.cleared_tool_results <- list()
       private$.usage_stale_turns <- 0L
-      private$.frame_snapshots <- list()
+      private$reset_frame_snapshots()
       invisible(self)
     },
 

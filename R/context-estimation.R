@@ -180,6 +180,9 @@ ellmer_token_count_observe <- function(chat, error) {
 # can overflow the model's context.
 context_estimate_bytes_per_token <- 3
 context_estimate_image_tokens <- 1600
+# A document page: providers send its extracted text and, for PDFs, often an
+# image of the page as well.
+context_estimate_page_tokens <- 3000
 
 estimate_text_tokens <- function(text) {
   text <- as.character(text)
@@ -205,6 +208,12 @@ estimate_content_tokens <- function(content) {
   }
   if (inherits(content, "ellmer::ContentImage")) {
     return(context_estimate_image_tokens)
+  }
+  if (inherits(content, "ellmer::ContentPDF")) {
+    return(estimate_document_tokens(content@data, "application/pdf"))
+  }
+  if (inherits(content, "ellmer::ContentDocument")) {
+    return(estimate_document_tokens(content@data, content@mime_type))
   }
   if (inherits(content, "ellmer::ContentToolRequest")) {
     return(estimate_text_tokens(c(
@@ -238,6 +247,35 @@ estimate_content_tokens <- function(content) {
     public_json_text(content),
     error = function(error) paste(format(content), collapse = "\n")
   ))
+}
+
+# An inline document is sent whole, so it costs far more than its short
+# display text. A PDF counts per page (page objects in its body, or its size
+# at ~50 KB a page when they are compressed out of sight); any other document
+# at least counts its payload as text.
+estimate_document_tokens <- function(data, mime_type = "") {
+  payload <- tryCatch(
+    jsonlite::base64_dec(paste(data, collapse = "")),
+    error = function(error) NULL
+  )
+  bytes <- if (is.null(payload)) {
+    ceiling(sum(nchar(data, type = "bytes")) * 3 / 4)
+  } else {
+    length(payload)
+  }
+  by_payload <- ceiling(bytes / context_estimate_bytes_per_token)
+  if (!identical(mime_type, "application/pdf")) {
+    return(max(context_estimate_page_tokens, by_payload))
+  }
+  pages <- if (is.null(payload)) {
+    0L
+  } else {
+    length(grepRaw("/Type[[:space:]]*/Page[^s]", payload, all = TRUE))
+  }
+  if (pages == 0L) {
+    pages <- max(1, ceiling(bytes / 50000))
+  }
+  pages * context_estimate_page_tokens
 }
 
 # Tool definitions are sent with every request; count their names,
@@ -347,8 +385,9 @@ estimate_frame_tokens <- function(system_prompt, tools) {
 # of that request; `$set_system_prompt()`, `$set_tools()` and friends can
 # enlarge them afterwards. `snapshots` records the frame before each
 # estimated request (with the turn count then), so the frame the anchor's
-# request carried is the latest snapshot taken before that turn. Without one
-# (a restored conversation, say), the anchor is trusted as it is. Shrinkage
+# request carried is the latest snapshot taken before that turn. Turns
+# installed wholesale have a baseline at turn 0 (the frame when they were
+# installed); without any record, the anchor is trusted as it is. Shrinkage
 # is not subtracted: over-estimating only compacts early.
 frame_growth <- function(frame, snapshots, index) {
   before <- Filter(function(snapshot) snapshot$turns < index, snapshots)

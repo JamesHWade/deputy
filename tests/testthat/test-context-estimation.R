@@ -342,10 +342,33 @@ test_that("prompt and tool growth after a reported response is added to its usag
   expect_gte(grown$tokens - steady$tokens, growth)
 })
 
-test_that("a replaced conversation forgets earlier frame records", {
+test_that("growth before the first estimate of a preloaded conversation counts", {
   local_ellmer_observations()
   withr::local_options(ellmer_max_tries = 1)
-  server <- local_runtime_server(list(not_found_response()))
+  server <- local_runtime_server(list(
+    not_found_response(),
+    not_found_response()
+  ))
+  chat <- gateway_chat(server)
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    reported_turn("A1", input = 5000, output = 100)
+  ))
+  agent <- Agent$new(chat = chat)
+  # The host enlarges the prompt before any estimate has run.
+  prompt <- strrep("Always cite sources. ", 300)
+  chat$set_system_prompt(prompt)
+  estimate <- estimate_context(agent, list("Q2"))
+  expect_gte(estimate$tokens, 5100 + estimate_text_tokens(prompt))
+})
+
+test_that("a replaced conversation measures growth from the frame at replacement", {
+  local_ellmer_observations()
+  withr::local_options(ellmer_max_tries = 1)
+  server <- local_runtime_server(list(
+    not_found_response(),
+    not_found_response()
+  ))
   chat <- gateway_chat(server)
   chat$set_turns(list(
     create_mock_user_turn("Q1"),
@@ -354,7 +377,58 @@ test_that("a replaced conversation forgets earlier frame records", {
   agent <- Agent$new(chat = chat)
   estimate_context(agent, list("Q2"))
   private <- agent$.__enclos_env__$private
-  expect_length(private$.frame_snapshots, 1L)
   agent$set_turns(chat$get_turns())
-  expect_length(private$.frame_snapshots, 0L)
+  # Earlier records are dropped; only the frame at replacement remains.
+  expect_length(private$.frame_snapshots, 1L)
+  prompt <- strrep("Always cite sources. ", 300)
+  chat$set_system_prompt(prompt)
+  estimate <- estimate_context(agent, list("Q2"))
+  expect_gte(estimate$tokens, 5100 + estimate_text_tokens(prompt))
+})
+
+test_that("inline PDFs and documents count per page, not by their descriptor", {
+  pdf_pages <- function(n) {
+    pages <- paste(
+      sprintf(
+        "%d 0 obj << /Type /Page /Parent 2 0 R >> endobj",
+        seq_len(n) + 2L
+      ),
+      collapse = "\n"
+    )
+    paste0(
+      "%PDF-1.4\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
+      "2 0 obj << /Type /Pages /Count ",
+      n,
+      " >> endobj\n",
+      pages,
+      "\n%%EOF"
+    )
+  }
+  encode <- function(text) jsonlite::base64_enc(charToRaw(text))
+  pdf <- ellmer::ContentPDF(
+    type = "application/pdf",
+    data = encode(pdf_pages(4)),
+    filename = "report.pdf"
+  )
+  expect_gte(estimate_content_tokens(pdf), 4 * context_estimate_page_tokens)
+  expect_gt(
+    estimate_content_tokens(ellmer::ContentPDF(
+      type = "application/pdf",
+      data = encode(pdf_pages(8)),
+      filename = "report.pdf"
+    )),
+    estimate_content_tokens(pdf)
+  )
+  # A document ellmer sends inline counts its payload at least.
+  text <- strrep("Quarterly revenue by segment. ", 2000)
+  document <- ellmer::ContentDocument(
+    mime_type = "text/plain",
+    data = encode(text),
+    filename = "notes.txt"
+  )
+  expect_gte(estimate_content_tokens(document), estimate_text_tokens(text))
+  expect_gte(
+    estimate_content_tokens(ellmer::UserTurn(list(pdf))),
+    4 * context_estimate_page_tokens
+  )
 })
