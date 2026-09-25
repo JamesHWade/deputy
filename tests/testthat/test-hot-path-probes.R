@@ -30,24 +30,6 @@ probe_tool_result_turn <- function() {
   ellmer::UserTurn(list(ellmer::ContentToolResult("done", request = request)))
 }
 
-local_ellmer_observations <- function(env = parent.frame()) {
-  saved <- as.list(ellmer_observations, all.names = TRUE)
-  rm(
-    list = ls(ellmer_observations, all.names = TRUE),
-    envir = ellmer_observations
-  )
-  withr::defer(
-    {
-      rm(
-        list = ls(ellmer_observations, all.names = TRUE),
-        envir = ellmer_observations
-      )
-      list2env(saved, envir = ellmer_observations)
-    },
-    envir = env
-  )
-}
-
 uncached_usage_summary <- function(chat) {
   provider_usage_summary_for(chat, chat$get_turns(), FALSE)
 }

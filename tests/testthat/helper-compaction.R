@@ -43,3 +43,22 @@ compaction_hook_log <- function(agent) {
   }
   seen
 }
+
+# Isolate process-wide ellmer probe observations within one test.
+local_ellmer_observations <- function(env = parent.frame()) {
+  saved <- as.list(ellmer_observations, all.names = TRUE)
+  rm(
+    list = ls(ellmer_observations, all.names = TRUE),
+    envir = ellmer_observations
+  )
+  withr::defer(
+    {
+      rm(
+        list = ls(ellmer_observations, all.names = TRUE),
+        envir = ellmer_observations
+      )
+      list2env(saved, envir = ellmer_observations)
+    },
+    envir = env
+  )
+}

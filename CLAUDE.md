@@ -387,7 +387,10 @@ rounds at ellmer's request-start boundary. Its isolated summary streams share
 the run's budget and cancellation controller. ContextPolicy's explicit summary
 fallback Chats never select the task provider or inherit executable tools and
 callbacks. Installing a compacted window preserves prior usage and completed
-tool effects. Manual `compact()` remains synchronous. Evaluation cases and the
+tool effects. Manual `compact()` remains synchronous. When the provider cannot
+count tokens, `ContextPolicy(estimator = "auto")` estimates locally from the
+latest reported usage plus characters (`R/context-estimation.R`); kept-turn
+subsets and usage reported before a compaction use characters only. Evaluation cases and the
 future history-retrieval comparison are described in `dev/compaction-evaluation.md`.
 `Agent$get_turns()` and `turns()` expose the complete selected conversation;
 `get_context_turns()` exposes the compacted model input. Accepted compaction

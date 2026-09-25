@@ -1,5 +1,13 @@
 # deputy (development version)
 
+* `ContextPolicy()` gains `estimator`. With the default `"auto"`, automatic
+  compaction now runs when the provider cannot count tokens: it adds a
+  conservative character estimate of later content to the usage reported for
+  the latest response. Previously such providers, including gateways whose
+  token-counting route returns HTTP 404, never compacted. `"provider"` keeps
+  the old behaviour. A token-counting endpoint that returns HTTP 404, 405 or
+  501 is asked only once per provider class and base URL (#213).
+
 * `Agent$microcompact()` clears old tool results from the model's context,
   as Posit Assistant's `/microcompact` does: results before the last
   `keep_last` turns become a marker unless their tool is in `keep_tools`. No

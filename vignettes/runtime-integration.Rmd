@@ -50,6 +50,14 @@ summary. Summary failures still produce an inspectable `last_run()` with termina
 hooks and usage. Between tool rounds, compaction runs at the next model-request
 boundary, after all tool results settle.
 
+The threshold compares the provider's token count when it has one. Many
+endpoints cannot count tokens (some gateways answer the counting route with
+HTTP 404), so the default `ContextPolicy(estimator = "auto")` then estimates
+locally: the usage the provider reported for its latest response, plus a
+conservative character estimate of the tool results and request added since.
+The `compaction_start` event's `estimate_source` says which was used.
+`estimator = "provider"` keeps compaction off when the provider cannot count.
+
 If summary failure, cancellation, or a limit stops that boundary, settled tool
 results remain in the conversation and survive save/load. Resuming sends those
 results once, without repeating the tool or inventing an assistant response.
