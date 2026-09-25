@@ -1,5 +1,13 @@
 # deputy (development version)
 
+* `ask_user` handlers from `tools_interactive()` can now serve hosts that
+  cannot block for input, such as Shiny. A handler may return a promise for
+  the answers, which the tool awaits within the run, or `AskUserDeferred()`,
+  which shows the questions and asks the model to end its turn so the answers
+  arrive as the person's next message. `AskUserDeferred(extra = )` attaches a
+  host display to the tool result. Delegated agents accept promises and reject
+  deferral, since their answers must return within the child's run.
+
 * `Agent$microcompact()` clears old tool results from the model's context,
   as Posit Assistant's `/microcompact` does: results before the last
   `keep_last` turns become a marker unless their tool is in `keep_tools`. No

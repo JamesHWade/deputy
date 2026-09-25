@@ -574,7 +574,10 @@ review module. `inst/examples/trusted-results/` is the three-area app.
 
 Concurrent and hosted Agents bind their own handler with
 `tools_interactive(callback, context)`. The context carries stable routing
-values and may be resolved lazily. `set_ask_user_callback()` is only a legacy
+values and may be resolved lazily. Hosts that cannot block return a promise
+for the answers, or `AskUserDeferred()` so the model ends its turn and the
+answers arrive as the next user message; delegated children reject deferral.
+`set_ask_user_callback()` is only a legacy
 process-wide fallback for single-Agent scripts; do not use it for Shiny or
 other concurrent hosts.
 
