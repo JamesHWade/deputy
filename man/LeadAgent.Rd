@@ -22,6 +22,7 @@ sub-agents based on registered AgentDefinitions.
 \subsection{Public methods}{
   \itemize{
     \item \href{#method-LeadAgent-initialize}{\code{LeadAgent$new()}}
+    \item \href{#method-LeadAgent-set_delegation_sources}{\code{LeadAgent$set_delegation_sources()}}
     \item \href{#method-LeadAgent-register_sub_agent}{\code{LeadAgent$register_sub_agent()}}
     \item \href{#method-LeadAgent-available_sub_agents}{\code{LeadAgent$available_sub_agents()}}
     \item \href{#method-LeadAgent-parallel_delegate}{\code{LeadAgent$parallel_delegate()}}
@@ -203,6 +204,50 @@ trusted results are recorded in the lead's run and sent to its
   }
   \subsection{Returns}{
     A new \code{LeadAgent} object
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-set_delegation_sources"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-set_delegation_sources}{}}}
+\subsection{\code{LeadAgent$set_delegation_sources()}}{
+  Replace the host-owned delegation source snapshot.
+
+A host whose sources change during a conversation (a drawing revised, a
+document added) replaces the whole snapshot here; there is no partial
+update. Each delegation resolves its evidence against the snapshot
+current when it is admitted, so a replacement never changes a
+delegation already running.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$set_delegation_sources(
+  sources = list(),
+  scope = NULL,
+  clear_records = FALSE
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{sources}}{Unnamed list of source records, as for \code{new()}'s
+\code{delegation_sources}.}
+      \item{\code{scope}}{Optional new \code{delegation_scope} (\code{owner_id} and
+\code{conversation_id}). \code{NULL} keeps the current scope. A scope can change
+only while no run or delegation is active and no retained agent is
+held, and, unless \code{clear_records = TRUE}, while no delegation record
+or observation event from the current scope is retained, since
+inspection and observation authorize against the lead's current scope.}
+      \item{\code{clear_records}}{When the scope changes, discard the retained
+delegation records and observation events from the current scope
+instead of refusing the change. A host that moves the lead to another
+conversation passes \code{TRUE}; observers of the old stream then fail
+their cursor check.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self
   }
 }
 
