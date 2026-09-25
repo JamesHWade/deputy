@@ -22,6 +22,7 @@ sub-agents based on registered AgentDefinitions.
 \subsection{Public methods}{
   \itemize{
     \item \href{#method-LeadAgent-initialize}{\code{LeadAgent$new()}}
+    \item \href{#method-LeadAgent-set_delegation_sources}{\code{LeadAgent$set_delegation_sources()}}
     \item \href{#method-LeadAgent-register_sub_agent}{\code{LeadAgent$register_sub_agent()}}
     \item \href{#method-LeadAgent-available_sub_agents}{\code{LeadAgent$available_sub_agents()}}
     \item \href{#method-LeadAgent-parallel_delegate}{\code{LeadAgent$parallel_delegate()}}
@@ -203,6 +204,39 @@ trusted results are recorded in the lead's run and sent to its
   }
   \subsection{Returns}{
     A new \code{LeadAgent} object
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-set_delegation_sources"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-set_delegation_sources}{}}}
+\subsection{\code{LeadAgent$set_delegation_sources()}}{
+  Replace the host-owned delegation source snapshot.
+
+A host whose sources change during a conversation (a drawing revised, a
+document added) replaces the whole snapshot here; there is no partial
+update. Each delegation resolves its evidence against the snapshot
+current when it is admitted, so a replacement never changes a
+delegation already running.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$set_delegation_sources(sources = list(), scope = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{sources}}{Unnamed list of source records, as for \code{new()}'s
+\code{delegation_sources}.}
+      \item{\code{scope}}{Optional new \code{delegation_scope} (\code{owner_id} and
+\code{conversation_id}). \code{NULL} keeps the current scope. A scope can change
+only while no run is active, since running delegations and their
+inspection records are bound to it.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Invisible self
   }
 }
 

@@ -275,6 +275,45 @@ normalize_delegation_sources <- function(sources, scope) {
   list(sources = sources, scope = scope)
 }
 
+# The sources a definition may cite in the lead's current scope.
+delegation_offered_sources <- function(private, definition) {
+  Filter(
+    function(source) {
+      identical(source$owner_id, private$delegation_scope$owner_id) &&
+        identical(
+          source$conversation_id,
+          private$delegation_scope$conversation_id
+        ) &&
+        (is.null(source$allowed_agents) ||
+          definition$name %in% source$allowed_agents)
+    },
+    private$delegation_sources
+  )
+}
+
+delegation_offered_text <- function(offered, max = 20L) {
+  if (!length(offered)) {
+    return("No evidence sources are available; put what the agent needs in the task.")
+  }
+  shown <- utils::head(offered, max)
+  refs <- vapply(
+    shown,
+    function(source) {
+      sprintf("%s (revision %s)", source$source_id, source$revision)
+    },
+    character(1)
+  )
+  more <- length(offered) - length(shown)
+  # Braces in host ids must not be read as cli markup.
+  refs <- gsub("([{}])", "\\1\\1", refs)
+  paste0(
+    "Available sources: ",
+    paste(refs, collapse = ", "),
+    if (more > 0L) sprintf(", and %d more", more) else "",
+    "."
+  )
+}
+
 resolve_delegation_input <- function(lead, definition, input) {
   private <- lead$.__enclos_env__$private
   input <- normalize_delegation_input(input)
@@ -284,13 +323,23 @@ resolve_delegation_input <- function(lead, definition, input) {
       "Delegation input exceeds the host admission ceiling."
     )
   }
+  # The model chose these references, so a refusal names what it could have
+  # chosen: the sources in this scope that this definition may read. Sources
+  # outside the scope are never named.
+  offered <- delegation_offered_sources(private, definition)
   sources <- lapply(input$evidence, function(ref) {
     matches <- Filter(
       function(source) identical(source$source_id, ref$source_id),
       private$delegation_sources
     )
     if (!length(matches)) {
-      delegation_input_abort("missing", "Requested evidence is unavailable.")
+      delegation_input_abort(
+        "missing",
+        paste(
+          "Requested evidence {.val {ref$source_id}} is unavailable.",
+          delegation_offered_text(offered)
+        )
+      )
     }
     scoped <- Filter(
       function(source) {
@@ -307,14 +356,21 @@ resolve_delegation_input <- function(lead, definition, input) {
     if (!length(scoped)) {
       delegation_input_abort(
         "unauthorized",
-        "Requested evidence is unavailable."
+        paste(
+          "Requested evidence {.val {ref$source_id}} is unavailable.",
+          delegation_offered_text(offered)
+        )
       )
     }
     source <- scoped[[1L]]
     if (!identical(source$revision, ref$revision)) {
       delegation_input_abort(
         "stale",
-        "Requested evidence revision is unavailable."
+        paste(
+          "Requested evidence revision {.val {ref$revision}} of",
+          "{.val {ref$source_id}} is unavailable; the current revision is",
+          "{.val {source$revision}}."
+        )
       )
     }
     source$digest <- digest::digest(

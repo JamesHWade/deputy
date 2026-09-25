@@ -1,5 +1,12 @@
 # deputy (development version)
 
+* `LeadAgent$set_delegation_sources()` replaces the host-owned source snapshot
+  after construction, so a host whose sources change during a conversation
+  (a drawing revised, a document added) can offer them as evidence. The scope
+  can change only between runs. An evidence reference that does not resolve
+  now names the sources available in scope (and a stale revision names the
+  current one) instead of "Requested evidence is unavailable."
+
 * `Agent$microcompact()` clears old tool results from the model's context,
   as Posit Assistant's `/microcompact` does: results before the last
   `keep_last` turns become a marker unless their tool is in `keep_tools`. No

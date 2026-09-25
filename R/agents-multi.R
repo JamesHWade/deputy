@@ -183,6 +183,41 @@ LeadAgent <- R6::R6Class(
     },
 
     #' @description
+    #' Replace the host-owned delegation source snapshot.
+    #'
+    #' A host whose sources change during a conversation (a drawing revised, a
+    #' document added) replaces the whole snapshot here; there is no partial
+    #' update. Each delegation resolves its evidence against the snapshot
+    #' current when it is admitted, so a replacement never changes a
+    #' delegation already running.
+    #'
+    #' @param sources Unnamed list of source records, as for `new()`'s
+    #'   `delegation_sources`.
+    #' @param scope Optional new `delegation_scope` (`owner_id` and
+    #'   `conversation_id`). `NULL` keeps the current scope. A scope can change
+    #'   only while no run is active, since running delegations and their
+    #'   inspection records are bound to it.
+    #' @return Invisible self
+    set_delegation_sources = function(sources = list(), scope = NULL) {
+      current <- private$delegation_scope
+      if (is.null(current)) current <- list()
+      normalized <- normalize_delegation_sources(
+        sources,
+        if (is.null(scope)) current else scope
+      )
+      new_scope <- normalize_run_context(normalized$scope, "delegation_scope")
+      if (!identical(new_scope, current) && isTRUE(private$run_active)) {
+        delegation_input_abort(
+          "invalid",
+          "The delegation scope cannot change during an active run."
+        )
+      }
+      private$delegation_sources <- normalized$sources
+      private$delegation_scope <- new_scope
+      invisible(self)
+    },
+
+    #' @description
     #' Register a new sub-agent definition.
     #'
     #' @param definition An [agent_definition()] object
