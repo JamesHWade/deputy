@@ -723,3 +723,79 @@ test_that("a stale revision names the current one, and scope can move between ru
     class = "deputy_delegation_input_error"
   )
 })
+
+test_that("the scope holds while a delegation runs or a retained agent is held", {
+  state <- new.env(parent = emptyenv())
+  lead <- input_test_lead(state)
+  private <- lead$.__enclos_env__$private
+  other <- list(owner_id = "owner-a", conversation_id = "conversation-b")
+
+  # A child started through the delegate tool outside a lead run.
+  private$active_subagents <- list(running = TRUE)
+  running <- tryCatch(
+    lead$set_delegation_sources(list(), scope = other, clear_records = TRUE),
+    error = identity
+  )
+  expect_s3_class(running, "deputy_delegation_input_error")
+  expect_match(conditionMessage(running), "while a delegation is running")
+  private$active_subagents <- list()
+
+  # A retained specialist would carry this conversation's history across.
+  private$owned_conversations <- list(handle = TRUE)
+  held <- tryCatch(
+    lead$set_delegation_sources(list(), scope = other, clear_records = TRUE),
+    error = identity
+  )
+  expect_match(conditionMessage(held), "release them first")
+  expect_identical(private$delegation_scope$conversation_id, "conversation-a")
+  private$owned_conversations <- list()
+
+  lead$set_delegation_sources(list(), scope = other)
+  expect_identical(private$delegation_scope$conversation_id, "conversation-b")
+})
+
+test_that("a subscription on a cleared stream fails instead of crossing into the new one", {
+  state <- new.env(parent = emptyenv())
+  lead <- input_test_lead(
+    state,
+    delegation_disclosure = DelegationDisclosure(
+      authorize = function(requester, scope) identical(requester, "owner")
+    )
+  )
+  old <- lead$observe_subagents("owner")
+  resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
+  expect_gt(length(old$poll()$events), 0L)
+  lead$set_delegation_sources(
+    list(),
+    scope = list(owner_id = "owner-a", conversation_id = "conversation-b"),
+    clear_records = TRUE
+  )
+  expect_error(old$poll(), "foreign child observation cursor")
+  expect_error(old$snapshot(), "foreign child observation cursor")
+  fresh <- lead$observe_subagents("owner")
+  expect_length(fresh$snapshot()$children, 0L)
+})
+
+test_that("refusals bound the ids they name", {
+  state <- new.env(parent = emptyenv())
+  long <- strrep("x", 5000)
+  lead <- input_test_lead(
+    state,
+    lapply(seq_len(20), function(i) {
+      source_record(id = paste0(long, i), revision = strrep("r", 3000))
+    })
+  )
+  err <- tryCatch(
+    lead$get_tools()$delegate_to_agent(
+      "a",
+      DelegationInput(
+        "task",
+        evidence = list(list(source_id = strrep("y", 5000), revision = "r1"))
+      )
+    ),
+    error = identity
+  )
+  expect_identical(err$reason, "missing")
+  expect_lt(nchar(conditionMessage(err), type = "bytes"), 4000L)
+  expect_match(conditionMessage(err), "and \\d+ more")
+})

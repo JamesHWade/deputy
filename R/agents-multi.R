@@ -195,9 +195,10 @@ LeadAgent <- R6::R6Class(
     #'   `delegation_sources`.
     #' @param scope Optional new `delegation_scope` (`owner_id` and
     #'   `conversation_id`). `NULL` keeps the current scope. A scope can change
-    #'   only while no run is active and no delegation record or observation
-    #'   event from the current scope is retained, since inspection and
-    #'   observation authorize against the lead's current scope.
+    #'   only while no run or delegation is active and no retained agent is
+    #'   held, and, unless `clear_records = TRUE`, while no delegation record
+    #'   or observation event from the current scope is retained, since
+    #'   inspection and observation authorize against the lead's current scope.
     #' @param clear_records When the scope changes, discard the retained
     #'   delegation records and observation events from the current scope
     #'   instead of refusing the change. A host that moves the lead to another
@@ -219,10 +220,25 @@ LeadAgent <- R6::R6Class(
       )
       new_scope <- normalize_run_context(normalized$scope, "delegation_scope")
       if (!identical(new_scope, current)) {
-        if (isTRUE(private$run_active)) {
+        # A child launched through the delegate tool outside a lead run is
+        # active without `run_active`; clearing its record would break its
+        # settlement.
+        if (isTRUE(private$run_active) || length(private$active_subagents)) {
           delegation_input_abort(
             "invalid",
-            "The delegation scope cannot change during an active run."
+            "The delegation scope cannot change while a delegation is running."
+          )
+        }
+        # A retained specialist keeps its history from this scope, and
+        # continuing it would publish that history under the new one. It is
+        # released explicitly, never here.
+        if (length(private$owned_conversations)) {
+          delegation_input_abort(
+            "invalid",
+            paste(
+              "The delegation scope cannot change while retained agents from",
+              "the current scope are held; release them first."
+            )
           )
         }
         # Retained runs and observation events carry no scope of their own:

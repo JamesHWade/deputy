@@ -234,9 +234,10 @@ delegation already running.
 \code{delegation_sources}.}
       \item{\code{scope}}{Optional new \code{delegation_scope} (\code{owner_id} and
 \code{conversation_id}). \code{NULL} keeps the current scope. A scope can change
-only while no run is active and no delegation record or observation
-event from the current scope is retained, since inspection and
-observation authorize against the lead's current scope.}
+only while no run or delegation is active and no retained agent is
+held, and, unless \code{clear_records = TRUE}, while no delegation record
+or observation event from the current scope is retained, since
+inspection and observation authorize against the lead's current scope.}
       \item{\code{clear_records}}{When the scope changes, discard the retained
 delegation records and observation events from the current scope
 instead of refusing the change. A host that moves the lead to another
