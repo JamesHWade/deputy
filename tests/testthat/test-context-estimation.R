@@ -432,3 +432,23 @@ test_that("inline PDFs and documents count per page, not by their descriptor", {
     4 * context_estimate_page_tokens
   )
 })
+
+test_that("usage reported before microcompaction is not reused afterwards", {
+  local_ellmer_observations()
+  withr::local_options(ellmer_max_tries = 1)
+  server <- local_runtime_server(list(
+    not_found_response(),
+    not_found_response()
+  ))
+  chat <- gateway_chat(server)
+  chat$set_turns(c(
+    list(create_mock_user_turn("Q1")),
+    tool_round(1000, 50, strrep("row ", 40000)),
+    list(reported_turn("A1", input = 60000, output = 100))
+  ))
+  agent <- Agent$new(chat = chat)
+  expect_gte(estimate_context(agent, list("Q2"))$tokens, 60000)
+  expect_identical(agent$microcompact(keep_last = 1L)$cleared, 1L)
+  # The old count described the result before it was cleared.
+  expect_lt(estimate_context(agent, list("Q2"))$tokens, 10000)
+})

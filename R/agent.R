@@ -1910,6 +1910,8 @@ Agent <- R6::R6Class(
       if (cleared > 0L) {
         private$.chat$set_turns(turns)
         private$.cleared_tool_results <- originals
+        # Reported usage counted the results just cleared.
+        private$.usage_stale_turns <- length(turns)
       }
       list(cleared = cleared)
     },
