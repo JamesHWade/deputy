@@ -40,6 +40,34 @@ project_tool_content <- function(
   value
 }
 
+# Whether a tool value is ellmer's native content list (text, images, ...).
+is_native_content_list <- function(value) {
+  is.list(value) &&
+    is.null(names(value)) &&
+    length(value) > 0L &&
+    all(vapply(value, inherits, logical(1), what = "ellmer::Content"))
+}
+
+# JSON text of public evidence, with Content objects projected by `formatter`.
+public_json_text <- function(value, formatter = public_content_text) {
+  as.character(jsonlite::toJSON(
+    project_tool_content(value, for_json = TRUE, formatter = formatter),
+    auto_unbox = TRUE,
+    digits = NA,
+    null = "null"
+  ))
+}
+
+# Public text of a projected tool result value (see project_tool_content()):
+# native content and unnamed character vectors join their text; other values
+# are JSON.
+public_tool_value_text <- function(projected, native = FALSE) {
+  if (native || (is.character(projected) && is.null(names(projected)))) {
+    return(paste(projected, collapse = "\n"))
+  }
+  public_json_text(projected)
+}
+
 # Native evidence identities contain public properties and type tags, never the
 # mutable S7 constructor and validator environments retained by R serialization.
 native_content_identity <- function(value) {

@@ -12,7 +12,8 @@ ContextPolicy(
   offload_dir = NULL,
   summary_fallback_chats = list(),
   max_tool_result_image_bytes = 2 * 1024 * 1024,
-  max_tool_result_images = 4L
+  max_tool_result_images = 4L,
+  estimator = c("auto", "provider")
 )
 }
 \arguments{
@@ -71,6 +72,17 @@ recoverable result artifact and the original display metadata is preserved.}
 bound. Image limits are independent of the non-image \code{max_tool_result_bytes}
 limit. Model token limits and automatic compaction continue to apply.
 Display metadata is host-facing evidence and is not sent to the model.}
+
+\item{estimator}{How automatic compaction estimates context size when the
+provider cannot count tokens. \code{"auto"} (the default) first asks the
+provider and otherwise estimates locally: the usage reported by the most
+recent completed response (input, cached input and output tokens) plus a
+conservative character estimate of later content and the pending request.
+Without reported usage, the system prompt, tool definitions, turns and
+pending request are estimated by characters. \code{"provider"} uses only the
+provider's count, so automatic compaction does not run when it cannot
+count. Character estimates assume three characters per token and a fixed
+allowance per image; they are deliberately high for typical text and JSON.}
 }
 \value{
 A read-only \code{ContextPolicy} S7 object.
@@ -96,6 +108,16 @@ An accepted summary remains installed when the budget prevents task dispatch.
 usage, and original condition. Summaries are internal context, not task output.
 This policy does not archive removed turns or restore runtime permissions
 from a summary.
+
+The \code{"compaction_start"} run event records \code{estimate_source}: \code{"provider"}
+or \code{"estimate"} (the local fallback). Choosing how many recent turns to keep
+estimates each candidate by characters when the provider cannot count,
+because reported usage also covers the turns being removed. For the same
+reason, usage reported before an accepted compaction, or before restoring a
+compacted session, is not reused until the provider reports usage for the
+new context. A token-counting endpoint that answers HTTP 404, 405 or 501 is
+not asked again for the same provider class and base URL while the same
+packages are loaded.
 
 This is a read-only S7 value. Use \code{$} or \code{S7::prop()} to read properties,
 and construct a new policy to change configuration. \code{S7::props()} returns

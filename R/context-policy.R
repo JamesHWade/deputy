@@ -13,6 +13,16 @@ NULL
 #'
 #' @param max_tokens Estimated complete-context token threshold that triggers
 #'   compaction. Use `NULL` to disable automatic compaction.
+#' @param estimator How automatic compaction estimates context size when the
+#'   provider cannot count tokens. `"auto"` (the default) first asks the
+#'   provider and otherwise estimates locally: the usage reported by the most
+#'   recent completed response (input, cached input and output tokens) plus a
+#'   conservative character estimate of later content and the pending request.
+#'   Without reported usage, the system prompt, tool definitions, turns and
+#'   pending request are estimated by characters. `"provider"` uses only the
+#'   provider's count, so automatic compaction does not run when it cannot
+#'   count. Character estimates assume three characters per token and a fixed
+#'   allowance per image; they are deliberately high for typical text and JSON.
 #' @param compact_to Fraction of `max_tokens` that the retained recent context
 #'   should occupy after compaction.
 #' @param fallback What to do when LLM summary generation fails. `"error"` fails
@@ -75,6 +85,16 @@ NULL
 #' This policy does not archive removed turns or restore runtime permissions
 #' from a summary.
 #'
+#' The `"compaction_start"` run event records `estimate_source`: `"provider"`
+#' or `"estimate"` (the local fallback). Choosing how many recent turns to keep
+#' estimates each candidate by characters when the provider cannot count,
+#' because reported usage also covers the turns being removed. For the same
+#' reason, usage reported before an accepted compaction, or before restoring a
+#' compacted session, is not reused until the provider reports usage for the
+#' new context. A token-counting endpoint that answers HTTP 404, 405 or 501 is
+#' not asked again for the same provider class and base URL while the same
+#' packages are loaded.
+#'
 #' This is a read-only S7 value. Use `$` or `S7::prop()` to read properties,
 #' and construct a new policy to change configuration. `S7::props()` returns
 #' a plain property list, but nested Chats retain reference semantics. The
@@ -120,7 +140,8 @@ ContextPolicy <- S7::new_class(
     summary_fallback_chats = readonly_property(
       "summary_fallback_chats",
       S7::class_list
-    )
+    ),
+    estimator = readonly_property("estimator", S7::class_character)
   ),
   constructor = function(
     max_tokens = 32000L,
@@ -130,9 +151,11 @@ ContextPolicy <- S7::new_class(
     offload_dir = NULL,
     summary_fallback_chats = list(),
     max_tool_result_image_bytes = 2 * 1024 * 1024,
-    max_tool_result_images = 4L
+    max_tool_result_images = 4L,
+    estimator = c("auto", "provider")
   ) {
     fallback <- match.arg(fallback)
+    estimator <- match.arg(estimator)
     summary_fallback_chats <- normalize_fallback_chats(
       summary_fallback_chats,
       primary = NULL,
@@ -194,7 +217,8 @@ ContextPolicy <- S7::new_class(
       offload_dir = offload_dir,
       max_tool_result_image_bytes = max_tool_result_image_bytes,
       max_tool_result_images = max_tool_result_images,
-      summary_fallback_chats = summary_fallback_chats
+      summary_fallback_chats = summary_fallback_chats,
+      estimator = estimator
     )
     freeze_value(value)
   }
@@ -253,6 +277,7 @@ S7::method(print, ContextPolicy) <- function(x, ...) {
     cli::cli_div(theme = list(div = list("margin-left" = 2)))
     cli::cli_text("compact at: {x$max_tokens %||% 'disabled'} tokens")
     cli::cli_text("compact to: {format(x$compact_to * 100)}%")
+    cli::cli_text("estimator: {x$estimator}")
     cli::cli_text("fallback: {x$fallback}")
     cli::cli_text("summary fallback Chats: {length(x$summary_fallback_chats)}")
     cli::cli_text(

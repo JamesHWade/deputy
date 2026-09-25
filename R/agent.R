@@ -1141,6 +1141,7 @@ Agent <- R6::R6Class(
       private$.compaction_summary <- NULL
       private$.compacted_turns <- list()
       private$.cleared_tool_results <- list()
+      private$.usage_stale_turns <- 0L
       invisible(self)
     },
 
@@ -2575,6 +2576,9 @@ Agent <- R6::R6Class(
       .last_compaction = NULL,
       .compaction_summary = NULL,
       .compacted_turns = list(),
+      # Leading context turns whose reported usage describes a different
+      # context (before compaction), which local estimates must not reuse.
+      .usage_stale_turns = 0L,
       # Original tool results cleared from model context by microcompact(),
       # keyed by tool call ID, so the conversation view keeps them.
       .cleared_tool_results = list(),

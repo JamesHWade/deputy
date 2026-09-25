@@ -33,13 +33,17 @@ governed_compaction_async <- coro::async(function(
   ) {
     return(NULL)
   }
-  estimated <- private$context_token_count(messages)
+  estimate <- private$context_estimate(messages)
+  estimated <- estimate$tokens
   if (is.null(estimated) || estimated <= policy$max_tokens) {
     return(NULL)
   }
   keep_last <- private$compaction_keep_last(
     messages,
-    floor(policy$max_tokens * policy$compact_to)
+    floor(policy$max_tokens * policy$compact_to),
+    # Subsets use the same source as the full estimate, so a provider count
+    # is never compared with a character estimate.
+    estimate = identical(estimate$source, "estimate")
   )
   plan <- private$prepare_compaction(
     keep_last,
@@ -57,6 +61,7 @@ governed_compaction_async <- coro::async(function(
   private$record_run_event(private$agent_event(
     "compaction_start",
     estimated_tokens = estimated,
+    estimate_source = estimate$source,
     turns_compacted = length(plan$turns_to_compact),
     turns_kept = length(plan$turns_to_keep)
   ))
