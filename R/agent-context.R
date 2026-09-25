@@ -491,14 +491,31 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         return(NULL)
       }
       tools <- tryCatch(private$.chat$get_tools(), error = function(e) list())
+      system_prompt <- private$.chat$get_system_prompt()
+      current <- turns %||% private$.chat$get_turns()
       tokens <- local_context_estimate(
-        system_prompt = private$.chat$get_system_prompt(),
+        system_prompt = system_prompt,
         tools = tools,
-        turns = turns %||% private$.chat$get_turns(),
+        turns = current,
         messages = messages,
         use_usage = is.null(turns),
-        usage_after = private$.usage_stale_turns
+        usage_after = private$.usage_stale_turns,
+        frame_snapshots = private$.frame_snapshots
       )
+      if (is.null(turns)) {
+        # The frame the upcoming request carries; a later estimate compares
+        # the current frame with it (see frame_growth()).
+        private$.frame_snapshots <- utils::tail(
+          c(
+            private$.frame_snapshots,
+            list(list(
+              turns = length(current),
+              frame = estimate_frame_tokens(system_prompt, tools)
+            ))
+          ),
+          8L
+        )
+      }
       list(tokens = as.numeric(tokens), source = "estimate")
     },
 
@@ -795,6 +812,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       private$.compaction_summary <- summary
       # Retained turns report usage for the context before compaction.
       private$.usage_stale_turns <- length(plan$turns_to_keep)
+      private$.frame_snapshots <- list()
       if (!is.null(private$.compaction_artifacts)) {
         private$.compaction_artifacts$installed <- TRUE
       }

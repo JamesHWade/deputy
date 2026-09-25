@@ -295,3 +295,66 @@ test_that("local estimates count tool arguments, results and images", {
   )
   expect_identical(estimate_content_tokens(list("abc", "def")), 2)
 })
+
+test_that("text is estimated from UTF-8 bytes, so CJK and emoji are not under-counted", {
+  expect_identical(estimate_text_tokens(strrep("x", 900)), 300)
+  # One CJK character can be a whole token; three bytes each keeps the
+  # estimate at one token per character or more.
+  expect_gte(estimate_text_tokens(strrep("漢", 900)), 900)
+  expect_gte(estimate_text_tokens(strrep("\U0001F600", 300)), 300)
+})
+
+test_that("prompt and tool growth after a reported response is added to its usage", {
+  local_ellmer_observations()
+  withr::local_options(ellmer_max_tries = 1)
+  server <- local_runtime_server(list(
+    not_found_response(),
+    not_found_response()
+  ))
+  chat <- gateway_chat(server)
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    reported_turn("A1", input = 5000, output = 100)
+  ))
+  agent <- Agent$new(chat = chat)
+  # The estimate before the next request records the prompt and tools it
+  # will carry.
+  before <- estimate_context(agent, list("Q2"))
+  expect_identical(before$source, "estimate")
+  # That request completes with usage covering the prompt as it was.
+  chat$add_turn(
+    create_mock_user_turn("Q2"),
+    reported_turn("A2", input = 5200, output = 100)
+  )
+  steady <- estimate_context(agent, list("Q3"))
+  expect_lt(steady$tokens, 5300 + 100)
+
+  # The host then enlarges the system prompt and adds a tool.
+  chat$set_system_prompt(strrep("Always cite sources. ", 300))
+  chat$register_tool(ellmer::tool(
+    function(query) query,
+    name = "wide_search",
+    description = strrep("Search everything. ", 100),
+    arguments = list(query = ellmer::type_string("Query"))
+  ))
+  grown <- estimate_context(agent, list("Q3"))
+  growth <- estimate_text_tokens(strrep("Always cite sources. ", 300))
+  expect_gte(grown$tokens - steady$tokens, growth)
+})
+
+test_that("a replaced conversation forgets earlier frame records", {
+  local_ellmer_observations()
+  withr::local_options(ellmer_max_tries = 1)
+  server <- local_runtime_server(list(not_found_response()))
+  chat <- gateway_chat(server)
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    reported_turn("A1", input = 5000, output = 100)
+  ))
+  agent <- Agent$new(chat = chat)
+  estimate_context(agent, list("Q2"))
+  private <- agent$.__enclos_env__$private
+  expect_length(private$.frame_snapshots, 1L)
+  agent$set_turns(chat$get_turns())
+  expect_length(private$.frame_snapshots, 0L)
+})

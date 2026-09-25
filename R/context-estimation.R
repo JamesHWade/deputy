@@ -173,9 +173,12 @@ ellmer_token_count_observe <- function(chat, error) {
 
 # Deliberately conservative: typical English text and JSON average about four
 # characters per token, and one image costs at most about 1,600 tokens on
-# common providers. Over-estimating compacts slightly early; under-estimating
+# common providers. Text is measured in UTF-8 bytes, not characters: ASCII is
+# one byte per character, while CJK text and emoji take three or four bytes
+# for what can be a whole token each, so a per-character ratio would badly
+# under-count them. Over-estimating compacts slightly early; under-estimating
 # can overflow the model's context.
-context_estimate_chars_per_token <- 3
+context_estimate_bytes_per_token <- 3
 context_estimate_image_tokens <- 1600
 
 estimate_text_tokens <- function(text) {
@@ -183,9 +186,8 @@ estimate_text_tokens <- function(text) {
   if (!length(text)) {
     return(0)
   }
-  chars <- nchar(text, type = "chars", allowNA = TRUE)
-  chars[is.na(chars)] <- nchar(text[is.na(chars)], type = "bytes")
-  ceiling(sum(chars) / context_estimate_chars_per_token)
+  bytes <- nchar(enc2utf8(text), type = "bytes")
+  ceiling(sum(bytes) / context_estimate_bytes_per_token)
 }
 
 # Tokens for model-facing content: turns, content objects, strings or lists.
@@ -312,9 +314,11 @@ local_context_estimate <- function(
   turns,
   messages,
   use_usage = TRUE,
-  usage_after = 0L
+  usage_after = 0L,
+  frame_snapshots = list()
 ) {
   pending <- estimate_content_tokens(messages)
+  frame <- estimate_frame_tokens(system_prompt, tools)
   usage <- if (use_usage) reported_context_usage(turns, usage_after)
   if (!is.null(usage)) {
     later <- if (usage$index < length(turns)) {
@@ -322,10 +326,34 @@ local_context_estimate <- function(
     } else {
       list()
     }
-    return(usage$tokens + estimate_content_tokens(later) + pending)
+    return(
+      usage$tokens +
+        frame_growth(frame, frame_snapshots, usage$index) +
+        estimate_content_tokens(later) +
+        pending
+    )
   }
+  frame + estimate_content_tokens(turns) + pending
+}
+
+# The system prompt and tool definitions every request carries.
+estimate_frame_tokens <- function(system_prompt, tools) {
   estimate_text_tokens(system_prompt %||% character()) +
-    estimate_tool_tokens(tools) +
-    estimate_content_tokens(turns) +
-    pending
+    estimate_tool_tokens(tools)
+}
+
+# How much the prompt and tools have grown since the request that produced
+# the usage anchored at `index`. Reported usage covers the prompt and tools
+# of that request; `$set_system_prompt()`, `$set_tools()` and friends can
+# enlarge them afterwards. `snapshots` records the frame before each
+# estimated request (with the turn count then), so the frame the anchor's
+# request carried is the latest snapshot taken before that turn. Without one
+# (a restored conversation, say), the anchor is trusted as it is. Shrinkage
+# is not subtracted: over-estimating only compacts early.
+frame_growth <- function(frame, snapshots, index) {
+  before <- Filter(function(snapshot) snapshot$turns < index, snapshots)
+  if (!length(before)) {
+    return(0)
+  }
+  max(0, frame - before[[length(before)]]$frame)
 }

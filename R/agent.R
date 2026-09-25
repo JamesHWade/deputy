@@ -1142,6 +1142,7 @@ Agent <- R6::R6Class(
       private$.compacted_turns <- list()
       private$.cleared_tool_results <- list()
       private$.usage_stale_turns <- 0L
+      private$.frame_snapshots <- list()
       invisible(self)
     },
 
@@ -2579,6 +2580,9 @@ Agent <- R6::R6Class(
       # Leading context turns whose reported usage describes a different
       # context (before compaction), which local estimates must not reuse.
       .usage_stale_turns = 0L,
+      # The prompt-and-tools size before each estimated request, with the turn
+      # count then, so estimates can add later growth to reported usage.
+      .frame_snapshots = list(),
       # Original tool results cleared from model context by microcompact(),
       # keyed by tool call ID, so the conversation view keeps them.
       .cleared_tool_results = list(),

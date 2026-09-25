@@ -280,6 +280,7 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       } else {
         length(private$.chat$get_turns())
       }
+      private$.frame_snapshots <- list()
     }
   )
 }
