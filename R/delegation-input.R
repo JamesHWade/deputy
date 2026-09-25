@@ -293,7 +293,9 @@ delegation_offered_sources <- function(private, definition) {
 
 delegation_offered_text <- function(offered, max = 20L) {
   if (!length(offered)) {
-    return("No evidence sources are available; put what the agent needs in the task.")
+    return(
+      "No evidence sources are available; put what the agent needs in the task."
+    )
   }
   shown <- utils::head(offered, max)
   refs <- vapply(

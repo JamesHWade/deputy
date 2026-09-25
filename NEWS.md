@@ -3,7 +3,10 @@
 * `LeadAgent$set_delegation_sources()` replaces the host-owned source snapshot
   after construction, so a host whose sources change during a conversation
   (a drawing revised, a document added) can offer them as evidence. The scope
-  can change only between runs. An evidence reference that does not resolve
+  can change only between runs, and only once the retained delegation records
+  and observation events from the current scope are gone: inspection and
+  observation authorize against the lead's current scope, so a host moving the
+  lead to another conversation passes `clear_records = TRUE` to discard them. An evidence reference that does not resolve
   now names the sources available in scope (and a stale revision names the
   current one) instead of "Requested evidence is unavailable."
 

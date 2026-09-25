@@ -220,7 +220,11 @@ current when it is admitted, so a replacement never changes a
 delegation already running.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{LeadAgent$set_delegation_sources(sources = list(), scope = NULL)}
+    \preformatted{LeadAgent$set_delegation_sources(
+  sources = list(),
+  scope = NULL,
+  clear_records = FALSE
+)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -230,8 +234,14 @@ delegation already running.
 \code{delegation_sources}.}
       \item{\code{scope}}{Optional new \code{delegation_scope} (\code{owner_id} and
 \code{conversation_id}). \code{NULL} keeps the current scope. A scope can change
-only while no run is active, since running delegations and their
-inspection records are bound to it.}
+only while no run is active and no delegation record or observation
+event from the current scope is retained, since inspection and
+observation authorize against the lead's current scope.}
+      \item{\code{clear_records}}{When the scope changes, discard the retained
+delegation records and observation events from the current scope
+instead of refusing the change. A host that moves the lead to another
+conversation passes \code{TRUE}; observers of the old stream then fail
+their cursor check.}
     }
     \if{html}{\out{</div>}}
   }

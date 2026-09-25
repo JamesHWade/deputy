@@ -195,22 +195,61 @@ LeadAgent <- R6::R6Class(
     #'   `delegation_sources`.
     #' @param scope Optional new `delegation_scope` (`owner_id` and
     #'   `conversation_id`). `NULL` keeps the current scope. A scope can change
-    #'   only while no run is active, since running delegations and their
-    #'   inspection records are bound to it.
+    #'   only while no run is active and no delegation record or observation
+    #'   event from the current scope is retained, since inspection and
+    #'   observation authorize against the lead's current scope.
+    #' @param clear_records When the scope changes, discard the retained
+    #'   delegation records and observation events from the current scope
+    #'   instead of refusing the change. A host that moves the lead to another
+    #'   conversation passes `TRUE`; observers of the old stream then fail
+    #'   their cursor check.
     #' @return Invisible self
-    set_delegation_sources = function(sources = list(), scope = NULL) {
+    set_delegation_sources = function(
+      sources = list(),
+      scope = NULL,
+      clear_records = FALSE
+    ) {
       current <- private$delegation_scope
-      if (is.null(current)) current <- list()
+      if (is.null(current)) {
+        current <- list()
+      }
       normalized <- normalize_delegation_sources(
         sources,
         if (is.null(scope)) current else scope
       )
       new_scope <- normalize_run_context(normalized$scope, "delegation_scope")
-      if (!identical(new_scope, current) && isTRUE(private$run_active)) {
-        delegation_input_abort(
-          "invalid",
-          "The delegation scope cannot change during an active run."
-        )
+      if (!identical(new_scope, current)) {
+        if (isTRUE(private$run_active)) {
+          delegation_input_abort(
+            "invalid",
+            "The delegation scope cannot change during an active run."
+          )
+        }
+        # Retained runs and observation events carry no scope of their own:
+        # inspection and observation authorize against the lead's current
+        # scope, so moving it would disclose them to the new conversation.
+        # A host that moves the lead to another conversation passes
+        # `clear_records = TRUE`: the records stay behind with the old scope
+        # rather than moving with the lead.
+        buffer <- private$.delegation_buffer
+        retained <- length(private$subagent_runs) ||
+          (!is.null(buffer) && length(buffer$events))
+        if (retained && !isTRUE(clear_records)) {
+          delegation_input_abort(
+            "invalid",
+            paste(
+              "The delegation scope cannot change while delegation records",
+              "from the current scope are retained; pass",
+              "`clear_records = TRUE` to discard them."
+            )
+          )
+        }
+        if (retained) {
+          private$subagent_runs <- list()
+          if (!is.null(buffer)) {
+            private$.delegation_buffer <- new_delegation_buffer(buffer$policy)
+          }
+        }
       }
       private$delegation_sources <- normalized$sources
       private$delegation_scope <- new_scope
