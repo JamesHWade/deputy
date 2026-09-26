@@ -1,5 +1,5 @@
-# A host-owned recipe, sourced by the app and headless tests. All runtime calls
-# use Deputy's public API. This is not a new package-level result store.
+# Helpers shared by the example app and its tests. Everything here uses
+# Deputy's public API.
 study_data <- function() {
   data.frame(
     subject = sprintf("plant-%02d", seq_len(12L)),

@@ -26,7 +26,7 @@ test_that("basic, structured, session and skill scripts execute independently", 
     create_mock_chat("An R vector.")
   )
   expect_identical(basic$result$response, "An R vector.")
-  expect_identical(attr(basic, "models"), "gpt-5.6-luna")
+  expect_identical(attr(basic, "models"), "gpt-6-luna")
   server <- local_runtime_server(list(
     runtime_reply("status is ok"),
     runtime_reply('{"status":"ok"}', stream = FALSE)
@@ -65,7 +65,7 @@ test_that("basic, structured, session and skill scripts execute independently", 
   })
   expect_equal(receiver_chat$get_turns(), source_chat$get_turns())
   expect_identical(index, 2L)
-  expect_identical(attr(session, "models"), rep("gpt-5.6-luna", 2L))
+  expect_identical(attr(session, "models"), rep("gpt-6-luna", 2L))
   expect_identical(session$resumed$run_context$project, "session-example")
   expect_identical(session$result$response, "Cedar")
   expect_false(file.exists(session$session_file))
