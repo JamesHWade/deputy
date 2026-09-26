@@ -147,6 +147,73 @@ test_that("Agent cost reports incomplete provider records", {
   expect_identical(cost$missing, 1L)
 })
 
+test_that("Agent usage and cost cover turns removed by compaction", {
+  chat <- ellmer::chat_openai(
+    model = "gpt-4o-mini",
+    credentials = function() "unused"
+  )
+  turns <- list()
+  for (i in 1:4) {
+    turns <- c(
+      turns,
+      list(
+        ellmer::UserTurn(list(ellmer::ContentText(paste("Question", i)))),
+        ellmer::AssistantTurn(
+          list(ellmer::ContentText(paste("Answer", i))),
+          tokens = c(100, 20, 0),
+          cost = 0.01
+        )
+      )
+    )
+  }
+  chat$set_turns(turns)
+  agent <- Agent$new(chat)
+  before <- agent$usage()
+
+  suppressMessages(agent$compact(keep_last = 2, summary = "Earlier answers."))
+
+  expect_length(agent$get_context_turns(), 2L)
+  after <- agent$usage()
+  expect_equal(after$requests, 4)
+  expect_equal(after$input_tokens, 400)
+  expect_equal(after$output_tokens, 80)
+  expect_equal(after$cost_usd, before$cost_usd)
+  cost <- agent$cost()
+  expect_equal(cost$total, 0.04)
+  expect_identical(cost$complete, TRUE)
+})
+
+test_that("Agent usage counts the tool calls the model asked for", {
+  request <- ellmer::ContentToolRequest(
+    id = "call_1",
+    name = "read_file",
+    arguments = list(path = "notes.txt")
+  )
+  chat <- ellmer::chat_openai(
+    model = "gpt-4o-mini",
+    credentials = function() "unused"
+  )
+  chat$set_turns(list(
+    ellmer::UserTurn(list(ellmer::ContentText("Read my notes"))),
+    ellmer::AssistantTurn(list(request), tokens = c(10, 5, 0), cost = 0.001),
+    ellmer::UserTurn(list(ellmer::ContentToolResult(
+      value = "Buy milk",
+      request = request
+    ))),
+    ellmer::AssistantTurn(
+      list(ellmer::ContentText("Buy milk.")),
+      tokens = c(20, 5, 0),
+      cost = 0.001
+    )
+  ))
+  agent <- Agent$new(chat)
+
+  usage <- agent$usage()
+
+  expect_equal(usage$requests, 2)
+  expect_equal(usage$tool_calls, 1)
+})
+
 test_that("Agent provider returns correct structure", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)

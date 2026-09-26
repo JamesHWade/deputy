@@ -1563,26 +1563,37 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get token counts and estimated cost for the turns in the model context.
-    #' Turns removed by compaction no longer count.
+    #' Get token counts and estimated cost for the whole conversation,
+    #' including turns that compaction removed from the model's context. The
+    #' requests that wrote compaction summaries aren't conversation turns, so
+    #' they aren't included; see `$last_compaction()`.
     #'
     #' @return A list with `input`, `output` and `cached` token counts, the
     #'   estimated `total` cost, `complete` (whether every response had a cost)
     #'   and `missing` (how many didn't). `total` is `NA` when `complete` is
     #'   `FALSE`.
     cost = function() {
-      summary <- provider_usage_summary(private$.chat)
+      summary <- conversation_usage_summary(
+        private$.chat,
+        private$.compacted_turns
+      )
       summary[c("input", "output", "cached", "total", "complete", "missing")]
     },
 
     #' @description
-    #' Get usage for the turns in the model context. Turns removed by compaction
-    #' no longer count, and `tool_calls` is always 0 here. For one run's usage,
-    #' use `$usage` on its [AgentResult] or the `"usage"` event from `$run()`.
+    #' Get usage for the whole conversation, including turns that compaction
+    #' removed from the model's context. `tool_calls` counts the tool calls the
+    #' model asked for. Compaction summary requests aren't included; see
+    #' `$last_compaction()`. For one run's usage, use `$usage` on its
+    #' [AgentResult] or the `"usage"` event from `$run()`.
     #'
     #' @return An [AgentUsage] object.
     usage = function() {
-      agent_usage_snapshot(private$.chat)
+      conversation_usage_snapshot(
+        private$.chat,
+        private$.compacted_turns,
+        tool_calls = count_tool_requests(self$get_turns())
+      )
     },
 
     #' @description

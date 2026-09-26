@@ -137,8 +137,8 @@ S7::method(print, UsageLimits) <- function(x, ...) {
 #' @description
 #' A usage record counts model requests, tool calls, tokens and estimated cost.
 #' [AgentResult]`$usage` and the `"usage"` and `"stop"` events cover a single
-#' run. [Agent]`$usage()` covers the turns currently in the model context, so
-#' turns removed by compaction no longer count there. You rarely need to call
+#' run. [Agent]`$usage()` covers the whole conversation, including turns that
+#' compaction removed from the model's context. You rarely need to call
 #' `AgentUsage()` yourself.
 #'
 #' Records are read-only. Read fields with `$`; `S7::props()` returns them all
@@ -514,6 +514,72 @@ agent_usage_snapshot <- function(chat) {
     use.names = TRUE
   )
   usage
+}
+
+# Usage for the whole conversation: the turns compaction removed from the
+# model's context, followed by the turns still in it. Those removed turns keep
+# their reported tokens and cost.
+conversation_usage_summary <- function(chat, compacted_turns = list()) {
+  summary <- provider_usage_summary(chat)
+  earlier <- assistant_turn_tokens(compacted_turns)
+  if (NROW(earlier) == 0L) {
+    return(summary)
+  }
+  earlier_total <- function(name) sum(earlier[[name]], na.rm = TRUE)
+  earlier_cost <- provider_cost_summary(earlier)
+  complete <- isTRUE(summary$complete) && isTRUE(earlier_cost$complete)
+  list(
+    requests = summary$requests + NROW(earlier),
+    input = summary$input + earlier_total("input"),
+    output = summary$output + earlier_total("output"),
+    cached = summary$cached + earlier_total("cached_input"),
+    total = if (complete) summary$total + earlier_cost$total else NA_real_,
+    complete = complete,
+    missing = summary$missing + earlier_cost$missing,
+    cost_records = c(earlier$cost, summary$cost_records)
+  )
+}
+
+conversation_usage_snapshot <- function(
+  chat,
+  compacted_turns = list(),
+  tool_calls = 0L
+) {
+  summary <- conversation_usage_summary(chat, compacted_turns)
+  usage <- AgentUsage(
+    requests = summary$requests,
+    tool_calls = tool_calls,
+    input_tokens = summary$input,
+    output_tokens = summary$output,
+    cached_tokens = summary$cached,
+    cost_usd = summary$total
+  )
+  attr(usage, "provider_cost_records") <- summary$cost_records
+  attr(usage, "provider_usage_totals") <- unlist(
+    summary[c("input", "output", "cached")],
+    use.names = TRUE
+  )
+  usage
+}
+
+# Tool calls the model asked for in `turns`, including any that were denied.
+count_tool_requests <- function(turns) {
+  counts <- vapply(
+    turns,
+    function(turn) {
+      if (!inherits(turn, "ellmer::AssistantTurn")) {
+        return(0L)
+      }
+      sum(vapply(
+        turn@contents,
+        inherits,
+        logical(1),
+        what = "ellmer::ContentToolRequest"
+      ))
+    },
+    integer(1)
+  )
+  sum(counts)
 }
 
 agent_usage_difference <- function(

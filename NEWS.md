@@ -17,6 +17,10 @@
   `hook_limit_file_writes()` now return `NULL` when they don't deny a call, so
   hooks added after them for the same event still run.
 
+* `Agent$usage()` and `Agent$cost()` now include turns that compaction removed
+  from the model's context, and `Agent$usage()$tool_calls` counts the tool
+  calls the model asked for instead of always being 0.
+
 * `edit_file` and `multi_edit` now change only the text they replace, instead
   of rewriting the file, which converted CRLF to LF and added a final newline.
   Non-UTF-8 bytes are kept too. Search text written with `"\n"` still matches

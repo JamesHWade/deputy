@@ -34,8 +34,8 @@ An \code{AgentUsage} object.
 \description{
 A usage record counts model requests, tool calls, tokens and estimated cost.
 \link{AgentResult}\verb{$usage} and the \code{"usage"} and \code{"stop"} events cover a single
-run. \link{Agent}\verb{$usage()} covers the turns currently in the model context, so
-turns removed by compaction no longer count there. You rarely need to call
+run. \link{Agent}\verb{$usage()} covers the whole conversation, including turns that
+compaction removed from the model's context. You rarely need to call
 \code{AgentUsage()} yourself.
 
 Records are read-only. Read fields with \code{$}; \code{S7::props()} returns them all

@@ -1692,8 +1692,10 @@ calls.
 \if{html}{\out{<a id="method-Agent-cost"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-cost}{}}}
 \subsection{\code{Agent$cost()}}{
-  Get token counts and estimated cost for the turns in the model context.
-Turns removed by compaction no longer count.
+  Get token counts and estimated cost for the whole conversation,
+including turns that compaction removed from the model's context. The
+requests that wrote compaction summaries aren't conversation turns, so
+they aren't included; see \verb{$last_compaction()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$cost()}
@@ -1711,9 +1713,11 @@ and \code{missing} (how many didn't). \code{total} is \code{NA} when \code{compl
 \if{html}{\out{<a id="method-Agent-usage"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-usage}{}}}
 \subsection{\code{Agent$usage()}}{
-  Get usage for the turns in the model context. Turns removed by compaction
-no longer count, and \code{tool_calls} is always 0 here. For one run's usage,
-use \verb{$usage} on its \link{AgentResult} or the \code{"usage"} event from \verb{$run()}.
+  Get usage for the whole conversation, including turns that compaction
+removed from the model's context. \code{tool_calls} counts the tool calls the
+model asked for. Compaction summary requests aren't included; see
+\verb{$last_compaction()}. For one run's usage, use \verb{$usage} on its
+\link{AgentResult} or the \code{"usage"} event from \verb{$run()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$usage()}
