@@ -1,6 +1,8 @@
 # Recursive retained agents
 
-Run the example from a source checkout with:
+A Shiny app with three levels of agents: a root agent asks a retained
+analyst, and the analyst asks a retained reviewer. Each keeps its own
+conversation, and the whole graph shares one budget.
 
 ```r
 shiny::runApp("inst/examples/recursive-agents")
@@ -8,37 +10,38 @@ shiny::runApp("inst/examples/recursive-agents")
 shiny::runApp(system.file("examples/recursive-agents", package = "deputy"))
 ```
 
-The app starts a local OpenAI-compatible HTTP fixture in a separate R process.
-It makes no paid model calls and does not require credentials. The `Run root →
-analyst → reviewer` button drives one real streaming path through the graph:
-the root calls the retained analyst, the analyst reads deterministic evidence
-and calls the retained reviewer, and the root receives both reports. `Cancel
-active graph` requests cooperative cancellation through the root, which owns
-the child lifecycle.
+It needs shiny, bslib, shinychat (0.5.0 or later), httpuv, commonmark and
+xml2. A local OpenAI-compatible test server runs in a separate R process, so
+there are no API keys or paid requests.
 
-The child panel is read-only. Select the analyst or reviewer card, then inspect
-the retained transcript and live status. The host owns disclosure, observation,
-cancellation, and the graph budget. The `Follow up with analyst` button spends
-the same cumulative graph allocation; it does not create a second budget or
-silently reset the analyst's conversation.
+## What to try
 
-Each Shiny session creates and owns its own graph. The local host controls act
-only on that session's graph; the child panel exposes observation without a
-cancellation callback. The requester token demonstrates disclosure scoping,
-not end-user authentication. A shared deployment must supply its own identity
-and action authorization, independently of permission to view child transcripts.
+Click "Run root → analyst → reviewer". The root calls the analyst, the
+analyst reads the evidence and calls the reviewer, and the root receives both
+reports in the chat on the left. Select the analyst or reviewer card on the
+right to read its conversation and status; that panel is read-only. "Follow
+up with analyst" continues the analyst's conversation from the same graph
+budget. "Cancel active graph" cancels the root's run and everything beneath
+it.
 
-The route declarations demonstrate borrowing. The root may borrow `analyst`
-through `analyze`, and `analyst` may borrow `reviewer` through `review`. Each
-route fixes its target, description, and per-invocation allocation. Depth is
-bounded at two edges, total delegations at eight, concurrent children at two,
-and retained invocations at 32. The graph-wide eight-request and four-tool-call
-ceilings remain in force across follow-ups. `release_agent_graph()` is called
-when the session closes after the graph is idle.
+## How the graph is set up
 
-The visible controls have stable Shiny ids `run`, `followup`, and `cancel`. The
-child selector is `children-choice`; transcript selection is accompanied by the
-`Selected child` heading (`children-heading`). Headless coverage is in
-`tests/testthat/test-recursive-example.R`; it uses the same local HTTP fixture
-and checks the real three-level requests, effects, parent identities, depth,
-transcripts, cumulative accounting, and cleanup.
+`workflow.R` calls `retain_agent_graph()` with two routes: the root reaches
+`analyst` through a tool named `analyze`, and `analyst` reaches `reviewer`
+through `review`. Each route fixes its target, description and per-call
+budget. The graph allows a depth of two, eight delegations, two running at
+once and 32 retained runs, with eight requests and four tool calls in total
+across every run, follow-ups included. The app calls `release_agent_graph()`
+when the Shiny session ends.
+
+Each Shiny session builds its own graph. The `requester` object decides who may
+view the specialists' conversations, but it stands in for a signed-in user and
+is not authentication. A shared deployment needs its own login and its own
+checks on who may run or cancel work.
+
+The buttons have the Shiny ids `run`, `followup` and `cancel`. The child
+selector is `children-choice`, and the "Selected child" heading above the
+transcript is `children-heading`.
+
+From a source checkout, `devtools::test(filter = "recursive-example")` runs
+the app's tests against the same local server.

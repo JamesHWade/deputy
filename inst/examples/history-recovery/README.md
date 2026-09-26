@@ -1,120 +1,93 @@
-# Bounded history recovery experiment
+# History recovery experiment
 
-Compare cumulative summary plus recent context with **the same prepared context**
-plus read-only search and reads of caller-owned source records. This is an
-external example, not a new Deputy API, conversation database, or RLM runtime.
+Does an agent whose conversation has been compacted answer better if it can
+also search and read the full earlier history? This experiment prepares one
+compacted context, then continues it twice: once with the summary and recent
+turns only, and once with two read-only history tools added. It is an example
+built on Deputy and ellmer, not part of Deputy's API.
 
-This implementation uses caller-owned records and released ellmer APIs. It can
-be developed and evaluated independently of the optional shinychat history
-adapter tracked in #66. A future adapter must preserve the scope, revision and
-read-budget checks exercised here.
+## The fixture
 
-`fixture.R` supplies an entirely synthetic evidence review with three checkpoints,
-early eligibility constraints, a superseded denominator, unresolved methods, a
-historical export receipt, and quoted malicious instructions. Ninety synthetic
-catalogue records add approximately 400 KB of deliberately repetitive distractor
-text. This stresses repeated transitions; it is not representative clinical data
-or evidence of performance on real conversations. Each trial executes one host-authorized CSV export before checkpoint 2. The
-receipt records the artifact SHA-256, bytes and contents; both continuations
-inherit that verified completed effect. The temporary file is removed after
-preparation, while its receipt remains in the saved evidence.
+`fixture.R` defines a synthetic evidence review of reports A to F, loaded in
+three checkpoints. The history contains early eligibility rules, a corrected
+denominator, unresolved methods, a completed export and quoted malicious
+instructions. Ninety synthetic catalogue records add about 400 KB of
+repetitive distractor text. None of it is real clinical data.
 
-This producer uses a fixed C-only export contract: `export-0042`, version 1,
-and the exact CSV payload defined by `history_export_contract()`. Planned
-metadata, payload digest and the scoped receipt row are checked before writing.
-The completed receipt description comes from the same contract. Changing the
-fixture's planned export does not authorize an alternative artifact; a different
-effect requires a separate producer and matching evaluation protocol.
+`DEPUTY_HISTORY_SCENARIO` picks one of three scenarios. `original` is the
+default. In `changed-constraint`, a user instruction at checkpoint 3 replaces
+the adults-only rule with an all-ages rule for randomized studies: B becomes
+eligible, while D and F still wait for allocation details. The instruction is
+also stored as a source record. The final question doesn't repeat the change,
+and the old rule stays in the history, so the scenario tests whether the model
+applies the newer rule. In `resolved-methods`, later allocation details under
+the original rule make D eligible and exclude F, leaving no reports pending.
 
-The `changed-constraint` scenario adds a host instruction at checkpoint 3 that
-supersedes the adult-only rule with an all-ages randomized-study rule. B becomes
-eligible; D and F still await allocation details. The amendment is submitted as
-a user instruction and retained as a source record with its own ID and revision.
-The final question asks for the current rule without repeating the amendment.
-The original rule and quoted malicious instructions remain in the history, so
-the new scenario checks supersession as well as recall. All scenarios execute the same isolated host export during preparation. The
-`resolved-methods` scenario instead adds later verified allocation details: D
-is eligible, F is excluded, and no reports remain pending. This tests resolution
-of earlier open work while keeping the original host constraint.
+Each trial runs one real CSV export (`export-0042`, fixed by
+`history_export_contract()`) before checkpoint 2. The file's SHA-256, size
+and contents are recorded, both continuations receive that record, and the
+file is deleted. Both continuations also have an export tool that the agent's
+permissions forbid, even if the history asks for another export.
 
-`evaluation.R` loads each checkpoint through an actual ellmer tool round under a
-Deputy read-only allowlist. Large-result offloading is disabled for this experiment
-so the source text reaches the model. Preparation must load all checkpoints and
-produce at least two automatic compactions. A repeated or out-of-order checkpoint
-invalidates preparation and is not scored. Both continuations start from identical
-prepared turns and system prompt; their order alternates across trials. The helper
-model performs preparation and summarization; the task model is held fixed.
-The authorized fixture must contain exactly stages 1, 2 and 3; missing, extra or
-alternate stages are rejected before creating a model client or dispatching work.
+## How a trial runs
 
-The history continuation adds two tools from `history.R`:
+`evaluation.R` loads each checkpoint through a real ellmer tool call in a
+read-only Deputy agent, with large-result offloading turned off so the model
+sees the source text. Preparation must load checkpoints 1, 2 and 3 in order and
+compact at least twice; otherwise the trial is discarded. Both continuations
+then start from the same turns and system prompt, in alternating order. The
+helper model prepares and summarizes; the task model answers.
 
-- `history_search(query)`: literal word matching, at most three IDs with revisions
-  and short excerpts. All query words must match; narrow the query for omitted hits.
-- `history_read(item_id, revision, offset)`: a bounded UTF-8 chunk. An optional
-  expected revision rejects stale references; `next_offset` continues a read.
+The history arm adds two tools from `history.R`. `history_search(query)`
+matches literal words, all of which must appear, and returns up to three item
+IDs with revisions and short excerpts. `history_read(item_id, revision,
+offset)` returns one UTF-8 chunk of an item; it rejects an outdated
+`revision`, and `next_offset` continues the read.
 
-The host binds owner, conversation, Agent and branch before searching. The model
-cannot change that scope. Missing and unauthorized IDs return the same result.
-The adapter verifies each authorized record's revision against the SHA-256 of
-its text when binding the snapshot. Changed text requires a new matching
-revision; a refreshed adapter rejects reads expecting the previous revision.
-Defaults allow six calls, 4,096 bytes per response and 16,384 bytes overall,
-including JSON framing and provenance. Rejections contain no source payload and
-do not consume the source-byte allowance. Both strategies register an export spy;
-host permissions prohibit executing it even if source text asks for another write.
+The tools only see records for the owner, conversation, agent and branch the
+app sets; the model can't change that, and missing and unauthorized IDs look
+the same. Each record's revision is checked against the SHA-256 of its text.
+By default the tools allow six calls, 4,096 bytes per response and 16,384
+bytes in total, counting JSON framing. Refused calls return no source text and
+don't use up the byte allowance.
 
-## Budget-aware comparison
+## Budget-aware protocol
 
-The optional `budget-aware` protocol makes the shared history allowance explicit
-in tool descriptions and response envelopes. Calls remaining are measured after
-the attempt; bytes remaining are measured before the response, which also counts
-against the byte ceiling. Requests beyond the allowance return no source payload.
-
-The host reserves two of the existing eight model requests for the final answer.
-It first allows at most six retrieval requests, then removes all tools and asks
-for the structured answer with at most two requests. Retrieval completion or a
-request/tool-limit stop can lead to that final phase. Cancellation, exhausted
-aggregate budgets and other failures remain explicit incomplete outcomes. All
-phase costs and requests count toward the same continuation and experiment.
+The optional `budget-aware` protocol tells the model how many history calls
+and bytes it has left, in the tool descriptions and in every response. Of each
+continuation's eight model requests, up to six go to retrieval; then the tools
+are removed and the model has up to two requests for its structured answer.
+The answer phase also runs if retrieval stops at a request or tool-call limit.
+Cancellation, an exhausted overall budget or another failure ends the
+continuation as incomplete. Every phase counts toward the same budget.
 
 `history_evaluate(protocols = c("baseline", "budget-aware"))` compares both
-retrieval protocols and summary-only against the same prepared context. Three
-trials rotate their order so each arm occupies every position once. The default
-for direct `history_evaluate()` calls remains the original two-arm baseline.
+retrieval protocols and summary-only against the same prepared context, and
+three trials rotate the order so each arm takes every position once. Called
+directly, `history_evaluate()` defaults to the two-arm `baseline` comparison.
 The [follow-up protocol](../../../dev/evaluations/history-recovery/budget-aware-protocol.md)
-declares the comparison and its outcomes before a new paid run.
+sets out that comparison and its outcomes before any paid run.
 
-## Deterministic verification
+## Offline tests
 
-From the source checkout, with released ellmer 0.5.0 installed:
+From a source checkout, with ellmer 0.5.0 or later:
 
 ```r
 devtools::test(filter = "history-recovery-example|compaction-evidence")
 ```
 
-Tests use real ellmer producers against a local HTTP server, with canned answers
-and a character-count estimator that shrinks after compaction to force transitions. They cover paired preparation,
-structured scoring, real retrieval, scope isolation, stale/missing references,
-UTF-8 and payload limits, denied exports, cancellation and exhausted/unknown-cost
-budgets. All three scenarios exercise repeated compaction and paired continuations;
-the changed-rule case also retrieves the amendment and rejects an answer that
-keeps the superseded rule. Canned answer scores test the wiring, **not model
-recall quality**.
-Budget-aware fixtures also exercise a batch beyond the remaining call allowance,
-exhausted retrieval requests, the reserved answer phase, and cancellation before
-that phase without losing the incomplete continuation's evidence.
+The tests run real ellmer calls against a local HTTP server with canned
+answers, and use a character-count token estimate to force compaction. They
+cover preparation, scoring, retrieval, scope isolation, stale and missing
+references, size limits, denied exports, cancellation, exhausted or
+unknown-cost budgets and the budget-aware answer phase, and run all three
+scenarios through compaction and both continuations. The canned answers test
+the wiring, not how well a model recalls.
 
-## Live pilot
+## Live runs
 
-The [7 September 2026 results](../../../dev/evaluations/history-recovery/2026-09-07/README.md)
-record nine paired trials across all three scenarios. Retrieval improved
-grounding when it finished, but three continuations stopped at the tool-call
-limit. The report retains these failures, costs, matched contexts and effect
-receipts; it does not establish production quality.
-
-Install this Deputy branch first. Configure OpenAI credentials through ellmer's
-normal mechanism. Run the following only after choosing a spending allowance:
+Live runs make paid OpenAI requests. Install Deputy, set up OpenAI credentials
+as you normally would for ellmer, choose a spending limit, and run:
 
 ```sh
 DEPUTY_HISTORY_LIVE=yes \
@@ -123,57 +96,68 @@ DEPUTY_HISTORY_OUTPUT=/tmp/history-recovery-luna-pilot \
 Rscript -e 'source(system.file("examples/history-recovery/run.R", package = "deputy"))'
 ```
 
-The limit is **observed estimated cost, not a hard billing cap**: an in-flight
-response may cross it, and provider retries may not have reported usage. Leave
-headroom within the authorized allowance and use provider-side controls if a
-strict spending ceiling is required. Unknown cost stops subsequent dispatch.
-The runner also caps the experiment at 100 governed requests, limits each run,
-and requests at most 1,024 output tokens per response. Provider accounting and
-retry behavior remain ellmer's responsibility.
+`DEPUTY_HISTORY_MAX_COST_USD` is a limit on observed estimated cost, not a
+billing cap: a response already in flight can go over it, and provider retries
+may not report their usage. Leave headroom, and set a limit with your provider
+if you need a hard ceiling. The run stops if a cost is unknown. It also stops
+after 100 requests in total, limits each run, and asks for at most 1,024
+output tokens per response.
 
-Optional environment variables are `DEPUTY_HISTORY_TRIALS` (default `3`),
-`DEPUTY_HISTORY_HELPERS` (comma-separated, default `gpt-5.6-luna`) and
-`DEPUTY_HISTORY_TASK_MODEL` (default `gpt-5.6-luna`). For a helper comparison, keep
-the task model fixed and include Luna and Terra in `DEPUTY_HISTORY_HELPERS`.
-Choose `DEPUTY_HISTORY_SCENARIO=changed-constraint` for the amendment case
-(default `original`), using a separate output directory for each scenario.
-Use `resolved-methods` for the allocation-clarification case.
-`DEPUTY_HISTORY_PROTOCOLS` defaults to `baseline,budget-aware`, producing three
-matched continuations per preparation. Set it to `baseline` for the original
-two-arm comparison or `budget-aware` to compare summary-only with the new protocol.
-Each invocation has its own spending threshold; account for their combined
-cost within the authorized allowance.
-The aggregate request budget can stop a larger experiment early; use
-`history_evaluate()` directly to choose a different request allowance.
+Other settings:
 
-Each new output directory receives `results.json` and `report.md`. The JSON uses
-full numeric precision and schema version 3; it adds protocols and per-phase
-outcomes to the original evidence. The JSON
-includes fixtures, input contexts, prompts, answers, source references, run IDs,
-compaction attempts, events, usage, latency and completed-effect counters.
-Conditions are reduced to their classes so credential-bearing request objects
-are not persisted. Inputs are synthetic; a consented-data adaptation must treat
-its outputs as private host data. Recoverable run failures preserve partial
-evidence. A process kill or interactive interrupt before saving does not.
+- `DEPUTY_HISTORY_TRIALS`: number of trials, default `3`.
+- `DEPUTY_HISTORY_HELPERS`: comma-separated helper models, default
+  `gpt-5.6-luna`. To compare helpers, keep the task model fixed and list
+  several, such as `gpt-5.6-luna,gpt-5.6-terra`.
+- `DEPUTY_HISTORY_TASK_MODEL`: the answering model, default `gpt-5.6-luna`.
+- `DEPUTY_HISTORY_SCENARIO`: `original` (default), `changed-constraint` or
+  `resolved-methods`. Use a separate output directory for each.
+- `DEPUTY_HISTORY_PROTOCOLS`: `baseline,budget-aware` (default, three
+  continuations per preparation), `baseline` (the original two-arm comparison)
+  or `budget-aware` (summary-only against the budget-aware protocol).
 
-Ten explicit structured checks score the answer, including the current host
-constraint and the individual D/F classifications; no model judge is used.
-Report individual paired outcomes, failed/missing trials and score/latency
-distributions. Fully correct means all ten checks pass; it does not measure
-every claim in the free-text answer. Preparation costs are shared once per pair;
-continuation costs remain separate. Reports include failed checks, missing
-continuations, completion counts, successful source-payload responses separately
-from retrieval attempts, verified completed writes and export attempts. Completed
-and incomplete latencies are reported separately. Do not infer Luna/Terra equivalence, production
-retrieval quality, or a need for recursive analysis from a small synthetic pilot.
+Each invocation has its own spending limit, so add them up when you run
+several. The 100-request cap can stop a larger experiment early; call
+`history_evaluate()` directly to set a different one.
 
-The optional `cancelled` callback is cooperative: checked before runs and history
-access. It does not interrupt an already-running provider request. Deputy's
-runtime cancellation behavior is covered separately in its compaction tests.
+## Output and scoring
 
-The [approved budget-aware follow-up](../../../dev/evaluations/history-recovery/2026-09-07-budget-aware/README.md)
-recorded 9/9 budget-aware answers versus 8/9 baseline-history answers, with 7/9
-fully correct answers in both arms. The one recovered answer accounts for the
-mean-score increase; budget-aware recovery used more requests, estimated cost and time.
-The archive includes all 27 continuations, exact invocation and independent
-checks. This small synthetic comparison does not establish production quality.
+Each run writes `results.json` and `report.md` to a new output directory. The
+JSON (schema version 3, full numeric precision) holds the fixture, input
+contexts, prompts, answers, source references, run IDs, compaction attempts,
+events, usage, latency and effect counts, including each protocol phase's
+outcome. Errors are reduced to their classes, so request objects carrying
+credentials are not saved. If you adapt the experiment to real data, treat
+these files as private. A failure the runner can recover from still saves
+partial results; killing or interrupting the process before it saves does
+not.
+
+Ten structured checks score each answer, including the current eligibility
+rule and the individual D and F classifications; no model acts as judge.
+"Fully correct" means all ten pass, which doesn't cover every claim in the
+free text. Preparation cost is counted once per pair and each continuation's
+cost separately. The report lists individual paired outcomes, failed checks,
+missing continuations, completion counts, retrieval attempts and those that
+returned source text, verified writes and export attempts, with latency for
+completed and incomplete runs shown separately.
+
+The optional `cancelled` callback is checked before each run and each history
+call. It doesn't interrupt a request that is already running.
+
+## Results so far
+
+The [7 September 2026 pilot](../../../dev/evaluations/history-recovery/2026-09-07/README.md)
+ran nine paired trials across the three scenarios. Retrieval improved source
+grounding when it finished, but three history continuations stopped at the
+tool-call limit. The report keeps those failures, the costs, the matched
+contexts and the export records.
+
+The [budget-aware follow-up](../../../dev/evaluations/history-recovery/2026-09-07-budget-aware/README.md)
+got structured answers in 9/9 budget-aware and 8/9 baseline-history trials,
+with 7/9 fully correct in both. The one recovered answer accounts for the
+higher mean score, and the budget-aware arm used more requests, cost and time.
+The archive holds all 27 continuations, the exact invocation and independent
+checks.
+
+Both are small synthetic samples. They don't show production quality, that
+Luna and Terra are interchangeable, or that recursive analysis is needed.
