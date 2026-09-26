@@ -49,6 +49,7 @@ test_that("public API is deliberate", {
     "PermissionResultDeny",
     "PermissionResultPending",
     "ApprovalContinuation",
+    "AskUserDeferred",
     "approval_read",
     "permissions_standard",
     "permissions_readonly",

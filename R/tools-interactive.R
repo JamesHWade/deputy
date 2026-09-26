@@ -348,11 +348,12 @@ AskUserDeferred <- S7::new_class(
     if (!is.list(extra) || (length(extra) && !rlang::is_named(extra))) {
       cli::cli_abort("{.arg extra} must be a named list")
     }
-    freeze_value(S7::new_object(
+    value <- S7::new_object(
       S7::S7_object(),
       instructions = instructions,
       extra = extra
-    ))
+    )
+    freeze_value(value)
   }
 )
 
