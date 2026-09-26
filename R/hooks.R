@@ -473,8 +473,8 @@ HookRegistry <- R6::R6Class(
 #'
 #' @description
 #' Creates a PostToolUse hook that prints a cli line after each tool call,
-#' saying whether it succeeded or failed. It returns a result for every call,
-#' so PostToolUse hooks added after it don't run. Add it last.
+#' saying whether it succeeded or failed. It returns `NULL`, so hooks added
+#' after it still run.
 #'
 #' @param verbose If `TRUE`, also print the first 100 characters of each
 #'   successful result.
@@ -505,7 +505,8 @@ hook_log_tools <- function(verbose = FALSE) {
           cli::cli_alert_info(paste0("Result: ", result_preview))
         }
       }
-      HookResultPostToolUse()
+      # Only observes: let later PostToolUse hooks run.
+      NULL
     }
   )
 }
@@ -536,8 +537,8 @@ hook_log_tools <- function(verbose = FALSE) {
 #' commands contained, turn off `bash` in [Permissions] or run the agent in a
 #' container or other OS sandbox.
 #'
-#' The hook returns a result for every command it checks, so PreToolUse hooks
-#' for `run_bash` added after it don't run.
+#' The hook returns a denial for a matching command and `NULL` otherwise, so
+#' hooks added after it still see the commands it lets through.
 #'
 #' @param patterns Character vector of regular expressions to block. `NULL`
 #'   (the default) uses the built-in patterns.
@@ -718,13 +719,13 @@ hook_block_dangerous_bash <- function(
       command <- tool_input$command %||% ""
 
       if (grepl(combined_pattern, command, ignore.case = TRUE)) {
-        HookResultPreToolUse(
+        return(HookResultPreToolUse(
           permission = "deny",
           reason = "Blocked: potentially dangerous command pattern detected"
-        )
-      } else {
-        HookResultPreToolUse(permission = "allow")
+        ))
       }
+      # No objection: let later PreToolUse hooks decide.
+      NULL
     }
   )
 }
@@ -738,8 +739,8 @@ hook_block_dangerous_bash <- function(
 #' agent's [Permissions] is the main way to limit writes; this hook adds a
 #' second check.
 #'
-#' The hook returns a result for every call it checks, so PreToolUse hooks for
-#' these tools added after it don't run.
+#' The hook returns a denial for a write outside `allowed_dir` and `NULL`
+#' otherwise, so hooks added after it still see the writes it lets through.
 #'
 #' @param allowed_dir An existing directory where writes are allowed. It is
 #'   resolved to an absolute path when the hook is created.
@@ -770,13 +771,13 @@ hook_limit_file_writes <- function(allowed_dir) {
     callback = function(tool_name, tool_input, context) {
       result <- permissions_check(permissions, tool_name, tool_input, context)
       if (identical(result$decision, "deny")) {
-        HookResultPreToolUse(
+        return(HookResultPreToolUse(
           permission = "deny",
           reason = result$reason
-        )
-      } else {
-        HookResultPreToolUse(permission = "allow")
+        ))
       }
+      # No objection: let later PreToolUse hooks decide.
+      NULL
     }
   )
 }

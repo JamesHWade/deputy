@@ -15,8 +15,8 @@ A \link{HookMatcher}.
 }
 \description{
 Creates a PostToolUse hook that prints a cli line after each tool call,
-saying whether it succeeded or failed. It returns a result for every call,
-so PostToolUse hooks added after it don't run. Add it last.
+saying whether it succeeded or failed. It returns \code{NULL}, so hooks added
+after it still run.
 }
 \examples{
 \dontrun{

@@ -160,14 +160,10 @@ check, or to confine writes more tightly for one agent than its policy does.
 ## Order and errors
 
 Hooks for an event run in the order you added them, and the first hook that
-returns something other than `NULL` decides. Later hooks for that event don't
-run. So:
-
-- return `NULL` from hooks that only observe, so the hooks after them still run;
-- add hooks that can deny a call before hooks that might allow it;
-- add the built-in hooks after your own hooks for the same event. They always
-  return a result, even when they have no objection, so a hook added after
-  `hook_block_dangerous_bash()` never sees `run_bash` calls.
+returns something other than `NULL` decides; later hooks for that event don't
+run. So return `NULL` from hooks that only observe, and add hooks that can deny
+a call before hooks that might allow it. The built-in hooks return `NULL`
+unless they deny a call.
 
 If a `PreToolUse` hook throws an error, Deputy denies the tool call. An error
 in any other hook is reported and the run carries on. `agent$hooks$last_errors()`

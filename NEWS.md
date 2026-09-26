@@ -1,5 +1,9 @@
 # deputy (development version)
 
+* `hook_log_tools()`, `hook_block_dangerous_bash()` and
+  `hook_limit_file_writes()` now return `NULL` when they don't deny a call, so
+  hooks added after them for the same event still run.
+
 * `edit_file` and `multi_edit` now change only the text they replace, instead
   of rewriting the file, which converted CRLF to LF and added a final newline.
   Non-UTF-8 bytes are kept too. Search text written with `"\n"` still matches

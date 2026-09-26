@@ -20,8 +20,8 @@ Creates a PreToolUse hook that denies \code{write_file}, \code{edit_file} and
 agent's \link{Permissions} is the main way to limit writes; this hook adds a
 second check.
 
-The hook returns a result for every call it checks, so PreToolUse hooks for
-these tools added after it don't run.
+The hook returns a denial for a write outside \code{allowed_dir} and \code{NULL}
+otherwise, so hooks added after it still see the writes it lets through.
 }
 \examples{
 \dontrun{

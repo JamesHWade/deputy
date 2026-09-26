@@ -41,8 +41,8 @@ denylist can't catch every obfuscated command either. To keep shell
 commands contained, turn off \code{bash} in \link{Permissions} or run the agent in a
 container or other OS sandbox.
 
-The hook returns a result for every command it checks, so PreToolUse hooks
-for \code{run_bash} added after it don't run.
+The hook returns a denial for a matching command and \code{NULL} otherwise, so
+hooks added after it still see the commands it lets through.
 }
 \examples{
 \dontrun{

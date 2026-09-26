@@ -112,10 +112,10 @@ denies:
 agent$add_hook(approval_gate(callback = my_approval_handler))
 ```
 
-Add approval hooks before any other hook for the same event, including the
-built-in ones. The first hook to return a result decides, so an earlier hook
-that returns a result would skip the approval. The gate returns `NULL` after
-an approval, so hooks added after it still run.
+Add approval hooks before other hooks for the same event that return a
+result. The first hook to return a result decides, so an earlier hook that
+allows the call would skip the approval. The gate returns `NULL` after an
+approval, so hooks added after it still run.
 
 The recipe also has `approval_after_install()`, which asks before
 `push_changes` only if an `install_dependency` tool succeeded earlier in the
