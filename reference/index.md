@@ -98,6 +98,8 @@ Built-in tools and tool bundles
   : Get a tool preset by name
 - [`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md)
   : Tools for interactive workflows
+- [`AskUserDeferred()`](https://jameshwade.github.io/deputy/reference/AskUserDeferred.md)
+  : Defer answers to a later user turn
 - [`tools_mcp()`](https://jameshwade.github.io/deputy/reference/tools_mcp.md)
   : Get tools from MCP servers
 - [`McpConnection`](https://jameshwade.github.io/deputy/reference/McpConnection.md)

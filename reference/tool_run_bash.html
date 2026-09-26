@@ -80,7 +80,9 @@ Use with caution! This can execute arbitrary system commands."><meta property="o
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>When called directly, a character string containing command output
-or a success message.</p>
+(standard error follows a <code>[stderr]</code> line) or a success message. A
+command that exits with a non-zero status is rejected with its status
+and output, so the model sees the step failed.</p>
     </div>
 
     <div class="section level2">

@@ -22,8 +22,10 @@ A tool definition created with
 
 ## Value
 
-When called directly, a character string containing command output or a
-success message.
+When called directly, a character string containing command output
+(standard error follows a `[stderr]` line) or a success message. A
+command that exits with a non-zero status is rejected with its status
+and output, so the model sees the step failed.
 
 ## Examples
 

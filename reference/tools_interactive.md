@@ -17,7 +17,11 @@ tools_interactive(callback = NULL, context = list())
 
   Optional handler with signature `function(questions, context)`. It
   should return a named list that maps each question text to the
-  selected label or labels. When omitted, interactive sessions use
+  selected label or labels, a promise resolving to that list, or
+  [`AskUserDeferred()`](https://jameshwade.github.io/deputy/reference/AskUserDeferred.md)
+  when the answers will arrive in the person's next message. Shiny hosts
+  cannot block for input, so they use one of the latter two forms. When
+  omitted, interactive sessions use
   [`readline()`](https://rdrr.io/r/base/readline.html) and
   non-interactive sessions may use the legacy callback from
   [`set_ask_user_callback()`](https://jameshwade.github.io/deputy/reference/set_ask_user_callback.md).
