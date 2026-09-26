@@ -21,6 +21,9 @@
   from the model's context, and `Agent$usage()$tool_calls` counts the tool
   calls the model asked for instead of always being 0.
 
+* The command-line app now reports how many model requests a run made,
+  instead of "NA turn(s)".
+
 * `edit_file` and `multi_edit` now change only the text they replace, instead
   of rewriting the file, which converted CRLF to LF and added a final newline.
   Non-UTF-8 bytes are kept too. Search text written with `"\n"` still matches

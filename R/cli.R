@@ -419,12 +419,13 @@ cli_render_event <- function(
     },
     warning = cli::cli_alert_warning(event$message %||% "Agent warning"),
     stop = {
-      total_turns <- event$total_turns %||% NA_integer_
+      # The stop event carries the run's usage; count its model requests.
+      requests <- event$usage$requests %||% NA_integer_
       stop_reason <- event$reason %||% "complete"
       cost <- event$cost %||% NULL
       cost_total <- if (is.null(cost)) NULL else cost$total %||% NULL
       if (!is.null(debug_log)) {
-        debug_log("run stop: turns=", as.character(total_turns))
+        debug_log("run stop: requests=", as.character(requests))
       }
       cat("\n")
       if (identical(mode, "task")) {
@@ -433,12 +434,12 @@ cli_render_event <- function(
         }
         if (identical(stop_reason, "complete")) {
           cli::cli_alert_success(
-            "Completed in {.val {total_turns}} turn(s)"
+            "Completed in {.val {requests}} model request(s)"
           )
         }
       } else if (!identical(stop_reason, "complete")) {
         cli::cli_alert_warning(
-          "Run stopped after {.val {total_turns}} turn(s): {.val {stop_reason}}"
+          "Run stopped after {.val {requests}} model request(s): {.val {stop_reason}}"
         )
       } else if (
         verbose &&
@@ -447,8 +448,8 @@ cli_render_event <- function(
           cost_total > 0
       ) {
         cli::cli_text(cli::col_grey(sprintf(
-          "[%d turns, $%.4f]",
-          total_turns,
+          "[%d requests, $%.4f]",
+          as.integer(requests),
           cost_total
         )))
       }
