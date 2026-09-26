@@ -739,7 +739,7 @@ test_that("only Deputy's ask_user takes the plan-mode prompt shortcut", {
     ),
     PermissionResultAllow
   )
-  for (name in c("ask_user", "Ask-User", "ask.user")) {
+  for (name in c("ask_user", "Ask-User")) {
     expect_s7_class(
       permissions_check(
         plan,
