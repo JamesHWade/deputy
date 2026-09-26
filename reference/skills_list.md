@@ -1,6 +1,7 @@
 # List available skills in a directory
 
-Scans a directory for subdirectories containing SKILL.yaml files.
+Finds skills in `path`: subdirectories that contain `SKILL.yaml` or
+`SKILL.md`, and Markdown files directly inside `path`.
 
 ## Usage
 
@@ -12,11 +13,12 @@ skills_list(path = "skills")
 
 - path:
 
-  Path to search for skills (default: "skills" in working dir)
+  Directory to search. Defaults to `"skills"` in the working directory.
 
 ## Value
 
-Data frame with skill names and paths
+A data frame with `name` and `path` columns, empty if `path` doesn't
+exist.
 
 ## Examples
 

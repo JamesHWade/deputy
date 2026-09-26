@@ -1,16 +1,17 @@
 # Create a permission policy
 
-A read-only S7 value controlling tool access. Use
-[`permissions_check()`](https://jameshwade.github.io/deputy/reference/permissions_check.md)
-to evaluate a call. Read properties with `S7::prop(policy, "mode")` or
-`$`. To narrow an active Agent, use its `set_permission_mode()` method;
-replacing its policy or changing its properties is not supported.
+A `Permissions` object decides which tool calls an agent may make. Pass
+it to `Agent$new()`, or test a call with
+[`permissions_check()`](https://jameshwade.github.io/deputy/reference/permissions_check.md).
+[PermissionMode](https://jameshwade.github.io/deputy/reference/PermissionMode.md)
+describes how each mode uses these settings.
 
-Directory grants are canonicalized at construction. The callback retains
-its caller-owned executable state. Read-only properties protect the
-public configuration; they are not an execution sandbox. Serialized
-policies are configuration records, not portable authority grants or a
-way to widen an existing Agent's authority.
+The object is read-only; read its fields with `$`. To restrict an agent
+further while it runs, call `agent$set_permission_mode()`. Permissions
+can be narrowed but not widened.
+
+A policy is not an OS sandbox: code run through `run_r_code` or
+`run_bash` can do anything your R session can.
 
 ## Usage
 
@@ -38,41 +39,47 @@ Permissions(
 
 - file_read:
 
-  Allow file reading. One non-missing logical value.
+  Allow file reading. `TRUE` or `FALSE`.
 
 - file_write:
 
-  `TRUE`, `FALSE`, or an existing absolute directory path.
+  `TRUE`, `FALSE`, or an existing absolute directory. A directory allows
+  writes only inside it and is resolved when the policy is created.
+  Defaults to the current working directory.
 
 - bash:
 
-  Allow shell commands. One non-missing logical value.
+  Allow shell commands. `TRUE` or `FALSE`.
 
 - r_code:
 
-  Allow R code execution. One non-missing logical value; defaults to
-  `FALSE`.
+  Allow R code execution. `TRUE` or `FALSE`.
 
 - web:
 
-  Allow web requests. One non-missing logical value.
+  Allow web access, including other tools that reach external systems.
+  `TRUE` or `FALSE`.
 
 - install_packages:
 
-  Allow package installation. One non-missing logical value.
+  Allow package installation. `TRUE` or `FALSE`.
 
 - can_use_tool:
 
-  A function accepting tool name, input, and context, returning a
-  [PermissionResultAllow](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md),
-  [PermissionResultDeny](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md),
-  [PermissionResultPending](https://jameshwade.github.io/deputy/reference/PermissionResultPending.md),
-  or `NULL`.
+  Optional function `(tool_name, tool_input, context)` that returns
+  [`PermissionResultAllow()`](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md),
+  [`PermissionResultDeny()`](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md)
+  or
+  [`PermissionResultPending()`](https://jameshwade.github.io/deputy/reference/PermissionResultPending.md).
+  It is called, in every mode, for each call the rest of the policy
+  allows, so it can deny a call or pause it for approval but can't allow
+  a call the policy denies. Any other return value, including `NULL`,
+  denies the call with a warning, and so does an error.
 
 - tool_allowlist:
 
-  Character vector of allowed tool names, or `NULL`. An empty vector
-  denies all tools; `NULL` disables this gate.
+  Character vector of allowed tool names, or `NULL` (the default) to
+  allow any name. An empty vector denies all tools.
 
 - tool_denylist:
 
@@ -80,12 +87,19 @@ Permissions(
 
 - permission_prompt_tool_name:
 
-  Optional dedicated approval-tool name to suggest in deny messages.
-  Native capability-bearing tools cannot be used.
+  Optional name of a tool the model can call to ask for approval, such
+  as `"ask_user"`. It is allowed in every mode unless `tool_allowlist`
+  or `tool_denylist` excludes it, and denials from those lists point the
+  model to it. Built-in file, code, web, install and delegation tools
+  can't be used.
 
 ## Value
 
-A read-only `Permissions` S7 object.
+A `Permissions` object.
+
+## See also
+
+[`vignette("permissions")`](https://jameshwade.github.io/deputy/articles/permissions.md)
 
 ## Examples
 
@@ -96,6 +110,6 @@ permissions_check(policy, "write_file", list(path = "output.txt"))
 #>  @ decision : chr "deny"
 #>  @ reason   : chr "File writing is not allowed"
 #>  @ interrupt: logi FALSE
-S7::prop(policy, "file_write")
+policy$file_write
 #> [1] FALSE
 ```

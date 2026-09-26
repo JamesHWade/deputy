@@ -1,7 +1,8 @@
-# Create a hook that logs all tool calls
+# Create a hook that logs tool calls
 
-Convenience function to create a PostToolUse hook that logs tool calls
-using the cli package.
+Creates a PostToolUse hook that prints a cli line after each tool call,
+saying whether it succeeded or failed. It returns `NULL`, so hooks added
+after it still run.
 
 ## Usage
 
@@ -13,13 +14,13 @@ hook_log_tools(verbose = FALSE)
 
 - verbose:
 
-  If TRUE, include tool result in log
+  If `TRUE`, also print the first 100 characters of each successful
+  result.
 
 ## Value
 
 A
-[HookMatcher](https://jameshwade.github.io/deputy/reference/HookMatcher.md)
-object
+[HookMatcher](https://jameshwade.github.io/deputy/reference/HookMatcher.md).
 
 ## Examples
 

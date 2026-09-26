@@ -1,10 +1,10 @@
 # Create a standard permission policy
 
-Creates a permission policy suitable for most use cases. Allows reads of
-files accessible to the R process, confines file writes to the working
-directory. Denies arbitrary R code, bash commands, web access, and
-package installation. Grant code execution explicitly only when the
-model and task are trusted; process separation is not an OS sandbox.
+Creates a `"standard"` policy for everyday use. The agent can read any
+file your R session can read, and write files inside `working_dir`. R
+code, shell commands, web access and package installation are denied.
+Turn on code execution only when you trust the model and the task: the
+code runs with your user's access, not in an OS sandbox.
 
 ## Usage
 
@@ -16,14 +16,14 @@ permissions_standard(working_dir = getwd())
 
 - working_dir:
 
-  Existing absolute root directory for file writes (default: current
-  directory). This does not restrict otherwise accessible file reads.
+  An existing absolute path to the directory the agent may write to.
+  Defaults to the current directory. Reads are not limited to it.
 
 ## Value
 
 A
 [Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md)
-object
+object.
 
 ## Examples
 

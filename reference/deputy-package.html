@@ -20,26 +20,37 @@ Run tasks with language models and R tools using 'ellmer'. Control tool access w
       <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/getting-started.html">Get started</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/JamesHWade/deputy/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -62,26 +73,25 @@ Run tasks with language models and R tools using 'ellmer'. Control tool access w
 
 
     <div class="section level2">
-    <h2 id="main-functions">Main Functions<a class="anchor" aria-label="anchor" href="#main-functions"></a></h2>
+    <h2 id="main-functions">Main functions<a class="anchor" aria-label="anchor" href="#main-functions"></a></h2>
 
 
-<ul><li><p><a href="Agent.html">Agent</a> - The main class for creating agents</p></li>
-<li><p><a href="LeadAgent.html">LeadAgent</a> - Coordinate specialized delegated agents</p></li>
-<li><p><code><a href="tools_preset.html">tools_preset()</a></code> - Choose a set of built-in tools</p></li>
-<li><p><code><a href="UsageLimits.html">UsageLimits()</a></code> - Set request, tool, token, and cost limits</p></li>
-<li><p><code><a href="permissions_standard.html">permissions_standard()</a></code> - Standard permission policy</p></li>
-<li><p><code><a href="permissions_plan.html">permissions_plan()</a></code> - Planning permission policy</p></li>
-<li><p><code><a href="permissions_readonly.html">permissions_readonly()</a></code> - Read-only permission policy</p></li>
+<ul><li><p><a href="Agent.html">Agent</a>: runs a task with an ellmer Chat, tools, permissions and limits.</p></li>
+<li><p><a href="LeadAgent.html">LeadAgent</a>: an agent that delegates tasks to subagents.</p></li>
+<li><p><code><a href="tools_preset.html">tools_preset()</a></code>: picks a set of built-in tools.</p></li>
+<li><p><code><a href="UsageLimits.html">UsageLimits()</a></code>: caps requests, tool calls, tokens and cost.</p></li>
+<li><p><code><a href="permissions_standard.html">permissions_standard()</a></code>, <code><a href="permissions_plan.html">permissions_plan()</a></code> and
+<code><a href="permissions_readonly.html">permissions_readonly()</a></code>: ready-made permission policies.</p></li>
 </ul></div>
     <div class="section level2">
-    <h2 id="getting-started">Getting Started<a class="anchor" aria-label="anchor" href="#getting-started"></a></h2>
+    <h2 id="getting-started">Getting started<a class="anchor" aria-label="anchor" href="#getting-started"></a></h2>
 
 
 
 <p></p><div class="sourceCode r"><pre><code><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span>

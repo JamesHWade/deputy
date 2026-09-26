@@ -1,10 +1,15 @@
-# Authorize and redact child conversation inspection
+# Control who can inspect subagents
 
-Hosts authenticate requesters before calling inspection methods.
-Identifiers are routing locators, never access grants. Authorization
-runs before record lookup; redaction runs before each snapshot leaves
-Deputy. These trusted host callbacks never run as model tools. The
-default denies all disclosures.
+Decides who may read subagent results and history, through the
+inspection methods of
+[Agent](https://jameshwade.github.io/deputy/reference/Agent.md) and
+[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
+or
+[`delegation_history()`](https://jameshwade.github.io/deputy/reference/delegation_history.md).
+Pass it as `delegation_disclosure`. `authorize` is where your
+application checks access; `redact` removes what the requester shouldn't
+see. By default every request is denied. Authenticate the requester
+first: a delegation ID alone never grants access.
 
 ## Usage
 
@@ -20,23 +25,25 @@ DelegationDisclosure(
 
 - authorize:
 
-  Function of `requester` and fixed host `scope`; only an exact `TRUE`
-  permits disclosure. Errors deny access without disclosing details.
+  A `function(requester, scope)`. Only an exact `TRUE` allows access;
+  anything else, including an error, denies it. `scope` holds the
+  agent's `delegation_scope`, `agent_id` and `session_id`, or the
+  `scope` given to
+  [`delegation_history()`](https://jameshwade.github.io/deputy/reference/delegation_history.md).
 
 - redact:
 
-  Function of `view` and `requester`, returning a redacted list. It may
-  remove fields or content. It must not perform agent execution.
+  A `function(view, requester)` that returns `view`, as a list, without
+  anything the requester shouldn't see. The default returns it
+  unchanged.
 
 - max_bytes:
 
-  Maximum serialized content-payload bytes in one disclosed snapshot or
-  saved history, including replayed turn content but excluding shared R
-  class/method metadata. Oversized disclosures fail explicitly; select
-  fewer children or omit transcripts. Defaults to 16 MiB. Rich table
-  projections also have a separate conservative 16 MiB size estimate
-  limit; larger projections receive an explicit omission marker.
+  Maximum size, in bytes, of one disclosed result; defaults to 16 MiB.
+  Larger results are an error, so ask for fewer subagents or no
+  transcripts. Separately, data frames in tool results are replaced by a
+  placeholder above an estimated 16 MiB.
 
 ## Value
 
-Read-only `DelegationDisclosure` host configuration.
+A `DelegationDisclosure` object.

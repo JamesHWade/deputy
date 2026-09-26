@@ -35,30 +35,41 @@
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
 <li class="nav-item"><a class="nav-link" href="../articles/getting-started.html">Get started</a></li>
-<li class="nav-item dropdown">
+<li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -103,16 +114,12 @@ person.</p>
 <p>Their <a href="https://trustedminiagents.dev/definition.html" class="external-link">definition</a>
 closes both gaps with three rules:</p>
 <ol style="list-style-type: decimal">
-<li>
-<strong>Trusted tools produce every result.</strong> No result comes
-from the model.</li>
-<li>
-<strong>Each kind of result comes from exactly one trusted
-tool.</strong> No other tool can produce it instead.</li>
-<li>
-<strong>A person reviews the model-generated inputs to trusted
-tools</strong>, in a form they can check quickly and without much
-fatigue.</li>
+<li>Trusted tools produce every result. No result comes from the
+model.</li>
+<li>Each kind of result comes from exactly one trusted tool. No other
+tool can produce it instead.</li>
+<li>A person reviews the model-generated inputs to trusted tools, in a
+form they can check quickly and without much fatigue.</li>
 </ol>
 <p>In their framing, this changes what the user has to ask. Instead of
 “Are these results correct?”, the user asks “Is the agent solving the
@@ -145,7 +152,7 @@ runtime:</p>
 <td>1. Tools produce results</td>
 <td>
 <code><a href="../reference/TrustedResults.html">TrustedResults()</a></code> delivers the trusted tool’s return
-value to the host directly, as a <code>"trusted_result"</code> event and
+value straight to your app, as a <code>"trusted_result"</code> event and
 an <code>on_result</code> callback, before the model sees any
 output.</td>
 <td>Model text never reaches the result channel.</td>
@@ -226,7 +233,7 @@ of result:</p>
 <p>With <code>model_receipt = TRUE</code>, the model receives a short
 receipt naming the result ID instead of the forecast itself. It cannot
 restate the numbers wrongly later in the conversation, because it never
-has them. Without a receipt, the model gets the same value as the host,
+has them. Without a receipt, the model gets the same value as your app,
 as in Landau and Parmar’s examples.</p>
 <p>The agent combines the policy with a permission callback that pauses
 every forecast for review:</p>
@@ -236,7 +243,7 @@ every forecast for review:</p>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span></span>
-<span>    model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span>,</span>
+<span>    model <span class="op">=</span> <span class="st">"gpt-6-luna"</span>,</span>
 <span>    credentials <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="st">"not used in this article"</span></span>
 <span>  <span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">get_forecast</span><span class="op">)</span>,</span>
@@ -270,14 +277,14 @@ could produce a forecast some other way is refused:</p>
 always rejected. They could compute anything.</li>
 <li>Any other tool must be annotated read-only and closed-world.
 Unannotated tools get conservative defaults and are rejected.</li>
-<li>A local tool the host knows to be harmless can be listed in
-<code>TrustedResults(exempt_tools = )</code>. That is an explicit
-statement by the host, never something Deputy infers. MCP and
-provider-side tools cannot be exempted.</li>
+<li>A local tool you know to be harmless can be listed in
+<code>TrustedResults(exempt_tools = )</code>. That is your decision,
+never something Deputy infers. MCP and provider-side tools cannot be
+exempted.</li>
 </ul>
-<p>The trusted tool itself must be a local R function, and it only runs
-through the agent’s own governed tool call. Another tool or host code
-calling it directly cannot publish a result.</p>
+<p>The trusted tool itself must be a local R function, and it only
+publishes a result when the agent calls it. Another tool, or your own
+code, calling it directly cannot publish a result.</p>
 </div>
 <div class="section level3">
 <h3 id="reviewing-the-inputs">Reviewing the inputs<a class="anchor" aria-label="anchor" href="#reviewing-the-inputs"></a>
@@ -307,7 +314,7 @@ type and description:</p>
 <p>Permission callbacks and hooks receive the same declared types as
 <code>context$tool_arguments</code>, so a review can be built anywhere a
 call is intercepted.</p>
-<p>The host then approves, denies, or approves with edits. The trusted
+<p>Your app then approves, denies, or approves with edits. The trusted
 tool runs only after approval, with the reviewed inputs:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">resume_approval</span><span class="op">(</span></span>
@@ -354,7 +361,7 @@ trusted tool writes to the results area.</p>
 <span>  <span class="va">approval_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"approvals-"</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">approval_dir</span><span class="op">)</span></span>
 <span>  <span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>    chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>    chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
 <span>    tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">get_forecast</span><span class="op">)</span>,</span>
 <span>    approval_dir <span class="op">=</span> <span class="va">approval_dir</span>,</span>
 <span>    permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
@@ -401,7 +408,7 @@ model, so they need no API key:</p>
 tree:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
 <span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>    <span class="st">"forecaster"</span>,</span>
 <span>    <span class="st">"Produce forecasts"</span>,</span>
@@ -430,25 +437,16 @@ does this.</p>
 <h2 id="what-this-does-not-guarantee">What this does not guarantee<a class="anchor" aria-label="anchor" href="#what-this-does-not-guarantee"></a>
 </h2>
 <p>The pattern moves trust from the model to the tools and the review.
-It does not remove the need for either:</p>
-<ul>
-<li>
-<strong>The trusted tool must be right.</strong> Deputy guarantees
-that results come from it unchanged, not that its code or data are
-correct.</li>
-<li>
-<strong>The review must be real.</strong> A person clicking Approve
-without looking gets no protection. Keep the inputs few and easy to
-check.</li>
-<li>
-<strong>The host is trusted.</strong> The policy stops the model and
-other tools from producing results. It does not protect against code in
-the host R process, and it is not an OS sandbox.</li>
-<li>
-<strong>The model still talks.</strong> Its chat text is commentary.
-Present it that way, apart from the results, as the three-area layout
-does.</li>
-</ul>
+It does not remove the need for either.</p>
+<p>The trusted tool must be right. Deputy guarantees that results come
+from it unchanged, not that its code or data are correct.</p>
+<p>The review must be real. A person who clicks Approve without looking
+gets no protection, so keep the inputs few and easy to check.</p>
+<p>Your own R code is trusted. The policy stops the model and other
+tools from producing results, but it doesn’t protect against code in
+your R process, and it isn’t an OS sandbox.</p>
+<p>The model still talks. Its chat text is commentary: show it apart
+from the results, as the three-area layout does.</p>
 </div>
 <div class="section level2">
 <h2 id="credit">Credit<a class="anchor" aria-label="anchor" href="#credit"></a>
@@ -456,13 +454,8 @@ does.</li>
 <p>The trusted mini-agent pattern, its three rules, the three-area app
 layout and the weather example all come from <a href="https://trustedminiagents.dev" class="external-link"><em>Trusted Mini-Agents</em></a> by
 Will Landau and Sam Parmar. Deputy’s contribution is enforcing the rules
-in the runtime:</p>
-<ul>
-<li>the result channel and registry checks;</li>
-<li>the typed review module;</li>
-<li>the extension to delegation.</li>
-</ul>
-<p>The design is recorded in <a href="https://github.com/JamesHWade/deputy/blob/main/dev/adr/0030-trusted-result-channel.md" class="external-link">ADR-0030</a>.</p>
+at run time: the result channel and the checks on registered tools, the
+typed review module, and the extension to delegation.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

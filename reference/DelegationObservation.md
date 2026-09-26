@@ -1,8 +1,10 @@
-# Bound the child activity observation buffer
+# Set limits for the subagent event buffer
 
-One in-memory ring belongs to each Agent. Subscribers hold only cursors;
-they cannot block execution or accumulate private queues. Retained
-transcript storage is separate from this transient buffer.
+Each agent keeps recent subagent events in an in-memory buffer that
+`$observe_subagents()` readers poll. When it is full, the oldest events
+are dropped: a slow reader never holds up a run, but sees a gap.
+Subagent transcripts are kept separately and don't count toward these
+limits.
 
 ## Usage
 
@@ -18,20 +20,22 @@ DelegationObservation(
 
 - max_events:
 
-  Maximum retained events, default 256.
+  Maximum number of events kept. Defaults to 256.
 
 - max_bytes:
 
-  Maximum serialized bytes across retained envelopes, default 1 MiB. The
-  buffer evicts oldest envelopes until both limits hold.
+  Maximum total size of the kept events, in bytes. Defaults to 1 MiB.
 
 - max_event_bytes:
 
-  Maximum bytes in one event, default 64 KiB. Oversized or nonportable
-  content becomes an explicit omission envelope; hosts recover completed
-  public content from an authorized snapshot.
+  Maximum size of one event, in bytes: between 2048 and `max_bytes`, 64
+  KiB by default. Larger content is replaced by a marker; get it from a
+  [DelegationSubscription](https://jameshwade.github.io/deputy/reference/DelegationSubscription.md)
+  snapshot instead.
 
 ## Value
 
-Read-only observation limits for
-[Agent](https://jameshwade.github.io/deputy/reference/Agent.md).
+A `DelegationObservation` object for the `delegation_observation`
+argument of
+[Agent](https://jameshwade.github.io/deputy/reference/Agent.md) or
+[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md).

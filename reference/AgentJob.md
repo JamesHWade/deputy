@@ -1,8 +1,12 @@
-# AgentJob read-only durable inspection
+# Background job record
 
-AgentJob values are returned by job_read and job_run. They contain
-portable lifecycle and outcome data, never Agents, Chats, tools,
-callbacks, credentials, connections, promises or cleanup closures.
+A read-only snapshot of a background job, returned by
+[`job_read()`](https://jameshwade.github.io/deputy/reference/job_read.md),
+[`job_run()`](https://jameshwade.github.io/deputy/reference/job_run.md)
+and
+[`job_cancel()`](https://jameshwade.github.io/deputy/reference/job_cancel.md).
+Read fields with `$`. It holds plain data only, never an agent, chat,
+tools, callbacks or credentials.
 
 ## Usage
 
@@ -40,104 +44,127 @@ AgentJob(
 
 - path:
 
-  Committed job directory.
+  The job directory.
 
 - revision:
 
-  Immutable record revision.
+  Revision number; it goes up with each update.
 
 - id:
 
-  Stable job identifier.
+  Job ID.
 
 - status:
 
-  Durable lifecycle status.
+  One of `"queued"`, `"running"`, `"resuming"`, `"approval_pending"`,
+  `"completed"`, `"failed"`, `"cancelled"` or `"indeterminate"`. The
+  last four are final.
 
 - task:
 
-  Submitted task text.
+  The task text.
 
 - owner_id:
 
-  Host owner identifier.
+  The `owner_id` given to
+  [`job_create()`](https://jameshwade.github.io/deputy/reference/job_create.md).
 
 - definition_revision:
 
-  Host Agent-definition revision.
+  The `definition_revision` given to
+  [`job_create()`](https://jameshwade.github.io/deputy/reference/job_create.md).
 
 - context_revision:
 
-  Host source-context revision.
+  The `context_revision` given to
+  [`job_create()`](https://jameshwade.github.io/deputy/reference/job_create.md).
 
 - usage_limits:
 
-  Reserved usage ceiling.
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  for the job.
 
 - usage:
 
-  Observed usage.
+  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+  so far.
 
 - associations:
 
-  Portable host associations.
+  The `associations` list given to
+  [`job_create()`](https://jameshwade.github.io/deputy/reference/job_create.md).
 
 - manifest:
 
-  Portable Agent and graph manifest.
+  The agent setup saved by
+  [`job_create()`](https://jameshwade.github.io/deputy/reference/job_create.md),
+  which
+  [`job_run()`](https://jameshwade.github.io/deputy/reference/job_run.md)
+  checks the rebuilt agent against.
 
 - allocation:
 
-  Original allocation reservation.
+  The usage limits set aside when the job was created.
 
 - reservations:
 
-  Durable reservation state.
+  Whether that allocation is still held or has been released.
 
 - pending_approval:
 
-  Persisted approval inspection, or NULL.
+  Details of the approval the job is waiting for, including its `path`,
+  or `NULL`.
 
 - pending_decision:
 
-  Persisted decision receipt, or NULL.
+  The approval decision being applied (`decision`, `tool_input`,
+  `recorded_at`), or `NULL`.
 
 - transitions:
 
-  Bounded lifecycle transitions.
+  Status changes, each with `from`, `to`, `at` and `reason`. Only the
+  latest 128 are kept.
 
 - events:
 
-  Bounded runtime events.
+  Simplified run events: at most the latest 512, fewer if needed to stay
+  within the storage limit.
 
 - result:
 
-  Portable terminal result summary, or NULL.
+  Summary of the final
+  [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
+  (`response`, `stop_reason`, `usage` and so on), or `NULL`.
 
 - error:
 
-  Portable terminal error summary, or NULL.
+  Summary of the error that ended the job (`class`, `message` and so
+  on), or `NULL`.
 
 - cleanup:
 
-  Cleanup ownership and ledger state.
+  Who is responsible for cleaning up the job's resources, and whether
+  cleanup has run.
 
 - runtime:
 
-  Portable runtime snapshot.
+  State saved while the job ran, such as the tool calls it executed.
 
 - graph:
 
-  Portable graph snapshot, or NULL.
+  Usage and limits of the retained agent graph, or `NULL` for a single
+  agent.
 
 - source:
 
-  Portable correlation metadata.
+  IDs of the agents, sessions and runs involved.
 
 - control:
 
-  Portable independent cancellation state.
+  Cancellation state: whether
+  [`job_cancel()`](https://jameshwade.github.io/deputy/reference/job_cancel.md)
+  was called, and its reason.
 
 ## Value
 
-A read-only S7 AgentJob value.
+An `AgentJob` object.

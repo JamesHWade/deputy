@@ -1,55 +1,49 @@
-# Deputy Error Classes
+# Deputy error classes
 
-Structured error types for programmatic error handling in deputy. All
-deputy errors inherit from `deputy_error` and include contextual
-information for debugging. Errors use cli formatting for readable
-output.
+Errors signalled by deputy have class `deputy_error` plus more specific
+classes, so you can catch them by class with
+[`tryCatch()`](https://rdrr.io/r/base/conditions.html). Many carry extra
+fields, such as `tool_name` or `limit`. Errors from ellmer or the
+provider, such as HTTP errors, are passed through unchanged.
 
-## Error Hierarchy
+## Error classes
 
-- **deputy_error** - Base class for all deputy errors
+- `deputy_error`: every deputy error.
 
-  - **deputy_permission** - Permission-related failures
+  - `deputy_permission_denied` (also `deputy_permission`): an action
+    wasn't allowed.
 
-    - `deputy_permission_denied` - Tool/action not allowed by
-      permissions
+  - `deputy_tool_execution` (also `deputy_tool`): a tool failed.
 
-  - **deputy_tool** - Tool execution failures
+  - `deputy_budget`: a usage limit was reached. Only signalled when
+    [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+    has `on_exceed = "error"`.
 
-    - `deputy_tool_execution` - Tool failed during execution
+    - `deputy_request_limit`: `max_requests` was reached.
 
-  - **deputy_budget** - Resource limit violations
+    - `deputy_cost_unavailable`: `max_cost_usd` is set but a response's
+      cost is unknown.
 
-    - `deputy_budget_exceeded` - Cost limit exceeded
+    - `deputy_budget_exceeded`: a tool-call, token or cost limit was
+      reached. The error's `budget_type`, `actual` and `limit` fields
+      say which.
 
-    - `deputy_cost_unavailable` - Cost limit could not be measured
+  - `deputy_session_load`, `deputy_session_save` (also
+    `deputy_session`): loading or saving a session file failed.
 
-    - `deputy_request_limit` - Maximum model requests exceeded
+  - `deputy_human_input_unavailable`: an `ask_user` request couldn't
+    reach a person, for example in a non-interactive session with no
+    handler.
 
-  - **deputy_provider** - LLM provider failures
-
-  - **deputy_session** - Session management failures
-
-    - `deputy_session_load` - Failed to load session
-
-    - `deputy_session_save` - Failed to save session
-
-  - **deputy_hook** - Hook execution failures
-
-  - **deputy_human_input_unavailable** - No interactive or bound handler
-    is available for an `ask_user` request
+Other deputy errors, such as `deputy_run_active` (the agent is already
+running), also inherit from `deputy_error`.
 
 ## Usage
 
-Errors can be caught using
-[`tryCatch()`](https://rdrr.io/r/base/conditions.html) with class-based
-matching:
-
     tryCatch(
       agent$run_sync("task"),
-      deputy_budget_exceeded = function(e) {
-        message("Budget exceeded: ", conditionMessage(e))
-        message("Current cost: $", e$current_cost)
+      deputy_budget = function(e) {
+        message("Usage limit reached: ", conditionMessage(e))
       },
       deputy_error = function(e) {
         message("Deputy error: ", conditionMessage(e))

@@ -20,4 +20,4 @@ load_skill_tools(skill_path, tool_specs)
 
 ## Value
 
-List of tool definitions
+List of tools

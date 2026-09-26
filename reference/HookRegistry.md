@@ -1,7 +1,8 @@
-# HookRegistry R6 Class
+# Hook registry
 
-Manages a collection of hooks for an agent. Handles registration,
-matching, and execution of hooks.
+Holds an agent's hooks, finds the ones that match an event, and runs
+them. Each agent has its own registry in `agent$hooks`; add hooks with
+`agent$add_hook()`.
 
 ## Methods
 
@@ -29,7 +30,7 @@ matching, and execution of hooks.
 
 ### `HookRegistry$new()`
 
-Create a new HookRegistry.
+Create an empty registry.
 
 #### Usage
 
@@ -50,18 +51,17 @@ Add a hook to the registry.
 - `hook`:
 
   A
-  [HookMatcher](https://jameshwade.github.io/deputy/reference/HookMatcher.md)
-  object
+  [HookMatcher](https://jameshwade.github.io/deputy/reference/HookMatcher.md).
 
 #### Returns
 
-Invisible self for chaining
+The registry, invisibly.
 
 ------------------------------------------------------------------------
 
 ### `HookRegistry$get_hooks()`
 
-Get all hooks for a specific event.
+Get the hooks that match an event.
 
 #### Usage
 
@@ -71,29 +71,29 @@ Get all hooks for a specific event.
 
 - `event`:
 
-  The event type
+  A
+  [HookEvent](https://jameshwade.github.io/deputy/reference/HookEvent.md).
 
 - `tool_name`:
 
-  Optional tool name for filtering
+  Optional tool name to match against hook patterns.
 
 #### Returns
 
-List of matching HookMatcher objects
+A list of
+[HookMatcher](https://jameshwade.github.io/deputy/reference/HookMatcher.md)
+objects.
 
 ------------------------------------------------------------------------
 
 ### `HookRegistry$fire()`
 
-Fire hooks for an event and return the first non-NULL result.
+Run the matching hooks in the order they were added and return the first
+non-`NULL` result. Later hooks don't run.
 
-Hook errors are handled as follows:
-
-- **PreToolUse**: Errors result in denial (fail-safe security behavior)
-
-- **Other events**: Errors are logged prominently and stored in the
-  `last_errors` field, but execution continues to prevent cascade
-  failures
+A failing callback is recorded in `last_errors()`. For PreToolUse the
+failure denies the tool call; for other events it is reported and the
+next hook runs.
 
 #### Usage
 
@@ -103,28 +103,29 @@ Hook errors are handled as follows:
 
 - `event`:
 
-  The event type
+  A
+  [HookEvent](https://jameshwade.github.io/deputy/reference/HookEvent.md).
 
 - `tool_name`:
 
-  Optional tool name for filtering (also passed to callback)
+  Optional tool name, matched against hook patterns and passed to the
+  callback.
 
 - `...`:
 
-  Arguments to pass to the callback
+  Other arguments for the callback.
 
 #### Returns
 
-The first non-NULL hook result, or NULL
+The first non-`NULL` result, or `NULL`.
 
 ------------------------------------------------------------------------
 
 ### `HookRegistry$last_errors()`
 
-Get errors from recent hook executions.
-
-Useful for programmatic checking of hook health, especially for
-audit/logging hooks where failures are logged but not fatal.
+Get the errors raised by hook callbacks since the registry was created
+or last cleared. Use it to check logging hooks, whose failures don't
+stop the run.
 
 #### Usage
 
@@ -132,14 +133,13 @@ audit/logging hooks where failures are logged but not fatal.
 
 #### Returns
 
-List of error records, each containing event, tool_name, error,
-timestamp
+A list of records with `event`, `tool_name`, `error` and `timestamp`.
 
 ------------------------------------------------------------------------
 
 ### `HookRegistry$clear_errors()`
 
-Clear the error history.
+Clear the recorded errors.
 
 #### Usage
 
@@ -157,7 +157,7 @@ Get the number of registered hooks.
 
 #### Returns
 
-Integer count
+An integer.
 
 ------------------------------------------------------------------------
 

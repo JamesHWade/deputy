@@ -1,6 +1,6 @@
-# Inspect streamed text
+# Get the streamed text chunks from a result
 
-Inspect streamed text
+Get the streamed text chunks from a result
 
 ## Usage
 
@@ -13,11 +13,10 @@ result_text_chunks(result)
 - result:
 
   An
-  [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
-  S7 value.
+  [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md).
 
 ## Value
 
-Character vector of text chunks; empty when none were emitted. Missing
-and non-character text payloads are ignored. Character-vector payloads
-are flattened in event order.
+A character vector of text chunks in order, or
+[`character()`](https://rdrr.io/r/base/character.html) if there were
+none.

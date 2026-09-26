@@ -1,8 +1,10 @@
 # Create a planning permission policy
 
-Creates a permission policy for planning-oriented sessions. Only tools
-annotated as read-only are allowed, plus the permission prompt tool when
-configured.
+Creates a `"plan"` policy, for letting the model look around and propose
+a plan before it changes anything. Only tools annotated as read-only are
+allowed, plus the approval prompt tool and delegation to subagents,
+which can't use a less strict mode. Web access is on, so read-only web
+tools such as `web_fetch` work. Writes and code execution are denied.
 
 ## Usage
 
@@ -14,15 +16,15 @@ permissions_plan(permission_prompt_tool_name = "ask_user")
 
 - permission_prompt_tool_name:
 
-  Optional dedicated approval-tool name that the model can use to
-  request explicit approval. Native capability-bearing tools are
-  rejected. Defaults to `"ask_user"`.
+  Name of the tool the model can call to ask for approval, `"ask_user"`
+  by default. `NULL` means none. Built-in file, code, web, install and
+  delegation tools can't be used.
 
 ## Value
 
 A
 [Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md)
-object
+object.
 
 ## Examples
 

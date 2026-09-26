@@ -12,17 +12,18 @@ ask_user_impl(questions, callback = NULL, context = list())
 
 - questions:
 
-  List of structured question objects
+  List of question objects.
 
 - callback:
 
-  Optional instance-scoped handler. It receives `questions` and the
-  resolved `context`. When omitted, the legacy process-wide fallback is
-  used.
+  Optional handler for this tool. It receives `questions` and the
+  resolved `context`. When omitted, the callback from
+  [`set_ask_user_callback()`](https://jameshwade.github.io/deputy/reference/set_ask_user_callback.md)
+  is used, then [`readline()`](https://rdrr.io/r/base/readline.html).
 
 - context:
 
-  Named routing context or a zero-argument function that returns it.
+  Named list, or a function with no arguments that returns one.
 
 ## Value
 

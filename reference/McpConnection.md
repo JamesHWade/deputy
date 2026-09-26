@@ -1,42 +1,36 @@
-# Own an isolated MCP client connection
+# MCP server connection
 
-A host-owned connection to one configured server. A separate R worker
-keeps mcptools' connection registry independent of other connections.
-mcptools owns transport and authentication; the selected server owns
-execution.
-
-This temporary adapter is qualified for mcptools 1.0.2 and 1.0.3 and
-uses their internal request and shutdown functions. Public replacements
-are tracked upstream in issues 129 and 130. Other versions fail
-explicitly.
+A connection to one MCP server, owned by one agent. Use it instead of
+[`tools_mcp()`](https://jameshwade.github.io/deputy/reference/tools_mcp.md)
+when you need a fixed list of allowed tools, resources and prompts, a
+request timeout, or control over when the server stops. Each connection
+runs its own mcptools client in a separate R process. Requires mcptools
+1.0.2 or 1.0.3.
 
 ## Details
 
-Construct an Agent first, then bind a connection to it. Tool, resource
-URI and prompt allowlists are fixed at construction. Discovery never
-expands them. Register the tools returned by `$tools()` to apply the
-Agent's normal permissions, hooks and budgets. Direct host methods use
-the connection's allowlists but do not constitute an Agent run.
+Create the
+[Agent](https://jameshwade.github.io/deputy/reference/Agent.md) first,
+then the connection. The allowlists are fixed when the connection is
+created; `$discover()` never adds to them. Register `$tools()` on the
+agent so that calls go through its permissions, hooks and limits. The
+other methods call the server directly, outside any agent run.
 
-Calls return promises, with at most one active call per connection. A
-concurrent call fails with a busy error; unrelated connections and the
-host event loop remain available. The host must call `$close()` when its
-conversation ends. `$cancel()` terminates the connection and its process
-tree, discarding server session state. It does not promise a
-state-preserving interpreter interrupt. Timeouts also close the
-connection; old tools cannot reconnect implicitly.
+Methods that contact the server return promises. A connection handles
+one request at a time; a second request made meanwhile errors, but other
+connections are not blocked. Call `$close()` when the conversation ends.
+`$cancel()`, and any request that times out, stop the connection and
+discard the server's session state; its tools then stop working.
 
-The qualified mcptools releases wait about 4 seconds for a stdio reply
-and do not match replies to requests. If a server does not answer in
-that window, or a reply does not match its request, the call fails with
-a `deputy_mcp_desynchronized` error and the connection closes, because a
-late reply would otherwise answer the next request. The server's session
-state is lost; create a new connection to continue.
+mcptools waits about 4 seconds for a stdio server's reply and doesn't
+match replies to requests, so a late or mismatched reply fails the call
+with a `deputy_mcp_desynchronized` error and closes the connection.
+Create a new connection to continue.
 
-Owner identifiers and run context prevent accidental cross-Agent reuse;
-the host remains responsible for authentication and assigning those
-identifiers. Connections and executable tools are not portable
-saved-session state.
+The connection is tied to the agent's ID, session and run context: its
+tools can't be registered on another agent and stop working if the
+agent's session changes. Connections are not saved with the agent's
+session.
 
 ## Methods
 
@@ -64,7 +58,7 @@ saved-session state.
 
 ### `McpConnection$new()`
 
-Connect and discover tools from one exact server entry.
+Start the server and connect to it.
 
 #### Usage
 
@@ -87,37 +81,40 @@ Connect and discover tools from one exact server entry.
 
 - `server`:
 
-  Exact configured server name.
+  Name of the server in `config`.
 
 - `agent`:
 
-  Agent whose identity, session and run context own this connection.
+  The agent that owns the connection. The server starts in its working
+  directory.
 
 - `tools`:
 
-  Exact tool names the host allows. Empty by default.
+  Names of the server tools to allow. None by default. The connection
+  fails if the server doesn't offer all of them.
 
 - `resources`:
 
-  Exact resource URIs the host allows. Empty by default.
+  Resource URIs to allow. None by default.
 
 - `prompts`:
 
-  Exact prompt names the host allows. Empty by default.
+  Prompt names to allow. None by default.
 
 - `timeout`:
 
-  Maximum seconds for each request.
+  Maximum seconds for each request. A request that takes longer closes
+  the connection.
 
 - `startup_timeout`:
 
-  Maximum seconds for client and server startup.
+  Maximum seconds for the client and server to start.
 
 ------------------------------------------------------------------------
 
 ### `McpConnection$status()`
 
-Inspect local connection state and fixed host allowances.
+Report the connection's state and allowlists.
 
 #### Usage
 
@@ -125,13 +122,16 @@ Inspect local connection state and fixed host allowances.
 
 #### Returns
 
-A list. This is local process state, not a remote health probe.
+A list with the connection's ID, server, owner, `state`, the `reason` it
+closed, its allowlists and version details. It doesn't contact the
+server.
 
 ------------------------------------------------------------------------
 
 ### `McpConnection$discover()`
 
-Inspect one catalogue page without registering or authorizing items.
+List one page of what the server offers. Listing an item doesn't allow
+it.
 
 #### Usage
 
@@ -148,17 +148,18 @@ Inspect one catalogue page without registering or authorizing items.
 
 - `cursor`:
 
-  Opaque cursor returned by a previous page, or NULL.
+  Cursor from a previous page, or `NULL` for the first page.
 
 #### Returns
 
-A promise for one server result with connection provenance.
+A promise for a list with `source` (the server and connection) and the
+server's `result`.
 
 ------------------------------------------------------------------------
 
 ### `McpConnection$read_resource()`
 
-Read one explicitly allowed resource URI.
+Read an allowed resource.
 
 #### Usage
 
@@ -168,18 +169,17 @@ Read one explicitly allowed resource URI.
 
 - `uri`:
 
-  Exact allowed resource URI. Returned links are never fetched
-  automatically.
+  An allowed resource URI. Links in the result are not followed.
 
 #### Returns
 
-A promise for the upstream resource result and connection provenance.
+A promise for a list with `source` and the server's `result`.
 
 ------------------------------------------------------------------------
 
 ### `McpConnection$get_prompt()`
 
-Retrieve one explicitly allowed prompt without changing any Chat.
+Get an allowed prompt. The prompt is not added to any conversation.
 
 #### Usage
 
@@ -189,21 +189,22 @@ Retrieve one explicitly allowed prompt without changing any Chat.
 
 - `name`:
 
-  Exact allowed prompt name.
+  An allowed prompt name.
 
 - `arguments`:
 
-  Named list of prompt argument strings.
+  Named list of strings to fill in the prompt.
 
 #### Returns
 
-A promise for the upstream prompt result and connection provenance.
+A promise for a list with `source` and the server's `result`.
 
 ------------------------------------------------------------------------
 
 ### `McpConnection$tools()`
 
-Build allowed tool handles for explicit Agent registration.
+Create tools for the allowed server tools, to register on the owning
+agent.
 
 #### Usage
 
@@ -211,13 +212,16 @@ Build allowed tool handles for explicit Agent registration.
 
 #### Returns
 
-A named list of ellmer tools, bound to this connection and owner.
+A named list of ellmer tools.
 
 ------------------------------------------------------------------------
 
 ### `McpConnection$capability_tools()`
 
-Build resource and prompt tools restricted to the fixed host allowlists.
+Create `<prefix>_read_resource` and `<prefix>_get_prompt` tools that let
+the model read allowed resources and get allowed prompts. Each is
+created only if its allowlist isn't empty. Prompts that need arguments
+can't be fetched this way.
 
 #### Usage
 
@@ -227,19 +231,18 @@ Build resource and prompt tools restricted to the fixed host allowlists.
 
 - `prefix`:
 
-  Tool name prefix. Use distinct prefixes when registering capability
-  tools from multiple connections. Must contain 1 to 50 letters, digits,
-  underscores or hyphens.
+  Prefix for the tool names: 1 to 50 letters, digits, underscores or
+  hyphens. Use a different prefix for each connection on the same agent.
 
 #### Returns
 
-A named list of ellmer tools for explicit Agent registration.
+A named list of ellmer tools, possibly empty.
 
 ------------------------------------------------------------------------
 
 ### `McpConnection$cancel()`
 
-End the connection and discard its server session state.
+Stop the connection at once and discard the server's session state.
 
 #### Usage
 
@@ -247,13 +250,14 @@ End the connection and discard its server session state.
 
 #### Returns
 
-Invisibly, NULL. Repeated calls are harmless.
+`NULL`, invisibly. Safe to call more than once.
 
 ------------------------------------------------------------------------
 
 ### `McpConnection$close()`
 
-Close transport when idle, then terminate the client process tree.
+Close the connection. If no request is running, the server is first
+asked to shut down; then its processes are stopped.
 
 #### Usage
 
@@ -261,4 +265,4 @@ Close transport when idle, then terminate the client process tree.
 
 #### Returns
 
-Invisibly, NULL. Closing an active call rejects its promise.
+`NULL`, invisibly. A request still running is rejected.

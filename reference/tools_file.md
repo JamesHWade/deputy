@@ -1,12 +1,11 @@
-# File operation tools
+# Get the basic file tools
 
-Returns a list of tools for file operations:
-
-- `read_file` - Read file contents
-
-- `write_file` - Write content to files
-
-- `list_files` - List directory contents
+Returns `read_file`, `read_markdown`, `write_file` and `list_files`. The
+editing and search tools, such as
+[tool_edit_file](https://jameshwade.github.io/deputy/reference/tool_edit_file.md)
+and
+[tool_grep_files](https://jameshwade.github.io/deputy/reference/tool_grep_files.md),
+are separate.
 
 ## Usage
 
@@ -16,11 +15,12 @@ tools_file()
 
 ## Value
 
-A list of tool definitions
+A list of tools.
 
 ## See also
 
 [tool_read_file](https://jameshwade.github.io/deputy/reference/tool_read_file.md),
+[tool_read_markdown](https://jameshwade.github.io/deputy/reference/tool_read_markdown.md),
 [tool_write_file](https://jameshwade.github.io/deputy/reference/tool_write_file.md),
 [tool_list_files](https://jameshwade.github.io/deputy/reference/tool_list_files.md)
 
@@ -29,7 +29,7 @@ A list of tool definitions
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_file()
 )
 } # }

@@ -1,7 +1,10 @@
 # Execute bash commands
 
-A tool that executes bash/shell commands and returns the output. **Use
-with caution!** This can execute arbitrary system commands.
+A tool that runs a shell command and returns its output. The model can
+run any command your user account can, and nothing is sandboxed.
+Commands time out after 30 seconds. The default permissions deny this
+tool; allow it with `bash = TRUE` in
+[`Permissions()`](https://jameshwade.github.io/deputy/reference/Permissions.md).
 
 ## Usage
 
@@ -18,23 +21,22 @@ A tool definition created with
 
 - command:
 
-  The bash command to execute (tool argument)
+  The shell command to run.
 
 ## Value
 
-When called directly, a character string containing command output
-(standard error follows a `[stderr]` line) or a success message. A
-command that exits with a non-zero status is rejected with its status
-and output, so the model sees the step failed.
+The command's output as one string, with standard error after a
+`[stderr]` line. A command that exits with a non-zero status is reported
+to the model as a failed tool call, with its status and output.
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_run_bash),
-  permissions = permissions_full()  # Required for bash
+  permissions = Permissions(bash = TRUE)
 )
 } # }
 ```

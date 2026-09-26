@@ -1,7 +1,13 @@
-# Hook events supported by deputy
+# Hook events
 
-Hook events are fired at specific points during agent execution. Each
-event type has a specific callback signature and context structure.
+`HookEvent` lists the events you can attach a hook to with
+[`HookMatcher()`](https://jameshwade.github.io/deputy/reference/HookMatcher.md).
+
+When several hooks match an event, they run in the order they were
+added. The first callback that returns a non-`NULL` value decides the
+outcome, and the remaining hooks for that event don't run. If a
+PreToolUse callback errors or times out, the tool call is denied. Errors
+in other callbacks are reported and the run continues.
 
 ## Usage
 
@@ -9,248 +15,155 @@ event type has a specific callback signature and context structure.
 HookEvent
 ```
 
-## Event Types
+## Events
 
-**PreToolUse** - Before a tool is executed (can deny)
+Each entry shows the event with its callback's arguments, then when it
+fires.
 
-Callback signature: `function(tool_name, tool_input, context)`
+- `PreToolUse(tool_name, tool_input, context)`: before a tool runs, once
+  the permission policy has allowed it.
 
-- `tool_name`: Name of the tool being called (character)
+- `PostToolUse(tool_name, tool_result, tool_error, context)`: after a
+  tool call finishes, whether or not it failed.
 
-- `tool_input`: Named list of arguments passed to the tool
+- `PostToolUseFailure(tool_name, tool_result, tool_error, context)`:
+  after `PostToolUse`, when the tool failed.
 
-- `context`: Common correlation fields plus `tool_call_id` and
-  `tool_annotations` (if available)
+- `PermissionRequest(tool_name, tool_input, permission_result, context)`:
+  when the permission policy denies a call.
 
-- Return:
+- `SessionStart(context)`: at the start of each run.
+
+- `UserPromptSubmit(prompt, context)`: at the start of each run, after
+  `SessionStart`.
+
+- `Stop(reason, context)`: at the end of each run.
+
+- `SessionEnd(reason, context)`: at the end of each run, after `Stop`.
+
+- `SubagentStart(agent_name, task, context)`: when a subagent starts a
+  delegated task.
+
+- `SubagentStop(agent_name, task, result, context)`: when a subagent
+  finishes.
+
+- `PreCompact(turns_to_compact, turns_to_keep, context)`: before older
+  turns are summarised.
+
+- `PostCompact(result, context)`: after compaction.
+
+- `Notification(message, context)`: when the agent reports something,
+  such as a denied call.
+
+- `ConfigChange(key, old_value, new_value, context)`: when
+  `set_permission_mode()` changes the mode.
+
+`tool_input` is the named list of tool arguments. After a successful
+call `tool_error` is `NULL`; after a failure `tool_result` is `NULL` and
+`tool_error` holds the error message. `reason` is the stop reason, such
+as `"complete"`, `"request_limit"`, `"cost_limit"`, `"tool_loop"`,
+`"hook_requested_stop"` or `"provider_error"`. `result` is the
+subagent's result for `SubagentStop` and the
+[DeputyCompaction](https://jameshwade.github.io/deputy/reference/DeputyCompaction.md)
+for `PostCompact`. For `ConfigChange`, `key` is `"permission_mode"`.
+
+Four events use the callback's return value:
+
+- `PreToolUse`: return
   [`HookResultPreToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.md)
-  to allow/deny
+  to allow or deny the call, or to stop the run.
 
-**PostToolUse** - After a tool completes
-
-Callback signature:
-`function(tool_name, tool_result, tool_error, context)`
-
-- `tool_name`: Name of the tool that was called (character)
-
-- `tool_result`: Result returned by the tool (or NULL on error)
-
-- `tool_error`: Error message if tool failed (or NULL on success)
-
-- `context`: Common correlation fields plus `tool_call_id`
-
-- Return:
+- `PostToolUse`: return
   [`HookResultPostToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.md)
-  to continue/stop
+  to stop the run or to change what the `tool_end` event shows.
 
-**PostToolUseFailure** - After a tool reports an error
-
-Callback signature:
-`function(tool_name, tool_result, tool_error, context)`
-
-- Same arguments as PostToolUse, fired only when `tool_error` is not
-  NULL
-
-**Stop** - When the agent stops
-
-Callback signature: `function(reason, context)`
-
-- `reason`: Why the agent stopped (for example `"complete"`,
-  `"request_limit"`, `"cost_limit"`, `"cost_unavailable"`,
-  `"tool_loop"`, or `"provider_error"`)
-
-- `context`: Common correlation fields plus `usage` and `cost`; native
-  `run()` also includes `total_turns`
-
-- Return: NULL (informational only)
-
-**SubagentStop** - When a sub-agent completes (LeadAgent only)
-
-Callback signature: `function(agent_name, task, result, context)`
-
-- `agent_name`: Name of the sub-agent that completed (character)
-
-- `task`: The task that was delegated (character)
-
-- `result`: Result returned by the sub-agent
-
-- `context`: Common correlation fields plus parent/child Agent and run
-  IDs
-
-- Return: NULL (informational only)
-
-**SubagentStart** - When a delegated sub-agent starts (LeadAgent only)
-
-Callback signature: `function(agent_name, task, context)`
-
-- `agent_name`: Name of the sub-agent that started
-
-- `task`: The delegated task
-
-- `context`: Common correlation fields plus parent/child Agent IDs
-
-**PermissionRequest** - When permission policy denies a tool call
-
-Callback signature:
-`function(tool_name, tool_input, permission_result, context)`
-
-- Return:
+- `PermissionRequest`: return
   [`PermissionResultAllow()`](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md)
-  to override the denial, or
+  to allow the call anyway, or
   [`PermissionResultDeny()`](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md)
-  to replace the denial reason
+  to change the reason.
 
-**ConfigChange** - When runtime configuration changes
-
-Callback signature: `function(key, old_value, new_value, context)`
-
-**UserPromptSubmit** - When a user prompt is submitted
-
-Callback signature: `function(prompt, context)`
-
-- `prompt`: The user's prompt text (character)
-
-- `context`: Common correlation fields
-
-- Return: NULL (informational only)
-
-**Notification** - Informational runtime notice
-
-Callback signature: `function(message, context)`
-
-- `message`: The notification text (character)
-
-- `context`: Common correlation fields plus `level`, `code`, and any
-  event-specific metadata
-
-- Return: NULL (informational only)
-
-**PreCompact** - Before conversation compaction
-
-Hook signature: `function(turns_to_compact, turns_to_keep, context)`
-
-- `turns_to_compact`: List of turns that will be compacted into a
-  summary
-
-- `turns_to_keep`: List of recent turns that will be preserved
-
-- `context`: Common correlation fields plus `total_turns` and
-  `compact_count`
-
-- Return:
+- `PreCompact`: return
   [`HookResultPreCompact()`](https://jameshwade.github.io/deputy/reference/HookResultPreCompact.md)
-  to allow/cancel or provide custom summary
+  to cancel compaction or to supply your own summary.
 
-**PostCompact** - After conversation compaction
+Other events ignore the return value. Returning `NULL` means "no
+decision".
 
-Hook signature: `function(result, context)`
+## Context
 
-- `result`: The `DeputyCompaction` outcome, including method and usage
+`context` is a named list. Every event includes:
 
-- `context`: Common correlation fields plus `compact_count` and
-  `automatic`
+- `working_dir`: the agent's working directory.
 
-- Return: NULL (informational only)
+- `agent_id`, `agent_name`, `session_id`: the agent's identifiers.
 
-**SessionStart** - When an agent session begins
+- `run_id`: the current run, when one is active.
 
-Callback signature: `function(context)`
+- `run_context`: the run's `run_context` list.
 
-- `context`: Common correlation fields plus `permissions`, `provider`,
-  and `tools_count`
+- `parent_agent_id`, `parent_run_id`, `delegation_id`: set in subagent
+  runs.
 
-- Return: NULL (informational only)
+Some events add fields:
 
-**SessionEnd** - When an agent session ends
-
-Callback signature: `function(reason, context)`
-
-- `reason`: Why the agent stopped (for example `"complete"`,
-  `"request_limit"`, `"cost_unavailable"`, `"tool_loop"`, or
-  `"hook_requested_stop"`)
-
-- `context`: Common correlation fields plus `usage` and `cost`; native
-  `run()` also includes `total_turns`
-
-- Return: NULL (informational only)
-
-## Context Structure
-
-The context parameter is always a named list. Common fields:
-
-- `working_dir`: The agent's current working directory
-
-- `run_context`: Immutable canonical product context for the active run
-
-- `agent_id`: Stable identifier for the Agent instance
-
-- `agent_name`: Optional human-readable Agent name
-
-- `parent_agent_id`: Parent Agent identifier for delegated runs
-
-- `parent_run_id`: Parent run identifier for delegated runs
-
-- `delegation_id`: Delegation identifier for delegated runs and tools
-
-- `tool_annotations`: (PreToolUse only) Tool annotations from ellmer if
-  available
-
-- `tool_call_id`: Canonical tool lifecycle identifier
-
-- `usage`: Run-scoped
+- `tool_call_id`, `permission_mode`, `usage`, `usage_limits` (tool
+  events): the call's ID, the permission mode, the run's
   [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
-  for tool and terminal lifecycle hooks
+  so far and its
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md).
 
-- `usage_limits`: Active
-  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
-  for tool lifecycle hooks
+- `tool_annotations`, `tool_arguments`, `tool_metadata` (PreToolUse,
+  PermissionRequest): the tool's annotations, declared arguments and
+  [`tool_metadata()`](https://jameshwade.github.io/deputy/reference/tool_metadata.md),
+  when available.
 
-- `run_id`: Identifier for the active run
+- `usage`, `cost` (Stop, SessionEnd): the run's
+  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+  and the conversation's cost, as returned by `agent$cost()`.
 
-- `total_turns`: (native Stop, PreCompact, native SessionEnd)
-  Conversation turns
+- `total_turns`, `compact_count` (PreCompact, PostCompact): the number
+  of turns in the conversation and the number being summarised.
 
-- `cost`: (Stop, SessionEnd) List with `input`, `output`, `cached`, and
-  `total`
+- `automatic` (PostCompact): `TRUE` when compaction ran automatically
+  during a run rather than through `compact()`.
 
-- `compact_count`: (PreCompact only) Number of turns being compacted
+- `child_agent_id`, `child_run_id`, `status` (SubagentStart,
+  SubagentStop): the subagent's identifiers and status.
 
-- `automatic`: (PostCompact only) Whether the run kernel triggered
-  compaction
+- `level`, `code` (Notification): a severity such as `"info"` or
+  `"warning"`, and a notification code when there is one.
 
-- `level`: (Notification only) Informational severity such as `"info"`
-  or `"warning"`
+- `permissions`, `provider`, `tools_count` (SessionStart): the agent's
+  [Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md),
+  a list with the provider `name` and `model`, and the number of
+  registered tools.
 
-- `code`: (Notification only) Stable notification code when available
+## See also
 
-- `permissions`: (SessionStart only) The agent's permissions
-  configuration
-
-- `provider`: (SessionStart only) List with `name` and `model`
-
-- `tools_count`: (SessionStart only) Number of registered tools
+[`vignette("hooks")`](https://jameshwade.github.io/deputy/articles/hooks.md)
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
-# PreToolUse callback example
+# Log each tool call. Returning NULL leaves the decision to other hooks.
 agent$add_hook(HookMatcher(
   event = "PreToolUse",
   callback = function(tool_name, tool_input, context) {
     message("Tool: ", tool_name, " in ", context$working_dir)
-    HookResultPreToolUse(permission = "allow")
+    NULL
   }
 ))
 
-# PostToolUse callback example
+# Stop the run when a tool fails
 agent$add_hook(HookMatcher(
   event = "PostToolUse",
   callback = function(tool_name, tool_result, tool_error, context) {
     if (!is.null(tool_error)) {
-      warning("Tool failed: ", tool_error)
+      return(HookResultPostToolUse(continue = FALSE))
     }
-    HookResultPostToolUse()
+    NULL
   }
 ))
 } # }

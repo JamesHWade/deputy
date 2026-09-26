@@ -1,36 +1,40 @@
 # Create a hook that blocks dangerous bash commands
 
-Convenience function to create a PreToolUse hook that blocks potentially
-dangerous bash commands. Default patterns include:
+Creates a PreToolUse hook that denies `run_bash` commands matching any
+of a set of regular expressions (case-insensitive). The default patterns
+cover:
 
-**File system destruction:** `rm -rf`, `mkfs`, `dd if=`, writes to
-`/dev/`
+- file system destruction: `rm -rf`, `mkfs`, `dd if=`, writes to
+  `/dev/`;
 
-**Privilege escalation:** `sudo`, `su -`, `chmod 777`, `chown`, `setuid`
+- privilege escalation: `sudo`, `su -`, `chmod 777`, `chown root`,
+  `setuid`;
 
-**Code execution:** `eval`, `exec`, `source` (with variables), backticks
+- code execution: `eval`, `exec`, `source $VAR`, backticks, `$(...)`,
+  `python -c` and similar one-liners;
 
-**Process manipulation:** `kill -9`, `killall`, `pkill`, fork bombs
+- process manipulation: `kill -9`, `killall`, `pkill -9`, fork bombs;
 
-**System modification:** `crontab`, `systemctl`, `/etc/passwd`,
-`/etc/shadow`
+- system files and services: `crontab`, `systemctl`, `/etc/passwd`,
+  `/etc/shadow`, `/etc/sudoers`;
 
-**Network exfiltration:** `curl -X POST`, `wget --post`, `nc -e`,
-`netcat`, reverse shells
+- credentials and history: `printenv`, reading `.ssh`, `.aws` or `.env`
+  files, clearing shell history;
 
-**Obfuscation detection:** Variable expansion in commands, base64
-piping, hex/octal escapes, quote splitting, backslash escapes
+- network exfiltration: `curl -X POST`, `wget --post`, `nc -e`,
+  `netcat`, reverse shells;
 
-**Security Note:** This is defense-in-depth and cannot catch all
-possible obfuscation techniques. For high-security environments,
-consider:
+- obfuscation: variable expansion, piping `base64` output to a shell,
+  hex and octal escapes, quote splitting, backslash escapes.
 
-1.  Using sandboxed execution (Docker, firejail)
+The patterns are broad, so they also block some harmless commands. A
+denylist can't catch every obfuscated command either. To keep shell
+commands contained, turn off `bash` in
+[Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md)
+or run the agent in a container or other OS sandbox.
 
-2.  Disabling bash entirely via
-    [Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md)
-
-3.  Using a command whitelist instead of blacklist
+The hook returns a denial for a matching command and `NULL` otherwise,
+so hooks added after it still see the commands it lets through.
 
 ## Usage
 
@@ -42,19 +46,17 @@ hook_block_dangerous_bash(patterns = NULL, additional_patterns = NULL)
 
 - patterns:
 
-  Character vector of regex patterns to block. Default includes
-  comprehensive dangerous patterns.
+  Character vector of regular expressions to block. `NULL` (the default)
+  uses the built-in patterns.
 
 - additional_patterns:
 
-  Optional character vector of additional patterns to block alongside
-  defaults.
+  Optional character vector of extra patterns to block as well.
 
 ## Value
 
 A
-[HookMatcher](https://jameshwade.github.io/deputy/reference/HookMatcher.md)
-object
+[HookMatcher](https://jameshwade.github.io/deputy/reference/HookMatcher.md).
 
 ## Examples
 

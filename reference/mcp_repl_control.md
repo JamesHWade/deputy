@@ -1,10 +1,11 @@
-# Request an upstream REPL interrupt or reset
+# Interrupt or reset an mcp-repl session
 
-Sends mcp-repl's documented Ctrl-C or Ctrl-D input through the same
-connection. Interrupt is best effort; reset requests a fresh interpreter
-and discards its state. The returned upstream result describes what
-happened. Neither action is treated as proof of success merely because a
-request was sent.
+Sends Ctrl-C (`"interrupt"`) or Ctrl-D (`"reset"`) to the R session
+behind a
+[`mcp_repl_connection()`](https://jameshwade.github.io/deputy/reference/mcp_repl_connection.md).
+An interrupt may not stop the code. A reset starts a fresh interpreter
+and discards its variables. Check the returned result to see what
+happened.
 
 ## Usage
 
@@ -25,6 +26,6 @@ mcp_repl_control(connection, action = c("interrupt", "reset"))
 
 ## Value
 
-A promise for the upstream ellmer-compatible result. This is a direct
-host operation, not an Agent run. Busy client connections reject
-overlap.
+A promise for mcp-repl's reply. The call goes straight to the server,
+not through the agent, and errors if the connection is already handling
+a request.

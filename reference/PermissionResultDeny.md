@@ -1,6 +1,7 @@
 # Create a deny permission result
 
-Returns a permission result that denies the tool from executing.
+Return this from a `can_use_tool` callback or a PermissionRequest hook
+to deny a tool call.
 
 ## Usage
 
@@ -12,21 +13,21 @@ PermissionResultDeny(reason, interrupt = FALSE)
 
 - reason:
 
-  Reason for denial (shown to the LLM)
+  Why the call was denied. The model sees it.
 
 - interrupt:
 
-  One non-missing logical value. If TRUE, stop the entire conversation
-  (default FALSE)
+  `TRUE` or `FALSE`. `TRUE` also stops the run, with stop reason
+  `"permission_denied"`.
 
 ## Value
 
-A `PermissionResultDeny` S7 object
+A `PermissionResultDeny` object.
 
 ## See also
 
 [CallbackResult](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
-for read-only properties and S7 inspection.
+for reading result fields.
 
 ## Examples
 
@@ -38,7 +39,7 @@ PermissionResultDeny(reason = "File write not allowed")
 #>  @ reason   : chr "File write not allowed"
 #>  @ interrupt: logi FALSE
 
-# Deny and interrupt the conversation
+# Deny and stop the run
 PermissionResultDeny(reason = "Critical security violation", interrupt = TRUE)
 #> <deputy::PermissionResultDeny>
 #>  @ decision : chr "deny"

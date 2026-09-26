@@ -1,26 +1,22 @@
-# Configure run-scoped usage limits
+# Set usage limits for a run
 
-`UsageLimits()` defines run-scoped stop conditions for one call to
-[Agent](https://jameshwade.github.io/deputy/reference/Agent.md) `$run()`
-or `$run_sync()`. Limits are evaluated against usage added by that run,
-not the complete persisted conversation. This keeps resumed sessions
-from inheriting a spent budget.
+`UsageLimits()` caps what one run of an
+[Agent](https://jameshwade.github.io/deputy/reference/Agent.md) may use:
+model requests, tool calls, tokens and estimated cost. Each run starts
+counting from zero, so earlier turns in the conversation, or in a loaded
+session, don't count against it. A `NULL` field sets no limit.
 
-Request and tool-call limits are checked at model and tool boundaries.
-Token and cost limits depend on usage reported after a model response,
-so the run stops after an overage is observed and can exceed a threshold
-by one response. A `NULL` field leaves that limit unset on this object;
-when the object configures or overrides an
-[Agent](https://jameshwade.github.io/deputy/reference/Agent.md), Deputy
-may fill unset fields from the agent's defaults.
+Request and tool-call limits are checked before each request or tool
+call. Token and cost limits can only be checked after a response
+arrives, so a run can go over them by one response.
 
-This is a read-only S7 value. Read fields with `$` or
-[`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html);
-use
-[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
-for a plain named-list snapshot. Construct a new value to change limits.
-Per-run overrides fill unset fields from the Agent defaults; delegated
-budgets are intersected with the lead's remaining allowance.
+Limits passed to `Agent$new()` apply to every run. Limits passed to a
+single run take any `NULL` field from the agent's limits, so they can't
+remove a limit the agent sets. Subagent runs are also capped by what is
+left of the lead's budget.
+
+The object is read-only: read fields with `$` and create a new one to
+change a limit.
 
 ## Usage
 
@@ -40,46 +36,46 @@ UsageLimits(
 
 - max_requests:
 
-  Maximum governed model dispatches, including failed calls, automatic
-  compaction, structured extraction, and corrections. Retries inside
-  ellmer's HTTP transport are not separately observable. `NULL` leaves
-  the field unset.
+  Maximum model requests, counting failed requests, compaction
+  summaries, structured-output extraction and corrections. ellmer's own
+  HTTP retries don't count separately.
 
 - max_tool_calls:
 
-  Maximum requested tool calls. Rejected calls count toward usage.
-  `NULL` leaves the field unset.
+  Maximum tool calls the model may request. Denied calls count too.
 
 - max_input_tokens:
 
-  Maximum provider-reported input tokens. `NULL` leaves the field unset.
+  Maximum input tokens.
 
 - max_output_tokens:
 
-  Maximum provider-reported output tokens. `NULL` leaves the field
-  unset.
+  Maximum output tokens.
 
 - max_total_tokens:
 
-  Maximum input plus output tokens. Cached input is reported separately
-  and is not counted twice. `NULL` leaves the field unset.
+  Maximum input plus output tokens. Cached input tokens are reported
+  separately and aren't added again.
 
 - max_cost_usd:
 
-  Maximum provider-reported estimated cost in US dollars. `NULL` leaves
-  the field unset. If configured, missing provider cost data stops the
-  run with `"cost_unavailable"` rather than undercounting.
+  Maximum estimated cost in US dollars. If the cost of a response is
+  unknown, the run stops with `"cost_unavailable"` rather than guessing.
 
 - on_exceed:
 
-  What to do when a limit is exceeded. `"stop"` returns an
+  What happens when a limit is reached. `"stop"` (the default) ends the
+  run and returns an
   [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
-  with a typed stop reason; `"error"` emits the final usage event and
-  then signals a structured Deputy limit error.
+  whose `stop_reason` names the limit, such as `"request_limit"`,
+  `"tool_call_limit"` or `"cost_limit"`. `"error"` ends the run the same
+  way, then signals an error that inherits from `deputy_budget` (see
+  [deputy-errors](https://jameshwade.github.io/deputy/reference/deputy-errors.md)).
+  The result is still available from `$last_run()`.
 
 ## Value
 
-A read-only `UsageLimits` S7 object.
+A `UsageLimits` object.
 
 ## Examples
 

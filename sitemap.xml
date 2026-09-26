@@ -3,7 +3,11 @@
 <url><loc>https://jameshwade.github.io/deputy/CONTEXT.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/LICENSE-text.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/LICENSE.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/articles/approvals.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/background-jobs.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/articles/code-execution.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/articles/conversations.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/articles/delegation.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/example-code-review.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/example-data-analysis.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/example-extraction-pipeline.html</loc></url>
@@ -11,8 +15,10 @@
 <url><loc>https://jameshwade.github.io/deputy/articles/getting-started.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/hooks.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/index.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/articles/mcp.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/multi-agent.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/permissions.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/articles/retained-agents.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/runtime-integration.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/structured-output.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/tools.html</loc></url>

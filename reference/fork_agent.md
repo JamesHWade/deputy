@@ -1,9 +1,12 @@
-# Retain a host-authorized context fork for explicit continuation
+# Start a retained agent from a conversation fork
 
-The child must be a standalone Agent with an independent empty Chat. Its
-own tools, prompt and resources remain host-configured; the fork only
-seeds inert selected history and uses the ordinary retained-conversation
-governance.
+Gives `agent` the turns in `fork` as its history and makes `parent` its
+owner, as `parent$retain_agent()` does; continue it with
+`parent$continue_agent()`. `agent` must be a standalone `Agent` with an
+empty chat of its own and no `approval_dir` or fallback chats. It keeps
+its own tools, system prompt and permissions: the fork brings only the
+conversation. See
+[`vignette("retained-agents")`](https://jameshwade.github.io/deputy/articles/retained-agents.md).
 
 ## Usage
 
@@ -15,30 +18,35 @@ fork_agent(parent, agent, fork, authorize, usage_limits, max_runs = 32L)
 
 - parent:
 
-  Owning Agent.
+  The `Agent` that will own the new conversation.
 
 - agent:
 
-  Standalone empty child Agent.
+  A new `Agent` whose agent and session IDs differ from `parent`'s.
 
 - fork:
 
-  A host-selected ContextFork.
+  A
+  [ContextFork](https://jameshwade.github.io/deputy/reference/ContextFork.md).
 
 - authorize:
 
-  Function receiving the portable fork snapshot and returning the exact
-  current `owner_id`, `conversation_id`, `branch_id`, and `revision`
-  record.
+  A function that receives the fork as a plain list and checks that its
+  source may be used. To allow it, return a list with exactly the fork's
+  `owner_id`, `conversation_id`, `branch_id` and `revision`; return
+  `NULL` or `FALSE`, or throw an error, to deny it. It is called again
+  before every continuation.
 
 - usage_limits:
 
-  Cumulative UsageLimits ceiling for the retained handle.
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  for all runs of the retained agent combined.
 
 - max_runs:
 
-  Maximum explicit continuations, default 32.
+  Maximum number of continuations. Defaults to 32.
 
 ## Value
 
-An owner-local retained conversation handle.
+A handle for `parent`'s `$continue_agent()`, `$cancel_agent()` and
+`$release_agent()`. It only works with `parent`.

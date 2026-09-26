@@ -1,9 +1,10 @@
-# Describe a task-specific delegation input
+# Describe a task for a subagent
 
+An
 [AgentDefinition](https://jameshwade.github.io/deputy/reference/agent_definition.md)
-describes a reusable role. `DelegationInput` supplies one task,
-instructions and ordered evidence references without granting authority.
-String tasks remain supported and are equivalent to
+describes a reusable subagent; a `DelegationInput` describes one task
+for it: what to do, constraints, evidence, the expected deliverable and
+when to stop. A plain string task is the same as
 `DelegationInput(task)`.
 
 ## Usage
@@ -22,17 +23,18 @@ DelegationInput(
 
 - task:
 
-  One non-empty UTF-8 task string. Whitespace is preserved.
+  The task, as a single non-empty string.
 
 - constraints:
 
-  Task constraints, as a character vector.
+  Constraints on the task, as a character vector.
 
 - evidence:
 
-  Ordered unnamed list of plain records with `source_id` and exact
-  `revision`. References resolve only against the LeadAgent's host-owned
-  scoped source snapshot. They are not paths, URLs or access grants.
+  Sources to give the subagent: an unnamed list of lists, each with the
+  `source_id` and exact `revision` of a record passed to
+  [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
+  as `delegation_sources`. They are not file paths or URLs.
 
 - deliverable:
 
@@ -40,25 +42,26 @@ DelegationInput(
 
 - stop_conditions:
 
-  Text instructions about when to stop. These do not install runtime
-  limits, permissions or approval decisions.
+  When to stop, as a character vector. These are instructions for the
+  model; use
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  to enforce limits.
 
 ## Value
 
-A read-only `DelegationInput` S7 value.
+A `DelegationInput` object.
 
 ## Details
 
-This read-only S7 value contains only portable text and lists. There are
-at most 64 entries in each vector/reference list and a 1 MiB
-serialized-input ceiling. A LeadAgent enforces its smaller configured
-admission ceiling on resolved context. Unsupported multimodal or
-executable content is rejected.
-[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
-gives a portable record; `do.call(DelegationInput, record)` validates it
-again. JSON readers should preserve record lists, for example
-`jsonlite::fromJSON(json, simplifyVector = FALSE)`. No runtime state is
-restored.
+`constraints`, `evidence` and `stop_conditions` hold up to 64 entries
+each, and the whole input must be under 1 MiB. A
+[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
+also applies its `delegation_max_bytes` limit, 64 KiB by default.
+
+The object is read-only; read its fields with `$`. To store it, save
+`S7::props(x)` and rebuild it with `do.call(DelegationInput, record)`.
+When reading the record from JSON, keep lists intact with
+`jsonlite::fromJSON(json, simplifyVector = FALSE)`.
 
 ## Examples
 

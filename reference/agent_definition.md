@@ -1,8 +1,10 @@
-# Create an Agent Definition
+# Define a subagent
 
-AgentDefinition describes a specialized agent that can be used by a lead
-agent to delegate tasks. It bundles together a system prompt, tools, and
-metadata about what the agent can do.
+Describe a subagent that a
+[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
+can delegate to: its name, a description the lead's model reads when
+choosing, a system prompt, tools and other settings. Each delegation
+creates a new subagent from the definition.
 
 ## Usage
 
@@ -42,86 +44,88 @@ agent_definition(
 
 - name:
 
-  Unique routing key for this Agent type. Names are trimmed, converted
-  to lowercase, and must start with a letter followed only by letters,
-  numbers, underscores, or hyphens.
+  Name used to select the subagent. It is trimmed and lowercased, and
+  must start with a letter followed by letters, numbers, underscores or
+  hyphens.
 
 - description:
 
-  Brief description of what this agent does (shown to lead agent)
+  What the subagent does. The lead's model reads it when choosing where
+  to delegate.
 
 - prompt:
 
-  System prompt for this agent
+  System prompt for the subagent.
 
 - tools:
 
-  Optional list of tools for this agent
+  List of tools for the subagent. It doesn't inherit the lead's tools.
 
 - model:
 
-  Model to use. `"inherit"` (the default) uses the parent's chat as it
-  is. A bare model id such as `"gpt-5.6-luna"` uses the parent's
-  provider, endpoint and credentials with that model. A
-  `"provider/model"` string builds a new chat with
+  Model to use. `"inherit"` (the default) uses a copy of the lead's
+  chat. A bare model id such as `"gpt-6-luna"` keeps the lead's provider
+  and credentials but switches the model. A `"provider/model"` string
+  such as `"anthropic/claude-sonnet-5"` creates a new chat with
   [`ellmer::chat()`](https://ellmer.tidyverse.org/reference/chat-any.html).
 
 - skills:
 
-  Optional list of skills to load
+  List of
+  [Skill](https://jameshwade.github.io/deputy/reference/Skill.md)
+  objects or skill directory paths to load.
 
 - disallowed_tools:
 
-  Optional tool denylist for this sub-agent
+  Names of tools to remove from the subagent, including tools from
+  skills. Case is ignored.
 
 - memory:
 
-  Optional memory text appended to this sub-agent's prompt
+  Notes appended to the subagent's system prompt under a "Memory"
+  heading.
 
 - mcp_servers:
 
-  Optional MCP server names to load for this sub-agent
+  Names of MCP servers the subagent needs. Deputy doesn't connect to
+  them: such a definition needs a
+  [DelegationPolicy](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
+  with `resource_mode = "owned"`, whose `resources` function creates the
+  MCP tools.
 
 - initial_prompt:
 
-  Optional text prepended to delegated tasks
+  Text sent ahead of every task delegated to this subagent.
 
 - max_requests:
 
-  Optional non-negative whole-number sub-agent request limit
+  Maximum model requests per delegation. The remaining budget of the
+  lead's run also applies.
 
 - permission_mode:
 
-  Optional permission mode. A child may keep the lead mode or narrow it
-  to `"readonly"`; a `"full"` lead may select any mode. Use
-  `disallowed_tools` and `max_requests` for additional limits.
+  Permission mode for the subagent; defaults to the lead's. It can
+  otherwise only be `"readonly"`, unless the lead's mode is `"full"`.
+  Use `disallowed_tools` and `max_requests` for finer limits.
 
 ## Value
 
-A read-only `AgentDefinition` S7 object
+An `AgentDefinition` object.
 
 ## Details
 
-This is a read-only S7 value. `agent_definition()` is an alias of
-`AgentDefinition()`; both construct the same class. Read fields with
-`$`,
-[`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html), or
-`@`.
-[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
-returns a plain property list for constructing a revised value.
-Canonical names, limits, and other fields cannot be changed after
-construction, including through LeadAgent snapshots.
+An `AgentDefinition` is read-only; read its fields with `$`. To change a
+field, build a new definition from
+[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html),
+as in the examples. `agent_definition()` and `AgentDefinition()` are the
+same function.
 
-Tools and read-only Skill values are composed directly. Executable tools
-nested in either value retain their closures, services, and caller-owned
-state without cloning. Read-only configuration does not freeze tool
-state. Use
+Tools and skills are stored as given, not copied, so a tool that keeps
+state in its closure shares that state wherever the definition is used.
+To save a definition as YAML, use
 [`agent_definition_write()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md)
 and
-[`agent_definition_read()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md)
-with explicit host registries for portable YAML;
-[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
-alone is not a portable serializer for executable objects.
+[`agent_definition_read()`](https://jameshwade.github.io/deputy/reference/agent_definition_read.md).
 
 ## Examples
 
@@ -148,7 +152,7 @@ do.call(agent_definition, fields)
 if (FALSE) { # \dontrun{
 # Use with a lead agent
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   sub_agents = list(code_reviewer)
 )
 } # }

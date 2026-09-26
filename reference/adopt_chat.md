@@ -1,11 +1,14 @@
-# Adopt a curated Chat for owned delegation
+# Turn an ellmer chat into a retained agent
 
-Makes an independent conversation copy and explicitly replaces its tool
-and request callbacks with Deputy governance. Provider configuration,
-model parameters, system prompt and executable tools are preserved. Tool
-closures remain shared host resources; copying a Chat is not a sandbox.
-The original Chat is unchanged. Use `owner$retain_agent()` to transfer
-an existing Agent.
+Copies a configured ellmer chat into a new agent that `owner` keeps for
+later calls, for example through a
+[`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md).
+The copy keeps the provider, model settings, system prompt, tools and,
+optionally, turns, but drops callbacks such as `on_tool_request()`; the
+new agent's permissions and hooks apply instead. The original chat is
+unchanged but shares its tools, and any state they hold, with the copy.
+To keep an existing `Agent`, use `owner$retain_agent()`. See
+[`vignette("retained-agents")`](https://jameshwade.github.io/deputy/articles/retained-agents.md).
 
 ## Usage
 
@@ -26,44 +29,44 @@ adopt_chat(
 
 - chat:
 
-  A configured ellmer Chat with a public `clone()` method.
+  A configured ellmer `Chat`.
 
 - owner:
 
-  The host-owned
-  [Agent](https://jameshwade.github.io/deputy/reference/Agent.md) that
-  will invoke and inspect this specialist.
+  The [Agent](https://jameshwade.github.io/deputy/reference/Agent.md)
+  that will own and call the new agent.
 
 - permissions:
 
-  Explicit specialist
-  [Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md),
-  also bounded by the caller's current policy on every invocation.
+  [Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md)
+  for the new agent. The owner's current permissions also apply to every
+  call.
 
 - usage_limits:
 
-  Explicit cumulative
   [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
-  for the retained handle.
+  for all calls combined.
 
 - history:
 
-  Explicit `"retain"` or `"fresh"` choice for copied turns.
+  `"retain"` to copy the chat's turns, or `"fresh"` to start with an
+  empty history.
 
 - callbacks:
 
-  Must be `"replace"` to acknowledge Deputy callback ownership.
+  Must be `"replace"`, to confirm that the chat's callbacks are dropped.
 
 - name:
 
-  Optional specialist display name.
+  Optional display name for the new agent.
 
 - max_runs:
 
-  Maximum retained invocations, default 32.
+  Maximum number of calls. Defaults to 32.
 
 ## Value
 
-An owner-local conversation handle for
+A handle for
 [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
-and the owner's continuation, cancellation and release methods.
+and for `owner`'s `$continue_agent()`, `$cancel_agent()` and
+`$release_agent()`. It only works with `owner`.

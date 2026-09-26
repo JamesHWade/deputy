@@ -1,9 +1,12 @@
-# Create a durable host-owned Agent job
+# Create a background job
 
-The Agent is inspected into a portable manifest. It is never serialized;
-the host supplies a binder again when
+Saves a task in a new job directory so that
 [`job_run()`](https://jameshwade.github.io/deputy/reference/job_run.md)
-consumes the job.
+can run it later, possibly in another R process. The agent isn't saved:
+Deputy records its setup (model, system prompt, tools, permissions,
+conversation and so on), and
+[`job_run()`](https://jameshwade.github.io/deputy/reference/job_run.md)
+checks that the agent you rebuild matches it.
 
 ## Usage
 
@@ -25,46 +28,65 @@ job_create(
 
 - directory:
 
-  Parent directory owned by the host.
+  Directory to create the job directory in. It is created if needed.
 
 - agent:
 
-  Idle ordinary
-  [Agent](https://jameshwade.github.io/deputy/reference/Agent.md) whose
-  exact manifest is retained.
+  The [Agent](https://jameshwade.github.io/deputy/reference/Agent.md) to
+  describe. `bind` in
+  [`job_run()`](https://jameshwade.github.io/deputy/reference/job_run.md)
+  must rebuild an agent with the same setup.
 
 - task:
 
-  Non-empty task text.
+  The task, as one non-empty string.
 
 - owner_id:
 
-  Host owner or tenant identifier.
+  ID of the user or tenant that owns the job.
 
 - definition_revision:
 
-  Host revision for the Agent definition.
+  Your label (a string or number) for the current version of the agent's
+  configuration.
+  [`job_run()`](https://jameshwade.github.io/deputy/reference/job_run.md)
+  runs the job only if `authorize` returns the same value.
 
 - context_revision:
 
-  Host revision for source context.
+  Your label (a string or number) for the current version of the context
+  the agent works from, checked the same way.
 
 - usage_limits:
 
   [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
-  reserved for this job.
+  for the job.
 
 - associations:
 
-  Portable host conversation associations.
+  Optional plain list of your own data to keep with the job, such as a
+  conversation ID.
 
 - max_bytes:
 
-  Maximum bytes for each immutable store. Active job revisions must also
-  leave 1 MiB + 128 KiB per revision for cleanup and terminal
-  settlement; admission fails if the initial record and reserve cannot
-  fit.
+  Size limit for the job's saved record, in bytes (50 MiB by default).
+  While the job is active, the record must stay below half this limit
+  minus about 1.1 MiB, which is kept free for the final result and
+  cleanup. `job_create()` errors if the first record is too big.
 
 ## Value
 
-The committed job directory.
+The path to the new job directory. Keep it to run, read or cancel the
+job.
+
+## Details
+
+The agent must be idle and must be a plain
+[Agent](https://jameshwade.github.io/deputy/reference/Agent.md) (not a
+[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md))
+or the root of a graph from `agent$retain_agent_graph()`. Fallback chats
+and provider-native tools aren't supported.
+
+## See also
+
+[`vignette("background-jobs")`](https://jameshwade.github.io/deputy/articles/background-jobs.md)

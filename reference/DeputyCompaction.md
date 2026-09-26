@@ -1,15 +1,11 @@
-# Record a conversation compaction outcome
+# Create a compaction result
 
+Describes one compaction.
 [Agent](https://jameshwade.github.io/deputy/reference/Agent.md)`$compact()`
-and `$last_compaction()` return this read-only S7 value. `$` and
-[`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html)
-read its properties.
-[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
-returns a plain list for explicit reporting; nested usage must also be
-projected for JSON. Original provider conditions in `attempts` retain
-their identity and any reference semantics. Reporting code should select
-safe evidence fields rather than serialize arbitrary conditions or
-provider objects.
+and `$last_compaction()` return it; you rarely need to create one
+yourself. It is read-only; read fields with `$`. `attempts` holds the
+original error conditions, so pick out the fields you need rather than
+saving or logging it whole.
 
 ## Usage
 
@@ -31,55 +27,54 @@ DeputyCompaction(
 
 - method:
 
-  Outcome: `"none"`, `"cancelled"`, `"custom"`, `"hook"`, `"llm"`, or
-  `"text"`.
+  How the summary was made: `"llm"` (by the model), `"text"` (the plain
+  fallback), `"custom"` (passed to `$compact()`) or `"hook"` (from a
+  `PreCompact` hook). `"none"` means there was nothing to compact and
+  `"cancelled"` means a hook cancelled it.
 
 - automatic:
 
-  Whether the run triggered compaction automatically.
+  Whether a run compacted automatically.
 
 - turns_compacted:
 
-  Number of turns removed from the active context.
+  Number of turns removed from the model context.
 
 - turns_kept:
 
-  Number of retained turns.
+  Number of turns kept.
 
 - estimated_tokens:
 
-  Estimated context size before compaction, or `NULL` when unavailable.
+  Estimated context size before compaction, or `NULL`.
 
 - usage:
 
-  An
   [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
-  value for summary generation, including failed attempts. Unknown
-  provider costs remain unknown.
+  of the summary requests, including failed ones.
 
 - summary:
 
-  Installed summary text, or `NULL` when no replacement occurred.
+  The summary text, or `NULL` if nothing was replaced.
 
 - attempts:
 
-  List of summary attempt records containing `fallback_index`,
-  `provider`, `model`, `usage`, and the original `condition` (or
-  `NULL`).
+  List of summary attempts, each with `fallback_index`, `provider`,
+  `model`, `usage` and the error `condition` (or `NULL`).
 
 - run_id:
 
-  Governed run identifier, or `NULL` for manual compaction.
+  ID of the run that compacted, or `NULL` for a manual compaction.
 
 ## Value
 
-A read-only `DeputyCompaction` S7 object.
+A `DeputyCompaction` object.
 
 ## Additional properties
 
 - `@compacted_at`:
 
-  Construction time as a `POSIXct` value. Read-only.
+  When the result was created, as a `POSIXct` value.
 
 ## Examples
 

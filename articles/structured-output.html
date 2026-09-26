@@ -38,27 +38,38 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -86,111 +97,111 @@
 
     
     
-<p>Use ellmer types to ask for a list or data frame with specified
-fields. Deputy stores the converted R value in
-<code>result$structured_output</code> so you can use it in the next step
-of your analysis.</p>
+<p>When the next step of your analysis needs a list or a data frame
+rather than prose, describe the shape you want with an ellmer type.
+Deputy asks the model for that shape and gives you the converted R
+value.</p>
 <div class="section level2">
-<h2 id="extract-directly">Extract directly<a class="anchor" aria-label="anchor" href="#extract-directly"></a>
+<h2 id="extract-from-whats-already-there">Extract from what’s already there<a class="anchor" aria-label="anchor" href="#extract-from-whats-already-there"></a>
 </h2>
-<p>Use <code>chat_structured()</code> when the conversation already
-contains the information to extract. It requests structured output
-without calling ordinary tools, as ellmer does.
-<code>chat_structured_async()</code> returns a promise with the same
-value. Automatic compaction and optional validation corrections can add
-model requests; all count toward the run’s usage limits.</p>
+<p><code>chat_structured()</code> works like ellmer’s: it asks the model
+to answer in the given type, without calling tools, and returns the R
+value.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
 <span><span class="va">review_type</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_object</a></span><span class="op">(</span></span>
 <span>  status <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_enum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ok"</span>, <span class="st">"needs_review"</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  findings <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_array</a></span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="va">data</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">chat_structured</span><span class="op">(</span><span class="st">"The review found no problems."</span>, type <span class="op">=</span> <span class="va">review_type</span><span class="op">)</span></span>
-<span><span class="va">agent</span><span class="op">$</span><span class="fu">last_run</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">usage</span></span></code></pre></div>
-<p>Existing JSON Schema can enter through
-<code>ellmer::type_from_schema(text = ...)</code>. ellmer handles schema
-support and conversion to R values.</p>
+<span></span>
+<span><span class="va">review</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">chat_structured</span><span class="op">(</span></span>
+<span>  <span class="st">"The review found no problems."</span>,</span>
+<span>  type <span class="op">=</span> <span class="va">review_type</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">review</span><span class="op">$</span><span class="va">status</span></span></code></pre></div>
+<p><code>chat_structured_async()</code> returns a promise for the same
+value. The request counts against the agent’s usage limits like any
+other, and <code>agent$last_run()$usage</code> shows what it cost.</p>
+<p>If you already have a JSON Schema,
+<code><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">ellmer::type_from_schema()</a></code> converts it:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">status_type</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_from_schema</a></span><span class="op">(</span></span>
-<span>  <span class="st">'{"type":"object","properties":{"status":{"type":"string"}},"required":["status"],"additionalProperties":false}'</span></span>
+<span>  <span class="st">'{"type": "object",</span></span>
+<span><span class="st">    "properties": {"status": {"type": "string"}},</span></span>
+<span><span class="st">    "required": ["status"],</span></span>
+<span><span class="st">    "additionalProperties": false}'</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="complete-a-task-then-extract">Complete a task, then extract<a class="anchor" aria-label="anchor" href="#complete-a-task-then-extract"></a>
+<h2 id="do-the-work-then-extract">Do the work, then extract<a class="anchor" aria-label="anchor" href="#do-the-work-then-extract"></a>
 </h2>
-<p><code>run_sync(type = ...)</code>,
-<code>run_async(type = ...)</code>, and the semantic
-<code>run(type = ...)</code> stream first complete an ordinary
-tool-using task, then ask ellmer to extract from that conversation. Both
-phases share one run ID, hook lifecycle, permission policy, and
-request/token/cost budget. The extraction never repeats tool work. The
-<code>response</code> is the task’s text; <code>structured_output</code>
-is the extracted value. Even a task without tools uses these two
-explicit phases; use <code>chat_structured()</code> to extract directly
-without the initial task phase.</p>
+<p>Pass <code>type</code> to <code>run_sync()</code>,
+<code>run_async()</code> or <code>run()</code> and the agent works in
+two steps: it completes the task with its tools as usual, then extracts
+the typed value from the conversation. Both steps share one budget, and
+the extraction step doesn’t call tools, so no tool runs twice.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">8</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Review the README"</span>, type <span class="op">=</span> <span class="va">status_type</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Review the README."</span>, type <span class="op">=</span> <span class="va">status_type</span><span class="op">)</span></span>
+<span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="../reference/result_is_success.html">result_is_success</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli_abort</a></span><span class="op">(</span><span class="st">"Review stopped early: {result$stop_reason}."</span><span class="op">)</span></span>
+<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli_abort</a></span><span class="op">(</span><span class="st">"The review stopped early: {result$stop_reason}."</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">structured_output</span></span></code></pre></div>
+<p><code>result$response</code> holds the model’s text from the first
+step, and <code>result$structured_output</code> holds the extracted
+value. Check <code><a href="../reference/result_is_success.html">result_is_success()</a></code> first: a run that hit a
+limit has no structured value.</p>
 </div>
 <div class="section level2">
-<h2 id="bounded-application-validation">Bounded application validation<a class="anchor" aria-label="anchor" href="#bounded-application-validation"></a>
+<h2 id="check-the-value-yourself">Check the value yourself<a class="anchor" aria-label="anchor" href="#check-the-value-yourself"></a>
 </h2>
-<p>A <code>validate</code> function receives ellmer’s converted value
-and returns <code>TRUE</code>, <code>FALSE</code>, or non-empty text
-explaining a failed application rule. Set <code>max_corrections</code>
-to a finite non-negative integer to permit more structured requests. The
-default is zero. Corrections have no tools and consume the remaining run
-budget. They retain failed values, available turns, feedback, and
-conditions in <code>structured_attempt</code> events. These local events
-can contain user data; Deputy’s tracing adapter omits that content.</p>
+<p>ellmer makes sure the value has the right shape. Rules about its
+content are yours to check. Pass a <code>validate</code> function that
+returns <code>TRUE</code> when the value is acceptable, and
+<code>FALSE</code> or a string explaining the problem when it isn’t.
+With <code>max_corrections</code> above zero, Deputy sends the
+explanation back to the model and asks again:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">chat_structured</span><span class="op">(</span></span>
 <span>  <span class="st">"Extract the review status."</span>,</span>
 <span>  type <span class="op">=</span> <span class="va">status_type</span>,</span>
 <span>  validate <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">x</span><span class="op">$</span><span class="va">status</span>, <span class="st">"ok"</span><span class="op">)</span><span class="op">)</span> <span class="cn">TRUE</span> <span class="kw">else</span> <span class="st">"status must equal ok"</span></span>
+<span>    <span class="kw">if</span> <span class="op">(</span><span class="va">x</span><span class="op">$</span><span class="va">status</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ok"</span>, <span class="st">"needs_review"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="cn">TRUE</span></span>
+<span>    <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>      <span class="st">"status must be 'ok' or 'needs_review'"</span></span>
+<span>    <span class="op">}</span></span>
 <span>  <span class="op">}</span>,</span>
-<span>  max_corrections <span class="op">=</span> <span class="fl">1L</span></span>
+<span>  max_corrections <span class="op">=</span> <span class="fl">1</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Corrections cover failed application validation and JSON parsing
-failures confirmed through ellmer’s recorded <code>ContentJson</code>.
-Unclassified conversion errors and application callback errors are
-terminal, preserving their original conditions. An exhausted correction
-policy signals <code>deputy_structured_output_invalid</code>. An
-exception or <code>NA</code> from the validator is terminal. Provider
-failures are not application corrections. Incomplete responses rejected
-by ellmer before a turn can be recorded are terminal; the caller must
-change the token/context policy. Cancellation is cooperative: an
-in-flight structured request can finish, but no correction starts after
-cancellation. With <code>on_exceed = "stop"</code>, a budget stop
-returns a result with a stop reason and no successful structured value;
-with <code>on_exceed = "error"</code>, it signals the typed limit
-condition. Inspect <code>last_run()</code> for completed-run evidence
-even after an error.</p>
+<p><code>max_corrections</code> defaults to zero, so a failed check is
+an error unless you opt in. Each correction is another model request,
+without tools, and counts against the run’s limits. A reply that isn’t
+valid JSON gets the same treatment. When the corrections run out, Deputy
+signals a <code>deputy_structured_output_invalid</code> error.</p>
+<p>Some failures are never retried: the validator itself erroring or
+returning <code>NA</code>, a conversion error ellmer can’t explain, a
+provider error, or a response cut off by the token limit. Every attempt
+is recorded as a <code>"structured_attempt"</code> event on the result,
+including the rejected values, so be careful where you log those events
+if the data is sensitive.</p>
 </div>
 <div class="section level2">
-<h2 id="native-structured-streaming">Native structured streaming<a class="anchor" aria-label="anchor" href="#native-structured-streaming"></a>
+<h2 id="stream-structured-output">Stream structured output<a class="anchor" aria-label="anchor" href="#stream-structured-output"></a>
 </h2>
-<p><code>stream(type = ...)</code> and
-<code>stream_async(type = ...)</code> forward to ellmer’s native
-structured streaming API. Chunks contain raw JSON text/content; the
-completed upstream assistant turn stores <code>ContentJson</code>. These
-methods do not add an application correction loop. Providers requiring
-ellmer’s schema-tool fallback must use <code>chat_structured()</code>
-instead.</p>
-<p>The former <code>output_format</code> argument and its
-<code>parsed</code>/<code>valid</code> wrapper were removed before
-Deputy’s first CRAN release. Update callers to ellmer types and consume
-<code>structured_output</code> directly.</p>
+<p><code>stream(type = )</code> and <code>stream_async(type = )</code>
+use ellmer’s structured streaming: chunks arrive as raw JSON text while
+the model writes. Streaming doesn’t support <code>validate</code> or
+corrections. Some providers can only produce structured output through a
+tool call; use <code>chat_structured()</code> with those.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

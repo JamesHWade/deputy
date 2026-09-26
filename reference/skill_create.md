@@ -1,7 +1,10 @@
-# Create a skill programmatically
+# Create a skill in code
 
-Create a skill without loading from disk. Useful for defining skills
-inline in R code.
+Creates a
+[Skill](https://jameshwade.github.io/deputy/reference/Skill.md) in R
+instead of loading one from disk. It is the same as
+[`Skill()`](https://jameshwade.github.io/deputy/reference/Skill.md),
+except that `version` defaults to `"1.0.0"`.
 
 ## Usage
 
@@ -20,32 +23,32 @@ skill_create(
 
 - name:
 
-  Skill name
+  Skill name.
 
 - description:
 
-  Brief description
+  Short description.
 
 - prompt:
 
-  System prompt extension
+  Text to add to the system prompt.
 
 - tools:
 
   List of tools created with
-  [`ellmer::tool()`](https://ellmer.tidyverse.org/reference/tool.html)
+  [`ellmer::tool()`](https://ellmer.tidyverse.org/reference/tool.html).
 
 - version:
 
-  Version string (default: "1.0.0")
+  Version string. Defaults to `"1.0.0"`.
 
 - requires:
 
-  List of requirements (packages, providers)
+  List with optional `packages` and `providers` character vectors.
 
 ## Value
 
-A [Skill](https://jameshwade.github.io/deputy/reference/Skill.md) object
+A [Skill](https://jameshwade.github.io/deputy/reference/Skill.md).
 
 ## Examples
 

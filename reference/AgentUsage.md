@@ -1,16 +1,17 @@
-# Create an agent usage record
+# Create a usage record
 
-`AgentUsage()` creates a normalized usage record. `AgentResult$usage`
-and run `usage`/`stop` events are scoped to that run, while
+A usage record counts model requests, tool calls, tokens and estimated
+cost.
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)`$usage`
+and the `"usage"` and `"stop"` events cover a single run.
 [Agent](https://jameshwade.github.io/deputy/reference/Agent.md)`$usage()`
-describes the complete in-memory conversation at the time it is called.
+covers the whole conversation, including turns that compaction removed
+from the model's context. You rarely need to call `AgentUsage()`
+yourself.
 
-This is a read-only S7 value. Its `total_tokens` property is calculated
-from input plus output tokens at construction. Read properties with `$`
-or [`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html);
+Records are read-only. Read fields with `$`;
 [`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
-returns a plain named-list snapshot for reporting or serialization.
-Construct a new value for different usage.
+returns them all as a plain list, which is handy for logging.
 
 ## Usage
 
@@ -29,41 +30,39 @@ AgentUsage(
 
 - requests:
 
-  Number of model requests attributed to the run.
+  Number of model requests.
 
 - tool_calls:
 
-  Number of requested tool calls, including calls rejected before
-  execution.
+  Number of tool calls requested, including denied calls.
 
 - input_tokens:
 
-  Provider-reported input tokens.
+  Input tokens reported by the provider.
 
 - output_tokens:
 
-  Provider-reported output tokens.
+  Output tokens reported by the provider.
 
 - cached_tokens:
 
-  Provider-reported cached input tokens. These are reported separately
-  and are not added again to `total_tokens`.
+  Cached input tokens reported by the provider. They aren't added to
+  `total_tokens`.
 
 - cost_usd:
 
-  Provider-reported estimated cost in US dollars, or `NA_real_` when the
-  provider did not report complete cost information.
+  Estimated cost in US dollars, or `NA_real_` if the cost of some
+  responses is unknown.
 
 ## Value
 
-A read-only `AgentUsage` S7 object.
+An `AgentUsage` object.
 
 ## Additional properties
 
 - `@total_tokens`:
 
-  Input plus output tokens, without adding cached input again.
-  Read-only.
+  `input_tokens + output_tokens`.
 
 ## Examples
 

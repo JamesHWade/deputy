@@ -1,6 +1,6 @@
 # List files in a directory
 
-A tool that lists files and directories within a specified path.
+A tool that lists the files and directories in a directory, with sizes.
 
 ## Usage
 
@@ -22,31 +22,30 @@ A tool definition created with
 
 - path:
 
-  Directory path to list (tool argument)
+  Directory to list. Defaults to the working directory.
 
 - pattern:
 
-  Optional regex pattern to filter files (tool argument)
+  Optional regular expression to filter file names.
 
 - recursive:
 
-  If TRUE, list files recursively (tool argument)
+  If `TRUE`, include subdirectories.
 
 - full_names:
 
-  If TRUE, return full paths (tool argument)
+  If `TRUE`, show full paths.
 
 ## Value
 
-When called directly, a character summary of the matching files and
-directories.
+A text listing of names and sizes.
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_list_files)
 )
 } # }

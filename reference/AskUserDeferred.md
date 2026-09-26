@@ -2,16 +2,16 @@
 
 Return `AskUserDeferred()` from a
 [`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md)
-handler when the host shows the questions without waiting for them, as a
-chat interface does. The tool result tells the model that the questions
-are displayed and that it should end its turn; the person's answers then
-arrive in their next message.
+handler when your app shows the questions without waiting for the
+answers, as a chat interface does. The tool result tells the model that
+the questions are on screen and that it should end its turn; the
+person's answers arrive as their next message.
 
-A handler that must wait inside the current run can instead return a
+A handler that must wait within the run can instead return a
 [`promises::promise()`](https://rstudio.github.io/promises/reference/promise.html)
-resolving to the named answers list. Deferred answers keep the run short
-and make the reply an ordinary user turn, which a host can persist,
-quote and cancel like any other message.
+for the answers. Deferring keeps runs short, and the answers arrive as
+an ordinary user message. Subagents can't defer; their handler must
+return the answers or a promise.
 
 ## Usage
 
@@ -34,9 +34,9 @@ AskUserDeferred(
 
 - extra:
 
-  Optional named list stored as
-  [`ellmer::ContentToolResult()`](https://ellmer.tidyverse.org/reference/Content.html)
-  `extra`, for example a host display for the questions.
+  Optional named list stored in the tool result's `extra` field (see
+  [`ellmer::ContentToolResult()`](https://ellmer.tidyverse.org/reference/Content.html)),
+  for example data your app uses to display the questions.
 
 ## Value
 
@@ -50,7 +50,7 @@ A read-only `AskUserDeferred` S7 object.
 
 ``` r
 handler <- function(questions, context) {
-  # Show `questions` in the host UI, then return without waiting.
+  # Show `questions` in your app, then return without waiting.
   AskUserDeferred()
 }
 tools <- tools_interactive(callback = handler)

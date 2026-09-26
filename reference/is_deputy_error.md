@@ -1,6 +1,9 @@
-# Check if an object is a deputy error
+# Check whether a condition is a Deputy error
 
-Tests whether an object is a deputy error condition.
+Tests whether `x` is an error signalled by Deputy, optionally of a
+specific class. See
+[deputy-errors](https://jameshwade.github.io/deputy/reference/deputy-errors.md)
+for the classes.
 
 ## Usage
 
@@ -12,26 +15,28 @@ is_deputy_error(x, class = NULL)
 
 - x:
 
-  Object to test
+  Object to test.
 
 - class:
 
-  Optional specific error class to check for (without "deputy\_" prefix)
+  Optional error class to check for, without the `"deputy_"` prefix,
+  such as `"budget"`.
 
 ## Value
 
-Logical indicating if `x` is a deputy error (of the specified class)
+`TRUE` if `x` has class `deputy_error` (and `deputy_<class>` when
+`class` is given), otherwise `FALSE`.
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
-tryCatch(
-  abort_deputy("test"),
-  error = function(e) {
-    is_deputy_error(e)
-    # TRUE
-  }
+result <- tryCatch(
+  agent$run_sync("Summarise the logs"),
+  error = function(e) e
 )
+if (is_deputy_error(result, "budget")) {
+  message("A usage limit stopped the run.")
+}
 } # }
 ```

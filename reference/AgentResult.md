@@ -1,21 +1,24 @@
-# Create a completed agent result
+# Create an agent run result
 
-A read-only S7 snapshot of a governed run. It contains original ellmer
-turns, Deputy events, usage, and correlation metadata. Read properties
-with `S7::prop(result, "response")` or `$`; use
+An `AgentResult` describes one finished run.
+[Agent](https://jameshwade.github.io/deputy/reference/Agent.md)`$run_sync()`,
+`$run_async()` and `$last_run()` return one; you rarely need to create
+it yourself. It holds the final response, the conversation turns, every
+[AgentEvent](https://jameshwade.github.io/deputy/reference/AgentEvent.md),
+usage and cost, and IDs that link the run to its agent and session.
+
+Results are read-only. Read fields with `$`, for example
+`result$response`, or use
 [`result_n_turns()`](https://jameshwade.github.io/deputy/reference/result_n_turns.md),
 [`result_tool_calls()`](https://jameshwade.github.io/deputy/reference/result_tool_calls.md),
 [`result_tool_results()`](https://jameshwade.github.io/deputy/reference/result_tool_results.md),
-[`result_text_chunks()`](https://jameshwade.github.io/deputy/reference/result_text_chunks.md),
+[`result_text_chunks()`](https://jameshwade.github.io/deputy/reference/result_text_chunks.md)
 and
-[`result_is_success()`](https://jameshwade.github.io/deputy/reference/result_is_success.md)
-for inspection.
+[`result_is_success()`](https://jameshwade.github.io/deputy/reference/result_is_success.md).
 
-All properties are read-only, including previously writable R6 fields.
-Ordinary nested lists use R value semantics. Embedded provider objects,
-conditions, environments, and closures retain their own reference
-semantics; the result does not deep-copy or sanitize their contents. Run
-context is separately normalized to canonical JSON-compatible values.
+`usage` covers this run only, but `cost` covers the whole conversation,
+including earlier runs and turns that compaction removed from the model
+context.
 
 ## Usage
 
@@ -49,12 +52,13 @@ AgentResult(
 
 - turns:
 
-  List of original conversation turns.
+  List of ellmer turns in the model context when the run ended.
 
 - cost:
 
-  Cost information, including provider coverage metadata, or `NULL`. An
-  incomplete total is `NA_real_`.
+  Cost summary (as from
+  [Agent](https://jameshwade.github.io/deputy/reference/Agent.md)`$cost()`),
+  or `NULL`. `total` is `NA` if some responses had no cost.
 
 - events:
 
@@ -64,34 +68,35 @@ AgentResult(
 
 - duration:
 
-  Finite, nonnegative duration in seconds, or `NULL`.
+  Run time in seconds, or `NULL`.
 
 - stop_reason:
 
-  One nonempty stop-reason string.
+  Why the run stopped: `"complete"` if the model finished, otherwise a
+  reason such as `"request_limit"`, `"interrupted"` or `"error"`.
 
 - structured_output:
 
-  Parsed structured output, if any.
+  Extracted structured data, if any.
 
 - session_id, run_id, agent_id, agent_name, parent_agent_id,
   parent_run_id, delegation_id:
 
-  Optional nonempty correlation and identity strings.
+  Optional ID strings linking the run to its session and agent and, for
+  a subagent, to the parent run and delegation.
 
 - usage:
 
-  Run-scoped
-  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md),
-  or `NULL`.
+  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+  for this run only, or `NULL`.
 
 - run_context:
 
-  Canonical product context for the run.
+  The run's `run_context`, a named list.
 
 ## Value
 
-An `AgentResult` S7 object.
+An `AgentResult` object.
 
 ## Examples
 

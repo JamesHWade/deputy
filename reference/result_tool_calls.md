@@ -1,6 +1,6 @@
-# Inspect tool calls
+# Get the tool calls from a result
 
-Inspect tool calls
+Get the tool calls from a result
 
 ## Usage
 
@@ -13,9 +13,8 @@ result_tool_calls(result)
 - result:
 
   An
-  [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
-  S7 value.
+  [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md).
 
 ## Value
 
-List of `tool_start` events.
+A list of `"tool_start"` events.

@@ -1,6 +1,9 @@
 # Apply multiple text edits to a file
 
-Apply a sequence of exact-match text replacements to a file.
+A tool that applies several exact-text replacements to one file, in
+order. Each edit follows the rules of
+[tool_edit_file](https://jameshwade.github.io/deputy/reference/tool_edit_file.md).
+If any edit fails, the file is left unchanged.
 
 ## Usage
 
@@ -17,16 +20,16 @@ A tool definition created with
 
 - path:
 
-  Path to the file to edit (tool argument)
+  Path to the file to edit.
 
 - edits:
 
-  List or JSON string of edit operations (tool argument)
+  A list of edits, or a JSON array. Each edit has `old_text`, `new_text`
+  and, optionally, `replace_all`.
 
 ## Value
 
-When called directly, a character status message describing the edits
-and total replacement count.
+A status message with the number of edits and replacements.
 
 ## Examples
 
@@ -37,6 +40,6 @@ tool_multi_edit(
   path,
   list(list(old_text = "alpha", new_text = "gamma"))
 )
-#> [1] "Successfully applied 1 edit(s) to /tmp/RtmpNHyg1W/file1a962dbc9e26.txt (1 total replacement)"
+#> [1] "Successfully applied 1 edit(s) to /tmp/RtmpRU2rTg/file1a6460c7bb8e.txt (1 total replacement)"
 unlink(path)
 ```

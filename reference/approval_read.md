@@ -1,21 +1,19 @@
-# Inspect a durable approval continuation
+# Read a pending approval
 
-Read an approval directory without loading a Chat or running any tools.
-Snapshots are read-only S7 values; they are inspection records, not
-grants. Use `agent$resume_approval(path, decision = "approve")` or
-`"deny"` to consume a pending decision. Edited inputs are supplied
-through `tool_input`.
+Reads an approval directory and returns the paused tool call, its status
+and the usage so far, without loading a chat or running tools. To act on
+a pending approval, call `agent$resume_approval(path, "approve")` or
+`"deny"`, passing any edited inputs as `tool_input`.
 
-Only `pending` records can resume. An `executing` record may have
-produced effects; an interrupted `resuming` or `continuing` record also
-requires host reconciliation. These records cannot automatically retry.
-OS locks prevent concurrent consumers and are released when the owning
-process exits.
+Only a `"pending"` approval can be resumed, and only once. A record
+interrupted while `"resuming"`, `"executing"` or `"continuing"` can't be
+resumed or retried: its tool may already have run, so check the effects
+yourself. File locks stop two processes resuming the same approval at
+once, but nothing guarantees that a tool runs exactly once.
 
-Approval directories contain private conversation and tool data. The
-host owns storage, access control, retention, and associations with its
-conversation store. They never contain serialized tools, callbacks, or
-Chat clients.
+Approval directories hold the conversation and tool inputs, so keep them
+private; access control and clean-up are up to you. They never contain
+tools, callbacks or chat clients.
 
 ## Usage
 
@@ -27,10 +25,9 @@ approval_read(path)
 
 - path:
 
-  Path to an approval directory returned on the `approval` event.
+  Path to an approval directory, as given in the `approval` event.
 
 ## Value
 
 An
-[ApprovalContinuation](https://jameshwade.github.io/deputy/reference/ApprovalContinuation.md)
-inspection value.
+[ApprovalContinuation](https://jameshwade.github.io/deputy/reference/ApprovalContinuation.md).

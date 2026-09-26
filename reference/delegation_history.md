@@ -1,10 +1,11 @@
-# Replay authorized settled child history
+# Replay saved subagent history
 
-Replays host-owned snapshots from `LeadAgent$export_subagents()` using
-public ellmer Content records. No Chat, model request, tools, or active
-execution is restored. Hosts own durable storage and authenticate the
-supplied history; this function does not treat stored scope or IDs as
-authorization.
+Turns a snapshot from `$export_subagents()` back into ellmer turns for
+display, for example in
+[`subagent_chat_server()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md).
+Replaying never runs tools, calls a model or restores a chat. Access is
+checked again with `disclosure`; the IDs and scope stored in `history`
+grant nothing.
 
 ## Usage
 
@@ -16,25 +17,25 @@ delegation_history(history, requester, disclosure, scope)
 
 - history:
 
-  A portable snapshot produced by `export_subagents()`.
+  A snapshot from `$export_subagents()`.
 
 - requester:
 
-  Authenticated host request context.
+  Who is asking, passed to `disclosure`. Authenticate it first.
 
 - disclosure:
 
-  A freshly host-bound
-  [DelegationDisclosure](https://jameshwade.github.io/deputy/reference/DelegationDisclosure.md).
+  A
+  [DelegationDisclosure](https://jameshwade.github.io/deputy/reference/DelegationDisclosure.md)
+  for this request.
 
 - scope:
 
-  Current host scope, matched exactly against the saved scope after
-  authorization. Obtain it from the host's own durable ownership record.
+  The scope the history belongs to, from your own records rather than
+  from `history`. It must match the saved scope exactly.
 
 ## Value
 
-Authorized, redacted child views with native ellmer `turns` added for
-read-only rendering. Artifact availability is `unresolved` until the
-host checks its retained storage; saved availability is never treated as
-current.
+A list with one redacted view per subagent, each with ellmer `turns`.
+Artifact references are marked `availability = "unresolved"`, since the
+saved status may be stale.

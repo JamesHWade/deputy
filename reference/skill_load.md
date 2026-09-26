@@ -1,8 +1,9 @@
 # Load a skill from a directory
 
-Loads a skill from a directory containing `SKILL.yaml` (metadata) and/or
-`SKILL.md` (system prompt extension). You can also pass a direct path to
-a `SKILL.md` file.
+Loads a skill from a directory containing `SKILL.yaml` (metadata and
+tools), `SKILL.md` (prompt text) or both, or from a single Markdown
+file. Loading a skill with tools runs its R files, so only load skills
+you trust.
 
 ## Usage
 
@@ -14,21 +15,22 @@ skill_load(path, check_requirements = TRUE)
 
 - path:
 
-  Path to the skill directory
+  Path to the skill directory or Markdown file.
 
 - check_requirements:
 
-  If TRUE (default), verify requirements are met
+  If `TRUE` (the default), warn when required packages are missing.
 
 ## Value
 
-A [Skill](https://jameshwade.github.io/deputy/reference/Skill.md) object
+A [Skill](https://jameshwade.github.io/deputy/reference/Skill.md).
 
 ## Details
 
-The skill directory should contain one of:
-
-**SKILL.yaml** (required):
+`SKILL.yaml` needs a `name`. Each entry under `tools` names an R file in
+the skill directory and the object in it created with
+[`ellmer::tool()`](https://ellmer.tidyverse.org/reference/tool.html);
+entries that can't be loaded are skipped with a warning.
 
     name: my_skill
     version: "1.0.0"
@@ -41,9 +43,8 @@ The skill directory should contain one of:
         file: tools.R
         function: tool_my_tool
 
-**SKILL.md** (optional, or standalone file): Markdown content that will
-be appended to the agent's system prompt when this skill is loaded.
-Frontmatter is supported:
+The body of `SKILL.md` is added to the agent's system prompt. Its
+optional YAML front matter overrides fields from `SKILL.yaml`:
 
     ---
     name: my_skill
@@ -52,8 +53,8 @@ Frontmatter is supported:
       packages: [dplyr]
     ---
 
-**tools.R** (optional): R file containing tool definitions referenced in
-SKILL.yaml.
+A skill without a name is named after its directory or file. Reading
+YAML needs the yaml package.
 
 ## Examples
 

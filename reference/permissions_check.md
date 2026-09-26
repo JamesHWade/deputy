@@ -1,6 +1,8 @@
-# Evaluate a tool call against a permission policy
+# Check a tool call against a permission policy
 
-Evaluate a tool call against a permission policy
+Returns the policy's decision for one tool call. It calls the policy's
+`can_use_tool` callback if the rest of the policy allows the call, but
+runs no hooks. Use it to test a policy.
 
 ## Usage
 
@@ -14,7 +16,7 @@ permissions_check(permissions, tool_name, tool_input, context = list())
 
   A
   [Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md)
-  S7 value.
+  object.
 
 - tool_name:
 
@@ -22,12 +24,12 @@ permissions_check(permissions, tool_name, tool_input, context = list())
 
 - tool_input:
 
-  Arguments passed to the tool.
+  Named list of arguments for the tool.
 
 - context:
 
-  Additional context such as working directory, tool origin, and
-  annotations.
+  Optional named list of details the agent normally supplies, such as
+  `working_dir` (used to resolve relative paths) and `tool_annotations`.
 
 ## Value
 

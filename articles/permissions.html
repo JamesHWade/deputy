@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Permissions and Safety • deputy</title>
+<title>Permissions and limits • deputy</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Permissions and Safety">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Permissions and limits">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -38,27 +38,38 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -77,7 +88,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Permissions and Safety</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Permissions and limits</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/vignettes/permissions.Rmd" class="external-link"><code>vignettes/permissions.Rmd</code></a></small>
@@ -86,203 +97,236 @@
 
     
     
-<p>Permissions control which tool calls an agent can run. Use a preset
-for common read or write tasks, or a <code>Permissions</code> object to
-allow specific capabilities. Deputy checks the policy before running a
-tool.</p>
+<p>Deputy checks every tool call against the agent’s permission policy
+before the tool runs, and counts every request and tool call against its
+usage limits. Both are set when you create the agent. You can tighten
+them afterwards, but you can’t loosen them.</p>
 <div class="section level2">
-<h2 id="permission-presets">Permission Presets<a class="anchor" aria-label="anchor" href="#permission-presets"></a>
+<h2 id="presets">Presets<a class="anchor" aria-label="anchor" href="#presets"></a>
 </h2>
+<p>Four functions cover the common cases:</p>
+<table class="table">
+<colgroup>
+<col width="20%">
+<col width="20%">
+<col width="20%">
+<col width="20%">
+<col width="20%">
+</colgroup>
+<thead><tr class="header">
+<th>Preset</th>
+<th>Reads files</th>
+<th>Writes files</th>
+<th>Runs code</th>
+<th>Uses the web</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code><a href="../reference/permissions_readonly.html">permissions_readonly()</a></code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr class="even">
+<td>
+<code><a href="../reference/permissions_standard.html">permissions_standard()</a></code> (the default)</td>
+<td>yes</td>
+<td>inside the working directory</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr class="odd">
+<td><code><a href="../reference/permissions_plan.html">permissions_plan()</a></code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>read-only web tools</td>
+</tr>
+<tr class="even">
+<td><code><a href="../reference/permissions_full.html">permissions_full()</a></code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<p>Pass one to <code>Agent$new()</code>:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Read-only: known Deputy read tools are allowed</span></span>
-<span><span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Plan: annotated read-only tools plus ask_user</span></span>
-<span><span class="fu"><a href="../reference/permissions_plan.html">permissions_plan</a></span><span class="op">(</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Standard (default): accessible reads and workspace-scoped writes;</span></span>
-<span><span class="co"># no R code, bash, or web</span></span>
-<span><span class="fu"><a href="../reference/permissions_standard.html">permissions_standard</a></span><span class="op">(</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Full: everything allowed (use with caution!)</span></span>
-<span><span class="fu"><a href="../reference/permissions_full.html">permissions_full</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Each preset returns a <code>Permissions</code> object. Pass it to
-<code>Agent$new()</code>:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>“Reads files” means any file the R process can read, wherever it is.
+The working directory limits writes, not reads.</p>
+<p><code><a href="../reference/permissions_plan.html">permissions_plan()</a></code> is meant for planning before acting:
+it allows tools annotated as read-only, including web fetches and
+searches, plus <code>ask_user</code> so the model can check its plan
+with you. <code><a href="../reference/permissions_full.html">permissions_full()</a></code> allows every tool call.</p>
 </div>
 <div class="section level2">
-<h2 id="s7-policy-values">S7 policy values<a class="anchor" aria-label="anchor" href="#s7-policy-values"></a>
+<h2 id="build-your-own-policy">Build your own policy<a class="anchor" aria-label="anchor" href="#build-your-own-policy"></a>
 </h2>
-<p><code>Permissions(...)</code> creates a read-only S7 policy; presets
-return the same class. Use
-<code>permissions_check(policy, tool_name, tool_input, context)</code>
-to inspect a permission decision. Read fields with
-<code>S7::prop(policy, "mode")</code> or <code>policy$mode</code>.
-Constructor flags must each be <code>TRUE</code> or <code>FALSE</code>,
-and a custom callback must be a function. An empty tool allowlist denies
-all tools, while <code>NULL</code> disables that gate.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>file_write <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/permissions_check.html">permissions_check</a></span><span class="op">(</span><span class="va">policy</span>, <span class="st">"write_file"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>path <span class="op">=</span> <span class="st">"output.txt"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">prop</a></span><span class="op">(</span><span class="va">policy</span>, <span class="st">"file_write"</span><span class="op">)</span></span></code></pre></div>
-<p>Create a new Agent to explicitly adopt broader authority. An existing
-Agent’s <code>set_permission_mode()</code> can only preserve or narrow
-its current policy; its policy cannot be replaced. Serializing a policy
-retains configuration for the caller to inspect, including its canonical
-directory grant. It does not grant a restored record authority over an
-existing Agent. Callback closures remain caller-owned executable
-state.</p>
-</div>
-<div class="section level2">
-<h2 id="custom-permissions">Custom Permissions<a class="anchor" aria-label="anchor" href="#custom-permissions"></a>
-</h2>
-<p>For fine-grained control, create a <code>Permissions</code> object
-directly:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
+<p><code><a href="../reference/Permissions.html">Permissions()</a></code> sets each capability directly:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
 <span>  file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  file_write <span class="op">=</span> <span class="st">"/path/to/allowed/dir"</span>,</span>
+<span>  file_write <span class="op">=</span> <span class="st">"/path/to/output"</span>,</span>
 <span>  bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  r_code <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  web <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  install_packages <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Setting <code>r_code = TRUE</code> or <code>bash = TRUE</code>
-authorizes Deputy’s built-in trusted-code tools. It does not confine the
-subprocess. Use this only when the model, prompt, inputs, and
-current-user filesystem authority are all within the same trust
-boundary. Direct <code><a href="../reference/Permissions.html">Permissions()</a></code> policies default
-<code>r_code</code> to <code>FALSE</code>, including partial policies
-such as <code>Permissions(web = TRUE)</code>.</p>
-<p>Fields:</p>
 <table class="table">
 <colgroup>
-<col width="26%">
-<col width="23%">
-<col width="50%">
+<col width="33%">
+<col width="33%">
+<col width="33%">
 </colgroup>
 <thead><tr class="header">
-<th>Field</th>
-<th>Type</th>
-<th>Description</th>
+<th>Argument</th>
+<th>Controls</th>
+<th>Default</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td><code>file_read</code></td>
-<td>logical</td>
-<td>Allow reading files</td>
+<td>the built-in file reading tools</td>
+<td><code>TRUE</code></td>
 </tr>
 <tr class="even">
 <td><code>file_write</code></td>
-<td>logical / path</td>
-<td>Allow writing (optionally restricted to a directory)</td>
+<td>
+<code>write_file</code>, <code>edit_file</code> and
+<code>multi_edit</code>: <code>TRUE</code>, <code>FALSE</code>, or a
+directory to confine them to</td>
+<td>the current directory</td>
 </tr>
 <tr class="odd">
 <td><code>bash</code></td>
-<td>logical</td>
-<td>Allow bash commands</td>
+<td><code>run_bash</code></td>
+<td><code>FALSE</code></td>
 </tr>
 <tr class="even">
 <td><code>r_code</code></td>
-<td>logical</td>
-<td>Allow R code execution</td>
+<td><code>run_r_code</code></td>
+<td><code>FALSE</code></td>
 </tr>
 <tr class="odd">
 <td><code>web</code></td>
-<td>logical</td>
-<td>Allow web access</td>
+<td>web tools and any tool annotated as open world</td>
+<td><code>FALSE</code></td>
 </tr>
 <tr class="even">
 <td><code>install_packages</code></td>
-<td>logical</td>
-<td>Allow package installation</td>
+<td>package installation</td>
+<td><code>FALSE</code></td>
+</tr>
+<tr class="odd">
+<td><code>tool_allowlist</code></td>
+<td>if set, only these tools may run</td>
+<td><code>NULL</code></td>
+</tr>
+<tr class="even">
+<td><code>tool_denylist</code></td>
+<td>these tools never run</td>
+<td><code>NULL</code></td>
 </tr>
 <tr class="odd">
 <td><code>can_use_tool</code></td>
-<td>function</td>
-<td>Apply custom permission decisions</td>
-</tr>
-<tr class="even">
-<td><code>tool_allowlist</code></td>
-<td>character</td>
-<td>Deny tools not explicitly listed</td>
-</tr>
-<tr class="odd">
-<td><code>tool_denylist</code></td>
-<td>character</td>
-<td>Always deny explicitly listed tools</td>
+<td>a function that can deny or pause calls the rest of the policy
+allows (see below)</td>
+<td><code>NULL</code></td>
 </tr>
 <tr class="even">
 <td><code>permission_prompt_tool_name</code></td>
-<td>character</td>
-<td>Dedicated approval tool used in gating messages</td>
+<td>a tool the model may always call to ask for approval</td>
+<td><code>NULL</code></td>
+</tr>
+<tr class="odd">
+<td><code>mode</code></td>
+<td>
+<code>"standard"</code>, <code>"readonly"</code>,
+<code>"plan"</code> or <code>"full"</code>
+</td>
+<td><code>"standard"</code></td>
 </tr>
 </tbody>
 </table>
+<p>Deputy’s own tools map to these capabilities by name. Other tools are
+judged by their <a href="tools.html#turn-an-r-function-into-a-tool">annotations</a>: a tool
+annotated as open world needs <code>web = TRUE</code>, and a destructive
+one needs file writes or shell commands to be allowed. Missing
+annotations count as the risky answer.</p>
+<p>Setting <code>r_code = TRUE</code> or <code>bash = TRUE</code> lets
+the model run code with your user account’s access to files and the
+network. Only do that when you trust the model, the prompt and every
+input it will see. <a href="code-execution.html">Running R code</a>
+shows how to run model-written code in an OS sandbox instead.</p>
+<p>To see how a policy treats a call without running anything, use
+<code><a href="../reference/permissions_check.html">permissions_check()</a></code>:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>file_write <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/permissions_check.html">permissions_check</a></span><span class="op">(</span><span class="va">policy</span>, <span class="st">"write_file"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>path <span class="op">=</span> <span class="st">"notes.md"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;deputy::PermissionResultDeny&gt;</span></span>
+<span><span class="co">#&gt;  @ decision : chr "deny"</span></span>
+<span><span class="co">#&gt;  @ reason   : chr "File writing is not allowed"</span></span>
+<span><span class="co">#&gt;  @ interrupt: logi FALSE</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="permission-modes">Permission Modes<a class="anchor" aria-label="anchor" href="#permission-modes"></a>
+<h2 id="modes">Modes<a class="anchor" aria-label="anchor" href="#modes"></a>
 </h2>
-<p>The <code>mode</code> field provides broad policy shortcuts:</p>
+<p>The <code>mode</code> argument changes how the capabilities are
+applied:</p>
 <table class="table">
 <colgroup>
-<col width="35%">
-<col width="64%">
+<col width="50%">
+<col width="50%">
 </colgroup>
 <thead><tr class="header">
 <th>Mode</th>
-<th>Behaviour</th>
+<th>Allows</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td><code>"standard"</code></td>
-<td>Check each tool against the configured capabilities</td>
+<td>any call the capabilities allow</td>
 </tr>
 <tr class="even">
 <td><code>"readonly"</code></td>
-<td>Allow known Deputy read tools and explicit allowlist entries within
-configured capabilities</td>
+<td>Deputy’s read tools, plus web tools if <code>web = TRUE</code> and
+custom tools you list in <code>tool_allowlist</code>; never writes, code
+or destructive tools</td>
 </tr>
 <tr class="odd">
 <td><code>"plan"</code></td>
-<td>Allow read-only annotated tools within configured capabilities and
-the human approval prompt tool</td>
+<td>tools annotated as read-only (open-world ones only if
+<code>web = TRUE</code>)</td>
 </tr>
 <tr class="even">
 <td><code>"full"</code></td>
-<td>Allow every tool (dangerous!)</td>
+<td>every call</td>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"readonly"</span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="../reference/permissions_plan.html">permissions_plan()</a></code> creates a planning-oriented
-policy:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_all.html">tools_all</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_plan.html">permissions_plan</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<p>In every mode, <code>tool_denylist</code> and
+<code>tool_allowlist</code> are checked first, and the tool named by
+<code>permission_prompt_tool_name</code> is always allowed. Read-only
+and plan modes also allow a lead agent to delegate: its <a href="multi-agent.html#permissions-and-budgets">subagents</a> can’t use
+a less strict mode than the lead.</p>
 </div>
 <div class="section level2">
-<h2 id="changing-an-agents-mode">Changing an Agent’s Mode<a class="anchor" aria-label="anchor" href="#changing-an-agents-mode"></a>
+<h2 id="narrow-an-agents-permissions">Narrow an agent’s permissions<a class="anchor" aria-label="anchor" href="#narrow-an-agents-permissions"></a>
 </h2>
-<p>An agent’s configured permissions are an authority ceiling. Calling
-<code>set_permission_mode()</code> may preserve or narrow that
-authority, but it cannot widen it or replace it with an incomparable
-policy:</p>
+<p><code>set_permission_mode()</code> switches a running agent to a
+stricter mode. It can’t switch to a mode that allows more than the agent
+started with:</p>
 <table class="table">
 <thead><tr class="header">
 <th>Current mode</th>
-<th>Allowed target modes</th>
+<th>Can switch to</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
@@ -310,359 +354,130 @@ policy:</p>
 </tr>
 </tbody>
 </table>
-<p>Reapplying the current mode is an exact no-op. For an allowed
-narrowing, Deputy intersects the target mode with the existing
-capabilities. Custom restrictions, tool gates, callbacks, and
-directory-scoped write roots therefore remain authoritative. If the
-target removes web access, Deputy also removes registered
-provider-native web tools before activating the new policy. Ordinary
-function tools stay registered because Deputy can still deny them when
-they are requested; provider-side tools have no equivalent interception
-point.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">set_permission_mode</span><span class="op">(</span><span class="st">"readonly"</span><span class="op">)</span></span></code></pre></div>
-<p>Create a newly configured <code>Agent</code> when broader or
-incomparable authority is required.</p>
+<p>The new mode is combined with the original policy, so directory
+limits, allow and deny lists and callbacks keep applying. If the new
+mode takes away web access, Deputy also removes any provider-side web
+tools, because it can’t intercept their calls. To give an agent more
+permissions, create a new agent.</p>
 </div>
 <div class="section level2">
-<h2 id="tool-annotations">Tool Annotations<a class="anchor" aria-label="anchor" href="#tool-annotations"></a>
+<h2 id="decide-each-call-with-a-callback">Decide each call with a callback<a class="anchor" aria-label="anchor" href="#decide-each-call-with-a-callback"></a>
 </h2>
-<p>Tools carry annotations that describe their behaviour. The permission
-system uses these annotations to make decisions:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># A read-only tool</span></span>
-<span><span class="va">tool_safe</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
-<span>  fun <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span>,</span>
-<span>  name <span class="op">=</span> <span class="st">"safe_tool"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"A safe, read-only tool"</span>,</span>
-<span>  arguments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="st">"Input"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  annotations <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool_annotations.html" class="external-link">tool_annotations</a></span><span class="op">(</span></span>
-<span>    read_only_hint <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>    destructive_hint <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>Annotations describe behavior; they do not independently grant
-authority. In <code>"readonly"</code> mode, Deputy recognizes its
-built-in read tools and explicit allowlist entries, while still denying
-known writes, destructive tools, and open-world tools when web access is
-disabled. Unknown tools do not become authorized merely by declaring
-<code>read_only_hint = TRUE</code>. In <code>"standard"</code> mode,
-annotations participate in the configured capability checks.</p>
-</div>
-<div class="section level2">
-<h2 id="custom-permission-callbacks">Custom Permission Callbacks<a class="anchor" aria-label="anchor" href="#custom-permission-callbacks"></a>
-</h2>
-<p>For complex logic, provide a <code>can_use_tool</code> callback:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">perms</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
+<p>A <code>can_use_tool</code> function adds your own rules on top of a
+policy. Deputy calls it, in every mode, for each call the rest of the
+policy allows. It receives the tool name, its arguments and a context
+list, and returns <code><a href="../reference/PermissionResultAllow.html">PermissionResultAllow()</a></code>,
+<code>PermissionResultDeny(reason)</code> or
+<code>PermissionResultPending(reason)</code>. Any other return value, or
+an error, denies the call.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
+<span>  file_write <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  can_use_tool <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="co"># Block writes to sensitive files</span></span>
-<span>    <span class="kw">if</span> <span class="op">(</span><span class="va">tool_name</span> <span class="op">==</span> <span class="st">"write_file"</span><span class="op">)</span> <span class="op">{</span></span>
-<span>      <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"^\\.env|secrets|credentials"</span>, <span class="va">tool_input</span><span class="op">$</span><span class="va">path</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>        <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="fu"><a href="../reference/PermissionResultDeny.html">PermissionResultDeny</a></span><span class="op">(</span></span>
-<span>          reason <span class="op">=</span> <span class="st">"Cannot write to sensitive files"</span></span>
-<span>        <span class="op">)</span><span class="op">)</span></span>
-<span>      <span class="op">}</span></span>
+<span>    <span class="va">path</span> <span class="op">&lt;-</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">is.character</a></span><span class="op">(</span><span class="va">tool_input</span><span class="op">$</span><span class="va">path</span><span class="op">)</span><span class="op">)</span> <span class="va">tool_input</span><span class="op">$</span><span class="va">path</span> <span class="kw">else</span> <span class="st">""</span></span>
+<span>    <span class="kw">if</span> <span class="op">(</span><span class="va">tool_name</span> <span class="op">==</span> <span class="st">"write_file"</span> <span class="op">&amp;&amp;</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"^\\.env|secrets"</span>, <span class="va">path</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="fu"><a href="../reference/PermissionResultDeny.html">PermissionResultDeny</a></span><span class="op">(</span><span class="st">"Don't write to secret files."</span><span class="op">)</span><span class="op">)</span></span>
 <span>    <span class="op">}</span></span>
 <span>    <span class="fu"><a href="../reference/PermissionResultAllow.html">PermissionResultAllow</a></span><span class="op">(</span><span class="op">)</span></span>
 <span>  <span class="op">}</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The callback receives:</p>
-<ul>
-<li>
-<code>tool_name</code> – Name of the tool being called</li>
-<li>
-<code>tool_input</code> – Named list of arguments</li>
-<li>
-<code>context</code> – List with <code>working_dir</code> and
-<code>tool_annotations</code>
-</li>
-</ul>
-<p>Custom callbacks govern function tools whose requests Deputy can
-intercept. Provider-native tools are rejected when a callback is
-configured; use the universal function tool when authorization depends
-on request arguments or run context.</p>
-<p>It must return <code><a href="../reference/PermissionResultAllow.html">PermissionResultAllow()</a></code> or
-<code>PermissionResultDeny(reason)</code>. These are read-only S7
-values. Untyped lists and legacy S3 class tags do not satisfy this
-callback contract and produce the existing invalid-result denial.
-<code>interrupt</code> must be one non-missing logical value, and
-<code>reason</code> must be one non-missing string. Construct a new
-result to revise a decision.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
-<span><span class="va">decision</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/PermissionResultDeny.html">PermissionResultDeny</a></span><span class="op">(</span><span class="st">"Host veto"</span>, interrupt <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/S7_inherits.html" class="external-link">S7_inherits</a></span><span class="op">(</span><span class="va">decision</span>, <span class="va">PermissionResult</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] TRUE</span></span>
-<span><span class="va">decision</span><span class="op">$</span><span class="va">decision</span></span>
-<span><span class="co">#&gt; [1] "deny"</span></span>
-<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">props</a></span><span class="op">(</span><span class="va">decision</span><span class="op">)</span></span>
-<span><span class="co">#&gt; $decision</span></span>
-<span><span class="co">#&gt; [1] "deny"</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $reason</span></span>
-<span><span class="co">#&gt; [1] "Host veto"</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $interrupt</span></span>
-<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>The callback can deny a call or pause it, but it can’t allow a call
+the rest of the policy denies. The context list includes the working
+directory, the tool’s annotations and argument types, and the run’s
+identifiers. A <a href="hooks.html">PreToolUse hook</a> is often simpler
+when you only want to block a few calls, and a <a href="hooks.html#allow-a-denied-call">PermissionRequest hook</a> can
+allow a call the policy denies, for example after asking you.</p>
+<p>Tools that run on the provider’s servers, such as Anthropic’s web
+search, can’t be checked per call. An agent whose policy has a callback
+refuses to register them.</p>
+<p><code><a href="../reference/PermissionResultPending.html">PermissionResultPending()</a></code> pauses the run until a person
+approves the call. <a href="approvals.html">Human input and
+approvals</a> explains how to set that up.</p>
 </div>
 <div class="section level2">
-<h2 id="example-read-only-agent">Example: Read-Only Agent<a class="anchor" aria-label="anchor" href="#example-read-only-agent"></a>
+<h2 id="usage-limits">Usage limits<a class="anchor" aria-label="anchor" href="#usage-limits"></a>
 </h2>
-<p>A read-only agent can explore files but cannot change anything:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"What files are in the current directory?"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="run-limits">Run Limits<a class="anchor" aria-label="anchor" href="#run-limits"></a>
-</h2>
-<p>Permissions decide whether a tool may run. Configure resource limits
-separately with <code><a href="../reference/UsageLimits.html">UsageLimits()</a></code> on the agent or an individual
-run:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<p><code><a href="../reference/UsageLimits.html">UsageLimits()</a></code> caps what one run can spend. Set defaults
+on the agent, and override them for a single run:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_standard.html">permissions_standard</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span></span>
-<span>    max_requests <span class="op">=</span> <span class="fl">10</span>,</span>
-<span>    max_tool_calls <span class="op">=</span> <span class="fl">20</span>,</span>
-<span>    max_cost_usd <span class="op">=</span> <span class="fl">1</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="../reference/UsageLimits.html">UsageLimits()</a></code> and <code><a href="../reference/AgentUsage.html">AgentUsage()</a></code> create
-read-only S7 values. Their constructors and <code>$</code> reads keep
-the same spelling; list indexing and field assignment are replaced by
-property access and construction of a new value. Use
-<code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> to obtain a plain reporting record:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">limits</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">3</span>, max_cost_usd <span class="op">=</span> <span class="fl">0.25</span><span class="op">)</span></span>
-<span><span class="va">usage</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/AgentUsage.html">AgentUsage</a></span><span class="op">(</span>requests <span class="op">=</span> <span class="fl">1</span>, input_tokens <span class="op">=</span> <span class="fl">100</span>, output_tokens <span class="op">=</span> <span class="fl">20</span>,</span>
-<span>                    cached_tokens <span class="op">=</span> <span class="fl">80</span>, cost_usd <span class="op">=</span> <span class="cn">NA_real_</span><span class="op">)</span></span>
-<span><span class="va">limits</span><span class="op">$</span><span class="va">max_requests</span></span>
-<span><span class="va">usage</span><span class="op">$</span><span class="va">total_tokens</span> <span class="co"># Cached input is already included in input_tokens</span></span>
-<span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">props</a></span><span class="op">(</span><span class="va">usage</span><span class="op">)</span>   <span class="co"># A plain list; editing it does not change usage</span></span></code></pre></div>
-<p><code>NULL</code> leaves a limit unset; zero is an explicit limit.
-Run overrides inherit unset fields from the Agent’s defaults, while
-delegated agents receive the lead’s remaining allowance intersected with
-the child definition’s limits. Constructing or serializing a value does
-not change an active Agent’s defaults.</p>
-<p>When a limit is reached, the agent stops and the
-<code>AgentResult$stop_reason</code> identifies the limit, such as
-<code>"request_limit"</code>, <code>"tool_call_limit"</code>, or
-<code>"cost_limit"</code>. If <code>max_cost_usd</code> is configured
-and the provider omits a cost record, Deputy fails closed with
-<code>"cost_unavailable"</code>. <code>Agent$cost()</code> and
-<code>AgentResult$cost</code> expose <code>complete</code> and
-<code>missing</code>; an incomplete <code>total</code> is
-<code>NA</code>, never an understated sum.</p>
-<p>Deputy also stops a run with <code>"tool_loop"</code> after three
-consecutive requests for the same tool and canonical arguments. Cosmetic
-changes in surrounding model text do not reset that progress signal;
-changing the tool or its arguments does.</p>
-</div>
-<div class="section level2">
-<h2 id="trusted-code-and-os-sandboxes">Trusted Code and OS Sandboxes<a class="anchor" aria-label="anchor" href="#trusted-code-and-os-sandboxes"></a>
-</h2>
-<p>Permissions and sandboxes answer different questions. A permission
-decides whether the model may call a tool. An OS sandbox constrains what
-already authorized code can read, write, execute, or reach over the
-network.</p>
-<p><code>tool_run_r_code</code> and <code>tool_run_bash</code> are
-trusted-code tools. <code>callr</code> gives the R tool a separate
-process and a timeout, but the subprocess retains the current user’s
-filesystem and network authority. Deputy therefore excludes R execution
-from both the standard permission policy and the standard tool
-preset.</p>
-<p>For model-generated R that needs confinement, use mcp-repl as the
-execution backend. Its server entry must name the policy explicitly:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="dt">"mcpServers"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>    <span class="dt">"r"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>      <span class="dt">"command"</span><span class="fu">:</span> <span class="st">"/absolute/path/to/mcp-repl"</span><span class="fu">,</span></span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>      <span class="dt">"args"</span><span class="fu">:</span> <span class="ot">[</span></span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>        <span class="st">"--sandbox"</span><span class="ot">,</span> <span class="st">"workspace-write"</span><span class="ot">,</span></span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>        <span class="st">"--interpreter"</span><span class="ot">,</span> <span class="st">"r"</span></span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>      <span class="ot">]</span></span>
-<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>    <span class="fu">}</span></span>
-<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>  <span class="fu">}</span></span>
-<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">repl_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tools_mcp_repl.html">tools_mcp_repl</a></span><span class="op">(</span></span>
-<span>  server <span class="op">=</span> <span class="st">"r"</span>,</span>
-<span>  sandbox <span class="op">=</span> <span class="st">"workspace-write"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="../reference/tools_mcp_repl.html">tools_mcp_repl()</a></code> checks the exact final
-<code>--sandbox</code> setting before starting the server. It accepts
-only <code>"read-only"</code> and <code>"workspace-write"</code>. It
-rejects implicit defaults, <code>danger-full-access</code>,
-<code>external-sandbox</code>, and <code>inherit-codex</code>; the
-latter needs per-call metadata that mcptools does not provide. mcp-repl
-owns the platform-specific enforcement and fails rather than downgrading
-when it cannot establish the requested OS boundary. See mcp-repl’s <a href="https://github.com/posit-dev/mcp-repl/blob/main/docs/sandbox.md" class="external-link">sandbox
-contract</a> for its filesystem, network, and platform guarantees.</p>
-</div>
-<div class="section level2">
-<h2 id="durable-approval-after-process-exit">Durable approval after process exit<a class="anchor" aria-label="anchor" href="#durable-approval-after-process-exit"></a>
-</h2>
-<p>For a decision that may outlive the R process, configure a private
-existing <code>approval_dir</code> and return
-<code><a href="../reference/PermissionResultPending.html">PermissionResultPending()</a></code> from the permission callback.
-Deputy suspends before that tool executes. It journals tools completed
-before the pause and retains their results when a fresh Agent
-resumes.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">approval_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"approvals"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">approval_dir</span>, showWarnings <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Raw argument tools validate their own inputs. Keep convert = FALSE from the</span></span>
-<span><span class="co"># original registration; changing it on an existing tool changes its semantics.</span></span>
-<span><span class="va">export_report</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
-<span>  <span class="kw">function</span><span class="op">(</span><span class="va">name</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">is.character</a></span><span class="op">(</span><span class="va">name</span><span class="op">)</span> <span class="op">||</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">name</span><span class="op">)</span> <span class="op">!=</span> <span class="fl">1L</span> <span class="op">||</span> <span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">name</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>      <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli_abort</a></span><span class="op">(</span><span class="st">"name must be one string"</span><span class="op">)</span></span>
-<span>    <span class="op">}</span></span>
-<span>    <span class="co"># A host would perform its effect here and return an external receipt.</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Prepared"</span>, <span class="va">name</span><span class="op">)</span></span>
-<span>  <span class="op">}</span>,</span>
-<span>  name <span class="op">=</span> <span class="st">"export_report"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Prepare a named report"</span>,</span>
-<span>  arguments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>name <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  convert <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  annotations <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool_annotations.html" class="external-link">tool_annotations</a></span><span class="op">(</span></span>
-<span>    read_only_hint <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>    destructive_hint <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>    open_world_hint <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span>  <span class="op">)</span></span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">10</span>, max_tool_calls <span class="op">=</span> <span class="fl">20</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">make_agent</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">chat</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>    chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>    tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">export_report</span><span class="op">)</span>,</span>
-<span>    permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>can_use_tool <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
-<span>      <span class="fu"><a href="../reference/PermissionResultPending.html">PermissionResultPending</a></span><span class="op">(</span><span class="st">"Host review required for report preparation"</span><span class="op">)</span></span>
-<span>    <span class="op">}</span><span class="op">)</span>,</span>
-<span>    approval_dir <span class="op">=</span> <span class="va">approval_dir</span>,</span>
-<span>    working_dir <span class="op">=</span> <span class="va">approval_dir</span>,</span>
-<span>    session_id <span class="op">=</span> <span class="st">"report_session"</span>,</span>
-<span>    agent_id <span class="op">=</span> <span class="st">"report_agent"</span>,</span>
-<span>    run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>owner_id <span class="op">=</span> <span class="st">"owner_1"</span>, conversation_id <span class="op">=</span> <span class="st">"conversation_1"</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="fu">make_agent</span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Prepare the annual report"</span><span class="op">)</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span>, <span class="st">"approval_pending"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">pending</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">pending_approval</span><span class="op">(</span><span class="op">)</span></span>
-<span>  <span class="va">approval_path</span> <span class="op">&lt;-</span> <span class="va">pending</span><span class="op">$</span><span class="va">source</span><span class="op">$</span><span class="va">path</span></span>
-<span>  <span class="va">pending</span><span class="op">$</span><span class="va">request</span></span>
-<span>  <span class="va">pending</span><span class="op">$</span><span class="va">usage</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="co"># This inspection needs no Chat and executes no tools, including after restart.</span></span>
-<span><span class="va">pending</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/approval_read.html">approval_read</a></span><span class="op">(</span><span class="va">approval_path</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># The host authorizes its caller, restores its own conversation association,</span></span>
-<span><span class="co"># and reattaches the same tool definition, scope, and permission callback.</span></span>
-<span><span class="va">resumed</span> <span class="op">&lt;-</span> <span class="fu">make_agent</span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">resumed</span><span class="op">$</span><span class="fu">resume_approval</span><span class="op">(</span></span>
-<span>  <span class="va">approval_path</span>,</span>
-<span>  <span class="st">"approve"</span>,</span>
-<span>  tool_input <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>name <span class="op">=</span> <span class="st">"reviewed annual report"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="co"># Alternatively: resumed$resume_approval(approval_path, "deny")</span></span></code></pre></div>
-<p><code>ApprovalContinuation</code> is a read-only inspection value. It
-exposes the pending request and tool-call ID, source correlation,
-decision, usage, budget and static permission ceilings, and
-completed-effect journal. The approval event supplies an ID and path
-that the host can associate with its owner, conversation, selected
-branch and revision. These associations belong in the host’s store;
-Deputy does not provide a second conversation database. Do not treat
-correlation IDs as credentials. Only expose a private record after
-authenticating its owner.</p>
-<p>Only a <code>pending</code> record can resume. The receiving Agent’s
-session ID, Agent ID, working directory, context and delegation
-correlation must match. It checks saved and current static permission
-ceilings before the current callback and hooks. A host edit cannot
-authorize a forbidden path or tool. Rebinding checks source
-body/formals, schema, conversion and metadata; the host remains
-responsible for captured closure state and external resource
-identity.</p>
-<p>When a batch contains three tool calls and the second needs approval,
-the first result is retained and the third is marked unexecuted. Resume
-supplies one result for every original ID. A later model request cannot
-replay an already executed or denied operation in that continuation. Use
-a separate, explicitly authorized workflow if repeating the same
-operation is intended.</p>
-<p>A tool-boundary budget limit can also create a pending decision.
-Resume normally keeps the suspended limits and all prior usage. To grant
-more allowance, pass <code>usage_limits = UsageLimits(...)</code>
-explicitly; Deputy caps it by both the original and current Agent
-ceilings. Inspect <code>pending$budget_ceiling</code> before presenting
-choices. Model boundaries with no pending tool retain ordinary limit
-stops.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">resumed</span><span class="op">$</span><span class="fu">resume_approval</span><span class="op">(</span></span>
-<span>  <span class="va">approval_path</span>,</span>
-<span>  <span class="st">"approve"</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
+<span>  <span class="st">"Summarise every R file in R/."</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_tool_calls <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Consumption holds an OS lock and commits state before each effect. If
-a worker exits while a tool is executing, the record remains
-<code>executing</code>; no automatic retry is allowed. An interrupted
-<code>resuming</code> or <code>continuing</code> record, or a terminal
-<code>indeterminate</code> record, also requires the host to inspect
-external receipts and reconcile the outcome. Duplicate approval delivery
-is rejected. This protocol does not claim exactly-once effects or
-power-loss durability.</p>
-<p>The latest stored revision retains the complete effect journal.
-Superseded revisions are removed after a successful commit, so repeated
-lifecycle updates do not accumulate copies of the session. Each
-serialized revision is limited to 25 MiB within a 50 MiB store budget,
-leaving room for an atomic replacement. Snapshots that cannot fit are
-rejected before publishing a pending approval; later growth of the
-journal or session remains bounded by the same limit.</p>
-<p>The stored transcript support uses ellmer’s public content
-record/replay and the same session payload as
-<code>save_session()</code> / <code>load_session()</code>. Loading a
-separate session snapshot does not consume an approval. Tools, callbacks
-and provider clients are never serialized. Offloaded data frames and
-serializable S3 checkpoint metadata retain their values, classes and
-attributes. Runtime objects inside metadata or attributes remain
-unsupported. The host owns access, retention and backups for these
-trusted local R records. An optional shinychat adapter must use its
-released public contract; it is not required for this headless workflow.
-See <a href="https://github.com/JamesHWade/deputy/blob/main/dev/adr/0016-durable-approval-continuations.md" class="external-link">ADR-0016</a>
-for the control-state contract.</p>
+<p>Unset fields in a run’s limits fall back to the agent’s. The agent
+defaults to 25 model requests per run. Limits count only the current
+run, so a restored conversation starts with a fresh budget.</p>
+<table class="table">
+<thead><tr class="header">
+<th>Limit</th>
+<th>Stops the run with</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>max_requests</code></td>
+<td><code>"request_limit"</code></td>
+</tr>
+<tr class="even">
+<td><code>max_tool_calls</code></td>
+<td><code>"tool_call_limit"</code></td>
+</tr>
+<tr class="odd">
+<td><code>max_input_tokens</code></td>
+<td><code>"input_token_limit"</code></td>
+</tr>
+<tr class="even">
+<td><code>max_output_tokens</code></td>
+<td><code>"output_token_limit"</code></td>
+</tr>
+<tr class="odd">
+<td><code>max_total_tokens</code></td>
+<td><code>"total_token_limit"</code></td>
+</tr>
+<tr class="even">
+<td><code>max_cost_usd</code></td>
+<td><code>"cost_limit"</code></td>
+</tr>
+</tbody>
+</table>
+<p>Request and tool-call limits are checked before each request or call.
+Token and cost limits can only be checked once a response reports its
+usage, so a run can overshoot them by one response.</p>
+<p>Cost comes from ellmer’s price table. If you set
+<code>max_cost_usd</code> and ellmer can’t price the model, for example
+because the model is newer than your version of ellmer, the run stops
+with <code>"cost_unavailable"</code> rather than guess. Likewise,
+<code>result$cost$total</code> is <code>NA</code> whenever any response
+couldn’t be priced, and <code>result$cost$missing</code> counts those
+responses.</p>
+<p>By default a limit returns an <code>AgentResult</code> with the
+reason in <code>stop_reason</code>. With
+<code>UsageLimits(on_exceed = "error")</code>, it signals an error
+instead, and <code>agent$last_run()</code> still holds the partial
+result.</p>
+<p>Deputy also stops a run with <code>"tool_loop"</code> when the model
+makes the same tool call three times in a row and gets the same result
+each time.</p>
+<p>Subagents get the lead agent’s remaining budget, further limited by
+their own definition. See <a href="multi-agent.html">Subagents</a>.</p>
 </div>
 <div class="section level2">
-<h2 id="trusted-results">Trusted results<a class="anchor" aria-label="anchor" href="#trusted-results"></a>
+<h2 id="permissions-are-not-a-sandbox">Permissions are not a sandbox<a class="anchor" aria-label="anchor" href="#permissions-are-not-a-sandbox"></a>
 </h2>
-<p>Permissions decide whether a tool may run. For a <a href="https://trustedminiagents.dev" class="external-link">trusted mini-agent</a>, in Will
-Landau and Sam Parmar’s sense, you also want a guarantee about where
-results come from:</p>
-<ul>
-<li>only a designated tool produces them;</li>
-<li>no other tool can bypass it;</li>
-<li>a person reviews its inputs.</li>
-</ul>
-<p><code><a href="../reference/TrustedResults.html">TrustedResults()</a></code> adds that guarantee on top of
-permissions. It fixes which tools may be registered beside the trusted
-one. It does not grant permission to call anything, and the callbacks,
-hooks and approvals above still govern every call. See
-<code><a href="../articles/trusted-mini-agents.html">vignette("trusted-mini-agents")</a></code> for the pattern, a worked
-example and the Shiny review module.</p>
+<p>A permission decides whether the model may call a tool. It can’t
+limit what a tool does once it runs. <code>run_r_code</code> gets a
+separate process and a timeout, but that process can read and write
+anything your user account can. For model-written code that should only
+touch part of the system, use an OS sandbox such as mcp-repl; see <a href="code-execution.html">Running R code</a>.</p>
+<p>To make sure the results you show a user come from one trusted tool
+rather than from model text, see <a href="trusted-mini-agents.html">Trusted mini-agents</a>.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

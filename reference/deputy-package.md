@@ -6,35 +6,32 @@ responses, tool calls, and the reason each run stopped. Supports
 streaming output, 'Shiny' applications, saved conversations, file
 checkpoints, and delegation to other agents.
 
-## Main Functions
+## Main functions
 
-- [Agent](https://jameshwade.github.io/deputy/reference/Agent.md) - The
-  main class for creating agents
+- [Agent](https://jameshwade.github.io/deputy/reference/Agent.md): runs
+  a task with an ellmer Chat, tools, permissions and limits.
 
-- [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md) -
-  Coordinate specialized delegated agents
+- [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md):
+  an agent that delegates tasks to subagents.
 
-- [`tools_preset()`](https://jameshwade.github.io/deputy/reference/tools_preset.md) -
-  Choose a set of built-in tools
+- [`tools_preset()`](https://jameshwade.github.io/deputy/reference/tools_preset.md):
+  picks a set of built-in tools.
 
-- [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md) -
-  Set request, tool, token, and cost limits
+- [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md):
+  caps requests, tool calls, tokens and cost.
 
-- [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md) -
-  Standard permission policy
+- [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md),
+  [`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md)
+  and
+  [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md):
+  ready-made permission policies.
 
-- [`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md) -
-  Planning permission policy
-
-- [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md) -
-  Read-only permission policy
-
-## Getting Started
+## Getting started
 
     library(deputy)
 
     agent <- Agent$new(
-      chat = ellmer::chat("openai/gpt-5.6-luna"),
+      chat = ellmer::chat("openai/gpt-6-luna"),
       tools = tools_preset("minimal"),
       permissions = permissions_readonly(),
       usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),

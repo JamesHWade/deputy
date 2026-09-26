@@ -1,7 +1,7 @@
 # Create a PreCompact hook result
 
-Return this from a PreCompact hook callback to control whether
-compaction should proceed.
+Return this from a PreCompact hook to cancel compaction or to supply the
+summary yourself.
 
 ## Usage
 
@@ -13,20 +13,20 @@ HookResultPreCompact(continue = TRUE, summary = NULL)
 
 - continue:
 
-  One non-missing logical value. If FALSE, cancels the compaction
+  `TRUE` or `FALSE`. `FALSE` cancels the compaction.
 
 - summary:
 
-  Optional custom summary to use for compaction
+  Optional summary to use instead of generating one.
 
 ## Value
 
-A `HookResultPreCompact` S7 object
+A `HookResultPreCompact` object.
 
 ## See also
 
 [CallbackResult](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
-for read-only properties and S7 inspection.
+for reading result fields.
 
 ## Examples
 

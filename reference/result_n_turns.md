@@ -1,6 +1,6 @@
-# Count conversation turns
+# Count the turns in a result
 
-Count conversation turns
+Count the turns in a result
 
 ## Usage
 
@@ -13,9 +13,8 @@ result_n_turns(result)
 - result:
 
   An
-  [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
-  S7 value.
+  [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md).
 
 ## Value
 
-Integer count of turns.
+The number of turns in `result$turns`.

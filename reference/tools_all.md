@@ -1,8 +1,12 @@
-# All built-in tools
+# Get all built-in tools
 
-Returns all built-in tools. Use with
+Returns every built-in tool except `ask_user`, which you can add with
+[`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md).
+That includes `run_r_code` and `run_bash`, which run with your user
+account's access and are not sandboxed. The default permissions deny
+them and the web tools;
 [`permissions_full()`](https://jameshwade.github.io/deputy/reference/permissions_full.md)
-if you want to allow all operations.
+allows everything.
 
 ## Usage
 
@@ -12,15 +16,15 @@ tools_all()
 
 ## Value
 
-A list of all tool definitions
+A list of tools.
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
-# Allow all tools with full permissions
+# Allow every tool
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_all(),
   permissions = permissions_full()
 )

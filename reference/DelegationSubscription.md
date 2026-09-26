@@ -1,10 +1,12 @@
-# Read bounded child activity without driving execution
+# Subscription to subagent events
 
-Create through `Agent$observe_subagents()`. The runtime consumes each
-child stream once; subscriptions only observe retained public events.
-Authorization is rechecked on every read, including snapshot and
-reconnect. Sequence numbers are monotonic across one lead's transient
-stream, not per child. Cursors are locators and cannot authorize access.
+Reads an agent's subagent events; create one with
+`Agent$observe_subagents()`. `$snapshot()` returns the current state and
+`$poll()` the events since the last read. Reading never affects the
+subagents, and every read checks access again with the agent's
+[DelegationDisclosure](https://jameshwade.github.io/deputy/reference/DelegationDisclosure.md).
+Event sequence numbers count across all of the agent's subagents. A
+cursor marks a position; it doesn't grant access.
 
 ## Methods
 
@@ -22,7 +24,7 @@ stream, not per child. Cursors are locators and cannot authorize access.
 
 ### `DelegationSubscription$new()`
 
-Create an authorized cursor. Normally use the lead method.
+Create a subscription, usually through `Agent$observe_subagents()`.
 
 #### Usage
 
@@ -32,28 +34,30 @@ Create an authorized cursor. Normally use the lead method.
 
 - `lead`:
 
-  An Agent owning delegated conversations.
+  The `Agent` or
+  [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
+  to follow.
 
 - `requester`:
 
-  Host-authenticated request context.
+  Who is reading, passed to the disclosure functions. Authenticate it
+  first.
 
 - `delegation_id`:
 
-  Optional child locator filter.
+  Optional delegation ID, to follow one subagent.
 
 - `after`:
 
-  A cursor previously returned by this lead, or NULL to start at its
-  current sequence. Foreign/future cursors fail explicitly.
+  A cursor from this agent to resume from, or `NULL` to start now. A
+  cursor from another agent is an error.
 
 ------------------------------------------------------------------------
 
 ### `DelegationSubscription$snapshot()`
 
-Return an authorized snapshot and its matching event cursor. This resets
-the subscription cursor. The snapshot is copied before host redaction;
-subsequent polls contain only events after that boundary.
+Get the subagents' current state and move the cursor to now, so the next
+`$poll()` returns only later events.
 
 #### Usage
 
@@ -63,21 +67,20 @@ subsequent polls contain only events after that boundary.
 
 - `transcript`:
 
-  Include public child transcripts. Defaults to FALSE.
+  Whether to include transcripts. Defaults to `FALSE`.
 
 #### Returns
 
-List with `children` and `cursor`. Inspection never starts work.
+A list with `children`, one redacted view per subagent, and `cursor`.
 
 ------------------------------------------------------------------------
 
 ### `DelegationSubscription$poll()`
 
-Read retained events since this cursor, advancing on success. No
-generator is consumed. A slow reader gets explicit `gaps` for lost
-sequence ranges; obtain a snapshot to recover retained public history.
-Filtering children can make an evicted stream range irrelevant to the
-selected child, but the gap is still reported conservatively.
+Get the events since the last read and advance the cursor. Ranges of
+events dropped before you read them are listed in `gaps`; call
+`$snapshot()` to catch up. When following one subagent, a gap may only
+cover other subagents' events.
 
 #### Usage
 
@@ -85,15 +88,15 @@ selected child, but the gap is still reported conservatively.
 
 #### Returns
 
-List with `events`, `gaps`, and next `cursor`. Event redaction receives
-`list(kind = "event", event = envelope)`; remove `event` to hide it.
-Redaction errors do not advance the cursor or affect child execution.
+A list with `events`, `gaps` and `cursor`. Each event goes through the
+disclosure `redact` function as `list(kind = "event", event = event)`;
+remove `event` to hide it. If `redact` errors, the cursor doesn't move.
 
 ------------------------------------------------------------------------
 
 ### `DelegationSubscription$close()`
 
-Detach this reader. Does not cancel or resume a child.
+Stop reading; the subagents keep running.
 
 #### Usage
 
@@ -101,4 +104,4 @@ Detach this reader. Does not cancel or resume a child.
 
 #### Returns
 
-Invisibly NULL. Repeated closes are harmless; reads then fail.
+`NULL`, invisibly. Later reads error.

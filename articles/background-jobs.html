@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Host-scheduled background jobs • deputy</title>
+<title>Background jobs • deputy</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Host-scheduled background jobs">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Background jobs">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -38,27 +38,38 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -77,7 +88,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Host-scheduled background jobs</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Background jobs</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/vignettes/background-jobs.Rmd" class="external-link"><code>vignettes/background-jobs.Rmd</code></a></small>
@@ -86,25 +97,27 @@
 
     
     
-<p>A host can queue a task in one R process, execute it in another, and
-inspect its outcome after both processes exit. Deputy stores execution
-state and uses the ordinary governed Agent runtime. Your application
-owns the scheduler, worker processes, authentication, resource factories
-and conversation archive.</p>
+<p>Some agent work shouldn’t run inside the process that asked for it: a
+Shiny app that queues a long analysis, or a batch of tasks spread over
+workers. The job functions let you queue a task in one R process, run it
+in another, and check the result later, even after both have exited.</p>
+<p>Deputy stores each job’s state in a directory on disk and runs it
+with the ordinary agent, so permissions, hooks and limits apply as
+usual. Your application supplies the rest: the scheduler that starts
+workers (callr, mirai, cron, a queue), user authentication, and the code
+that rebuilds the agent in the worker.</p>
 <div class="section level2">
-<h2 id="queue-and-run-a-job">Queue and run a job<a class="anchor" aria-label="anchor" href="#queue-and-run-a-job"></a>
+<h2 id="queue-a-job">Queue a job<a class="anchor" aria-label="anchor" href="#queue-a-job"></a>
 </h2>
-<p>Build the same configured Agent at admission and in the worker.
-Stable identities and explicit definition and context revisions let
-Deputy reject an incompatible binding before a model request or tool
-execution.</p>
+<p>Write one function that builds the agent, and call it both when you
+queue the job and in the worker:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">make_worker</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span></span>
+<span><span class="va">make_agent</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>    <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span>,</span>
-<span>    system_prompt <span class="op">=</span> <span class="st">"Summarize the supplied report evidence."</span>,</span>
+<span>    <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>    system_prompt <span class="op">=</span> <span class="st">"Summarise the report you are given."</span>,</span>
 <span>    agent_id <span class="op">=</span> <span class="st">"report-agent"</span>,</span>
 <span>    session_id <span class="op">=</span> <span class="st">"report-session"</span>,</span>
 <span>    permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -114,26 +127,35 @@ execution.</p>
 <span></span>
 <span><span class="va">path</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/job_create.html">job_create</a></span><span class="op">(</span></span>
 <span>  directory <span class="op">=</span> <span class="st">"jobs"</span>,</span>
-<span>  agent <span class="op">=</span> <span class="fu">make_worker</span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  task <span class="op">=</span> <span class="st">"Explain the supplied report evidence."</span>,</span>
-<span>  owner_id <span class="op">=</span> <span class="st">"report-owner"</span>,</span>
-<span>  definition_revision <span class="op">=</span> <span class="st">"report-definition-1"</span>,</span>
-<span>  context_revision <span class="op">=</span> <span class="st">"report-context-1"</span>,</span>
+<span>  agent <span class="op">=</span> <span class="fu">make_agent</span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  task <span class="op">=</span> <span class="st">"Summarise the quarterly report."</span>,</span>
+<span>  owner_id <span class="op">=</span> <span class="st">"user-17"</span>,</span>
+<span>  definition_revision <span class="op">=</span> <span class="st">"report-agent-v1"</span>,</span>
+<span>  context_revision <span class="op">=</span> <span class="st">"q3-report"</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span>
-<span>  associations <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>conversation_id <span class="op">=</span> <span class="st">"report-conversation"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/job_read.html">job_read</a></span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span></code></pre></div>
-<p>The host stores <code>path</code> and dispatches a worker through its
-chosen scheduler. <code><a href="../reference/job_run.html">job_run()</a></code> runs synchronously in that
-worker; it does not start a process or register a recurring task
-itself.</p>
-<p><code><a href="../reference/job_read.html">job_read()</a></code> only inspects the committed record. It does
-not bind an Agent, call a provider or execute a tool, so hosts can use
-it for status displays and recovery decisions.</p>
+<span>  associations <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>conversation_id <span class="op">=</span> <span class="st">"chat-42"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/job_create.html">job_create()</a></code> records the task, a description of the
+agent, and the revisions and owner you supply, and returns the job’s
+directory. Store that path with the request in your own database. The
+revisions are labels you choose for the version of the agent’s
+configuration and of the input data. If either has changed by the time
+the job runs, the worker refuses to run it, so bump them whenever
+something the job depends on changes, including anything the tools’ code
+relies on.</p>
+<p><code>job_read(path)</code> returns the job’s status and details. It
+never builds an agent or calls a model, so it’s safe to use for status
+pages.</p>
+</div>
+<div class="section level2">
+<h2 id="run-it-in-a-worker">Run it in a worker<a class="anchor" aria-label="anchor" href="#run-it-in-a-worker"></a>
+</h2>
+<p>In the worker, <code><a href="../reference/job_run.html">job_run()</a></code> rebuilds the agent with your
+<code>bind</code> function, asks your <code>authorize</code> function
+whether the job may still run, and runs it to the end:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">authorize_job</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">job</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="co"># Application code authenticates the requester and checks current access.</span></span>
-<span>  <span class="va">current</span> <span class="op">&lt;-</span> <span class="fu">lookup_authorized_job</span><span class="op">(</span><span class="va">job</span><span class="op">$</span><span class="va">id</span><span class="op">)</span></span>
+<span>  <span class="va">current</span> <span class="op">&lt;-</span> <span class="fu">look_up_job_in_your_database</span><span class="op">(</span><span class="va">job</span><span class="op">$</span><span class="va">id</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>    job_id <span class="op">=</span> <span class="va">current</span><span class="op">$</span><span class="va">id</span>,</span>
 <span>    owner_id <span class="op">=</span> <span class="va">current</span><span class="op">$</span><span class="va">owner_id</span>,</span>
@@ -142,84 +164,69 @@ it for status displays and recovery decisions.</p>
 <span>  <span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
-<span><span class="va">outcome</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/job_run.html">job_run</a></span><span class="op">(</span><span class="va">path</span>,</span>
-<span>  bind <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">job</span><span class="op">)</span> <span class="fu">make_worker</span><span class="op">(</span><span class="op">)</span>,</span>
+<span><span class="va">outcome</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/job_run.html">job_run</a></span><span class="op">(</span></span>
+<span>  <span class="va">path</span>,</span>
+<span>  bind <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">job</span><span class="op">)</span> <span class="fu">make_agent</span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  authorize <span class="op">=</span> <span class="va">authorize_job</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">outcome</span><span class="op">$</span><span class="va">status</span></span>
 <span><span class="va">outcome</span><span class="op">$</span><span class="va">result</span></span>
 <span><span class="va">outcome</span><span class="op">$</span><span class="va">usage</span></span></code></pre></div>
-<p><code>lookup_authorized_job()</code> belongs to your application. It
-must consult current authorization and revisions, rather than simply
-echoing the stored job. Reading a job also requires whatever access
-controls the host applies to its storage. An <code>AgentJob</code> is a
-read-only inspection value; it contains no live Agent, tools, callbacks,
-provider clients or credentials.</p>
-<p>The binder reconstructs the admitted configuration and selected
-conversation context, including stable Agent and session identities and
-the working directory. Definition revisions must cover external resource
-configuration and tool closure state that a public tool fingerprint
-cannot inspect. A factory can return
-<code>list(agent = agent, cleanup = function() ...)</code> to transfer
-resource cleanup to the worker. Returning an Agent alone leaves external
-resources host-owned.</p>
+<p><code>authorize</code> should check your current records, not echo
+the job back: Deputy compares its answer with the job and refuses to run
+when they differ. <code>bind</code> returns the agent, or
+<code>list(agent = agent, cleanup = function() ...)</code> if the worker
+should clean up resources, such as an R session or MCP connection, after
+the job. <code><a href="../reference/job_run.html">job_run()</a></code> blocks until the job finishes; it
+doesn’t start processes or schedule anything itself.</p>
+<p>The job directory holds the task and results, so protect it like the
+rest of your application’s data.</p>
 </div>
 <div class="section level2">
-<h2 id="restart-decisions-and-cancellation">Restart, decisions and cancellation<a class="anchor" aria-label="anchor" href="#restart-decisions-and-cancellation"></a>
+<h2 id="restarts-approvals-and-cancellation">Restarts, approvals and cancellation<a class="anchor" aria-label="anchor" href="#restarts-approvals-and-cancellation"></a>
 </h2>
-<p>Queued work can be claimed after its creating process exits. This
-includes a queued graph root: the worker restores the saved graph
-ledger, reservations and limits before dispatching any node. A terminal
-job is returned without binding resources or dispatching another
-request. Losing a worker after execution may have begun leaves an
-<strong>indeterminate</strong> job. Its allocation remains reserved;
-<code><a href="../reference/job_run.html">job_run()</a></code> will return that terminal inspection rather than
-rebinding or rerunning it. An external effect may have completed without
-its result being committed, so the host must reconcile that uncertainty
-before creating new work.</p>
-<p>A standalone Agent configured for durable approval can stop at an
-<code>approval_pending</code> boundary. Resume that boundary using the
-existing approval protocol through the job API. Approval recovery is
-supported for a standalone Agent only; a pending approval inside a
-retained graph is rejected rather than being replayed:</p>
+<p>A queued job can be run by any process, at any time after it was
+created. Running a finished job again just returns its stored
+outcome.</p>
+<p>If a worker dies while a job is running, the job becomes
+<code>"indeterminate"</code>. Deputy won’t run it again, because a tool
+may have done something (sent an email, written a file) before the
+crash. Check for those effects yourself before queueing a replacement.
+The job’s budget stays reserved.</p>
+<p>A job whose agent uses <a href="approvals.html">durable approvals</a>
+can stop in the <code>"approval_pending"</code> state. Continue it
+through <code><a href="../reference/job_run.html">job_run()</a></code> with a decision, from a worker that
+builds the agent with the same permission callback:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">outcome</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/job_run.html">job_run</a></span><span class="op">(</span><span class="va">path</span>,</span>
-<span>  bind <span class="op">=</span> <span class="va">host_reconstruct_approved_agent</span>,</span>
+<code class="sourceCode R"><span><span class="va">outcome</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/job_run.html">job_run</a></span><span class="op">(</span></span>
+<span>  <span class="va">path</span>,</span>
+<span>  bind <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">job</span><span class="op">)</span> <span class="fu">make_agent</span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  authorize <span class="op">=</span> <span class="va">authorize_job</span>,</span>
 <span>  decision <span class="op">=</span> <span class="st">"approve"</span></span>
-<span><span class="op">)</span></span>
-<span><span class="co"># Or, from a host control while the worker is running:</span></span>
-<span><span class="fu"><a href="../reference/job_cancel.html">job_cancel</a></span><span class="op">(</span><span class="va">path</span>, authorize <span class="op">=</span> <span class="va">authorize_job</span>, reason <span class="op">=</span> <span class="st">"user_cancelled"</span><span class="op">)</span></span></code></pre></div>
-<p>The host’s <code>host_reconstruct_approved_agent()</code> supplies
-the configured resources and current permission callback. Approval
-recovery keeps prior usage and completed effect evidence. It does not
-replay completed tool calls. Cancellation is cooperative and has a
-separate control record, so requesting it does not wait for the
-execution record’s lock. A process that disappears cannot certify
-cleanup; the persisted cleanup disposition reports that separately from
-the task outcome. If a task result was produced before binder cleanup
-failed, its bounded result summary remains available alongside the
-cleanup failure.</p>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Completed tool calls are kept and not repeated, and the usage from
+before the pause still counts.</p>
+<p><code><a href="../reference/job_cancel.html">job_cancel()</a></code> asks a job to stop. It can be called from
+another process while the job is running; the worker notices at its next
+check and stops:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/job_cancel.html">job_cancel</a></span><span class="op">(</span><span class="va">path</span>, authorize <span class="op">=</span> <span class="va">authorize_job</span>, reason <span class="op">=</span> <span class="st">"user_cancelled"</span><span class="op">)</span></span></code></pre></div>
+<p>If a worker fails after producing a result but before its cleanup
+finishes, the job keeps the result and reports the cleanup failure
+separately.</p>
 </div>
 <div class="section level2">
-<h2 id="graphs-and-conversation-storage">Graphs and conversation storage<a class="anchor" aria-label="anchor" href="#graphs-and-conversation-storage"></a>
+<h2 id="graphs-of-agents">Graphs of agents<a class="anchor" aria-label="anchor" href="#graphs-of-agents"></a>
 </h2>
-<p>An explicitly configured graph root can own a job. Reconstruct the
-same nodes, routes and source contexts in the binder. Deputy preserves
-cumulative usage, consumed admissions, continuation counts and graph
-limits; a new worker does not receive a fresh budget. Historical
-delegation correlations remain in the job record. They do not recreate
-live child handles or grant transcript access.</p>
-<p>Jobs currently accept ordinary Agents and explicit graph roots with
-one provider per node. A retained child cannot be detached into an
-independent job, and durable approvals inside a retained graph remain
-unsupported. Provider-native tools cannot supply the per-effect
-callbacks required by the durable journal.</p>
-<p>Saved conversation text, a shinychat branch and a provider batch
-identifier serve different purposes. None replaces the job’s authority,
-allocation, lifecycle and effect records. ellmer continues to own native
-turns and content; shinychat or another host store continues to own
-conversation persistence and branch selection.</p>
+<p>A job can run the root of a <a href="retained-agents.html#a-graph-of-specialists">graph of retained
+specialists</a>. The <code>bind</code> function must rebuild the same
+agents and routes. The job remembers the graph’s usage so far, so a new
+worker continues with the remaining budget rather than a fresh one.
+Approvals inside a graph aren’t supported yet.</p>
+<p>A job’s agents can’t have <code>fallback_chats</code>, and can’t use
+tools that run on the provider’s side, because Deputy has to record each
+tool call as it happens. Create and run jobs only while the agents
+involved are idle.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

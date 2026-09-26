@@ -1,6 +1,7 @@
-# Read a durable Agent job without binding or executing it
+# Read a background job
 
-Read a durable Agent job without binding or executing it
+Returns the job's saved state. It doesn't rebuild the agent, call the
+model or run tools, so it's safe to use for status displays.
 
 ## Usage
 
@@ -12,11 +13,10 @@ job_read(path)
 
 - path:
 
-  Committed directory returned by
+  Job directory returned by
   [`job_create()`](https://jameshwade.github.io/deputy/reference/job_create.md).
 
 ## Value
 
-A read-only
-[AgentJob](https://jameshwade.github.io/deputy/reference/AgentJob.md)
-inspection value.
+An
+[AgentJob](https://jameshwade.github.io/deputy/reference/AgentJob.md).

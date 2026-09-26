@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Example: Autonomous Data Analysis Agent • deputy</title>
+<title>Data analysis agent • deputy</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Example: Autonomous Data Analysis Agent">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Data analysis agent">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -38,27 +38,38 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -77,7 +88,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Example: Autonomous Data Analysis Agent</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Data analysis agent</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/vignettes/example-data-analysis.Rmd" class="external-link"><code>vignettes/example-data-analysis.Rmd</code></a></small>
@@ -86,176 +97,109 @@
 
     
     
-<p>This example asks an agent to explore a dataset, run R calculations,
-and report what it finds. The agent chooses its next calculation from
-the results of earlier ones. For a fixed sequence of steps, see the <a href="example-extraction-pipeline.html">extraction pipeline</a>.</p>
-<p>The example permits R code to run in a separate process with your
-user account’s access. For untrusted inputs or prompts, use an OS
-sandbox such as mcp-repl through <code><a href="../reference/tools_mcp_repl.html">tools_mcp_repl()</a></code>.</p>
+<p>This recipe gives an agent a dataset and R, and lets it decide what
+to compute next from what it has found so far. It suits open-ended
+exploration. When the steps are known in advance, a fixed <a href="example-extraction-pipeline.html">extraction pipeline</a> is
+cheaper and easier to check.</p>
+<p>The agent runs R code with your user account’s access to files and
+the network. That’s reasonable for your own data and prompts. For
+untrusted input, run the code in a sandbox instead; see <a href="code-execution.html">Running R code</a>.</p>
 <div class="section level2">
-<h2 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
+<h2 id="set-up-the-agent">Set up the agent<a class="anchor" aria-label="anchor" href="#set-up-the-agent"></a>
 </h2>
-<p>We create an agent with data and code tools, plus the built-in
-<code>data_analysis</code> skill:</p>
+<p>The agent gets the data-reading tools, <code>run_r_code</code>, and
+the bundled <code>data_analysis</code> skill, which adds two summary
+tools and some analysis guidance. The skill needs dplyr and ggplot2.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
-<span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
-<span>    file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>    file_write <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>    r_code <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  system_prompt <span class="op">=</span> <span class="st">"You are a data scientist. When exploring a dataset:</span></span>
-<span><span class="st">    1. Start with structure and summary statistics</span></span>
-<span><span class="st">    2. Check for missing values and data quality issues</span></span>
-<span><span class="st">    3. Examine distributions of key variables</span></span>
-<span><span class="st">    4. Look for interesting relationships and correlations</span></span>
-<span><span class="st">    5. Summarise your findings clearly</span></span>
-<span><span class="st"></span></span>
-<span><span class="st">    Use R code for all analysis. Show your reasoning at each step."</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">tool_run_r_code</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>r_code <span class="op">=</span> <span class="cn">TRUE</span>, file_write <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">15</span>, max_cost_usd <span class="op">=</span> <span class="fl">0.50</span><span class="op">)</span>,</span>
+<span>  system_prompt <span class="op">=</span> <span class="st">"You are a data scientist. When you explore a dataset:</span></span>
+<span><span class="st">    1. Start with its structure and summary statistics.</span></span>
+<span><span class="st">    2. Check for missing values and data quality problems.</span></span>
+<span><span class="st">    3. Look at the distributions of the key variables.</span></span>
+<span><span class="st">    4. Look for relationships between variables.</span></span>
+<span><span class="st">    5. Summarise what you found.</span></span>
+<span><span class="st">    Use R code for every calculation, and say why you run each step."</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Load the built-in data analysis skill for extra tools</span></span>
-<span><span class="va">skill_path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"skills/data_analysis"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span></span>
-<span><span class="va">agent</span><span class="op">$</span><span class="fu">load_skill</span><span class="op">(</span><span class="va">skill_path</span><span class="op">)</span></span></code></pre></div>
-<p>The <code>data_analysis</code> skill adds specialised tools like
-<code>eda_summary</code> and <code>describe_column</code> that
-complement the general-purpose <code>run_r_code</code> tool.</p>
+<span><span class="va">agent</span><span class="op">$</span><span class="fu">load_skill</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"skills"</span>, <span class="st">"data_analysis"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>The skill’s tools, <code>eda_summary</code> and
+<code>describe_column</code>, give the model quick overviews, so it can
+save <code>run_r_code</code> for the questions they don’t answer.</p>
 </div>
 <div class="section level2">
-<h2 id="running-the-analysis">Running the Analysis<a class="anchor" aria-label="anchor" href="#running-the-analysis"></a>
+<h2 id="run-the-analysis">Run the analysis<a class="anchor" aria-label="anchor" href="#run-the-analysis"></a>
 </h2>
-<p>With <code>run_sync()</code>, the agent works through the analysis
-autonomously. It calls tools, inspects results, and decides what to do
-next:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
-<span>  <span class="st">"Explore the airquality dataset that comes with R. Give me a</span></span>
-<span><span class="st">   thorough understanding of the data including quality issues,</span></span>
-<span><span class="st">   distributions, and interesting patterns."</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">15</span><span class="op">)</span></span>
+<span>  <span class="st">"Explore the airquality dataset that comes with R. Tell me about data</span></span>
+<span><span class="st">   quality problems, the distributions of the variables, and any patterns."</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span></code></pre></div>
-<p>The agent typically:</p>
-<ol style="list-style-type: decimal">
-<li>Loads the data and examines its structure</li>
-<li>Checks for missing values (airquality has <code>NA</code>s in
-<code>Ozone</code> and <code>Solar.R</code>)</li>
-<li>Computes summary statistics for each variable</li>
-<li>Looks at correlations between <code>Ozone</code>,
-<code>Solar.R</code>, <code>Wind</code>, and <code>Temp</code>
-</li>
-<li>Investigates seasonal patterns across <code>Month</code>
-</li>
-<li>Summarises findings</li>
-</ol>
+<p><code>airquality</code> has missing values in <code>Ozone</code> and
+<code>Solar.R</code>, and daily readings over five months, so a good
+answer will mention both. Each run can take a different path, because
+the model chooses its next step from the results so far.</p>
+<p>The run stops after 15 model requests or <span class="math inline">$0.50, whichever comes first, and
+`result$</span>stop_reason` says which.</p>
 </div>
 <div class="section level2">
-<h2 id="streaming-output">Streaming Output<a class="anchor" aria-label="anchor" href="#streaming-output"></a>
+<h2 id="watch-it-work">Watch it work<a class="anchor" aria-label="anchor" href="#watch-it-work"></a>
 </h2>
-<p>For interactive use, <code>run()</code> streams events as they
-happen. You see text arrive token by token and tools fire in real
-time:</p>
+<p><code>run()</code> returns a generator of events, so you can print
+progress as the agent works:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">events</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span><span class="st">"Summarise the mtcars dataset."</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
-<span>    file_read <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>    file_write <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>    r_code <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  system_prompt <span class="op">=</span> <span class="st">"You are a data scientist. Be thorough but concise."</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">events</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span><span class="st">"Summarise the mtcars dataset"</span><span class="op">)</span></span>
 <span><span class="kw">repeat</span> <span class="op">{</span></span>
 <span>  <span class="va">event</span> <span class="op">&lt;-</span> <span class="fu">events</span><span class="op">(</span><span class="op">)</span></span>
 <span>  <span class="kw">if</span> <span class="op">(</span><span class="fu">coro</span><span class="fu">::</span><span class="fu"><a href="https://coro.r-lib.org/reference/iterator.html" class="external-link">is_exhausted</a></span><span class="op">(</span><span class="va">event</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="kw">break</span></span>
 <span>  <span class="op">}</span></span>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/switch.html" class="external-link">switch</a></span><span class="op">(</span><span class="va">event</span><span class="op">$</span><span class="va">type</span>,</span>
-<span>    <span class="st">"text"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">event</span><span class="op">$</span><span class="va">text</span><span class="op">)</span>,</span>
-<span>    <span class="st">"tool_start"</span> <span class="op">=</span> <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Calling {event$tool_name}..."</span><span class="op">)</span>,</span>
-<span>    <span class="st">"tool_end"</span> <span class="op">=</span> <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_success</a></span><span class="op">(</span><span class="st">"{event$tool_name} done"</span><span class="op">)</span>,</span>
-<span>    <span class="st">"stop"</span> <span class="op">=</span> <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert</a></span><span class="op">(</span><span class="st">"Finished in {event$total_turns} turns"</span><span class="op">)</span></span>
+<span>    text <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">event</span><span class="op">$</span><span class="va">text</span><span class="op">)</span>,</span>
+<span>    tool_start <span class="op">=</span> <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Calling {event$tool_name}"</span><span class="op">)</span>,</span>
+<span>    tool_end <span class="op">=</span> <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_success</a></span><span class="op">(</span><span class="st">"{event$tool_name} done"</span><span class="op">)</span>,</span>
+<span>    stop <span class="op">=</span> <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert</a></span><span class="op">(</span><span class="st">"Stopped: {event$reason}"</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
+<p>For a simpler log, add <code><a href="../reference/hook_log_tools.html">hook_log_tools()</a></code> before calling
+<code>run_sync()</code>.</p>
 </div>
 <div class="section level2">
-<h2 id="inspecting-results">Inspecting Results<a class="anchor" aria-label="anchor" href="#inspecting-results"></a>
+<h2 id="check-the-result">Check the result<a class="anchor" aria-label="anchor" href="#check-the-result"></a>
 </h2>
-<p><code>AgentResult</code> captures everything about the run:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Did it succeed?</span></span>
-<span><span class="fu"><a href="../reference/result_is_success.html">result_is_success</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/result_is_success.html">result_is_success</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span></span>
 <span></span>
-<span><span class="co"># How many turns did the agent take?</span></span>
 <span><span class="fu"><a href="../reference/result_n_turns.html">result_n_turns</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="../reference/result_tool_calls.html">result_tool_calls</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># What tools were called?</span></span>
-<span><span class="va">tool_calls</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/result_tool_calls.html">result_tool_calls</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">tool_calls</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># How long and how much?</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">duration</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">cost</span></span></code></pre></div>
+<span><span class="va">result</span><span class="op">$</span><span class="va">usage</span></span></code></pre></div>
+<p><code><a href="../reference/result_tool_calls.html">result_tool_calls()</a></code> also shows the code the model ran,
+in each call’s <code>tool_input</code>, which is the quickest way to
+check how it reached a number.</p>
 </div>
 <div class="section level2">
-<h2 id="adding-guardrails">Adding Guardrails<a class="anchor" aria-label="anchor" href="#adding-guardrails"></a>
-</h2>
-<p>For production use, add permissions and hooks to monitor and
-constrain the agent:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_code.html">tools_code</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
-<span>    r_code <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>    bash <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>    file_write <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">20</span>, max_cost_usd <span class="op">=</span> <span class="fl">0.50</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Log every tool call</span></span>
-<span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/hook_log_tools.html">hook_log_tools</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Block dangerous bash commands (if bash were enabled)</span></span>
-<span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/hook_block_dangerous_bash.html">hook_block_dangerous_bash</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
-<span>  <span class="st">"Analyse the airquality dataset and report key findings."</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>The agent can read data and run R code, but cannot write files or run
-bash commands. This permission is application policy, not an OS sandbox.
-Deputy stops the run when it observes either configured usage limit, and
-stops with <code>"cost_unavailable"</code> if the provider does not
-report enough cost information to enforce the dollar limit.</p>
-</div>
-<div class="section level2">
-<h2 id="next-steps">Next Steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>
+<h2 id="next-steps">Next steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>
 </h2>
 <ul>
 <li>
-<code><a href="../articles/tools.html">vignette("tools")</a></code> – Tool bundles and custom tools</li>
+<a href="tools.html">Tools</a>: skills and custom tools.</li>
 <li>
-<code><a href="../articles/getting-started.html">vignette("getting-started")</a></code> – Skills, sessions, and run
-results</li>
+<a href="code-execution.html">Running R code</a>: keep R state
+between calls, or sandbox the code.</li>
 <li>
-<code><a href="../articles/example-extraction-pipeline.html">vignette("example-extraction-pipeline")</a></code> – Prompt
-chaining for structured extraction</li>
+<a href="example-extraction-pipeline.html">Extraction pipeline</a>:
+fixed steps with structured output.</li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

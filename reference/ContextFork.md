@@ -1,12 +1,15 @@
-# Describe a host-selected conversation fork
+# Capture conversation turns for a fork
 
-ContextFork() is a read-only request to seed a fresh standalone Agent
-with selected public ellmer turns. The host supplies the owner,
-conversation, branch, revision and fork point and remains responsible
-for authenticating those identifiers. Turns are projected through the
-public ellmer record contract; tool bindings, hidden thinking and
-provider-private fields are omitted, and incomplete tool evidence
-becomes inert text.
+Records turns from one of your conversations, and where they came from,
+so
+[`fork_agent()`](https://jameshwade.github.io/deputy/reference/fork_agent.md)
+can start a new agent from them. Deputy doesn't check the owner,
+conversation, branch or revision; your `authorize` function in
+[`fork_agent()`](https://jameshwade.github.io/deputy/reference/fork_agent.md)
+confirms them. The copy keeps text, tool calls and results, but not tool
+functions, hidden thinking or provider-specific data. A tool call
+without its result, or a result without its call, becomes plain text,
+and provider file uploads are replaced by a note.
 
 ## Usage
 
@@ -29,49 +32,49 @@ ContextFork(
 
 - owner_id:
 
-  Host owner identifier.
+  ID of the user or account that owns the conversation.
 
 - conversation_id:
 
-  Host conversation identifier.
+  ID of the source conversation.
 
 - branch_id:
 
-  Host-selected branch identifier.
+  ID of the branch the turns come from.
 
 - revision:
 
-  Exact host revision identifier.
+  Revision of the conversation the turns come from.
 
 - fork_point:
 
-  Host fork point token or non-negative turn number.
+  Where the fork starts: a turn number (0 or more) or a string of your
+  own.
 
 - view:
 
-  Either "transcript" for the complete selected transcript or "context"
-  for the current model context. The latter never falls back to the
-  transcript automatically.
+  `"transcript"` if `turns` come from the full conversation (as from
+  `$get_turns()`), `"context"` if they come from the current model
+  context (as from `$get_context_turns()`). It is only recorded; you
+  choose the turns.
 
 - turns:
 
-  A bounded list of native public ellmer turns, or public records
-  produced by
-  [`ellmer::contents_record()`](https://ellmer.tidyverse.org/reference/contents_record.html)
-  for those turns.
+  A list of ellmer user and assistant turns, or records of them from
+  [`ellmer::contents_record()`](https://ellmer.tidyverse.org/reference/contents_record.html).
 
 - max_bytes:
 
-  Maximum serialized bytes of the inert public projection.
+  Maximum size of the copied turns, in bytes. Defaults to 64 KiB.
 
 - max_turns:
 
-  Maximum number of selected turns.
+  Maximum number of turns. Defaults to 256.
 
 - schema_version:
 
-  Portable value schema version, currently 1L.
+  Format version; must be `1L`.
 
 ## Value
 
-A read-only ContextFork S7 value with no Chat or executable object.
+A `ContextFork` object. It is read-only; read its fields with `$`.

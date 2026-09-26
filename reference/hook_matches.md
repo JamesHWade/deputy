@@ -18,8 +18,8 @@ hook_matches(hook, tool_name = NULL)
 - tool_name:
 
   One tool name, or `NULL`. A hook without a pattern matches every name,
-  including `NULL`; a pattern requires a non-NULL name.
+  including `NULL`; a hook with a pattern never matches `NULL`.
 
 ## Value
 
-One logical value.
+`TRUE` or `FALSE`.

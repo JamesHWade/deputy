@@ -1,10 +1,12 @@
-# Inspect a compact delegation outcome
+# Result of a delegation
 
-Runtime identity and stop facts are separate from model-authored answer
-and claims. `completed` means execution ended normally, not verified
-task success. Outcomes are produced by
+How one delegation ended. The runtime's record (IDs, `status`,
+`stop_reason`) is kept apart from what the subagent's model said
+(`answer` and `claims`). A `"completed"` status means the run ended
+normally, not that the task succeeded.
 [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
-and are read-only portable values.
+returns outcomes from `$parallel_delegate()` and, as JSON, from the
+`delegate_to_agent` tool. Fields are read with `$`.
 
 ## Usage
 
@@ -16,22 +18,25 @@ DelegationOutcome(runtime, answer = "", references = list(), claims = list())
 
 - runtime:
 
-  Plain runtime identity, status and stop-reason record.
+  List of IDs, `status`, `stop_reason` and other facts recorded by the
+  runtime.
 
 - answer:
 
-  Bounded model-authored answer text.
+  The subagent's final reply, cut to 8 KiB. A longer reply is saved in
+  full in `references`.
 
 - references:
 
-  Scoped artifact locators, with provenance and availability. References
-  never confer authorization, verification or approval.
+  Saved artifacts, such as the full answer or large tool results, with
+  their origin and whether they are still available.
 
 - claims:
 
-  Model-authored missing-evidence and unresolved-work claims. `NULL`
-  means not supplied, not that no work or evidence is missing.
+  The subagent's report of `missing_evidence` and `unresolved_work` from
+  its structured output. `NULL` means it didn't report, not that nothing
+  is missing.
 
 ## Value
 
-A read-only `DelegationOutcome`.
+A `DelegationOutcome` object.

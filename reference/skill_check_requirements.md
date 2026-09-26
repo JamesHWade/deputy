@@ -1,9 +1,9 @@
-# Check Skill Requirements
+# Check a skill's requirements
 
-Report missing packages and provider compatibility for a
-[Skill](https://jameshwade.github.io/deputy/reference/Skill.md). This
-function does not install packages, load the skill, or execute its
-tools.
+Checks whether the packages a
+[Skill](https://jameshwade.github.io/deputy/reference/Skill.md) needs
+are installed and, if you give `current_provider`, whether the skill
+supports that provider. Nothing is installed, loaded or run.
 
 ## Usage
 
@@ -15,18 +15,19 @@ skill_check_requirements(skill, current_provider = NULL)
 
 - skill:
 
-  A [Skill](https://jameshwade.github.io/deputy/reference/Skill.md)
-  value.
+  A [Skill](https://jameshwade.github.io/deputy/reference/Skill.md).
 
 - current_provider:
 
-  Optional current provider name. Known aliases are normalized; other
-  provider names use case-insensitive exact matching. NULL skips the
-  provider check.
+  Optional provider name, such as `"openai"` or `"anthropic"`. Common
+  aliases match their provider (`"claude"` and `"chat_anthropic"` both
+  mean `"anthropic"`); other names must match exactly, ignoring case.
+  `NULL` skips the provider check.
 
 ## Value
 
-A list with `ok`, `missing`, `provider_mismatch`, `current_provider`,
+A list with `ok` (`TRUE` if nothing is missing or mismatched), `missing`
+(such as `"package:readr"`), `provider_mismatch`, `current_provider`,
 and `required_providers`.
 
 ## Examples

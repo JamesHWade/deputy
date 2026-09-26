@@ -1,6 +1,8 @@
 # Edit file contents by replacing text
 
-Replace a specific text span in an existing file.
+A tool that replaces exact text in an existing file. Unless
+`replace_all` is `TRUE`, `old_text` must appear exactly once. Line
+endings and the rest of the file are left as they were.
 
 ## Usage
 
@@ -17,25 +19,23 @@ A tool definition created with
 
 - path:
 
-  Path to the file to edit (tool argument)
+  Path to the file to edit.
 
 - old_text:
 
-  Existing text to replace (tool argument)
+  Text to replace.
 
 - new_text:
 
-  Replacement text (tool argument)
+  Replacement text.
 
 - replace_all:
 
-  If TRUE, replace all matches instead of requiring a unique match (tool
-  argument)
+  If `TRUE`, replace every occurrence of `old_text`.
 
 ## Value
 
-When called directly, a character status message describing the edit and
-replacement count.
+A status message with the number of replacements.
 
 ## Examples
 
@@ -43,6 +43,6 @@ replacement count.
 path <- tempfile(fileext = ".txt")
 writeLines("alpha", path)
 tool_edit_file(path, "alpha", "beta")
-#> [1] "Successfully edited /tmp/RtmpNHyg1W/file1a966ace8c20.txt (1 replacement)"
+#> [1] "Successfully edited /tmp/RtmpRU2rTg/file1a644b1c1479.txt (1 replacement)"
 unlink(path)
 ```

@@ -1,14 +1,12 @@
-# Request a durable tool approval
+# Pause a tool call for approval
 
-Return this from a
-[Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md)
-`can_use_tool` callback to suspend before execution. The Agent must have
-an `approval_dir`. Resumable tools must be registered with
-`convert = FALSE`; their functions accept raw JSON arguments. Tool
-outputs should be strings, explicit JSON, or ellmer Content values. Raw
-JSON shaped like a content record (`version`, `class`, `props`) is
-rejected because ellmer replay would reinterpret it as an S7
-constructor. No approval is granted by constructing this value.
+Return this from a `can_use_tool` callback (see
+[Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md))
+to stop the run before the tool executes and save the pending call to
+disk. Approve or deny it later, possibly from another R process, with
+`agent$resume_approval()`;
+[`approval_read()`](https://jameshwade.github.io/deputy/reference/approval_read.md)
+shows what is waiting.
 
 ## Usage
 
@@ -20,13 +18,24 @@ PermissionResultPending(reason = "Approval required")
 
 - reason:
 
-  One non-empty string explaining the pending decision.
+  Why the call needs approval, as one non-empty string.
 
 ## Value
 
-A read-only S7 permission result.
+A `PermissionResultPending` object.
+
+## Details
+
+The agent needs an `approval_dir`, and the tool must be registered with
+`convert = FALSE`, so its function receives the raw JSON arguments. Tool
+results should be strings, JSON from
+[`jsonlite::toJSON()`](https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html),
+or ellmer content objects. Inputs or results shaped like a list with
+`version`, `class` and `props` fields are rejected, because ellmer would
+read them back as serialized objects.
 
 ## See also
 
+[`vignette("approvals")`](https://jameshwade.github.io/deputy/articles/approvals.md),
 [`approval_read()`](https://jameshwade.github.io/deputy/reference/approval_read.md),
 [Agent](https://jameshwade.github.io/deputy/reference/Agent.md)

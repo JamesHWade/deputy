@@ -1,7 +1,10 @@
 # Search the web
 
-A tool that performs a web search and returns results. Uses DuckDuckGo's
-HTML search results by default.
+A tool that searches the web with DuckDuckGo's HTML search page and
+returns the title, URL and snippet of each result. Needs the httr2
+package. For better results, use a provider's own search tool (see
+[`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md))
+or a dedicated search API.
 
 ## Usage
 
@@ -18,22 +21,15 @@ A tool definition created with
 
 - query:
 
-  The search query (tool argument)
+  The search query.
 
 - num_results:
 
-  Maximum number of results to return (tool argument)
+  Maximum number of results to return. Defaults to 10.
 
 ## Value
 
-When called directly, a character string containing formatted search
-results.
-
-## Details
-
-This tool searches the web using DuckDuckGo and returns a list of
-results with titles, URLs, and snippets. For more sophisticated search
-needs, consider using a dedicated search API.
+The numbered results as one string.
 
 ## See also
 
@@ -44,7 +40,7 @@ needs, consider using a dedicated search API.
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_web_search),
   permissions = Permissions(web = TRUE)
 )

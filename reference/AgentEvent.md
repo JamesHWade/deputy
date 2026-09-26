@@ -1,16 +1,12 @@
 # Create an agent event
 
-Agent events are yielded by the `run()` generator to provide streaming
-updates on agent progress. Events are S7 values with read-only `type`,
-`timestamp`, and `data` properties. Use `S7::prop(event, "data")` to
-obtain the named payload; `event$text` and other `$` reads are
-conveniences for looking up payload fields. Missing fields return
-`NULL`.
-
-Select an event with its `type` property, not an S3 subtype class.
-Read-only properties protect the record, but environments, provider
-objects, and conditions inside the payload retain their own reference
-semantics.
+[Agent](https://jameshwade.github.io/deputy/reference/Agent.md)`$run()`
+yields these events as the agent works, and an
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
+keeps them in `events`. Each event has a `type`, a `timestamp` and a
+named list of `data`. Check `event$type` to tell events apart, and read
+data fields directly with `$`, for example `event$text`. A field that
+isn't there returns `NULL`. Events are read-only.
 
 ## Usage
 
@@ -22,80 +18,83 @@ AgentEvent(type, ...)
 
 - type:
 
-  Event type (see Event Types section)
+  Event type (see the "Event types" section).
 
 - ...:
 
-  Named event data with unique names. The envelope names `type`,
-  `timestamp`, and `data` are reserved.
+  Named event data. Names must be unique and can't be `type`,
+  `timestamp` or `data`.
 
 ## Value
 
-An `AgentEvent` object
+An `AgentEvent` object.
 
-## Event Types
+## Event types
 
-- `"start"` - Task started. Contains: `task`
+- `"start"`: the run started. `task`.
 
-- `"tool_start"` - Tool execution starting. Contains: `tool_call_id`,
-  `tool_name`, and `tool_input`
+- `"request_start"`, `"request_end"`, `"request_error"`: a model request
+  started, finished or failed, with the provider, model and request
+  number. `"request_error"` carries the original `condition`. ellmer's
+  HTTP retries are not separate requests.
 
-- `"tool_end"` - Tool execution completed. Contains: `tool_call_id`,
-  `tool_name`, `tool_result`, and `tool_error`
+- `"text"`: a streamed chunk of the reply. `text`, `is_complete`.
 
-- `"text"` - Text chunk from LLM. Contains: `text`, `is_complete`
+- `"text_complete"`: the full reply. `text`.
 
-- `"text_complete"` - Full text response. Contains: `text`
+- `"content"`: other content from the provider. `content`,
+  `content_type`.
 
-- `"turn"` - Turn completed. Contains: `turn`, `turn_number`
+- `"tool_start"`: a tool call is about to run. `tool_call_id`,
+  `tool_name`, `tool_input`.
 
-- `"warning"` - Warning condition occurred. Contains: `message`,
-  `details`
+- `"tool_end"`: a tool call finished. `tool_call_id`, `tool_name`,
+  `tool_result`, `tool_error`.
 
-- `"content"` - Non-text provider content. Contains: `content`,
-  `content_type`
+- `"turn"`: a turn finished. `turn`, `turn_number`.
 
-- `"request_start"`, `"request_end"`, `"request_error"` - Governed model
-  dispatch evidence with provider, model, request number, and original
-  HTTP/transport conditions on errors. These are not individual HTTP
-  retry attempts. Unclassified application errors are retained as
-  `"run_error"`.
+- `"permission"`, `"hook"`: a permission decision or hook result.
 
-- `"run_error"` - Terminal initialization, streaming, or
-  structured-output failure, with its phase and original condition.
-  Application callbacks and validation do not turn a successful response
-  into a `"request_error"`.
+- `"approval"`: a tool call is waiting for approval. `approval_id`,
+  `path`, `tool_name`, `tool_input`, `reason`.
 
-- `"fallback"` - Explicit Chat selection, prior condition, and usage.
+- `"trusted_result"`: a trusted tool returned a value (see
+  [TrustedResults](https://jameshwade.github.io/deputy/reference/TrustedResults.md)).
+  `result_id`, `result_type`, `tool_name`, `value`.
 
-- `"structured_attempt"` - Structured value, available turn, validation
-  outcome, feedback, and condition. May contain sensitive application
-  data.
+- `"compaction_start"`, `"compaction"`, `"compaction_error"`: automatic
+  compaction started, finished or failed.
 
-- `"permission"`, `"hook"`, `"compaction"` - Governance decisions and
-  lifecycle.
+- `"fallback"`: a fallback Chat took over after a transient error.
+  `fallback_index`, `condition`, `usage`.
 
-- `"file_checkpoint"` - Automatic run-boundary checkpoint. Contains:
-  `checkpoint_id`, `name`
+- `"structured_attempt"`: one attempt at structured output, with the
+  `value`, whether it was `valid` and any `feedback`. It may hold
+  sensitive data.
 
-- `"usage"` - Run usage snapshot. Contains: `usage`, `limits`
+- `"file_checkpoint"`: a file checkpoint was created at the start of the
+  run. `checkpoint_id`, `name`.
 
-- `"stop"` - Agent stopped. Contains: `reason`, `total_turns`, `cost`,
-  `usage`, and `run_id`
+- `"run_error"`: the run failed. `phase` and the original `condition`.
 
-Run-boundary and tool lifecycle events also carry `agent_id`, `run_id`,
-immutable `run_context`, and delegated-run correlation fields when
-applicable.
+- `"usage"`: the run's usage. `usage`, `limits`.
+
+- `"stop"`: the run ended. `reason`, `cost`, `usage`, and `limit`
+  (details of the usage limit that stopped the run, or `NULL`).
+
+Events also carry the `run_id`. All but `"text"`, `"text_complete"` and
+`"content"` carry `agent_id`, `session_id` and `run_context` too, plus
+parent and delegation IDs in subagent runs.
 
 ## Additional properties
 
 - `@timestamp`:
 
-  Construction time as a `POSIXct` value. Read-only.
+  When the event was created, as a `POSIXct` value.
 
 - `@data`:
 
-  Named list of event-specific data. Read-only.
+  Named list of event data.
 
 ## Examples
 
@@ -103,14 +102,11 @@ applicable.
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-09-26 01:53:47
+#>   timestamp: 2026-09-26 23:28:42
 #>   task: Analyze data.csv
 
 # Create a text event
-AgentEvent("text", text = "Hello", is_complete = FALSE
-)
-#> <AgentEvent: text >
-#>   timestamp: 2026-09-26 01:53:47
-#>   text: Hello
-#>   is_complete: FALSE
+event <- AgentEvent("text", text = "Hello", is_complete = FALSE)
+event$text
+#> [1] "Hello"
 ```

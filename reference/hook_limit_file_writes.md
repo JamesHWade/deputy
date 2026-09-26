@@ -1,11 +1,14 @@
 # Create a hook that limits file writes to a directory
 
-Convenience function to create a PreToolUse hook that applies Deputy's
-canonical file-write permission policy to `write_file`, `edit_file`, and
-`multi_edit`. Prefer configuring
+Creates a PreToolUse hook that denies `write_file`, `edit_file` and
+`multi_edit` calls outside `allowed_dir`, using the same path checks as
+`Permissions(file_write = allowed_dir)`. Setting `file_write` in the
+agent's
 [Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md)
-as the Agent's authority policy; this helper is useful as an additional
-hook-level restriction.
+is the main way to limit writes; this hook adds a second check.
+
+The hook returns a denial for a write outside `allowed_dir` and `NULL`
+otherwise, so hooks added after it still see the writes it lets through.
 
 ## Usage
 
@@ -17,14 +20,13 @@ hook_limit_file_writes(allowed_dir)
 
 - allowed_dir:
 
-  Existing directory where writes are allowed. The path is canonicalized
-  when the hook is created.
+  An existing directory where writes are allowed. It is resolved to an
+  absolute path when the hook is created.
 
 ## Value
 
 A
-[HookMatcher](https://jameshwade.github.io/deputy/reference/HookMatcher.md)
-object
+[HookMatcher](https://jameshwade.github.io/deputy/reference/HookMatcher.md).
 
 ## See also
 

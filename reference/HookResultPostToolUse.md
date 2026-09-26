@@ -1,6 +1,8 @@
 # Create a PostToolUse hook result
 
-Return this from a PostToolUse hook callback.
+Return this from a PostToolUse hook to stop the run or to change what
+the agent's `tool_end` event reports. The model always sees the tool's
+real result.
 
 ## Usage
 
@@ -18,37 +20,35 @@ HookResultPostToolUse(
 
 - continue:
 
-  One non-missing logical value. If FALSE, stop the agent after this
-  hook
+  `TRUE` or `FALSE`. `FALSE` stops the run after this tool call.
 
 - suppress_output:
 
-  Coerced with [`isTRUE()`](https://rdrr.io/r/base/Logic.html). Whether
-  to suppress the result on Deputy's emitted `tool_end` event. This does
-  not remove the result from model context.
+  If `TRUE`, leave the result out of the `tool_end` event.
 
 - updated_tool_output:
 
-  Optional replacement value for Deputy's emitted `tool_end` event.
-  ellmer does not support rewriting the model-visible in-flight result
-  from this callback.
+  Optional value to report in the `tool_end` event instead of the tool's
+  result.
 
 - additional_context:
 
-  Optional text to append to the running context
+  Optional text to add to the agent's system prompt. It stays there for
+  later turns; the same text is only added once.
 
 - stop_reason:
 
-  Optional stop reason used when `continue = FALSE`
+  Optional stop reason used when `continue = FALSE`. Defaults to
+  `"hook_requested_stop"`.
 
 ## Value
 
-A `HookResultPostToolUse` S7 object
+A `HookResultPostToolUse` object.
 
 ## See also
 
 [CallbackResult](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
-for read-only properties and S7 inspection.
+for reading result fields.
 
 ## Examples
 

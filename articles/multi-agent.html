@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Multi-Agent Orchestration • deputy</title>
+<title>Subagents • deputy</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Multi-Agent Orchestration">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Subagents">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -38,27 +38,38 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -77,7 +88,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Multi-Agent Orchestration</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Subagents</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/vignettes/multi-agent.Rmd" class="external-link"><code>vignettes/multi-agent.Rmd</code></a></small>
@@ -86,246 +97,177 @@
 
     
     
-<p>For complex tasks, deputy supports a <strong>lead agent</strong> that
-delegates work to specialised <strong>sub-agents</strong>. Each
-sub-agent has its own tools, prompt, and (optionally) model. The lead
-agent decides when to delegate and synthesises the results.</p>
+<p>A <code>LeadAgent</code> can hand parts of a task to subagents:
+specialists with their own prompt, tools, model and permissions. Each
+delegated task runs in a fresh conversation, so a subagent sees only the
+brief the lead writes for it, and its tool calls don’t fill up the
+lead’s context. The lead gets the subagent’s answer back and decides
+what to do next.</p>
+<p>Subagents help when parts of a task need different tools or
+instructions, when some work should run with tighter permissions, or
+when you want several independent opinions. For a task one agent can
+handle with the right tools, one agent is simpler and cheaper.</p>
 <div class="section level2">
-<h2 id="when-to-use-multi-agent">When to Use Multi-Agent<a class="anchor" aria-label="anchor" href="#when-to-use-multi-agent"></a>
+<h2 id="define-subagents">Define subagents<a class="anchor" aria-label="anchor" href="#define-subagents"></a>
 </h2>
-<p>Multi-agent orchestration is useful when:</p>
-<ul>
-<li>Different parts of a task need different tools (e.g., code analysis
-vs. data analysis)</li>
-<li>You want to isolate sub-tasks with their own system prompts</li>
-<li>Sub-agents should run with restricted permissions</li>
-<li>You need audit trails per sub-agent via <code>SubagentStop</code>
-hooks</li>
-</ul>
-<p>For simpler tasks, a single <code>Agent</code> with the right tools
-is usually enough.</p>
-</div>
-<div class="section level2">
-<h2 id="composing-retained-specialists">Composing retained specialists<a class="anchor" aria-label="anchor" href="#composing-retained-specialists"></a>
-</h2>
-<p>For existing, independently configured conversations, use an ordinary
-<code>Agent</code> as the root and <code>retain_agent_graph()</code> to
-declare the permitted routes. The following assumes <code>root</code>,
-<code>analyst</code> and <code>reviewer</code> are distinct Agents whose
-permissions already allow the relevant tools:</p>
+<p><code><a href="../reference/agent_definition.html">agent_definition()</a></code> describes a subagent. The lead’s
+model reads the <code>description</code> to decide when to use it:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">handles</span> <span class="op">&lt;-</span> <span class="va">root</span><span class="op">$</span><span class="fu">retain_agent_graph</span><span class="op">(</span></span>
-<span>  agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>analyst <span class="op">=</span> <span class="va">analyst</span>, reviewer <span class="op">=</span> <span class="va">reviewer</span><span class="op">)</span>,</span>
-<span>  routes <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    root <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>analyze <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>      target <span class="op">=</span> <span class="st">"analyst"</span>, description <span class="op">=</span> <span class="st">"Analyze the evidence"</span>,</span>
-<span>      usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
-<span>    <span class="op">)</span><span class="op">)</span>,</span>
-<span>    analyst <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>review <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>      target <span class="op">=</span> <span class="st">"reviewer"</span>, description <span class="op">=</span> <span class="st">"Check the analysis"</span>,</span>
-<span>      usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
-<span>    <span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">12</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span>
-<span>  max_depth <span class="op">=</span> <span class="fl">2</span>, max_delegations <span class="op">=</span> <span class="fl">8</span>, max_concurrency <span class="op">=</span> <span class="fl">2</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">root</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Analyze the evidence and have it reviewed."</span><span class="op">)</span></span>
-<span><span class="va">root</span><span class="op">$</span><span class="fu">delegation_graph_usage</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>The root owns all retained conversations and descendant records. Each
-route fixes its target and allocation; the model supplies only a new
-task brief. Provider configuration, prompts and executable tools stay
-with each specialist. Policies and tool hooks from every ancestor also
-govern descendant tool calls. A child cannot grant itself more authority
-than its callers.</p>
-<p>The graph budget is cumulative across root runs and explicit host
-follow-ups. Depth counts edges from the root. Concurrency includes
-parents waiting for their children, so this three-level route requires
-two child slots. At capacity calls reject before dispatch. Cyclic routes
-can be configured, but a busy conversation cannot be reentered. Token
-and cost ceilings use reported responses; requests already in flight can
-overshoot them. A request ceiling bounds dispatch itself.</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Host controls require application authorization independently of disclosure.</span></span>
-<span><span class="va">root</span><span class="op">$</span><span class="fu">continue_agent</span><span class="op">(</span><span class="va">handles</span><span class="op">[[</span><span class="st">"analyst"</span><span class="op">]</span><span class="op">]</span>, <span class="st">"Revisit the conclusion"</span>,</span>
-<span>  <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">rows</span> <span class="op">&lt;-</span> <span class="va">root</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co"># With an explicitly configured DelegationDisclosure policy:</span></span>
-<span><span class="va">views</span> <span class="op">&lt;-</span> <span class="va">root</span><span class="op">$</span><span class="fu">inspect_subagents</span><span class="op">(</span><span class="va">requester</span>, transcript <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="va">reader</span> <span class="op">&lt;-</span> <span class="va">root</span><span class="op">$</span><span class="fu">observe_subagents</span><span class="op">(</span><span class="va">requester</span><span class="op">)</span></span>
-<span><span class="va">reader</span><span class="op">$</span><span class="fu">poll</span><span class="op">(</span><span class="op">)</span> <span class="co"># ordered root events with parent/depth metadata</span></span>
-<span><span class="va">reader</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">root</span><span class="op">$</span><span class="fu">interrupt_subagent</span><span class="op">(</span><span class="va">rows</span><span class="op">$</span><span class="va">delegation_id</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span>, <span class="st">"host_cancelled"</span><span class="op">)</span></span>
-<span><span class="co"># Await outstanding continuations before releasing all members together.</span></span>
-<span><span class="va">root</span><span class="op">$</span><span class="fu">release_agent_graph</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Observation and selected-child panels never consume a producer stream
-or inject child transcripts into the root’s model context. Cancellation
-cooperatively stops a subtree; siblings remain independently
-inspectable. Release removes graph routes and ownership, while borrowed
-tools and external resources remain the host’s responsibility. These
-handles do not survive an R restart.</p>
-<p>The <code>examples/recursive-agents</code> Shiny app provides a
-deterministic local HTTP producer and separate descendant transcript
-selection, with no paid model calls. Each session owns a separate graph
-and its host controls. The example’s requester token scopes disclosure;
-shared applications must supply authenticated identities and independent
-action authorization.</p>
-</div>
-<div class="section level2">
-<h2 id="copying-selected-context-into-a-specialist">Copying selected context into a specialist<a class="anchor" aria-label="anchor" href="#copying-selected-context-into-a-specialist"></a>
-</h2>
-<p>Fresh delegation gives each child its own context. When a specialist
-needs prior conversation material, the host can explicitly select and
-authorize a snapshot:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># The application authenticates the user and selects a revision from its store.</span></span>
-<span><span class="va">selected</span> <span class="op">&lt;-</span> <span class="fu">host_selected_context</span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">fork</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ContextFork.html">ContextFork</a></span><span class="op">(</span></span>
-<span>  owner_id <span class="op">=</span> <span class="va">selected</span><span class="op">$</span><span class="va">owner_id</span>,</span>
-<span>  conversation_id <span class="op">=</span> <span class="va">selected</span><span class="op">$</span><span class="va">conversation_id</span>,</span>
-<span>  branch_id <span class="op">=</span> <span class="va">selected</span><span class="op">$</span><span class="va">branch_id</span>,</span>
-<span>  revision <span class="op">=</span> <span class="va">selected</span><span class="op">$</span><span class="va">revision</span>,</span>
-<span>  fork_point <span class="op">=</span> <span class="va">selected</span><span class="op">$</span><span class="va">fork_point</span>,</span>
-<span>  view <span class="op">=</span> <span class="st">"context"</span>,</span>
-<span>  turns <span class="op">=</span> <span class="va">selected</span><span class="op">$</span><span class="va">turns</span>,</span>
-<span>  max_bytes <span class="op">=</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># specialist is an independently configured Agent with an empty Chat.</span></span>
-<span><span class="va">handle</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fork_agent.html">fork_agent</a></span><span class="op">(</span></span>
-<span>  <span class="va">root</span>, <span class="va">specialist</span>, <span class="va">fork</span>,</span>
-<span>  authorize <span class="op">=</span> <span class="va">host_authorize_current_source</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span>
-<span>  max_runs <span class="op">=</span> <span class="fl">2</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">root</span><span class="op">$</span><span class="fu">continue_agent</span><span class="op">(</span><span class="va">handle</span>, <span class="st">"Review the selected evidence."</span>,</span>
-<span>  <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>The <code>host_*</code> functions above belong to the application.
-The authorization function receives the selected snapshot, checks the
-current user’s access and source revision, and returns
-<code>owner_id</code>, <code>conversation_id</code>,
-<code>branch_id</code>, and <code>revision</code>. Deputy requires an
-exact match and rechecks it before each continuation.</p>
-<p>Choose <code>view = "transcript"</code> for selected retained history
-or <code>view = "context"</code> for selected model input after
-compaction. The host supplies the corresponding turns and any summary
-material it intends to include. Deputy never silently replaces a bounded
-selection with the full transcript. An oversized selection fails before
-dispatch.</p>
-<p>ellmer’s native turns preserve text, images, documents and settled
-tool evidence. Copied tool bindings are removed; incomplete tool
-evidence becomes explicitly labelled inert text. The specialist keeps
-its own configured prompt, tools and permissions, subject to the current
-parent’s restrictions. Parent and child messages diverge after the
-snapshot, and continuing the child does not copy later parent
-messages.</p>
-<p>Selecting or creating a branch remains an operation on the host’s
-conversation store. <code><a href="../reference/fork_agent.html">fork_agent()</a></code> copies context and retains
-an independent child; it does not create a persistent branch. shinychat
-supplies its managed history UI and rich-content rendering. A headless
-adapter requires its supported public branch contract; native
-host-supplied forks need no private shinychat APIs.</p>
-</div>
-<div class="section level2">
-<h2 id="defining-sub-agents">Defining Sub-Agents<a class="anchor" aria-label="anchor" href="#defining-sub-agents"></a>
-</h2>
-<p>Use <code><a href="../reference/agent_definition.html">agent_definition()</a></code> to describe a sub-agent:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">code_reviewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"code_reviewer"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Reviews R code for best practices and potential issues"</span>,</span>
-<span>  prompt <span class="op">=</span> <span class="st">"You are an expert R developer. Review code for correctness,</span></span>
-<span><span class="st">    style, and potential bugs. Be specific and actionable."</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  description <span class="op">=</span> <span class="st">"Reviews R code for bugs and unclear style."</span>,</span>
+<span>  prompt <span class="op">=</span> <span class="st">"You review R code. Report specific problems with file and line."</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  permission_mode <span class="op">=</span> <span class="st">"readonly"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">data_analyst</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"data_analyst"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Analyses data files and produces statistical summaries"</span>,</span>
-<span>  prompt <span class="op">=</span> <span class="st">"You are a data analyst. Read data files and provide clear,</span></span>
-<span><span class="st">    concise statistical summaries with key insights."</span>,</span>
+<span>  description <span class="op">=</span> <span class="st">"Summarises data files."</span>,</span>
+<span>  prompt <span class="op">=</span> <span class="st">"You read data files and summarise them in a few sentences."</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Fields:</p>
 <table class="table">
 <colgroup>
-<col width="35%">
-<col width="65%">
+<col width="50%">
+<col width="50%">
 </colgroup>
 <thead><tr class="header">
 <th>Field</th>
-<th>Description</th>
+<th>Meaning</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td><code>name</code></td>
-<td>Unique routing key: lowercase letter first, then letters, numbers,
-<code>_</code>, or <code>-</code>
+<td>routing name; converted to lower case, starts with a letter, then
+letters, digits, <code>_</code> or <code>-</code>
 </td>
 </tr>
 <tr class="even">
 <td><code>description</code></td>
-<td>What this agent does (shown to the lead LLM)</td>
+<td>what the subagent is for, shown to the lead</td>
 </tr>
 <tr class="odd">
 <td><code>prompt</code></td>
-<td>System prompt for the sub-agent</td>
+<td>the subagent’s system prompt</td>
 </tr>
 <tr class="even">
 <td><code>tools</code></td>
-<td>Tools available to the sub-agent</td>
+<td>the subagent’s tools; it doesn’t inherit the lead’s</td>
 </tr>
 <tr class="odd">
 <td><code>model</code></td>
-<td>
-<code>"inherit"</code> (default), a bare model id such as
-<code>"gpt-5.6-luna"</code> to use that model on the lead’s provider, or
-<code>"provider/model"</code> for a new chat</td>
+<td>which model to use (see below)</td>
 </tr>
 <tr class="even">
 <td><code>skills</code></td>
-<td>Optional list of skills to load</td>
+<td>skills to load into the subagent</td>
 </tr>
 <tr class="odd">
 <td><code>disallowed_tools</code></td>
-<td>Additional tool names that the child must not use</td>
+<td>tool names the subagent may never call</td>
 </tr>
 <tr class="even">
 <td><code>memory</code></td>
-<td>Optional context appended to the child’s system prompt</td>
+<td>text added to the subagent’s system prompt</td>
 </tr>
 <tr class="odd">
 <td><code>mcp_servers</code></td>
-<td>Optional MCP servers loaded for the child</td>
+<td>MCP servers for the subagent (see <a href="delegation.html">Briefing
+and inspecting subagents</a>)</td>
 </tr>
 <tr class="even">
 <td><code>initial_prompt</code></td>
-<td>Optional text prepended to delegated tasks</td>
+<td>text put in front of every task the subagent receives</td>
 </tr>
 <tr class="odd">
 <td><code>max_requests</code></td>
-<td>Optional per-child request limit</td>
+<td>model request limit for each delegated task</td>
 </tr>
 <tr class="even">
 <td><code>permission_mode</code></td>
-<td>Optional mode that preserves or narrows the lead policy</td>
+<td>a mode at least as strict as the lead’s</td>
 </tr>
 </tbody>
 </table>
+<p>Definitions are read-only values:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">reviewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
+<span>  <span class="st">"Reviewer"</span>,</span>
+<span>  <span class="st">"Reviews files without changing them."</span>,</span>
+<span>  <span class="st">"Review the files you are given and report problems."</span>,</span>
+<span>  max_requests <span class="op">=</span> <span class="fl">5</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">reviewer</span><span class="op">$</span><span class="va">name</span></span>
+<span><span class="co">#&gt; [1] "reviewer"</span></span>
+<span><span class="va">reviewer</span><span class="op">$</span><span class="va">max_requests</span></span>
+<span><span class="co">#&gt; [1] 5</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="create-a-lead-agent">Create a lead agent<a class="anchor" aria-label="anchor" href="#create-a-lead-agent"></a>
+</h2>
+<p><code>LeadAgent</code> is an <code>Agent</code> with one extra tool,
+<code>delegate_to_agent</code>, and a list of subagents the model can
+choose from:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">code_reviewer</span>, <span class="va">data_analyst</span><span class="op">)</span>,</span>
+<span>  system_prompt <span class="op">=</span> <span class="st">"You coordinate analysis tasks. Delegate to the right</span></span>
+<span><span class="st">    specialist, then combine their findings."</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">lead</span><span class="op">$</span><span class="fu">available_sub_agents</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "code_reviewer" "data_analyst"</span></span>
+<span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
+<span>  <span class="st">"Ask the code reviewer to read R/utils.R and summarise its problems."</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">response</span></span></code></pre></div>
+<p>Add a subagent later with
+<code>lead$register_sub_agent(definition)</code>, which also updates the
+list of subagents in the lead’s system prompt.</p>
+<p>When the lead delegates, the subagent runs to completion and its
+answer comes back as the result of the <code>delegate_to_agent</code>
+call. When the model delegates several tasks in one turn, they can run
+concurrently.</p>
 <div class="section level3">
-<h3 id="delegated-permission-boundaries">Delegated Permission Boundaries<a class="anchor" aria-label="anchor" href="#delegated-permission-boundaries"></a>
+<h3 id="choose-each-subagents-model">Choose each subagent’s model<a class="anchor" aria-label="anchor" href="#choose-each-subagents-model"></a>
 </h3>
-<p>A sub-agent cannot gain authority that its lead does not have. Deputy
-intersects the requested child mode with the lead’s capabilities, write
-root, tool gates, and permission callback. <code>disallowed_tools</code>
-adds further denials.</p>
-<p>The allowed child-mode transitions use the same authority order as
-<code>Agent$set_permission_mode()</code>:</p>
+<p><code>model</code> accepts three forms:</p>
+<ul>
+<li>
+<code>"inherit"</code>, the default, uses a copy of the lead’s chat:
+same provider, model and settings, without the lead’s conversation or
+tools.</li>
+<li>A bare model id such as <code>"gpt-6-luna"</code> uses the lead’s
+provider, endpoint and credentials with a different model, for example a
+cheaper one for simple work.</li>
+<li>
+<code>"provider/model"</code>, such as
+<code>"anthropic/claude-sonnet-5"</code>, creates a new chat with
+<code><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">ellmer::chat()</a></code>. Use this form for model ids that contain
+<code>/</code>.</li>
+</ul>
+</div>
+</div>
+<div class="section level2">
+<h2 id="permissions-and-budgets">Permissions and budgets<a class="anchor" aria-label="anchor" href="#permissions-and-budgets"></a>
+</h2>
+<p>A subagent can never do more than its lead. Deputy combines the
+subagent’s <code>permission_mode</code> with the lead’s policy, keeping
+the lead’s capabilities, write directory, allow and deny lists, and
+callback, and adds the definition’s <code>disallowed_tools</code>. The
+allowed modes follow the same order as
+<code>set_permission_mode()</code>:</p>
 <table class="table">
 <thead><tr class="header">
 <th>Lead mode</th>
-<th>Allowed child modes</th>
+<th>Subagent may use</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
@@ -346,137 +288,64 @@ adds further denials.</p>
 </tr>
 <tr class="even">
 <td><code>"full"</code></td>
-<td>
-<code>"full"</code>, <code>"standard"</code>, <code>"plan"</code>,
-<code>"readonly"</code>
-</td>
+<td>any mode</td>
 </tr>
 </tbody>
 </table>
-<p>For example, a readonly reviewer can be declared beneath a standard
-lead without gaining file reads, web access, or tools that the lead
-explicitly denied:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">reviewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
-<span>  name <span class="op">=</span> <span class="st">"reviewer"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Reviews files without changing them"</span>,</span>
-<span>  prompt <span class="op">=</span> <span class="st">"Review the requested files and report findings."</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  permission_mode <span class="op">=</span> <span class="st">"readonly"</span>,</span>
-<span>  disallowed_tools <span class="op">=</span> <span class="st">"read_csv"</span>,</span>
-<span>  max_requests <span class="op">=</span> <span class="fl">5</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-</div>
+<p>A lead in read-only or plan mode can still delegate, because its
+subagents can’t use a less strict mode. A lead created with
+<code><a href="../reference/permissions_readonly.html">permissions_readonly()</a></code> and all its subagents can read files
+but can’t write them or run code.</p>
+<p>The lead’s <code>PreToolUse</code>, <code>PostToolUse</code> and
+<code>PostToolUseFailure</code> hooks also run for subagent tool calls,
+and each subagent call is checked against the lead’s current
+permissions, so narrowing the lead mid-run narrows its subagents
+too.</p>
+<p>Subagents spend from the lead run’s budget. Each delegated task gets
+whatever is left of the lead’s <code>UsageLimits</code>, further capped
+by the definition’s <code>max_requests</code>, and its usage is added to
+the lead’s <code>result$usage</code>. When the model delegates several
+tasks at once, each reserves its share before it starts, so together
+they can’t overspend.</p>
+<p>A few things subagents can’t do. They can’t use tools that run on the
+provider’s side, because Deputy can’t check those calls. They can’t
+pause for a durable approval: a lead created with
+<code>approval_dir</code> refuses to delegate, and a subagent permission
+callback that returns <code><a href="../reference/PermissionResultPending.html">PermissionResultPending()</a></code> denies the
+call. And they share the lead’s working directory and file checkpoints;
+nothing about delegation isolates the file system.</p>
 </div>
 <div class="section level2">
-<h2 id="creating-a-leadagent">Creating a LeadAgent<a class="anchor" aria-label="anchor" href="#creating-a-leadagent"></a>
+<h2 id="ask-several-subagents-at-once">Ask several subagents at once<a class="anchor" aria-label="anchor" href="#ask-several-subagents-at-once"></a>
 </h2>
-<p><code>LeadAgent</code> extends <code>Agent</code> with a built-in
-<code>delegate_to_agent</code> tool:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<p>To get independent answers to the same question, call
+<code>parallel_delegate()</code> yourself instead of waiting for the
+model to delegate. Each named definition gets the task in a fresh
+conversation and answers with a single model request. The lead makes no
+request of its own, and its conversation is unchanged.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">code_reviewer</span>, <span class="va">data_analyst</span><span class="op">)</span>,</span>
-<span>  system_prompt <span class="op">=</span> <span class="st">"You coordinate analysis tasks. Delegate to the</span></span>
-<span><span class="st">    appropriate specialist and synthesise their findings."</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">available_sub_agents</span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "code_reviewer" "data_analyst"</span></span></code></pre></div>
-<p>Names are trimmed and converted to lowercase by
-<code><a href="../reference/agent_definition.html">agent_definition()</a></code>. A <code>LeadAgent</code> rejects
-duplicate normalized names at construction and registration. Its
-<code>sub_agent_defs</code> field returns a list of read-only S7
-<code>AgentDefinition</code> values; use
-<code>register_sub_agent()</code> so the registry and lead prompt stay
-synchronized. <code><a href="../reference/agent_definition.html">agent_definition()</a></code> and
-<code><a href="../reference/agent_definition.html">AgentDefinition()</a></code> are the same S7 constructor. To revise a
-definition, edit a plain property record and construct a new value:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
-<span><span class="va">reviewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"Reviewer"</span>, <span class="st">"Reviews text"</span>, <span class="st">"Read carefully."</span><span class="op">)</span></span>
-<span><span class="va">fields</span> <span class="op">&lt;-</span> <span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">props</a></span><span class="op">(</span><span class="va">reviewer</span><span class="op">)</span></span>
-<span><span class="va">fields</span><span class="op">$</span><span class="va">name</span> <span class="op">&lt;-</span> <span class="st">"limited-reviewer"</span></span>
-<span><span class="va">fields</span><span class="op">$</span><span class="va">max_requests</span> <span class="op">&lt;-</span> <span class="fl">2L</span></span>
-<span><span class="va">limited_reviewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">agent_definition</span>, <span class="va">fields</span><span class="op">)</span></span>
-<span><span class="va">limited_reviewer</span><span class="op">$</span><span class="va">name</span></span>
-<span><span class="co">#&gt; [1] "limited-reviewer"</span></span>
-<span><span class="va">limited_reviewer</span><span class="op">$</span><span class="va">max_requests</span></span>
-<span><span class="co">#&gt; [1] 2</span></span>
-<span><span class="co"># The original definition still has no request limit.</span></span>
-<span><span class="va">reviewer</span><span class="op">$</span><span class="va">max_requests</span></span>
-<span><span class="co">#&gt; NULL</span></span></code></pre></div>
-<p>Read properties with <code>$</code>, <code><a href="https://rconsortium.github.io/S7/reference/prop.html" class="external-link">S7::prop()</a></code>, or
-<code>@</code>. Definitions compose original ellmer tools and read-only
-Skill values. Executable tools nested in either value retain their
-closures, services, and caller-owned state; frozen configuration does
-not freeze tool state. <code><a href="https://rconsortium.github.io/S7/reference/props.html" class="external-link">S7::props()</a></code> retains these objects,
-so use the YAML helpers and explicit registries below when you need a
-portable definition.</p>
-</div>
-<div class="section level2">
-<h2 id="running-a-delegation-task">Running a Delegation Task<a class="anchor" aria-label="anchor" href="#running-a-delegation-task"></a>
-</h2>
-<p>When the lead agent decides to delegate, it calls
-<code>delegate_to_agent</code> internally. The sub-agent runs to
-completion and returns its result to the lead:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">code_reviewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
-<span>  name <span class="op">=</span> <span class="st">"code_reviewer"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Reviews R code and suggests improvements"</span>,</span>
-<span>  prompt <span class="op">=</span> <span class="st">"You are an R code reviewer. Be concise."</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"claude-sonnet-4-20250514"</span><span class="op">)</span></span>
-<span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">code_reviewer</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
-<span>  <span class="st">"Ask the code reviewer to look at the DESCRIPTION file and</span></span>
-<span><span class="st">   summarise what this package does."</span></span>
-<span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span></code></pre></div>
-<p>Direct delegation participates in the lead run’s usage limits. Each
-child inherits the lead’s remaining <code>UsageLimits</code>, and its
-usage is aggregated into <code>result$usage</code> and enforced by the
-lead after delegation. Concurrent direct children reserve allocations
-before launch. Background children, transitive child trees, and
-cross-run global limits remain outside this contract.</p>
-</div>
-<div class="section level2">
-<h2 id="stateless-fan-out">Stateless fan-out<a class="anchor" aria-label="anchor" href="#stateless-fan-out"></a>
-</h2>
-<p>For independent perspectives on supplied text, the host can select
-responders directly. Each definition gets a fresh conversation with its
-own prompt and at most one model request. The lead makes no model
-request for orchestration. Definitions with tools, skills, or MCP
-servers are rejected before dispatch.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
 <span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"benefits"</span>, <span class="st">"Find benefits"</span>, <span class="st">"Explain the strongest benefits."</span><span class="op">)</span>,</span>
-<span>    <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"risks"</span>, <span class="st">"Find risks"</span>, <span class="st">"Explain the strongest risks."</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"benefits"</span>, <span class="st">"Finds benefits"</span>, <span class="st">"Make the strongest case for."</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"risks"</span>, <span class="st">"Finds risks"</span>, <span class="st">"Make the strongest case against."</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span>
+<span></span>
 <span><span class="va">batch</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">parallel_delegate</span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>benefits <span class="op">=</span> <span class="st">"Review a four-day working week."</span>,</span>
-<span>    risks <span class="op">=</span> <span class="st">"Review a four-day working week."</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>    benefits <span class="op">=</span> <span class="st">"Should our team adopt a four-day week?"</span>,</span>
+<span>    risks <span class="op">=</span> <span class="st">"Should our team adopt a four-day week?"</span></span>
+<span>  <span class="op">)</span>,</span>
 <span>  max_active <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span>
-<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>workflow <span class="op">=</span> <span class="st">"decision-review"</span><span class="op">)</span></span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
+<span></span>
 <span><span class="va">batch</span><span class="op">$</span><span class="va">status</span></span>
 <span><span class="va">batch</span><span class="op">$</span><span class="va">results</span><span class="op">$</span><span class="va">benefits</span><span class="op">$</span><span class="va">response</span></span>
-<span><span class="va">batch</span><span class="op">$</span><span class="va">run</span><span class="op">$</span><span class="va">usage</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Names are normalized and must select each registered definition at
-most once. The result preserves input order and has five fields:</p>
+<span><span class="va">batch</span><span class="op">$</span><span class="va">run</span><span class="op">$</span><span class="va">usage</span></span></code></pre></div>
+<p>The subagents in a batch can’t have tools, skills or MCP servers. The
+result keeps the order of the tasks:</p>
 <table class="table">
 <colgroup>
 <col width="50%">
@@ -484,723 +353,182 @@ most once. The result preserves input order and has five fields:</p>
 </colgroup>
 <thead><tr class="header">
 <th>Field</th>
-<th>Meaning</th>
+<th>Contents</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td><code>mode</code></td>
+<td><code>status</code></td>
 <td>
-<code>"stateless"</code>; other modes are currently rejected</td>
+<code>"completed"</code>, <code>"failed"</code>,
+<code>"stopped"</code> or <code>"not_started"</code> for each task</td>
 </tr>
 <tr class="even">
 <td><code>results</code></td>
-<td>Named list of child <code>AgentResult</code> objects, or
-<code>NULL</code>
+<td>each subagent’s <code>AgentResult</code>, or <code>NULL</code>
 </td>
 </tr>
 <tr class="odd">
-<td><code>errors</code></td>
-<td>Named list of captured conditions, or <code>NULL</code>
+<td><code>outcomes</code></td>
+<td>each subagent’s <a href="delegation.html#what-a-delegation-returns">compact
+outcome</a>
 </td>
 </tr>
 <tr class="even">
-<td><code>status</code></td>
-<td>Named vector: <code>completed</code>, <code>failed</code>,
-<code>stopped</code>, or <code>not_started</code>
+<td><code>errors</code></td>
+<td>each failure’s condition, or <code>NULL</code>
 </td>
 </tr>
 <tr class="odd">
 <td><code>run</code></td>
-<td>Aggregate <code>AgentResult</code> with usage, events, and batch
-stop reason</td>
+<td>an <code>AgentResult</code> for the whole batch, with the combined
+usage</td>
 </tr>
 </tbody>
 </table>
-<p>A failed responder does not discard successful siblings. Check
-<code>status</code> before synthesis; a stopped child may have partial
-text. Child records include unique agent, session, run, and delegation
-identifiers linked to the batch run, and fire the usual
-<code>SubagentStart</code> and <code>SubagentStop</code> hooks.
-<code>$last_run()</code> retains the aggregate on normal return. The
-lead’s conversation is unchanged; the host explicitly supplies selected
-responses to any later synthesis run.</p>
-<div class="section level3">
-<h3 id="limits-and-cancellation">Limits and cancellation<a class="anchor" aria-label="anchor" href="#limits-and-cancellation"></a>
-</h3>
-<p><code>max_active</code> bounds simultaneous responders. Work runs in
-waves: the next wave starts after all current responders settle. Each
-wave reserves request slots before dispatch and divides the remaining
-token and cost ceilings among its responders. A definition can narrow
-its request allowance to zero. Failed dispatch attempts count as
-requests; missing cost information stops queued work when a cost ceiling
-is configured.</p>
-<p>Request limits prevent excess dispatches. Token and cost ceilings use
-observed usage, so a wave can exceed them by up to one response per
-active responder. Unused allocations are released after settlement. All
-observed child usage is included in the aggregate, including failed or
-interrupted runs. The default <code>on_exceed = "stop"</code> returns
-partial outcomes. <code>on_exceed = "error"</code> raises the usual
-typed limit condition after cleanup; completed child records remain
-inspectable through <code>$list_subagents()</code> and
-<code>$get_subagent_results()</code>.</p>
-<p>For Shiny or another asynchronous host, use
-<code>$parallel_delegate_async()</code> and consume its promise.
-<code>$interrupt()</code> prevents queued work from starting and asks
-active responders to stop at the next supported provider boundary. The
-batch settles after its active responders drain. The lead rejects
-overlapping runs until cleanup finishes. Tool-using background workers
-and persistent agent scheduling are separate future work.</p>
-</div>
-</div>
-<div class="section level2">
-<h2 id="opposing-perspectives-and-synthesis">Opposing perspectives and synthesis<a class="anchor" aria-label="anchor" href="#opposing-perspectives-and-synthesis"></a>
-</h2>
-<p>For a complete opposing-perspective workflow, run the installed
-standalone example after configuring your OpenAI credentials:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<p>One failure doesn’t discard the other answers, so check
+<code>status</code> before using them. <code>max_active</code> sets how
+many run at once; the batch works through the tasks in waves of that
+size. Request limits are reserved before each wave starts, and token and
+cost limits are split across it, so a wave can overshoot a token or cost
+limit by up to one response per subagent. With the default
+<code>on_exceed = "stop"</code>, a limit returns the answers so far.</p>
+<p>In Shiny, use <code>parallel_delegate_async()</code>, which returns a
+promise. <code>lead$interrupt()</code> stops tasks that haven’t started
+and asks running ones to stop.</p>
+<p>For a complete example that compares two opposing answers and asks a
+separate moderator to weigh them, run the bundled debate script with
+your OpenAI key set:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples"</span>, <span class="st">"standalone"</span>, <span class="st">"09-debate.R"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>It prints a Markdown comparison, requires both heads to complete, and
-then uses a separate one-request moderator. Its bundled prompt can also
-be reused with any Agent:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">load_skill</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"skills"</span>, <span class="st">"debate"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>Loading this prompt does not start independent responders. The host
-supplies arguments or orchestrates fan-out explicitly.</p>
 </div>
 <div class="section level2">
-<h2 id="inspecting-child-conversations">Inspecting child conversations<a class="anchor" aria-label="anchor" href="#inspecting-child-conversations"></a>
+<h2 id="see-what-the-subagents-did">See what the subagents did<a class="anchor" aria-label="anchor" href="#see-what-the-subagents-did"></a>
 </h2>
-<p><code>lead$list_subagents()</code> has one row per admitted
-delegation in admission order, even while children are running.
-<code>delegation_id</code> remains stable as <code>status</code> changes
-from <code>queued</code> to <code>running</code> and then a settled
-outcome:</p>
+<p><code>lead$list_subagents()</code> returns a data frame with one row
+per delegated task, including tasks still running: the subagent’s name,
+its <code>status</code>, the exact <code>stop_reason</code>, timestamps
+and identifiers.</p>
 <table class="table">
-<colgroup>
-<col width="50%">
-<col width="50%">
-</colgroup>
 <thead><tr class="header">
 <th>Status</th>
 <th>Meaning</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
+<td>
+<code>queued</code>, <code>running</code>
+</td>
+<td>not finished yet</td>
+</tr>
+<tr class="even">
 <td><code>completed</code></td>
-<td>The child returned an AgentResult with stop reason
-<code>complete</code>
+<td>the subagent’s run ended with <code>"complete"</code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>stopped</code></td>
-<td>A limit, interruption, or another non-complete stop</td>
-</tr>
-<tr class="odd">
-<td><code>failed</code></td>
-<td>Construction or execution failed</td>
+<td>a limit or an interruption ended the run</td>
 </tr>
 <tr class="even">
-<td><code>not_started</code></td>
-<td>Admitted work never entered a child run</td>
+<td><code>failed</code></td>
+<td>the subagent errored</td>
 </tr>
 <tr class="odd">
-<td><code>suspended</code></td>
-<td>An approval suspension, where the child supports it</td>
+<td><code>not_started</code></td>
+<td>the task never started</td>
 </tr>
 </tbody>
 </table>
-<p><code>stop_reason</code> preserves the exact runtime reason.
-Completion does not verify the assigned task or its evidence.
-<code>admitted_at</code> records acceptance, <code>started_at</code>
-records lifecycle entry before the start hook, and
-<code>completed_at</code> records the invocation settling, including
-suspension. Cancellation in a start hook can therefore yield
-<code>not_started</code> with a start timestamp. Run IDs are unavailable
-until the child starts a run. Callback failures follow the existing hook
-policy and appear separately in <code>hook_error</code>; they do not
-turn a successful child response into an execution failure.</p>
-<p><code>get_subagent_results(delegation_id = id)</code> returns a list
-of retained AgentResults, with <code>NULL</code> entries where no result
-is available and an empty list when no delegation matches.
-<code>get_subagent_messages(session_id = session)</code> returns the
-child’s available conversation turns, including partial history after
-failure. Both accessors retain admission order. Live message snapshots
-are not a token stream. Reading them does not copy them into the lead’s
-context, resume a child, or approve a pending action. The host must
-authorize and redact any user-facing disclosure. These records belong to
-the live LeadAgent; they are not persisted as a durable child job
-store.</p>
-<p>For an asynchronous lead run,
-<code>lead$interrupt(reason = "cancelled_by_host")</code> cooperatively
-interrupts both the lead and active children. It takes effect at the
-next supported provider boundary. Closing an inspection panel should not
-call this method unless the user explicitly requests cancellation.</p>
-</div>
-<div class="section level2">
-<h2 id="explicit-input-and-context-inspection">Explicit input and context inspection<a class="anchor" aria-label="anchor" href="#explicit-input-and-context-inspection"></a>
-</h2>
-<p>A plain task string still starts a fresh child conversation. For
-structured work, use <code><a href="../reference/DelegationInput.html">DelegationInput()</a></code> with constraints,
-evidence references, a deliverable and stop conditions. Stop conditions
-are instructions; runtime limits and permissions remain separate host
-configuration.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"reviewer"</span>, <span class="st">"Review evidence"</span>, <span class="st">"Keep units explicit."</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  delegation_scope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>owner_id <span class="op">=</span> <span class="st">"team-a"</span>, conversation_id <span class="op">=</span> <span class="st">"review-17"</span><span class="op">)</span>,</span>
-<span>  delegation_sources <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    source_id <span class="op">=</span> <span class="st">"assay-17"</span>, revision <span class="op">=</span> <span class="st">"r3"</span>,</span>
-<span>    owner_id <span class="op">=</span> <span class="st">"team-a"</span>, conversation_id <span class="op">=</span> <span class="st">"review-17"</span>,</span>
-<span>    text <span class="op">=</span> <span class="st">"Reported concentration: 12 mg/L."</span>,</span>
-<span>    allowed_agents <span class="op">=</span> <span class="st">"reviewer"</span></span>
-<span>  <span class="op">)</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">brief</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationInput.html">DelegationInput</a></span><span class="op">(</span></span>
-<span>  <span class="st">"Assess the reported concentration"</span>,</span>
-<span>  constraints <span class="op">=</span> <span class="st">"Preserve the reported units"</span>,</span>
-<span>  evidence <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>source_id <span class="op">=</span> <span class="st">"assay-17"</span>, revision <span class="op">=</span> <span class="st">"r3"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  deliverable <span class="op">=</span> <span class="st">"A conclusion citing the source revision"</span>,</span>
-<span>  stop_conditions <span class="op">=</span> <span class="st">"State uncertainty if method information is missing"</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">parallel_delegate</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>reviewer <span class="op">=</span> <span class="va">brief</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">id</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">delegation_id</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">get_subagent_contexts</span><span class="op">(</span><span class="va">id</span><span class="op">)</span>                     <span class="co"># initial manifest</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">get_subagent_contexts</span><span class="op">(</span><span class="va">id</span>, view <span class="op">=</span> <span class="st">"current"</span><span class="op">)</span>   <span class="co"># working context</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">get_subagent_contexts</span><span class="op">(</span><span class="va">id</span>, redact <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>      <span class="co"># content-redacted metadata</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">get_subagent_messages</span><span class="op">(</span><span class="op">)</span>                      <span class="co"># retained child chats</span></span></code></pre></div>
-<p>Model-driven <code>delegate_to_agent</code> calls support the same
-brief fields. Models can select exact source revisions, but cannot
-supply source bodies, owner scope or byte ceilings. Every child brief is
-encoded as one JSON object with separate brief fields and a
-<code>resolved_evidence</code> array, even when that array is empty.
-Text that imitates an evidence header remains inside its quoted brief
-field. This preserves source-selection provenance in the representation;
-it does not make source text trustworthy or guarantee how the model
-interprets it. The host supplies authenticated, authorized text
-snapshots; Deputy checks scope, definition eligibility and revision
-equality against that snapshot. Refreshing external evidence requires a
-new snapshot and LeadAgent. Missing or <code>NULL</code>
-<code>allowed_agents</code> permits all definitions;
-<code><a href="https://rdrr.io/r/base/character.html" class="external-link">character()</a></code> permits none. Snapshots are text only, not live
-retrieval or multimodal storage.</p>
-<p>The default admission ceiling is 64 KiB for both initial
-system/message text and the complete serialized manifest. Inputs reject
-explicitly when missing, stale, unauthorized, invalid or oversized;
-<code>list_subagents()$input_error</code> records why. Known token
-estimates also obey <code>ContextPolicy$max_tokens</code>. Unknown
-estimates remain explicit and rely on byte admission, without a
-token-bound guarantee.</p>
-<p>The initial manifest records static definition memory separately from
-resolved evidence and survives changes to the working context. It is a
-preparation receipt, not the exact provider wire payload or an authority
-grant. A redacted view is explicitly incomplete. Hosts control
-disclosure of both text and metadata. Inspection does not add child
-history to the lead, resume a child, or approve a tool. This provides
-the data for a child-chat inspector; nested live streaming and durable
-child continuation remain separate work.</p>
-</div>
-<div class="section level2">
-<h2 id="monitoring-with-subagentstop-hooks">Monitoring with SubagentStop Hooks<a class="anchor" aria-label="anchor" href="#monitoring-with-subagentstop-hooks"></a>
-</h2>
-<p>Use a <code>SubagentStop</code> hook to log or inspect sub-agent
-results:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">hook_monitor</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
+<p><code>"completed"</code> means the run ended normally. It doesn’t
+mean the subagent did the task well; read its answer.</p>
+<p><code>lead$get_subagent_results()</code> returns each task’s
+<code>AgentResult</code>, and <code>lead$get_subagent_messages()</code>
+returns each subagent’s conversation, including what it managed before a
+failure. Filter both by <code>agent_name</code>, or by
+<code>delegation_id</code> and <code>session_id</code> respectively.
+Reading them doesn’t add anything to the lead’s context. These records
+live in the <code>LeadAgent</code> object and disappear with it.</p>
+<p>To react while delegations happen, add <code>SubagentStart</code> and
+<code>SubagentStop</code> hooks to the lead:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">lead</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"SubagentStop"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">agent_name</span>, <span class="va">task</span>, <span class="va">result</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Sub-agent {agent_name} finished"</span><span class="op">)</span></span>
-<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert</a></span><span class="op">(</span><span class="st">"Status: {context$status}"</span><span class="op">)</span></span>
+<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli_inform</a></span><span class="op">(</span><span class="st">"{agent_name} finished: {context$status}"</span><span class="op">)</span></span>
 <span>    <span class="cn">NULL</span></span>
 <span>  <span class="op">}</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va">hook_monitor</span><span class="op">)</span></span></code></pre></div>
+<span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>These accessors are for your own code. Before you show subagent
+conversations to users, read <a href="delegation.html">Briefing and
+inspecting subagents</a>, which covers authorising and redacting what
+each user may see.</p>
 </div>
 <div class="section level2">
-<h2 id="portable-definitions">Portable definitions<a class="anchor" aria-label="anchor" href="#portable-definitions"></a>
+<h2 id="keep-definitions-in-files">Keep definitions in files<a class="anchor" aria-label="anchor" href="#keep-definitions-in-files"></a>
 </h2>
-<p>AgentDefinitions can live as <code>.yaml</code> or <code>.yml</code>
-files in <code>.deputy/agents/</code>. A file contains data, while the
-host chooses the actual tools and skills it can reference. Reading files
-does not run R code, load a Skill, contact an MCP server, or create an
-Agent.</p>
-<p>Here is a complete version 1 definition:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">version</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> reviewer</span></span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="fu">description</span><span class="kw">:</span><span class="at"> Reviews local text for gaps</span></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="fu">prompt</span><span class="kw">: </span><span class="ch">|</span></span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>  Read the supplied text using read_file.</span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>  Report unsupported claims and missing evidence concisely.</span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="fu">tools</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">read_file</span><span class="kw">]</span></span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a><span class="fu">model</span><span class="kw">:</span><span class="at"> inherit</span></span>
-<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a><span class="fu">skills</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
-<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a><span class="fu">disallowed_tools</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">write_file</span><span class="kw">,</span><span class="at"> run_bash</span><span class="kw">]</span></span>
-<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
-<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a><span class="fu">mcp_servers</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
-<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a><span class="fu">initial_prompt</span><span class="kw">:</span><span class="at"> Keep the review grounded in the supplied text.</span></span>
-<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a><span class="fu">max_requests</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
-<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a><span class="fu">permission_mode</span><span class="kw">:</span><span class="at"> readonly</span></span></code></pre></div>
+<p>Definitions can live as YAML files, conventionally in
+<code>.deputy/agents/</code>, so they can be reviewed and versioned like
+any other configuration:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">version</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> reviewer</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">description</span><span class="kw">:</span><span class="at"> Reviews local text for gaps</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="fu">prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  Read the supplied text using read_file.</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  Report unsupported claims and missing evidence concisely.</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="fu">tools</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">read_file</span><span class="kw">]</span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="fu">model</span><span class="kw">:</span><span class="at"> inherit</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="fu">disallowed_tools</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">write_file</span><span class="kw">,</span><span class="at"> run_bash</span><span class="kw">]</span></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="fu">initial_prompt</span><span class="kw">:</span><span class="at"> Keep the review grounded in the supplied text.</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="fu">max_requests</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="fu">permission_mode</span><span class="kw">:</span><span class="at"> readonly</span></span></code></pre></div>
 <p>Only <code>version</code>, <code>name</code>,
-<code>description</code>, and <code>prompt</code> are required. All
-other fields use <code><a href="../reference/agent_definition.html">agent_definition()</a></code> defaults when omitted.
-The format covers the entire constructor surface:</p>
-<table class="table">
-<colgroup>
-<col width="50%">
-<col width="50%">
-</colgroup>
-<thead><tr class="header">
-<th>Field</th>
-<th>Type and meaning</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code>version</code></td>
-<td>Required numeric format version, currently <code>1</code>
-</td>
-</tr>
-<tr class="even">
-<td><code>name</code></td>
-<td>Required routing name; canonicalized to lowercase</td>
-</tr>
-<tr class="odd">
-<td><code>description</code></td>
-<td>Required nonempty description shown to the lead</td>
-</tr>
-<tr class="even">
-<td><code>prompt</code></td>
-<td>Required nonempty prompt; <code>|</code> preserves multiline
-text</td>
-</tr>
-<tr class="odd">
-<td><code>tools</code></td>
-<td>Tool registry keys; defaults to <code>[]</code>
-</td>
-</tr>
-<tr class="even">
-<td><code>model</code></td>
-<td>Model string, default <code>inherit</code>
-</td>
-</tr>
-<tr class="odd">
-<td><code>skills</code></td>
-<td>Skill registry keys; defaults to <code>[]</code>
-</td>
-</tr>
-<tr class="even">
-<td><code>disallowed_tools</code></td>
-<td>Tool names denied to the subagent, or <code>null</code>
-</td>
-</tr>
-<tr class="odd">
-<td><code>memory</code></td>
-<td>Sequence of memory strings, or <code>null</code>
-</td>
-</tr>
-<tr class="even">
-<td><code>mcp_servers</code></td>
-<td>MCP server names for the existing delegation lifecycle, or
-<code>null</code>
-</td>
-</tr>
-<tr class="odd">
-<td><code>initial_prompt</code></td>
-<td>Initial task prefix, or <code>null</code>
-</td>
-</tr>
-<tr class="even">
-<td><code>max_requests</code></td>
-<td>Non-negative integer request limit, or <code>null</code>
-</td>
-</tr>
-<tr class="odd">
-<td><code>permission_mode</code></td>
-<td>
-<code>standard</code>, <code>readonly</code>, <code>plan</code>,
-<code>full</code>, or <code>null</code>
-</td>
-</tr>
-</tbody>
-</table>
-<p>The lead still controls the authority ceiling. A file cannot give a
-subagent more permission than its lead, nor supply credentials, host
-settings, or nested subagents. Tool and skill references are exact,
-case-sensitive keys like <code>read_file</code> or
-<code>concise_review</code>; they do not name R expressions, package
-exports, or filesystem paths. A host can map a key to an approved Skill
-path. Loading that Skill happens when the subagent is instantiated.</p>
-<p>Unknown fields, unsupported versions, missing references, duplicate
-keys, and <code>!expr</code> tags are errors. Quote YAML strings like
-<code>"yes"</code> and <code>"123"</code> to prevent YAML’s automatic
-type conversion. Use <code>[]</code> for empty sequences and
-<code>null</code> for absent optional fields. Single strings are also
-accepted for one-element sequences. Files are limited to 1 MiB.</p>
-<div class="section level3">
-<h3 id="read-and-delegate">Read and delegate<a class="anchor" aria-label="anchor" href="#read-and-delegate"></a>
-</h3>
-<p>The package ships the YAML above as a working example. This chunk
-reads it without model credentials:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
-<span><span class="va">tool_registry</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>read_file <span class="op">=</span> <span class="va">tool_read_file</span><span class="op">)</span></span>
+<code>description</code> and <code>prompt</code> are required; the other
+fields default as in <code><a href="../reference/agent_definition.html">agent_definition()</a></code>. A file can’t
+contain R code. Tools and skills are named by keys that your code maps
+to real objects, so a file can only use the tools you offer it:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">tool_registry</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>read_file <span class="op">=</span> <span class="va">tool_read_file</span><span class="op">)</span></span>
 <span><span class="va">definition_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples"</span>, <span class="st">"agent-definitions"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span></span>
+<span></span>
 <span><span class="va">definitions</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition_read.html">agent_definitions</a></span><span class="op">(</span><span class="va">definition_dir</span>, tools <span class="op">=</span> <span class="va">tool_registry</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">definitions</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "reviewer"</span></span>
-<span><span class="va">definitions</span><span class="op">$</span><span class="va">reviewer</span><span class="op">$</span><span class="va">max_requests</span></span>
-<span><span class="co">#&gt; [1] 2</span></span></code></pre></div>
-<p>For a project, use
-<code>agent_definitions(tools = tool_registry)</code> to discover
-<code>.deputy/agents/</code>. Discovery is nonrecursive and ordered by
-filename. A missing or empty directory returns an empty list. Duplicate
-canonical names and invalid files stop discovery rather than silently
-dropping a definition.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span>,</span>
-<span>  sub_agents <span class="op">=</span> <span class="va">definitions</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"standard"</span>, file_write <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span>
-<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Delegate a review of input.txt to reviewer."</span><span class="op">)</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">list_subagents</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="write-and-round-trip">Write and round-trip<a class="anchor" aria-label="anchor" href="#write-and-round-trip"></a>
-</h3>
-<p>Pass the same registries when writing and reading. The writer finds
-registry keys by exact object identity; it refuses unmapped tools/skills
-and ambiguous aliases. Existing files require
-<code>overwrite = TRUE</code>. Comments, YAML formatting, and names
-attached to R lists or character sequences are not preserved; object
-order and registry identity are preserved.</p>
-<p>The writer completes a temporary file in the destination directory
-before installing it. With <code>overwrite = TRUE</code>, it renames the
-completed file into place. Otherwise it creates a hard link, which fails
-atomically if another writer has already created the destination. This
-requires filesystem support for hard links. A failed write or
-installation leaves an existing definition intact.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<span><span class="co">#&gt; [1] "reviewer"</span></span></code></pre></div>
+<p><code><a href="../reference/agent_definition_read.html">agent_definitions()</a></code> reads every <code>.yaml</code> and
+<code>.yml</code> file in a directory (<code>.deputy/agents/</code> by
+default), in file name order. A missing directory gives an empty list;
+an invalid file, an unknown key or a duplicate name is an error. Reading
+files never runs code, loads skills, or connects to servers.</p>
+<p><code><a href="../reference/agent_definition_read.html">agent_definition_read()</a></code> reads one file, and
+<code><a href="../reference/agent_definition_read.html">agent_definition_write()</a></code> writes a definition back, given
+the same registries:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".yaml"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/agent_definition_read.html">agent_definition_write</a></span><span class="op">(</span><span class="va">definitions</span><span class="op">$</span><span class="va">reviewer</span>, <span class="va">path</span>, tools <span class="op">=</span> <span class="va">tool_registry</span><span class="op">)</span></span>
 <span><span class="va">restored</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition_read.html">agent_definition_read</a></span><span class="op">(</span><span class="va">path</span>, tools <span class="op">=</span> <span class="va">tool_registry</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">restored</span>, <span class="va">definitions</span><span class="op">$</span><span class="va">reviewer</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] TRUE</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span></code></pre></div>
-</div>
-</div>
-<div class="section level2">
-<h2 id="bind-host-policy-and-execution-resources">Bind host policy and execution resources<a class="anchor" aria-label="anchor" href="#bind-host-policy-and-execution-resources"></a>
-</h2>
-<p>A child starts a fresh conversation, but a tool closure can still
-capture shared state. <code><a href="../reference/DelegationPolicy.html">DelegationPolicy()</a></code> makes that
-ownership visible in its initial manifest. The default
-<code>resource_mode = "shared"</code> borrows definition and skill
-tools; Deputy does not close them. Choose <code>"exclusive"</code> with
-a shared host <code>resource_key</code> to reject overlapping
-delegations that use one resource in the same R process. This does not
-lock direct host access or isolate the filesystem.</p>
-<p>For an independent R worker per delegation, use the public resource
-factory:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationPolicy.html">DelegationPolicy</a></span><span class="op">(</span></span>
-<span>  resource_mode <span class="op">=</span> <span class="st">"owned"</span>,</span>
-<span>  resources <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">agent</span>, <span class="va">definition</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">worker</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/RSession.html">RSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="va">agent</span><span class="op">)</span></span>
-<span>    <span class="fu"><a href="../reference/DelegationResources.html">DelegationResources</a></span><span class="op">(</span><span class="va">worker</span><span class="op">$</span><span class="fu">tools</span><span class="op">(</span><span class="op">)</span>, cleanup <span class="op">=</span> <span class="va">worker</span><span class="op">$</span><span class="va">close</span><span class="op">)</span></span>
-<span>  <span class="op">}</span>,</span>
-<span>  observers <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Notification"</span>, <span class="st">"Stop"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_full.html">permissions_full</a></span><span class="op">(</span><span class="op">)</span>, <span class="co"># Trusted R uses this account's access</span></span>
-<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"analyst"</span>, <span class="st">"Analyze data"</span>, <span class="st">"Check the data."</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  delegation_policy <span class="op">=</span> <span class="va">policy</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>The factory receives a fresh child before provider dispatch. It can
-bind an <code>RSession</code> or <code>McpConnection</code> using public
-Agent identity and workspace APIs. Return tools without running or
-mutating the child. A factory must clean up its own partial construction
-if it throws; once it returns <code>DelegationResources</code>, Deputy
-calls cleanup exactly once after settlement or subsequent setup failure.
-Cancellation is cooperative. Cleanup errors appear separately in
-<code>lead$list_subagents()$cleanup_error</code>.</p>
-<p>Owned mode rejects tools captured in definitions or skills. MCP
-selections in a definition require an owned factory, which resolves the
-host’s explicit config and server/tool allowances. The ordinary child
-permissions and definition denylist apply to all registered tool
-origins. Stateless parallel responders never call a resource factory or
-acquire tools, handlers or resource leases.</p>
-<p>Tool governance hooks (<code>PreToolUse</code>,
-<code>PostToolUse</code>, <code>PostToolUseFailure</code>) forward from
-the live lead registry. Other observers require explicit selection.
-Their callbacks remain shared host code; Deputy does not clone captured
-state. Children retain the initial permission ceiling and check current
-lead restrictions before each tool operation. Provider-native tools are
-unsupported for delegated runs because they bypass these execution
-gates.</p>
-<p>For a hosted child that asks questions, select the interactive tool
-in its definition (or return it from its owned factory) and bind a
-handler:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationPolicy.html">DelegationPolicy</a></span><span class="op">(</span>human_input <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">questions</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="co"># The host authenticates the owner and supplies the UI routing function.</span></span>
-<span>  <span class="fu">request_answers</span><span class="op">(</span></span>
-<span>    <span class="va">questions</span>,</span>
-<span>    owner <span class="op">=</span> <span class="va">context</span><span class="op">$</span><span class="va">scope</span><span class="op">$</span><span class="va">owner_id</span>,</span>
-<span>    agent_id <span class="op">=</span> <span class="va">context</span><span class="op">$</span><span class="va">agent_id</span>,</span>
-<span>    run_id <span class="op">=</span> <span class="va">context</span><span class="op">$</span><span class="va">run_id</span>,</span>
-<span>    delegation_id <span class="op">=</span> <span class="va">context</span><span class="op">$</span><span class="va">delegation_id</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">}</span><span class="op">)</span></span>
-<span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  <span class="va">chat</span>,</span>
-<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
-<span>    <span class="st">"interviewer"</span>, <span class="st">"Clarify requirements"</span>, <span class="st">"Ask focused questions."</span>,</span>
-<span>    tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_interactive.html">tools_interactive</a></span><span class="op">(</span><span class="op">)</span></span>
-<span>  <span class="op">)</span><span class="op">)</span>,</span>
-<span>  delegation_scope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>owner_id <span class="op">=</span> <span class="st">"authenticated-owner"</span>, conversation_id <span class="op">=</span> <span class="st">"chat-1"</span><span class="op">)</span>,</span>
-<span>  delegation_policy <span class="op">=</span> <span class="va">policy</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>The current routing context includes child, parent and session
-identifiers. An unbound <code>ask_user</code> fails preparation rather
-than falling back to a process-wide handler. Scope values are host
-assertions, not authentication. The host still controls access and
-redaction for manifests and retained transcripts.</p>
-<p>Human answers and delegation briefs never approve tool effects.
-Delegated durable approval is not yet supported: a lead configured with
-<code>approval_dir</code> rejects delegation before dispatch, and a
-child permission callback returning <code>PermissionResultPending</code>
-stops without executing the requested effect. Continue to use standalone
-<code>Agent</code> approval APIs where durable suspension is needed.
-Child continuation and durable job recovery are separate backlog
-work.</p>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>Unknown fields, unsupported versions and YAML <code>!expr</code> tags
+are errors. Quote strings such as <code>"yes"</code> and
+<code>"123"</code> that YAML would otherwise convert. Files are limited
+to 1 MiB, and a file can’t give a subagent more permissions than its
+lead.</p>
 </div>
 <div class="section level2">
-<h2 id="compact-outcomes-and-child-history">Compact outcomes and child history<a class="anchor" aria-label="anchor" href="#compact-outcomes-and-child-history"></a>
+<h2 id="going-further">Going further<a class="anchor" aria-label="anchor" href="#going-further"></a>
 </h2>
-<p>The <code>delegate_to_agent</code> tool returns a JSON
-<code>DelegationOutcome</code> projection. Its <code>runtime</code>
-contains execution status, exact stop reason, and stable child, run,
-parent tool-call and delegation identities. The <code>answer</code> and
-optional <code>claims</code> are model-authored. A normal stop never
-verifies a claim or approves an artifact. <code>missing_evidence</code>
-and <code>unresolved_work</code> are <code>NULL</code> when not
-supplied. <code>parallel_delegate()</code> also returns named
-<code>outcomes</code> beside its existing results.</p>
-<p>Answers are bounded to 8 KiB of UTF-8 text. Larger answers use the
-existing ContextPolicy offload store; a scoped reference retains
-provenance. The model projection includes at most eight references and
-reports omissions. <code>runtime$claim_omissions</code> reports omitted
-entries and text truncation for each structured claim, including in host
-inspection. Full child history is separate from the lead’s model
-context.</p>
-<p>Bind disclosure to the authenticated host session before exposing
-inspection:</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">owner_session</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">new.env</a></span><span class="op">(</span>parent <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">emptyenv</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="co"># supplied by host authentication</span></span>
-<span><span class="va">scope</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>owner_id <span class="op">=</span> <span class="st">"owner-1"</span>, conversation_id <span class="op">=</span> <span class="st">"chat-1"</span><span class="op">)</span></span>
-<span><span class="va">disclosure</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationDisclosure.html">DelegationDisclosure</a></span><span class="op">(</span></span>
-<span>  authorize <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">requester</span>, <span class="va">scope</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">requester</span>, <span class="va">owner_session</span><span class="op">)</span>,</span>
-<span>  redact <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">view</span>, <span class="va">requester</span><span class="op">)</span> <span class="va">view</span> <span class="co"># apply application-specific redaction</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  <span class="va">chat</span>, sub_agents <span class="op">=</span> <span class="va">definitions</span>,</span>
-<span>  delegation_scope <span class="op">=</span> <span class="va">scope</span>, delegation_disclosure <span class="op">=</span> <span class="va">disclosure</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">parallel_delegate</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>analyst <span class="op">=</span> <span class="st">"Analyze the evidence"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">views</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">inspect_subagents</span><span class="op">(</span><span class="va">owner_session</span>, transcript <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="va">views</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">outcome</span><span class="op">$</span><span class="va">runtime</span></span>
-<span><span class="va">views</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">turns</span> <span class="co"># native public ellmer turns for optional rendering</span></span>
-<span></span>
-<span><span class="va">history</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">export_subagents</span><span class="op">(</span><span class="va">owner_session</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">history</span>, <span class="st">"child-history.rds"</span><span class="op">)</span> <span class="co"># host-owned private storage</span></span>
-<span><span class="va">restored</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/delegation_history.html">delegation_history</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="st">"child-history.rds"</span><span class="op">)</span>, <span class="va">owner_session</span>, <span class="va">disclosure</span>,</span>
-<span>  scope <span class="op">=</span> <span class="va">history</span><span class="op">$</span><span class="va">scope</span> <span class="co"># use the host's trusted ownership record on reload</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>Authorization runs before lookup, even for nonexistent IDs. The
-default policy denies access. Redaction receives a child view, or a list
-with <code>kind = "artifact"</code> and <code>result</code> for
-<code>read_subagent_result()</code>. Remove references as well as text
-when an artifact must not be disclosed. Host callbacks are trusted
-application code; requester strings and saved scope do not authenticate
-a user. The low-level <code>get_subagent_*()</code> getters remain
-private-to-the-host inspection surfaces and do not perform end-user
-authorization.</p>
-<p>Snapshots include initial manifests, run and cumulative child usage,
-outcomes, errors and optionally transcripts. Child cumulative usage
-currently equals its single run; continuation is unsupported. Unknown
-usage/cost stays unknown. Public ellmer record/replay strips executable
-tools, raw provider payloads, hidden thinking and arbitrary display
-extras. General rich-widget persistence is separate work. Text remains
-untrusted content for the renderer to sanitize.</p>
-<p>Export accepts settled children only. Replay neither constructs an
-Agent nor runs a model or tool, and never grants permission, cancels or
-resumes execution. Restored artifact availability is explicitly
-unresolved until checked against host storage. Live inspection checks
-retained artifacts and reports missing ones. The default 16 MiB
-disclosure ceiling fails explicitly for larger views; select one child
-or omit its transcript. Storage retention and durable active-run
-recovery remain host responsibilities. Public content records carry a
-tool-value kind receipt so ordinary application objects are never
-interpreted as content constructors. Supported classed tool values (data
-frames, factors, dates, times, and durations) use a portable JSON text
-projection; native typed attachments retain their content
-representation. Unsupported application S7 values become an explicit
-omission notice without invoking their methods or exposing private
-fields. Other nonportable values still fail closed. The optional
-child-chat adapter builds on these headless records; Deputy core does
-not require shinychat.</p>
-</div>
-<div class="section level2">
-<h2 id="observe-child-activity">Observe child activity<a class="anchor" aria-label="anchor" href="#observe-child-activity"></a>
-</h2>
-<p>Observation reads a transient, bounded buffer. The runtime remains
-the only consumer of each child stream. This supports concurrent
-subscribers without running tools twice or letting a slow view block a
-child.</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">reader</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">observe_subagents</span><span class="op">(</span><span class="va">owner_session</span><span class="op">)</span></span>
-<span><span class="va">initial</span> <span class="op">&lt;-</span> <span class="va">reader</span><span class="op">$</span><span class="fu">snapshot</span><span class="op">(</span>transcript <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co"># Start work through a separate host action; observation itself starts nothing.</span></span>
-<span><span class="va">promise</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">parallel_delegate_async</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>analyst <span class="op">=</span> <span class="st">"Analyze the evidence"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">update</span> <span class="op">&lt;-</span> <span class="va">reader</span><span class="op">$</span><span class="fu">poll</span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">update</span><span class="op">$</span><span class="va">events</span></span>
-<span><span class="va">update</span><span class="op">$</span><span class="va">gaps</span> <span class="co"># ranges lost to eviction; recover with reader$snapshot()</span></span>
-<span><span class="va">reader</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span> <span class="co"># detach only; the child continues</span></span>
-<span></span>
-<span><span class="va">reconnected</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">observe_subagents</span><span class="op">(</span><span class="va">owner_session</span>, after <span class="op">=</span> <span class="va">update</span><span class="op">$</span><span class="va">cursor</span><span class="op">)</span></span>
-<span><span class="va">reconnected</span><span class="op">$</span><span class="fu">poll</span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co"># A separately authorized host action may cancel one child:</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">interrupt_subagent</span><span class="op">(</span><span class="va">delegation_id</span>, reason <span class="op">=</span> <span class="st">"user_cancelled"</span><span class="op">)</span></span></code></pre></div>
-<p>Each cursor contains a transient stream ID and sequence number.
-Sequences increase across the lead, while envelopes retain child
-conversation, delegation, run, parent and tool-call IDs. A snapshot
-returns its boundary cursor; subsequent polls return later events.
-Reconnecting with a previous cursor does not repeat events already
-acknowledged. Foreign and future cursors fail. A filtered subscription
-still reports gaps conservatively for the whole stream.</p>
-<p>The defaults retain at most 256 envelopes and 1 MiB. Individual
-events above 64 KiB become an explicit <code>content_omitted</code>
-envelope, recoverable from retained public history when available. These
-limits cover the observation buffer, not the separately retained
-conversation. <code><a href="../reference/DelegationObservation.html">DelegationObservation()</a></code> configures them.
-There are no per-reader queues and no subscriber callbacks inside
-execution.</p>
-<p>Every read reauthorizes the host request. Event redaction receives
-<code>list(kind = "event", event = envelope)</code>; returning a list
-without <code>event</code> hides it. Redaction errors leave the cursor
-unchanged and never fail the child. Host redactors must remain
-synchronous and must not drive execution. Internal observation errors
-appear separately as <code>observation_error</code>. Hidden thinking and
-private transport objects are excluded. Tool start events are
-deduplicated against the existing runtime tool-call identity; execution
-is unchanged.</p>
-<p><code>settled</code> is the delegation terminal envelope; a child’s
-own <code>stop</code> event may precede it. The former includes
-setup/unstarted outcomes and final governance status. Closing, selecting
-and replaying a view do not cancel or resume a child.
-<code>interrupt_subagent()</code> is a trusted host control API
-requiring the host’s separate action authorization. Streams are
-in-process only: process restart needs host-owned saved history, and
-active-run recovery remains unsupported.</p>
-</div>
-<div class="section level2">
-<h2 id="inspect-children-in-shiny">Inspect children in Shiny<a class="anchor" aria-label="anchor" href="#inspect-children-in-shiny"></a>
-</h2>
-<p>The optional adapter places an activity strip and selected child
-conversation beside the host’s lead chat. It requires shinychat 0.5.0,
-Shiny, bslib, commonmark and xml2. The core runtime has no UI
-dependency. Assistant Markdown is rendered then filtered to inert HTML
-so inline and fenced code retain their literal characters. Native tool
-code values and errors remain plain text.</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">ui</span> <span class="op">&lt;-</span> <span class="fu">bslib</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/bslib/reference/page.html" class="external-link">page_fluid</a></span><span class="op">(</span></span>
-<span>  <span class="fu">bslib</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/bslib/reference/layout_columns.html" class="external-link">layout_columns</a></span><span class="op">(</span><span class="va">lead_chat_ui</span>, <span class="fu"><a href="../reference/subagent_chat_ui.html">subagent_chat_ui</a></span><span class="op">(</span><span class="st">"children"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="../reference/subagent_chat_ui.html">subagent_chat_server</a></span><span class="op">(</span></span>
-<span>    <span class="st">"children"</span>, <span class="va">lead</span>,</span>
-<span>    requester <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="va">authenticated_owner_session</span>,</span>
-<span>    <span class="co"># Optional: authorize this action separately from disclosure.</span></span>
-<span>    on_cancel <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">id</span>, <span class="va">requester</span><span class="op">)</span> <span class="op">{</span></span>
-<span>      <span class="fu">authorize_child_cancellation</span><span class="op">(</span><span class="va">requester</span>, <span class="va">id</span><span class="op">)</span></span>
-<span>      <span class="va">lead</span><span class="op">$</span><span class="fu">interrupt_subagent</span><span class="op">(</span><span class="va">id</span>, <span class="st">"user_cancelled"</span><span class="op">)</span></span>
-<span>    <span class="op">}</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">}</span></span></code></pre></div>
-<p>Activity cards and the keyboard-accessible selector identify
-individual delegations, including repeated calls to the same specialist.
-The selected view shows execution status, initial context, usage,
-unresolved claims and native tool cards with retained attachments.
-Completed execution does not establish task success, approval or
-evidence verification. Tool results remain untrusted.</p>
-<p>Selecting, closing and reopening a child only reads history. The
-panel has no prompt handler; it cannot resume a child. Closing detaches
-its reader while children continue. Cancellation appears only when the
-host supplies a separately authorized callback. Polling rechecks
-authorization and redaction; denial clears the displayed history. Buffer
-gaps recover from retained snapshots, while partial live text is
-bounded. The read-only composer is hidden with scoped presentation CSS
-tested against shinychat 0.5.0; no private runtime helpers are used.</p>
-<p>For saved history, provide a reactive <code>history</code> plus the
-current host-owned <code>disclosure</code> policy and trusted
-<code>scope</code>, obtained independently of the saved payload. Replay
-restores no execution, and unresolved artifact references stay
-unresolved. The module returns reactive selection, views, notice and
-closed state for host composition.</p>
-<p>Run <code>inst/examples/subagent-chats/app.R</code> for a
-deterministic local demo with native tool output and a plot, concurrent
-specialists, repeated names, a partial failure, optional cancellation,
-access revocation and saved-history replay. Its visible model/tool
-counters make extra execution detectable. It uses a local fixture
-service and needs no paid model credentials.</p>
-</div>
-<div class="section level2">
-<h2 id="a-trusted-scientific-result">A trusted scientific result<a class="anchor" aria-label="anchor" href="#a-trusted-scientific-result"></a>
-</h2>
-<p>The runnable <code>inst/examples/trusted-mini-agent</code> example
-applies Will Landau and Sam Parmar’s <a href="https://trustedminiagents.dev" class="external-link">trusted mini-agent</a> pattern to a
-scientific workflow. It delegates proposal writing to a specialist, then
-uses a separate host-owned Agent for durable approval and a fixed
-descriptive computation. The reviewer sees the dataset revision, groups,
-units and method, and can edit or deny the inputs. The computed result
-panel reads only the designated tool’s host receipt; deliberately false
-model commentary cannot replace it. The example uses clearly synthetic
-plant weights and a local deterministic provider, with no paid
-calls.</p>
-<p><code>r eval=FALSE shiny::runApp(system.file("examples", "trusted-mini-agent", package = "deputy"))</code></p>
-<p>The explicit handoff is necessary because delegated child approval
-continuation is not yet supported. The receipt keeps the source child
-delegation separate from the execution Agent. Reading a child remains
-observational. This example demonstrates the execution and output
-contract, not scientific correctness or model quality; trusted code,
-appropriate inputs and effective review are still required.</p>
-<div class="section level3">
-<h3 id="trusted-results-across-delegation">Trusted results across delegation<a class="anchor" aria-label="anchor" href="#trusted-results-across-delegation"></a>
-</h3>
-<p><code>LeadAgent$new(trusted_results = TrustedResults(...))</code>
-applies one <a href="trusted-mini-agents.html">trusted-results
-policy</a> to the whole delegation tree. The policy implements Will
-Landau and Sam Parmar’s <a href="https://trustedminiagents.dev" class="external-link">trusted
-mini-agent</a> rules; delegation is Deputy’s extension of them. Every
-child inherits it, so each definition’s tools must pass the same
-no-bypass check: no code execution, no further delegation, and only
-read-only, closed-world tools unless exempted. A designated tool can
-live in a child, but it must be the same tool object wherever it
-appears, declared in the definition’s <code>tools</code> or in a
-<code>Skill</code> value rather than a skill directory. When a child
-runs it, the result is recorded in the lead’s run and sent to the lead’s
-<code>on_result</code>, carrying the child’s
-<code>delegation_id</code>:</p>
-<p><code>r eval=FALSE forecast &lt;- get_forecast_tool() lead &lt;- LeadAgent$new(   chat = ellmer::chat("openai/gpt-5.6-luna"),   sub_agents = list(agent_definition(     "forecaster",     "Produce forecasts",     "Call get_forecast.",     tools = list(forecast)   )),   trusted_results = TrustedResults(     forecast = "get_forecast",     on_result = function(event) show_forecast(event$value)   ) )</code></p>
-<p>Definitions that break the rule are rejected by
-<code>register_sub_agent()</code> and at construction. Children cannot
-suspend for durable approval, so input review of a child’s trusted tool
-still needs the separate executor pattern above.</p>
-</div>
+<ul>
+<li>
+<a href="delegation.html">Briefing and inspecting subagents</a>:
+pass structured briefs and evidence, give each subagent its own
+resources, and show subagent conversations to users safely.</li>
+<li>
+<a href="retained-agents.html">Retained specialists and agent
+graphs</a>: keep a specialist’s conversation across several tasks, and
+let specialists delegate to each other.</li>
+<li>
+<a href="example-code-review.html">Multi-agent code review</a>: a
+complete example.</li>
+</ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

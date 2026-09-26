@@ -1,11 +1,12 @@
-# Connect an Agent to an independent sandboxed REPL
+# Connect an agent to a sandboxed mcp-repl session
 
-Creates a
-[McpConnection](https://jameshwade.github.io/deputy/reference/McpConnection.md)
-for one explicitly configured mcp-repl server. Each connection owns an
-independent client and upstream interpreter session. Register its
-`$tools()` on the supplied Agent to retain normal permissions, hooks,
-budgets and execution provenance.
+Starts one mcp-repl server from an mcptools configuration and connects
+it to `agent`. mcp-repl runs R inside an OS sandbox and keeps variables
+between calls; each connection has its own R session. Register
+`connection$tools()` on the agent so that calls go through its
+permissions, hooks and limits. The server entry must pass `--sandbox`,
+as described in
+[`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md).
 
 ## Usage
 
@@ -29,66 +30,60 @@ mcp_repl_connection(
 
 - agent:
 
-  Agent that owns the connection.
+  The agent that owns the connection.
 
 - server:
 
-  Exact configured mcp-repl server name.
+  Name of the mcp-repl server in `config`.
 
 - sandbox:
 
-  Required explicit upstream sandbox policy.
+  The sandbox mode the server must be configured with.
 
 - timeout:
 
-  Maximum seconds for one MCP request. This is distinct from mcp-repl's
-  `timeout_ms`, which can return a busy result while code continues.
-  Deputy forwards at most 3000 ms as `timeout_ms` (see Details).
+  Maximum seconds to wait for one MCP request before closing the
+  connection. This is separate from the per-call `timeout_ms` limit
+  described in Details.
 
 - startup_timeout:
 
-  Maximum seconds for client/server startup.
+  Maximum seconds for the client and server to start.
 
 ## Value
 
 A
 [McpConnection](https://jameshwade.github.io/deputy/reference/McpConnection.md).
-The host must close it when the conversation ends.
+Call its `$close()` method when the conversation ends.
 
 ## Details
 
-The producer contract is qualified with mcptools 1.0.2 or 1.0.3 and
-mcp-repl 0.3.0. The executable must be installed and configured by the
-host. mcp-repl owns interpreter startup, sandbox enforcement, reset,
-interrupt, rich content and oversized-output artifacts. The client
-requires its `repl(input, timeout_ms)` tool contract; it does not infer
-a binary version from the executable name.
+Supported with mcptools 1.0.2 or 1.0.3 and mcp-repl 0.3.0. You install
+and configure the mcp-repl executable yourself; it handles the sandbox,
+interrupts, resets, rich output and large outputs. The connection errors
+if the server's `repl` tool doesn't take exactly the arguments `input`
+and `timeout_ms`.
 
-Each `repl` call forwards `timeout_ms` capped at 3000 ms, and 3000 ms
-when it is omitted (mcp-repl would otherwise wait up to 60 s). The
-qualified mcptools releases wait only about 4 seconds for a stdio reply,
-and a reply that misses that window would desynchronize the connection.
-Work that takes longer keeps running in the interpreter: the call
-returns mcp-repl's busy result, and a later call with empty `input`
-retrieves the remaining output. The registered tool description tells
-the model this.
+mcptools waits only about 4 seconds for a reply, so each `repl` call
+waits at most 3 seconds: `timeout_ms` is capped at 3000 and defaults to
+3000 (instead of mcp-repl's 60 seconds). Longer work keeps running: the
+call returns a busy result, and a later call with empty `input` collects
+the rest of the output. The tool description tells the model this.
 
-A busy interpreter result is upstream output, not a completed
-calculation. After such a response,
+A busy result means the code hasn't finished. Use
 [`mcp_repl_control()`](https://jameshwade.github.io/deputy/reference/mcp_repl_control.md)
-can request an interrupt or reset. An active client request cannot
-accept a second request: use `$cancel()` to terminate the connection and
-discard state, or wait for the request to return. Interrupting the
-owning Agent also cancels its active MCP connections.
+to interrupt it or reset the session. A connection handles one request
+at a time; `$cancel()` ends the connection and discards the R session.
+Interrupting the agent also cancels its active MCP connections.
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
-agent <- Agent$new(chat = ellmer::chat("openai/gpt-5.6-luna"))
+agent <- Agent$new(chat = ellmer::chat("openai/gpt-6-luna"))
 connection <- mcp_repl_connection(agent = agent)
 agent$register_tools(connection$tools())
-# In a Shiny host: session$onSessionEnded(function() connection$close())
+# In a Shiny app: session$onSessionEnded(function() connection$close())
 connection$close()
 } # }
 ```

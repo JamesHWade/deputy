@@ -1,7 +1,11 @@
 # Create a read-only permission policy
 
-Creates a permission policy that only allows reading files. All write
-operations, code execution, and web access are denied.
+Creates a `"readonly"` policy. The agent can use the built-in
+file-reading tools such as `read_file`, `list_files` and `grep_files`,
+and a
+[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
+can delegate to subagents, which are read-only too. Writes, code
+execution, web access and custom tools are denied.
 
 ## Usage
 
@@ -13,7 +17,7 @@ permissions_readonly()
 
 A
 [Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md)
-object
+object.
 
 ## Examples
 

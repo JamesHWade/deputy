@@ -1,6 +1,7 @@
 # Create an allow permission result
 
-Returns a permission result that allows the tool to execute.
+Return this from a `can_use_tool` callback or a PermissionRequest hook
+to allow a tool call.
 
 ## Usage
 
@@ -12,16 +13,17 @@ PermissionResultAllow(message = NULL)
 
 - message:
 
-  Optional message to display
+  Optional note stored on the result. Deputy doesn't show it to the
+  model or the user.
 
 ## Value
 
-A `PermissionResultAllow` S7 object
+A `PermissionResultAllow` object.
 
 ## See also
 
 [CallbackResult](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
-for read-only properties and S7 inspection.
+for reading result fields.
 
 ## Examples
 

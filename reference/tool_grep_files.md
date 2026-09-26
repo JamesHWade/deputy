@@ -1,6 +1,7 @@
 # Search file contents with grep-like matching
 
-Search text files under a directory and return matching lines.
+A tool that searches the lines of files under a directory with a
+Perl-compatible regular expression.
 
 ## Usage
 
@@ -23,27 +24,27 @@ A tool definition created with
 
 - pattern:
 
-  Regex pattern to search for (tool argument)
+  Regular expression to search for.
 
 - path:
 
-  Base directory to search (tool argument)
+  Directory to search. Defaults to the working directory.
 
 - recursive:
 
-  If TRUE, search subdirectories recursively (tool argument)
+  If `TRUE` (the default), search subdirectories.
 
 - ignore_case:
 
-  If TRUE, ignore case when matching (tool argument)
+  If `TRUE`, ignore case.
 
 - max_matches:
 
-  Maximum matching lines to return (tool argument)
+  Maximum number of matching lines to return. Defaults to 100.
 
 ## Value
 
-When called directly, a character summary of matching file lines.
+Matching lines formatted as `file:line: text`.
 
 ## Examples
 

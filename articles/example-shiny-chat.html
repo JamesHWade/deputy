@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Example: Shiny Chat with shinychat • deputy</title>
+<title>Shiny chat • deputy</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Example: Shiny Chat with shinychat">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Shiny chat">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -38,27 +38,38 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -77,7 +88,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Example: Shiny Chat with shinychat</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Shiny chat</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/vignettes/example-shiny-chat.Rmd" class="external-link"><code>vignettes/example-shiny-chat.Rmd</code></a></small>
@@ -86,48 +97,33 @@
 
     
     
-<p>Deputy Agents implement the ellmer chat methods used by <a href="https://posit-dev.github.io/shinychat/" class="external-link">shinychat</a>. Pass an
-Agent directly to <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server()</a></code> to stream responses and
-tool activity while Deputy checks permissions and tracks usage.</p>
-<pre class="text"><code>shinychat input -&gt; Agent$stream_async() -&gt; ellmer
-                                      \-&gt; AgentResult + hooks + usage</code></pre>
-<p>The stream keeps ellmer’s native chunks, so shinychat can render
-incremental text, tool activity, and attachment-enabled input. After it
-finishes, <code>agent$last_run()</code> exposes the corresponding
-<code>AgentResult</code>.</p>
+<p>An agent works anywhere <a href="https://posit-dev.github.io/shinychat/" class="external-link">shinychat</a> expects an
+ellmer chat. Pass it to <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server()</a></code> and the app streams
+the model’s replies and tool calls, while Deputy applies the agent’s
+permissions, hooks and limits to every message.</p>
 <div class="section level2">
-<h2 id="basic-setup">Basic Setup<a class="anchor" aria-label="anchor" href="#basic-setup"></a>
+<h2 id="a-minimal-app">A minimal app<a class="anchor" aria-label="anchor" href="#a-minimal-app"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://shiny.posit.co/" class="external-link">shiny</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://posit-dev.github.io/shinychat/r/" class="external-link">shinychat</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">workspace</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/normalizePath.html" class="external-link">normalizePath</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>, mustWork <span class="op">=</span> <span class="cn">TRUE</span>, winslash <span class="op">=</span> <span class="st">"/"</span><span class="op">)</span></span>
+<span><span class="va">workspace</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/normalizePath.html" class="external-link">normalizePath</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>, winslash <span class="op">=</span> <span class="st">"/"</span>, mustWork <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">ui</span> <span class="op">&lt;-</span> <span class="fu">bslib</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/bslib/reference/page.html" class="external-link">page_fluid</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_ui.html" class="external-link">chat_ui</a></span><span class="op">(</span><span class="st">"chat"</span>, fill <span class="op">=</span> <span class="cn">TRUE</span>, allow_attachments <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span></span>
-<span>    model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span>,</span>
-<span>    system_prompt <span class="op">=</span> <span class="st">"You are a concise data assistant."</span></span>
-<span>  <span class="op">)</span></span>
-<span></span>
 <span>  <span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>    chat <span class="op">=</span> <span class="va">chat</span>,</span>
+<span>    chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span></span>
+<span>      <span class="st">"openai/gpt-6-luna"</span>,</span>
+<span>      system_prompt <span class="op">=</span> <span class="st">"You are a concise data assistant."</span></span>
+<span>    <span class="op">)</span>,</span>
 <span>    tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>    permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>    usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span></span>
-<span>      max_requests <span class="op">=</span> <span class="fl">10</span>,</span>
-<span>      max_tool_calls <span class="op">=</span> <span class="fl">12</span>,</span>
-<span>      max_cost_usd <span class="op">=</span> <span class="fl">0.50</span></span>
-<span>    <span class="op">)</span>,</span>
-<span>    context_policy <span class="op">=</span> <span class="fu"><a href="../reference/ContextPolicy.html">ContextPolicy</a></span><span class="op">(</span></span>
-<span>      max_tokens <span class="op">=</span> <span class="fl">32000</span>,</span>
-<span>      fallback <span class="op">=</span> <span class="st">"error"</span></span>
-<span>    <span class="op">)</span>,</span>
+<span>    usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">10</span>, max_tool_calls <span class="op">=</span> <span class="fl">12</span><span class="op">)</span>,</span>
 <span>    working_dir <span class="op">=</span> <span class="va">workspace</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
@@ -135,172 +131,91 @@ finishes, <code>agent$last_run()</code> exposes the corresponding
 <span><span class="op">}</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/shinyApp.html" class="external-link">shinyApp</a></span><span class="op">(</span><span class="va">ui</span>, <span class="va">server</span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server()</a></code> passes both plain text and
-attachment-enabled ellmer content to the Agent unchanged. It also
-supplies shinychat history and cancellation around Deputy’s stream.</p>
-<p>Compaction and native conversation history can be enabled together.
-Deputy’s <code>get_turns()</code> supplies the complete selected
-conversation to shinychat, while <code>get_context_turns()</code>
-exposes only the compacted model context. Later completed replies remain
-available when the user switches conversations or restores a branch.
-Native history requires a shinychat version exporting
-<code><a href="https://posit-dev.github.io/shinychat/r/reference/history_options.html" class="external-link">history_options()</a></code> and <code>FileConversationStore</code>;
-Deputy’s transcript contract also works without shinychat. Hosts that
-previously rejected a non-NULL <code>ContextPolicy(max_tokens)</code>
-with native history can remove that workaround when using this
-implementation.</p>
+<p>Create the agent inside <code>server()</code>, so that each browser
+session gets its own conversation, usage and hooks. shinychat calls the
+agent’s <code>stream_async()</code> method, passing text and attachments
+through unchanged, and handles the input box, cancellation and
+conversation history. After each reply, <code>agent$last_run()</code>
+returns the run’s <code>AgentResult</code>.</p>
+<p>The limits apply to each message the user sends. The agent also keeps
+its <a href="conversations.html">context policy</a>: long conversations
+are compacted automatically, and large tool results are stored outside
+the model’s context.</p>
 </div>
 <div class="section level2">
-<h2 id="showing-compaction-to-users">Showing compaction to users<a class="anchor" aria-label="anchor" href="#showing-compaction-to-users"></a>
+<h2 id="tell-users-when-older-messages-are-summarised">Tell users when older messages are summarised<a class="anchor" aria-label="anchor" href="#tell-users-when-older-messages-are-summarised"></a>
 </h2>
-<p>The runnable <code>inst/examples/shiny-chat/</code> app includes a
-host-owned compaction notice above the transcript. While summarization
-runs it says “Summarizing earlier messages…”. After successful
-installation it says “Earlier messages summarized for the assistant.
-Your full conversation is still available.” An expandable “View summary”
-shows the accepted summary as escaped text, alongside an explanation
-that the assistant uses it with recent messages and that some earlier
-details may be omitted.</p>
-<p>The notice does not add, hide, or replace chat messages.
-<code>PreCompact</code> and <code>PostCompact</code> hooks update its
-state; a <code>Stop</code> hook clears the busy indication after an
-automatic run fails or is interrupted, while retaining any previously
-accepted summary. Register custom compaction-veto hooks before this
-notice so their early return prevents the progress indication. Hosts
-that call <code>agent$compact()</code> directly must also clear progress
-when that call ends, including errors or vetoes; a manual call does not
-fire the run’s <code>Stop</code> hook. The example scopes the notice to
-shinychat’s public conversation ID and clears it through
-<code>history$on_restore()</code>, including branch navigation. Native
-history restores the complete transcript rather than the compacted
-context, so the notice stays hidden until compaction happens again. This
-presentation belongs to the host; Deputy does not insert UI messages
-into its conversation record.</p>
+<p>When compaction runs, the model sees a summary instead of the oldest
+messages, but the chat still shows the whole conversation. The example
+app in <code>inst/examples/shiny-chat/</code> shows a small notice above
+the chat while that happens (“Summarizing earlier messages…”) and
+afterwards (“Earlier messages summarized for the assistant. Your full
+conversation is still available.”), with a “View summary” link that
+shows the summary text.</p>
+<p>The notice is driven by hooks: <code>PreCompact</code> sets it to
+busy, <code>PostCompact</code> records the summary, and
+<code>Stop</code> clears the busy state if a run fails or is cancelled.
+If you call <code>agent$compact()</code> yourself, clear the notice when
+that call returns, because a manual compaction doesn’t fire
+<code>Stop</code>. The notice belongs to the page, not the conversation:
+Deputy never adds messages to the chat to report compaction.</p>
+<p>shinychat’s conversation history, where available, stores the whole
+conversation (<code>agent$get_turns()</code>), so restoring a
+conversation brings back every message while the model continues from
+the summary.</p>
 </div>
 <div class="section level2">
-<h2 id="what-the-agent-adds">What the Agent Adds<a class="anchor" aria-label="anchor" href="#what-the-agent-adds"></a>
+<h2 id="hooks-in-an-app">Hooks in an app<a class="anchor" aria-label="anchor" href="#hooks-in-an-app"></a>
 </h2>
-<p>Choose a method by the result your application needs:</p>
-<table class="table">
-<colgroup>
-<col width="33%">
-<col width="33%">
-<col width="33%">
-</colgroup>
-<thead><tr class="header">
-<th>Method</th>
-<th>Native return</th>
-<th>Typical host</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code>chat()</code></td>
-<td>final text</td>
-<td>scripts and consoles</td>
-</tr>
-<tr class="even">
-<td><code>chat_async()</code></td>
-<td>promise of final text</td>
-<td>async applications</td>
-</tr>
-<tr class="odd">
-<td>
-<code>chat_structured()</code> /
-<code>chat_structured_async()</code>
-</td>
-<td>typed data</td>
-<td>structured-output hosts</td>
-</tr>
-<tr class="even">
-<td><code>stream()</code></td>
-<td>synchronous ellmer stream</td>
-<td>terminal hosts</td>
-</tr>
-<tr class="odd">
-<td><code>stream_async()</code></td>
-<td>asynchronous ellmer stream</td>
-<td>shinychat</td>
-</tr>
-<tr class="even">
-<td><code>run_sync()</code></td>
-<td><code>AgentResult</code></td>
-<td>inspected workflows</td>
-</tr>
-<tr class="odd">
-<td><code>run_async()</code></td>
-<td>promise of <code>AgentResult</code>
-</td>
-<td>subagents</td>
-</tr>
-</tbody>
-</table>
-<p>All interfaces enforce the Agent’s permissions, hooks,
-<code>UsageLimits</code>, workspace path resolution, file checkpoints,
-automatic context compaction, large-result offloading, and run
-accounting. Native relative file paths resolve against the Agent’s
-immutable <code>working_dir</code>; Deputy never changes the process
-working directory. Custom hosts can pass <code>run_context</code> to any
-chat, stream, or run method to correlate a request with product-owned
-session and stage identities.</p>
-<p><code><a href="../reference/ContextPolicy.html">ContextPolicy()</a></code> checks the estimated complete context
-after run initialization and again at model-request boundaries between
-tool rounds, compacting whenever it crosses the token threshold. Summary
-streaming is asynchronous and shares the run’s cancellation controller
-and usage limits. The default fails closed if LLM summary generation
-fails. Set <code>fallback = "text"</code> only when a deterministic
-degraded summary is acceptable. <code>summary_fallback_chats</code>
-explicitly configures separate summary recovery destinations.
-<code>agent$last_compaction()</code> reports the method, run ID, attempt
-conditions, and compaction usage.</p>
-<p>Large tool results are stored as integrity-checked envelopes and
-replaced in model context with a preview and
-<code>deputy://tool-result/...</code> reference. The Agent registers
-<code>deputy_read_tool_result()</code> so the model can page through the
-stored result in bounded chunks. Applications can retrieve the original
-R value with <code>agent$resolve_tool_result(reference)</code>.</p>
-</div>
-<div class="section level2">
-<h2 id="hooks-and-cancellation">Hooks and Cancellation<a class="anchor" aria-label="anchor" href="#hooks-and-cancellation"></a>
-</h2>
-<p>Hooks attach to the Agent as usual:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/hook_log_tools.html">hook_log_tools</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
+<p>Hooks are added to the agent as usual, inside
+<code>server()</code>:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/hook_log_tools.html">hook_log_tools</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PostCompact"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">result</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_abort.html" class="external-link">cli_inform</a></span><span class="op">(</span><span class="st">"Compacted with: {result$method}"</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/showNotification.html" class="external-link">showNotification</a></span><span class="op">(</span><span class="st">"Earlier messages were summarised."</span><span class="op">)</span></span>
+<span>    <span class="cn">NULL</span></span>
 <span>  <span class="op">}</span></span>
 <span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append()</a></code> owns the completion promise and surfaces
-stream errors in the chat UI. shinychat cancellation propagates through
-ellmer’s stream controller; Deputy still finalizes checkpoints and fires
-<code>Stop</code> and <code>SessionEnd</code>.</p>
+<p>When the user cancels a reply, the run stops at the next point where
+ellmer can stop it, and Deputy still fires the <code>Stop</code> and
+<code>SessionEnd</code> hooks and saves any file checkpoints.</p>
+<p>To ask the user questions from a tool, give each session its own
+handler with <code><a href="../reference/tools_interactive.html">tools_interactive()</a></code>; see <a href="approvals.html">Human input and approvals</a>.</p>
 </div>
 <div class="section level2">
-<h2 id="subagents">Subagents<a class="anchor" aria-label="anchor" href="#subagents"></a>
+<h2 id="long-running-tools">Long-running tools<a class="anchor" aria-label="anchor" href="#long-running-tools"></a>
 </h2>
-<p><code>LeadAgent</code> delegation uses <code>run_async()</code>
-internally, so a subagent does not block the Shiny R process while the
-parent chat is streaming. A custom async tool can use the same
-contract:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">tool_scout</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
-<span>  fun <span class="op">=</span> <span class="fu">coro</span><span class="fu">::</span><span class="fu"><a href="https://coro.r-lib.org/reference/async.html" class="external-link">async</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">prompt</span><span class="op">)</span> <span class="op">{</span></span>
+<p>Delegating to a subagent doesn’t block the app:
+<code>LeadAgent</code> runs subagents with <code>run_async()</code>, so
+other sessions keep working while the lead waits. Your own tools can do
+the same by returning a promise:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">ask_scout</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/tool.html" class="external-link">tool</a></span><span class="op">(</span></span>
+<span>  <span class="fu">coro</span><span class="fu">::</span><span class="fu"><a href="https://coro.r-lib.org/reference/async.html" class="external-link">async</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">prompt</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="va">result</span> <span class="op">&lt;-</span> <span class="fu">coro</span><span class="fu">::</span><span class="fu"><a href="https://coro.r-lib.org/reference/async.html" class="external-link">await</a></span><span class="op">(</span><span class="va">scout</span><span class="op">$</span><span class="fu">run_async</span><span class="op">(</span><span class="va">prompt</span><span class="op">)</span><span class="op">)</span></span>
 <span>    <span class="va">result</span><span class="op">$</span><span class="va">response</span></span>
 <span>  <span class="op">}</span><span class="op">)</span>,</span>
-<span>  name <span class="op">=</span> <span class="st">"agent_scout"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Delegate a literature search."</span>,</span>
-<span>  arguments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>prompt <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="st">"Self-contained task"</span><span class="op">)</span><span class="op">)</span></span>
+<span>  name <span class="op">=</span> <span class="st">"ask_scout"</span>,</span>
+<span>  description <span class="op">=</span> <span class="st">"Ask the literature scout to search for papers."</span>,</span>
+<span>  arguments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>prompt <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="st">"A self-contained task"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="va">agent</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="va">tool_scout</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">agent</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="va">ask_scout</span><span class="op">)</span></span></code></pre></div>
+<p>Here <code>scout</code> is another <code>Agent</code>. A tool that
+calls another agent like this should also have annotations, like any
+other tool; see <a href="tools.html">Tools</a>.</p>
 </div>
 <div class="section level2">
-<h2 id="running-the-example">Running the Example<a class="anchor" aria-label="anchor" href="#running-the-example"></a>
+<h2 id="run-the-example">Run the example<a class="anchor" aria-label="anchor" href="#run-the-example"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples/shiny-chat"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>The package includes the app with the compaction notice:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples"</span>, <span class="st">"shiny-chat"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>For apps that show subagent conversations beside the main chat, see
+<a href="delegation.html#a-subagent-panel-for-shiny">Briefing and
+inspecting subagents</a>.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

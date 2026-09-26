@@ -1,6 +1,9 @@
-# Return resources owned by one delegation
+# Return tools from a resource factory
 
-Return resources owned by one delegation
+The value returned by a
+[DelegationPolicy](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
+`resources` function: the tools built for one subagent and a function
+that releases them.
 
 ## Usage
 
@@ -12,20 +15,18 @@ DelegationResources(tools = list(), cleanup)
 
 - tools:
 
-  List of ellmer function tools constructed for the supplied child.
+  List of ellmer tools built for this subagent.
 
 - cleanup:
 
-  Zero-argument synchronous function releasing all constructed
-  resources. Deputy calls it once after settlement, cancellation, or
-  subsequent setup failure, including rejected tools. It must not resume
-  or approve work. Cleanup errors are retained separately in
-  `list_subagents()$cleanup_error`. Cancellation is cooperative;
-  borrowed resources are never closed by Deputy.
+  A function with no arguments that releases what the factory created.
+  Deputy calls it once when the delegation ends, including after a
+  failure during setup such as a rejected tool. Errors are recorded in
+  the `cleanup_error` column of `$list_subagents()`.
 
 ## Value
 
-A read-only runtime `DelegationResources` value, not a portable receipt.
+A `DelegationResources` object.
 
 ## See also
 

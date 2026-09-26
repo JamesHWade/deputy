@@ -1,9 +1,11 @@
-# Request durable cooperative cancellation of an Agent job
+# Cancel a background job
 
-The small control store is independent from the execution store, so a
-cancellation request can be recorded while a worker owns the execution
-lock. The worker observes it at runtime checkpoints and through its
-bounded interrupt poller.
+Records a request to cancel the job. A queued job, or one waiting for
+approval, is cancelled straight away. A job that is running stops at the
+next point where its process checks for cancellation, so the job
+returned here may still be `"running"`. A job left `"running"` by a
+process that died is marked `"indeterminate"`. Cancelling a finished job
+does nothing.
 
 ## Usage
 
@@ -15,19 +17,19 @@ job_cancel(path, authorize, reason = "cancelled")
 
 - path:
 
-  Committed directory returned by
+  Job directory returned by
   [`job_create()`](https://jameshwade.github.io/deputy/reference/job_create.md).
 
 - authorize:
 
-  Function returning the exact job identity receipt.
+  Function that checks the request, as in
+  [`job_run()`](https://jameshwade.github.io/deputy/reference/job_run.md).
 
 - reason:
 
-  Host cancellation reason.
+  Reason to record, as one string.
 
 ## Value
 
-A read-only
-[AgentJob](https://jameshwade.github.io/deputy/reference/AgentJob.md)
-inspection value.
+The updated
+[AgentJob](https://jameshwade.github.io/deputy/reference/AgentJob.md).

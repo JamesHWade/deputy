@@ -1,16 +1,41 @@
-# Permission modes for agent tool access
+# Permission modes
 
-Permission modes control the overall behavior of tool permission
-checking:
+`PermissionMode` lists the modes a
+[Permissions](https://jameshwade.github.io/deputy/reference/Permissions.md)
+policy can use. In every mode, `tool_denylist` and `tool_allowlist` are
+checked first, and the approval prompt tool
+(`permission_prompt_tool_name`) is then allowed without further checks.
 
-- `"standard"` - Check each tool against the configured capabilities
+- `"standard"`: checks built-in tools against the capability flags
+  (`file_read`, `file_write`, `bash`, `r_code`, `web`,
+  `install_packages`) and custom tools against their annotations.
 
-- `"plan"` - Allow annotated read-only tools within configured
-  capabilities plus human approval prompts
+- `"readonly"`: allows the built-in file-reading tools, the web tools
+  when `web = TRUE`, a
+  [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)'s
+  own `delegate_to_agent` tool and tools on `tool_allowlist`. It denies
+  writes, code execution, destructive tools and, unless `web = TRUE`,
+  open-world tools.
 
-- `"readonly"` - Deny all write/execute tools
+- `"plan"`: allows only tools annotated as read-only, plus the approval
+  prompt tool and a
+  [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)'s
+  own `delegate_to_agent` tool. Open-world tools also need `web = TRUE`.
 
-- `"full"` - Allow all tools (dangerous, use with caution)
+- `"full"`: allows every call. Capability flags and annotations are not
+  checked.
+
+A
+[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)'s
+subagents can't use a less strict mode than their lead, and each of
+their tool calls is also checked against the lead's policy.
+
+If the policy has a `can_use_tool` callback, it is called in every mode
+for each call the rest of the policy allows. It can deny the call or
+pause it for approval, but it can't allow a call the policy denies.
+
+A denied call can still be allowed by a PermissionRequest hook (see
+[HookEvent](https://jameshwade.github.io/deputy/reference/HookEvent.md)).
 
 ## Usage
 
@@ -18,47 +43,34 @@ checking:
 PermissionMode
 ```
 
-## Tool Annotations
+## Tool annotations
 
-Permissions use tool annotations (from
-[`ellmer::tool_annotations()`](https://ellmer.tidyverse.org/reference/tool_annotations.html))
-to determine tool behavior. Available annotations:
+Custom tools are checked through their annotations, set with
+[`ellmer::tool_annotations()`](https://ellmer.tidyverse.org/reference/tool_annotations.html).
+A missing annotation takes a cautious default:
 
-**read_only_hint** (logical, default: FALSE)
+- `read_only_hint` (default `FALSE`): the tool only reads data. Plan
+  mode allows only these tools.
 
-Indicates the tool only reads data and doesn't modify state. Annotations
-are descriptive metadata, not an authority grant: `"readonly"` mode
-allows known Deputy read tools or explicit allowlist entries, subject to
-destructive and open-world capability checks. Examples:
-`tool_read_file`, `tool_list_files`, `tool_search`.
+- `destructive_hint` (default `TRUE`, or `FALSE` when
+  `read_only_hint = TRUE`): the tool may make irreversible changes.
+  Destructive tools are denied in plan and readonly modes, and in
+  standard mode when both `file_write` and `bash` are off.
 
-**destructive_hint** (logical, default: TRUE)
+- `open_world_hint` (default `TRUE`): the tool may reach external
+  systems. Open-world tools are denied unless `web = TRUE`, except in
+  full mode.
 
-Indicates the tool may cause destructive/irreversible changes. Tools
-with `destructive_hint = TRUE` require explicit permission. Examples:
-`tool_write_file`, `tool_delete_file`, `tool_run_bash`
+- `idempotent_hint` (default `FALSE`): repeated calls have the same
+  effect. Permission checks don't use it.
 
-**open_world_hint** (logical, default: TRUE)
+So in standard mode an unannotated custom tool needs `web = TRUE`, and
+plan and readonly modes deny it. Built-in tools such as `write_file` and
+`run_bash` are checked against their capability flag instead.
 
-Indicates the tool may interact with external systems. Used for network
-calls, package installation, etc. Examples: `tool_web_search`,
-`tool_install_package`
+## Annotating tools
 
-**idempotent_hint** (logical, default: FALSE)
-
-Indicates repeated calls produce the same result. This annotation alone
-does not authorize automatic retries.
-
-Missing annotations remain absent on the tool. For custom tools,
-permission checks assume modification, possible destruction, external
-access, and no idempotence unless stated otherwise. If
-`read_only_hint = TRUE`, an omitted destructive annotation is ignored;
-an explicit TRUE still denies read-only use. Native tools continue to
-require their named capabilities. A custom permission callback can
-explicitly authorize a tool in standard mode; full mode bypasses
-annotation checks but still honors tool gating.
-
-## Creating Tools with Annotations
+Set annotations when you create a tool:
 
     # Read-only tool
     tool_search <- ellmer::tool(
@@ -81,7 +93,8 @@ annotation checks but still honors tool gating.
       arguments = list(path = ellmer::type_string("File path")),
       annotations = ellmer::tool_annotations(
         read_only_hint = FALSE,
-        destructive_hint = TRUE
+        destructive_hint = TRUE,
+        open_world_hint = FALSE
       )
     )
 

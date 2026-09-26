@@ -1,6 +1,8 @@
 # Find files using a glob pattern
 
-Search for files under a directory using shell-style glob matching.
+A tool that finds files and directories matching a glob pattern such as
+`"*.R"` or `"R/*.R"`. `*` and `?` don't match `/`; `**` matches across
+directories.
 
 ## Usage
 
@@ -17,20 +19,19 @@ A tool definition created with
 
 - pattern:
 
-  Glob pattern to match (tool argument)
+  Glob pattern to match.
 
 - path:
 
-  Base directory to search (tool argument)
+  Directory to search. Defaults to the working directory.
 
 - recursive:
 
-  If TRUE, search subdirectories recursively (tool argument)
+  If `TRUE` (the default), search subdirectories.
 
 ## Value
 
-When called directly, a character summary of paths matching the glob
-pattern.
+A text listing of matching paths, relative to `path`.
 
 ## Examples
 
@@ -39,6 +40,6 @@ directory <- tempfile()
 dir.create(directory)
 writeLines("example", file.path(directory, "example.txt"))
 tool_glob_files("*.txt", directory)
-#> [1] "Base path: /tmp/RtmpNHyg1W/file1a964005320a\nMatches: 1\n\nexample.txt"
+#> [1] "Base path: /tmp/RtmpRU2rTg/file1a642f285c12\nMatches: 1\n\nexample.txt"
 unlink(directory, recursive = TRUE)
 ```

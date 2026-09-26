@@ -1,9 +1,9 @@
-# Declarative Skill Configuration
+# Reusable instructions and tools
 
-A read-only S7 value bundling a prompt extension, original ellmer tools,
-and declared package and provider requirements. Load a Skill into an
-[Agent](https://jameshwade.github.io/deputy/reference/Agent.md) with
-`agent$load_skill(skill)`.
+A skill bundles extra system prompt text, tools, and the packages and
+providers it needs, so you can add them to an
+[Agent](https://jameshwade.github.io/deputy/reference/Agent.md) in one
+step with `agent$load_skill(skill)`.
 
 ## Usage
 
@@ -23,13 +23,13 @@ Skill(
 
 - name:
 
-  Non-empty skill name, retained as supplied.
+  Skill name.
 
 - version:
 
-  Non-empty version string. Defaults to `"0.0.0"`;
-  [`skill_create()`](https://jameshwade.github.io/deputy/reference/skill_create.md)
-  retains its `"1.0.0"` default.
+  Version string. Defaults to `"0.0.0"`
+  ([`skill_create()`](https://jameshwade.github.io/deputy/reference/skill_create.md)
+  defaults to `"1.0.0"`).
 
 - description:
 
@@ -37,7 +37,7 @@ Skill(
 
 - prompt:
 
-  Optional system prompt extension.
+  Optional text to add to the system prompt.
 
 - tools:
 
@@ -46,45 +46,33 @@ Skill(
 
 - requires:
 
-  List with optional `packages` and `providers` entries. Each entry
-  contains strings, or is NULL or an empty sequence. Other declarative
-  metadata is retained but not evaluated.
+  List with optional `packages` and `providers` entries, each a
+  character vector. Other entries are kept but not checked. It must hold
+  only plain data, not functions or environments.
 
 - path:
 
-  Optional path to the skill directory. Construction does not inspect or
-  load this path.
+  Optional path to the skill directory. It is recorded, not read.
 
 ## Value
 
-A read-only `Skill` S7 value.
+A read-only `Skill` S7 object.
 
 ## Details
 
-Construct skills with `Skill(...)`,
+Create skills with `Skill()`,
 [`skill_create()`](https://jameshwade.github.io/deputy/reference/skill_create.md),
 or
 [`skill_load()`](https://jameshwade.github.io/deputy/reference/skill_load.md).
-Read properties with `$`, `@`, or
-[`S7::prop()`](https://rconsortium.github.io/S7/reference/prop.html). To
-revise configuration, edit `S7::props(skill)` and pass that list to
-`do.call(Skill, fields)`. Individual and bulk property replacement are
-rejected, including initially NULL fields. Requirements are declarative
-package/provider sequences.
+Skills are read-only: read fields with `$`, and to change one, edit
+`S7::props(skill)` and pass the list back to `Skill()` with
+[`do.call()`](https://rdrr.io/r/base/do.call.html), as in the example.
 
-Executable tools are composed without cloning. Their closures, clients,
-services, and caller-owned environments retain their original semantics;
-read-only Skill configuration does not freeze state inside those tools.
-Neither construction nor
-[`skill_check_requirements()`](https://jameshwade.github.io/deputy/reference/skill_check_requirements.md)
-executes tool code.
+Tools are stored as given, not copied, so any state they hold is shared
+with the originals. Creating a skill or checking its requirements never
+runs tool code;
 [`skill_load()`](https://jameshwade.github.io/deputy/reference/skill_load.md)
-remains the explicit boundary that can source declared tools.
-
-RDS can preserve the value and serializable R object graphs after Deputy
-loads in the receiving process. It is not a portable transport for live
-services or connections. AgentDefinition YAML uses explicit host
-registries to attach skills; it does not embed executable Skill objects.
+runs the R files a skill's tools come from.
 
 ## Examples
 

@@ -1,7 +1,11 @@
 # Get a tool preset by name
 
-Returns a pre-configured collection of tools for common use cases.
-Presets simplify agent setup by providing curated toolsets.
+Returns a ready-made set of tools for a common kind of task. The
+`"dev"`, `"data"` and `"full"` presets include code execution tools,
+which run with your user account's access. The default permissions deny
+them; allow them with `r_code = TRUE` (and `bash = TRUE` for `run_bash`)
+in
+[`Permissions()`](https://jameshwade.github.io/deputy/reference/Permissions.md).
 
 ## Usage
 
@@ -15,24 +19,25 @@ tools_preset(name)
 
   The preset name. One of:
 
-  - `"minimal"` - Read-only tools for safe exploration (`read_file`,
-    `read_markdown`, `list_files`)
+  - `"minimal"`: read-only tools (`read_file`, `read_markdown`,
+    `list_files`).
 
-  - `"standard"` - File-oriented toolset for ordinary work (`read_file`,
-    `read_markdown`, `write_file`, `list_files`)
+  - `"standard"`: file tools (`read_file`, `read_markdown`,
+    `write_file`, `list_files`).
 
-  - `"dev"` - Full development with shell access (`read_file`,
+  - `"dev"`: file tools plus code execution (`read_file`,
     `read_markdown`, `write_file`, `list_files`, `run_r_code`,
-    `run_bash`)
+    `run_bash`).
 
-  - `"data"` - Data analysis focused tools (`read_file`,
-    `read_markdown`, `list_files`, `read_csv`, `run_r_code`)
+  - `"data"`: data analysis (`read_file`, `read_markdown`, `list_files`,
+    `read_csv`, `run_r_code`).
 
-  - `"full"` - All available tools (requires appropriate permissions)
+  - `"full"`: everything in
+    [`tools_all()`](https://jameshwade.github.io/deputy/reference/tools_all.md).
 
 ## Value
 
-A list of tool definitions
+A list of tools.
 
 ## See also
 
@@ -45,23 +50,24 @@ A list of tool definitions
 
 ``` r
 if (FALSE) { # \dontrun{
-# Minimal preset for read-only operations
+# Read-only exploration
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_preset("minimal"),
   permissions = permissions_readonly()
 )
 
-# Standard preset for typical development
+# Reading and writing files
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_preset("standard")
 )
 
-# Data analysis preset
+# Data analysis with R code
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  tools = tools_preset("data")
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = tools_preset("data"),
+  permissions = Permissions(r_code = TRUE)
 )
 } # }
 ```

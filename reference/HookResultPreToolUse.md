@@ -1,6 +1,7 @@
 # Create a PreToolUse hook result
 
-Return this from a PreToolUse hook callback to control tool execution.
+Return this from a PreToolUse hook to allow or deny a tool call. A hook
+can only deny calls that the permission policy has already allowed.
 
 ## Usage
 
@@ -18,33 +19,34 @@ HookResultPreToolUse(
 
 - permission:
 
-  Either `"allow"` or `"deny"`
+  Either `"allow"` or `"deny"`.
 
 - reason:
 
-  Reason for denial (shown to the LLM)
+  Why the call was denied. The model sees it.
 
 - continue:
 
-  One non-missing logical value. If FALSE, stop the agent after this
-  hook
+  `TRUE` or `FALSE`. `FALSE` stops the run.
 
 - additional_context:
 
-  Optional text to append to the running context
+  Optional text to add to the agent's system prompt. It stays there for
+  later turns; the same text is only added once.
 
 - stop_reason:
 
-  Optional stop reason used when `continue = FALSE`
+  Optional stop reason used when `continue = FALSE`. Defaults to
+  `"hook_requested_stop"`.
 
 ## Value
 
-A `HookResultPreToolUse` S7 object
+A `HookResultPreToolUse` object.
 
 ## See also
 
 [CallbackResult](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
-for read-only properties and S7 inspection.
+for reading result fields.
 
 ## Examples
 

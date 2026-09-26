@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Getting Started with Deputy • deputy</title>
+<title>Get started • deputy</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Getting Started with Deputy">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Get started">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -38,27 +38,38 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -77,7 +88,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Getting Started with Deputy</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Get started</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/vignettes/getting-started.Rmd" class="external-link"><code>vignettes/getting-started.Rmd</code></a></small>
@@ -86,125 +97,153 @@
 
     
     
-<p>This guide uses Deputy to explain an R package from its source files.
-You will run a task, inspect the answer and tool calls, then create an
-agent that can write a summary file.</p>
+<p>This article builds an agent that explains an R package by reading
+its source. You will run a task, check what the agent did, and then give
+a second agent permission to write a file, and undo what it wrote.</p>
 <div class="section level2">
-<h2 id="install-and-connect">Install and connect<a class="anchor" aria-label="anchor" href="#install-and-connect"></a>
+<h2 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
 </h2>
 <p>Install Deputy from GitHub:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"JamesHWade/deputy"</span><span class="op">)</span></span></code></pre></div>
-<p>You need credentials for an <a href="https://ellmer.tidyverse.org/reference/index.html" class="external-link">ellmer
-provider</a>. These examples use OpenAI with <code>gpt-5.6-luna</code>.
-Set <code>OPENAI_API_KEY</code> in your R environment before running
-them. You can edit your user <code>.Renviron</code> file with <a href="https://usethis.r-lib.org/reference/edit.html" class="external-link"><code>usethis::edit_r_environ()</code></a>
-if you have usethis installed; restart R after saving it. Keep
-credentials out of scripts and version control.</p>
-<p>Use another ellmer chat constructor if you prefer a different
-provider. Deputy keeps the model and parameters of the chat you
-supply.</p>
+<p>The examples use OpenAI’s <code>gpt-6-luna</code>, so they need
+<code>OPENAI_API_KEY</code>. Put it in your <code>.Renviron</code> file
+(<code>usethis::edit_r_environ()</code> opens it) and restart R. Keep
+keys out of scripts and version control.</p>
+<p>To use another provider, pass a different <a href="https://ellmer.tidyverse.org/reference/index.html" class="external-link">ellmer
+chat</a>. Deputy uses whatever model and settings that chat has.</p>
 </div>
 <div class="section level2">
 <h2 id="create-an-agent">Create an agent<a class="anchor" aria-label="anchor" href="#create-an-agent"></a>
 </h2>
-<p>Open an R session in the package you want to inspect, then run:</p>
+<p>Start R in the package you want to explain, then run:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">workspace</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/normalizePath.html" class="external-link">normalizePath</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>, winslash <span class="op">=</span> <span class="st">"/"</span>, mustWork <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span>
 <span>  working_dir <span class="op">=</span> <span class="va">workspace</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Each setting has one job:</p>
 <ul>
 <li>
-<code>chat</code> connects to the model through ellmer.</li>
+<code>chat</code> is the ellmer chat that talks to the model.</li>
 <li>
 <code>tools</code> gives the model three tools:
-<code>read_file</code>, <code>read_markdown</code>, and
+<code>read_file</code>, <code>read_markdown</code> and
 <code>list_files</code>.</li>
 <li>
-<code>permissions</code> allows those reads and denies writes, code
-execution, and web requests.</li>
+<code>permissions</code> allows reading and denies writing files,
+running code and using the web.</li>
 <li>
-<code>usage_limits</code> stops the run after at most six model
-requests or eight tool calls.</li>
+<code>usage_limits</code> ends the run after six model requests or
+eight tool calls.</li>
 <li>
-<code>working_dir = workspace</code> sets the base for relative file
-paths. To inspect a package elsewhere, replace <code><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd()</a></code> in
-the <code>workspace &lt;- normalizePath(...)</code> line with that
-package’s path.</li>
+<code>working_dir</code> is where relative paths start. To explain a
+package somewhere else, use its path instead of
+<code><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd()</a></code>.</li>
 </ul>
-<p>The read-only policy still allows access to files outside
-<code>working_dir</code> when the R process can read them. It is not a
-filesystem sandbox.</p>
+<p>Read-only stops the agent from changing anything. It does not limit
+what it reads: the agent can open any file your R session can open.
+Permissions decide which tools may run; they are not a filesystem
+sandbox.</p>
 </div>
 <div class="section level2">
 <h2 id="run-a-task">Run a task<a class="anchor" aria-label="anchor" href="#run-a-task"></a>
 </h2>
-<p>Ask for an answer that the available files can support:</p>
+<p>Ask a question that the files can answer:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
 <span>  <span class="st">"Read DESCRIPTION and list R/. Explain what this package does and cite the files you used."</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">response</span></span></code></pre></div>
-<p><code>run_sync()</code> waits until the run stops, then returns an
-<code>AgentResult</code>. The answer depends on the package and model.
-Check whether it finished before using the response:</p>
+<p><code>run_sync()</code> blocks until the run ends and returns an
+<code>AgentResult</code>. Before you use the response, check why the run
+ended:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span><span class="op">$</span><span class="va">stop_reason</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">usage</span></span></code></pre></div>
-<p><code>"complete"</code> means the task finished. Other reasons
-include <code>"request_limit"</code> and <code>"tool_call_limit"</code>.
-A stopped run can still have a partial response.
-<code>result$usage</code> reports requests, tokens, and any cost
-reported by the provider.</p>
-<p>Inspect the tool calls to see which files the agent used:</p>
+<p><code>"complete"</code> means the model finished. A limit stops the
+run with a reason such as <code>"request_limit"</code> or
+<code>"tool_call_limit"</code>, and the response may be partial.
+<code>result$usage</code> counts requests, tool calls and tokens, and
+the cost when ellmer can price the model.</p>
+<p>To see which files the agent read, list its tool calls and their
+results:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/result_tool_calls.html">result_tool_calls</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/result_tool_results.html">result_tool_results</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span></code></pre></div>
-<p>Results are read-only S7 values. For example,
-<code>S7::prop(result, "response")</code> reads the same value as
-<code>result$response</code>. Construct a separate
-<code><a href="../reference/AgentResult.html">AgentResult()</a></code> when you need a different record; changing a
-completed result’s properties is not supported. Original provider
-objects and conditions retain their own reference semantics inside the
-record.</p>
-<p>The <a href="../reference/AgentResult.html">AgentResult reference</a>
-describes the other fields, including events and run identifiers.</p>
+<p><code><a href="../reference/AgentResult.html">?AgentResult</a></code> describes the other fields, including the
+full event log and run identifiers.</p>
 </div>
 <div class="section level2">
-<h2 id="show-progress-in-the-console">Show progress in the console<a class="anchor" aria-label="anchor" href="#show-progress-in-the-console"></a>
+<h2 id="other-ways-to-run-a-task">Other ways to run a task<a class="anchor" aria-label="anchor" href="#other-ways-to-run-a-task"></a>
 </h2>
-<p>Add a logging hook before the next run to see tool activity as it
-happens:</p>
+<p><code>run_sync()</code> suits scripts. An agent also works like an
+ellmer chat, so pick the method that fits your program:</p>
+<table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
+<thead><tr class="header">
+<th>Method</th>
+<th>Returns</th>
+<th>Use it for</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>chat()</code></td>
+<td>the final text</td>
+<td>quick questions at the console</td>
+</tr>
+<tr class="even">
+<td><code>run()</code></td>
+<td>a generator of events</td>
+<td>printing progress as it happens</td>
+</tr>
+<tr class="odd">
+<td><code>run_async()</code></td>
+<td>a promise of an <code>AgentResult</code>
+</td>
+<td>async code and background work</td>
+</tr>
+<tr class="even">
+<td><code>stream_async()</code></td>
+<td>an ellmer stream</td>
+<td><a href="example-shiny-chat.html">Shiny apps</a></td>
+</tr>
+</tbody>
+</table>
+<p>Every method goes through the same permission checks, hooks and
+limits.</p>
+</div>
+<div class="section level2">
+<h2 id="watch-tool-calls-as-they-happen">Watch tool calls as they happen<a class="anchor" aria-label="anchor" href="#watch-tool-calls-as-they-happen"></a>
+</h2>
+<p>Add a hook that prints each tool call:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/hook_log_tools.html">hook_log_tools</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Read DESCRIPTION and name the package's imported dependencies."</span><span class="op">)</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">response</span></span></code></pre></div>
-<p><code><a href="../reference/hook_log_tools.html">hook_log_tools()</a></code> uses cli for console output. See <a href="hooks.html">Hooks</a> to write a callback or change what gets
-reported.</p>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span><span class="st">"Read DESCRIPTION and name the package's imported dependencies."</span><span class="op">)</span></span></code></pre></div>
+<p><a href="hooks.html">Hooks</a> shows how to write your own.</p>
 </div>
 <div class="section level2">
-<h2 id="write-a-summary-file">Write a summary file<a class="anchor" aria-label="anchor" href="#write-a-summary-file"></a>
+<h2 id="let-an-agent-write-a-file">Let an agent write a file<a class="anchor" aria-label="anchor" href="#let-an-agent-write-a-file"></a>
 </h2>
-<p>Writing needs a different permission policy. Create a new agent:
-permissions on an existing agent can be narrowed, but cannot be expanded
-beyond those set at construction.</p>
-<p>This policy permits native file writes inside <code>workspace</code>.
-R execution, shell commands, web requests, and package installation
-remain disabled by default.</p>
+<p>An agent’s permissions can be narrowed after it is created but never
+widened, so writing needs a new agent. This one may write inside
+<code>workspace</code>. It still can’t run R or shell code, use the web
+or install packages.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">write_agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-5.6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>file_write <span class="op">=</span> <span class="va">workspace</span><span class="op">)</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span>
@@ -220,62 +259,61 @@ remain disabled by default.</p>
 <span></span>
 <span><span class="va">write_result</span><span class="op">$</span><span class="va">stop_reason</span></span>
 <span><span class="fu"><a href="../reference/result_tool_calls.html">result_tool_calls</a></span><span class="op">(</span><span class="va">write_result</span><span class="op">)</span></span></code></pre></div>
-<p>Open <code>deputy-summary.md</code> and review the changes in Git.
-Deputy saved the previous contents of files changed by its native write
-tools after the checkpoint. If you want to undo those changes, run:</p>
+<p>Open <code>deputy-summary.md</code> and check the change in Git.
+Because checkpointing is on, Deputy saved the old contents of every file
+its write tools touched after the checkpoint. To undo the agent’s
+changes:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">write_agent</span><span class="op">$</span><span class="fu">rewind_files</span><span class="op">(</span><span class="va">checkpoint_id</span><span class="op">)</span></span></code></pre></div>
-<p>Checkpoints cover Deputy’s native write, edit, and multi-edit tools.
-They do not capture changes made by R code, shell commands, or other
-programs. See <a href="permissions.html">Permissions</a> for the limits
-of file policies and code execution.</p>
+<p>Checkpoints cover Deputy’s <code>write_file</code>,
+<code>edit_file</code> and <code>multi_edit</code> tools. Changes made
+by R code, shell commands or other programs are not recorded.</p>
 </div>
 <div class="section level2">
 <h2 id="troubleshooting">Troubleshooting<a class="anchor" aria-label="anchor" href="#troubleshooting"></a>
 </h2>
-<div class="section level3">
-<h3 id="the-provider-cannot-authenticate">The provider cannot authenticate<a class="anchor" aria-label="anchor" href="#the-provider-cannot-authenticate"></a>
-</h3>
-<p>Check the credential expected by your ellmer provider. Try a plain
-ellmer chat to confirm the connection before adding tools or Deputy
-settings.</p>
-</div>
-<div class="section level3">
-<h3 id="a-tool-call-is-denied">A tool call is denied<a class="anchor" aria-label="anchor" href="#a-tool-call-is-denied"></a>
-</h3>
-<p>Check that the tool is registered and that its required permission is
-enabled. For custom tools, check their annotations and any allowlist as
-well. The <a href="tools.html">Tools guide</a> includes a complete
-custom-tool example.</p>
-</div>
-<div class="section level3">
-<h3 id="the-run-stops-before-finishing">The run stops before finishing<a class="anchor" aria-label="anchor" href="#the-run-stops-before-finishing"></a>
-</h3>
-<p>Inspect <code>result$stop_reason</code> and
-<code>result$usage</code>. Try a smaller task, or raise the limit that
-was reached. <code>"tool_loop"</code> means an identical tool call
-returned the same result three times in a row.
-<code>"cost_unavailable"</code> means a cost limit was set, but the
-provider did not report enough cost information to enforce it. See
-<code><a href="../reference/UsageLimits.html">UsageLimits()</a></code> for all stop reasons.</p>
-</div>
+<dl>
+<dt>The provider can’t authenticate</dt>
+<dd>
+Check the credential your ellmer provider expects. Try a plain ellmer
+chat before adding Deputy.
+</dd>
+<dt>A tool call is denied</dt>
+<dd>
+Check that the tool is registered and that the permission it needs is
+on. Custom tools also need accurate annotations; see <a href="tools.html">Tools</a>.
+</dd>
+<dt>The run stops early</dt>
+<dd>
+Look at <code>result$stop_reason</code> and <code>result$usage</code>,
+then give the agent a smaller task or raise the limit it hit.
+<code>"tool_loop"</code> means the model made the same tool call with
+the same result three times in a row. <code>"cost_unavailable"</code>
+means you set a cost limit but ellmer couldn’t price the model, so
+Deputy stopped rather than guess. <code><a href="../reference/UsageLimits.html">?UsageLimits</a></code> lists every
+limit.
+</dd>
+</dl>
 </div>
 <div class="section level2">
 <h2 id="next-steps">Next steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>
 </h2>
 <ul>
 <li>
-<a href="tools.html">Tools</a>: select a preset or register an R
-function.</li>
+<a href="tools.html">Tools</a>: choose built-in tools or turn your
+own R functions into tools.</li>
 <li>
-<a href="structured-output.html">Structured output</a>: extract data
-with ellmer types.</li>
+<a href="permissions.html">Permissions and limits</a>: decide what
+an agent may do and how much it may spend.</li>
 <li>
-<a href="example-shiny-chat.html">Shiny chat</a>: use the agent in
-an app.</li>
+<a href="structured-output.html">Structured output</a>: get lists
+and data frames back instead of text.</li>
 <li>
-<a href="multi-agent.html">Multiple agents</a>: give separate tasks
-to other agents.</li>
+<a href="example-shiny-chat.html">Shiny chat</a>: put an agent in an
+app.</li>
+<li>
+<a href="multi-agent.html">Subagents</a>: split a task across
+specialists.</li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

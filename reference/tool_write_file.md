@@ -1,6 +1,7 @@
 # Write content to a file
 
-A tool that writes content to a file, creating it if it doesn't exist.
+A tool that writes text to a file, creating the file and any missing
+parent directories.
 
 ## Usage
 
@@ -17,26 +18,26 @@ A tool definition created with
 
 - path:
 
-  Path to the file to write (tool argument)
+  Path to the file to write.
 
 - content:
 
-  Content to write to the file (tool argument)
+  Text to write.
 
 - append:
 
-  If TRUE, append to existing file (tool argument)
+  If `TRUE`, add to the end of the file instead of overwriting it.
 
 ## Value
 
-When called directly, a character status message describing the write.
+A status message with the number of characters written.
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_write_file)
 )
 } # }

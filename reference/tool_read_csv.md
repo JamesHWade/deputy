@@ -1,7 +1,7 @@
 # Read a CSV file
 
-A tool that reads a CSV file and returns a summary of its structure
-along with the first few rows.
+A tool that reads a CSV file and summarises it: row and column counts,
+column types and the first few rows.
 
 ## Usage
 
@@ -18,27 +18,26 @@ A tool definition created with
 
 - path:
 
-  Path to the CSV file to read (tool argument)
+  Path to the CSV file.
 
 - n_max:
 
-  Maximum number of rows to read (tool argument)
+  Maximum number of rows to read. Defaults to 1000.
 
 - show_head:
 
-  Number of rows to show in preview (tool argument)
+  Number of rows to show. Defaults to 10.
 
 ## Value
 
-When called directly, a character summary of the CSV structure and
-preview rows.
+The summary as one string.
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_read_csv)
 )
 } # }

@@ -1,15 +1,13 @@
-# Code execution tools
+# Get the code execution tools
 
-Returns a list of tools for code execution:
-
-- `run_r_code` - Execute R code in a separate process
-
-- `run_bash` - Execute bash commands
-
-**Note:** These tools execute trusted code and require explicit
-permissions. Process separation is not an OS sandbox;
+Returns `run_r_code` and `run_bash`. Both run model-written code with
+your user account's access. Each call runs in a separate process, which
+is not a sandbox.
 [`permissions_standard()`](https://jameshwade.github.io/deputy/reference/permissions_standard.md)
-denies both tools.
+denies both tools; allow them with `r_code = TRUE` and `bash = TRUE` in
+[`Permissions()`](https://jameshwade.github.io/deputy/reference/Permissions.md).
+For an OS sandbox, use
+[`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md).
 
 ## Usage
 
@@ -19,7 +17,7 @@ tools_code()
 
 ## Value
 
-A list of tool definitions
+A list of tools.
 
 ## See also
 
@@ -31,8 +29,9 @@ A list of tool definitions
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  tools = tools_code()
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = tools_code(),
+  permissions = Permissions(r_code = TRUE, bash = TRUE)
 )
 } # }
 ```

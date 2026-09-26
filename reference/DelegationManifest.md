@@ -1,9 +1,12 @@
-# Inspect the prepared initial context of a delegation
+# Record what a subagent started with
 
-A read-only S7 receipt produced by LeadAgent preparation. It describes
-the supplied initial context, not later provider framing, hooks,
-compaction, or runtime state. It never grants access or installs tools
-or permissions.
+Holds what a subagent was given when a delegation started: the task,
+evidence, system prompt, first message, model, tool names, and its
+permission and context settings. A
+[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
+keeps one in memory for each delegation; read them with
+`$get_subagent_contexts()`. A manifest covers the starting point only,
+not what happened during the run.
 
 ## Usage
 
@@ -27,63 +30,63 @@ DelegationManifest(
 
 - input:
 
-  Plain normalized
+  The task, as a list of
   [DelegationInput](https://jameshwade.github.io/deputy/reference/DelegationInput.md)
-  properties.
+  fields.
 
 - definition:
 
-  Declarative definition identity and prompt material.
+  The definition's name, prompt, memory, initial prompt and skill names,
+  plus an `id` hash.
 
 - sources:
 
-  Ordered resolved text sources and content digests.
+  The evidence given to the subagent, each with a SHA-256 `digest` of
+  its text.
 
 - scope:
 
-  Host-bound owner and conversation identifiers.
+  The lead's `delegation_scope`.
 
 - system_prompt:
 
-  Prepared system prompt, including static memory/skills.
+  The subagent's system prompt, including memory and skills.
 
 - message:
 
-  Prepared first user message, including initial prompt and evidence.
+  The first message sent to the subagent, including the definition's
+  `initial_prompt` and the evidence.
 
 - model:
 
-  Selected model name; no provider credentials.
+  The model name. Credentials are never recorded.
 
 - tools:
 
-  Registered tool names, not unconditional grants of permission.
+  Names of the subagent's tools.
 
 - policies:
 
-  Policy identifiers and non-executable settings.
+  A summary of the permission, context and
+  [DelegationPolicy](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
+  settings, with hashes that identify them. Callbacks are not recorded.
 
 - size:
 
-  Byte counts and a public complete-context token estimate when known.
+  `text_bytes`, `manifest_bytes` and `estimated_tokens` (`NULL` when
+  unknown). The token count is an estimate, not a billed count.
 
 - schema_version:
 
-  Portable record schema. Currently `1L`.
+  Format version; must be `1L`.
 
 ## Value
 
-A read-only `DelegationManifest` S7 value.
+A `DelegationManifest` object.
 
 ## Details
 
-Hosts normally obtain these values from
-`LeadAgent$get_subagent_contexts()`.
-[`S7::props()`](https://rconsortium.github.io/S7/reference/props.html)
-returns portable plain records suitable for host JSON/RDS storage.
-Constructing or restoring a receipt does not recreate an Agent. The host
-owns disclosure authorization and storage; the LeadAgent retains
-receipts in memory. Evidence hashes identify bytes, not truth or
-authorization. Size estimates are estimates, not billed token counts.
-Fresh working context and retained history remain separately inspectable
-after compaction (ADR-0017).
+To store a manifest, save `S7::props(x)` (plain lists) and rebuild it
+with `do.call(DelegationManifest, record)`. A manifest includes the task
+and evidence text, so check who may see it before showing it to users;
+`$get_subagent_contexts(redact = TRUE)` leaves that text out.

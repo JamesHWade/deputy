@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Example: Multi-Agent Code Review • deputy</title>
+<title>Multi-agent code review • deputy</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Example: Multi-Agent Code Review">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Multi-agent code review">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -38,27 +38,38 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -77,7 +88,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Example: Multi-Agent Code Review</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Multi-agent code review</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/JamesHWade/deputy/blob/main/vignettes/example-code-review.Rmd" class="external-link"><code>vignettes/example-code-review.Rmd</code></a></small>
@@ -86,262 +97,172 @@
 
     
     
-<p>This example assigns separate reviewers to bugs, code style, and
-documentation in an R package. A lead agent combines their findings into
-a report. Each reviewer has its own prompt and conversation, so you can
-inspect its results separately.</p>
+<p>This recipe reviews an R package with three specialist subagents, one
+each for bugs, style and documentation, and a lead agent that combines
+their findings into one report. Each reviewer works in its own
+conversation with its own prompt, so its instructions stay focused and
+you can inspect its work separately.</p>
 <div class="section level2">
-<h2 id="define-the-reviewer-agents">Define the Reviewer Agents<a class="anchor" aria-label="anchor" href="#define-the-reviewer-agents"></a>
+<h2 id="define-the-reviewers">Define the reviewers<a class="anchor" aria-label="anchor" href="#define-the-reviewers"></a>
 </h2>
-<p>Each reviewer agent focuses on one dimension of code quality. They
-all use <code><a href="../reference/tools_file.html">tools_file()</a></code> for read-only file access:</p>
+<p>All three reviewers get the same read-only tools for finding and
+reading code:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
+<span><span class="va">review_tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  <span class="va">tool_read_file</span>,</span>
+<span>  <span class="va">tool_list_files</span>,</span>
+<span>  <span class="va">tool_glob_files</span>,</span>
+<span>  <span class="va">tool_grep_files</span></span>
+<span><span class="op">)</span></span>
+<span></span>
 <span><span class="va">bug_hunter</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"bug_hunter"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Finds logic errors, edge cases, off-by-one errors,</span></span>
-<span><span class="st">    and potential runtime failures in R code"</span>,</span>
-<span>  prompt <span class="op">=</span> <span class="st">"You are a bug-hunting specialist for R code. Focus on:</span></span>
-<span><span class="st">    - Logic errors and incorrect conditions</span></span>
-<span><span class="st">    - Edge cases (NULL, NA, empty inputs, zero-length vectors)</span></span>
-<span><span class="st">    - Off-by-one errors in indexing</span></span>
-<span><span class="st">    - Missing error handling for external calls</span></span>
-<span><span class="st">    - Type coercion issues</span></span>
-<span><span class="st"></span></span>
-<span><span class="st">    Read the source files carefully. Report specific issues with</span></span>
-<span><span class="st">    file paths and line numbers. Be precise -- only report real bugs,</span></span>
-<span><span class="st">    not style preferences."</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  description <span class="op">=</span> <span class="st">"Finds logic errors, unhandled edge cases and likely runtime</span></span>
+<span><span class="st">    failures in R code."</span>,</span>
+<span>  prompt <span class="op">=</span> <span class="st">"You look for bugs in R code: wrong conditions, NULL/NA/empty</span></span>
+<span><span class="st">    inputs that aren't handled, off-by-one indexing, unchecked external calls,</span></span>
+<span><span class="st">    and surprising type coercion. Report only real bugs, each with a file path</span></span>
+<span><span class="st">    and line number. Ignore style."</span>,</span>
+<span>  tools <span class="op">=</span> <span class="va">review_tools</span>,</span>
+<span>  permission_mode <span class="op">=</span> <span class="st">"readonly"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">style_reviewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"style_reviewer"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Checks code against tidyverse style conventions,</span></span>
-<span><span class="st">    naming patterns, and code organisation"</span>,</span>
-<span>  prompt <span class="op">=</span> <span class="st">"You are an R style reviewer following tidyverse conventions.</span></span>
-<span><span class="st">    Focus on:</span></span>
-<span><span class="st">    - snake_case naming for functions and variables</span></span>
-<span><span class="st">    - Consistent use of &lt;- for assignment (not =)</span></span>
-<span><span class="st">    - Function length (flag functions over ~50 lines)</span></span>
-<span><span class="st">    - Clear, descriptive names</span></span>
-<span><span class="st">    - Proper use of R6 conventions for classes</span></span>
-<span><span class="st"></span></span>
-<span><span class="st">    Be pragmatic -- flag patterns that hurt readability, not</span></span>
-<span><span class="st">    minor nitpicks."</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  description <span class="op">=</span> <span class="st">"Checks R code against the tidyverse style guide."</span>,</span>
+<span>  prompt <span class="op">=</span> <span class="st">"You review R code against the tidyverse style guide: naming,</span></span>
+<span><span class="st">    assignment with &lt;-, function length and clear names. Flag what hurts</span></span>
+<span><span class="st">    readability; skip trivial nitpicks."</span>,</span>
+<span>  tools <span class="op">=</span> <span class="va">review_tools</span>,</span>
+<span>  permission_mode <span class="op">=</span> <span class="st">"readonly"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">doc_checker</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"doc_checker"</span>,</span>
-<span>  description <span class="op">=</span> <span class="st">"Reviews roxygen2 documentation for completeness,</span></span>
-<span><span class="st">    accuracy, and clarity"</span>,</span>
-<span>  prompt <span class="op">=</span> <span class="st">"You are a documentation reviewer for R packages. Focus on:</span></span>
-<span><span class="st">    - Missing roxygen2 tags (@param, @return, @export)</span></span>
-<span><span class="st">    - Inaccurate parameter descriptions</span></span>
-<span><span class="st">    - Missing @examples sections on exported functions</span></span>
-<span><span class="st">    - Unclear or misleading descriptions</span></span>
-<span><span class="st">    - Missing @seealso cross-references</span></span>
-<span><span class="st"></span></span>
-<span><span class="st">    Read both the roxygen comments and the function bodies to verify</span></span>
-<span><span class="st">    that documentation matches the actual behaviour."</span>,</span>
-<span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  description <span class="op">=</span> <span class="st">"Checks that roxygen2 documentation is complete and matches</span></span>
+<span><span class="st">    the code."</span>,</span>
+<span>  prompt <span class="op">=</span> <span class="st">"You review roxygen2 documentation: missing @param, @return and</span></span>
+<span><span class="st">    @examples, and descriptions that don't match what the function does. Read</span></span>
+<span><span class="st">    the function body to check."</span>,</span>
+<span>  tools <span class="op">=</span> <span class="va">review_tools</span>,</span>
+<span>  permission_mode <span class="op">=</span> <span class="st">"readonly"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="create-the-lead-agent">Create the Lead Agent<a class="anchor" aria-label="anchor" href="#create-the-lead-agent"></a>
+<h2 id="create-the-lead">Create the lead<a class="anchor" aria-label="anchor" href="#create-the-lead"></a>
 </h2>
-<p>The <code>LeadAgent</code> coordinates the reviewers. It has a
-<code>delegate_to_agent</code> tool that lets it assign tasks to any
-registered sub-agent:</p>
+<p>The lead decides what to ask each reviewer and merges their
+answers:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
+<code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
 <span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">bug_hunter</span>, <span class="va">style_reviewer</span>, <span class="va">doc_checker</span><span class="op">)</span>,</span>
-<span>  system_prompt <span class="op">=</span> <span class="st">"You are a lead code reviewer coordinating a team of</span></span>
-<span><span class="st">    specialists. For each review request:</span></span>
-<span><span class="st"></span></span>
-<span><span class="st">    1. Delegate to each specialist with a clear, specific task</span></span>
-<span><span class="st">    2. Collect their findings</span></span>
-<span><span class="st">    3. Synthesise into a unified review with findings sorted by severity</span></span>
-<span><span class="st">    4. Remove duplicate findings across reviewers</span></span>
-<span><span class="st"></span></span>
-<span><span class="st">    Severity levels: critical, warning, suggestion.</span></span>
-<span><span class="st">    Always include the file path and a concrete suggestion for each finding."</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  system_prompt <span class="op">=</span> <span class="st">"You lead a code review. Give each specialist a clear,</span></span>
+<span><span class="st">    specific task, then merge their findings: remove duplicates, sort by</span></span>
+<span><span class="st">    severity (critical, warning, suggestion), and give a file path and a</span></span>
+<span><span class="st">    concrete fix for each finding."</span>,</span>
+<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">20</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">lead</span><span class="op">$</span><span class="fu">available_sub_agents</span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "bug_hunter" "style_reviewer" "doc_checker"</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="add-monitoring-hooks">Add Monitoring Hooks<a class="anchor" aria-label="anchor" href="#add-monitoring-hooks"></a>
-</h2>
-<p>Hooks provide real-time visibility as the agent works. Use them for
-logging and blocking; use <code>AgentResult</code> for post-hoc
-analysis.</p>
+<span><span class="co">#&gt; [1] "bug_hunter"     "style_reviewer" "doc_checker"</span></span></code></pre></div>
+<p>The lead and the reviewers all run in read-only mode, so nobody
+changes a file. Read-only mode still lets the lead delegate, because its
+subagents can’t use a less strict mode than the lead.</p>
+<p>To follow along while it runs, log each reviewer as it finishes, and
+each tool call:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Log when each sub-agent finishes</span></span>
-<span><span class="va">hook_sub_agent_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="va">lead</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"SubagentStop"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">agent_name</span>, <span class="va">task</span>, <span class="va">result</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Sub-agent {.val {agent_name}} finished"</span><span class="op">)</span></span>
+<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"{agent_name} finished"</span><span class="op">)</span></span>
 <span>    <span class="cn">NULL</span></span>
 <span>  <span class="op">}</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Log tool calls with the built-in hook</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va">hook_sub_agent_log</span><span class="op">)</span></span>
-<span><span class="va">lead</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/hook_log_tools.html">hook_log_tools</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">lead</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/hook_log_tools.html">hook_log_tools</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="run-the-review">Run the Review<a class="anchor" aria-label="anchor" href="#run-the-review"></a>
+<h2 id="run-the-review">Run the review<a class="anchor" aria-label="anchor" href="#run-the-review"></a>
 </h2>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
-<span>  <span class="st">"Review the R source files in R/ for code quality issues.</span></span>
-<span><span class="st">   Have each specialist review the code from their perspective,</span></span>
-<span><span class="st">   then synthesise the findings into a unified report."</span></span>
+<span>  <span class="st">"Review the R files in R/. Ask each specialist to review them from their</span></span>
+<span><span class="st">   perspective, then combine the findings into one report."</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">response</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="structured-review-output">Structured Review Output<a class="anchor" aria-label="anchor" href="#structured-review-output"></a>
+<h2 id="get-the-findings-as-a-data-frame">Get the findings as a data frame<a class="anchor" aria-label="anchor" href="#get-the-findings-as-a-data-frame"></a>
 </h2>
-<p>For machine-readable results, add a structured output schema to
-capture individual findings:</p>
+<p>For a report you can filter and count, ask for structured output. An
+array of objects comes back as a data frame, and enums as factors:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">review_schema</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  type <span class="op">=</span> <span class="st">"object"</span>,</span>
-<span>  properties <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    summary <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"string"</span><span class="op">)</span>,</span>
-<span>    total_findings <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"integer"</span><span class="op">)</span>,</span>
-<span>    findings <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>      type <span class="op">=</span> <span class="st">"array"</span>,</span>
-<span>      items <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>        type <span class="op">=</span> <span class="st">"object"</span>,</span>
-<span>        properties <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>          severity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>            type <span class="op">=</span> <span class="st">"string"</span>,</span>
-<span>            enum <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"critical"</span>, <span class="st">"warning"</span>, <span class="st">"suggestion"</span><span class="op">)</span></span>
-<span>          <span class="op">)</span>,</span>
-<span>          category <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>            type <span class="op">=</span> <span class="st">"string"</span>,</span>
-<span>            enum <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"bug"</span>, <span class="st">"style"</span>, <span class="st">"documentation"</span><span class="op">)</span></span>
-<span>          <span class="op">)</span>,</span>
-<span>          file <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"string"</span><span class="op">)</span>,</span>
-<span>          line <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"integer"</span><span class="op">)</span>,</span>
-<span>          issue <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"string"</span><span class="op">)</span>,</span>
-<span>          suggestion <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"string"</span><span class="op">)</span>,</span>
-<span>          reviewer <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"string"</span><span class="op">)</span></span>
-<span>        <span class="op">)</span>,</span>
-<span>        required <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>          <span class="st">"severity"</span>,</span>
-<span>          <span class="st">"category"</span>,</span>
-<span>          <span class="st">"file"</span>,</span>
-<span>          <span class="st">"issue"</span>,</span>
-<span>          <span class="st">"suggestion"</span>,</span>
-<span>          <span class="st">"reviewer"</span></span>
-<span>        <span class="op">)</span></span>
-<span>      <span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">review_type</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_object</a></span><span class="op">(</span></span>
+<span>  summary <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="st">"Two or three sentences on overall quality."</span><span class="op">)</span>,</span>
+<span>  findings <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_array</a></span><span class="op">(</span></span>
+<span>    <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_object</a></span><span class="op">(</span></span>
+<span>      severity <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_enum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"critical"</span>, <span class="st">"warning"</span>, <span class="st">"suggestion"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>      category <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_enum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"bug"</span>, <span class="st">"style"</span>, <span class="st">"documentation"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>      file <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>      line <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_integer</a></span><span class="op">(</span>required <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span>
+<span>      issue <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>      fix <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>      reviewer <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_string</a></span><span class="op">(</span><span class="op">)</span></span>
 <span>    <span class="op">)</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  required <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"summary"</span>, <span class="st">"total_findings"</span>, <span class="st">"findings"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"gpt-5.6-luna"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="va">chat</span>,</span>
-<span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">bug_hunter</span>, <span class="va">style_reviewer</span>, <span class="va">doc_checker</span><span class="op">)</span>,</span>
-<span>  system_prompt <span class="op">=</span> <span class="st">"You coordinate code reviewers. Delegate to each</span></span>
-<span><span class="st">    specialist, then combine their findings into structured JSON.</span></span>
-<span><span class="st">    Deduplicate findings across reviewers."</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">run_sync</span><span class="op">(</span></span>
-<span>  <span class="st">"Review the R/ directory and return structured findings."</span>,</span>
-<span>  type <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/type_boolean.html" class="external-link">type_from_schema</a></span><span class="op">(</span><span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="va">review_schema</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="processing-the-results">Processing the Results<a class="anchor" aria-label="anchor" href="#processing-the-results"></a>
-</h2>
-<p>With structured output, you can filter, sort, and summarise findings
-programmatically:</p>
+<span>  <span class="st">"Review the R files in R/ and return every finding."</span>,</span>
+<span>  type <span class="op">=</span> <span class="va">review_type</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">review</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">$</span><span class="va">structured_output</span></span>
+<span><span class="va">findings</span> <span class="op">&lt;-</span> <span class="va">review</span><span class="op">$</span><span class="va">findings</span></span></code></pre></div>
+<p>From there it’s ordinary R:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">review</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">$</span><span class="va">structured_output</span></span>
+<code class="sourceCode R"><span><span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_h1.html" class="external-link">cli_h1</a></span><span class="op">(</span><span class="st">"Code review"</span><span class="op">)</span></span>
+<span><span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_text.html" class="external-link">cli_text</a></span><span class="op">(</span><span class="va">review</span><span class="op">$</span><span class="va">summary</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Summary</span></span>
-<span><span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_h1.html" class="external-link">cli_h1</a></span><span class="op">(</span><span class="st">"Code Review: {review$summary}"</span><span class="op">)</span></span>
-<span><span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Total findings: {review$total_findings}"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">findings</span><span class="op">$</span><span class="va">category</span>, <span class="va">findings</span><span class="op">$</span><span class="va">severity</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Filter by severity</span></span>
-<span><span class="va">critical</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/funprog.html" class="external-link">Filter</a></span><span class="op">(</span></span>
-<span>  <span class="kw">function</span><span class="op">(</span><span class="va">f</span><span class="op">)</span> <span class="va">f</span><span class="op">$</span><span class="va">severity</span> <span class="op">==</span> <span class="st">"critical"</span>,</span>
-<span>  <span class="va">review</span><span class="op">$</span><span class="va">findings</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">warnings</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/funprog.html" class="external-link">Filter</a></span><span class="op">(</span></span>
-<span>  <span class="kw">function</span><span class="op">(</span><span class="va">f</span><span class="op">)</span> <span class="va">f</span><span class="op">$</span><span class="va">severity</span> <span class="op">==</span> <span class="st">"warning"</span>,</span>
-<span>  <span class="va">review</span><span class="op">$</span><span class="va">findings</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_danger</a></span><span class="op">(</span><span class="st">"{length(critical)} critical issue(s)"</span><span class="op">)</span></span>
-<span><span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_warning</a></span><span class="op">(</span><span class="st">"{length(warnings)} warning(s)"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Display critical findings</span></span>
-<span><span class="kw">for</span> <span class="op">(</span><span class="va">finding</span> <span class="kw">in</span> <span class="va">critical</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_h1.html" class="external-link">cli_h2</a></span><span class="op">(</span><span class="st">"{finding$file}"</span><span class="op">)</span></span>
-<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_danger</a></span><span class="op">(</span><span class="st">"{finding$issue}"</span><span class="op">)</span></span>
-<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Suggestion: {finding$suggestion}"</span><span class="op">)</span></span>
-<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_text.html" class="external-link">cli_text</a></span><span class="op">(</span><span class="st">"Found by: {finding$reviewer}"</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="co"># Summarise by category</span></span>
-<span><span class="va">findings_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">review</span><span class="op">$</span><span class="va">findings</span>, <span class="va">as.data.frame</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">findings_df</span><span class="op">$</span><span class="va">category</span>, <span class="va">findings_df</span><span class="op">$</span><span class="va">severity</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">critical</span> <span class="op">&lt;-</span> <span class="va">findings</span><span class="op">[</span><span class="va">findings</span><span class="op">$</span><span class="va">severity</span> <span class="op">==</span> <span class="st">"critical"</span>, <span class="op">]</span></span>
+<span><span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">critical</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_h1.html" class="external-link">cli_h2</a></span><span class="op">(</span><span class="va">critical</span><span class="op">$</span><span class="va">file</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_danger</a></span><span class="op">(</span><span class="va">critical</span><span class="op">$</span><span class="va">issue</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Fix: {critical$fix[[i]]}"</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="cost-and-performance">Cost and Performance<a class="anchor" aria-label="anchor" href="#cost-and-performance"></a>
+<h2 id="cost-and-effort">Cost and effort<a class="anchor" aria-label="anchor" href="#cost-and-effort"></a>
 </h2>
-<p><code>AgentResult</code> captures cost and tool usage for post-hoc
-analysis:</p>
+<p>The lead’s result includes the reviewers’ usage:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Total cost and duration</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">cost</span></span>
+<code class="sourceCode R"><span><span class="va">result</span><span class="op">$</span><span class="va">usage</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">duration</span></span>
-<span></span>
-<span><span class="co"># Never substitute zero for an incomplete provider total</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/Logic.html" class="external-link">isTRUE</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">cost</span><span class="op">$</span><span class="va">complete</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_warning</a></span><span class="op">(</span></span>
-<span>    <span class="st">"Provider omitted {result$cost$missing} cost record{?s}."</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="co"># All tool calls made during the review</span></span>
-<span><span class="va">tool_calls</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/result_tool_calls.html">result_tool_calls</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
-<span><span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span><span class="st">"Total tool calls: {length(tool_calls)}"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># How many model requests were used?</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">usage</span><span class="op">$</span><span class="va">requests</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="../reference/result_tool_calls.html">result_tool_calls</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><code>result$usage$cost_usd</code> is <code>NA</code> when ellmer
+couldn’t price every response, for example with a model newer than your
+ellmer version. It’s never a partial total that looks complete.
+<code>lead$list_subagents()</code> shows each delegation, with its
+status and stop reason, if you want to see where the requests went.</p>
 </div>
 <div class="section level2">
-<h2 id="next-steps">Next Steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>
+<h2 id="next-steps">Next steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>
 </h2>
 <ul>
 <li>
-<code><a href="../articles/multi-agent.html">vignette("multi-agent")</a></code> – LeadAgent and
-agent_definition() reference</li>
+<a href="multi-agent.html">Subagents</a>: definitions, budgets and
+parallel delegation.</li>
 <li>
-<code><a href="../articles/hooks.html">vignette("hooks")</a></code> – Hook events and pre-built
-hooks</li>
+<a href="hooks.html">Hooks</a>: events and built-in hooks.</li>
 <li>
-<code><a href="../articles/structured-output.html">vignette("structured-output")</a></code> – JSON schema output and
-validation</li>
+<a href="structured-output.html">Structured output</a>: types and
+validation.</li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

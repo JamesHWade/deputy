@@ -1,6 +1,6 @@
-# Inspect run success
+# Check whether a run completed
 
-Inspect run success
+Check whether a run completed
 
 ## Usage
 
@@ -13,9 +13,9 @@ result_is_success(result)
 - result:
 
   An
-  [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md)
-  S7 value.
+  [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md).
 
 ## Value
 
-Whether the stop reason is `"complete"`.
+`TRUE` if the stop reason is `"complete"`, meaning the model finished on
+its own. It doesn't check the answer.

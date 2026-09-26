@@ -18,26 +18,37 @@
       <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/getting-started.html">Get started</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
-    <li><a class="dropdown-item" href="../articles/tools.html">Tools and Tool Bundles</a></li>
-    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and Safety</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Guides</h6></li>
+    <li><a class="dropdown-item" href="../articles/tools.html">Tools</a></li>
+    <li><a class="dropdown-item" href="../articles/permissions.html">Permissions and limits</a></li>
     <li><a class="dropdown-item" href="../articles/hooks.html">Hooks</a></li>
+    <li><a class="dropdown-item" href="../articles/approvals.html">Human input and approvals</a></li>
+    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured output</a></li>
+    <li><a class="dropdown-item" href="../articles/conversations.html">Conversations and context</a></li>
+    <li><a class="dropdown-item" href="../articles/code-execution.html">Running R code</a></li>
+    <li><a class="dropdown-item" href="../articles/mcp.html">MCP servers</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Apps</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny Chat</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Multiple agents</h6></li>
+    <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
+    <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Advanced</h6></li>
-    <li><a class="dropdown-item" href="../articles/multi-agent.html">Multi-Agent Orchestration</a></li>
-    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background Jobs</a></li>
-    <li><a class="dropdown-item" href="../articles/structured-output.html">Structured Output</a></li>
-    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Runtime Integration and Evaluation</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
+    <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
+    <li><a class="dropdown-item" href="../articles/background-jobs.html">Background jobs</a></li>
+    <li><a class="dropdown-item" href="../articles/runtime-integration.html">Fallbacks, tracing and evaluation</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Recipes</h6></li>
-    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data Analysis Agent</a></li>
-    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction Pipeline</a></li>
-    <li><a class="dropdown-item" href="../articles/example-code-review.html">Code Review (Multi-Agent)</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Patterns and recipes</h6></li>
+    <li><a class="dropdown-item" href="../articles/trusted-mini-agents.html">Trusted mini-agents</a></li>
+    <li><a class="dropdown-item" href="../articles/example-data-analysis.html">Data analysis agent</a></li>
+    <li><a class="dropdown-item" href="../articles/example-extraction-pipeline.html">Extraction pipeline</a></li>
+    <li><a class="dropdown-item" href="../articles/example-code-review.html">Multi-agent code review</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/JamesHWade/deputy/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -52,9 +63,9 @@
     </div>
 
     <div class="section level2">
-      <h2 id="agent">Agent<a class="anchor" aria-label="anchor" href="#agent"></a></h2>
+      <h2 id="agents">Agents<a class="anchor" aria-label="anchor" href="#agents"></a></h2>
 
-      <div class="section-desc"><p>Run a task and inspect its response, tool calls, and usage.</p></div>
+      <div class="section-desc"><p>Create an agent, run a task, and inspect what happened.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -66,70 +77,49 @@
           <code><a href="Agent.html">Agent</a></code>
 
         </dt>
-        <dd>Agent R6 Class</dd>
-
-        <dt>
-
-          <code><a href="adopt_chat.html">adopt_chat()</a></code>
-
-        </dt>
-        <dd>Adopt a curated Chat for owned delegation</dd>
-
-        <dt>
-
-          <code><a href="delegation_tool.html">delegation_tool()</a></code>
-
-        </dt>
-        <dd>Delegate through a host-curated specialist</dd>
+        <dd>Agent that runs tasks with tools</dd>
 
         <dt>
 
           <code><a href="AgentResult.html">AgentResult()</a></code>
 
         </dt>
-        <dd>Create a completed agent result</dd>
-
-        <dt>
-
-          <code><a href="result_n_turns.html">result_n_turns()</a></code>
-
-        </dt>
-        <dd>Count conversation turns</dd>
-
-        <dt>
-
-          <code><a href="result_tool_calls.html">result_tool_calls()</a></code>
-
-        </dt>
-        <dd>Inspect tool calls</dd>
-
-        <dt>
-
-          <code><a href="result_tool_results.html">result_tool_results()</a></code>
-
-        </dt>
-        <dd>Inspect completed tool calls</dd>
-
-        <dt>
-
-          <code><a href="result_trusted_results.html">result_trusted_results()</a></code>
-
-        </dt>
-        <dd>Inspect trusted results</dd>
-
-        <dt>
-
-          <code><a href="result_text_chunks.html">result_text_chunks()</a></code>
-
-        </dt>
-        <dd>Inspect streamed text</dd>
+        <dd>Create an agent run result</dd>
 
         <dt>
 
           <code><a href="result_is_success.html">result_is_success()</a></code>
 
         </dt>
-        <dd>Inspect run success</dd>
+        <dd>Check whether a run completed</dd>
+
+        <dt>
+
+          <code><a href="result_n_turns.html">result_n_turns()</a></code>
+
+        </dt>
+        <dd>Count the turns in a result</dd>
+
+        <dt>
+
+          <code><a href="result_text_chunks.html">result_text_chunks()</a></code>
+
+        </dt>
+        <dd>Get the streamed text chunks from a result</dd>
+
+        <dt>
+
+          <code><a href="result_tool_calls.html">result_tool_calls()</a></code>
+
+        </dt>
+        <dd>Get the tool calls from a result</dd>
+
+        <dt>
+
+          <code><a href="result_tool_results.html">result_tool_results()</a></code>
+
+        </dt>
+        <dd>Get the finished tool calls from a result</dd>
 
         <dt>
 
@@ -143,16 +133,25 @@
           <code><a href="AgentUsage.html">AgentUsage()</a></code>
 
         </dt>
-        <dd>Create an agent usage record</dd>
+        <dd>Create a usage record</dd>
 
         <dt>
 
           <code><a href="UsageLimits.html">UsageLimits()</a></code>
 
         </dt>
-        <dd>Configure run-scoped usage limits</dd>
+        <dd>Set usage limits for a run</dd>
+      </dl></div><div class="section level2">
+      <h2 id="conversations-and-context">Conversations and context<a class="anchor" aria-label="anchor" href="#conversations-and-context"></a></h2>
 
-        <dt>
+      <div class="section-desc"><p>Keep long conversations within the model’s context window.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
 
           <code><a href="ContextPolicy.html">ContextPolicy()</a></code>
 
@@ -164,11 +163,11 @@
           <code><a href="DeputyCompaction.html">DeputyCompaction()</a></code>
 
         </dt>
-        <dd>Record a conversation compaction outcome</dd>
+        <dd>Create a compaction result</dd>
       </dl></div><div class="section level2">
-      <h2 id="background-jobs">Background jobs<a class="anchor" aria-label="anchor" href="#background-jobs"></a></h2>
+      <h2 id="built-in-tools">Built-in tools<a class="anchor" aria-label="anchor" href="#built-in-tools"></a></h2>
 
-      <div class="section-desc"><p>Persist and dispatch governed work through a host-owned scheduler.</p></div>
+      <div class="section-desc"><p>Tools for files, data, the web and code, and presets that bundle them.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -177,49 +176,47 @@
 
       <dl><dt>
 
-          <code><a href="AgentJob.html">AgentJob()</a></code>
+          <code><a href="tools_preset.html">tools_preset()</a></code>
 
         </dt>
-        <dd>AgentJob read-only durable inspection</dd>
+        <dd>Get a tool preset by name</dd>
 
         <dt>
 
-          <code><a href="job_create.html">job_create()</a></code>
+          <code><a href="tools_file.html">tools_file()</a></code>
 
         </dt>
-        <dd>Create a durable host-owned Agent job</dd>
+        <dd>Get the basic file tools</dd>
 
         <dt>
 
-          <code><a href="job_read.html">job_read()</a></code>
+          <code><a href="tools_code.html">tools_code()</a></code>
 
         </dt>
-        <dd>Read a durable Agent job without binding or executing it</dd>
+        <dd>Get the code execution tools</dd>
 
         <dt>
 
-          <code><a href="job_run.html">job_run()</a></code>
+          <code><a href="tools_data.html">tools_data()</a></code>
 
         </dt>
-        <dd>Consume one durable Agent job</dd>
+        <dd>Get the data reading tools</dd>
 
         <dt>
 
-          <code><a href="job_cancel.html">job_cancel()</a></code>
+          <code><a href="tools_web.html">tools_web()</a></code>
 
         </dt>
-        <dd>Request durable cooperative cancellation of an Agent job</dd>
-      </dl></div><div class="section level2">
-      <h2 id="tools">Tools<a class="anchor" aria-label="anchor" href="#tools"></a></h2>
+        <dd>Get web tools</dd>
 
-      <div class="section-desc"><p>Built-in tools and tool bundles</p></div>
+        <dt>
 
-      <dl></dl></div><div class="section level2">
+          <code><a href="tools_all.html">tools_all()</a></code>
 
+        </dt>
+        <dd>Get all built-in tools</dd>
 
-
-
-      <dl><dt>
+        <dt>
 
           <code><a href="tool_read_file.html">tool_read_file()</a></code>
 
@@ -231,7 +228,7 @@
           <code><a href="tool_read_markdown.html">tool_read_markdown()</a></code>
 
         </dt>
-        <dd>Convert a file to markdown using MarkItDown</dd>
+        <dd>Convert a file to Markdown using MarkItDown</dd>
 
         <dt>
 
@@ -277,6 +274,13 @@
 
         <dt>
 
+          <code><a href="tool_read_csv.html">tool_read_csv()</a></code>
+
+        </dt>
+        <dd>Read a CSV file</dd>
+
+        <dt>
+
           <code><a href="tool_run_r_code.html">tool_run_r_code()</a></code>
 
         </dt>
@@ -284,24 +288,10 @@
 
         <dt>
 
-          <code><a href="RSession.html">RSession</a></code>
-
-        </dt>
-        <dd>Own a conversation's trusted R session</dd>
-
-        <dt>
-
           <code><a href="tool_run_bash.html">tool_run_bash()</a></code>
 
         </dt>
         <dd>Execute bash commands</dd>
-
-        <dt>
-
-          <code><a href="tool_read_csv.html">tool_read_csv()</a></code>
-
-        </dt>
-        <dd>Read a CSV file</dd>
 
         <dt>
 
@@ -319,68 +309,72 @@
 
         <dt>
 
-          <code><a href="tool_ask_user.html">tool_ask_user()</a></code>
+          <code><a href="tool_metadata.html">tool_metadata()</a></code>
 
         </dt>
-        <dd>Ask user tool</dd>
+        <dd>Inspect a tool's origin and annotations</dd>
+      </dl></div><div class="section level2">
+      <h2 id="running-code">Running code<a class="anchor" aria-label="anchor" href="#running-code"></a></h2>
+
+      <div class="section-desc"><p>Persistent R sessions and OS-sandboxed interpreters.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="RSession.html">RSession</a></code>
+
+        </dt>
+        <dd>Persistent R session for a conversation</dd>
 
         <dt>
 
-          <code><a href="tools_file.html">tools_file()</a></code>
+          <code><a href="tools_mcp_repl.html">tools_mcp_repl()</a></code>
 
         </dt>
-        <dd>File operation tools</dd>
+        <dd>Load sandboxed R tools from mcp-repl</dd>
 
         <dt>
 
-          <code><a href="tools_code.html">tools_code()</a></code>
+          <code><a href="mcp_repl_connection.html">mcp_repl_connection()</a></code>
 
         </dt>
-        <dd>Code execution tools</dd>
+        <dd>Connect an agent to a sandboxed mcp-repl session</dd>
 
         <dt>
 
-          <code><a href="tools_data.html">tools_data()</a></code>
+          <code><a href="mcp_repl_control.html">mcp_repl_control()</a></code>
 
         </dt>
-        <dd>Data reading tools</dd>
+        <dd>Interrupt or reset an mcp-repl session</dd>
 
         <dt>
 
-          <code><a href="tools_web.html">tools_web()</a></code>
+          <code><a href="mcp_console_connection.html">mcp_console_connection()</a></code>
 
         </dt>
-        <dd>Web tools</dd>
+        <dd>Connect an agent to a sandboxed MCP Console session</dd>
 
         <dt>
 
-          <code><a href="tools_all.html">tools_all()</a></code>
+          <code><a href="mcp_console_control.html">mcp_console_control()</a></code>
 
         </dt>
-        <dd>All built-in tools</dd>
+        <dd>Interrupt or restart an MCP Console session</dd>
+      </dl></div><div class="section level2">
+      <h2 id="mcp-servers">MCP servers<a class="anchor" aria-label="anchor" href="#mcp-servers"></a></h2>
 
-        <dt>
+      <div class="section-desc"><p>Use tools, resources and prompts from Model Context Protocol servers.</p></div>
 
-          <code><a href="tools_preset.html">tools_preset()</a></code>
+      <dl></dl></div><div class="section level2">
 
-        </dt>
-        <dd>Get a tool preset by name</dd>
 
-        <dt>
 
-          <code><a href="tools_interactive.html">tools_interactive()</a></code>
 
-        </dt>
-        <dd>Tools for interactive workflows</dd>
-
-        <dt>
-
-          <code><a href="AskUserDeferred.html">AskUserDeferred()</a></code>
-
-        </dt>
-        <dd>Defer answers to a later user turn</dd>
-
-        <dt>
+      <dl><dt>
 
           <code><a href="tools_mcp.html">tools_mcp()</a></code>
 
@@ -392,67 +386,11 @@
           <code><a href="McpConnection.html">McpConnection</a></code>
 
         </dt>
-        <dd>Own an isolated MCP client connection</dd>
-
-        <dt>
-
-          <code><a href="tool_metadata.html">tool_metadata()</a></code>
-
-        </dt>
-        <dd>Inspect a tool's origin and annotation coverage</dd>
-
-        <dt>
-
-          <code><a href="tool_input_review.html">tool_input_review()</a></code>
-
-        </dt>
-        <dd>Tabulate tool arguments for human review</dd>
-
-        <dt>
-
-          <code><a href="tools_mcp_repl.html">tools_mcp_repl()</a></code>
-
-        </dt>
-        <dd>Load an R REPL with an enforced OS sandbox</dd>
-
-        <dt>
-
-          <code><a href="mcp_repl_connection.html">mcp_repl_connection()</a></code>
-
-        </dt>
-        <dd>Connect an Agent to an independent sandboxed REPL</dd>
-
-        <dt>
-
-          <code><a href="mcp_repl_control.html">mcp_repl_control()</a></code>
-
-        </dt>
-        <dd>Request an upstream REPL interrupt or reset</dd>
-
-        <dt>
-
-          <code><a href="mcp_console_connection.html">mcp_console_connection()</a></code>
-
-        </dt>
-        <dd>Connect an Agent to a sandboxed MCP Console workbench</dd>
-
-        <dt>
-
-          <code><a href="mcp_console_control.html">mcp_console_control()</a></code>
-
-        </dt>
-        <dd>Interrupt or restart an MCP Console session</dd>
-
-        <dt>
-
-          <code><a href="set_ask_user_callback.html">set_ask_user_callback()</a></code>
-
-        </dt>
-        <dd>Set callback for non-interactive user input</dd>
+        <dd>MCP server connection</dd>
       </dl></div><div class="section level2">
       <h2 id="permissions">Permissions<a class="anchor" aria-label="anchor" href="#permissions"></a></h2>
 
-      <div class="section-desc"><p>Control what agents can do</p></div>
+      <div class="section-desc"><p>Decide which tool calls an agent may make.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -465,69 +403,6 @@
 
         </dt>
         <dd>Create a permission policy</dd>
-
-        <dt>
-
-          <code><a href="TrustedResults.html">TrustedResults()</a></code>
-
-        </dt>
-        <dd>Designate trusted tools as the only producers of host results</dd>
-
-        <dt>
-
-          <code><a href="permissions_check.html">permissions_check()</a></code>
-
-        </dt>
-        <dd>Evaluate a tool call against a permission policy</dd>
-
-        <dt>
-
-          <code><a href="PermissionMode.html">PermissionMode</a></code>
-
-        </dt>
-        <dd>Permission modes for agent tool access</dd>
-
-        <dt>
-
-          <code><a href="PermissionResultAllow.html">PermissionResultAllow()</a></code>
-
-        </dt>
-        <dd>Create an allow permission result</dd>
-
-        <dt>
-
-          <code><a href="PermissionResultDeny.html">PermissionResultDeny()</a></code>
-
-        </dt>
-        <dd>Create a deny permission result</dd>
-
-        <dt>
-
-          <code><a href="PermissionResultPending.html">PermissionResultPending()</a></code>
-
-        </dt>
-        <dd>Request a durable tool approval</dd>
-
-        <dt>
-
-          <code><a href="ApprovalContinuation.html">ApprovalContinuation()</a></code>
-
-        </dt>
-        <dd>Durable approval inspection value</dd>
-
-        <dt>
-
-          <code><a href="approval_read.html">approval_read()</a></code>
-
-        </dt>
-        <dd>Inspect a durable approval continuation</dd>
-
-        <dt>
-
-          <code><a href="approval_review_ui.html">approval_review_ui()</a></code> <code><a href="approval_review_ui.html">approval_review_server()</a></code>
-
-        </dt>
-        <dd>Review a pending tool call in Shiny</dd>
 
         <dt>
 
@@ -556,10 +431,133 @@
 
         </dt>
         <dd>Create a full access permission policy</dd>
+
+        <dt>
+
+          <code><a href="PermissionMode.html">PermissionMode</a></code>
+
+        </dt>
+        <dd>Permission modes</dd>
+
+        <dt>
+
+          <code><a href="permissions_check.html">permissions_check()</a></code>
+
+        </dt>
+        <dd>Check a tool call against a permission policy</dd>
+
+        <dt>
+
+          <code><a href="PermissionResultAllow.html">PermissionResultAllow()</a></code>
+
+        </dt>
+        <dd>Create an allow permission result</dd>
+
+        <dt>
+
+          <code><a href="PermissionResultDeny.html">PermissionResultDeny()</a></code>
+
+        </dt>
+        <dd>Create a deny permission result</dd>
+
+        <dt>
+
+          <code><a href="PermissionResultPending.html">PermissionResultPending()</a></code>
+
+        </dt>
+        <dd>Pause a tool call for approval</dd>
+      </dl></div><div class="section level2">
+      <h2 id="human-input-and-approvals">Human input and approvals<a class="anchor" aria-label="anchor" href="#human-input-and-approvals"></a></h2>
+
+      <div class="section-desc"><p>Ask a person questions, and hold tool calls until someone approves them.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="tools_interactive.html">tools_interactive()</a></code>
+
+        </dt>
+        <dd>Create an ask_user tool with its own handler</dd>
+
+        <dt>
+
+          <code><a href="tool_ask_user.html">tool_ask_user()</a></code>
+
+        </dt>
+        <dd>Ask the user questions</dd>
+
+        <dt>
+
+          <code><a href="AskUserDeferred.html">AskUserDeferred()</a></code>
+
+        </dt>
+        <dd>Defer answers to a later user turn</dd>
+
+        <dt>
+
+          <code><a href="set_ask_user_callback.html">set_ask_user_callback()</a></code>
+
+        </dt>
+        <dd>Set a process-wide handler for ask_user</dd>
+
+        <dt>
+
+          <code><a href="approval_read.html">approval_read()</a></code>
+
+        </dt>
+        <dd>Read a pending approval</dd>
+
+        <dt>
+
+          <code><a href="ApprovalContinuation.html">ApprovalContinuation()</a></code>
+
+        </dt>
+        <dd>Pending approval record</dd>
+
+        <dt>
+
+          <code><a href="approval_review_ui.html">approval_review_ui()</a></code> <code><a href="approval_review_ui.html">approval_review_server()</a></code>
+
+        </dt>
+        <dd>Review a pending tool call in Shiny</dd>
+
+        <dt>
+
+          <code><a href="tool_input_review.html">tool_input_review()</a></code>
+
+        </dt>
+        <dd>Tabulate a tool call's arguments for review</dd>
+      </dl></div><div class="section level2">
+      <h2 id="trusted-results">Trusted results<a class="anchor" aria-label="anchor" href="#trusted-results"></a></h2>
+
+      <div class="section-desc"><p>Make one tool the only source of each kind of result.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="TrustedResults.html">TrustedResults()</a></code>
+
+        </dt>
+        <dd>Designate trusted tools</dd>
+
+        <dt>
+
+          <code><a href="result_trusted_results.html">result_trusted_results()</a></code>
+
+        </dt>
+        <dd>Get the trusted results from a run</dd>
       </dl></div><div class="section level2">
       <h2 id="hooks">Hooks<a class="anchor" aria-label="anchor" href="#hooks"></a></h2>
 
-      <div class="section-desc"><p>Intercept and customize agent behavior</p></div>
+      <div class="section-desc"><p>Run R code at fixed points in an agent’s lifecycle.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -571,14 +569,14 @@
           <code><a href="HookEvent.html">HookEvent</a></code>
 
         </dt>
-        <dd>Hook events supported by deputy</dd>
+        <dd>Hook events</dd>
 
         <dt>
 
           <code><a href="HookMatcher.html">HookMatcher()</a></code>
 
         </dt>
-        <dd>Match a lifecycle hook</dd>
+        <dd>Create a hook</dd>
 
         <dt>
 
@@ -589,10 +587,24 @@
 
         <dt>
 
-          <code><a href="CallbackResult.html">HookResult()</a></code> <code><a href="CallbackResult.html">PermissionResult()</a></code>
+          <code><a href="hook_log_tools.html">hook_log_tools()</a></code>
 
         </dt>
-        <dd>Callback result value families</dd>
+        <dd>Create a hook that logs tool calls</dd>
+
+        <dt>
+
+          <code><a href="hook_block_dangerous_bash.html">hook_block_dangerous_bash()</a></code>
+
+        </dt>
+        <dd>Create a hook that blocks dangerous bash commands</dd>
+
+        <dt>
+
+          <code><a href="hook_limit_file_writes.html">hook_limit_file_writes()</a></code>
+
+        </dt>
+        <dd>Create a hook that limits file writes to a directory</dd>
 
         <dt>
 
@@ -617,28 +629,14 @@
 
         <dt>
 
-          <code><a href="hook_log_tools.html">hook_log_tools()</a></code>
+          <code><a href="CallbackResult.html">HookResult()</a></code> <code><a href="CallbackResult.html">PermissionResult()</a></code>
 
         </dt>
-        <dd>Create a hook that logs all tool calls</dd>
-
-        <dt>
-
-          <code><a href="hook_block_dangerous_bash.html">hook_block_dangerous_bash()</a></code>
-
-        </dt>
-        <dd>Create a hook that blocks dangerous bash commands</dd>
-
-        <dt>
-
-          <code><a href="hook_limit_file_writes.html">hook_limit_file_writes()</a></code>
-
-        </dt>
-        <dd>Create a hook that limits file writes to a directory</dd>
+        <dd>Hook and permission results</dd>
       </dl></div><div class="section level2">
       <h2 id="skills">Skills<a class="anchor" aria-label="anchor" href="#skills"></a></h2>
 
-      <div class="section-desc"><p>Load reusable instructions for an agent.</p></div>
+      <div class="section-desc"><p>Package instructions and tools for reuse.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -650,7 +648,14 @@
           <code><a href="Skill.html">Skill()</a></code>
 
         </dt>
-        <dd>Declarative Skill Configuration</dd>
+        <dd>Reusable instructions and tools</dd>
+
+        <dt>
+
+          <code><a href="skill_create.html">skill_create()</a></code>
+
+        </dt>
+        <dd>Create a skill in code</dd>
 
         <dt>
 
@@ -661,28 +666,21 @@
 
         <dt>
 
-          <code><a href="skill_create.html">skill_create()</a></code>
+          <code><a href="skills_list.html">skills_list()</a></code>
 
         </dt>
-        <dd>Create a skill programmatically</dd>
+        <dd>List available skills in a directory</dd>
 
         <dt>
 
           <code><a href="skill_check_requirements.html">skill_check_requirements()</a></code>
 
         </dt>
-        <dd>Check Skill Requirements</dd>
-
-        <dt>
-
-          <code><a href="skills_list.html">skills_list()</a></code>
-
-        </dt>
-        <dd>List available skills in a directory</dd>
+        <dd>Check a skill's requirements</dd>
       </dl></div><div class="section level2">
-      <h2 id="multi-agent">Multi-Agent<a class="anchor" aria-label="anchor" href="#multi-agent"></a></h2>
+      <h2 id="subagents">Subagents<a class="anchor" aria-label="anchor" href="#subagents"></a></h2>
 
-      <div class="section-desc"><p>Coordinate multiple specialized agents</p></div>
+      <div class="section-desc"><p>Delegate parts of a task from a lead agent to specialists.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -694,109 +692,176 @@
           <code><a href="LeadAgent.html">LeadAgent</a></code>
 
         </dt>
-        <dd>LeadAgent R6 Class</dd>
-
-        <dt>
-
-          <code><a href="DelegationInput.html">DelegationInput()</a></code>
-
-        </dt>
-        <dd>Describe a task-specific delegation input</dd>
-
-        <dt>
-
-          <code><a href="DelegationManifest.html">DelegationManifest()</a></code>
-
-        </dt>
-        <dd>Inspect the prepared initial context of a delegation</dd>
-
-        <dt>
-
-          <code><a href="ContextFork.html">ContextFork()</a></code>
-
-        </dt>
-        <dd>Describe a host-selected conversation fork</dd>
-
-        <dt>
-
-          <code><a href="fork_agent.html">fork_agent()</a></code>
-
-        </dt>
-        <dd>Retain a host-authorized context fork for explicit continuation</dd>
-
-        <dt>
-
-          <code><a href="DelegationPolicy.html">DelegationPolicy()</a></code>
-
-        </dt>
-        <dd>Bind host policy and resources to delegated agents</dd>
-
-        <dt>
-
-          <code><a href="DelegationResources.html">DelegationResources()</a></code>
-
-        </dt>
-        <dd>Return resources owned by one delegation</dd>
-
-        <dt>
-
-          <code><a href="DelegationDisclosure.html">DelegationDisclosure()</a></code>
-
-        </dt>
-        <dd>Authorize and redact child conversation inspection</dd>
-
-        <dt>
-
-          <code><a href="DelegationOutcome.html">DelegationOutcome()</a></code>
-
-        </dt>
-        <dd>Inspect a compact delegation outcome</dd>
-
-        <dt>
-
-          <code><a href="DelegationObservation.html">DelegationObservation()</a></code>
-
-        </dt>
-        <dd>Bound the child activity observation buffer</dd>
-
-        <dt>
-
-          <code><a href="DelegationSubscription.html">DelegationSubscription</a></code>
-
-        </dt>
-        <dd>Read bounded child activity without driving execution</dd>
-
-        <dt>
-
-          <code><a href="subagent_chat_ui.html">subagent_chat_ui()</a></code> <code><a href="subagent_chat_ui.html">subagent_chat_server()</a></code>
-
-        </dt>
-        <dd>Inspect child conversations in an optional Shiny panel</dd>
-
-        <dt>
-
-          <code><a href="delegation_history.html">delegation_history()</a></code>
-
-        </dt>
-        <dd>Replay authorized settled child history</dd>
+        <dd>Agent that delegates to subagents</dd>
 
         <dt>
 
           <code><a href="agent_definition.html">AgentDefinition()</a></code> <code><a href="agent_definition.html">agent_definition()</a></code>
 
         </dt>
-        <dd>Create an Agent Definition</dd>
+        <dd>Define a subagent</dd>
 
         <dt>
 
           <code><a href="agent_definition_read.html">agent_definition_read()</a></code> <code><a href="agent_definition_read.html">agent_definition_write()</a></code> <code><a href="agent_definition_read.html">agent_definitions()</a></code>
 
         </dt>
-        <dd>Read, write, and discover AgentDefinition files</dd>
+        <dd>Read and write agent definition files</dd>
+
+        <dt>
+
+          <code><a href="DelegationInput.html">DelegationInput()</a></code>
+
+        </dt>
+        <dd>Describe a task for a subagent</dd>
+
+        <dt>
+
+          <code><a href="DelegationPolicy.html">DelegationPolicy()</a></code>
+
+        </dt>
+        <dd>Configure subagent tools, hooks and user input</dd>
+
+        <dt>
+
+          <code><a href="DelegationResources.html">DelegationResources()</a></code>
+
+        </dt>
+        <dd>Return tools from a resource factory</dd>
+
+        <dt>
+
+          <code><a href="DelegationManifest.html">DelegationManifest()</a></code>
+
+        </dt>
+        <dd>Record what a subagent started with</dd>
+
+        <dt>
+
+          <code><a href="DelegationOutcome.html">DelegationOutcome()</a></code>
+
+        </dt>
+        <dd>Result of a delegation</dd>
+
+        <dt>
+
+          <code><a href="DelegationDisclosure.html">DelegationDisclosure()</a></code>
+
+        </dt>
+        <dd>Control who can inspect subagents</dd>
+
+        <dt>
+
+          <code><a href="delegation_history.html">delegation_history()</a></code>
+
+        </dt>
+        <dd>Replay saved subagent history</dd>
+
+        <dt>
+
+          <code><a href="DelegationObservation.html">DelegationObservation()</a></code>
+
+        </dt>
+        <dd>Set limits for the subagent event buffer</dd>
+
+        <dt>
+
+          <code><a href="DelegationSubscription.html">DelegationSubscription</a></code>
+
+        </dt>
+        <dd>Subscription to subagent events</dd>
+
+        <dt>
+
+          <code><a href="subagent_chat_ui.html">subagent_chat_ui()</a></code> <code><a href="subagent_chat_ui.html">subagent_chat_server()</a></code>
+
+        </dt>
+        <dd>Show subagent conversations in a Shiny panel</dd>
+      </dl></div><div class="section level2">
+      <h2 id="retained-specialists">Retained specialists<a class="anchor" aria-label="anchor" href="#retained-specialists"></a></h2>
+
+      <div class="section-desc"><p>Keep a specialist’s conversation across several delegations.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="adopt_chat.html">adopt_chat()</a></code>
+
+        </dt>
+        <dd>Turn an ellmer chat into a retained agent</dd>
+
+        <dt>
+
+          <code><a href="delegation_tool.html">delegation_tool()</a></code>
+
+        </dt>
+        <dd>Create a tool that calls a retained agent</dd>
+
+        <dt>
+
+          <code><a href="ContextFork.html">ContextFork()</a></code>
+
+        </dt>
+        <dd>Capture conversation turns for a fork</dd>
+
+        <dt>
+
+          <code><a href="fork_agent.html">fork_agent()</a></code>
+
+        </dt>
+        <dd>Start a retained agent from a conversation fork</dd>
+      </dl></div><div class="section level2">
+      <h2 id="background-jobs">Background jobs<a class="anchor" aria-label="anchor" href="#background-jobs"></a></h2>
+
+      <div class="section-desc"><p>Queue work in one R process and run it in another.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="job_create.html">job_create()</a></code>
+
+        </dt>
+        <dd>Create a background job</dd>
+
+        <dt>
+
+          <code><a href="job_run.html">job_run()</a></code>
+
+        </dt>
+        <dd>Run a background job</dd>
+
+        <dt>
+
+          <code><a href="job_read.html">job_read()</a></code>
+
+        </dt>
+        <dd>Read a background job</dd>
+
+        <dt>
+
+          <code><a href="job_cancel.html">job_cancel()</a></code>
+
+        </dt>
+        <dd>Cancel a background job</dd>
+
+        <dt>
+
+          <code><a href="AgentJob.html">AgentJob()</a></code>
+
+        </dt>
+        <dd>Background job record</dd>
       </dl></div><div class="section level2">
       <h2 id="errors">Errors<a class="anchor" aria-label="anchor" href="#errors"></a></h2>
 
-      <div class="section-desc"><p>Catch errors by class and inspect their details.</p></div>
+      <div class="section-desc"><p>Catch Deputy errors by class.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -808,14 +873,14 @@
           <code><a href="deputy-errors.html">deputy-errors</a></code> <code><a href="deputy-errors.html">DeputyError</a></code>
 
         </dt>
-        <dd>Deputy Error Classes</dd>
+        <dd>Deputy error classes</dd>
 
         <dt>
 
           <code><a href="is_deputy_error.html">is_deputy_error()</a></code>
 
         </dt>
-        <dd>Check if an object is a deputy error</dd>
+        <dd>Check whether a condition is a Deputy error</dd>
       </dl></div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
