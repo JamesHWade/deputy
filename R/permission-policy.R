@@ -12,12 +12,12 @@
 #'   (`file_read`, `file_write`, `bash`, `r_code`, `web`, `install_packages`)
 #'   and custom tools against their annotations.
 #' * `"readonly"`: allows the built-in file-reading tools, the web tools when
-#'   `web = TRUE`, `delegate_to_agent` and tools on `tool_allowlist`. It
-#'   denies writes, code execution, destructive tools and, unless
-#'   `web = TRUE`, open-world tools.
+#'   `web = TRUE`, a [LeadAgent]'s own `delegate_to_agent` tool and tools on
+#'   `tool_allowlist`. It denies writes, code execution, destructive tools
+#'   and, unless `web = TRUE`, open-world tools.
 #' * `"plan"`: allows only tools annotated as read-only, plus the approval
-#'   prompt tool and `delegate_to_agent`. Open-world tools also need
-#'   `web = TRUE`.
+#'   prompt tool and a [LeadAgent]'s own `delegate_to_agent` tool. Open-world
+#'   tools also need `web = TRUE`.
 #' * `"full"`: allows every call. Capability flags and annotations are not
 #'   checked.
 #'

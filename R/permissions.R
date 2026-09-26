@@ -367,10 +367,7 @@ permission_check_readonly_mode <- function(
   }
   # Subagents inherit this mode and every subagent tool call is rechecked
   # against the lead's policy, so delegating can't widen what runs.
-  if (
-    !is_mcp_tool_context(context) &&
-      identical(tool_id, "delegate_to_agent")
-  ) {
+  if (permission_is_lead_delegation(tool_name, context)) {
     return(PermissionResultAllow())
   }
   if (isTRUE(explicitly_allowed)) {

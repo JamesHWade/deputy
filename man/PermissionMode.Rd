@@ -16,12 +16,12 @@ without further checks.
 (\code{file_read}, \code{file_write}, \code{bash}, \code{r_code}, \code{web}, \code{install_packages})
 and custom tools against their annotations.
 \item \code{"readonly"}: allows the built-in file-reading tools, the web tools when
-\code{web = TRUE}, \code{delegate_to_agent} and tools on \code{tool_allowlist}. It
-denies writes, code execution, destructive tools and, unless
-\code{web = TRUE}, open-world tools.
+\code{web = TRUE}, a \link{LeadAgent}'s own \code{delegate_to_agent} tool and tools on
+\code{tool_allowlist}. It denies writes, code execution, destructive tools
+and, unless \code{web = TRUE}, open-world tools.
 \item \code{"plan"}: allows only tools annotated as read-only, plus the approval
-prompt tool and \code{delegate_to_agent}. Open-world tools also need
-\code{web = TRUE}.
+prompt tool and a \link{LeadAgent}'s own \code{delegate_to_agent} tool. Open-world
+tools also need \code{web = TRUE}.
 \item \code{"full"}: allows every call. Capability flags and annotations are not
 checked.
 }

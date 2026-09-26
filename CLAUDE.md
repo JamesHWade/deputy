@@ -477,8 +477,9 @@ delegated agents are bounded by the same rule and by their lead's restrictions.
 `can_use_tool` runs in every mode, after gating and mode/capability checks,
 and only for calls those allow: it can deny or suspend, never widen.
 PermissionRequest hooks are the explicit override for denied calls. Readonly
-and plan modes admit the native `delegate_to_agent` tool because children
-cannot use a less strict mode. See ADR-0031.
+and plan modes admit a LeadAgent's own `delegate_to_agent` tool because
+children cannot use a less strict mode; the tool is identified by a private
+marker, not its name. See ADR-0031.
 
 ### AgentDefinition Routing
 

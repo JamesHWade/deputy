@@ -29,9 +29,11 @@ reviews had to use standard mode with `file_write = FALSE` to delegate.
 - The internal tool-result reader keeps its allowlist exemption and stays
   vetoable, because it takes the same path.
 - `PermissionRequest` hooks remain the explicit way to allow a denied call.
-- Readonly and plan modes allow the native `delegate_to_agent` tool. An MCP
-  tool with that name gains nothing. `delegation_tool()` and graph route tools
-  are unchanged: readonly mode allows them only through `tool_allowlist`, and
+- Readonly and plan modes allow a LeadAgent's own `delegate_to_agent` tool.
+  The runtime identifies it by a private marker, as it does the tool-result
+  reader, because any registered, skill or MCP tool can use the same name;
+  those gain nothing. `delegation_tool()` and graph route tools are
+  unchanged: readonly mode allows them only through `tool_allowlist`, and
   plan mode denies them because they are not annotated read-only.
 
 ## Consequences

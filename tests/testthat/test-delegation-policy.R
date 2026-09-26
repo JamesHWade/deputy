@@ -384,26 +384,28 @@ test_that("delegated S7 policies preserve ceilings after serialization", {
   expect_snapshot(error = TRUE, child$set_permission_mode("full"))
 })
 
-test_that("read-only and plan policies allow delegate_to_agent", {
+test_that("read-only and plan policies allow the lead's delegate_to_agent", {
   annotations <- list(
     read_only_hint = FALSE,
     open_world_hint = FALSE,
     idempotent_hint = FALSE,
     destructive_hint = FALSE
   )
-  context <- list(tool_annotations = annotations)
+  plain <- list(tool_annotations = annotations)
+  lead <- c(plain, list(.deputy_internal_tool = deputy_delegation_tool_marker))
   input <- list(agent_name = "reviewer", task = "Review it")
   for (policy in list(
     permissions_readonly(),
     permissions_plan(),
     Permissions(mode = "plan", web = FALSE, file_write = FALSE)
   )) {
-    decision <- permissions_check(policy, "delegate_to_agent", input, context)
+    decision <- permissions_check(policy, "delegate_to_agent", input, lead)
     expect_s7_class(decision, PermissionResultAllow)
+    # Another tool with the same name gains nothing from it.
+    decision <- permissions_check(policy, "delegate_to_agent", input, plain)
+    expect_s7_class(decision, PermissionResultDeny)
   }
-
-  # An MCP tool doesn't gain the delegation exception from its name.
-  mcp <- c(context, list(tool_metadata = list(source = list(type = "mcp"))))
+  mcp <- c(plain, list(tool_metadata = list(source = list(type = "mcp"))))
   expect_s7_class(
     permissions_check(permissions_readonly(), "delegate_to_agent", input, mcp),
     PermissionResultDeny
@@ -416,9 +418,62 @@ test_that("read-only and plan policies allow delegate_to_agent", {
     can_use_tool = function(...) PermissionResultDeny("No delegation")
   )
   expect_identical(
-    permissions_check(vetoed, "delegate_to_agent", input, context)$reason,
+    permissions_check(vetoed, "delegate_to_agent", input, lead)$reason,
     "No delegation"
   )
+})
+
+test_that("read-only and plan agents deny a custom delegate_to_agent tool", {
+  for (mode in c("readonly", "plan")) {
+    calls <- 0L
+    impostor <- ellmer::tool(
+      function(agent_name, task) {
+        calls <<- calls + 1L
+        "done"
+      },
+      name = "delegate_to_agent",
+      description = "Not a lead's delegation tool.",
+      arguments = list(
+        agent_name = ellmer::type_string(),
+        task = ellmer::type_string()
+      ),
+      annotations = ellmer::tool_annotations(
+        read_only_hint = FALSE,
+        destructive_hint = FALSE,
+        open_world_hint = FALSE
+      )
+    )
+    server <- local_runtime_server(list(
+      runtime_reply(
+        tool = "delegate_to_agent",
+        arguments = list(agent_name = "reviewer", task = "Review it")
+      ),
+      runtime_reply("Stopped.")
+    ))
+    agent <- Agent$new(
+      ellmer::chat_openai_compatible(
+        base_url = server$url,
+        credentials = function() "fixture",
+        model = "gpt-4o-mini",
+        echo = "none"
+      ),
+      tools = list(impostor),
+      permissions = Permissions(mode = mode, file_write = FALSE)
+    )
+
+    result <- suppressWarnings(agent$run_sync("Delegate the review"))
+
+    expect_identical(result$stop_reason, "complete", info = mode)
+    expect_identical(calls, 0L, info = mode)
+    denied <- Filter(
+      function(event) {
+        identical(event$type, "permission") &&
+          identical(event$data$decision, "deny")
+      },
+      result$events
+    )
+    expect_length(denied, 1L)
+  }
 })
 
 test_that("a read-only lead delegates to a read-only subagent", {

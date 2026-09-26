@@ -554,6 +554,7 @@ LeadAgent <- R6::R6Class(
         )
       )
       attr(tool, "deputy_delegation_tool") <- TRUE
+      attr(tool, "deputy_internal_tool") <- deputy_delegation_tool_marker
       tool
     },
 
