@@ -854,3 +854,13 @@ tool_read_csv <- ellmer::tool(
     destructive_hint = FALSE
   )
 )
+
+# Deputy's own tools; see mark_native_tool().
+tool_read_file <- mark_native_tool(tool_read_file)
+tool_write_file <- mark_native_tool(tool_write_file)
+tool_edit_file <- mark_native_tool(tool_edit_file)
+tool_multi_edit <- mark_native_tool(tool_multi_edit)
+tool_list_files <- mark_native_tool(tool_list_files)
+tool_glob_files <- mark_native_tool(tool_glob_files)
+tool_grep_files <- mark_native_tool(tool_grep_files)
+tool_read_csv <- mark_native_tool(tool_read_csv)

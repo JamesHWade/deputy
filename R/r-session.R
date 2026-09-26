@@ -164,6 +164,7 @@ RSession <- R6::R6Class(
           open_world_hint = TRUE
         )
       )
+      tool <- mark_native_tool(tool)
       attr(tool, "deputy_r_session_owner") <- private$owner
       if (length(private$tool_names)) {
         attr(tool, "deputy_r_session_invoke") <- function(code, execution_id) {

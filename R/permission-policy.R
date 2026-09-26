@@ -118,6 +118,18 @@ is_permission_native_capability_tool <- function(tool_name) {
     permission_native_capability_tool_ids
 }
 
+# Names that carry native permission treatment, including the default prompt
+# tool. Grants based on them need a trusted native origin (#216).
+permission_native_tool_ids <- c(
+  permission_native_capability_tool_ids,
+  "ask_user"
+)
+
+permission_is_native_capability <- function(tool_name, context) {
+  permission_trusts_native_name(context) &&
+    is_permission_native_capability_tool(tool_name)
+}
+
 # Validate a permission mode string.
 validate_permission_mode_value <- function(mode, arg = "mode") {
   if (!is.character(mode) || length(mode) != 1 || is.na(mode)) {

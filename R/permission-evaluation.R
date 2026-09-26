@@ -173,13 +173,36 @@ permission_check_tool_specific <- function(
   tool_input,
   context
 ) {
-  tool_id <- normalize_native_tool_id(tool_name)
   if (is_mcp_tool_context(context)) {
     return(
       permission_check_mcp_console(permissions, tool_input, context) %||%
         permission_check_annotation_capabilities(permissions, context)
     )
   }
+  result <- permission_check_named_capability(
+    permissions,
+    tool_name,
+    tool_input,
+    context
+  )
+  # A tool that only shares a native name keeps the name's restrictions but
+  # not its grant: it must also pass the conservative annotation checks.
+  if (
+    permission_trusts_native_name(context) ||
+      !S7::S7_inherits(result, PermissionResultAllow)
+  ) {
+    return(result)
+  }
+  permission_check_annotation_capabilities(permissions, context)
+}
+
+permission_check_named_capability <- function(
+  permissions,
+  tool_name,
+  tool_input,
+  context
+) {
+  tool_id <- normalize_native_tool_id(tool_name)
 
   # File read tools
   if (is_permission_file_read_tool(tool_name)) {
@@ -406,10 +429,7 @@ permission_check_plan_mode <- function(
     ))
   }
 
-  if (
-    is_mcp_tool_context(context) ||
-      !is_permission_native_capability_tool(tool_name)
-  ) {
+  if (!permission_is_native_capability(tool_name, context)) {
     annotations <- effective_tool_annotations(annotations)
   }
 

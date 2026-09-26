@@ -604,3 +604,195 @@ test_that("released MCP transport preserves origin, annotations and connection i
     logical(1)
   )))
 })
+
+native_name_host_tool <- function(name, annotations = list()) {
+  ellmer::tool(
+    function(path = "") "host",
+    name = name,
+    description = "A host tool that shares a native name.",
+    arguments = list(path = ellmer::type_string(required = FALSE)),
+    annotations = annotations
+  )
+}
+
+native_name_context <- function(tool) {
+  list(
+    tool_metadata = tool_metadata(tool),
+    tool_annotations = tool@annotations,
+    .deputy_native_tool = is_native_tool(tool)
+  )
+}
+
+test_that("Deputy marks its own tools as native", {
+  for (tool in list(
+    tool_read_file,
+    tool_write_file,
+    tool_run_bash,
+    tool_web_fetch,
+    tool_ask_user,
+    tools_interactive()[[1]]
+  )) {
+    expect_true(is_native_tool(tool), info = tool@name)
+  }
+  expect_false(is_native_tool(native_name_host_tool("read_file")))
+  agent <- Agent$new(chat = create_mock_chat(), tools = list(tool_read_file))
+  expect_true(is_native_tool(agent$get_tools()$read_file))
+  expect_true(is_native_tool(agent$clone()$get_tools()$read_file))
+})
+
+test_that("a tool sharing a native name gets no native grants (#216)", {
+  host_read <- native_name_host_tool("read_file")
+  host_alias <- native_name_host_tool("Read-File")
+  readonly <- permissions_readonly()
+  expect_s7_class(
+    permissions_check(
+      readonly,
+      "read_file",
+      list(),
+      native_name_context(tool_read_file)
+    ),
+    PermissionResultAllow
+  )
+  for (tool in list(host_read, host_alias)) {
+    expect_s7_class(
+      permissions_check(readonly, tool@name, list(), native_name_context(tool)),
+      PermissionResultDeny
+    )
+  }
+
+  standard <- permissions_standard(withr::local_tempdir())
+  expect_s7_class(
+    permissions_check(
+      standard,
+      "read_file",
+      list(),
+      native_name_context(host_read)
+    ),
+    PermissionResultDeny
+  )
+  closed <- native_name_host_tool(
+    "read_file",
+    ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      destructive_hint = FALSE,
+      open_world_hint = FALSE
+    )
+  )
+  expect_s7_class(
+    permissions_check(
+      standard,
+      "read_file",
+      list(),
+      native_name_context(closed)
+    ),
+    PermissionResultAllow
+  )
+  # The native name's restrictions still apply to the host tool.
+  for (mode in c("standard", "readonly")) {
+    no_read <- Permissions(
+      mode = mode,
+      file_read = FALSE,
+      tool_allowlist = "read_file"
+    )
+    expect_s7_class(
+      permissions_check(
+        no_read,
+        "read_file",
+        list(),
+        native_name_context(closed)
+      ),
+      PermissionResultDeny
+    )
+  }
+  # An explicitly allowlisted, annotated host tool is allowed in readonly.
+  allowed <- Permissions(mode = "readonly", tool_allowlist = "read_file")
+  expect_s7_class(
+    permissions_check(
+      allowed,
+      "read_file",
+      list(),
+      native_name_context(closed)
+    ),
+    PermissionResultAllow
+  )
+
+  plan <- permissions_plan()
+  expect_s7_class(
+    permissions_check(
+      plan,
+      "read_file",
+      list(),
+      native_name_context(host_read)
+    ),
+    PermissionResultDeny
+  )
+})
+
+test_that("only Deputy's ask_user takes the plan-mode prompt shortcut", {
+  plan <- permissions_plan()
+  expect_s7_class(
+    permissions_check(
+      plan,
+      "ask_user",
+      list(),
+      native_name_context(tools_interactive()[[1]])
+    ),
+    PermissionResultAllow
+  )
+  for (name in c("ask_user", "Ask-User")) {
+    expect_s7_class(
+      permissions_check(
+        plan,
+        name,
+        list(),
+        native_name_context(native_name_host_tool(name))
+      ),
+      PermissionResultDeny
+    )
+  }
+  # A host-chosen prompt name remains the host's explicit trust.
+  custom <- permissions_plan(permission_prompt_tool_name = "request_approval")
+  expect_s7_class(
+    permissions_check(
+      custom,
+      "request_approval",
+      list(),
+      native_name_context(native_name_host_tool("request_approval"))
+    ),
+    PermissionResultAllow
+  )
+})
+
+test_that("direct policy queries without tool metadata keep name-based classification", {
+  expect_s7_class(
+    permissions_check(permissions_readonly(), "read_file", list(), list()),
+    PermissionResultAllow
+  )
+  expect_s7_class(
+    permissions_check(permissions_plan(), "ask_user", list(), list()),
+    PermissionResultAllow
+  )
+})
+
+test_that("an Agent denies a host tool named read_file in readonly mode", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+  dir <- withr::local_tempdir()
+  writeLines("hello", file.path(dir, "note.txt"))
+  for (native in c(TRUE, FALSE)) {
+    read <- create_shiny_tool_chat(
+      tool_name = "read_file",
+      tool_input = list(path = "note.txt")
+    )
+    tool <- if (native) tool_read_file else native_name_host_tool("read_file")
+    agent <- Agent$new(
+      chat = read$chat,
+      tools = list(tool),
+      permissions = permissions_readonly(),
+      working_dir = dir
+    )
+    resolve_async_value(agent$run_async("read"))
+    expect_identical(read$state$executed, native, info = native)
+    expect_identical(read$state$rejected, !native, info = native)
+  }
+})

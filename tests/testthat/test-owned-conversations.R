@@ -653,7 +653,7 @@ test_that("retention rebinds shared tool callbacks and adapters to the child", {
   child <- Agent$new(
     chat,
     permissions = Permissions(file_write = TRUE),
-    tools = list(ellmer::tool(
+    tools = list(mark_native_tool(ellmer::tool(
       function() {
         effects <<- effects + 1L
         "written"
@@ -661,7 +661,7 @@ test_that("retention rebinds shared tool callbacks and adapters to the child", {
       name = "write_file",
       description = "Write",
       arguments = list()
-    ))
+    )))
   )
   child$on_tool_request(function(request) {
     child_requests <<- child_requests + 1L
@@ -754,7 +754,7 @@ test_that("retained hook registries cannot widen policy before dispatch", {
   child <- Agent$new(
     runtime_chat(server),
     permissions = Permissions(file_write = FALSE),
-    tools = list(ellmer::tool(
+    tools = list(mark_native_tool(ellmer::tool(
       function() {
         effects <<- effects + 1L
         "written"
@@ -762,7 +762,7 @@ test_that("retained hook registries cannot widen policy before dispatch", {
       name = "write_file",
       description = "Write",
       arguments = list()
-    ))
+    )))
   )
   original_hooks <- child$hooks
   allow <- HookMatcher("PermissionRequest", callback = function(...) {

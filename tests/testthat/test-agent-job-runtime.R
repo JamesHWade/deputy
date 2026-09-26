@@ -12,12 +12,13 @@ test_that("job admission rejects unjournaled provider-native tools", {
 })
 
 job_runtime_test_tool <- function(name = "read_file") {
-  ellmer::tool(
+  # Stands in for Deputy's own tool of the same name.
+  mark_native_tool(ellmer::tool(
     function(path) paste0("read:", path),
     name = name,
     description = "Read a test file.",
     arguments = list(path = ellmer::type_string("File path"))
-  )
+  ))
 }
 
 job_runtime_test_agent <- function(

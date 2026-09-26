@@ -222,10 +222,14 @@ S7::method(permissions_check, Permissions) <- function(
   }
 
   # Allow the configured prompt tool so gated workflows can request
-  # explicit human approval, provided it passed explicit tool gating.
+  # explicit human approval, provided it passed explicit tool gating. A
+  # native prompt name such as ask_user must belong to Deputy's own tool; a
+  # host-chosen prompt name is the host's explicit trust.
   if (
     !is_mcp_tool_context(context) &&
-      permission_is_prompt_tool(permissions, tool_name)
+      permission_is_prompt_tool(permissions, tool_name) &&
+      (permission_trusts_native_name(context) ||
+        !normalize_native_tool_id(tool_name) %in% permission_native_tool_ids)
   ) {
     return(PermissionResultAllow())
   }
@@ -256,9 +260,7 @@ S7::method(permissions_check, Permissions) <- function(
   # Extract tool annotations from context if available
   annotations <- context$tool_annotations
   if (
-    (is_mcp_tool_context(context) ||
-      !normalize_native_tool_id(tool_name) %in%
-        permission_native_capability_tool_ids) &&
+    !permission_is_native_capability(tool_name, context) &&
       !isTRUE(allowlist_exempt)
   ) {
     annotations <- effective_tool_annotations(annotations)
@@ -296,6 +298,8 @@ S7::method(permissions_check, Permissions) <- function(
       ))
     }
 
+    # Native read and web names keep their restrictions for every non-MCP
+    # tool, but only Deputy's own tools are known reads (#216).
     if (
       !is_mcp_tool_context(context) &&
         is_permission_file_read_tool(tool_name)
@@ -305,12 +309,14 @@ S7::method(permissions_check, Permissions) <- function(
           reason = "File reading is not allowed"
         ))
       }
-      return(permission_apply_callback_veto(
-        permissions,
-        tool_name,
-        tool_input,
-        context
-      ))
+      if (permission_trusts_native_name(context)) {
+        return(permission_apply_callback_veto(
+          permissions,
+          tool_name,
+          tool_input,
+          context
+        ))
+      }
     }
 
     if (
@@ -322,12 +328,14 @@ S7::method(permissions_check, Permissions) <- function(
           reason = "Web access is not allowed in readonly mode"
         ))
       }
-      return(permission_apply_callback_veto(
-        permissions,
-        tool_name,
-        tool_input,
-        context
-      ))
+      if (permission_trusts_native_name(context)) {
+        return(permission_apply_callback_veto(
+          permissions,
+          tool_name,
+          tool_input,
+          context
+        ))
+      }
     }
     if (isTRUE(explicitly_allowed)) {
       if (isTRUE(callback_checked)) {

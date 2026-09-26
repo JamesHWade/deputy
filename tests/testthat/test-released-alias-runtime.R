@@ -14,7 +14,7 @@ test_that("released aliases dispatch with their own permissions and observers", 
     child <- Agent$new(
       chat,
       permissions = Permissions(file_write = TRUE),
-      tools = list(ellmer::tool(
+      tools = list(mark_native_tool(ellmer::tool(
         function() {
           effects <<- effects + 1L
           "written"
@@ -22,7 +22,7 @@ test_that("released aliases dispatch with their own permissions and observers", 
         name = "write_file",
         description = "Write",
         arguments = list()
-      ))
+      )))
     )
     child$on_tool_request(function(request) {
       child_requests <<- child_requests + 1L
