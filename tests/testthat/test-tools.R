@@ -579,6 +579,57 @@ test_that("tool schemas require non-default structured inputs", {
   expect_true(tool_multi_edit@arguments@properties$edits@required)
 })
 
+edit_test_file <- function(text, env = parent.frame()) {
+  path <- withr::local_tempfile(fileext = ".txt", .local_envir = env)
+  writeBin(charToRaw(text), path)
+  path
+}
+
+edit_test_bytes <- function(path) {
+  rawToChar(readBin(path, "raw", n = file.size(path)))
+}
+
+test_that("edit_file keeps CRLF line endings and matches LF edits", {
+  path <- edit_test_file("alpha\r\nbeta\r\ngamma\r\n")
+
+  tool_edit_file(path, "alpha\nbeta", "one\ntwo")
+
+  expect_identical(edit_test_bytes(path), "one\r\ntwo\r\ngamma\r\n")
+})
+
+test_that("edit_file keeps whether the file ends with a newline", {
+  without <- edit_test_file("alpha\nbeta")
+  with <- edit_test_file("alpha\nbeta\n")
+
+  tool_edit_file(without, "beta", "gamma")
+  tool_edit_file(with, "beta", "gamma")
+
+  expect_identical(edit_test_bytes(without), "alpha\ngamma")
+  expect_identical(edit_test_bytes(with), "alpha\ngamma\n")
+})
+
+test_that("multi_edit keeps CRLF line endings and the final newline state", {
+  path <- edit_test_file("alpha\r\nbeta")
+
+  tool_multi_edit(
+    path,
+    list(
+      list(old_text = "alpha", new_text = "one\r\ntwo"),
+      list(old_text = "beta", new_text = "three")
+    )
+  )
+
+  expect_identical(edit_test_bytes(path), "one\r\ntwo\r\nthree")
+})
+
+test_that("edit tools leave mixed line endings outside the edit unchanged", {
+  path <- edit_test_file("alpha\r\nbeta\ngamma\r\n")
+
+  tool_edit_file(path, "beta", "delta")
+
+  expect_identical(edit_test_bytes(path), "alpha\r\ndelta\ngamma\r\n")
+})
+
 test_that("tools_preset returns correct tools for data", {
   tools <- tools_preset("data")
   expect_type(tools, "list")

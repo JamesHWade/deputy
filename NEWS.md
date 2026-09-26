@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* `edit_file` and `multi_edit` now change only the replaced text. They
+  previously rewrote the whole file through `readLines()`/`writeLines()`,
+  converting CRLF line endings to LF and adding a final newline. A file whose
+  newlines are all CRLF is still matched with LF, so multi-line edits written
+  with `"\n"` apply, and it is written back with CRLF (#217).
+
 * `run_bash` no longer reports a failed command as successful. A non-zero
   exit status, including a command that is not found, is now a tool
   rejection naming the status, and standard error is returned after a

@@ -9,6 +9,28 @@ count_fixed_matches <- function(text, pattern) {
   length(matches)
 }
 
+# Edit tools change only the replaced text. The file's other bytes, its line
+# endings and whether it ends with a newline, are kept. When every newline is
+# CRLF, text is matched with LF so edits written with "\n" still apply.
+read_edit_text <- function(path) {
+  text <- rawToChar(readBin(path, "raw", n = file.size(path)))
+  Encoding(text) <- "UTF-8"
+  newlines <- count_fixed_matches(text, "\n")
+  crlf <- newlines > 0L && count_fixed_matches(text, "\r\n") == newlines
+  if (crlf) {
+    text <- gsub("\r\n", "\n", text, fixed = TRUE)
+  }
+  list(text = text, crlf = crlf)
+}
+
+write_edit_text <- function(path, text, crlf) {
+  if (crlf) {
+    text <- gsub("\r\n", "\n", text, fixed = TRUE)
+    text <- gsub("\n", "\r\n", text, fixed = TRUE)
+  }
+  writeBin(charToRaw(text), path)
+}
+
 # Apply a fixed-string replacement with safety checks for edit tools.
 replace_fixed_text <- function(text, old_text, new_text, replace_all = FALSE) {
   if (!nzchar(old_text)) {
@@ -309,14 +331,14 @@ tool_edit_file <- ellmer::tool(
 
     tryCatch(
       {
-        original <- paste(readLines(path, warn = FALSE), collapse = "\n")
+        original <- read_edit_text(path)
         updated <- replace_fixed_text(
-          original,
+          original$text,
           old_text = old_text,
           new_text = new_text,
           replace_all = replace_all
         )
-        writeLines(updated$text, path)
+        write_edit_text(path, updated$text, original$crlf)
 
         paste(
           "Successfully edited",
@@ -381,7 +403,8 @@ tool_multi_edit <- ellmer::tool(
     tryCatch(
       {
         operations <- parse_multi_edits(edits)
-        text <- paste(readLines(path, warn = FALSE), collapse = "\n")
+        original <- read_edit_text(path)
+        text <- original$text
         total_replacements <- 0L
 
         for (edit in operations) {
@@ -395,7 +418,7 @@ tool_multi_edit <- ellmer::tool(
           total_replacements <- total_replacements + result$replacements
         }
 
-        writeLines(text, path)
+        write_edit_text(path, text, original$crlf)
 
         paste(
           "Successfully applied",
