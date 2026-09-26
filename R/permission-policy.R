@@ -1,54 +1,60 @@
 # Permission system for deputy agents
 
-#' Permission modes for agent tool access
+#' Permission modes
 #'
 #' @description
-#' Permission modes control the overall behavior of tool permission checking:
-#' * `"standard"` - Check each tool against the configured capabilities
-#' * `"plan"` - Allow annotated read-only tools within configured capabilities
-#'   plus human approval prompts
-#' * `"readonly"` - Deny all write/execute tools
-#' * `"full"` - Allow all tools (dangerous, use with caution)
+#' `PermissionMode` lists the modes a [Permissions] policy can use. In every
+#' mode, `tool_denylist` and `tool_allowlist` are checked first, and the
+#' approval prompt tool (`permission_prompt_tool_name`) is then allowed
+#' without further checks.
 #'
-#' @section Tool Annotations:
+#' * `"standard"`: checks built-in tools against the capability flags
+#'   (`file_read`, `file_write`, `bash`, `r_code`, `web`, `install_packages`)
+#'   and custom tools against their annotations.
+#' * `"readonly"`: allows the built-in file-reading tools, the web tools when
+#'   `web = TRUE`, a [LeadAgent]'s own `delegate_to_agent` tool and tools on
+#'   `tool_allowlist`. It denies writes, code execution, destructive tools
+#'   and, unless `web = TRUE`, open-world tools.
+#' * `"plan"`: allows only tools annotated as read-only, plus the approval
+#'   prompt tool and a [LeadAgent]'s own `delegate_to_agent` tool. Open-world
+#'   tools also need `web = TRUE`.
+#' * `"full"`: allows every call. Capability flags and annotations are not
+#'   checked.
 #'
-#' Permissions use tool annotations (from [ellmer::tool_annotations()]) to
-#' determine tool behavior. Available annotations:
+#' A [LeadAgent]'s subagents can't use a less strict mode than their lead,
+#' and each of their tool calls is also checked against the lead's policy.
 #'
-#' **read_only_hint** (logical, default: FALSE)
+#' If the policy has a `can_use_tool` callback, it is called in every mode for
+#' each call the rest of the policy allows. It can deny the call or pause it
+#' for approval, but it can't allow a call the policy denies.
 #'
-#' Indicates the tool only reads data and doesn't modify state. Annotations are
-#' descriptive metadata, not an authority grant: `"readonly"` mode allows known
-#' Deputy read tools or explicit allowlist entries, subject to destructive and
-#' open-world capability checks. Examples: `tool_read_file`, `tool_list_files`,
-#' `tool_search`.
+#' A denied call can still be allowed by a PermissionRequest hook (see
+#' [HookEvent]).
 #'
-#' **destructive_hint** (logical, default: TRUE)
+#' @section Tool annotations:
 #'
-#' Indicates the tool may cause destructive/irreversible changes.
-#' Tools with `destructive_hint = TRUE` require explicit permission.
-#' Examples: `tool_write_file`, `tool_delete_file`, `tool_run_bash`
+#' Custom tools are checked through their annotations, set with
+#' [ellmer::tool_annotations()]. A missing annotation takes a cautious
+#' default:
 #'
-#' **open_world_hint** (logical, default: TRUE)
+#' * `read_only_hint` (default `FALSE`): the tool only reads data. Plan mode
+#'   allows only these tools.
+#' * `destructive_hint` (default `TRUE`, or `FALSE` when `read_only_hint =
+#'   TRUE`): the tool may make irreversible changes. Destructive tools are
+#'   denied in plan and readonly modes, and in standard mode when both
+#'   `file_write` and `bash` are off.
+#' * `open_world_hint` (default `TRUE`): the tool may reach external systems.
+#'   Open-world tools are denied unless `web = TRUE`, except in full mode.
+#' * `idempotent_hint` (default `FALSE`): repeated calls have the same effect.
+#'   Permission checks don't use it.
 #'
-#' Indicates the tool may interact with external systems.
-#' Used for network calls, package installation, etc.
-#' Examples: `tool_web_search`, `tool_install_package`
+#' So in standard mode an unannotated custom tool needs `web = TRUE`, and plan
+#' and readonly modes deny it. Built-in tools such as `write_file` and
+#' `run_bash` are checked against their capability flag instead.
 #'
-#' **idempotent_hint** (logical, default: FALSE)
+#' @section Annotating tools:
 #'
-#' Indicates repeated calls produce the same result.
-#' This annotation alone does not authorize automatic retries.
-#'
-#' Missing annotations remain absent on the tool. For custom tools, permission
-#' checks assume modification, possible destruction, external access, and no
-#' idempotence unless stated otherwise. If `read_only_hint = TRUE`, an omitted
-#' destructive annotation is ignored; an explicit TRUE still denies read-only
-#' use. Native tools continue to require their named capabilities. A custom
-#' permission callback can explicitly authorize a tool in standard mode;
-#' full mode bypasses annotation checks but still honors tool gating.
-#'
-#' @section Creating Tools with Annotations:
+#' Set annotations when you create a tool:
 #'
 #' ```r
 #' # Read-only tool
@@ -72,7 +78,8 @@
 #'   arguments = list(path = ellmer::type_string("File path")),
 #'   annotations = ellmer::tool_annotations(
 #'     read_only_hint = FALSE,
-#'     destructive_hint = TRUE
+#'     destructive_hint = TRUE,
+#'     open_world_hint = FALSE
 #'   )
 #' )
 #' ```

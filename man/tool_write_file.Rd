@@ -10,23 +10,24 @@ A tool definition created with \code{ellmer::tool()}.
 tool_write_file(path, content, append = FALSE)
 }
 \arguments{
-\item{path}{Path to the file to write (tool argument)}
+\item{path}{Path to the file to write.}
 
-\item{content}{Content to write to the file (tool argument)}
+\item{content}{Text to write.}
 
-\item{append}{If TRUE, append to existing file (tool argument)}
+\item{append}{If \code{TRUE}, add to the end of the file instead of overwriting
+it.}
 }
 \value{
-When called directly, a character status message describing the
-write.
+A status message with the number of characters written.
 }
 \description{
-A tool that writes content to a file, creating it if it doesn't exist.
+A tool that writes text to a file, creating the file and any missing parent
+directories.
 }
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_write_file)
 )
 }

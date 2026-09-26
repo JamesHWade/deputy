@@ -7,19 +7,18 @@
 permissions_standard(working_dir = getwd())
 }
 \arguments{
-\item{working_dir}{Existing absolute root directory for file writes (default:
-current directory). This does not restrict otherwise accessible file
-reads.}
+\item{working_dir}{An existing absolute path to the directory the agent may
+write to. Defaults to the current directory. Reads are not limited to it.}
 }
 \value{
-A \link{Permissions} object
+A \link{Permissions} object.
 }
 \description{
-Creates a permission policy suitable for most use cases.
-Allows reads of files accessible to the R process, confines file writes to
-the working directory. Denies arbitrary R code, bash commands, web access,
-and package installation. Grant code execution explicitly only when the
-model and task are trusted; process separation is not an OS sandbox.
+Creates a \code{"standard"} policy for everyday use. The agent can read any file
+your R session can read, and write files inside \code{working_dir}. R code, shell
+commands, web access and package installation are denied. Turn on code
+execution only when you trust the model and the task: the code runs with
+your user's access, not in an OS sandbox.
 }
 \examples{
 perms <- permissions_standard()

@@ -1,25 +1,25 @@
 # Tool bundles for deputy agents
 # Convenient groupings of related tools
 
-#' File operation tools
+#' Get the basic file tools
 #'
 #' @description
-#' Returns a list of tools for file operations:
-#' * `read_file` - Read file contents
-#' * `write_file` - Write content to files
-#' * `list_files` - List directory contents
+#' Returns `read_file`, `read_markdown`, `write_file` and `list_files`. The
+#' editing and search tools, such as [tool_edit_file] and [tool_grep_files],
+#' are separate.
 #'
-#' @return A list of tool definitions
+#' @return A list of tools.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = tools_file()
 #' )
 #' }
 #'
-#' @seealso [tool_read_file], [tool_write_file], [tool_list_files]
+#' @seealso [tool_read_file], [tool_read_markdown], [tool_write_file],
+#'   [tool_list_files]
 #' @export
 tools_file <- function() {
   list(
@@ -30,24 +30,23 @@ tools_file <- function() {
   )
 }
 
-#' Code execution tools
+#' Get the code execution tools
 #'
 #' @description
-#' Returns a list of tools for code execution:
-#' * `run_r_code` - Execute R code in a separate process
-#' * `run_bash` - Execute bash commands
+#' Returns `run_r_code` and `run_bash`. Both run model-written code with your
+#' user account's access. Each call runs in a separate process, which is not a
+#' sandbox. [permissions_standard()] denies both tools; allow them with
+#' `r_code = TRUE` and `bash = TRUE` in [Permissions()]. For an OS sandbox, use
+#' [tools_mcp_repl()].
 #'
-#' **Note:** These tools execute trusted code and require explicit permissions.
-#' Process separation is not an OS sandbox; [permissions_standard()] denies
-#' both tools.
-#'
-#' @return A list of tool definitions
+#' @return A list of tools.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
-#'   tools = tools_code()
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   tools = tools_code(),
+#'   permissions = Permissions(r_code = TRUE, bash = TRUE)
 #' )
 #' }
 #'
@@ -60,24 +59,22 @@ tools_code <- function() {
   )
 }
 
-#' Data reading tools
+#' Get the data reading tools
 #'
 #' @description
-#' Returns a list of tools for reading data files:
-#' * `read_csv` - Read CSV files with summary
-#' * `read_file` - Read any file as text
+#' Returns `read_csv`, `read_file` and `read_markdown`.
 #'
-#' @return A list of tool definitions
+#' @return A list of tools.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = tools_data()
 #' )
 #' }
 #'
-#' @seealso [tool_read_csv], [tool_read_file]
+#' @seealso [tool_read_csv], [tool_read_file], [tool_read_markdown]
 #' @export
 tools_data <- function() {
   list(
@@ -87,50 +84,52 @@ tools_data <- function() {
   )
 }
 
-#' Web tools
+#' Get web tools
 #'
 #' @description
-#' Returns a list of tools for web operations. When a `chat` object is provided,
-#' automatically selects the best tools for that provider:
+#' Returns a `web_search` and a `web_fetch` tool. By default these are
+#' [tool_web_search] (DuckDuckGo) and [tool_web_fetch], which work with any
+#' provider. If you pass `chat`, the provider's own tools are used where
+#' available:
 #'
-#' * **Claude (Anthropic)**: Uses native `claude_tool_web_search()` and
-#'   `claude_tool_web_fetch()` for higher quality results (requires admin
-#'   enablement and incurs extra cost)
-#' * **Google (Gemini/Vertex)**: Uses native `google_tool_web_search()` and
-#'   `google_tool_web_fetch()`
-#' * **OpenAI**: Uses native `openai_tool_web_search()`
-#' * **Other providers**: Falls back to universal tools using httr2 and DuckDuckGo
+#' * Anthropic: `claude_tool_web_search()` and `claude_tool_web_fetch()`.
+#'   These cost extra and may need to be enabled by your organization's admin.
+#' * Google Gemini and Vertex: `google_tool_web_search()` and
+#'   `google_tool_web_fetch()`.
+#' * OpenAI: `openai_tool_web_search()`, plus [tool_web_fetch].
+#' * Other providers: the default tools.
 #'
-#' Without a `chat` argument, returns universal tools that work with any provider.
+#' Provider tools run on the provider's servers, so the agent checks them once,
+#' at registration, not on each call. It accepts them only if its permissions
+#' set `web = TRUE`, list the tool names in `tool_allowlist`, and have no
+#' `can_use_tool` callback.
 #'
-#' @param chat Optional ellmer Chat object. If provided, returns provider-specific
-#'   tools when available for better quality results.
-#' @param use_native Logical. If `TRUE` (default), use native provider tools when
-#'   available. Set to `FALSE` to always use universal tools.
+#' @param chat Optional ellmer Chat, used to pick the provider's own tools.
+#' @param use_native If `FALSE`, always return the default tools.
 #'
-#' @return A list of tool definitions
+#' @return A list of tools.
 #'
 #' @examples
 #' \dontrun{
-#' # Universal tools (work with any provider)
+#' # Default tools, for any provider
 #' agent <- Agent$new(
-#'   chat = ellmer::chat_ollama(),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = tools_web(),
 #'   permissions = Permissions(web = TRUE)
 #' )
 #'
-#' # Provider-specific tools (auto-detected)
-#' chat <- ellmer::chat_claude()
+#' # Anthropic's own web tools
+#' chat <- ellmer::chat("anthropic/claude-sonnet-5")
 #' agent <- Agent$new(
 #'   chat = chat,
-#'   tools = tools_web(chat),  # Uses Claude's native web tools
+#'   tools = tools_web(chat),
 #'   permissions = Permissions(
 #'     web = TRUE,
 #'     tool_allowlist = c("web_search", "web_fetch")
 #'   )
 #' )
 #'
-#' # Force universal tools even with Claude
+#' # Default tools, even with Anthropic
 #' agent <- Agent$new(
 #'   chat = chat,
 #'   tools = tools_web(chat, use_native = FALSE),
@@ -208,19 +207,22 @@ get_provider_name <- function(chat) {
   )
 }
 
-#' All built-in tools
+#' Get all built-in tools
 #'
 #' @description
-#' Returns all built-in tools. Use with [permissions_full()] if you want
-#' to allow all operations.
+#' Returns every built-in tool except `ask_user`, which you can add with
+#' [tools_interactive()]. That includes `run_r_code` and `run_bash`, which run
+#' with your user account's access and are not sandboxed. The default
+#' permissions deny them and the web tools; [permissions_full()] allows
+#' everything.
 #'
-#' @return A list of all tool definitions
+#' @return A list of tools.
 #'
 #' @examples
 #' \dontrun{
-#' # Allow all tools with full permissions
+#' # Allow every tool
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = tools_all(),
 #'   permissions = permissions_full()
 #' )
@@ -251,41 +253,44 @@ ToolPresets <- c("minimal", "standard", "dev", "data", "full")
 #' Get a tool preset by name
 #'
 #' @description
-#' Returns a pre-configured collection of tools for common use cases.
-#' Presets simplify agent setup by providing curated toolsets.
+#' Returns a ready-made set of tools for a common kind of task. The `"dev"`,
+#' `"data"` and `"full"` presets include code execution tools, which run with
+#' your user account's access. The default permissions deny them; allow them
+#' with `r_code = TRUE` (and `bash = TRUE` for `run_bash`) in [Permissions()].
 #'
 #' @param name The preset name. One of:
-#'   * `"minimal"` - Read-only tools for safe exploration
-#'     (`read_file`, `read_markdown`, `list_files`)
-#'   * `"standard"` - File-oriented toolset for ordinary work
-#'     (`read_file`, `read_markdown`, `write_file`, `list_files`)
-#'   * `"dev"` - Full development with shell access
-#'     (`read_file`, `read_markdown`, `write_file`, `list_files`, `run_r_code`, `run_bash`)
-#'   * `"data"` - Data analysis focused tools
-#'     (`read_file`, `read_markdown`, `list_files`, `read_csv`, `run_r_code`)
-#'   * `"full"` - All available tools (requires appropriate permissions)
+#'   * `"minimal"`: read-only tools
+#'     (`read_file`, `read_markdown`, `list_files`).
+#'   * `"standard"`: file tools
+#'     (`read_file`, `read_markdown`, `write_file`, `list_files`).
+#'   * `"dev"`: file tools plus code execution (`read_file`, `read_markdown`,
+#'     `write_file`, `list_files`, `run_r_code`, `run_bash`).
+#'   * `"data"`: data analysis
+#'     (`read_file`, `read_markdown`, `list_files`, `read_csv`, `run_r_code`).
+#'   * `"full"`: everything in [tools_all()].
 #'
-#' @return A list of tool definitions
+#' @return A list of tools.
 #'
 #' @examples
 #' \dontrun{
-#' # Minimal preset for read-only operations
+#' # Read-only exploration
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = tools_preset("minimal"),
 #'   permissions = permissions_readonly()
 #' )
 #'
-#' # Standard preset for typical development
+#' # Reading and writing files
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = tools_preset("standard")
 #' )
 #'
-#' # Data analysis preset
+#' # Data analysis with R code
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
-#'   tools = tools_preset("data")
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   tools = tools_preset("data"),
+#'   permissions = Permissions(r_code = TRUE)
 #' )
 #' }
 #'

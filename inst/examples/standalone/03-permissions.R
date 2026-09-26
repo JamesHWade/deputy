@@ -1,7 +1,7 @@
 # Run with Rscript after installing deputy and setting OPENAI_API_KEY.
 library(deputy)
 chat <- ellmer::chat_openai(
-  model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-5.6-luna")
+  model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-6-luna")
 )
 
 workspace <- tempfile("deputy-permissions-")
@@ -17,7 +17,7 @@ agent <- Agent$new(
 result <- agent$run_sync("Use write_file to write hello to blocked.txt.")
 stopifnot(!file.exists(file.path(workspace, "blocked.txt")))
 cli::cli_text("{result$response}")
-# Switching modes may narrow authority, never widen it.
+# Check the policy's decision without running the tool.
 print(permissions_check(
   agent$permissions,
   "write_file",

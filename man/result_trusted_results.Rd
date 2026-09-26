@@ -2,22 +2,22 @@
 % Please edit documentation in R/trusted-results.R
 \name{result_trusted_results}
 \alias{result_trusted_results}
-\title{Inspect trusted results}
+\title{Get the trusted results from a run}
 \usage{
 result_trusted_results(result, type = NULL)
 }
 \arguments{
-\item{result}{An \link{AgentResult} S7 value.}
+\item{result}{An \link{AgentResult}.}
 
-\item{type}{Optional result type to select.}
+\item{type}{Optional result type. \code{NULL} returns results of every type.}
 }
 \value{
-List of \code{"trusted_result"} events. Each contains \code{result_id},
-\code{result_type}, \code{tool_name}, \code{tool_call_id}, \code{arguments}, and the tool's
-verbatim \code{value}, plus run correlation fields.
+A list of \code{"trusted_result"} \link{AgentEvent}s. Each has \code{result_id},
+\code{result_type}, \code{tool_name}, \code{tool_call_id}, \code{arguments}, the tool's
+unchanged \code{value}, and the run's IDs.
 }
 \description{
-Inspect trusted results
+Get the trusted results from a run
 }
 \seealso{
 \link{TrustedResults}

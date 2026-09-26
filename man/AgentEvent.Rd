@@ -7,60 +7,60 @@
 AgentEvent(type, ...)
 }
 \arguments{
-\item{type}{Event type (see Event Types section)}
+\item{type}{Event type (see the "Event types" section).}
 
-\item{...}{Named event data with unique names. The envelope names \code{type},
-\code{timestamp}, and \code{data} are reserved.}
+\item{...}{Named event data. Names must be unique and can't be \code{type},
+\code{timestamp} or \code{data}.}
 }
 \value{
-An \code{AgentEvent} object
+An \code{AgentEvent} object.
 }
 \description{
-Agent events are yielded by the \code{run()} generator to provide streaming
-updates on agent progress. Events are S7 values with read-only \code{type},
-\code{timestamp}, and \code{data} properties. Use \code{S7::prop(event, "data")} to obtain
-the named payload; \code{event$text} and other \code{$} reads are conveniences for
-looking up payload fields. Missing fields return \code{NULL}.
-
-Select an event with its \code{type} property, not an S3 subtype class. Read-only
-properties protect the record, but environments, provider objects, and
-conditions inside the payload retain their own reference semantics.
+\link{Agent}\verb{$run()} yields these events as the agent works, and an
+\link{AgentResult} keeps them in \code{events}. Each event has a \code{type}, a
+\code{timestamp} and a named list of \code{data}. Check \code{event$type} to tell events
+apart, and read data fields directly with \code{$}, for example \code{event$text}. A
+field that isn't there returns \code{NULL}. Events are read-only.
 }
-\section{Event Types}{
+\section{Event types}{
 
 \itemize{
-\item \code{"start"} - Task started. Contains: \code{task}
-\item \code{"tool_start"} - Tool execution starting. Contains: \code{tool_call_id},
-\code{tool_name}, and \code{tool_input}
-\item \code{"tool_end"} - Tool execution completed. Contains: \code{tool_call_id},
-\code{tool_name}, \code{tool_result}, and \code{tool_error}
-\item \code{"text"} - Text chunk from LLM. Contains: \code{text}, \code{is_complete}
-\item \code{"text_complete"} - Full text response. Contains: \code{text}
-\item \code{"turn"} - Turn completed. Contains: \code{turn}, \code{turn_number}
-\item \code{"warning"} - Warning condition occurred. Contains: \code{message}, \code{details}
-\item \code{"content"} - Non-text provider content. Contains: \code{content},
-\code{content_type}
-\item \code{"request_start"}, \code{"request_end"}, \code{"request_error"} - Governed model
-dispatch evidence with provider, model, request number, and original
-HTTP/transport conditions on errors. These are not individual HTTP retry
-attempts. Unclassified application errors are retained as \code{"run_error"}.
-\item \code{"run_error"} - Terminal initialization, streaming, or structured-output
-failure, with its phase and original condition. Application callbacks and
-validation do not turn a successful response into a \code{"request_error"}.
-\item \code{"fallback"} - Explicit Chat selection, prior condition, and usage.
-\item \code{"structured_attempt"} - Structured value, available turn, validation
-outcome, feedback, and condition. May contain sensitive application data.
-\item \code{"permission"}, \code{"hook"}, \code{"compaction"} - Governance decisions and lifecycle.
-\item \code{"file_checkpoint"} - Automatic run-boundary checkpoint. Contains:
-\code{checkpoint_id}, \code{name}
-\item \code{"usage"} - Run usage snapshot. Contains: \code{usage}, \code{limits}
-\item \code{"stop"} - Agent stopped. Contains: \code{reason}, \code{total_turns}, \code{cost},
-\code{usage}, and \code{run_id}
+\item \code{"start"}: the run started. \code{task}.
+\item \code{"request_start"}, \code{"request_end"}, \code{"request_error"}: a model request
+started, finished or failed, with the provider, model and request
+number. \code{"request_error"} carries the original \code{condition}. ellmer's HTTP
+retries are not separate requests.
+\item \code{"text"}: a streamed chunk of the reply. \code{text}, \code{is_complete}.
+\item \code{"text_complete"}: the full reply. \code{text}.
+\item \code{"content"}: other content from the provider. \code{content}, \code{content_type}.
+\item \code{"tool_start"}: a tool call is about to run. \code{tool_call_id},
+\code{tool_name}, \code{tool_input}.
+\item \code{"tool_end"}: a tool call finished. \code{tool_call_id}, \code{tool_name},
+\code{tool_result}, \code{tool_error}.
+\item \code{"turn"}: a turn finished. \code{turn}, \code{turn_number}.
+\item \code{"permission"}, \code{"hook"}: a permission decision or hook result.
+\item \code{"approval"}: a tool call is waiting for approval. \code{approval_id}, \code{path},
+\code{tool_name}, \code{tool_input}, \code{reason}.
+\item \code{"trusted_result"}: a trusted tool returned a value (see
+\link{TrustedResults}). \code{result_id}, \code{result_type}, \code{tool_name}, \code{value}.
+\item \code{"compaction_start"}, \code{"compaction"}, \code{"compaction_error"}: automatic
+compaction started, finished or failed.
+\item \code{"fallback"}: a fallback Chat took over after a transient error.
+\code{fallback_index}, \code{condition}, \code{usage}.
+\item \code{"structured_attempt"}: one attempt at structured output, with the
+\code{value}, whether it was \code{valid} and any \code{feedback}. It may hold sensitive
+data.
+\item \code{"file_checkpoint"}: a file checkpoint was created at the start of the
+run. \code{checkpoint_id}, \code{name}.
+\item \code{"run_error"}: the run failed. \code{phase} and the original \code{condition}.
+\item \code{"usage"}: the run's usage. \code{usage}, \code{limits}.
+\item \code{"stop"}: the run ended. \code{reason}, \code{cost}, \code{usage}, and \code{limit} (details
+of the usage limit that stopped the run, or \code{NULL}).
 }
 
-Run-boundary and tool lifecycle events also carry \code{agent_id}, \code{run_id},
-immutable \code{run_context}, and delegated-run correlation fields when
-applicable.
+Events also carry the \code{run_id}. All but \code{"text"}, \code{"text_complete"} and
+\code{"content"} carry \code{agent_id}, \code{session_id} and \code{run_context} too, plus
+parent and delegation IDs in subagent runs.
 }
 
 \examples{
@@ -68,14 +68,15 @@ applicable.
 AgentEvent("start", task = "Analyze data.csv")
 
 # Create a text event
-AgentEvent("text", text = "Hello", is_complete = FALSE
-)
+event <- AgentEvent("text", text = "Hello", is_complete = FALSE)
+event$text
 
 }
 \section{Additional properties}{
 
 \describe{
-\item{\code{@timestamp}}{Construction time as a \code{POSIXct} value. Read-only.}
+\item{\code{@timestamp}}{When the event was created, as a \code{POSIXct} value.}
 
-\item{\code{@data}}{Named list of event-specific data. Read-only.}
+\item{\code{@data}}{Named list of event data.}
 }}
+

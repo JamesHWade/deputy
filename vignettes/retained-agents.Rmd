@@ -1,0 +1,249 @@
+---
+title: "Retained specialists and agent graphs"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Retained specialists and agent graphs}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+A [subagent](multi-agent.html) starts every task with an empty conversation.
+Sometimes you want the opposite: a specialist that remembers what it did last
+time, so a follow-up question can build on its earlier work. Deputy calls
+these *retained* specialists. Any agent can own them, and you can let the
+model delegate to them, follow up with them yourself, or wire several into a
+graph where specialists delegate to each other.
+
+## Retain an agent
+
+`retain_agent()` hands a fully configured agent to an owner agent. The owner
+then runs it, keeping its conversation between tasks:
+
+```{r}
+library(deputy)
+
+owner <- Agent$new(ellmer::chat("openai/gpt-6-luna"))
+
+analyst <- Agent$new(
+  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  tools = tools_data(),
+  permissions = permissions_readonly(),
+  system_prompt = "You analyse data files and explain your reasoning."
+)
+
+handle <- owner$retain_agent(
+  analyst,
+  usage_limits = UsageLimits(max_requests = 20)
+)
+
+first <- owner$continue_agent(
+  handle,
+  "Summarise sales.csv.",
+  UsageLimits(max_requests = 4)
+)
+second <- owner$continue_agent(
+  handle,
+  "Which region drove the change you found?",
+  UsageLimits(max_requests = 4)
+)
+```
+
+Each call to `continue_agent()` sends a new task to the same conversation, with
+its own allocation. The `usage_limits` given to `retain_agent()` cap the total
+across all calls, and `max_runs` (32 by default) caps how many there can be.
+`continue_agent_async()` returns a promise instead.
+
+While retained, the specialist belongs to its owner. You can't run it directly
+or change its prompt, model or tools until you release it, and it runs one task
+at a time: a second call while one is running fails straight away.
+`owner$cancel_agent(handle)` stops the current task and keeps the history so
+far; `owner$release_agent(handle)` ends the arrangement. The specialist must be
+a plain `Agent`, without an approval directory or fallback chats.
+
+The specialist's tools and any connections they hold remain yours to manage.
+Handles and retained conversations live in memory and don't survive an R
+restart. To keep a record, export it with `owner$export_subagents()` (see
+[Briefing and inspecting subagents](delegation.html)) before releasing.
+
+## Let the model delegate to a specialist
+
+`delegation_tool()` turns a handle into a tool for the owner's model. The model
+supplies only the task; the specialist, its budget and everything else are
+fixed by your code:
+
+```{r}
+owner$register_tool(delegation_tool(
+  owner,
+  handle,
+  name = "ask_analyst",
+  description = "Ask the data analyst a question about the sales files.",
+  usage_limits = UsageLimits(max_requests = 4)
+))
+
+owner$run_sync("Find out what changed in sales this quarter and why.")
+```
+
+Every call continues the same conversation, whether the model or your code
+makes it. The tool returns the same compact [outcome](delegation.html#what-a-delegation-returns)
+as ordinary delegation.
+
+### Start from an ellmer chat
+
+If you already have configured ellmer chats, perhaps with their own tools and
+history, `adopt_chat()` retains a copy of one without building an `Agent` by
+hand:
+
+```{r}
+handle <- adopt_chat(
+  analyst_chat,
+  owner,
+  permissions = Permissions(
+    mode = "readonly",
+    file_write = FALSE,
+    tool_allowlist = names(analyst_chat$get_tools())
+  ),
+  usage_limits = UsageLimits(max_requests = 8),
+  history = "retain",
+  callbacks = "replace"
+)
+```
+
+The copy keeps the chat's provider, model, system prompt and tools, and the
+original chat is left alone. `history = "retain"` keeps its turns and
+`"fresh"` starts empty. `callbacks = "replace"` acknowledges that Deputy
+replaces the chat's tool callbacks with its own. The tools still share whatever
+their closures hold with the original chat. Each call is also limited by the
+owner's current permissions.
+
+The `curated-chats` example app retains two specialists this way and lets you
+follow up with one of them. It runs against a local test server, so it needs no
+API key:
+
+```{r}
+shiny::runApp(system.file("examples", "curated-chats", package = "deputy"))
+```
+
+## A graph of specialists
+
+`retain_agent_graph()` retains several agents at once and declares which may
+delegate to which. Each route becomes a tool on the calling agent, with a fixed
+target and allocation:
+
+```{r}
+handles <- root$retain_agent_graph(
+  agents = list(analyst = analyst, reviewer = reviewer),
+  routes = list(
+    root = list(
+      analyze = list(
+        target = "analyst",
+        description = "Analyse the evidence.",
+        usage_limits = UsageLimits(max_requests = 4)
+      )
+    ),
+    analyst = list(
+      review = list(
+        target = "reviewer",
+        description = "Check the analysis.",
+        usage_limits = UsageLimits(max_requests = 2)
+      )
+    )
+  ),
+  usage_limits = UsageLimits(max_requests = 12, max_tool_calls = 8),
+  max_depth = 2,
+  max_delegations = 8,
+  max_concurrency = 2
+)
+
+result <- root$run_sync("Analyse the evidence and have the analysis reviewed.")
+root$delegation_graph_usage()
+```
+
+Here the root may ask the analyst, and the analyst may ask the reviewer. The
+graph's `usage_limits` cover every run in the graph until you release it,
+including your own follow-ups with `continue_agent(handles$analyst, ...)`.
+`max_depth` counts delegation steps from the root, `max_delegations` caps the
+total number of delegations, and `max_concurrency` caps how many run at once.
+An agent waiting for its own delegate counts toward concurrency, so this
+three-level chain needs two slots. Routes can form a cycle, but a specialist
+that is already busy can't be called again.
+
+Token and cost limits are checked when responses arrive, so work already in
+flight can overshoot them; request limits are checked before each request.
+
+Permissions and tool hooks apply all the way down: a call made by the reviewer
+must also pass the analyst's and the root's permissions and `PreToolUse`
+hooks. Each specialist keeps its own provider, prompt and tools.
+
+The root sees the whole graph through the same methods as a lead agent:
+`list_subagents()`, `inspect_subagents()`, `observe_subagents()` and
+`interrupt_subagent()`, described in [Briefing and inspecting
+subagents](delegation.html). Interrupting one specialist also stops the
+delegations it started. When the graph is idle, `root$release_agent_graph()`
+removes the routes and handles.
+
+The `recursive-agents` example app runs a three-level graph against a local
+test server:
+
+```{r}
+shiny::runApp(system.file("examples", "recursive-agents", package = "deputy"))
+```
+
+## Start a specialist from part of a conversation
+
+Sometimes a specialist needs to see part of an existing conversation, for
+example the messages about one dataset. `ContextFork()` describes the turns to
+copy and where they came from, and `fork_agent()` retains a new specialist
+that starts with them:
+
+```{r}
+fork <- ContextFork(
+  owner_id = "user-1",
+  conversation_id = "chat-7",
+  branch_id = "main",
+  revision = "rev-42",
+  fork_point = 12,
+  view = "context",
+  turns = selected_turns,
+  max_bytes = 1024 * 1024
+)
+
+handle <- fork_agent(
+  owner,
+  specialist,
+  fork,
+  authorize = check_user_can_read,
+  usage_limits = UsageLimits(max_requests = 4),
+  max_runs = 2
+)
+
+owner$continue_agent(
+  handle,
+  "Review the selected evidence.",
+  UsageLimits(max_requests = 2)
+)
+```
+
+Your application chooses the turns, from the complete conversation
+(`view = "transcript"`) or from what the model currently sees
+(`view = "context"`), and describes where they came from. `specialist` must be
+a new `Agent` with an empty conversation, and a selection larger than
+`max_bytes` is an error. `authorize` is your function: it
+receives the fork's description, checks that the current user may still read
+that conversation, and returns its `owner_id`, `conversation_id`, `branch_id`
+and `revision`. Deputy calls it again before every continuation and stops if
+the answer changes.
+
+The copied turns are history only. They keep text, images, documents and
+completed tool calls, but not tool bindings or anything provider-specific, and
+unfinished tool calls become plain text. The specialist uses its own prompt,
+tools and permissions, and after the fork the two conversations are
+independent. Deputy doesn't create or store branches; that's up to your
+application.

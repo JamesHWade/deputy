@@ -2,50 +2,56 @@
 % Please edit documentation in R/r-session.R
 \name{RSession}
 \alias{RSession}
-\title{Own a conversation's trusted R session}
+\title{Persistent R session for a conversation}
 \description{
-A host-owned R worker for iterative calculations and plots. Construct an
-\link{Agent} with fixed conversation identity in \code{run_context}, then register
-\verb{$tools()}. Each owner has independent R variables and loaded packages.
-Calls queue in order and return promises without blocking other conversations.
+An R process that keeps variables and loaded packages between calls in one
+agent's conversation. Register \verb{$tools()} on the agent to give the model a
+\code{run_r_code} tool that uses it. Calls run in order and return promises, so
+other conversations aren't blocked.
 
-The worker executes with the local account's access. It provides process
-isolation, not an OS security sandbox. Agent permissions gate the registered
-tool; \verb{$run()} is an explicit trusted host operation, not a governed Agent run.
-With selected \code{tools}, code calls \verb{tools$<name>(...)} during a governed
-\code{run_r_code} call. Selected tools must use \code{convert = FALSE} and validate raw
-JSON arguments. Calls pass Agent permissions, hooks and usage limits; their
-events carry \code{parent_tool_call_id}. Direct \verb{$run()} is unavailable when tools
-are selected. A nested tool must return within the remaining execution
-\code{timeout}; otherwise the execution times out, the session resets and its
-variables are lost, and the nested call is recorded as a tool error. R
-receives the tool's original value; a \code{PostToolUse} hook's
-\code{updated_tool_output} applies only to the event and transcript.
-Recursive execution and nested durable approvals are unsupported.
-Sessions with selected tools cannot be created when \code{approval_dir} is configured.
-Requests are limited to 256 KiB and ordinary data results to 8 MiB serialized.
-The bridge never transfers host tool closures. Trusted account and environment
-access still applies, and cancellation cannot undo an external effect.
-
-Each call starts in the Agent's immutable working directory. A \code{setwd()} in
-evaluated code applies only until the next call.
-
-\verb{$cancel()} and timeouts terminate the worker and discard its variables and
-queued calls. Later calls start fresh and report that fact. External effects
-are not rolled back. \verb{$close()} is terminal; the host must call it when the
-conversation is disposed. Garbage collection also closes the worker.
-
-Results contain native ellmer text/images, embedded display HTML, and a plain
-\code{extra$deputy_r} execution record. Store conversation turns to keep code,
-output and plots reviewable after reopening. Agent snapshots retain current
-model turns; hosts must store full display history separately across compaction.
-Worker variables are live state,
-are not included in Agent session files, and must be recreated after restart.
-Static base, ggplot2, grid and patchwork figures are supported. Visible
-htmlwidgets and rich HTML tables report \code{unsupported_output}; they are not
-persisted as interactive artifacts. Print underlying data for a text table.
-Owners and executable tools cannot be cloned or transferred between Agents.
+The process runs with your user account's access to files and the network;
+it is not an OS sandbox. The default permissions deny the tool; allow it
+with \code{r_code = TRUE} in \code{\link[=Permissions]{Permissions()}}. \verb{$run()} runs code directly,
+without permission checks. See \code{vignette("code-execution")}.
 }
+\section{Working directory and resets}{
+
+Each call starts in the agent's working directory; \code{setwd()} lasts until
+the next call. \verb{$cancel()} and timeouts kill the R process and discard its
+variables and queued calls; the next call starts fresh and says so. Effects
+outside R, such as written files, are not undone. The session belongs to one
+agent and stops accepting calls if the agent's session changes. Call
+\verb{$close()} when the conversation ends.
+}
+
+\section{Results and saved conversations}{
+
+Each result holds ellmer text and image content, HTML for display, and an
+\code{extra$deputy_r} record of the call. Saved turns keep the code, output and
+plots but not the variables, which must be recreated after a restart. Agent
+snapshots keep only the current model context, so with compaction, store the
+full display history yourself. Base, ggplot2, grid and patchwork plots are
+captured; htmlwidgets and rich HTML tables report \code{unsupported_output}, so
+print the data instead.
+}
+
+\section{Calling agent tools from R}{
+
+With \code{tools = c("name")}, code run through the agent's \code{run_r_code} tool can
+call \code{tools$name(...)}. The calls go through the agent's permissions, hooks
+and usage limits, and their events carry \code{parent_tool_call_id}. Selected
+tools must already be registered on the agent, use \code{convert = FALSE} and
+validate their raw JSON arguments; \code{run_r_code} itself can't be selected. R
+gets the tool's original return value, even if a \code{PostToolUse} hook sets
+\code{updated_tool_output}. A call must finish within the remaining \code{timeout},
+or the session resets.
+
+With selected tools, \verb{$run()} is unavailable and the agent can't have an
+\code{approval_dir}. Requests are limited to 256 KiB and results to 8 MiB
+serialized. The tool functions run in your main R process; selecting them
+doesn't limit what the R code can do.
+}
+
 \section{Methods}{
 \subsection{Public methods}{
   \itemize{
@@ -61,7 +67,7 @@ Owners and executable tools cannot be cloned or transferred between Agents.
 \if{html}{\out{<a id="method-RSession-initialize"></a>}}
 \if{latex}{\out{\hypertarget{method-RSession-initialize}{}}}
 \subsection{\code{RSession$new()}}{
-  Create a lazy R worker owner. No code is executed here.
+  Create a session. The R process starts on the first call.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{RSession$new(
@@ -79,16 +85,17 @@ Owners and executable tools cannot be cloned or transferred between Agents.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{agent}}{Agent owning the session and its conversation identity.}
-      \item{\code{timeout}}{Maximum seconds for each dispatched execution.}
-      \item{\code{startup_timeout}}{Maximum seconds for worker startup.}
-      \item{\code{queue_limit}}{Maximum waiting calls, excluding the active call.}
-      \item{\code{max_output_bytes}}{Maximum retained output bytes per execution.
-This bounds captured evidence, not arbitrary R allocations or effects.}
-      \item{\code{plot_width, plot_height}}{PNG plot dimensions in pixels.}
-      \item{\code{tools}}{Character vector of explicitly selected Agent tool names
-that generated R may call through \verb{tools$<name>(...)}. The default
-keeps the worker's existing behavior and exposes no Agent tools.}
+      \item{\code{agent}}{The agent that owns the session.}
+      \item{\code{timeout}}{Maximum seconds for each call. A call that takes longer
+resets the session.}
+      \item{\code{startup_timeout}}{Maximum seconds for the R process to start.}
+      \item{\code{queue_limit}}{Maximum number of calls waiting behind the running
+one.}
+      \item{\code{max_output_bytes}}{Maximum bytes of output kept per call. This
+limits captured output, not memory use.}
+      \item{\code{plot_width, plot_height}}{PNG plot size in pixels, at most 4096.}
+      \item{\code{tools}}{Names of tools registered on \code{agent} that R code may call
+as \verb{tools$<name>(...)}. None by default.}
     }
     \if{html}{\out{</div>}}
   }
@@ -98,14 +105,15 @@ keeps the worker's existing behavior and exposes no Agent tools.}
 \if{html}{\out{<a id="method-RSession-tools"></a>}}
 \if{latex}{\out{\hypertarget{method-RSession-tools}{}}}
 \subsection{\code{RSession$tools()}}{
-  Return the governed \code{run_r_code} tool for this owner.
+  Return the \code{run_r_code} tool for this session, to register
+on the agent.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{RSession$tools()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A list containing one ellmer tool definition.
+    A list containing one ellmer tool.
   }
 }
 
@@ -113,7 +121,8 @@ keeps the worker's existing behavior and exposes no Agent tools.}
 \if{html}{\out{<a id="method-RSession-run"></a>}}
 \if{latex}{\out{\hypertarget{method-RSession-run}{}}}
 \subsection{\code{RSession$run()}}{
-  Enqueue a trusted host execution. Invalid inputs fail before admission.
+  Run code directly, without the agent's permissions or
+hooks. Errors at once if \code{code} is invalid or the queue is full.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{RSession$run(code)}
@@ -127,8 +136,8 @@ keeps the worker's existing behavior and exposes no Agent tools.}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A promise resolving to an \code{ellmer::ContentToolResult}. R errors,
-worker failures and cancelled queued calls are retained as result evidence.
+    A promise for an \code{ellmer::ContentToolResult}. R errors, crashes
+and cancelled calls resolve to a result that describes them.
   }
 }
 
@@ -136,14 +145,16 @@ worker failures and cancelled queued calls are retained as result evidence.
 \if{html}{\out{<a id="method-RSession-status"></a>}}
 \if{latex}{\out{\hypertarget{method-RSession-status}{}}}
 \subsection{\code{RSession$status()}}{
-  Inspect local worker state without executing R code.
+  Report the session's state without running code.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{RSession$status()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A plain list with state, generation, queue size and worker PID.
+    A list with \code{id}, \code{state}, \code{generation} (incremented each time a
+fresh R process starts), \code{queued}, \code{last_reset}, \code{pid} and
+\code{working_dir}.
   }
 }
 
@@ -151,7 +162,8 @@ worker failures and cancelled queued calls are retained as result evidence.
 \if{html}{\out{<a id="method-RSession-cancel"></a>}}
 \if{latex}{\out{\hypertarget{method-RSession-cancel}{}}}
 \subsection{\code{RSession$cancel()}}{
-  Cancel active and queued work and discard live R state.
+  Cancel running and queued calls and discard the session's
+variables.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{RSession$cancel()}
@@ -166,7 +178,7 @@ worker failures and cancelled queued calls are retained as result evidence.
 \if{html}{\out{<a id="method-RSession-close"></a>}}
 \if{latex}{\out{\hypertarget{method-RSession-close}{}}}
 \subsection{\code{RSession$close()}}{
-  Close the owner permanently and release its worker.
+  Close the session for good and stop its R process.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{RSession$close()}

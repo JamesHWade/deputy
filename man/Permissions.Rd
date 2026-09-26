@@ -21,49 +21,60 @@ Permissions(
 \arguments{
 \item{mode}{One of \code{"standard"}, \code{"plan"}, \code{"readonly"}, or \code{"full"}.}
 
-\item{file_read}{Allow file reading. One non-missing logical value.}
+\item{file_read}{Allow file reading. \code{TRUE} or \code{FALSE}.}
 
-\item{file_write}{\code{TRUE}, \code{FALSE}, or an existing absolute directory path.}
+\item{file_write}{\code{TRUE}, \code{FALSE}, or an existing absolute directory. A
+directory allows writes only inside it and is resolved when the policy is
+created. Defaults to the current working directory.}
 
-\item{bash}{Allow shell commands. One non-missing logical value.}
+\item{bash}{Allow shell commands. \code{TRUE} or \code{FALSE}.}
 
-\item{r_code}{Allow R code execution. One non-missing logical value;
-defaults to \code{FALSE}.}
+\item{r_code}{Allow R code execution. \code{TRUE} or \code{FALSE}.}
 
-\item{web}{Allow web requests. One non-missing logical value.}
+\item{web}{Allow web access, including other tools that reach external
+systems. \code{TRUE} or \code{FALSE}.}
 
-\item{install_packages}{Allow package installation. One non-missing logical
-value.}
+\item{install_packages}{Allow package installation. \code{TRUE} or \code{FALSE}.}
 
-\item{can_use_tool}{A function accepting tool name, input, and context,
-returning a \link{PermissionResultAllow}, \link{PermissionResultDeny},
-\link{PermissionResultPending}, or \code{NULL}.}
+\item{can_use_tool}{Optional function \verb{(tool_name, tool_input, context)}
+that returns \code{\link[=PermissionResultAllow]{PermissionResultAllow()}}, \code{\link[=PermissionResultDeny]{PermissionResultDeny()}} or
+\code{\link[=PermissionResultPending]{PermissionResultPending()}}. It is called, in every mode, for each call
+the rest of the policy allows, so it can deny a call or pause it for
+approval but can't allow a call the policy denies. Any other return
+value, including \code{NULL}, denies the call with a warning, and so does an
+error.}
 
-\item{tool_allowlist}{Character vector of allowed tool names, or \code{NULL}.
-An empty vector denies all tools; \code{NULL} disables this gate.}
+\item{tool_allowlist}{Character vector of allowed tool names, or \code{NULL}
+(the default) to allow any name. An empty vector denies all tools.}
 
 \item{tool_denylist}{Character vector of denied tool names, or \code{NULL}.}
 
-\item{permission_prompt_tool_name}{Optional dedicated approval-tool name to
-suggest in deny messages. Native capability-bearing tools cannot be used.}
+\item{permission_prompt_tool_name}{Optional name of a tool the model can
+call to ask for approval, such as \code{"ask_user"}. It is allowed in every
+mode unless \code{tool_allowlist} or \code{tool_denylist} excludes it, and denials
+from those lists point the model to it. Built-in file, code, web, install
+and delegation tools can't be used.}
 }
 \value{
-A read-only \code{Permissions} S7 object.
+A \code{Permissions} object.
 }
 \description{
-A read-only S7 value controlling tool access. Use \code{\link[=permissions_check]{permissions_check()}} to
-evaluate a call. Read properties with \code{S7::prop(policy, "mode")} or \code{$}.
-To narrow an active Agent, use its \code{set_permission_mode()} method; replacing
-its policy or changing its properties is not supported.
+A \code{Permissions} object decides which tool calls an agent may make. Pass it
+to \code{Agent$new()}, or test a call with \code{\link[=permissions_check]{permissions_check()}}.
+\link{PermissionMode} describes how each mode uses these settings.
 
-Directory grants are canonicalized at construction. The callback retains
-its caller-owned executable state. Read-only properties protect the public
-configuration; they are not an execution sandbox. Serialized policies are
-configuration records, not portable authority grants or a way to widen an
-existing Agent's authority.
+The object is read-only; read its fields with \code{$}. To restrict an agent
+further while it runs, call \code{agent$set_permission_mode()}. Permissions can
+be narrowed but not widened.
+
+A policy is not an OS sandbox: code run through \code{run_r_code} or \code{run_bash}
+can do anything your R session can.
 }
 \examples{
 policy <- Permissions(file_write = FALSE)
 permissions_check(policy, "write_file", list(path = "output.txt"))
-S7::prop(policy, "file_write")
+policy$file_write
+}
+\seealso{
+\code{vignette("permissions")}
 }

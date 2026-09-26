@@ -1,43 +1,44 @@
-# Child conversation inspection
+# Subagent conversations
 
-From a source checkout with development dependencies installed:
+A Shiny app that shows a lead agent's conversation next to a panel of its
+subagents' conversations, built with `subagent_chat_ui()` and
+`subagent_chat_server()`. From a source checkout with the development
+dependencies installed:
 
 ```r
 pkgload::load_all()
 shiny::runApp("inst/examples/subagent-chats")
 ```
 
-Requires Shiny, bslib, shinychat >= 0.5.0, ellmer >= 0.5.0, callr, httpuv, commonmark and xml2.
-The demo starts a local OpenAI-compatible fixture in a child process. It needs
-no model credentials and makes no paid provider calls. Ending the session stops
-the fixture and removes its temporary data.
+It needs shiny, bslib, shinychat (0.5.0 or later), httpuv, commonmark and
+xml2. A local OpenAI-compatible test server runs in a separate R process, so
+there are no API keys or paid requests. Ending the session stops the server
+and deletes its temporary files.
 
-Run two specialists, select their activity cards, and expand a native tool card
-to inspect the retained evidence plot. Both definitions have explicit request
-budgets. Child responses pause for five seconds so running work can be inspected
-and cancelled by hand. Repeat the analyst to see a distinct conversation for the same name.
-Enable the auditor failure to retain partial evidence after a provider error;
-the large-answer option exercises compact outcomes and artifact offloading.
+## What to try
 
-The child selector also supports keyboard navigation. Selecting a card moves
-focus to the child heading. Closing the view detaches observation without
-cancelling children. An explicit cancellation button appears during a running
-child; its host callback has separate action authorization.
+- "Run two specialists" delegates to an analyst and an auditor. Each subagent
+  reply takes five seconds, so you can select a running subagent and cancel it.
+- Select an activity card and expand its tool card to see the evidence plot.
+- "Repeat analyst" starts a new analyst conversation under the same name.
+- "Fail auditor after its tool result" makes the auditor's next request fail,
+  keeping the evidence it had. "Include a large answer" shows a long answer
+  being shortened and saved to a file.
+- "Restore saved child history" saves the finished subagents to disk and shows
+  the saved copy. Selecting and replaying run nothing: the request and tool
+  counts under the lead chat don't change.
+- "Show nested lineage fixture" adds a made-up grandchild record to show how
+  nesting looks. No grandchild runs.
+- "Deny child access" and "Allow child access" toggle a flag in this app that
+  hides or shows the subagents.
 
-Restore saved history to replay a serialized, settled snapshot. Model-request
-and tool-execution counters must remain unchanged during selection and replay.
-The nested-lineage button adds a clearly marked synthetic grandchild record;
-it does not start recursive execution. The host binds the trusted replay scope
-independently of the snapshot.
+The panel keeps only the last eight events, so you can see how it reports gaps
+and recovers from the saved history. The tool and model text contains hostile
+HTML on purpose; the panel renders it as inert text, keeps literal characters
+in code, and still shows images. The subagent selector works with the
+keyboard, and selecting a card moves focus to the subagent's heading. Closing
+the panel stops watching without cancelling anything.
 
-The access buttons modify only this disposable demo's in-memory display flag.
-Denied access clears child disclosure; it does not alter any external account,
-file permission, credentials, network access or persistent security setting.
-Tool and model text deliberately contain hostile HTML. The adapter renders Markdown then rebuilds inert HTML, preserving literal
-characters in code examples; typed images remain visible.
-
-The ring deliberately retains only eight events so snapshot recovery and gap
-notices are observable. Retained history is separate from the transient ring.
-A completed child indicates execution status, not task success or verified
-scientific evidence. Active-run recovery and recursive execution remain outside
-this example; general widget persistence remains a separate contract.
+When replaying saved history, the app passes `disclosure` and `scope` from its
+own records, not from the saved file. A "completed" subagent means its run
+finished, not that its answer is right.

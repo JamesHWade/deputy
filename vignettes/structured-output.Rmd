@@ -7,109 +7,115 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(eval = FALSE)
 library(deputy)
 ```
 
-Use ellmer types to ask for a list or data frame with specified fields. Deputy
-stores the converted R value in `result$structured_output` so you can use it
-in the next step of your analysis.
+When the next step of your analysis needs a list or a data frame rather than
+prose, describe the shape you want with an ellmer type. Deputy asks the model
+for that shape and gives you the converted R value.
 
-## Extract directly
+## Extract from what's already there
 
-Use `chat_structured()` when the conversation already contains the information
-to extract. It requests structured output without calling ordinary tools,
-as ellmer does. `chat_structured_async()` returns a promise with the same value.
-Automatic compaction and optional validation corrections can add model requests;
-all count toward the run's usage limits.
+`chat_structured()` works like ellmer's: it asks the model to answer in the
+given type, without calling tools, and returns the R value.
 
 ```{r direct}
-agent <- Agent$new(ellmer::chat("openai/gpt-5.6-luna"))
+agent <- Agent$new(ellmer::chat("openai/gpt-6-luna"))
+
 review_type <- ellmer::type_object(
   status = ellmer::type_enum(c("ok", "needs_review")),
   findings = ellmer::type_array(ellmer::type_string())
 )
-data <- agent$chat_structured("The review found no problems.", type = review_type)
-agent$last_run()$usage
+
+review <- agent$chat_structured(
+  "The review found no problems.",
+  type = review_type
+)
+review$status
 ```
 
-Existing JSON Schema can enter through `ellmer::type_from_schema(text = ...)`.
-ellmer handles schema support and conversion to R values.
+`chat_structured_async()` returns a promise for the same value. The request
+counts against the agent's usage limits like any other, and
+`agent$last_run()$usage` shows what it cost.
+
+If you already have a JSON Schema, `ellmer::type_from_schema()` converts it:
 
 ```{r schema}
 status_type <- ellmer::type_from_schema(
-  '{"type":"object","properties":{"status":{"type":"string"}},"required":["status"],"additionalProperties":false}'
+  '{"type": "object",
+    "properties": {"status": {"type": "string"}},
+    "required": ["status"],
+    "additionalProperties": false}'
 )
 ```
 
-## Complete a task, then extract
+## Do the work, then extract
 
-`run_sync(type = ...)`, `run_async(type = ...)`, and the semantic `run(type = ...)`
-stream first complete an ordinary tool-using task, then ask ellmer to extract
-from that conversation. Both phases share one run ID, hook lifecycle, permission
-policy, and request/token/cost budget. The extraction never repeats tool work.
-The `response` is the task's text; `structured_output` is the extracted value.
-Even a task without tools uses these two explicit phases; use
-`chat_structured()` to extract directly without the initial task phase.
+Pass `type` to `run_sync()`, `run_async()` or `run()` and the agent works in
+two steps: it completes the task with its tools as usual, then extracts the
+typed value from the conversation. Both steps share one budget, and the
+extraction step doesn't call tools, so no tool runs twice.
 
 ```{r task}
 agent <- Agent$new(
-  ellmer::chat("openai/gpt-5.6-luna"),
+  ellmer::chat("openai/gpt-6-luna"),
   tools = tools_file(),
   permissions = permissions_readonly(),
   usage_limits = UsageLimits(max_requests = 8)
 )
-result <- agent$run_sync("Review the README", type = status_type)
+
+result <- agent$run_sync("Review the README.", type = status_type)
+
 if (!result_is_success(result)) {
-  cli::cli_abort("Review stopped early: {result$stop_reason}.")
+  cli::cli_abort("The review stopped early: {result$stop_reason}.")
 }
 result$structured_output
 ```
 
-## Bounded application validation
+`result$response` holds the model's text from the first step, and
+`result$structured_output` holds the extracted value. Check
+`result_is_success()` first: a run that hit a limit has no structured value.
 
-A `validate` function receives ellmer's converted value and returns `TRUE`,
-`FALSE`, or non-empty text explaining a failed application rule. Set
-`max_corrections` to a finite non-negative integer to permit more structured
-requests. The default is zero. Corrections have no tools and consume the
-remaining run budget. They retain failed values, available turns, feedback, and
-conditions in `structured_attempt` events. These local events can contain user
-data; Deputy's tracing adapter omits that content.
+## Check the value yourself
+
+ellmer makes sure the value has the right shape. Rules about its content are
+yours to check. Pass a `validate` function that returns `TRUE` when the value
+is acceptable, and `FALSE` or a string explaining the problem when it isn't.
+With `max_corrections` above zero, Deputy sends the explanation back to the
+model and asks again:
 
 ```{r validation}
 data <- agent$chat_structured(
   "Extract the review status.",
   type = status_type,
   validate = function(x) {
-    if (identical(x$status, "ok")) TRUE else "status must equal ok"
+    if (x$status %in% c("ok", "needs_review")) {
+      TRUE
+    } else {
+      "status must be 'ok' or 'needs_review'"
+    }
   },
-  max_corrections = 1L
+  max_corrections = 1
 )
 ```
 
-Corrections cover failed application validation and JSON parsing failures
-confirmed through ellmer's recorded `ContentJson`. Unclassified conversion
-errors and application callback errors are terminal, preserving their original
-conditions. An exhausted correction policy signals
-`deputy_structured_output_invalid`. An exception or `NA` from the validator is
-terminal. Provider failures are not application corrections.
-Incomplete responses rejected by ellmer before a turn
-can be recorded are terminal; the caller must change the token/context policy.
-Cancellation is cooperative: an in-flight structured request can finish, but no
-correction starts after cancellation. With `on_exceed = "stop"`, a budget stop
-returns a result with a stop reason and no successful structured value; with
-`on_exceed = "error"`, it signals the typed limit condition. Inspect `last_run()`
-for completed-run evidence even after an error.
+`max_corrections` defaults to zero, so a failed check is an error unless you
+opt in. Each correction is another model request, without tools, and counts
+against the run's limits. A reply that isn't valid JSON gets the same
+treatment. When the corrections run out, Deputy signals a
+`deputy_structured_output_invalid` error.
 
-## Native structured streaming
+Some failures are never retried: the validator itself erroring or returning
+`NA`, a conversion error ellmer can't explain, a provider error, or a response
+cut off by the token limit. Every attempt is recorded as a
+`"structured_attempt"` event on the result, including the rejected values, so
+be careful where you log those events if the data is sensitive.
 
-`stream(type = ...)` and `stream_async(type = ...)` forward to ellmer's native
-structured streaming API. Chunks contain raw JSON text/content; the completed
-upstream assistant turn stores `ContentJson`. These methods do not add an
-application correction loop. Providers requiring ellmer's schema-tool fallback
-must use `chat_structured()` instead.
+## Stream structured output
 
-The former `output_format` argument and its `parsed`/`valid` wrapper were removed
-before Deputy's first CRAN release. Update callers to ellmer types and consume
-`structured_output` directly.
+`stream(type = )` and `stream_async(type = )` use ellmer's structured
+streaming: chunks arrive as raw JSON text while the model writes. Streaming
+doesn't support `validate` or corrections. Some providers can only produce
+structured output through a tool call; use `chat_structured()` with those.

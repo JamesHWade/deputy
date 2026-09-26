@@ -6,63 +6,63 @@ NULL
 #' Create an agent event
 #'
 #' @description
-#' Agent events are yielded by the `run()` generator to provide streaming
-#' updates on agent progress. Events are S7 values with read-only `type`,
-#' `timestamp`, and `data` properties. Use `S7::prop(event, "data")` to obtain
-#' the named payload; `event$text` and other `$` reads are conveniences for
-#' looking up payload fields. Missing fields return `NULL`.
+#' [Agent]`$run()` yields these events as the agent works, and an
+#' [AgentResult] keeps them in `events`. Each event has a `type`, a
+#' `timestamp` and a named list of `data`. Check `event$type` to tell events
+#' apart, and read data fields directly with `$`, for example `event$text`. A
+#' field that isn't there returns `NULL`. Events are read-only.
 #'
-#' Select an event with its `type` property, not an S3 subtype class. Read-only
-#' properties protect the record, but environments, provider objects, and
-#' conditions inside the payload retain their own reference semantics.
+#' @param type Event type (see the "Event types" section).
+#' @param ... Named event data. Names must be unique and can't be `type`,
+#'   `timestamp` or `data`.
+#' @prop timestamp When the event was created, as a `POSIXct` value.
+#' @prop data Named list of event data.
+#' @return An `AgentEvent` object.
 #'
-#' @param type Event type (see Event Types section)
-#' @param ... Named event data with unique names. The envelope names `type`,
-#'   `timestamp`, and `data` are reserved.
-#' @prop timestamp Construction time as a `POSIXct` value. Read-only.
-#' @prop data Named list of event-specific data. Read-only.
-#' @return An `AgentEvent` object
+#' @section Event types:
+#' * `"start"`: the run started. `task`.
+#' * `"request_start"`, `"request_end"`, `"request_error"`: a model request
+#'   started, finished or failed, with the provider, model and request
+#'   number. `"request_error"` carries the original `condition`. ellmer's HTTP
+#'   retries are not separate requests.
+#' * `"text"`: a streamed chunk of the reply. `text`, `is_complete`.
+#' * `"text_complete"`: the full reply. `text`.
+#' * `"content"`: other content from the provider. `content`, `content_type`.
+#' * `"tool_start"`: a tool call is about to run. `tool_call_id`,
+#'   `tool_name`, `tool_input`.
+#' * `"tool_end"`: a tool call finished. `tool_call_id`, `tool_name`,
+#'   `tool_result`, `tool_error`.
+#' * `"turn"`: a turn finished. `turn`, `turn_number`.
+#' * `"permission"`, `"hook"`: a permission decision or hook result.
+#' * `"approval"`: a tool call is waiting for approval. `approval_id`, `path`,
+#'   `tool_name`, `tool_input`, `reason`.
+#' * `"trusted_result"`: a trusted tool returned a value (see
+#'   [TrustedResults]). `result_id`, `result_type`, `tool_name`, `value`.
+#' * `"compaction_start"`, `"compaction"`, `"compaction_error"`: automatic
+#'   compaction started, finished or failed.
+#' * `"fallback"`: a fallback Chat took over after a transient error.
+#'   `fallback_index`, `condition`, `usage`.
+#' * `"structured_attempt"`: one attempt at structured output, with the
+#'   `value`, whether it was `valid` and any `feedback`. It may hold sensitive
+#'   data.
+#' * `"file_checkpoint"`: a file checkpoint was created at the start of the
+#'   run. `checkpoint_id`, `name`.
+#' * `"run_error"`: the run failed. `phase` and the original `condition`.
+#' * `"usage"`: the run's usage. `usage`, `limits`.
+#' * `"stop"`: the run ended. `reason`, `cost`, `usage`, and `limit` (details
+#'   of the usage limit that stopped the run, or `NULL`).
 #'
-#' @section Event Types:
-#' * `"start"` - Task started. Contains: `task`
-#' * `"tool_start"` - Tool execution starting. Contains: `tool_call_id`,
-#'   `tool_name`, and `tool_input`
-#' * `"tool_end"` - Tool execution completed. Contains: `tool_call_id`,
-#'   `tool_name`, `tool_result`, and `tool_error`
-#' * `"text"` - Text chunk from LLM. Contains: `text`, `is_complete`
-#' * `"text_complete"` - Full text response. Contains: `text`
-#' * `"turn"` - Turn completed. Contains: `turn`, `turn_number`
-#' * `"warning"` - Warning condition occurred. Contains: `message`, `details`
-#' * `"content"` - Non-text provider content. Contains: `content`,
-#'   `content_type`
-#' * `"request_start"`, `"request_end"`, `"request_error"` - Governed model
-#'   dispatch evidence with provider, model, request number, and original
-#'   HTTP/transport conditions on errors. These are not individual HTTP retry
-#'   attempts. Unclassified application errors are retained as `"run_error"`.
-#' * `"run_error"` - Terminal initialization, streaming, or structured-output
-#'   failure, with its phase and original condition. Application callbacks and
-#'   validation do not turn a successful response into a `"request_error"`.
-#' * `"fallback"` - Explicit Chat selection, prior condition, and usage.
-#' * `"structured_attempt"` - Structured value, available turn, validation
-#'   outcome, feedback, and condition. May contain sensitive application data.
-#' * `"permission"`, `"hook"`, `"compaction"` - Governance decisions and lifecycle.
-#' * `"file_checkpoint"` - Automatic run-boundary checkpoint. Contains:
-#'   `checkpoint_id`, `name`
-#' * `"usage"` - Run usage snapshot. Contains: `usage`, `limits`
-#' * `"stop"` - Agent stopped. Contains: `reason`, `total_turns`, `cost`,
-#'   `usage`, and `run_id`
-#'
-#' Run-boundary and tool lifecycle events also carry `agent_id`, `run_id`,
-#' immutable `run_context`, and delegated-run correlation fields when
-#' applicable.
+#' Events also carry the `run_id`. All but `"text"`, `"text_complete"` and
+#' `"content"` carry `agent_id`, `session_id` and `run_context` too, plus
+#' parent and delegation IDs in subagent runs.
 #'
 #' @examples
 #' # Create a start event
 #' AgentEvent("start", task = "Analyze data.csv")
 #'
 #' # Create a text event
-#' AgentEvent("text", text = "Hello", is_complete = FALSE
-#' )
+#' event <- AgentEvent("text", text = "Hello", is_complete = FALSE)
+#' event$text
 #'
 #' @export
 AgentEvent <- S7::new_class(
@@ -165,34 +165,39 @@ S7::method(print, AgentEvent) <- function(x, ...) {
   invisible(x)
 }
 
-#' Create a completed agent result
+#' Create an agent run result
 #'
 #' @description
-#' A read-only S7 snapshot of a governed run. It contains original ellmer turns,
-#' Deputy events, usage, and correlation metadata. Read properties with
-#' `S7::prop(result, "response")` or `$`; use [result_n_turns()],
-#' [result_tool_calls()], [result_tool_results()], [result_text_chunks()], and
-#' [result_is_success()] for inspection.
+#' An `AgentResult` describes one finished run. [Agent]`$run_sync()`,
+#' `$run_async()` and `$last_run()` return one; you rarely need to create it
+#' yourself. It holds the final response, the conversation turns, every
+#' [AgentEvent], usage and cost, and IDs that link the run to its agent and
+#' session.
 #'
-#' All properties are read-only, including previously writable R6 fields.
-#' Ordinary nested lists use R value semantics. Embedded provider objects,
-#' conditions, environments, and closures retain their own reference semantics;
-#' the result does not deep-copy or sanitize their contents. Run context is
-#' separately normalized to canonical JSON-compatible values.
+#' Results are read-only. Read fields with `$`, for example
+#' `result$response`, or use [result_n_turns()], [result_tool_calls()],
+#' [result_tool_results()], [result_text_chunks()] and [result_is_success()].
+#'
+#' `usage` covers this run only, but `cost` covers the whole conversation,
+#' including earlier runs and turns that compaction removed from the model
+#' context.
 #'
 #' @param response Final text response, or `NULL`.
-#' @param turns List of original conversation turns.
-#' @param cost Cost information, including provider coverage metadata, or
-#'   `NULL`. An incomplete total is `NA_real_`.
+#' @param turns List of ellmer turns in the model context when the run ended.
+#' @param cost Cost summary (as from [Agent]`$cost()`), or `NULL`. `total` is
+#'   `NA` if some responses had no cost.
 #' @param events List of [AgentEvent] objects.
-#' @param duration Finite, nonnegative duration in seconds, or `NULL`.
-#' @param stop_reason One nonempty stop-reason string.
-#' @param structured_output Parsed structured output, if any.
+#' @param duration Run time in seconds, or `NULL`.
+#' @param stop_reason Why the run stopped: `"complete"` if the model finished,
+#'   otherwise a reason such as `"request_limit"`, `"interrupted"` or
+#'   `"error"`.
+#' @param structured_output Extracted structured data, if any.
 #' @param session_id,run_id,agent_id,agent_name,parent_agent_id,parent_run_id,delegation_id
-#'   Optional nonempty correlation and identity strings.
-#' @param usage Run-scoped [AgentUsage], or `NULL`.
-#' @param run_context Canonical product context for the run.
-#' @return An `AgentResult` S7 object.
+#'   Optional ID strings linking the run to its session and agent and, for a
+#'   subagent, to the parent run and delegation.
+#' @param usage [AgentUsage] for this run only, or `NULL`.
+#' @param run_context The run's `run_context`, a named list.
+#' @return An `AgentResult` object.
 #' @examples
 #' result <- AgentResult(response = "Done", events = list(
 #'   AgentEvent("text", text = "Done")
@@ -345,10 +350,10 @@ local({
   S7::method(`$`, AgentResult) <- function(x, name) S7::prop(x, name)
 })
 
-#' Count conversation turns
+#' Count the turns in a result
 #'
-#' @param result An [AgentResult] S7 value.
-#' @return Integer count of turns.
+#' @param result An [AgentResult].
+#' @return The number of turns in `result$turns`.
 #' @export
 result_n_turns <- S7::new_generic("result_n_turns", "result", function(result) {
   S7::S7_dispatch()
@@ -358,10 +363,10 @@ S7::method(result_n_turns, AgentResult) <- function(result) {
   length(result@turns)
 }
 
-#' Inspect tool calls
+#' Get the tool calls from a result
 #'
-#' @param result An [AgentResult] S7 value.
-#' @return List of `tool_start` events.
+#' @param result An [AgentResult].
+#' @return A list of `"tool_start"` events.
 #' @export
 result_tool_calls <- S7::new_generic(
   "result_tool_calls",
@@ -375,10 +380,10 @@ S7::method(result_tool_calls, AgentResult) <- function(result) {
   Filter(function(e) e$type == "tool_start", result@events)
 }
 
-#' Inspect completed tool calls
+#' Get the finished tool calls from a result
 #'
-#' @param result An [AgentResult] S7 value.
-#' @return List of `tool_end` events.
+#' @param result An [AgentResult].
+#' @return A list of `"tool_end"` events.
 #' @export
 result_tool_results <- S7::new_generic(
   "result_tool_results",
@@ -392,12 +397,11 @@ S7::method(result_tool_results, AgentResult) <- function(result) {
   Filter(function(e) e$type == "tool_end", result@events)
 }
 
-#' Inspect streamed text
+#' Get the streamed text chunks from a result
 #'
-#' @param result An [AgentResult] S7 value.
-#' @return Character vector of text chunks; empty when none were emitted.
-#'   Missing and non-character text payloads are ignored. Character-vector
-#'   payloads are flattened in event order.
+#' @param result An [AgentResult].
+#' @return A character vector of text chunks in order, or `character()` if
+#'   there were none.
 #' @export
 result_text_chunks <- S7::new_generic(
   "result_text_chunks",
@@ -416,10 +420,11 @@ S7::method(result_text_chunks, AgentResult) <- function(result) {
     character()
 }
 
-#' Inspect run success
+#' Check whether a run completed
 #'
-#' @param result An [AgentResult] S7 value.
-#' @return Whether the stop reason is `"complete"`.
+#' @param result An [AgentResult].
+#' @return `TRUE` if the stop reason is `"complete"`, meaning the model
+#'   finished on its own. It doesn't check the answer.
 #' @export
 result_is_success <- S7::new_generic(
   "result_is_success",

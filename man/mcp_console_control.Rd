@@ -12,19 +12,18 @@ mcp_console_control(connection, action = c("interrupt", "restart"))
 \item{action}{\code{"interrupt"} or \code{"restart"}.}
 }
 \value{
-A promise for the upstream result. This is a direct host operation,
-not an Agent run. A connection with an active request rejects overlap.
+A promise for MCP Console's reply. The call goes straight to the
+server, not through the agent, and errors if the connection is already
+handling a request.
 }
 \description{
-Sends MCP Console's \code{send(control = ...)} through the same connection.
-\code{"interrupt"} requests SIGINT for the active evaluation or dependency
-resolver and keeps in-memory state. Interruption is cooperative, so check
-the returned output: it can still end in \verb{[running; poll with an empty send]}.
-\code{"restart"} replaces the worker and discards R, Python and DuckDB state.
+\code{"interrupt"} sends SIGINT to the running code or dependency install and
+keeps the session's state. The code may not stop, so check the returned
+output: it can still end in \verb{[running; poll with an empty send]}.
+\code{"restart"} replaces the worker and discards all R, Python and DuckDB state.
 }
 \details{
-Restart has no upstream deadline. If the replacement is not ready within
-the client's response window (about 4 seconds), Deputy closes the connection
-and reports a \code{deputy_mcp_console_restart} error. The server and its worker
-are then stopped; create a new connection to continue.
+If a restart takes longer than about 4 seconds, the connection closes with a
+\code{deputy_mcp_console_restart} error and the server stops. Create a new
+connection to continue.
 }

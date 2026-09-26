@@ -3,47 +3,46 @@ NULL
 
 # Run-scoped usage accounting and limits.
 
-#' Configure run-scoped usage limits
+#' Set usage limits for a run
 #'
 #' @description
-#' `UsageLimits()` defines run-scoped stop conditions for one call to [Agent]
-#' `$run()` or `$run_sync()`. Limits are evaluated against usage added by that
-#' run, not the complete persisted conversation. This keeps resumed sessions
-#' from inheriting a spent budget.
+#' `UsageLimits()` caps what one run of an [Agent] may use: model requests,
+#' tool calls, tokens and estimated cost. Each run starts counting from zero, so
+#' earlier turns in the conversation, or in a loaded session, don't count
+#' against it. A `NULL` field sets no limit.
 #'
-#' Request and tool-call limits are checked at model and tool boundaries. Token
-#' and cost limits depend on usage reported after a model response, so the run
-#' stops after an overage is observed and can exceed a threshold by one
-#' response. A `NULL` field leaves that limit unset on this object; when the
-#' object configures or overrides an [Agent], Deputy may fill unset fields from
-#' the agent's defaults.
+#' Request and tool-call limits are checked before each request or tool call.
+#' Token and cost limits can only be checked after a response arrives, so a run
+#' can go over them by one response.
 #'
-#' This is a read-only S7 value. Read fields with `$` or `S7::prop()`; use
-#' `S7::props()` for a plain named-list snapshot. Construct a new value to
-#' change limits. Per-run overrides fill unset fields from the Agent defaults;
-#' delegated budgets are intersected with the lead's remaining allowance.
+#' Limits passed to `Agent$new()` apply to every run. Limits passed to a single
+#' run take any `NULL` field from the agent's limits, so they can't remove a
+#' limit the agent sets. Subagent runs are also capped by what is left of the
+#' lead's budget.
 #'
-#' @param max_requests Maximum governed model dispatches, including failed
-#'   calls, automatic compaction, structured extraction, and corrections. Retries
-#'   inside ellmer's HTTP transport are not separately observable. `NULL` leaves
-#'   the field unset.
-#' @param max_tool_calls Maximum requested tool calls. Rejected calls count
-#'   toward usage. `NULL` leaves the field unset.
-#' @param max_input_tokens Maximum provider-reported input tokens. `NULL` leaves
-#'   the field unset.
-#' @param max_output_tokens Maximum provider-reported output tokens. `NULL`
-#'   leaves the field unset.
-#' @param max_total_tokens Maximum input plus output tokens. Cached input is
-#'   reported separately and is not counted twice. `NULL` leaves the field
-#'   unset.
-#' @param max_cost_usd Maximum provider-reported estimated cost in US dollars.
-#'   `NULL` leaves the field unset. If configured, missing provider cost data
-#'   stops the run with `"cost_unavailable"` rather than undercounting.
-#' @param on_exceed What to do when a limit is exceeded. `"stop"` returns an
-#'   [AgentResult] with a typed stop reason; `"error"` emits the final usage
-#'   event and then signals a structured Deputy limit error.
+#' The object is read-only: read fields with `$` and create a new one to change
+#' a limit.
 #'
-#' @return A read-only `UsageLimits` S7 object.
+#' @param max_requests Maximum model requests, counting failed requests,
+#'   compaction summaries, structured-output extraction and corrections.
+#'   ellmer's own HTTP retries don't count separately.
+#' @param max_tool_calls Maximum tool calls the model may request. Denied
+#'   calls count too.
+#' @param max_input_tokens Maximum input tokens.
+#' @param max_output_tokens Maximum output tokens.
+#' @param max_total_tokens Maximum input plus output tokens. Cached input
+#'   tokens are reported separately and aren't added again.
+#' @param max_cost_usd Maximum estimated cost in US dollars. If the cost of a
+#'   response is unknown, the run stops with `"cost_unavailable"` rather than
+#'   guessing.
+#' @param on_exceed What happens when a limit is reached. `"stop"` (the
+#'   default) ends the run and returns an [AgentResult] whose `stop_reason`
+#'   names the limit, such as `"request_limit"`, `"tool_call_limit"` or
+#'   `"cost_limit"`. `"error"` ends the run the same way, then signals an error
+#'   that inherits from `deputy_budget` (see [deputy-errors]). The result is
+#'   still available from `$last_run()`.
+#'
+#' @return A `UsageLimits` object.
 #' @examples
 #' UsageLimits(max_requests = 5, max_tool_calls = 10)
 #' UsageLimits(max_cost_usd = 0.25, on_exceed = "error")
@@ -133,31 +132,29 @@ S7::method(print, UsageLimits) <- function(x, ...) {
   invisible(x)
 }
 
-#' Create an agent usage record
+#' Create a usage record
 #'
 #' @description
-#' `AgentUsage()` creates a normalized usage record. `AgentResult$usage` and
-#' run `usage`/`stop` events are scoped to that run, while [Agent]`$usage()`
-#' describes the complete in-memory conversation at the time it is called.
+#' A usage record counts model requests, tool calls, tokens and estimated cost.
+#' [AgentResult]`$usage` and the `"usage"` and `"stop"` events cover a single
+#' run. [Agent]`$usage()` covers the whole conversation, including turns that
+#' compaction removed from the model's context. You rarely need to call
+#' `AgentUsage()` yourself.
 #'
-#' This is a read-only S7 value. Its `total_tokens` property is calculated from
-#' input plus output tokens at construction. Read properties
-#' with `$` or `S7::prop()`; `S7::props()` returns a plain named-list snapshot
-#' for reporting or serialization. Construct a new value for different usage.
+#' Records are read-only. Read fields with `$`; `S7::props()` returns them all
+#' as a plain list, which is handy for logging.
 #'
-#' @param requests Number of model requests attributed to the run.
-#' @param tool_calls Number of requested tool calls, including calls rejected
-#'   before execution.
-#' @param input_tokens Provider-reported input tokens.
-#' @param output_tokens Provider-reported output tokens.
-#' @param cached_tokens Provider-reported cached input tokens. These are
-#'   reported separately and are not added again to `total_tokens`.
-#' @param cost_usd Provider-reported estimated cost in US dollars, or `NA_real_`
-#'   when the provider did not report complete cost information.
+#' @param requests Number of model requests.
+#' @param tool_calls Number of tool calls requested, including denied calls.
+#' @param input_tokens Input tokens reported by the provider.
+#' @param output_tokens Output tokens reported by the provider.
+#' @param cached_tokens Cached input tokens reported by the provider. They
+#'   aren't added to `total_tokens`.
+#' @param cost_usd Estimated cost in US dollars, or `NA_real_` if the cost of
+#'   some responses is unknown.
 #'
-#' @prop total_tokens Input plus output tokens, without adding cached input
-#'   again. Read-only.
-#' @return A read-only `AgentUsage` S7 object.
+#' @prop total_tokens `input_tokens + output_tokens`.
+#' @return An `AgentUsage` object.
 #' @examples
 #' AgentUsage(
 #'   requests = 2,
@@ -517,6 +514,72 @@ agent_usage_snapshot <- function(chat) {
     use.names = TRUE
   )
   usage
+}
+
+# Usage for the whole conversation: the turns compaction removed from the
+# model's context, followed by the turns still in it. Those removed turns keep
+# their reported tokens and cost.
+conversation_usage_summary <- function(chat, compacted_turns = list()) {
+  summary <- provider_usage_summary(chat)
+  earlier <- assistant_turn_tokens(compacted_turns)
+  if (NROW(earlier) == 0L) {
+    return(summary)
+  }
+  earlier_total <- function(name) sum(earlier[[name]], na.rm = TRUE)
+  earlier_cost <- provider_cost_summary(earlier)
+  complete <- isTRUE(summary$complete) && isTRUE(earlier_cost$complete)
+  list(
+    requests = summary$requests + NROW(earlier),
+    input = summary$input + earlier_total("input"),
+    output = summary$output + earlier_total("output"),
+    cached = summary$cached + earlier_total("cached_input"),
+    total = if (complete) summary$total + earlier_cost$total else NA_real_,
+    complete = complete,
+    missing = summary$missing + earlier_cost$missing,
+    cost_records = c(earlier$cost, summary$cost_records)
+  )
+}
+
+conversation_usage_snapshot <- function(
+  chat,
+  compacted_turns = list(),
+  tool_calls = 0L
+) {
+  summary <- conversation_usage_summary(chat, compacted_turns)
+  usage <- AgentUsage(
+    requests = summary$requests,
+    tool_calls = tool_calls,
+    input_tokens = summary$input,
+    output_tokens = summary$output,
+    cached_tokens = summary$cached,
+    cost_usd = summary$total
+  )
+  attr(usage, "provider_cost_records") <- summary$cost_records
+  attr(usage, "provider_usage_totals") <- unlist(
+    summary[c("input", "output", "cached")],
+    use.names = TRUE
+  )
+  usage
+}
+
+# Tool calls the model asked for in `turns`, including any that were denied.
+count_tool_requests <- function(turns) {
+  counts <- vapply(
+    turns,
+    function(turn) {
+      if (!inherits(turn, "ellmer::AssistantTurn")) {
+        return(0L)
+      }
+      sum(vapply(
+        turn@contents,
+        inherits,
+        logical(1),
+        what = "ellmer::ContentToolRequest"
+      ))
+    },
+    integer(1)
+  )
+  sum(counts)
 }
 
 agent_usage_difference <- function(

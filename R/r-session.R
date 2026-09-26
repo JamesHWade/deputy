@@ -1,63 +1,65 @@
-#' Own a conversation's trusted R session
+#' Persistent R session for a conversation
 #'
-#' A host-owned R worker for iterative calculations and plots. Construct an
-#' [Agent] with fixed conversation identity in `run_context`, then register
-#' `$tools()`. Each owner has independent R variables and loaded packages.
-#' Calls queue in order and return promises without blocking other conversations.
+#' @description
+#' An R process that keeps variables and loaded packages between calls in one
+#' agent's conversation. Register `$tools()` on the agent to give the model a
+#' `run_r_code` tool that uses it. Calls run in order and return promises, so
+#' other conversations aren't blocked.
 #'
-#' The worker executes with the local account's access. It provides process
-#' isolation, not an OS security sandbox. Agent permissions gate the registered
-#' tool; `$run()` is an explicit trusted host operation, not a governed Agent run.
-#' With selected `tools`, code calls `tools$<name>(...)` during a governed
-#' `run_r_code` call. Selected tools must use `convert = FALSE` and validate raw
-#' JSON arguments. Calls pass Agent permissions, hooks and usage limits; their
-#' events carry `parent_tool_call_id`. Direct `$run()` is unavailable when tools
-#' are selected. A nested tool must return within the remaining execution
-#' `timeout`; otherwise the execution times out, the session resets and its
-#' variables are lost, and the nested call is recorded as a tool error. R
-#' receives the tool's original value; a `PostToolUse` hook's
-#' `updated_tool_output` applies only to the event and transcript.
-#' Recursive execution and nested durable approvals are unsupported.
-#' Sessions with selected tools cannot be created when `approval_dir` is configured.
-#' Requests are limited to 256 KiB and ordinary data results to 8 MiB serialized.
-#' The bridge never transfers host tool closures. Trusted account and environment
-#' access still applies, and cancellation cannot undo an external effect.
+#' The process runs with your user account's access to files and the network;
+#' it is not an OS sandbox. The default permissions deny the tool; allow it
+#' with `r_code = TRUE` in [Permissions()]. `$run()` runs code directly,
+#' without permission checks. See `vignette("code-execution")`.
 #'
-#' Each call starts in the Agent's immutable working directory. A `setwd()` in
-#' evaluated code applies only until the next call.
+#' @section Working directory and resets:
+#' Each call starts in the agent's working directory; `setwd()` lasts until
+#' the next call. `$cancel()` and timeouts kill the R process and discard its
+#' variables and queued calls; the next call starts fresh and says so. Effects
+#' outside R, such as written files, are not undone. The session belongs to one
+#' agent and stops accepting calls if the agent's session changes. Call
+#' `$close()` when the conversation ends.
 #'
-#' `$cancel()` and timeouts terminate the worker and discard its variables and
-#' queued calls. Later calls start fresh and report that fact. External effects
-#' are not rolled back. `$close()` is terminal; the host must call it when the
-#' conversation is disposed. Garbage collection also closes the worker.
+#' @section Results and saved conversations:
+#' Each result holds ellmer text and image content, HTML for display, and an
+#' `extra$deputy_r` record of the call. Saved turns keep the code, output and
+#' plots but not the variables, which must be recreated after a restart. Agent
+#' snapshots keep only the current model context, so with compaction, store the
+#' full display history yourself. Base, ggplot2, grid and patchwork plots are
+#' captured; htmlwidgets and rich HTML tables report `unsupported_output`, so
+#' print the data instead.
 #'
-#' Results contain native ellmer text/images, embedded display HTML, and a plain
-#' `extra$deputy_r` execution record. Store conversation turns to keep code,
-#' output and plots reviewable after reopening. Agent snapshots retain current
-#' model turns; hosts must store full display history separately across compaction.
-#' Worker variables are live state,
-#' are not included in Agent session files, and must be recreated after restart.
-#' Static base, ggplot2, grid and patchwork figures are supported. Visible
-#' htmlwidgets and rich HTML tables report `unsupported_output`; they are not
-#' persisted as interactive artifacts. Print underlying data for a text table.
-#' Owners and executable tools cannot be cloned or transferred between Agents.
+#' @section Calling agent tools from R:
+#' With `tools = c("name")`, code run through the agent's `run_r_code` tool can
+#' call `tools$name(...)`. The calls go through the agent's permissions, hooks
+#' and usage limits, and their events carry `parent_tool_call_id`. Selected
+#' tools must already be registered on the agent, use `convert = FALSE` and
+#' validate their raw JSON arguments; `run_r_code` itself can't be selected. R
+#' gets the tool's original return value, even if a `PostToolUse` hook sets
+#' `updated_tool_output`. A call must finish within the remaining `timeout`,
+#' or the session resets.
+#'
+#' With selected tools, `$run()` is unavailable and the agent can't have an
+#' `approval_dir`. Requests are limited to 256 KiB and results to 8 MiB
+#' serialized. The tool functions run in your main R process; selecting them
+#' doesn't limit what the R code can do.
 #'
 #' @export
 RSession <- R6::R6Class(
   "RSession",
   cloneable = FALSE,
   public = list(
-    #' @description Create a lazy R worker owner. No code is executed here.
-    #' @param agent Agent owning the session and its conversation identity.
-    #' @param tools Character vector of explicitly selected Agent tool names
-    #'   that generated R may call through `tools$<name>(...)`. The default
-    #'   keeps the worker's existing behavior and exposes no Agent tools.
-    #' @param timeout Maximum seconds for each dispatched execution.
-    #' @param startup_timeout Maximum seconds for worker startup.
-    #' @param queue_limit Maximum waiting calls, excluding the active call.
-    #' @param max_output_bytes Maximum retained output bytes per execution.
-    #'   This bounds captured evidence, not arbitrary R allocations or effects.
-    #' @param plot_width,plot_height PNG plot dimensions in pixels.
+    #' @description Create a session. The R process starts on the first call.
+    #' @param agent The agent that owns the session.
+    #' @param tools Names of tools registered on `agent` that R code may call
+    #'   as `tools$<name>(...)`. None by default.
+    #' @param timeout Maximum seconds for each call. A call that takes longer
+    #'   resets the session.
+    #' @param startup_timeout Maximum seconds for the R process to start.
+    #' @param queue_limit Maximum number of calls waiting behind the running
+    #'   one.
+    #' @param max_output_bytes Maximum bytes of output kept per call. This
+    #'   limits captured output, not memory use.
+    #' @param plot_width,plot_height PNG plot size in pixels, at most 4096.
     initialize = function(
       agent,
       timeout = 30,
@@ -135,8 +137,9 @@ RSession <- R6::R6Class(
       invisible(self)
     },
 
-    #' @description Return the governed `run_r_code` tool for this owner.
-    #' @return A list containing one ellmer tool definition.
+    #' @description Return the `run_r_code` tool for this session, to register
+    #'   on the agent.
+    #' @return A list containing one ellmer tool.
     tools = function() {
       private$check_current()
       tool <- ellmer::tool(
@@ -180,17 +183,20 @@ RSession <- R6::R6Class(
       list(tool)
     },
 
-    #' @description Enqueue a trusted host execution. Invalid inputs fail before admission.
+    #' @description Run code directly, without the agent's permissions or
+    #'   hooks. Errors at once if `code` is invalid or the queue is full.
     #' @param code One non-empty string of R code, at most 256 KiB.
-    #' @return A promise resolving to an `ellmer::ContentToolResult`. R errors,
-    #'   worker failures and cancelled queued calls are retained as result evidence.
+    #' @return A promise for an `ellmer::ContentToolResult`. R errors, crashes
+    #'   and cancelled calls resolve to a result that describes them.
     run = function(code) {
       private$check_current()
       private$enqueue(code, execution_id = NULL)
     },
 
-    #' @description Inspect local worker state without executing R code.
-    #' @return A plain list with state, generation, queue size and worker PID.
+    #' @description Report the session's state without running code.
+    #' @return A list with `id`, `state`, `generation` (incremented each time a
+    #'   fresh R process starts), `queued`, `last_reset`, `pid` and
+    #'   `working_dir`.
     status = function() {
       worker <- private$resource$worker
       list(
@@ -212,7 +218,8 @@ RSession <- R6::R6Class(
       )
     },
 
-    #' @description Cancel active and queued work and discard live R state.
+    #' @description Cancel running and queued calls and discard the session's
+    #'   variables.
     #' @return Invisible `NULL`.
     cancel = function() {
       if (!identical(private$state, "closed")) {
@@ -221,7 +228,7 @@ RSession <- R6::R6Class(
       invisible(NULL)
     },
 
-    #' @description Close the owner permanently and release its worker.
+    #' @description Close the session for good and stop its R process.
     close = function() {
       if (!identical(private$state, "closed")) {
         private$reset("closed")

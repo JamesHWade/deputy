@@ -1,8 +1,8 @@
 ---
-title: "Permissions and Safety"
+title: "Permissions and limits"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Permissions and Safety}
+  %\VignetteIndexEntry{Permissions and limits}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -15,69 +15,52 @@ knitr::opts_chunk$set(
 )
 ```
 
-Permissions control which tool calls an agent can run. Use a preset for
-common read or write tasks, or a `Permissions` object to allow specific
-capabilities. Deputy checks the policy before running a tool.
-
-## Permission Presets
-
-```{r, eval = FALSE}
+```{r setup, include = FALSE, eval = TRUE}
 library(deputy)
-
-# Read-only: known Deputy read tools are allowed
-permissions_readonly()
-
-# Plan: annotated read-only tools plus ask_user
-permissions_plan()
-
-# Standard (default): accessible reads and workspace-scoped writes;
-# no R code, bash, or web
-permissions_standard()
-
-# Full: everything allowed (use with caution!)
-permissions_full()
 ```
 
-Each preset returns a `Permissions` object. Pass it to `Agent$new()`:
+Deputy checks every tool call against the agent's permission policy before the
+tool runs, and counts every request and tool call against its usage limits.
+Both are set when you create the agent. You can tighten them afterwards, but
+you can't loosen them.
 
-```{r, eval = FALSE}
+## Presets
+
+Four functions cover the common cases:
+
+| Preset | Reads files | Writes files | Runs code | Uses the web |
+|---|---|---|---|---|
+| `permissions_readonly()` | yes | no | no | no |
+| `permissions_standard()` (the default) | yes | inside the working directory | no | no |
+| `permissions_plan()` | yes | no | no | read-only web tools |
+| `permissions_full()` | yes | yes | yes | yes |
+
+Pass one to `Agent$new()`:
+
+```{r}
 agent <- Agent$new(
-  chat = ellmer::chat_anthropic(),
-  tools = tools_all(),
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = tools_file(),
   permissions = permissions_readonly()
 )
 ```
 
-## S7 policy values
+"Reads files" means any file the R process can read, wherever it is. The
+working directory limits writes, not reads.
 
-`Permissions(...)` creates a read-only S7 policy; presets return the same class.
-Use `permissions_check(policy, tool_name, tool_input, context)` to inspect a
-permission decision. Read fields with `S7::prop(policy, "mode")` or `policy$mode`.
-Constructor flags must each be `TRUE` or `FALSE`, and a custom callback must be
-a function. An empty tool allowlist denies all tools, while `NULL` disables that
-gate.
+`permissions_plan()` is meant for planning before acting: it allows tools
+annotated as read-only, including web fetches and searches, plus `ask_user` so
+the model can check its plan with you. `permissions_full()` allows every tool
+call.
+
+## Build your own policy
+
+`Permissions()` sets each capability directly:
 
 ```{r}
-policy <- Permissions(file_write = FALSE)
-permissions_check(policy, "write_file", list(path = "output.txt"))
-S7::prop(policy, "file_write")
-```
-
-Create a new Agent to explicitly adopt broader authority. An existing Agent's
-`set_permission_mode()` can only preserve or narrow its current policy; its
-policy cannot be replaced. Serializing a policy retains configuration for the
-caller to inspect, including its canonical directory grant. It does not grant
-a restored record authority over an existing Agent. Callback closures remain
-caller-owned executable state.
-
-## Custom Permissions
-
-For fine-grained control, create a `Permissions` object directly:
-
-```{r, eval = FALSE}
-perms <- Permissions(
+policy <- Permissions(
   file_read = TRUE,
-  file_write = "/path/to/allowed/dir",
+  file_write = "/path/to/output",
   bash = FALSE,
   r_code = TRUE,
   web = FALSE,
@@ -85,404 +68,173 @@ perms <- Permissions(
 )
 ```
 
-Setting `r_code = TRUE` or `bash = TRUE` authorizes Deputy's built-in
-trusted-code tools. It does not confine the subprocess. Use this only when the
-model, prompt, inputs, and current-user filesystem authority are all within the
-same trust boundary. Direct `Permissions()` policies default `r_code` to
-`FALSE`, including partial policies such as `Permissions(web = TRUE)`.
+| Argument | Controls | Default |
+|---|---|---|
+| `file_read` | the built-in file reading tools | `TRUE` |
+| `file_write` | `write_file`, `edit_file` and `multi_edit`: `TRUE`, `FALSE`, or a directory to confine them to | the current directory |
+| `bash` | `run_bash` | `FALSE` |
+| `r_code` | `run_r_code` | `FALSE` |
+| `web` | web tools and any tool annotated as open world | `FALSE` |
+| `install_packages` | package installation | `FALSE` |
+| `tool_allowlist` | if set, only these tools may run | `NULL` |
+| `tool_denylist` | these tools never run | `NULL` |
+| `can_use_tool` | a function that can deny or pause calls the rest of the policy allows (see below) | `NULL` |
+| `permission_prompt_tool_name` | a tool the model may always call to ask for approval | `NULL` |
+| `mode` | `"standard"`, `"readonly"`, `"plan"` or `"full"` | `"standard"` |
 
-Fields:
+Deputy's own tools map to these capabilities by name. Other tools are judged
+by their [annotations](tools.html#turn-an-r-function-into-a-tool): a tool
+annotated as open world needs `web = TRUE`, and a destructive one needs file
+writes or shell commands to be allowed. Missing annotations count as the risky
+answer.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `file_read` | logical | Allow reading files |
-| `file_write` | logical / path | Allow writing (optionally restricted to a directory) |
-| `bash` | logical | Allow bash commands |
-| `r_code` | logical | Allow R code execution |
-| `web` | logical | Allow web access |
-| `install_packages` | logical | Allow package installation |
-| `can_use_tool` | function | Apply custom permission decisions |
-| `tool_allowlist` | character | Deny tools not explicitly listed |
-| `tool_denylist` | character | Always deny explicitly listed tools |
-| `permission_prompt_tool_name` | character | Dedicated approval tool used in gating messages |
+Setting `r_code = TRUE` or `bash = TRUE` lets the model run code with your
+user account's access to files and the network. Only do that when you trust
+the model, the prompt and every input it will see. [Running R
+code](code-execution.html) shows how to run model-written code in an OS
+sandbox instead.
 
-## Permission Modes
+To see how a policy treats a call without running anything, use
+`permissions_check()`:
 
-The `mode` field provides broad policy shortcuts:
-
-| Mode | Behaviour |
-|------|-----------|
-| `"standard"` | Check each tool against the configured capabilities |
-| `"readonly"` | Allow known Deputy read tools and explicit allowlist entries within configured capabilities |
-| `"plan"` | Allow read-only annotated tools within configured capabilities and the human approval prompt tool |
-| `"full"` | Allow every tool (dangerous!) |
-
-```{r, eval = FALSE}
-perms <- Permissions(mode = "readonly")
+```{r, eval = TRUE}
+policy <- Permissions(file_write = FALSE)
+permissions_check(policy, "write_file", list(path = "notes.md"))
 ```
 
-`permissions_plan()` creates a planning-oriented policy:
+## Modes
 
-```{r, eval = FALSE}
-agent <- Agent$new(
-  chat = ellmer::chat_anthropic(),
-  tools = tools_all(),
-  permissions = permissions_plan()
-)
-```
+The `mode` argument changes how the capabilities are applied:
 
-## Changing an Agent's Mode
+| Mode | Allows |
+|---|---|
+| `"standard"` | any call the capabilities allow |
+| `"readonly"` | Deputy's read tools, plus web tools if `web = TRUE` and custom tools you list in `tool_allowlist`; never writes, code or destructive tools |
+| `"plan"` | tools annotated as read-only (open-world ones only if `web = TRUE`) |
+| `"full"` | every call |
 
-An agent's configured permissions are an authority ceiling. Calling
-`set_permission_mode()` may preserve or narrow that authority, but it cannot
-widen it or replace it with an incomparable policy:
+In every mode, `tool_denylist` and `tool_allowlist` are checked first, and the
+tool named by `permission_prompt_tool_name` is always allowed. Read-only and
+plan modes also allow a lead agent to delegate: its
+[subagents](multi-agent.html#permissions-and-budgets) can't use a less strict
+mode than the lead.
 
-| Current mode | Allowed target modes |
-|--------------|----------------------|
+## Narrow an agent's permissions
+
+`set_permission_mode()` switches a running agent to a stricter mode. It can't
+switch to a mode that allows more than the agent started with:
+
+| Current mode | Can switch to |
+|---|---|
 | `"readonly"` | `"readonly"` |
 | `"standard"` | `"standard"`, `"readonly"` |
 | `"plan"` | `"plan"`, `"readonly"` |
 | `"full"` | `"full"`, `"standard"`, `"plan"`, `"readonly"` |
 
-Reapplying the current mode is an exact no-op. For an allowed narrowing,
-Deputy intersects the target mode with the existing capabilities. Custom
-restrictions, tool gates, callbacks, and directory-scoped write roots therefore
-remain authoritative. If the target removes web access, Deputy also removes
-registered provider-native web tools before activating the new policy. Ordinary
-function tools stay registered because Deputy can still deny them when they are
-requested; provider-side tools have no equivalent interception point.
-
-```{r, eval = FALSE}
+```{r}
 agent$set_permission_mode("readonly")
 ```
 
-Create a newly configured `Agent` when broader or incomparable authority is
-required.
+The new mode is combined with the original policy, so directory limits, allow
+and deny lists and callbacks keep applying. If the new mode takes away web
+access, Deputy also removes any provider-side web tools, because it can't
+intercept their calls. To give an agent more permissions, create a new agent.
 
-## Tool Annotations
+## Decide each call with a callback
 
-Tools carry annotations that describe their behaviour. The permission system
-uses these annotations to make decisions:
+A `can_use_tool` function adds your own rules on top of a policy. Deputy
+calls it, in every mode, for each call the rest of the policy allows. It
+receives the tool name, its arguments and a context list, and returns
+`PermissionResultAllow()`, `PermissionResultDeny(reason)` or
+`PermissionResultPending(reason)`. Any other return value, or an error, denies
+the call.
 
-```{r, eval = FALSE}
-# A read-only tool
-tool_safe <- ellmer::tool(
-  fun = function(x) x,
-  name = "safe_tool",
-  description = "A safe, read-only tool",
-  arguments = list(x = ellmer::type_string("Input")),
-  annotations = ellmer::tool_annotations(
-    read_only_hint = TRUE,
-    destructive_hint = FALSE
-  )
-)
-```
-
-Annotations describe behavior; they do not independently grant authority.
-In `"readonly"` mode, Deputy recognizes its built-in read tools and explicit
-allowlist entries, while still denying known writes, destructive tools, and
-open-world tools when web access is disabled. Unknown tools do not become
-authorized merely by declaring `read_only_hint = TRUE`. In `"standard"` mode,
-annotations participate in the configured capability checks.
-
-## Custom Permission Callbacks
-
-For complex logic, provide a `can_use_tool` callback:
-
-```{r, eval = FALSE}
-perms <- Permissions(
+```{r}
+policy <- Permissions(
+  file_write = getwd(),
   can_use_tool = function(tool_name, tool_input, context) {
-    # Block writes to sensitive files
-    if (tool_name == "write_file") {
-      if (grepl("^\\.env|secrets|credentials", tool_input$path)) {
-        return(PermissionResultDeny(
-          reason = "Cannot write to sensitive files"
-        ))
-      }
+    path <- if (is.character(tool_input$path)) tool_input$path else ""
+    if (tool_name == "write_file" && grepl("^\\.env|secrets", path)) {
+      return(PermissionResultDeny("Don't write to secret files."))
     }
     PermissionResultAllow()
   }
 )
 ```
 
-The callback receives:
+The callback can deny a call or pause it, but it can't allow a call the rest
+of the policy denies. The context list includes the working directory, the
+tool's annotations and argument types, and the run's identifiers. A
+[PreToolUse hook](hooks.html) is often simpler when you only want to block a
+few calls, and a
+[PermissionRequest hook](hooks.html#allow-a-denied-call) can allow a call the
+policy denies, for example after asking you.
 
-- `tool_name` -- Name of the tool being called
-- `tool_input` -- Named list of arguments
-- `context` -- List with `working_dir` and `tool_annotations`
+Tools that run on the provider's servers, such as Anthropic's web search,
+can't be checked per call. An agent whose policy has a callback refuses to
+register them.
 
-Custom callbacks govern function tools whose requests Deputy can intercept.
-Provider-native tools are rejected when a callback is configured; use the
-universal function tool when authorization depends on request arguments or run
-context.
+`PermissionResultPending()` pauses the run until a person approves the call.
+[Human input and approvals](approvals.html) explains how to set that up.
 
-It must return `PermissionResultAllow()` or `PermissionResultDeny(reason)`.
-These are read-only S7 values. Untyped lists and legacy S3 class tags do not
-satisfy this callback contract and produce the existing invalid-result denial.
-`interrupt` must be one non-missing logical value, and `reason` must be one
-non-missing string. Construct a new result to revise a decision.
+## Usage limits
 
-```{r permission-result-values, eval = TRUE}
-library(deputy)
-decision <- PermissionResultDeny("Host veto", interrupt = TRUE)
-S7::S7_inherits(decision, PermissionResult)
-decision$decision
-S7::props(decision)
-```
+`UsageLimits()` caps what one run can spend. Set defaults on the agent, and
+override them for a single run:
 
-## Example: Read-Only Agent
-
-A read-only agent can explore files but cannot change anything:
-
-```{r permissions-readonly-demo}
-library(deputy)
-
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+```{r}
 agent <- Agent$new(
-  chat = chat,
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_file(),
-  permissions = permissions_readonly()
+  usage_limits = UsageLimits(max_requests = 10, max_tool_calls = 20)
 )
 
-result <- agent$run_sync("What files are in the current directory?")
-cat(result$response)
-```
-
-## Run Limits
-
-Permissions decide whether a tool may run. Configure resource limits separately
-with `UsageLimits()` on the agent or an individual run:
-
-```{r, eval = FALSE}
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  tools = tools_file(),
-  permissions = permissions_standard(),
-  usage_limits = UsageLimits(
-    max_requests = 10,
-    max_tool_calls = 20,
-    max_cost_usd = 1
-  )
+result <- agent$run_sync(
+  "Summarise every R file in R/.",
+  usage_limits = UsageLimits(max_tool_calls = 40)
 )
 ```
 
-`UsageLimits()` and `AgentUsage()` create read-only S7 values. Their constructors
-and `$` reads keep the same spelling; list indexing and field assignment are
-replaced by property access and construction of a new value. Use `S7::props()`
-to obtain a plain reporting record:
+Unset fields in a run's limits fall back to the agent's. The agent defaults to
+25 model requests per run. Limits count only the current run, so a restored
+conversation starts with a fresh budget.
 
-```{r}
-limits <- UsageLimits(max_requests = 3, max_cost_usd = 0.25)
-usage <- AgentUsage(requests = 1, input_tokens = 100, output_tokens = 20,
-                    cached_tokens = 80, cost_usd = NA_real_)
-limits$max_requests
-usage$total_tokens # Cached input is already included in input_tokens
-S7::props(usage)   # A plain list; editing it does not change usage
-```
+| Limit | Stops the run with |
+|---|---|
+| `max_requests` | `"request_limit"` |
+| `max_tool_calls` | `"tool_call_limit"` |
+| `max_input_tokens` | `"input_token_limit"` |
+| `max_output_tokens` | `"output_token_limit"` |
+| `max_total_tokens` | `"total_token_limit"` |
+| `max_cost_usd` | `"cost_limit"` |
 
-`NULL` leaves a limit unset; zero is an explicit limit. Run overrides inherit
-unset fields from the Agent's defaults, while delegated agents receive the
-lead's remaining allowance intersected with the child definition's limits.
-Constructing or serializing a value does not change an active Agent's defaults.
+Request and tool-call limits are checked before each request or call. Token
+and cost limits can only be checked once a response reports its usage, so a
+run can overshoot them by one response.
 
-When a limit is reached, the agent stops and the `AgentResult$stop_reason`
-identifies the limit, such as `"request_limit"`, `"tool_call_limit"`, or
-`"cost_limit"`. If `max_cost_usd` is configured and the provider omits a cost
-record, Deputy fails closed with `"cost_unavailable"`. `Agent$cost()` and
-`AgentResult$cost` expose `complete` and `missing`; an incomplete `total` is
-`NA`, never an understated sum.
+Cost comes from ellmer's price table. If you set `max_cost_usd` and ellmer
+can't price the model, for example because the model is newer than your
+version of ellmer, the run stops with `"cost_unavailable"` rather than guess.
+Likewise, `result$cost$total` is `NA` whenever any response couldn't be
+priced, and `result$cost$missing` counts those responses.
 
-Deputy also stops a run with `"tool_loop"` after three consecutive requests for
-the same tool and canonical arguments. Cosmetic changes in surrounding model
-text do not reset that progress signal; changing the tool or its arguments
-does.
+By default a limit returns an `AgentResult` with the reason in `stop_reason`.
+With `UsageLimits(on_exceed = "error")`, it signals an error instead, and
+`agent$last_run()` still holds the partial result.
 
-## Trusted Code and OS Sandboxes
+Deputy also stops a run with `"tool_loop"` when the model makes the same tool
+call three times in a row and gets the same result each time.
 
-Permissions and sandboxes answer different questions. A permission decides
-whether the model may call a tool. An OS sandbox constrains what already
-authorized code can read, write, execute, or reach over the network.
+Subagents get the lead agent's remaining budget, further limited by their own
+definition. See [Subagents](multi-agent.html).
 
-`tool_run_r_code` and `tool_run_bash` are trusted-code tools. `callr` gives the
-R tool a separate process and a timeout, but the subprocess retains the current
-user's filesystem and network authority. Deputy therefore excludes R execution
-from both the standard permission policy and the standard tool preset.
+## Permissions are not a sandbox
 
-For model-generated R that needs confinement, use mcp-repl as the execution
-backend. Its server entry must name the policy explicitly:
+A permission decides whether the model may call a tool. It can't limit what a
+tool does once it runs. `run_r_code` gets a separate process and a timeout, but
+that process can read and write anything your user account can. For
+model-written code that should only touch part of the system, use an OS sandbox
+such as mcp-repl; see [Running R code](code-execution.html).
 
-```json
-{
-  "mcpServers": {
-    "r": {
-      "command": "/absolute/path/to/mcp-repl",
-      "args": [
-        "--sandbox", "workspace-write",
-        "--interpreter", "r"
-      ]
-    }
-  }
-}
-```
-
-```{r, eval = FALSE}
-repl_tools <- tools_mcp_repl(
-  server = "r",
-  sandbox = "workspace-write"
-)
-```
-
-`tools_mcp_repl()` checks the exact final `--sandbox` setting before starting
-the server. It accepts only `"read-only"` and `"workspace-write"`. It rejects
-implicit defaults, `danger-full-access`, `external-sandbox`, and
-`inherit-codex`; the latter needs per-call metadata that mcptools does not
-provide. mcp-repl owns the platform-specific enforcement and fails rather than
-downgrading when it cannot establish the requested OS boundary. See mcp-repl's
-[sandbox contract](https://github.com/posit-dev/mcp-repl/blob/main/docs/sandbox.md)
-for its filesystem, network, and platform guarantees.
-
-## Durable approval after process exit
-
-For a decision that may outlive the R process, configure a private existing
-`approval_dir` and return `PermissionResultPending()` from the permission
-callback. Deputy suspends before that tool executes. It journals tools completed
-before the pause and retains their results when a fresh Agent resumes.
-
-```{r}
-approval_dir <- file.path(tempdir(), "approvals")
-dir.create(approval_dir, showWarnings = FALSE)
-
-# Raw argument tools validate their own inputs. Keep convert = FALSE from the
-# original registration; changing it on an existing tool changes its semantics.
-export_report <- ellmer::tool(
-  function(name) {
-    if (!is.character(name) || length(name) != 1L || is.na(name)) {
-      cli::cli_abort("name must be one string")
-    }
-    # A host would perform its effect here and return an external receipt.
-    paste("Prepared", name)
-  },
-  name = "export_report",
-  description = "Prepare a named report",
-  arguments = list(name = ellmer::type_string()),
-  convert = FALSE,
-  annotations = ellmer::tool_annotations(
-    read_only_hint = FALSE,
-    destructive_hint = FALSE,
-    open_world_hint = FALSE
-  )
-)
-
-make_agent <- function(chat) {
-  Agent$new(
-    chat = chat,
-    tools = list(export_report),
-    permissions = Permissions(can_use_tool = function(...) {
-      PermissionResultPending("Host review required for report preparation")
-    }),
-    approval_dir = approval_dir,
-    working_dir = approval_dir,
-    session_id = "report_session",
-    agent_id = "report_agent",
-    run_context = list(owner_id = "owner_1", conversation_id = "conversation_1")
-  )
-}
-
-agent <- make_agent(ellmer::chat_openai())
-result <- agent$run_sync("Prepare the annual report")
-if (identical(result$stop_reason, "approval_pending")) {
-  pending <- agent$pending_approval()
-  approval_path <- pending$source$path
-  pending$request
-  pending$usage
-}
-
-# This inspection needs no Chat and executes no tools, including after restart.
-pending <- approval_read(approval_path)
-
-# The host authorizes its caller, restores its own conversation association,
-# and reattaches the same tool definition, scope, and permission callback.
-resumed <- make_agent(ellmer::chat_openai())
-result <- resumed$resume_approval(
-  approval_path,
-  "approve",
-  tool_input = list(name = "reviewed annual report")
-)
-# Alternatively: resumed$resume_approval(approval_path, "deny")
-```
-
-`ApprovalContinuation` is a read-only inspection value. It exposes the pending
-request and tool-call ID, source correlation, decision, usage, budget and static
-permission ceilings, and completed-effect journal. The approval event supplies
-an ID and path that the host can associate with its owner, conversation, selected
-branch and revision. These associations belong in the host's store; Deputy does
-not provide a second conversation database. Do not treat correlation IDs as
-credentials. Only expose a private record after authenticating its owner.
-
-Only a `pending` record can resume. The receiving Agent's session ID, Agent ID,
-working directory, context and delegation correlation must match. It checks
-saved and current static permission ceilings before the current callback and
-hooks. A host edit cannot authorize a forbidden path or tool. Rebinding checks
-source body/formals, schema, conversion and metadata; the host remains
-responsible for captured closure state and external resource identity.
-
-When a batch contains three tool calls and the second needs approval, the first
-result is retained and the third is marked unexecuted. Resume supplies one result
-for every original ID. A later model request cannot replay an already executed
-or denied operation in that continuation. Use a separate, explicitly authorized
-workflow if repeating the same operation is intended.
-
-A tool-boundary budget limit can also create a pending decision. Resume normally
-keeps the suspended limits and all prior usage. To grant more allowance, pass
-`usage_limits = UsageLimits(...)` explicitly; Deputy caps it by both the original
-and current Agent ceilings. Inspect `pending$budget_ceiling` before presenting
-choices. Model boundaries with no pending tool retain ordinary limit stops.
-
-```{r}
-resumed$resume_approval(
-  approval_path,
-  "approve",
-  usage_limits = UsageLimits(max_requests = 10)
-)
-```
-
-Consumption holds an OS lock and commits state before each effect. If a worker
-exits while a tool is executing, the record remains `executing`; no automatic
-retry is allowed. An interrupted `resuming` or `continuing` record, or a terminal
-`indeterminate` record, also requires the host to inspect external receipts and
-reconcile the outcome. Duplicate approval delivery is rejected. This protocol
-does not claim exactly-once effects or power-loss durability.
-
-The latest stored revision retains the complete effect journal. Superseded
-revisions are removed after a successful commit, so repeated lifecycle updates
-do not accumulate copies of the session. Each serialized revision is limited to
-25 MiB within a 50 MiB store budget, leaving room for an atomic replacement.
-Snapshots that cannot fit are rejected before publishing a pending approval;
-later growth of the journal or session remains bounded by the same limit.
-
-The stored transcript support uses ellmer's public content record/replay and the
-same session payload as `save_session()` / `load_session()`. Loading a separate
-session snapshot does not consume an approval. Tools, callbacks and provider
-clients are never serialized. Offloaded data frames and serializable S3 checkpoint
-metadata retain their values, classes and attributes. Runtime objects inside
-metadata or attributes remain unsupported. The host owns access, retention and backups for
-these trusted local R records. An optional shinychat adapter must use its
-released public contract; it is not required for this headless workflow. See
-[ADR-0016](https://github.com/JamesHWade/deputy/blob/main/dev/adr/0016-durable-approval-continuations.md)
-for the control-state contract.
-
-## Trusted results
-
-Permissions decide whether a tool may run. For a
-[trusted mini-agent](https://trustedminiagents.dev), in Will Landau and Sam
-Parmar's sense, you also want a guarantee about where results come from:
-
-- only a designated tool produces them;
-- no other tool can bypass it;
-- a person reviews its inputs.
-
-`TrustedResults()` adds that guarantee on top of permissions. It fixes which
-tools may be registered beside the trusted one. It does not grant permission
-to call anything, and the callbacks, hooks and approvals above still govern
-every call. See `vignette("trusted-mini-agents")` for the pattern, a worked
-example and the Shiny review module.
+To make sure the results you show a user come from one trusted tool rather than
+from model text, see [Trusted mini-agents](trusted-mini-agents.html).

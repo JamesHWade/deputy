@@ -342,6 +342,20 @@ test_that("descriptive test name", {
 })
 ```
 
+### Writing user documentation
+
+README, vignettes, roxygen and example READMEs are for R users. Say what a
+function does and when to use it, then the caveats a user needs (security,
+cost, lost state), then stop. Keep internal design out of them: no ADR or issue
+references, no test files, no "previously" (that belongs in NEWS.md), and none
+of the internal vocabulary used in this file and `dev/` ("governed",
+"host-owned", "authority ceiling", "fail closed", "admission", "settlement",
+"canonical", "qualified"). Use the `CONTEXT.md` terms, such as "subagent".
+Examples use `ellmer::chat("openai/gpt-6-luna")` and
+`ellmer::chat("anthropic/claude-sonnet-5")`. The pkgdown navbar menu is built
+from the `articles:` sections in `_pkgdown.yml`, so a new article only needs to
+be listed there.
+
 ## Architecture
 
 `McpConnection` is the temporary client integration, qualified for an explicit
@@ -460,6 +474,13 @@ Permissions configured at construction are an immutable authority ceiling.
 `Agent$set_permission_mode()` may keep or narrow a policy but cannot widen it;
 delegated agents are bounded by the same rule and by their lead's restrictions.
 
+`can_use_tool` runs in every mode, after gating and mode/capability checks,
+and only for calls those allow: it can deny or suspend, never widen.
+PermissionRequest hooks are the explicit override for denied calls. Readonly
+and plan modes admit a LeadAgent's own `delegate_to_agent` tool because
+children cannot use a less strict mode; the tool is identified by a private
+marker, not its name. See ADR-0031.
+
 ### AgentDefinition Routing
 
 `agent_definition()` canonicalizes names to lowercase routing keys. A
@@ -471,7 +492,8 @@ delegated agents are bounded by the same rule and by their lead's restrictions.
 provide versioned Deputy YAML files, conventionally in `.deputy/agents/`.
 Tools and skills resolve through explicit host registries; file loading never
 sources R code, loads skills, or connects services. See ADR-0006 and the
-Multi-Agent vignette for the format and authoring examples.
+Subagents article (`vignettes/multi-agent.Rmd`) for the format and authoring
+examples.
 
 ### Durable approvals
 
@@ -500,8 +522,9 @@ match. Delegated job scheduling and host conversation adapters remain separate.
 OS locks and immutable revision commits prevent concurrent consumption and
 replay after process interruption; they do not promise exactly-once effects or
 power-loss durability. Indeterminate records require host reconciliation and
-cannot resume. See ADR-0016 and the Permissions vignette for ownership and
-limits. File storage uses the `filelock` package.
+cannot resume. See ADR-0016 and the approvals article
+(`vignettes/approvals.Rmd`) for ownership and limits. File storage uses the
+`filelock` package.
 
 ### Host-scheduled durable jobs
 

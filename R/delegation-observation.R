@@ -1,18 +1,20 @@
 #' @include delegation-inspection.R
 NULL
 
-#' Bound the child activity observation buffer
+#' Set limits for the subagent event buffer
 #'
-#' One in-memory ring belongs to each Agent. Subscribers hold only cursors;
-#' they cannot block execution or accumulate private queues. Retained transcript
-#' storage is separate from this transient buffer.
-#' @param max_events Maximum retained events, default 256.
-#' @param max_bytes Maximum serialized bytes across retained envelopes, default
-#'   1 MiB. The buffer evicts oldest envelopes until both limits hold.
-#' @param max_event_bytes Maximum bytes in one event, default 64 KiB. Oversized
-#'   or nonportable content becomes an explicit omission envelope; hosts recover
-#'   completed public content from an authorized snapshot.
-#' @return Read-only observation limits for [Agent].
+#' Each agent keeps recent subagent events in an in-memory buffer that
+#' `$observe_subagents()` readers poll. When it is full, the oldest events are
+#' dropped: a slow reader never holds up a run, but sees a gap. Subagent
+#' transcripts are kept separately and don't count toward these limits.
+#' @param max_events Maximum number of events kept. Defaults to 256.
+#' @param max_bytes Maximum total size of the kept events, in bytes. Defaults
+#'   to 1 MiB.
+#' @param max_event_bytes Maximum size of one event, in bytes: between 2048 and
+#'   `max_bytes`, 64 KiB by default. Larger content is replaced by a marker;
+#'   get it from a [DelegationSubscription] snapshot instead.
+#' @return A `DelegationObservation` object for the `delegation_observation`
+#'   argument of [Agent] or [LeadAgent].
 #' @export
 DelegationObservation <- S7::new_class(
   "DelegationObservation",
@@ -305,24 +307,27 @@ validate_observation_cursor <- function(cursor, buffer) {
   cursor
 }
 
-#' Read bounded child activity without driving execution
+#' Subscription to subagent events
 #'
-#' Create through `Agent$observe_subagents()`. The runtime consumes each
-#' child stream once; subscriptions only observe retained public events.
-#' Authorization is rechecked on every read, including snapshot and reconnect.
-#' Sequence numbers are monotonic across one lead's transient stream, not per
-#' child. Cursors are locators and cannot authorize access.
+#' Reads an agent's subagent events; create one with
+#' `Agent$observe_subagents()`. `$snapshot()` returns the current state and
+#' `$poll()` the events since the last read. Reading never affects the
+#' subagents, and every read checks access again with the agent's
+#' [DelegationDisclosure]. Event sequence numbers count across all of the
+#' agent's subagents. A cursor marks a position; it doesn't grant access.
 #' @export
 DelegationSubscription <- R6::R6Class(
   "DelegationSubscription",
   cloneable = FALSE,
   public = list(
-    #' @description Create an authorized cursor. Normally use the lead method.
-    #' @param lead An Agent owning delegated conversations.
-    #' @param requester Host-authenticated request context.
-    #' @param delegation_id Optional child locator filter.
-    #' @param after A cursor previously returned by this lead, or NULL to start
-    #'   at its current sequence. Foreign/future cursors fail explicitly.
+    #' @description Create a subscription, usually through
+    #' `Agent$observe_subagents()`.
+    #' @param lead The `Agent` or [LeadAgent] to follow.
+    #' @param requester Who is reading, passed to the disclosure functions.
+    #'   Authenticate it first.
+    #' @param delegation_id Optional delegation ID, to follow one subagent.
+    #' @param after A cursor from this agent to resume from, or `NULL` to start
+    #'   now. A cursor from another agent is an error.
     initialize = function(lead, requester, delegation_id = NULL, after = NULL) {
       if (!inherits(lead, "Agent")) {
         cli::cli_abort("lead must be an Agent.")
@@ -341,11 +346,11 @@ DelegationSubscription <- R6::R6Class(
       )
       invisible(self)
     },
-    #' @description Return an authorized snapshot and its matching event cursor.
-    #' This resets the subscription cursor. The snapshot is copied before host
-    #' redaction; subsequent polls contain only events after that boundary.
-    #' @param transcript Include public child transcripts. Defaults to FALSE.
-    #' @return List with `children` and `cursor`. Inspection never starts work.
+    #' @description Get the subagents' current state and move the cursor to
+    #' now, so the next `$poll()` returns only later events.
+    #' @param transcript Whether to include transcripts. Defaults to `FALSE`.
+    #' @return A list with `children`, one redacted view per subagent, and
+    #'   `cursor`.
     snapshot = function(transcript = FALSE) {
       private$authorize()
       if (
@@ -378,14 +383,14 @@ DelegationSubscription <- R6::R6Class(
       private$position <- cursor
       out
     },
-    #' @description Read retained events since this cursor, advancing on success.
-    #' No generator is consumed. A slow reader gets explicit `gaps` for lost
-    #' sequence ranges; obtain a snapshot to recover retained public history.
-    #' Filtering children can make an evicted stream range irrelevant to the
-    #' selected child, but the gap is still reported conservatively.
-    #' @return List with `events`, `gaps`, and next `cursor`. Event redaction
-    #' receives `list(kind = "event", event = envelope)`; remove `event` to hide
-    #' it. Redaction errors do not advance the cursor or affect child execution.
+    #' @description Get the events since the last read and advance the cursor.
+    #' Ranges of events dropped before you read them are listed in `gaps`;
+    #' call `$snapshot()` to catch up. When following one subagent, a gap may
+    #' only cover other subagents' events.
+    #' @return A list with `events`, `gaps` and `cursor`. Each event goes
+    #' through the disclosure `redact` function as
+    #' `list(kind = "event", event = event)`; remove `event` to hide it. If
+    #' `redact` errors, the cursor doesn't move.
     poll = function() {
       private$authorize()
       lead <- private$lead
@@ -429,8 +434,8 @@ DelegationSubscription <- R6::R6Class(
       private$position <- cursor
       out
     },
-    #' @description Detach this reader. Does not cancel or resume a child.
-    #' @return Invisibly NULL. Repeated closes are harmless; reads then fail.
+    #' @description Stop reading; the subagents keep running.
+    #' @return `NULL`, invisibly. Later reads error.
     close = function() {
       private$lead <- NULL
       private$requester <- NULL

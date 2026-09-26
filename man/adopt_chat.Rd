@@ -2,7 +2,7 @@
 % Please edit documentation in R/chat-composition.R
 \name{adopt_chat}
 \alias{adopt_chat}
-\title{Adopt a curated Chat for owned delegation}
+\title{Turn an ellmer chat into a retained agent}
 \usage{
 adopt_chat(
   chat,
@@ -16,31 +16,36 @@ adopt_chat(
 )
 }
 \arguments{
-\item{chat}{A configured ellmer Chat with a public \code{clone()} method.}
+\item{chat}{A configured ellmer \code{Chat}.}
 
-\item{owner}{The host-owned \link{Agent} that will invoke and inspect this specialist.}
+\item{owner}{The \link{Agent} that will own and call the new agent.}
 
-\item{permissions}{Explicit specialist \link{Permissions}, also bounded by the
-caller's current policy on every invocation.}
+\item{permissions}{\link{Permissions} for the new agent. The owner's current
+permissions also apply to every call.}
 
-\item{usage_limits}{Explicit cumulative \link{UsageLimits} for the retained handle.}
+\item{usage_limits}{\link{UsageLimits} for all calls combined.}
 
-\item{history}{Explicit \code{"retain"} or \code{"fresh"} choice for copied turns.}
+\item{history}{\code{"retain"} to copy the chat's turns, or \code{"fresh"} to start
+with an empty history.}
 
-\item{callbacks}{Must be \code{"replace"} to acknowledge Deputy callback ownership.}
+\item{callbacks}{Must be \code{"replace"}, to confirm that the chat's callbacks
+are dropped.}
 
-\item{name}{Optional specialist display name.}
+\item{name}{Optional display name for the new agent.}
 
-\item{max_runs}{Maximum retained invocations, default 32.}
+\item{max_runs}{Maximum number of calls. Defaults to 32.}
 }
 \value{
-An owner-local conversation handle for \code{\link[=delegation_tool]{delegation_tool()}} and the
-owner's continuation, cancellation and release methods.
+A handle for \code{\link[=delegation_tool]{delegation_tool()}} and for \code{owner}'s
+\verb{$continue_agent()}, \verb{$cancel_agent()} and \verb{$release_agent()}. It only
+works with \code{owner}.
 }
 \description{
-Makes an independent conversation copy and explicitly replaces its tool and
-request callbacks with Deputy governance. Provider configuration, model
-parameters, system prompt and executable tools are preserved. Tool closures
-remain shared host resources; copying a Chat is not a sandbox. The original
-Chat is unchanged. Use \code{owner$retain_agent()} to transfer an existing Agent.
+Copies a configured ellmer chat into a new agent that \code{owner} keeps for
+later calls, for example through a \code{\link[=delegation_tool]{delegation_tool()}}. The copy keeps the
+provider, model settings, system prompt, tools and, optionally, turns, but
+drops callbacks such as \code{on_tool_request()}; the new agent's permissions
+and hooks apply instead. The original chat is unchanged but shares its
+tools, and any state they hold, with the copy. To keep an existing \code{Agent},
+use \code{owner$retain_agent()}. See \code{vignette("retained-agents")}.
 }

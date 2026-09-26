@@ -2,38 +2,38 @@
 % Please edit documentation in R/tools-interactive.R
 \name{tools_interactive}
 \alias{tools_interactive}
-\title{Tools for interactive workflows}
+\title{Create an ask_user tool with its own handler}
 \usage{
 tools_interactive(callback = NULL, context = list())
 }
 \arguments{
-\item{callback}{Optional handler with signature \verb{function(questions, context)}. It should return a named list that maps each question text to
-the selected label or labels, a promise resolving to that list, or
-\code{\link[=AskUserDeferred]{AskUserDeferred()}} when the answers will arrive in the person's next
-message. Shiny hosts cannot block for input, so they use one of the latter
-two forms. When omitted, interactive sessions use
-\code{readline()} and non-interactive sessions may use the legacy callback from
-\code{\link[=set_ask_user_callback]{set_ask_user_callback()}}.}
+\item{callback}{A function of \code{questions} and \code{context} that returns a
+named list mapping each question's text to the chosen label or labels, a
+promise for that list, or \code{\link[=AskUserDeferred]{AskUserDeferred()}} when the answers will come in
+the person's next message. Shiny apps can't wait for input, so they return
+a promise or \code{AskUserDeferred()}. If \code{NULL}, the tool uses the
+\code{\link[=set_ask_user_callback]{set_ask_user_callback()}} callback if one is set, and otherwise
+\code{readline()} in an interactive session.}
 
-\item{context}{Named list of stable host routing values, such as \code{agent_id}
-and \code{session_id}, or a zero-argument function returning that list. A
-function is resolved for each question request.}
+\item{context}{A named list passed to \code{callback}, such as \code{agent_id} and
+\code{session_id} values that tell your app where to show the questions, or a
+function with no arguments that returns one. A function is called each
+time the model asks.}
 }
 \value{
-A list of tool definitions.
+A list of tools.
 }
 \description{
-Returns a list of tools that enable human-in-the-loop interactions.
-Currently includes \code{tool_ask_user} (\code{ask_user}) for asking
-clarifying questions. Supply \code{callback} in non-interactive or concurrent
-hosts so each Agent receives its own handler.
+Returns a list holding one \code{ask_user} tool (see \link{tool_ask_user}) that sends
+questions to \code{callback}. Give each agent its own tool when several agents or
+Shiny sessions share one R process, or when the session isn't interactive.
 }
 \examples{
 \dontrun{
 agent_id <- "agent-review"
 session_id <- "session-review"
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = c(
     tools_file(),
     tools_interactive(

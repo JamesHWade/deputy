@@ -7,14 +7,13 @@
 ask_user_impl(questions, callback = NULL, context = list())
 }
 \arguments{
-\item{questions}{List of structured question objects}
+\item{questions}{List of question objects.}
 
-\item{callback}{Optional instance-scoped handler. It receives \code{questions}
-and the resolved \code{context}. When omitted, the legacy process-wide fallback
-is used.}
+\item{callback}{Optional handler for this tool. It receives \code{questions} and
+the resolved \code{context}. When omitted, the callback from
+\code{\link[=set_ask_user_callback]{set_ask_user_callback()}} is used, then \code{readline()}.}
 
-\item{context}{Named routing context or a zero-argument function that returns
-it.}
+\item{context}{Named list, or a function with no arguments that returns one.}
 }
 \value{
 Named list mapping question text to selected answers

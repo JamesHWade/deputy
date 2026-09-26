@@ -1,8 +1,8 @@
 ---
-title: "Example: Shiny Chat with shinychat"
+title: "Shiny chat"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Example: Shiny Chat with shinychat}
+  %\VignetteIndexEntry{Shiny chat}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -15,52 +15,33 @@ knitr::opts_chunk$set(
 )
 ```
 
-Deputy Agents implement the ellmer chat methods used by
-[shinychat](https://posit-dev.github.io/shinychat/). Pass an Agent directly to
-`chat_server()` to stream responses and tool activity while Deputy checks
-permissions and tracks usage.
+An agent works anywhere [shinychat](https://posit-dev.github.io/shinychat/)
+expects an ellmer chat. Pass it to `chat_server()` and the app streams the
+model's replies and tool calls, while Deputy applies the agent's permissions,
+hooks and limits to every message.
 
-```text
-shinychat input -> Agent$stream_async() -> ellmer
-                                      \-> AgentResult + hooks + usage
-```
-
-The stream keeps ellmer's native chunks, so shinychat can render incremental
-text, tool activity, and attachment-enabled input. After it finishes,
-`agent$last_run()` exposes the corresponding `AgentResult`.
-
-## Basic Setup
+## A minimal app
 
 ```{r}
 library(shiny)
-library(deputy)
 library(shinychat)
+library(deputy)
 
-workspace <- normalizePath(getwd(), mustWork = TRUE, winslash = "/")
+workspace <- normalizePath(getwd(), winslash = "/", mustWork = TRUE)
 
 ui <- bslib::page_fluid(
   chat_ui("chat", fill = TRUE, allow_attachments = TRUE)
 )
 
 server <- function(input, output, session) {
-  chat <- ellmer::chat_openai(
-    model = "gpt-5.6-luna",
-    system_prompt = "You are a concise data assistant."
-  )
-
   agent <- Agent$new(
-    chat = chat,
+    chat = ellmer::chat(
+      "openai/gpt-6-luna",
+      system_prompt = "You are a concise data assistant."
+    ),
     tools = tools_data(),
     permissions = permissions_readonly(),
-    usage_limits = UsageLimits(
-      max_requests = 10,
-      max_tool_calls = 12,
-      max_cost_usd = 0.50
-    ),
-    context_policy = ContextPolicy(
-      max_tokens = 32000,
-      fallback = "error"
-    ),
+    usage_limits = UsageLimits(max_requests = 10, max_tool_calls = 12),
     working_dir = workspace
   )
 
@@ -70,118 +51,88 @@ server <- function(input, output, session) {
 shinyApp(ui, server)
 ```
 
-`chat_server()` passes both plain text and attachment-enabled ellmer content to
-the Agent unchanged. It also supplies shinychat history and cancellation around
-Deputy's stream.
+Create the agent inside `server()`, so that each browser session gets its own
+conversation, usage and hooks. shinychat calls the agent's `stream_async()`
+method, passing text and attachments through unchanged, and handles the
+input box, cancellation and conversation history. After each reply,
+`agent$last_run()` returns the run's `AgentResult`.
 
-Compaction and native conversation history can be enabled together. Deputy's
-`get_turns()` supplies the complete selected conversation to shinychat, while
-`get_context_turns()` exposes only the compacted model context. Later completed
-replies remain available when the user switches conversations or restores a
-branch. Native history requires a shinychat version exporting `history_options()`
-and `FileConversationStore`; Deputy's transcript contract also works without
-shinychat. Hosts that previously rejected a non-NULL `ContextPolicy(max_tokens)`
-with native history can remove that workaround when using this implementation.
+The limits apply to each message the user sends. The agent also keeps its
+[context policy](conversations.html): long conversations are compacted
+automatically, and large tool results are stored outside the model's context.
 
-## Showing compaction to users
+## Tell users when older messages are summarised
 
-The runnable `inst/examples/shiny-chat/` app includes a host-owned compaction
-notice above the transcript. While summarization runs it says "Summarizing
-earlier messages…". After successful installation it says "Earlier messages
-summarized for the assistant. Your full conversation is still available."
-An expandable "View summary" shows the accepted summary as escaped text,
-alongside an explanation that the assistant uses it with recent messages and
-that some earlier details may be omitted.
+When compaction runs, the model sees a summary instead of the oldest messages,
+but the chat still shows the whole conversation. The example app in
+`inst/examples/shiny-chat/` shows a small notice above the chat while that
+happens ("Summarizing earlier messages…") and afterwards ("Earlier messages
+summarized for the assistant. Your full conversation is still available."),
+with a "View summary" link that shows the summary text.
 
-The notice does not add, hide, or replace chat messages. `PreCompact` and
-`PostCompact` hooks update its state; a `Stop` hook clears the busy indication
-after an automatic run fails or is interrupted, while retaining any previously
-accepted summary. Register custom compaction-veto hooks before this notice so
-their early return prevents the progress indication. Hosts that call
-`agent$compact()` directly must also clear progress when that call ends,
-including errors or vetoes; a manual call does not fire the run's `Stop` hook.
-The example scopes the notice to shinychat's public conversation ID and clears
-it through `history$on_restore()`, including branch navigation. Native history
-restores the complete transcript rather than the compacted context, so the
-notice stays hidden until compaction happens again. This presentation belongs
-to the host; Deputy does not insert UI messages into its conversation record.
+The notice is driven by hooks: `PreCompact` sets it to busy, `PostCompact`
+records the summary, and `Stop` clears the busy state if a run fails or is
+cancelled. If you call `agent$compact()` yourself, clear the notice when that
+call returns, because a manual compaction doesn't fire `Stop`. The notice
+belongs to the page, not the conversation: Deputy never adds messages to the
+chat to report compaction.
 
-## What the Agent Adds
+shinychat's conversation history, where available, stores the whole
+conversation (`agent$get_turns()`), so restoring a conversation brings back
+every message while the model continues from the summary.
 
-Choose a method by the result your application needs:
+## Hooks in an app
 
-| Method | Native return | Typical host |
-|---|---|---|
-| `chat()` | final text | scripts and consoles |
-| `chat_async()` | promise of final text | async applications |
-| `chat_structured()` / `chat_structured_async()` | typed data | structured-output hosts |
-| `stream()` | synchronous ellmer stream | terminal hosts |
-| `stream_async()` | asynchronous ellmer stream | shinychat |
-| `run_sync()` | `AgentResult` | inspected workflows |
-| `run_async()` | promise of `AgentResult` | subagents |
-
-All interfaces enforce the Agent's permissions, hooks, `UsageLimits`, workspace path
-resolution, file checkpoints, automatic context compaction, large-result
-offloading, and run accounting. Native relative file paths resolve against the
-Agent's immutable `working_dir`; Deputy never changes the process working
-directory. Custom hosts can pass `run_context` to any chat, stream, or run
-method to correlate a request with product-owned session and stage identities.
-
-`ContextPolicy()` checks the estimated complete context after run initialization
-and again at model-request boundaries between tool rounds, compacting whenever
-it crosses the token threshold. Summary streaming is asynchronous and shares the
-run's cancellation controller and usage limits. The default fails closed if LLM summary generation fails. Set
-`fallback = "text"` only when a deterministic degraded summary is acceptable.
-`summary_fallback_chats` explicitly configures separate summary recovery
-destinations. `agent$last_compaction()` reports the method, run ID, attempt
-conditions, and compaction usage.
-
-Large tool results are stored as integrity-checked envelopes and replaced in
-model context with a preview and `deputy://tool-result/...` reference. The
-Agent registers `deputy_read_tool_result()` so the model can page through the
-stored result in bounded chunks. Applications can retrieve the original R
-value with `agent$resolve_tool_result(reference)`.
-
-## Hooks and Cancellation
-
-Hooks attach to the Agent as usual:
+Hooks are added to the agent as usual, inside `server()`:
 
 ```{r}
-agent$add_hook(hook_log_tools(verbose = TRUE))
+agent$add_hook(hook_log_tools())
 
 agent$add_hook(HookMatcher(
   event = "PostCompact",
   callback = function(result, context) {
-    cli::cli_inform("Compacted with: {result$method}")
+    showNotification("Earlier messages were summarised.")
+    NULL
   }
 ))
 ```
 
-`chat_append()` owns the completion promise and surfaces stream errors in the
-chat UI. shinychat cancellation propagates through ellmer's stream controller;
-Deputy still finalizes checkpoints and fires `Stop` and `SessionEnd`.
+When the user cancels a reply, the run stops at the next point where ellmer can
+stop it, and Deputy still fires the `Stop` and `SessionEnd` hooks and saves any
+file checkpoints.
 
-## Subagents
+To ask the user questions from a tool, give each session its own handler with
+`tools_interactive()`; see [Human input and approvals](approvals.html).
 
-`LeadAgent` delegation uses `run_async()` internally, so a subagent does not
-block the Shiny R process while the parent chat is streaming. A custom async
-tool can use the same contract:
+## Long-running tools
+
+Delegating to a subagent doesn't block the app: `LeadAgent` runs subagents with
+`run_async()`, so other sessions keep working while the lead waits. Your own
+tools can do the same by returning a promise:
 
 ```{r}
-tool_scout <- ellmer::tool(
-  fun = coro::async(function(prompt) {
+ask_scout <- ellmer::tool(
+  coro::async(function(prompt) {
     result <- coro::await(scout$run_async(prompt))
     result$response
   }),
-  name = "agent_scout",
-  description = "Delegate a literature search.",
-  arguments = list(prompt = ellmer::type_string("Self-contained task"))
+  name = "ask_scout",
+  description = "Ask the literature scout to search for papers.",
+  arguments = list(prompt = ellmer::type_string("A self-contained task"))
 )
-agent$register_tool(tool_scout)
+agent$register_tool(ask_scout)
 ```
 
-## Running the Example
+Here `scout` is another `Agent`. A tool that calls another agent like this
+should also have annotations, like any other tool; see [Tools](tools.html).
+
+## Run the example
+
+The package includes the app with the compaction notice:
 
 ```{r}
-shiny::runApp(system.file("examples/shiny-chat", package = "deputy"))
+shiny::runApp(system.file("examples", "shiny-chat", package = "deputy"))
 ```
+
+For apps that show subagent conversations beside the main chat, see [Briefing
+and inspecting subagents](delegation.html#a-subagent-panel-for-shiny).

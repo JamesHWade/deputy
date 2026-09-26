@@ -2,7 +2,7 @@
 % Please edit documentation in R/tools-mcp.R
 \name{tools_mcp_repl}
 \alias{tools_mcp_repl}
-\title{Load an R REPL with an enforced OS sandbox}
+\title{Load sandboxed R tools from mcp-repl}
 \usage{
 tools_mcp_repl(
   config = NULL,
@@ -14,28 +14,30 @@ tools_mcp_repl(
 \item{config}{Path to an mcptools JSON configuration. Defaults to
 \verb{~/.config/mcptools/config.json}.}
 
-\item{server}{Exact MCP server name. Defaults to \code{"r"}, the name used by
-mcp-repl's installation examples.}
+\item{server}{Name of the server in \code{config}. Defaults to \code{"r"}, the name
+mcp-repl's installation examples use.}
 
-\item{sandbox}{Required mcp-repl policy. \code{"workspace-write"} confines writes
-to configured roots and \code{"read-only"} denies workspace writes. mcp-repl
-also controls network access according to its server configuration.}
+\item{sandbox}{The sandbox mode the server must use. \code{"workspace-write"}
+limits writes to the configured workspace roots; \code{"read-only"} blocks
+workspace writes. Network access follows the server's own configuration.}
 }
 \value{
-A list of ellmer-compatible tools from the selected mcp-repl server.
-The \code{repl} tool forwards \code{timeout_ms} capped at 3000 ms, as described in
-\code{\link[=mcp_repl_connection]{mcp_repl_connection()}}; longer work returns a busy result and a later
-call with empty \code{input} retrieves its output.
+A list of tools from the server. The \code{repl} tool waits at most
+3 seconds per call (see \code{\link[=mcp_repl_connection]{mcp_repl_connection()}}); longer work returns a
+busy result, and a later call with empty \code{input} collects its output.
 }
 \description{
-Loads one explicitly configured \href{https://github.com/posit-dev/mcp-repl}{mcp-repl}
-server after verifying that its command requests the exact sandbox policy.
-Deputy refuses missing, inherited, external, and unrestricted policies.
+Loads the tools of one \href{https://github.com/posit-dev/mcp-repl}{mcp-repl}
+server, which runs R inside an OS sandbox. Use it when model-written code
+must not have your full user access; \link{tool_run_r_code} and \link{tool_run_bash}
+can reach your files and network.
 
-This is the supported path for model-generated code that requires an OS
-security boundary. Deputy's built-in \link{tool_run_r_code} and \link{tool_run_bash}
-are trusted-code tools; their subprocesses provide fault isolation, not
-filesystem or network confinement.
+The server's configuration entry must run the mcp-repl executable over stdio
+with \code{--sandbox} set to \code{sandbox}. A missing flag, a different mode, or a
+mode that doesn't guarantee a sandbox (\code{inherit}, \code{inherit-codex},
+\code{external-sandbox}, \code{danger-full-access}) is an error. For a connection
+owned by one agent that you can interrupt, reset and close, use
+\code{\link[=mcp_repl_connection]{mcp_repl_connection()}}.
 }
 \examples{
 \dontrun{
@@ -45,7 +47,7 @@ repl_tools <- tools_mcp_repl(
   sandbox = "workspace-write"
 )
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = repl_tools,
   permissions = Permissions(web = FALSE)
 )
