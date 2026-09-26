@@ -1,8 +1,8 @@
 ---
-title: "Multi-Agent Orchestration"
+title: "Subagents"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Multi-Agent Orchestration}
+  %\VignetteIndexEntry{Subagents}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -15,509 +15,255 @@ knitr::opts_chunk$set(
 )
 ```
 
-For complex tasks, deputy supports a **lead agent** that delegates work to
-specialised **sub-agents**. Each sub-agent has its own tools, prompt, and
-(optionally) model. The lead agent decides when to delegate and synthesises
-the results.
+A `LeadAgent` can hand parts of a task to subagents: specialists with their
+own prompt, tools, model and permissions. Each delegated task runs in a fresh
+conversation, so a subagent sees only the brief the lead writes for it, and its
+tool calls don't fill up the lead's context. The lead gets the subagent's
+answer back and decides what to do next.
 
-## When to Use Multi-Agent
+Subagents help when parts of a task need different tools or instructions, when
+some work should run with tighter permissions, or when you want several
+independent opinions. For a task one agent can handle with the right tools, one
+agent is simpler and cheaper.
 
-Multi-agent orchestration is useful when:
+## Define subagents
 
-- Different parts of a task need different tools (e.g., code analysis vs.
-  data analysis)
-- You want to isolate sub-tasks with their own system prompts
-- Sub-agents should run with restricted permissions
-- You need audit trails per sub-agent via `SubagentStop` hooks
-
-For simpler tasks, a single `Agent` with the right tools is usually enough.
-
-## Composing retained specialists
-
-For existing, independently configured conversations, use an ordinary `Agent`
-as the root and `retain_agent_graph()` to declare the permitted routes. The
-following assumes `root`, `analyst` and `reviewer` are distinct Agents whose
-permissions already allow the relevant tools:
+`agent_definition()` describes a subagent. The lead's model reads the
+`description` to decide when to use it:
 
 ```{r}
-handles <- root$retain_agent_graph(
-  agents = list(analyst = analyst, reviewer = reviewer),
-  routes = list(
-    root = list(analyze = list(
-      target = "analyst", description = "Analyze the evidence",
-      usage_limits = UsageLimits(max_requests = 4)
-    )),
-    analyst = list(review = list(
-      target = "reviewer", description = "Check the analysis",
-      usage_limits = UsageLimits(max_requests = 2)
-    ))
-  ),
-  usage_limits = UsageLimits(max_requests = 12, max_tool_calls = 8),
-  max_depth = 2, max_delegations = 8, max_concurrency = 2
-)
-result <- root$run_sync("Analyze the evidence and have it reviewed.")
-root$delegation_graph_usage()
-```
-
-The root owns all retained conversations and descendant records. Each route
-fixes its target and allocation; the model supplies only a new task brief.
-Provider configuration, prompts and executable tools stay with each specialist.
-Policies and tool hooks from every ancestor also govern descendant tool calls.
-A child cannot grant itself more authority than its callers.
-
-The graph budget is cumulative across root runs and explicit host follow-ups.
-Depth counts edges from the root. Concurrency includes parents waiting for their
-children, so this three-level route requires two child slots. At capacity calls
-reject before dispatch. Cyclic routes can be configured, but a busy conversation
-cannot be reentered. Token and cost ceilings use reported responses; requests
-already in flight can overshoot them. A request ceiling bounds dispatch itself.
-
-```{r}
-# Host controls require application authorization independently of disclosure.
-root$continue_agent(handles[["analyst"]], "Revisit the conclusion",
-  UsageLimits(max_requests = 1))
-rows <- root$list_subagents()
-# With an explicitly configured DelegationDisclosure policy:
-views <- root$inspect_subagents(requester, transcript = TRUE)
-reader <- root$observe_subagents(requester)
-reader$poll() # ordered root events with parent/depth metadata
-reader$close()
-root$interrupt_subagent(rows$delegation_id[[1]], "host_cancelled")
-# Await outstanding continuations before releasing all members together.
-root$release_agent_graph()
-```
-
-Observation and selected-child panels never consume a producer stream or inject
-child transcripts into the root's model context. Cancellation cooperatively stops
-a subtree; siblings remain independently inspectable. Release removes graph
-routes and ownership, while borrowed tools and external resources remain the
-host's responsibility. These handles do not survive an R restart.
-
-The `examples/recursive-agents` Shiny app provides a deterministic local HTTP
-producer and separate descendant transcript selection, with no paid model calls.
-Each session owns a separate graph and its host controls. The example's requester
-token scopes disclosure; shared applications must supply authenticated identities
-and independent action authorization.
-
-## Copying selected context into a specialist
-
-Fresh delegation gives each child its own context. When a specialist needs prior
-conversation material, the host can explicitly select and authorize a snapshot:
-
-```{r}
-# The application authenticates the user and selects a revision from its store.
-selected <- host_selected_context()
-fork <- ContextFork(
-  owner_id = selected$owner_id,
-  conversation_id = selected$conversation_id,
-  branch_id = selected$branch_id,
-  revision = selected$revision,
-  fork_point = selected$fork_point,
-  view = "context",
-  turns = selected$turns,
-  max_bytes = 1024 * 1024
-)
-
-# specialist is an independently configured Agent with an empty Chat.
-handle <- fork_agent(
-  root, specialist, fork,
-  authorize = host_authorize_current_source,
-  usage_limits = UsageLimits(max_requests = 4),
-  max_runs = 2
-)
-root$continue_agent(handle, "Review the selected evidence.",
-  UsageLimits(max_requests = 2))
-```
-
-The `host_*` functions above belong to the application. The authorization function
-receives the selected snapshot, checks the current user's access and source
-revision, and returns `owner_id`, `conversation_id`, `branch_id`, and `revision`.
-Deputy requires an exact match and rechecks it before each continuation.
-
-Choose `view = "transcript"` for selected retained history or `view = "context"`
-for selected model input after compaction. The host supplies the corresponding
-turns and any summary material it intends to include. Deputy never silently
-replaces a bounded selection with the full transcript. An oversized selection
-fails before dispatch.
-
-ellmer's native turns preserve text, images, documents and settled tool evidence.
-Copied tool bindings are removed; incomplete tool evidence becomes explicitly
-labelled inert text. The specialist keeps its own configured prompt, tools and
-permissions, subject to the current parent's restrictions. Parent and child
-messages diverge after the snapshot, and continuing the child does not copy later
-parent messages.
-
-Selecting or creating a branch remains an operation on the host's conversation
-store. `fork_agent()` copies context and retains an independent child; it does
-not create a persistent branch. shinychat supplies its managed history UI and
-rich-content rendering. A headless adapter requires its supported public branch
-contract; native host-supplied forks need no private shinychat APIs.
-
-## Defining Sub-Agents
-
-Use `agent_definition()` to describe a sub-agent:
-
-```{r, eval = FALSE}
 library(deputy)
 
 code_reviewer <- agent_definition(
   name = "code_reviewer",
-  description = "Reviews R code for best practices and potential issues",
-  prompt = "You are an expert R developer. Review code for correctness,
-    style, and potential bugs. Be specific and actionable.",
-  tools = tools_file()
+  description = "Reviews R code for bugs and unclear style.",
+  prompt = "You review R code. Report specific problems with file and line.",
+  tools = tools_file(),
+  permission_mode = "readonly"
 )
 
 data_analyst <- agent_definition(
   name = "data_analyst",
-  description = "Analyses data files and produces statistical summaries",
-  prompt = "You are a data analyst. Read data files and provide clear,
-    concise statistical summaries with key insights.",
+  description = "Summarises data files.",
+  prompt = "You read data files and summarise them in a few sentences.",
   tools = tools_data()
 )
 ```
 
-Fields:
+| Field | Meaning |
+|---|---|
+| `name` | routing name; converted to lower case, starts with a letter, then letters, digits, `_` or `-` |
+| `description` | what the subagent is for, shown to the lead |
+| `prompt` | the subagent's system prompt |
+| `tools` | the subagent's tools; it doesn't inherit the lead's |
+| `model` | which model to use (see below) |
+| `skills` | skills to load into the subagent |
+| `disallowed_tools` | tool names the subagent may never call |
+| `memory` | text added to the subagent's system prompt |
+| `mcp_servers` | MCP servers for the subagent (see [Briefing and inspecting subagents](delegation.html)) |
+| `initial_prompt` | text put in front of every task the subagent receives |
+| `max_requests` | model request limit for each delegated task |
+| `permission_mode` | a mode at least as strict as the lead's |
 
-| Field | Description |
-|-------|-------------|
-| `name` | Unique routing key: lowercase letter first, then letters, numbers, `_`, or `-` |
-| `description` | What this agent does (shown to the lead LLM) |
-| `prompt` | System prompt for the sub-agent |
-| `tools` | Tools available to the sub-agent |
-| `model` | `"inherit"` (default), a bare model id such as `"gpt-5.6-luna"` to use that model on the lead's provider, or `"provider/model"` for a new chat |
-| `skills` | Optional list of skills to load |
-| `disallowed_tools` | Additional tool names that the child must not use |
-| `memory` | Optional context appended to the child's system prompt |
-| `mcp_servers` | Optional MCP servers loaded for the child |
-| `initial_prompt` | Optional text prepended to delegated tasks |
-| `max_requests` | Optional per-child request limit |
-| `permission_mode` | Optional mode that preserves or narrows the lead policy |
+Definitions are read-only values:
 
-### Delegated Permission Boundaries
+```{r, eval = TRUE}
+library(deputy)
 
-A sub-agent cannot gain authority that its lead does not have. Deputy
-intersects the requested child mode with the lead's capabilities, write root,
-tool gates, and permission callback. `disallowed_tools` adds further denials.
-
-The allowed child-mode transitions use the same authority order as
-`Agent$set_permission_mode()`:
-
-| Lead mode | Allowed child modes |
-|-----------|---------------------|
-| `"readonly"` | `"readonly"` |
-| `"standard"` | `"standard"`, `"readonly"` |
-| `"plan"` | `"plan"`, `"readonly"` |
-| `"full"` | `"full"`, `"standard"`, `"plan"`, `"readonly"` |
-
-For example, a readonly reviewer can be declared beneath a standard lead
-without gaining file reads, web access, or tools that the lead explicitly
-denied:
-
-```{r, eval = FALSE}
 reviewer <- agent_definition(
-  name = "reviewer",
-  description = "Reviews files without changing them",
-  prompt = "Review the requested files and report findings.",
-  tools = tools_file(),
-  permission_mode = "readonly",
-  disallowed_tools = "read_csv",
+  "Reviewer",
+  "Reviews files without changing them.",
+  "Review the files you are given and report problems.",
   max_requests = 5
 )
+reviewer$name
+reviewer$max_requests
 ```
 
-## Creating a LeadAgent
+## Create a lead agent
 
-`LeadAgent` extends `Agent` with a built-in `delegate_to_agent` tool:
+`LeadAgent` is an `Agent` with one extra tool, `delegate_to_agent`, and a list
+of subagents the model can choose from:
 
-```{r, eval = FALSE}
+```{r}
 lead <- LeadAgent$new(
-  chat = ellmer::chat_anthropic(),
+  chat = ellmer::chat("anthropic/claude-sonnet-5"),
   sub_agents = list(code_reviewer, data_analyst),
-  system_prompt = "You coordinate analysis tasks. Delegate to the
-    appropriate specialist and synthesise their findings."
+  system_prompt = "You coordinate analysis tasks. Delegate to the right
+    specialist, then combine their findings."
 )
 
 lead$available_sub_agents()
 #> [1] "code_reviewer" "data_analyst"
-```
-
-Names are trimmed and converted to lowercase by `agent_definition()`. A
-`LeadAgent` rejects duplicate normalized names at construction and registration.
-Its `sub_agent_defs` field returns a list of read-only S7 `AgentDefinition`
-values; use `register_sub_agent()` so the registry and lead prompt stay
-synchronized. `agent_definition()` and `AgentDefinition()` are the same S7
-constructor. To revise a definition, edit a plain property record and construct
-a new value:
-
-```{r definition-value, eval = TRUE}
-library(deputy)
-reviewer <- agent_definition("Reviewer", "Reviews text", "Read carefully.")
-fields <- S7::props(reviewer)
-fields$name <- "limited-reviewer"
-fields$max_requests <- 2L
-limited_reviewer <- do.call(agent_definition, fields)
-limited_reviewer$name
-limited_reviewer$max_requests
-# The original definition still has no request limit.
-reviewer$max_requests
-```
-
-Read properties with `$`, `S7::prop()`, or `@`. Definitions compose original
-ellmer tools and read-only Skill values. Executable tools nested in either
-value retain their closures, services, and caller-owned state; frozen
-configuration does not freeze tool state. `S7::props()` retains these objects, so use the YAML
-helpers and explicit registries below when you need a portable definition.
-
-## Running a Delegation Task
-
-When the lead agent decides to delegate, it calls `delegate_to_agent`
-internally. The sub-agent runs to completion and returns its result to the
-lead:
-
-```{r multi-agent-demo}
-library(deputy)
-
-code_reviewer <- agent_definition(
-  name = "code_reviewer",
-  description = "Reviews R code and suggests improvements",
-  prompt = "You are an R code reviewer. Be concise.",
-  tools = tools_file()
-)
-
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
-lead <- LeadAgent$new(
-  chat = chat,
-  sub_agents = list(code_reviewer)
-)
 
 result <- lead$run_sync(
-  "Ask the code reviewer to look at the DESCRIPTION file and
-   summarise what this package does."
+  "Ask the code reviewer to read R/utils.R and summarise its problems."
 )
-cat(result$response)
+result$response
 ```
 
-Direct delegation participates in the lead run's usage limits. Each
-child inherits the lead's remaining `UsageLimits`, and its usage is aggregated
-into `result$usage` and enforced by the lead after delegation. Concurrent direct
-children reserve allocations before launch. Background children, transitive
-child trees, and cross-run global limits remain outside this contract.
+Add a subagent later with `lead$register_sub_agent(definition)`, which also
+updates the list of subagents in the lead's system prompt.
 
-## Stateless fan-out
+When the lead delegates, the subagent runs to completion and its answer comes
+back as the result of the `delegate_to_agent` call. When the model delegates
+several tasks in one turn, they can run concurrently.
 
-For independent perspectives on supplied text, the host can select responders
-directly. Each definition gets a fresh conversation with its own prompt and
-at most one model request. The lead makes no model request for orchestration.
-Definitions with tools, skills, or MCP servers are rejected before dispatch.
+### Choose each subagent's model
 
-```{r, eval = FALSE}
+`model` accepts three forms:
+
+- `"inherit"`, the default, uses a copy of the lead's chat: same provider,
+  model and settings, without the lead's conversation or tools.
+- A bare model id such as `"gpt-6-luna"` uses the lead's provider, endpoint
+  and credentials with a different model, for example a cheaper one for simple
+  work.
+- `"provider/model"`, such as `"anthropic/claude-sonnet-5"`, creates a new
+  chat with `ellmer::chat()`. Use this form for model ids that contain `/`.
+
+## Permissions and budgets
+
+A subagent can never do more than its lead. Deputy combines the subagent's
+`permission_mode` with the lead's policy, keeping the lead's capabilities,
+write directory, allow and deny lists, and callback, and adds the definition's
+`disallowed_tools`. The allowed modes follow the same order as
+`set_permission_mode()`:
+
+| Lead mode | Subagent may use |
+|---|---|
+| `"readonly"` | `"readonly"` |
+| `"standard"` | `"standard"`, `"readonly"` |
+| `"plan"` | `"plan"`, `"readonly"` |
+| `"full"` | any mode |
+
+The lead's model also needs permission to call `delegate_to_agent`. Read-only
+and plan modes allow only reading tools, so the model of a lead in those modes
+can't delegate. To stop a lead and its subagents from changing files, give the
+lead `Permissions(file_write = FALSE)` and the subagents
+`permission_mode = "readonly"`.
+
+The lead's `PreToolUse`, `PostToolUse` and `PostToolUseFailure` hooks also run
+for subagent tool calls, and each subagent call is checked against the lead's
+current permissions, so narrowing the lead mid-run narrows its subagents too.
+
+Subagents spend from the lead run's budget. Each delegated task gets whatever
+is left of the lead's `UsageLimits`, further capped by the definition's
+`max_requests`, and its usage is added to the lead's `result$usage`. When the
+model delegates several tasks at once, each reserves its share before it
+starts, so together they can't overspend.
+
+A few things subagents can't do. They can't use tools that run on the
+provider's side, because Deputy can't check those calls. They can't pause for
+a durable approval: a lead created with `approval_dir` refuses to delegate, and
+a subagent permission callback that returns `PermissionResultPending()` denies
+the call. And they share the lead's working directory and file checkpoints;
+nothing about delegation isolates the file system.
+
+## Ask several subagents at once
+
+To get independent answers to the same question, call `parallel_delegate()`
+yourself instead of waiting for the model to delegate. Each named definition
+gets the task in a fresh conversation and answers with a single model request.
+The lead makes no request of its own, and its conversation is unchanged.
+
+```{r}
 lead <- LeadAgent$new(
-  ellmer::chat_openai(model = "gpt-5.6-luna"),
+  ellmer::chat("openai/gpt-6-luna"),
   sub_agents = list(
-    agent_definition("benefits", "Find benefits", "Explain the strongest benefits."),
-    agent_definition("risks", "Find risks", "Explain the strongest risks.")
+    agent_definition("benefits", "Finds benefits", "Make the strongest case for."),
+    agent_definition("risks", "Finds risks", "Make the strongest case against.")
   )
 )
+
 batch <- lead$parallel_delegate(
-  c(benefits = "Review a four-day working week.",
-    risks = "Review a four-day working week."),
+  c(
+    benefits = "Should our team adopt a four-day week?",
+    risks = "Should our team adopt a four-day week?"
+  ),
   max_active = 2,
-  usage_limits = UsageLimits(max_requests = 2),
-  run_context = list(workflow = "decision-review")
+  usage_limits = UsageLimits(max_requests = 2)
 )
+
 batch$status
 batch$results$benefits$response
 batch$run$usage
-lead$list_subagents()
 ```
 
-Names are normalized and must select each registered definition at most once.
-The result preserves input order and has five fields:
+The subagents in a batch can't have tools, skills or MCP servers. The result
+keeps the order of the tasks:
 
-| Field | Meaning |
-| --- | --- |
-| `mode` | `"stateless"`; other modes are currently rejected |
-| `results` | Named list of child `AgentResult` objects, or `NULL` |
-| `errors` | Named list of captured conditions, or `NULL` |
-| `status` | Named vector: `completed`, `failed`, `stopped`, or `not_started` |
-| `run` | Aggregate `AgentResult` with usage, events, and batch stop reason |
+| Field | Contents |
+|---|---|
+| `status` | `"completed"`, `"failed"`, `"stopped"` or `"not_started"` for each task |
+| `results` | each subagent's `AgentResult`, or `NULL` |
+| `outcomes` | each subagent's [compact outcome](delegation.html#what-a-delegation-returns) |
+| `errors` | each failure's condition, or `NULL` |
+| `run` | an `AgentResult` for the whole batch, with the combined usage |
 
-A failed responder does not discard successful siblings. Check `status` before
-synthesis; a stopped child may have partial text. Child records include unique
-agent, session, run, and delegation identifiers linked to the batch run, and
-fire the usual `SubagentStart` and `SubagentStop` hooks. `$last_run()` retains
-the aggregate on normal return. The lead's conversation is unchanged; the
-host explicitly supplies selected responses to any later synthesis run.
+One failure doesn't discard the other answers, so check `status` before using
+them. `max_active` sets how many run at once; the batch works through the tasks
+in waves of that size. Request limits are reserved before each wave starts, and
+token and cost limits are split across it, so a wave can overshoot a token or
+cost limit by up to one response per subagent. With the default
+`on_exceed = "stop"`, a limit returns the answers so far.
 
-### Limits and cancellation
+In Shiny, use `parallel_delegate_async()`, which returns a promise.
+`lead$interrupt()` stops tasks that haven't started and asks running ones to
+stop.
 
-`max_active` bounds simultaneous responders. Work runs in waves: the next wave
-starts after all current responders settle. Each wave reserves request slots
-before dispatch and divides the remaining token and cost ceilings among its
-responders. A definition can narrow its request allowance to zero. Failed
-dispatch attempts count as requests; missing cost information stops queued
-work when a cost ceiling is configured.
+For a complete example that compares two opposing answers and asks a separate
+moderator to weigh them, run the bundled debate script with your OpenAI key
+set:
 
-Request limits prevent excess dispatches. Token and cost ceilings use observed
-usage, so a wave can exceed them by up to one response per active responder.
-Unused allocations are released after settlement. All observed child usage is
-included in the aggregate, including failed or interrupted runs. The default
-`on_exceed = "stop"` returns partial outcomes. `on_exceed = "error"` raises the
-usual typed limit condition after cleanup; completed child records remain
-inspectable through `$list_subagents()` and `$get_subagent_results()`.
-
-For Shiny or another asynchronous host, use `$parallel_delegate_async()` and
-consume its promise. `$interrupt()` prevents queued work from starting and
-asks active responders to stop at the next supported provider boundary. The
-batch settles after its active responders drain. The lead rejects overlapping
-runs until cleanup finishes. Tool-using background workers and persistent
-agent scheduling are separate future work.
-
-## Opposing perspectives and synthesis
-
-For a complete opposing-perspective workflow, run the installed standalone
-example after configuring your OpenAI credentials:
-
-```{r, eval = FALSE}
+```{r}
 source(system.file("examples", "standalone", "09-debate.R", package = "deputy"))
 ```
 
-It prints a Markdown comparison, requires both heads to complete, and then
-uses a separate one-request moderator. Its bundled prompt can also be reused
-with any Agent:
+## See what the subagents did
 
-```{r, eval = FALSE}
-agent$load_skill(system.file("skills", "debate", package = "deputy"))
-```
-
-Loading this prompt does not start independent responders. The host supplies
-arguments or orchestrates fan-out explicitly.
-
-## Inspecting child conversations
-
-`lead$list_subagents()` has one row per admitted delegation in admission order,
-even while children are running. `delegation_id` remains stable as `status`
-changes from `queued` to `running` and then a settled outcome:
+`lead$list_subagents()` returns a data frame with one row per delegated task,
+including tasks still running: the subagent's name, its `status`, the exact
+`stop_reason`, timestamps and identifiers.
 
 | Status | Meaning |
-| --- | --- |
-| `completed` | The child returned an AgentResult with stop reason `complete` |
-| `stopped` | A limit, interruption, or another non-complete stop |
-| `failed` | Construction or execution failed |
-| `not_started` | Admitted work never entered a child run |
-| `suspended` | An approval suspension, where the child supports it |
+|---|---|
+| `queued`, `running` | not finished yet |
+| `completed` | the subagent's run ended with `"complete"` |
+| `stopped` | a limit or an interruption ended the run |
+| `failed` | the subagent errored |
+| `not_started` | the task never started |
 
-`stop_reason` preserves the exact runtime reason. Completion does not verify the
-assigned task or its evidence. `admitted_at` records acceptance, `started_at`
-records lifecycle entry before the start hook, and `completed_at` records the
-invocation settling, including suspension. Cancellation in a start hook can
-therefore yield `not_started` with a start timestamp. Run IDs are unavailable
-until the child starts a run. Callback failures follow the existing hook policy
-and appear separately in `hook_error`; they do not turn a successful child
-response into an execution failure.
+`"completed"` means the run ended normally. It doesn't mean the subagent did
+the task well; read its answer.
 
-`get_subagent_results(delegation_id = id)` returns a list of retained AgentResults,
-with `NULL` entries where no result is available and an empty list when no
-delegation matches. `get_subagent_messages(session_id = session)`
-returns the child's available conversation turns, including partial history
-after failure. Both accessors retain admission order. Live message snapshots
-are not a token stream. Reading them does not copy them into the lead's context,
-resume a child, or approve a pending action. The host must authorize and redact
-any user-facing disclosure. These records belong to the live LeadAgent; they
-are not persisted as a durable child job store.
+`lead$get_subagent_results()` returns each task's `AgentResult`, and
+`lead$get_subagent_messages()` returns each subagent's conversation, including
+what it managed before a failure. Filter both by `agent_name`, or by
+`delegation_id` and `session_id` respectively. Reading them doesn't add
+anything to the lead's context. These records live in the `LeadAgent` object
+and disappear with it.
 
-For an asynchronous lead run, `lead$interrupt(reason = "cancelled_by_host")`
-cooperatively interrupts both the lead and active children. It takes effect at
-the next supported provider boundary. Closing an inspection panel should not
-call this method unless the user explicitly requests cancellation.
+To react while delegations happen, add `SubagentStart` and `SubagentStop`
+hooks to the lead:
 
-## Explicit input and context inspection
-
-A plain task string still starts a fresh child conversation. For structured work,
-use `DelegationInput()` with constraints, evidence references, a deliverable and
-stop conditions. Stop conditions are instructions; runtime limits and permissions
-remain separate host configuration.
-
-```{r explicit-delegation, eval=FALSE}
-lead <- LeadAgent$new(
-  chat = ellmer::chat_openai(),
-  sub_agents = list(agent_definition("reviewer", "Review evidence", "Keep units explicit.")),
-  delegation_scope = list(owner_id = "team-a", conversation_id = "review-17"),
-  delegation_sources = list(list(
-    source_id = "assay-17", revision = "r3",
-    owner_id = "team-a", conversation_id = "review-17",
-    text = "Reported concentration: 12 mg/L.",
-    allowed_agents = "reviewer"
-  ))
-)
-brief <- DelegationInput(
-  "Assess the reported concentration",
-  constraints = "Preserve the reported units",
-  evidence = list(list(source_id = "assay-17", revision = "r3")),
-  deliverable = "A conclusion citing the source revision",
-  stop_conditions = "State uncertainty if method information is missing"
-)
-lead$parallel_delegate(list(reviewer = brief))
-id <- lead$list_subagents()$delegation_id[[1]]
-lead$get_subagent_contexts(id)                     # initial manifest
-lead$get_subagent_contexts(id, view = "current")   # working context
-lead$get_subagent_contexts(id, redact = TRUE)      # content-redacted metadata
-lead$get_subagent_messages()                      # retained child chats
-```
-
-Model-driven `delegate_to_agent` calls support the same brief fields. Models can
-select exact source revisions, but cannot supply source bodies, owner scope or
-byte ceilings. Every child brief is encoded as one JSON object with separate
-brief fields and a `resolved_evidence` array, even when that array is empty.
-Text that imitates an evidence header remains inside its quoted brief field.
-This preserves source-selection provenance in the representation; it does not
-make source text trustworthy or guarantee how the model interprets it.
-The host supplies authenticated, authorized text snapshots;
-Deputy checks scope, definition eligibility and revision equality against that
-snapshot. Refreshing external evidence requires a new snapshot and LeadAgent.
-Missing or `NULL` `allowed_agents` permits all definitions; `character()` permits
-none. Snapshots are text only, not live retrieval or multimodal storage.
-
-The default admission ceiling is 64 KiB for both initial system/message text and
-the complete serialized manifest. Inputs reject explicitly when missing, stale,
-unauthorized, invalid or oversized; `list_subagents()$input_error` records why.
-Known token estimates also obey `ContextPolicy$max_tokens`. Unknown estimates
-remain explicit and rely on byte admission, without a token-bound guarantee.
-
-The initial manifest records static definition memory separately from resolved
-evidence and survives changes to the working context. It is a preparation receipt,
-not the exact provider wire payload or an authority grant. A redacted view is
-explicitly incomplete. Hosts control disclosure of both text and metadata.
-Inspection does not add child history to the lead, resume a child, or approve a
-tool. This provides the data for a child-chat inspector; nested live streaming
-and durable child continuation remain separate work.
-
-## Monitoring with SubagentStop Hooks
-
-Use a `SubagentStop` hook to log or inspect sub-agent results:
-
-```{r, eval = FALSE}
-hook_monitor <- HookMatcher(
+```{r}
+lead$add_hook(HookMatcher(
   event = "SubagentStop",
   callback = function(agent_name, task, result, context) {
-    cli::cli_alert_info("Sub-agent {agent_name} finished")
-    cli::cli_alert("Status: {context$status}")
+    cli::cli_inform("{agent_name} finished: {context$status}")
     NULL
   }
-)
-
-lead$add_hook(hook_monitor)
+))
 ```
 
-## Portable definitions
+These accessors are for your own code. Before you show subagent conversations
+to users, read [Briefing and inspecting subagents](delegation.html), which
+covers authorising and redacting what each user may see.
 
-AgentDefinitions can live as `.yaml` or `.yml` files in `.deputy/agents/`. A file
-contains data, while the host chooses the actual tools and skills it can
-reference. Reading files does not run R code, load a Skill, contact an MCP
-server, or create an Agent.
+## Keep definitions in files
 
-Here is a complete version 1 definition:
+Definitions can live as YAML files, conventionally in `.deputy/agents/`, so
+they can be reviewed and versioned like any other configuration:
 
 ```yaml
 version: 1
@@ -528,415 +274,51 @@ prompt: |
   Report unsupported claims and missing evidence concisely.
 tools: [read_file]
 model: inherit
-skills: []
 disallowed_tools: [write_file, run_bash]
-memory: []
-mcp_servers: []
 initial_prompt: Keep the review grounded in the supplied text.
 max_requests: 2
 permission_mode: readonly
 ```
 
-Only `version`, `name`, `description`, and `prompt` are required. All other
-fields use `agent_definition()` defaults when omitted. The format covers the
-entire constructor surface:
-
-| Field | Type and meaning |
-| --- | --- |
-| `version` | Required numeric format version, currently `1` |
-| `name` | Required routing name; canonicalized to lowercase |
-| `description` | Required nonempty description shown to the lead |
-| `prompt` | Required nonempty prompt; `|` preserves multiline text |
-| `tools` | Tool registry keys; defaults to `[]` |
-| `model` | Model string, default `inherit` |
-| `skills` | Skill registry keys; defaults to `[]` |
-| `disallowed_tools` | Tool names denied to the subagent, or `null` |
-| `memory` | Sequence of memory strings, or `null` |
-| `mcp_servers` | MCP server names for the existing delegation lifecycle, or `null` |
-| `initial_prompt` | Initial task prefix, or `null` |
-| `max_requests` | Non-negative integer request limit, or `null` |
-| `permission_mode` | `standard`, `readonly`, `plan`, `full`, or `null` |
-
-The lead still controls the authority ceiling. A file cannot give a subagent
-more permission than its lead, nor supply credentials, host settings, or
-nested subagents. Tool and skill references are exact, case-sensitive keys
-like `read_file` or `concise_review`; they do not name R expressions, package
-exports, or filesystem paths. A host can map a key to an approved Skill path.
-Loading that Skill happens when the subagent is instantiated.
-
-Unknown fields, unsupported versions, missing references, duplicate keys,
-and `!expr` tags are errors. Quote YAML strings like `"yes"` and `"123"` to
-prevent YAML's automatic type conversion. Use `[]` for empty sequences and
-`null` for absent optional fields. Single strings are also accepted for
-one-element sequences. Files are limited to 1 MiB.
-
-### Read and delegate
-
-The package ships the YAML above as a working example. This chunk reads it
-without model credentials:
+Only `version`, `name`, `description` and `prompt` are required; the other
+fields default as in `agent_definition()`. A file can't contain R code. Tools
+and skills are named by keys that your code maps to real objects, so a file can
+only use the tools you offer it:
 
 ```{r definition-file-read, eval = TRUE}
-library(deputy)
 tool_registry <- list(read_file = tool_read_file)
 definition_dir <- system.file("examples", "agent-definitions", package = "deputy")
+
 definitions <- agent_definitions(definition_dir, tools = tool_registry)
 names(definitions)
-definitions$reviewer$max_requests
 ```
 
-For a project, use `agent_definitions(tools = tool_registry)` to discover
-`.deputy/agents/`. Discovery is nonrecursive and ordered by filename. A missing
-or empty directory returns an empty list. Duplicate canonical names and
-invalid files stop discovery rather than silently dropping a definition.
+`agent_definitions()` reads every `.yaml` and `.yml` file in a directory
+(`.deputy/agents/` by default), in file name order. A missing directory gives
+an empty list; an invalid file, an unknown key or a duplicate name is an
+error. Reading files never runs code, loads skills, or connects to servers.
 
-```{r, eval = FALSE}
-lead <- LeadAgent$new(
-  chat = ellmer::chat_openai(model = "gpt-5.6-luna"),
-  sub_agents = definitions,
-  permissions = Permissions(mode = "standard", file_write = FALSE),
-  usage_limits = UsageLimits(max_requests = 6)
-)
-result <- lead$run_sync("Delegate a review of input.txt to reviewer.")
-lead$list_subagents()
-```
-
-### Write and round-trip
-
-Pass the same registries when writing and reading. The writer finds registry
-keys by exact object identity; it refuses unmapped tools/skills and ambiguous
-aliases. Existing files require `overwrite = TRUE`. Comments, YAML formatting,
-and names attached to R lists or character sequences are not preserved; object
-order and registry identity are preserved.
-
-The writer completes a temporary file in the destination directory before
-installing it. With `overwrite = TRUE`, it renames the completed file into
-place. Otherwise it creates a hard link, which fails atomically if another
-writer has already created the destination. This requires filesystem support
-for hard links. A failed write or installation leaves an existing definition
-intact.
+`agent_definition_read()` reads one file, and `agent_definition_write()` writes
+a definition back, given the same registries:
 
 ```{r definition-file-roundtrip, eval = TRUE}
 path <- tempfile(fileext = ".yaml")
 agent_definition_write(definitions$reviewer, path, tools = tool_registry)
 restored <- agent_definition_read(path, tools = tool_registry)
 identical(restored, definitions$reviewer)
-unlink(path)
 ```
 
-## Bind host policy and execution resources
+Unknown fields, unsupported versions and YAML `!expr` tags are errors. Quote
+strings such as `"yes"` and `"123"` that YAML would otherwise convert. Files
+are limited to 1 MiB, and a file can't give a subagent more permissions than
+its lead.
 
-A child starts a fresh conversation, but a tool closure can still capture shared
-state. `DelegationPolicy()` makes that ownership visible in its initial manifest.
-The default `resource_mode = "shared"` borrows definition and skill tools; Deputy
-does not close them. Choose `"exclusive"` with a shared host `resource_key` to
-reject overlapping delegations that use one resource in the same R process.
-This does not lock direct host access or isolate the filesystem.
+## Going further
 
-For an independent R worker per delegation, use the public resource factory:
-
-```{r, eval=FALSE}
-policy <- DelegationPolicy(
-  resource_mode = "owned",
-  resources = function(agent, definition, context) {
-    worker <- RSession$new(agent)
-    DelegationResources(worker$tools(), cleanup = worker$close)
-  },
-  observers = c("Notification", "Stop")
-)
-lead <- LeadAgent$new(
-  chat = chat,
-  permissions = permissions_full(), # Trusted R uses this account's access
-  sub_agents = list(agent_definition("analyst", "Analyze data", "Check the data.")),
-  delegation_policy = policy
-)
-```
-
-The factory receives a fresh child before provider dispatch. It can bind an
-`RSession` or `McpConnection` using public Agent identity and workspace APIs.
-Return tools without running or mutating the child. A factory must clean up its
-own partial construction if it throws; once it returns `DelegationResources`,
-Deputy calls cleanup exactly once after settlement or subsequent setup failure.
-Cancellation is cooperative. Cleanup errors appear separately in
-`lead$list_subagents()$cleanup_error`.
-
-Owned mode rejects tools captured in definitions or skills. MCP selections in a
-definition require an owned factory, which resolves the host's explicit config
-and server/tool allowances. The ordinary child permissions and definition denylist
-apply to all registered tool origins. Stateless parallel responders never call a
-resource factory or acquire tools, handlers or resource leases.
-
-Tool governance hooks (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`) forward
-from the live lead registry. Other observers require explicit selection. Their
-callbacks remain shared host code; Deputy does not clone captured state. Children
-retain the initial permission ceiling and check current lead restrictions before
-each tool operation. Provider-native tools are unsupported for delegated runs
-because they bypass these execution gates.
-
-For a hosted child that asks questions, select the interactive tool in its
-definition (or return it from its owned factory) and bind a handler:
-
-```{r, eval=FALSE}
-policy <- DelegationPolicy(human_input = function(questions, context) {
-  # The host authenticates the owner and supplies the UI routing function.
-  request_answers(
-    questions,
-    owner = context$scope$owner_id,
-    agent_id = context$agent_id,
-    run_id = context$run_id,
-    delegation_id = context$delegation_id
-  )
-})
-lead <- LeadAgent$new(
-  chat,
-  sub_agents = list(agent_definition(
-    "interviewer", "Clarify requirements", "Ask focused questions.",
-    tools = tools_interactive()
-  )),
-  delegation_scope = list(owner_id = "authenticated-owner", conversation_id = "chat-1"),
-  delegation_policy = policy
-)
-```
-
-The current routing context includes child, parent and session identifiers. An
-unbound `ask_user` fails preparation rather than falling back to a process-wide
-handler. Scope values are host assertions, not authentication. The host still
-controls access and redaction for manifests and retained transcripts.
-
-Human answers and delegation briefs never approve tool effects. Delegated durable
-approval is not yet supported: a lead configured with `approval_dir` rejects
-delegation before dispatch, and a child permission callback returning
-`PermissionResultPending` stops without executing the requested effect. Continue
-to use standalone `Agent` approval APIs where durable suspension is needed.
-Child continuation and durable job recovery are separate backlog work.
-
-## Compact outcomes and child history
-
-The `delegate_to_agent` tool returns a JSON `DelegationOutcome` projection. Its
-`runtime` contains execution status, exact stop reason, and stable child, run,
-parent tool-call and delegation identities. The `answer` and optional `claims`
-are model-authored. A normal stop never verifies a claim or approves an artifact.
-`missing_evidence` and `unresolved_work` are `NULL` when not supplied.
-`parallel_delegate()` also returns named `outcomes` beside its existing results.
-
-Answers are bounded to 8 KiB of UTF-8 text. Larger answers use the existing
-ContextPolicy offload store; a scoped reference retains provenance. The model
-projection includes at most eight references and reports omissions.
-`runtime$claim_omissions` reports omitted entries and text truncation for each
-structured claim, including in host inspection. Full child
-history is separate from the lead's model context.
-
-Bind disclosure to the authenticated host session before exposing inspection:
-
-```{r, eval=FALSE}
-owner_session <- new.env(parent = emptyenv()) # supplied by host authentication
-scope <- list(owner_id = "owner-1", conversation_id = "chat-1")
-disclosure <- DelegationDisclosure(
-  authorize = function(requester, scope) identical(requester, owner_session),
-  redact = function(view, requester) view # apply application-specific redaction
-)
-lead <- LeadAgent$new(
-  chat, sub_agents = definitions,
-  delegation_scope = scope, delegation_disclosure = disclosure
-)
-lead$parallel_delegate(c(analyst = "Analyze the evidence"))
-views <- lead$inspect_subagents(owner_session, transcript = TRUE)
-views[[1]]$outcome$runtime
-views[[1]]$turns # native public ellmer turns for optional rendering
-
-history <- lead$export_subagents(owner_session)
-saveRDS(history, "child-history.rds") # host-owned private storage
-restored <- delegation_history(
-  readRDS("child-history.rds"), owner_session, disclosure,
-  scope = history$scope # use the host's trusted ownership record on reload
-)
-```
-
-Authorization runs before lookup, even for nonexistent IDs. The default policy
-denies access. Redaction receives a child view, or a list with `kind = "artifact"`
-and `result` for `read_subagent_result()`. Remove references as well as text when
-an artifact must not be disclosed. Host callbacks are trusted application code;
-requester strings and saved scope do not authenticate a user. The low-level
-`get_subagent_*()` getters remain private-to-the-host inspection surfaces and do
-not perform end-user authorization.
-
-Snapshots include initial manifests, run and cumulative child usage, outcomes,
-errors and optionally transcripts. Child cumulative usage currently equals its
-single run; continuation is unsupported. Unknown usage/cost stays unknown.
-Public ellmer record/replay strips executable tools, raw provider payloads,
-hidden thinking and arbitrary display extras. General rich-widget persistence
-is separate work. Text remains untrusted content for the renderer to sanitize.
-
-Export accepts settled children only. Replay neither constructs an Agent nor
-runs a model or tool, and never grants permission, cancels or resumes execution.
-Restored artifact availability is explicitly unresolved until checked against
-host storage. Live inspection checks retained artifacts and reports missing
-ones. The default 16 MiB disclosure ceiling fails explicitly for larger views;
-select one child or omit its transcript. Storage retention and durable active-run
-recovery remain host responsibilities. Public content records carry a tool-value
-kind receipt so ordinary application objects are never interpreted as content
-constructors. Supported classed tool values (data frames, factors, dates, times,
-and durations) use a portable JSON text projection; native typed attachments
-retain their content representation. Unsupported application S7 values become
-an explicit omission notice without invoking their methods or exposing private
-fields. Other nonportable values still fail closed. The optional child-chat adapter builds on
-these headless records; Deputy core does not require shinychat.
-
-## Observe child activity
-
-Observation reads a transient, bounded buffer. The runtime remains the only
-consumer of each child stream. This supports concurrent subscribers without
-running tools twice or letting a slow view block a child.
-
-```{r, eval=FALSE}
-reader <- lead$observe_subagents(owner_session)
-initial <- reader$snapshot(transcript = FALSE)
-# Start work through a separate host action; observation itself starts nothing.
-promise <- lead$parallel_delegate_async(c(analyst = "Analyze the evidence"))
-update <- reader$poll()
-update$events
-update$gaps # ranges lost to eviction; recover with reader$snapshot()
-reader$close() # detach only; the child continues
-
-reconnected <- lead$observe_subagents(owner_session, after = update$cursor)
-reconnected$poll()
-# A separately authorized host action may cancel one child:
-lead$interrupt_subagent(delegation_id, reason = "user_cancelled")
-```
-
-Each cursor contains a transient stream ID and sequence number. Sequences increase
-across the lead, while envelopes retain child conversation, delegation, run,
-parent and tool-call IDs. A snapshot returns its boundary cursor; subsequent polls
-return later events. Reconnecting with a previous cursor does not repeat events
-already acknowledged. Foreign and future cursors fail. A filtered subscription
-still reports gaps conservatively for the whole stream.
-
-The defaults retain at most 256 envelopes and 1 MiB. Individual events above
-64 KiB become an explicit `content_omitted` envelope, recoverable from retained
-public history when available. These limits cover the observation buffer, not
-the separately retained conversation. `DelegationObservation()` configures them.
-There are no per-reader queues and no subscriber callbacks inside execution.
-
-Every read reauthorizes the host request. Event redaction receives
-`list(kind = "event", event = envelope)`; returning a list without `event` hides
-it. Redaction errors leave the cursor unchanged and never fail the child. Host
-redactors must remain synchronous and must not drive execution. Internal
-observation errors appear separately as `observation_error`. Hidden thinking and
-private transport objects are excluded. Tool start events are deduplicated
-against the existing runtime tool-call identity; execution is unchanged.
-
-`settled` is the delegation terminal envelope; a child's own `stop` event may
-precede it. The former includes setup/unstarted outcomes and final governance
-status. Closing, selecting and replaying a view do not cancel or resume a child.
-`interrupt_subagent()` is a trusted host control API requiring the host's separate
-action authorization. Streams are in-process only: process restart needs
-host-owned saved history, and active-run recovery remains unsupported.
-
-## Inspect children in Shiny
-
-The optional adapter places an activity strip and selected child conversation
-beside the host's lead chat. It requires shinychat 0.5.0, Shiny, bslib, commonmark
-and xml2. The core runtime has no UI dependency. Assistant Markdown is rendered
-then filtered to inert HTML so inline and fenced code retain their literal
-characters. Native tool code values and errors remain plain text.
-
-```{r, eval=FALSE}
-ui <- bslib::page_fluid(
-  bslib::layout_columns(lead_chat_ui, subagent_chat_ui("children"))
-)
-server <- function(input, output, session) {
-  subagent_chat_server(
-    "children", lead,
-    requester = function() authenticated_owner_session,
-    # Optional: authorize this action separately from disclosure.
-    on_cancel = function(id, requester) {
-      authorize_child_cancellation(requester, id)
-      lead$interrupt_subagent(id, "user_cancelled")
-    }
-  )
-}
-```
-
-Activity cards and the keyboard-accessible selector identify individual
-delegations, including repeated calls to the same specialist. The selected view
-shows execution status, initial context, usage, unresolved claims and native tool
-cards with retained attachments. Completed execution does not establish task
-success, approval or evidence verification. Tool results remain untrusted.
-
-Selecting, closing and reopening a child only reads history. The panel has no
-prompt handler; it cannot resume a child. Closing detaches its reader while
-children continue. Cancellation appears only when the host supplies a separately
-authorized callback. Polling rechecks authorization and redaction; denial clears
-the displayed history. Buffer gaps recover from retained snapshots, while partial
-live text is bounded. The read-only composer is hidden with scoped presentation
-CSS tested against shinychat 0.5.0; no private runtime helpers are used.
-
-For saved history, provide a reactive `history` plus the current host-owned
-`disclosure` policy and trusted `scope`, obtained independently of the saved
-payload. Replay restores no execution, and unresolved artifact references stay
-unresolved. The module returns reactive selection, views, notice and closed
-state for host composition.
-
-Run `inst/examples/subagent-chats/app.R` for a deterministic local demo with
-native tool output and a plot, concurrent specialists, repeated names, a partial
-failure, optional cancellation, access revocation and saved-history replay. Its
-visible model/tool counters make extra execution detectable. It uses a local
-fixture service and needs no paid model credentials.
-
-
-## A trusted scientific result
-
-The runnable `inst/examples/trusted-mini-agent` example applies Will Landau
-and Sam Parmar's [trusted mini-agent](https://trustedminiagents.dev) pattern
-to a scientific workflow. It delegates proposal
-writing to a specialist, then uses a separate host-owned Agent for durable
-approval and a fixed descriptive computation. The reviewer sees the dataset
-revision, groups, units and method, and can edit or deny the inputs. The
-computed result panel reads only the designated tool's host receipt; deliberately
-false model commentary cannot replace it. The example uses clearly synthetic
-plant weights and a local deterministic provider, with no paid calls.
-
-```r eval=FALSE
-shiny::runApp(system.file("examples", "trusted-mini-agent", package = "deputy"))
-```
-
-The explicit handoff is necessary because delegated child approval continuation
-is not yet supported. The receipt keeps the source child delegation separate
-from the execution Agent. Reading a child remains observational. This example
-demonstrates the execution and output contract, not scientific correctness or
-model quality; trusted code, appropriate inputs and effective review are still
-required.
-
-### Trusted results across delegation
-
-`LeadAgent$new(trusted_results = TrustedResults(...))` applies one
-[trusted-results policy](trusted-mini-agents.html) to the whole
-delegation tree. The policy implements Will Landau and Sam Parmar's
-[trusted mini-agent](https://trustedminiagents.dev) rules; delegation is
-Deputy's extension of them. Every child inherits it, so each definition's tools must pass
-the same no-bypass check: no code execution, no further delegation, and only
-read-only, closed-world tools unless exempted. A designated tool can live in a
-child, but it must be the same tool object wherever it appears, declared in the
-definition's `tools` or in a `Skill` value rather than a skill directory. When a child
-runs it, the result is recorded in the lead's run and sent to the lead's
-`on_result`, carrying the child's `delegation_id`:
-
-```r eval=FALSE
-forecast <- get_forecast_tool()
-lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  sub_agents = list(agent_definition(
-    "forecaster",
-    "Produce forecasts",
-    "Call get_forecast.",
-    tools = list(forecast)
-  )),
-  trusted_results = TrustedResults(
-    forecast = "get_forecast",
-    on_result = function(event) show_forecast(event$value)
-  )
-)
-```
-
-Definitions that break the rule are rejected by `register_sub_agent()` and at
-construction. Children cannot suspend for durable approval, so input review
-of a child's trusted tool still needs the separate executor pattern above.
+- [Briefing and inspecting subagents](delegation.html): pass structured briefs
+  and evidence, give each subagent its own resources, and show subagent
+  conversations to users safely.
+- [Retained specialists and agent graphs](retained-agents.html): keep a
+  specialist's conversation across several tasks, and let specialists delegate
+  to each other.
+- [Multi-agent code review](example-code-review.html): a complete example.

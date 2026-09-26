@@ -1,0 +1,228 @@
+---
+title: "Running R code"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Running R code}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+Letting the model write and run R code is the most flexible tool you can give
+an agent, and the most dangerous. Deputy offers four ways to do it, which
+differ in two respects: whether R state survives between calls, and whether
+the code is confined by an OS sandbox.
+
+| Option | State between calls | Confinement |
+|---|---|---|
+| `tool_run_r_code` | none; each call starts a new R process | your user account's access |
+| `RSession` | variables, packages and plots persist | your user account's access |
+| mcp-repl, through `mcp_repl_connection()` or `tools_mcp_repl()` | persists | OS sandbox |
+| MCP Console, through `mcp_console_connection()` | persists; R, Python and SQL share data | OS sandbox |
+
+Deputy calls the first two *trusted-code tools*. A separate process protects
+your R session from crashes and runaway loops, but the code can still read,
+write and send anything your account can. Use them when you trust the model,
+the prompt and every input the agent reads, for example your own analysis on
+your own data. Otherwise use a sandbox.
+
+## One-off R code
+
+`tool_run_r_code` runs each snippet in a fresh R process started with callr,
+with a 30-second timeout, and returns the printed output and result. Enable
+it with `r_code = TRUE`:
+
+```{r}
+library(deputy)
+
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = c(tools_data(), list(tool_run_r_code)),
+  permissions = Permissions(r_code = TRUE, file_write = FALSE)
+)
+agent$run_sync("How many rows of mtcars have more than 4 cylinders?")
+```
+
+`tool_run_bash` does the same for shell commands and needs `bash = TRUE`.
+Nothing carries over between calls, so the model has to reload data each time.
+
+## A persistent R session
+
+`RSession` gives one agent its own R worker process. Variables and loaded
+packages persist between calls, so the model can load data once and work with
+it over many steps. Plots come back to the model as images.
+
+```{r}
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  permissions = Permissions(r_code = TRUE, file_write = FALSE)
+)
+worker <- RSession$new(agent)
+agent$register_tools(worker$tools())
+
+agent$run_sync("Load mtcars, fit mpg ~ wt, and plot the residuals.")
+agent$run_sync("Now add hp to the model. Did the fit improve?")
+
+worker$close()
+```
+
+The worker starts on the first call. Calls run one at a time in order, each
+with a 30-second timeout by default, and each starts in the agent's working
+directory. `$cancel()`, or a timeout, stops the worker and discards its
+variables; the next call starts a fresh worker and says so. Call `$close()`
+when the conversation ends, for example from `session$onSessionEnded()` in
+Shiny.
+
+A saved conversation keeps the code, output and plots, but not the worker's
+variables. After a restart the model has to recreate them.
+
+Static plots from base graphics, ggplot2, grid and patchwork are captured.
+htmlwidgets and other interactive output are reported as unsupported.
+
+### Call your tools from R code
+
+An R session can let the model's code call some of the agent's other tools, so
+it can fetch data with a tool and then analyse the result in R:
+
+```{r}
+worker <- RSession$new(agent, tools = "fetch_measurements")
+agent$register_tools(worker$tools())
+```
+
+Inside the session, the code calls `tools$fetch_measurements(...)` and gets
+the tool's return value as an ordinary R object. Each of these calls goes
+through the agent's permissions, hooks and usage limits like any other tool
+call. The selected tools must be registered with `convert = FALSE` and check
+their own arguments, and they can't pause for a durable approval.
+
+## Sandboxed R with mcp-repl
+
+[mcp-repl](https://github.com/posit-dev/mcp-repl) runs an R interpreter as an
+MCP server inside an OS sandbox, so model-written code can only read and write
+what the sandbox allows. Configure the server in your mcptools config with an
+explicit `--sandbox` mode:
+
+```json
+{
+  "mcpServers": {
+    "r": {
+      "command": "/absolute/path/to/mcp-repl",
+      "args": ["--sandbox", "workspace-write", "--interpreter", "r"]
+    }
+  }
+}
+```
+
+Then connect an agent to its own REPL:
+
+```{r}
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  permissions = Permissions(web = FALSE)
+)
+repl <- mcp_repl_connection(
+  config = "~/.config/mcptools/config.json",
+  agent = agent,
+  server = "r",
+  sandbox = "workspace-write"
+)
+agent$register_tools(repl$tools())
+# ...
+repl$close()
+```
+
+Deputy checks that the server's final `--sandbox` argument matches the mode you
+ask for, and refuses to start otherwise. It accepts `"read-only"` and
+`"workspace-write"`; a configuration that leaves the mode out or uses any other
+mode is rejected. mcp-repl enforces the sandbox and refuses to start
+on a system where it can't. Its
+[sandbox documentation](https://github.com/posit-dev/mcp-repl/blob/main/docs/sandbox.md)
+describes what each mode allows on each platform.
+
+Each connection has its own REPL and belongs to one agent. Long computations
+return a "busy" result after about three seconds; the model then polls with an
+empty call to collect the output. `mcp_repl_control(repl, "interrupt")`
+interrupts the running code, and `mcp_repl_control(repl, "reset")` starts a
+fresh interpreter. Both return promises; check the result to see whether the
+REPL accepted the request.
+
+`tools_mcp_repl()` loads the same tools without a connection object, for simple
+scripts:
+
+```{r}
+agent$register_tools(tools_mcp_repl(server = "r", sandbox = "workspace-write"))
+```
+
+Deputy works with mcptools 1.0.2 and 1.0.3 and refuses other versions until
+they have been tested. It has been tested with mcp-repl 0.3.0.
+
+## R, Python and SQL with MCP Console
+
+[MCP Console](https://github.com/t-kalinowski/mcp-console) is a sandboxed
+workbench that grew out of mcp-repl. Its single `send` tool runs R, Python and
+DuckDB SQL cells in one worker, so a data frame made in R can be queried in SQL
+and read from Python in the same conversation.
+
+```{r}
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  permissions = Permissions(bash = TRUE, web = TRUE)
+)
+console <- mcp_console_connection(
+  agent,
+  command = Sys.getenv("DEPUTY_MCP_CONSOLE_BIN"),
+  dependencies = "allow"
+)
+agent$register_tools(console$tools())
+# ...
+console$close()
+```
+
+Install MCP Console 0.0.4 yourself (for example with
+`uv tool install mcp-console==0.0.4`) and pass the path to the executable.
+Deputy checks the version before starting it.
+
+In its sandbox, code can read files but can't reach the network, and it can
+write only to private temporary storage and to paths you allow. Deputy keeps it
+that way: it refuses options that would turn the sandbox off, widen file
+access, add a proxy, or run the code somewhere else. It accepts
+`--writable-root PATH` and the `-c extends=:workspace` (write in the agent's
+working directory), `-c extends=:read-only` and
+`-c sandbox.network=restricted` presets. A project config file,
+`.agents/console/config.yaml`, can change the sandbox policy, so Deputy won't
+start when one exists unless you have reviewed it and pass
+`project_config = TRUE`. After starting, Deputy checks the sandbox the server
+reports and disconnects unless it is the native sandbox with restricted
+networking.
+
+`send` runs code, so Deputy treats it like a shell command: the agent needs
+`bash = TRUE`, plus `web = TRUE` because the server doesn't annotate its tools.
+Read-only and plan modes deny it.
+
+MCP Console can also install the packages that code asks for, and that happens
+outside the sandbox. It does this when a call lists `requirements`, and also on
+its own when code loads a missing package. Since Deputy can't switch the second
+case off, the default `dependencies = "deny"` refuses to connect to a server
+that offers installation. With `dependencies = "allow"`, a call that lists
+`requirements` also needs `install_packages = TRUE` in the agent's permissions.
+Installers use their usual caches in your home directory; set variables such
+as `UV_CACHE_DIR` through `env` to move them.
+
+Calls wait up to 2.5 seconds. Longer work keeps running and returns
+`[running; poll with an empty send]`, and the model collects the output with an
+empty `send`. `mcp_console_control(console, "interrupt")` interrupts a cell and
+keeps the session's state; `mcp_console_control(console, "restart")` discards
+all R, Python and SQL state. If the restarted worker isn't ready within 2.5
+seconds, Deputy closes the connection and you need to start a new one.
+
+MCP Console records every call, with its output and plots, under
+`.agents/console/sessions/` in the agent's working directory. Recordings aren't
+redacted and aren't deleted automatically; `console$status()$execution` gives
+the path.

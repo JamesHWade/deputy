@@ -29,10 +29,10 @@ and when the model reports the tool's result back to the person.
 Their [definition](https://trustedminiagents.dev/definition.html) closes both
 gaps with three rules:
 
-1. **Trusted tools produce every result.** No result comes from the model.
-2. **Each kind of result comes from exactly one trusted tool.** No other tool
-   can produce it instead.
-3. **A person reviews the model-generated inputs to trusted tools**, in a form
+1. Trusted tools produce every result. No result comes from the model.
+2. Each kind of result comes from exactly one trusted tool. No other tool can
+   produce it instead.
+3. A person reviews the model-generated inputs to trusted tools, in a form
    they can check quickly and without much fatigue.
 
 In their framing, this changes what the user has to ask. Instead of "Are
@@ -50,7 +50,7 @@ using ellmer, shinychat and bslib. Deputy moves it into the runtime:
 
 | Rule | Deputy | If violated |
 |---|---|---|
-| 1. Tools produce results | `TrustedResults()` delivers the trusted tool's return value to the host directly, as a `"trusted_result"` event and an `on_result` callback, before the model sees any output. | Model text never reaches the result channel. |
+| 1. Tools produce results | `TrustedResults()` delivers the trusted tool's return value straight to your app, as a `"trusted_result"` event and an `on_result` callback, before the model sees any output. | Model text never reaches the result channel. |
 | 2. One tool per result | The policy maps each result type to one tool. Every tool registration is checked against it. | Registering a tool that could bypass the trusted one fails. |
 | 3. Human review of inputs | `PermissionResultPending()` suspends the call as a durable approval. `tool_input_review()` and `approval_review_ui()` show the typed inputs for review and editing. | The trusted tool does not run until someone approves. |
 
@@ -109,7 +109,7 @@ policy
 With `model_receipt = TRUE`, the model receives a short receipt naming the
 result ID instead of the forecast itself. It cannot restate the numbers
 wrongly later in the conversation, because it never has them. Without a
-receipt, the model gets the same value as the host, as in Landau and Parmar's
+receipt, the model gets the same value as your app, as in Landau and Parmar's
 examples.
 
 The agent combines the policy with a permission callback that pauses every
@@ -121,7 +121,7 @@ dir.create(approval_dir)
 
 agent <- Agent$new(
   chat = ellmer::chat_openai(
-    model = "gpt-5.6-luna",
+    model = "gpt-6-luna",
     credentials = function() "not used in this article"
   ),
   tools = list(get_forecast),
@@ -154,13 +154,12 @@ The rules for tools other than the trusted one:
   delegate to another agent are always rejected. They could compute anything.
 - Any other tool must be annotated read-only and closed-world. Unannotated
   tools get conservative defaults and are rejected.
-- A local tool the host knows to be harmless can be listed in
-  `TrustedResults(exempt_tools = )`. That is an explicit statement by the
-  host, never something Deputy infers. MCP and provider-side tools cannot be
-  exempted.
+- A local tool you know to be harmless can be listed in
+  `TrustedResults(exempt_tools = )`. That is your decision, never something
+  Deputy infers. MCP and provider-side tools cannot be exempted.
 
-The trusted tool itself must be a local R function, and it only runs through
-the agent's own governed tool call. Another tool or host code calling it
+The trusted tool itself must be a local R function, and it only publishes a
+result when the agent calls it. Another tool, or your own code, calling it
 directly cannot publish a result.
 
 ### Reviewing the inputs
@@ -193,7 +192,7 @@ Permission callbacks and hooks receive the same declared types as
 `context$tool_arguments`, so a review can be built anywhere a call is
 intercepted.
 
-The host then approves, denies, or approves with edits. The trusted tool runs
+Your app then approves, denies, or approves with edits. The trusted tool runs
 only after approval, with the reviewed inputs:
 
 ```{r, eval = FALSE}
@@ -242,7 +241,7 @@ server <- function(input, output, session) {
   approval_dir <- tempfile("approvals-")
   dir.create(approval_dir)
   agent <- Agent$new(
-    chat = ellmer::chat("openai/gpt-5.6-luna"),
+    chat = ellmer::chat("openai/gpt-6-luna"),
     tools = list(get_forecast),
     approval_dir = approval_dir,
     permissions = Permissions(
@@ -293,7 +292,7 @@ A `LeadAgent` can hold the policy for its whole delegation tree:
 
 ```{r, eval = FALSE}
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   sub_agents = list(agent_definition(
     "forecaster",
     "Produce forecasts",
@@ -322,28 +321,26 @@ flow above. The `trusted-mini-agent` example does this.
 ## What this does not guarantee
 
 The pattern moves trust from the model to the tools and the review. It does
-not remove the need for either:
+not remove the need for either.
 
-- **The trusted tool must be right.** Deputy guarantees that results come
-  from it unchanged, not that its code or data are correct.
-- **The review must be real.** A person clicking Approve without looking gets
-  no protection. Keep the inputs few and easy to check.
-- **The host is trusted.** The policy stops the model and other tools from
-  producing results. It does not protect against code in the host R process,
-  and it is not an OS sandbox.
-- **The model still talks.** Its chat text is commentary. Present it that way,
-  apart from the results, as the three-area layout does.
+The trusted tool must be right. Deputy guarantees that results come from it
+unchanged, not that its code or data are correct.
+
+The review must be real. A person who clicks Approve without looking gets no
+protection, so keep the inputs few and easy to check.
+
+Your own R code is trusted. The policy stops the model and other tools from
+producing results, but it doesn't protect against code in your R process, and
+it isn't an OS sandbox.
+
+The model still talks. Its chat text is commentary: show it apart from the
+results, as the three-area layout does.
 
 ## Credit
 
 The trusted mini-agent pattern, its three rules, the three-area app layout and
 the weather example all come from
 [*Trusted Mini-Agents*](https://trustedminiagents.dev) by Will Landau and Sam
-Parmar. Deputy's contribution is enforcing the rules in the runtime:
-
-- the result channel and registry checks;
-- the typed review module;
-- the extension to delegation.
-
-The design is recorded in
-[ADR-0030](https://github.com/JamesHWade/deputy/blob/main/dev/adr/0030-trusted-result-channel.md).
+Parmar. Deputy's contribution is enforcing the rules at run time: the result
+channel and the checks on registered tools, the typed review module, and the
+extension to delegation.

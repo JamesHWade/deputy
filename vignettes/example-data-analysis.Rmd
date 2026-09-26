@@ -1,8 +1,8 @@
 ---
-title: "Example: Autonomous Data Analysis Agent"
+title: "Data analysis agent"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Example: Autonomous Data Analysis Agent}
+  %\VignetteIndexEntry{Data analysis agent}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -15,170 +15,107 @@ knitr::opts_chunk$set(
 )
 ```
 
-This example asks an agent to explore a dataset, run R calculations, and
-report what it finds. The agent chooses its next calculation from the results
-of earlier ones. For a fixed sequence of steps, see the
-[extraction pipeline](example-extraction-pipeline.html).
+This recipe gives an agent a dataset and R, and lets it decide what to compute
+next from what it has found so far. It suits open-ended exploration. When the
+steps are known in advance, a fixed [extraction
+pipeline](example-extraction-pipeline.html) is cheaper and easier to check.
 
-The example permits R code to run in a separate process with your user
-account's access. For untrusted inputs or prompts, use an OS sandbox such as
-mcp-repl through `tools_mcp_repl()`.
+The agent runs R code with your user account's access to files and the
+network. That's reasonable for your own data and prompts. For untrusted input,
+run the code in a sandbox instead; see [Running R code](code-execution.html).
 
-## Setup
+## Set up the agent
 
-We create an agent with data and code tools, plus the built-in
-`data_analysis` skill:
+The agent gets the data-reading tools, `run_r_code`, and the bundled
+`data_analysis` skill, which adds two summary tools and some analysis
+guidance. The skill needs dplyr and ggplot2.
 
 ```{r setup}
 library(deputy)
 
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
-
 agent <- Agent$new(
-  chat = chat,
-  tools = c(tools_data(), tools_code()),
-  permissions = Permissions(
-    file_read = TRUE,
-    file_write = FALSE,
-    r_code = TRUE
-  ),
-  system_prompt = "You are a data scientist. When exploring a dataset:
-    1. Start with structure and summary statistics
-    2. Check for missing values and data quality issues
-    3. Examine distributions of key variables
-    4. Look for interesting relationships and correlations
-    5. Summarise your findings clearly
-
-    Use R code for all analysis. Show your reasoning at each step."
+  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  tools = c(tools_data(), list(tool_run_r_code)),
+  permissions = Permissions(r_code = TRUE, file_write = FALSE),
+  usage_limits = UsageLimits(max_requests = 15, max_cost_usd = 0.50),
+  system_prompt = "You are a data scientist. When you explore a dataset:
+    1. Start with its structure and summary statistics.
+    2. Check for missing values and data quality problems.
+    3. Look at the distributions of the key variables.
+    4. Look for relationships between variables.
+    5. Summarise what you found.
+    Use R code for every calculation, and say why you run each step."
 )
 
-# Load the built-in data analysis skill for extra tools
-skill_path <- system.file("skills/data_analysis", package = "deputy")
-agent$load_skill(skill_path)
+agent$load_skill(system.file("skills", "data_analysis", package = "deputy"))
 ```
 
-The `data_analysis` skill adds specialised tools like `eda_summary` and
-`describe_column` that complement the general-purpose `run_r_code` tool.
+The skill's tools, `eda_summary` and `describe_column`, give the model quick
+overviews, so it can save `run_r_code` for the questions they don't answer.
 
-## Running the Analysis
-
-With `run_sync()`, the agent works through the analysis autonomously. It
-calls tools, inspects results, and decides what to do next:
+## Run the analysis
 
 ```{r run-analysis}
 result <- agent$run_sync(
-  "Explore the airquality dataset that comes with R. Give me a
-   thorough understanding of the data including quality issues,
-   distributions, and interesting patterns.",
-  usage_limits = UsageLimits(max_requests = 15)
+  "Explore the airquality dataset that comes with R. Tell me about data
+   quality problems, the distributions of the variables, and any patterns."
 )
 
 cat(result$response)
 ```
 
-The agent typically:
+`airquality` has missing values in `Ozone` and `Solar.R`, and daily readings
+over five months, so a good answer will mention both. Each run can take a
+different path, because the model chooses its next step from the results so
+far.
 
-1. Loads the data and examines its structure
-2. Checks for missing values (airquality has `NA`s in `Ozone` and `Solar.R`)
-3. Computes summary statistics for each variable
-4. Looks at correlations between `Ozone`, `Solar.R`, `Wind`, and `Temp`
-5. Investigates seasonal patterns across `Month`
-6. Summarises findings
+The run stops after 15 model requests or $0.50, whichever comes first, and
+`result$stop_reason` says which.
 
-## Streaming Output
+## Watch it work
 
-For interactive use, `run()` streams events as they happen. You see text
-arrive token by token and tools fire in real time:
+`run()` returns a generator of events, so you can print progress as the agent
+works:
 
 ```{r streaming}
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+events <- agent$run("Summarise the mtcars dataset.")
 
-agent <- Agent$new(
-  chat = chat,
-  tools = c(tools_data(), tools_code()),
-  permissions = Permissions(
-    file_read = TRUE,
-    file_write = FALSE,
-    r_code = TRUE
-  ),
-  system_prompt = "You are a data scientist. Be thorough but concise."
-)
-
-events <- agent$run("Summarise the mtcars dataset")
 repeat {
   event <- events()
   if (coro::is_exhausted(event)) {
     break
   }
   switch(event$type,
-    "text" = cat(event$text),
-    "tool_start" = cli::cli_alert_info("Calling {event$tool_name}..."),
-    "tool_end" = cli::cli_alert_success("{event$tool_name} done"),
-    "stop" = cli::cli_alert("Finished in {event$total_turns} turns")
+    text = cat(event$text),
+    tool_start = cli::cli_alert_info("Calling {event$tool_name}"),
+    tool_end = cli::cli_alert_success("{event$tool_name} done"),
+    stop = cli::cli_alert("Stopped: {event$reason}")
   )
 }
 ```
 
-## Inspecting Results
+For a simpler log, add `hook_log_tools()` before calling `run_sync()`.
 
-`AgentResult` captures everything about the run:
+## Check the result
 
 ```{r inspect-results}
-# Did it succeed?
 result_is_success(result)
 result$stop_reason
 
-# How many turns did the agent take?
 result_n_turns(result)
+length(result_tool_calls(result))
 
-# What tools were called?
-tool_calls <- result_tool_calls(result)
-length(tool_calls)
-
-# How long and how much?
 result$duration
-result$cost
+result$usage
 ```
 
-## Adding Guardrails
+`result_tool_calls()` also shows the code the model ran, in each call's
+`tool_input`, which is the quickest way to check how it reached a number.
 
-For production use, add permissions and hooks to monitor and constrain the
-agent:
+## Next steps
 
-```{r guardrails}
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
-
-agent <- Agent$new(
-  chat = chat,
-  tools = c(tools_data(), tools_code()),
-  permissions = Permissions(
-    r_code = TRUE,
-    bash = FALSE,
-    file_write = FALSE
-  ),
-  usage_limits = UsageLimits(max_requests = 20, max_cost_usd = 0.50)
-)
-
-# Log every tool call
-agent$add_hook(hook_log_tools(verbose = TRUE))
-
-# Block dangerous bash commands (if bash were enabled)
-agent$add_hook(hook_block_dangerous_bash())
-
-result <- agent$run_sync(
-  "Analyse the airquality dataset and report key findings."
-)
-```
-
-The agent can read data and run R code, but cannot write files or run bash
-commands. This permission is application policy, not an OS sandbox. Deputy
-stops the run when it observes either configured usage limit, and stops with
-`"cost_unavailable"` if the provider does not report enough cost information to
-enforce the dollar limit.
-
-## Next Steps
-
-- `vignette("tools")` -- Tool bundles and custom tools
-- `vignette("getting-started")` -- Skills, sessions, and run results
-- `vignette("example-extraction-pipeline")` -- Prompt chaining for structured
-  extraction
+- [Tools](tools.html): skills and custom tools.
+- [Running R code](code-execution.html): keep R state between calls, or
+  sandbox the code.
+- [Extraction pipeline](example-extraction-pipeline.html): fixed steps with
+  structured output.

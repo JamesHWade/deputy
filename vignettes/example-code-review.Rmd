@@ -1,8 +1,8 @@
 ---
-title: "Example: Multi-Agent Code Review"
+title: "Multi-agent code review"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Example: Multi-Agent Code Review}
+  %\VignetteIndexEntry{Multi-agent code review}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -15,255 +15,174 @@ knitr::opts_chunk$set(
 )
 ```
 
-This example assigns separate reviewers to bugs, code style, and documentation
-in an R package. A lead agent combines their findings into a report. Each
-reviewer has its own prompt and conversation, so you can inspect its results
+This recipe reviews an R package with three specialist subagents, one each for
+bugs, style and documentation, and a lead agent that combines their findings
+into one report. Each reviewer works in its own conversation with its own
+prompt, so its instructions stay focused and you can inspect its work
 separately.
 
-## Define the Reviewer Agents
+## Define the reviewers
 
-Each reviewer agent focuses on one dimension of code quality. They all
-use `tools_file()` for read-only file access:
+All three reviewers get the same read-only tools for finding and reading code:
 
 ```{r define-agents}
 library(deputy)
 
+review_tools <- list(
+  tool_read_file,
+  tool_list_files,
+  tool_glob_files,
+  tool_grep_files
+)
+
 bug_hunter <- agent_definition(
   name = "bug_hunter",
-  description = "Finds logic errors, edge cases, off-by-one errors,
-    and potential runtime failures in R code",
-  prompt = "You are a bug-hunting specialist for R code. Focus on:
-    - Logic errors and incorrect conditions
-    - Edge cases (NULL, NA, empty inputs, zero-length vectors)
-    - Off-by-one errors in indexing
-    - Missing error handling for external calls
-    - Type coercion issues
-
-    Read the source files carefully. Report specific issues with
-    file paths and line numbers. Be precise -- only report real bugs,
-    not style preferences.",
-  tools = tools_file()
+  description = "Finds logic errors, unhandled edge cases and likely runtime
+    failures in R code.",
+  prompt = "You look for bugs in R code: wrong conditions, NULL/NA/empty
+    inputs that aren't handled, off-by-one indexing, unchecked external calls,
+    and surprising type coercion. Report only real bugs, each with a file path
+    and line number. Ignore style.",
+  tools = review_tools,
+  permission_mode = "readonly"
 )
 
 style_reviewer <- agent_definition(
   name = "style_reviewer",
-  description = "Checks code against tidyverse style conventions,
-    naming patterns, and code organisation",
-  prompt = "You are an R style reviewer following tidyverse conventions.
-    Focus on:
-    - snake_case naming for functions and variables
-    - Consistent use of <- for assignment (not =)
-    - Function length (flag functions over ~50 lines)
-    - Clear, descriptive names
-    - Proper use of R6 conventions for classes
-
-    Be pragmatic -- flag patterns that hurt readability, not
-    minor nitpicks.",
-  tools = tools_file()
+  description = "Checks R code against the tidyverse style guide.",
+  prompt = "You review R code against the tidyverse style guide: naming,
+    assignment with <-, function length and clear names. Flag what hurts
+    readability; skip trivial nitpicks.",
+  tools = review_tools,
+  permission_mode = "readonly"
 )
 
 doc_checker <- agent_definition(
   name = "doc_checker",
-  description = "Reviews roxygen2 documentation for completeness,
-    accuracy, and clarity",
-  prompt = "You are a documentation reviewer for R packages. Focus on:
-    - Missing roxygen2 tags (@param, @return, @export)
-    - Inaccurate parameter descriptions
-    - Missing @examples sections on exported functions
-    - Unclear or misleading descriptions
-    - Missing @seealso cross-references
-
-    Read both the roxygen comments and the function bodies to verify
-    that documentation matches the actual behaviour.",
-  tools = tools_file()
+  description = "Checks that roxygen2 documentation is complete and matches
+    the code.",
+  prompt = "You review roxygen2 documentation: missing @param, @return and
+    @examples, and descriptions that don't match what the function does. Read
+    the function body to check.",
+  tools = review_tools,
+  permission_mode = "readonly"
 )
 ```
 
-## Create the Lead Agent
+## Create the lead
 
-The `LeadAgent` coordinates the reviewers. It has a `delegate_to_agent`
-tool that lets it assign tasks to any registered sub-agent:
+The lead decides what to ask each reviewer and merges their answers:
 
 ```{r create-lead}
-chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
-
 lead <- LeadAgent$new(
-  chat = chat,
+  chat = ellmer::chat("openai/gpt-6-luna"),
   sub_agents = list(bug_hunter, style_reviewer, doc_checker),
-  system_prompt = "You are a lead code reviewer coordinating a team of
-    specialists. For each review request:
-
-    1. Delegate to each specialist with a clear, specific task
-    2. Collect their findings
-    3. Synthesise into a unified review with findings sorted by severity
-    4. Remove duplicate findings across reviewers
-
-    Severity levels: critical, warning, suggestion.
-    Always include the file path and a concrete suggestion for each finding.",
-  permissions = permissions_readonly()
+  system_prompt = "You lead a code review. Give each specialist a clear,
+    specific task, then merge their findings: remove duplicates, sort by
+    severity (critical, warning, suggestion), and give a file path and a
+    concrete fix for each finding.",
+  permissions = Permissions(file_write = FALSE),
+  usage_limits = UsageLimits(max_requests = 20)
 )
 
 lead$available_sub_agents()
-#> [1] "bug_hunter" "style_reviewer" "doc_checker"
+#> [1] "bug_hunter"     "style_reviewer" "doc_checker"
 ```
 
-## Add Monitoring Hooks
+The lead may delegate but not write files, and the reviewers run in read-only
+mode, so nobody changes a file. The lead can't use `permissions_readonly()`
+itself: read-only mode allows only reading tools, so it would deny the lead's
+own `delegate_to_agent` calls.
 
-Hooks provide real-time visibility as the agent works. Use them for logging
-and blocking; use `AgentResult` for post-hoc analysis.
+To follow along while it runs, log each reviewer as it finishes, and each tool
+call:
 
 ```{r monitoring-hooks}
-# Log when each sub-agent finishes
-hook_sub_agent_log <- HookMatcher(
+lead$add_hook(HookMatcher(
   event = "SubagentStop",
   callback = function(agent_name, task, result, context) {
-    cli::cli_alert_info("Sub-agent {.val {agent_name}} finished")
+    cli::cli_alert_info("{agent_name} finished")
     NULL
   }
-)
-
-# Log tool calls with the built-in hook
-lead$add_hook(hook_sub_agent_log)
-lead$add_hook(hook_log_tools(verbose = TRUE))
+))
+lead$add_hook(hook_log_tools())
 ```
 
-## Run the Review
+## Run the review
 
 ```{r run-review}
 result <- lead$run_sync(
-  "Review the R source files in R/ for code quality issues.
-   Have each specialist review the code from their perspective,
-   then synthesise the findings into a unified report."
+  "Review the R files in R/. Ask each specialist to review them from their
+   perspective, then combine the findings into one report."
 )
 
 cat(result$response)
 ```
 
-## Structured Review Output
+## Get the findings as a data frame
 
-For machine-readable results, add a structured output schema to capture
-individual findings:
+For a report you can filter and count, ask for structured output. An array of
+objects comes back as a data frame, and enums as factors:
 
 ```{r structured-review}
-review_schema <- list(
-  type = "object",
-  properties = list(
-    summary = list(type = "string"),
-    total_findings = list(type = "integer"),
-    findings = list(
-      type = "array",
-      items = list(
-        type = "object",
-        properties = list(
-          severity = list(
-            type = "string",
-            enum = c("critical", "warning", "suggestion")
-          ),
-          category = list(
-            type = "string",
-            enum = c("bug", "style", "documentation")
-          ),
-          file = list(type = "string"),
-          line = list(type = "integer"),
-          issue = list(type = "string"),
-          suggestion = list(type = "string"),
-          reviewer = list(type = "string")
-        ),
-        required = c(
-          "severity",
-          "category",
-          "file",
-          "issue",
-          "suggestion",
-          "reviewer"
-        )
-      )
+review_type <- ellmer::type_object(
+  summary = ellmer::type_string("Two or three sentences on overall quality."),
+  findings = ellmer::type_array(
+    ellmer::type_object(
+      severity = ellmer::type_enum(c("critical", "warning", "suggestion")),
+      category = ellmer::type_enum(c("bug", "style", "documentation")),
+      file = ellmer::type_string(),
+      line = ellmer::type_integer(required = FALSE),
+      issue = ellmer::type_string(),
+      fix = ellmer::type_string(),
+      reviewer = ellmer::type_string()
     )
-  ),
-  required = c("summary", "total_findings", "findings")
-)
-
-chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
-
-lead <- LeadAgent$new(
-  chat = chat,
-  sub_agents = list(bug_hunter, style_reviewer, doc_checker),
-  system_prompt = "You coordinate code reviewers. Delegate to each
-    specialist, then combine their findings into structured JSON.
-    Deduplicate findings across reviewers.",
-  permissions = permissions_readonly()
+  )
 )
 
 result <- lead$run_sync(
-  "Review the R/ directory and return structured findings.",
-  type = ellmer::type_from_schema(jsonlite::toJSON(review_schema, auto_unbox = TRUE))
+  "Review the R files in R/ and return every finding.",
+  type = review_type
 )
+
+review <- result$structured_output
+findings <- review$findings
 ```
 
-## Processing the Results
-
-With structured output, you can filter, sort, and summarise findings
-programmatically:
+From there it's ordinary R:
 
 ```{r process-results}
-review <- result$structured_output
+cli::cli_h1("Code review")
+cli::cli_text(review$summary)
 
-# Summary
-cli::cli_h1("Code Review: {review$summary}")
-cli::cli_alert_info("Total findings: {review$total_findings}")
+table(findings$category, findings$severity)
 
-# Filter by severity
-critical <- Filter(
-  function(f) f$severity == "critical",
-  review$findings
-)
-warnings <- Filter(
-  function(f) f$severity == "warning",
-  review$findings
-)
-
-cli::cli_alert_danger("{length(critical)} critical issue(s)")
-cli::cli_alert_warning("{length(warnings)} warning(s)")
-
-# Display critical findings
-for (finding in critical) {
-  cli::cli_h2("{finding$file}")
-  cli::cli_alert_danger("{finding$issue}")
-  cli::cli_alert_info("Suggestion: {finding$suggestion}")
-  cli::cli_text("Found by: {finding$reviewer}")
+critical <- findings[findings$severity == "critical", ]
+for (i in seq_len(nrow(critical))) {
+  cli::cli_h2(critical$file[[i]])
+  cli::cli_alert_danger(critical$issue[[i]])
+  cli::cli_alert_info("Fix: {critical$fix[[i]]}")
 }
-
-# Summarise by category
-findings_df <- do.call(rbind, lapply(review$findings, as.data.frame))
-table(findings_df$category, findings_df$severity)
 ```
 
-## Cost and Performance
+## Cost and effort
 
-`AgentResult` captures cost and tool usage for post-hoc analysis:
+The lead's result includes the reviewers' usage:
 
 ```{r costs}
-# Total cost and duration
-result$cost
+result$usage
 result$duration
-
-# Never substitute zero for an incomplete provider total
-if (!isTRUE(result$cost$complete)) {
-  cli::cli_alert_warning(
-    "Provider omitted {result$cost$missing} cost record{?s}."
-  )
-}
-
-# All tool calls made during the review
-tool_calls <- result_tool_calls(result)
-cli::cli_alert_info("Total tool calls: {length(tool_calls)}")
-
-# How many model requests were used?
-result$usage$requests
+length(result_tool_calls(result))
 ```
 
-## Next Steps
+`result$usage$cost_usd` is `NA` when ellmer couldn't price every response,
+for example with a model newer than your ellmer version. It's never a partial
+total that looks complete. `lead$list_subagents()` shows each delegation,
+with its status and stop reason, if you want to see where the requests went.
 
-- `vignette("multi-agent")` -- LeadAgent and agent_definition() reference
-- `vignette("hooks")` -- Hook events and pre-built hooks
-- `vignette("structured-output")` -- JSON schema output and validation
+## Next steps
+
+- [Subagents](multi-agent.html): definitions, budgets and parallel
+  delegation.
+- [Hooks](hooks.html): events and built-in hooks.
+- [Structured output](structured-output.html): types and validation.

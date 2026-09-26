@@ -1,8 +1,8 @@
 ---
-title: "Getting Started with Deputy"
+title: "Get started"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Getting Started with Deputy}
+  %\VignetteIndexEntry{Get started}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -14,11 +14,11 @@ knitr::opts_chunk$set(
 )
 ```
 
-This guide uses Deputy to explain an R package from its source files. You will
-run a task, inspect the answer and tool calls, then create an agent that can
-write a summary file.
+This article builds an agent that explains an R package by reading its source.
+You will run a task, check what the agent did, and then give a second agent
+permission to write a file, and undo what it wrote.
 
-## Install and connect
+## Setup
 
 Install Deputy from GitHub:
 
@@ -27,18 +27,17 @@ Install Deputy from GitHub:
 pak::pak("JamesHWade/deputy")
 ```
 
-You need credentials for an [ellmer provider](https://ellmer.tidyverse.org/reference/index.html).
-These examples use OpenAI with `gpt-5.6-luna`. Set `OPENAI_API_KEY` in your R
-environment before running them. You can edit your user `.Renviron` file with
-[`usethis::edit_r_environ()`](https://usethis.r-lib.org/reference/edit.html) if you have usethis installed; restart R after
-saving it. Keep credentials out of scripts and version control.
+The examples use OpenAI's `gpt-6-luna`, so they need `OPENAI_API_KEY`. Put it
+in your `.Renviron` file (`usethis::edit_r_environ()` opens it) and restart R.
+Keep keys out of scripts and version control.
 
-Use another ellmer chat constructor if you prefer a different provider. Deputy
-keeps the model and parameters of the chat you supply.
+To use another provider, pass a different
+[ellmer chat](https://ellmer.tidyverse.org/reference/index.html). Deputy uses
+whatever model and settings that chat has.
 
 ## Create an agent
 
-Open an R session in the package you want to inspect, then run:
+Start R in the package you want to explain, then run:
 
 ```{r first-agent, eval = FALSE}
 library(deputy)
@@ -46,7 +45,7 @@ library(deputy)
 workspace <- normalizePath(getwd(), winslash = "/", mustWork = TRUE)
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_preset("minimal"),
   permissions = permissions_readonly(),
   usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),
@@ -54,25 +53,22 @@ agent <- Agent$new(
 )
 ```
 
-Each setting has one job:
-
-- `chat` connects to the model through ellmer.
-- `tools` gives the model three tools: `read_file`, `read_markdown`, and
+- `chat` is the ellmer chat that talks to the model.
+- `tools` gives the model three tools: `read_file`, `read_markdown` and
   `list_files`.
-- `permissions` allows those reads and denies writes, code execution, and web
-  requests.
-- `usage_limits` stops the run after at most six model requests or eight tool
-  calls.
-- `working_dir = workspace` sets the base for relative file paths. To inspect
-  a package elsewhere, replace `getwd()` in the `workspace <- normalizePath(...)`
-  line with that package's path.
+- `permissions` allows reading and denies writing files, running code and
+  using the web.
+- `usage_limits` ends the run after six model requests or eight tool calls.
+- `working_dir` is where relative paths start. To explain a package somewhere
+  else, use its path instead of `getwd()`.
 
-The read-only policy still allows access to files outside `working_dir` when
-the R process can read them. It is not a filesystem sandbox.
+Read-only stops the agent from changing anything. It does not limit what it
+reads: the agent can open any file your R session can open. Permissions decide
+which tools may run; they are not a filesystem sandbox.
 
 ## Run a task
 
-Ask for an answer that the available files can support:
+Ask a question that the files can answer:
 
 ```{r first-run, eval = FALSE}
 result <- agent$run_sync(
@@ -82,60 +78,63 @@ result <- agent$run_sync(
 result$response
 ```
 
-`run_sync()` waits until the run stops, then returns an `AgentResult`.
-The answer depends on the package and model. Check whether it finished before
-using the response:
+`run_sync()` blocks until the run ends and returns an `AgentResult`. Before you
+use the response, check why the run ended:
 
 ```{r inspect-result, eval = FALSE}
 result$stop_reason
 result$usage
 ```
 
-`"complete"` means the task finished. Other reasons include `"request_limit"`
-and `"tool_call_limit"`. A stopped run can still have a partial response.
-`result$usage` reports requests, tokens, and any cost reported by the provider.
+`"complete"` means the model finished. A limit stops the run with a reason such
+as `"request_limit"` or `"tool_call_limit"`, and the response may be partial.
+`result$usage` counts requests, tool calls and tokens, and the cost when ellmer
+can price the model.
 
-Inspect the tool calls to see which files the agent used:
+To see which files the agent read, list its tool calls and their results:
 
 ```{r inspect-tools, eval = FALSE}
 result_tool_calls(result)
 result_tool_results(result)
 ```
 
-Results are read-only S7 values. For example, `S7::prop(result, "response")`
-reads the same value as `result$response`. Construct a separate `AgentResult()`
-when you need a different record; changing a completed result's properties is
-not supported. Original provider objects and conditions retain their own
-reference semantics inside the record.
+`?AgentResult` describes the other fields, including the full event log and
+run identifiers.
 
-The [AgentResult reference](../reference/AgentResult.html) describes the other
-fields, including events and run identifiers.
+## Other ways to run a task
 
-## Show progress in the console
+`run_sync()` suits scripts. An agent also works like an ellmer chat, so pick the
+method that fits your program:
 
-Add a logging hook before the next run to see tool activity as it happens:
+| Method | Returns | Use it for |
+|---|---|---|
+| `chat()` | the final text | quick questions at the console |
+| `run()` | a generator of events | printing progress as it happens |
+| `run_async()` | a promise of an `AgentResult` | async code and background work |
+| `stream_async()` | an ellmer stream | [Shiny apps](example-shiny-chat.html) |
+
+Every method goes through the same permission checks, hooks and limits.
+
+## Watch tool calls as they happen
+
+Add a hook that prints each tool call:
 
 ```{r log-tools, eval = FALSE}
 agent$add_hook(hook_log_tools())
 result <- agent$run_sync("Read DESCRIPTION and name the package's imported dependencies.")
-result$response
 ```
 
-`hook_log_tools()` uses cli for console output. See [Hooks](hooks.html) to
-write a callback or change what gets reported.
+[Hooks](hooks.html) shows how to write your own.
 
-## Write a summary file
+## Let an agent write a file
 
-Writing needs a different permission policy. Create a new agent: permissions
-on an existing agent can be narrowed, but cannot be expanded beyond those set
-at construction.
-
-This policy permits native file writes inside `workspace`. R execution, shell
-commands, web requests, and package installation remain disabled by default.
+An agent's permissions can be narrowed after it is created but never widened,
+so writing needs a new agent. This one may write inside `workspace`. It still
+can't run R or shell code, use the web or install packages.
 
 ```{r write-agent, eval = FALSE}
 write_agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_file(),
   permissions = Permissions(file_write = workspace),
   usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),
@@ -153,43 +152,41 @@ write_result$stop_reason
 result_tool_calls(write_result)
 ```
 
-Open `deputy-summary.md` and review the changes in Git. Deputy saved the
-previous contents of files changed by its native write tools after the
-checkpoint. If you want to undo those changes, run:
+Open `deputy-summary.md` and check the change in Git. Because checkpointing is
+on, Deputy saved the old contents of every file its write tools touched after
+the checkpoint. To undo the agent's changes:
 
 ```{r rewind, eval = FALSE}
 write_agent$rewind_files(checkpoint_id)
 ```
 
-Checkpoints cover Deputy's native write, edit, and multi-edit tools. They do
-not capture changes made by R code, shell commands, or other programs. See
-[Permissions](permissions.html) for the limits of file policies and code
-execution.
+Checkpoints cover Deputy's `write_file`, `edit_file` and `multi_edit` tools.
+Changes made by R code, shell commands or other programs are not recorded.
 
 ## Troubleshooting
 
-### The provider cannot authenticate
+The provider can't authenticate
+: Check the credential your ellmer provider expects. Try a plain ellmer chat
+  before adding Deputy.
 
-Check the credential expected by your ellmer provider. Try a plain ellmer
-chat to confirm the connection before adding tools or Deputy settings.
+A tool call is denied
+: Check that the tool is registered and that the permission it needs is on.
+  Custom tools also need accurate annotations; see [Tools](tools.html).
 
-### A tool call is denied
-
-Check that the tool is registered and that its required permission is enabled.
-For custom tools, check their annotations and any allowlist as well. The
-[Tools guide](tools.html) includes a complete custom-tool example.
-
-### The run stops before finishing
-
-Inspect `result$stop_reason` and `result$usage`. Try a smaller task, or raise the
-limit that was reached. `"tool_loop"` means an identical tool call returned the
-same result three times in a row. `"cost_unavailable"` means a cost limit was
-set, but the provider did not report enough cost information to enforce it.
-See `UsageLimits()` for all stop reasons.
+The run stops early
+: Look at `result$stop_reason` and `result$usage`, then give the agent a
+  smaller task or raise the limit it hit. `"tool_loop"` means the model made
+  the same tool call with the same result three times in a row.
+  `"cost_unavailable"` means you set a cost limit but ellmer couldn't price the
+  model, so Deputy stopped rather than guess. `?UsageLimits` lists every limit.
 
 ## Next steps
 
-- [Tools](tools.html): select a preset or register an R function.
-- [Structured output](structured-output.html): extract data with ellmer types.
-- [Shiny chat](example-shiny-chat.html): use the agent in an app.
-- [Multiple agents](multi-agent.html): give separate tasks to other agents.
+- [Tools](tools.html): choose built-in tools or turn your own R functions into
+  tools.
+- [Permissions and limits](permissions.html): decide what an agent may do and
+  how much it may spend.
+- [Structured output](structured-output.html): get lists and data frames back
+  instead of text.
+- [Shiny chat](example-shiny-chat.html): put an agent in an app.
+- [Subagents](multi-agent.html): split a task across specialists.
