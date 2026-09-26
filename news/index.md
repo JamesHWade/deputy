@@ -2,6 +2,16 @@
 
 ## deputy (development version)
 
+- `edit_file` and `multi_edit` now change only the replaced text. They
+  previously rewrote the whole file through
+  [`readLines()`](https://rdrr.io/r/base/readLines.html)/[`writeLines()`](https://rdrr.io/r/base/writeLines.html),
+  converting CRLF line endings to LF and adding a final newline.
+  Matching still reads every CRLF as LF, so multi-line edits written
+  with `"\n"` apply in Windows and mixed files; new lines take the
+  edited line’s ending. Files are compared and written as bytes, so
+  non-UTF-8 content is kept
+  ([\#217](https://github.com/JamesHWade/deputy/issues/217)).
+
 - `run_bash` no longer reports a failed command as successful. A
   non-zero exit status, including a command that is not found, is now a
   tool rejection naming the status, and standard error is returned after
