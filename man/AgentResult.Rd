@@ -63,8 +63,9 @@ Results are read-only. Read fields with \code{$}, for example
 \code{result$response}, or use \code{\link[=result_n_turns]{result_n_turns()}}, \code{\link[=result_tool_calls]{result_tool_calls()}},
 \code{\link[=result_tool_results]{result_tool_results()}}, \code{\link[=result_text_chunks]{result_text_chunks()}} and \code{\link[=result_is_success]{result_is_success()}}.
 
-\code{usage} covers this run only, but \code{cost} covers every turn in the model
-context, including earlier runs.
+\code{usage} covers this run only, but \code{cost} covers the whole conversation,
+including earlier runs and turns that compaction removed from the model
+context.
 }
 \examples{
 result <- AgentResult(response = "Done", events = list(

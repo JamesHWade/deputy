@@ -178,8 +178,9 @@ S7::method(print, AgentEvent) <- function(x, ...) {
 #' `result$response`, or use [result_n_turns()], [result_tool_calls()],
 #' [result_tool_results()], [result_text_chunks()] and [result_is_success()].
 #'
-#' `usage` covers this run only, but `cost` covers every turn in the model
-#' context, including earlier runs.
+#' `usage` covers this run only, but `cost` covers the whole conversation,
+#' including earlier runs and turns that compaction removed from the model
+#' context.
 #'
 #' @param response Final text response, or `NULL`.
 #' @param turns List of ellmer turns in the model context when the run ended.
