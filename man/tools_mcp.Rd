@@ -7,32 +7,23 @@
 tools_mcp(config = NULL, servers = NULL)
 }
 \arguments{
-\item{config}{Path to MCP configuration file. If NULL (default), uses the
-mcptools default location (\verb{~/.config/mcptools/config.json}).}
+\item{config}{Path to an MCP configuration file. Defaults to mcptools'
+default location, \verb{~/.config/mcptools/config.json}.}
 
-\item{servers}{Optional character vector of server names to load tools from.
-If NULL (default), loads tools from all configured servers. Filtering is
-performed on exact configuration names before connecting servers.}
+\item{servers}{Names of the servers to load, matched exactly. Servers not
+named are not started. \code{NULL} (the default) loads every configured server.}
 }
 \value{
-A list of tool definitions compatible with \code{Agent$register_tools()}.
-\code{\link[=tool_metadata]{tool_metadata()}} reports exact MCP origin, supplied annotations, and gaps.
-The metadata bridge is qualified for mcptools 1.0.2 and 1.0.3; other versions fail
-explicitly rather than silently losing annotations. Reconnecting a server
-invalidates tools loaded from its previous connection. Reload and explicitly
-replace those tools on the Agent. Load failures warn and return an empty list.
-Returns an empty list if mcptools is not installed or no tools are available.
+A list of tools. If mcptools isn't installed or loading fails,
+\code{tools_mcp()} warns and returns an empty list.
 }
 \description{
-Fetches ellmer-compatible tools from configured MCP servers using the
-mcptools package for use with deputy agents.
-
-MCP (Model Context Protocol) allows agents to access tools from external services
-like GitHub, Slack, Google Drive, and more. Tools are discovered dynamically
-from running MCP servers.
+Starts the servers in an mcptools configuration file and returns their
+tools, ready to register on an \link{Agent}. MCP (Model Context Protocol) servers
+give agents tools for services such as GitHub, Slack or Google Drive.
 }
 \details{
-The MCP configuration file follows the Claude Desktop format:
+The configuration file uses the Claude Desktop format:
 
 \if{html}{\out{<div class="sourceCode json">}}\preformatted{\{
   "mcpServers": \{
@@ -44,16 +35,28 @@ The MCP configuration file follows the Claude Desktop format:
   \}
 \}
 }\if{html}{\out{</div>}}
+
+Deputy supports mcptools 1.0.2 and 1.0.3; other versions give a warning and
+no tools. Annotations a server leaves out get cautious defaults, so MCP
+tools usually need \code{web = TRUE} in \code{\link[=Permissions]{Permissions()}}. \code{\link[=tool_metadata]{tool_metadata()}} shows
+what a tool declares.
+
+Loading a server again restarts it and breaks the tools from the earlier
+load; register the new ones with \code{replace = TRUE}. A stdio server that takes
+more than about 4 seconds to answer a call is stopped, and the call fails.
+\link{McpConnection} gives you a fixed tool allowlist, timeouts and control over
+shutdown.
 }
 \examples{
 \dontrun{
-# Get all MCP tools from default config
+# Get all MCP tools from the default config
 mcp_tools <- tools_mcp()
 
-# Create agent with MCP tools
+# Create an agent with MCP tools
 agent <- Agent$new(
-  chat = ellmer::chat_anthropic(),
-  tools = c(tools_file(), mcp_tools)
+  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  tools = c(tools_file(), mcp_tools),
+  permissions = Permissions(web = TRUE)
 )
 
 # Use custom config file
@@ -64,5 +67,6 @@ mcp_tools <- tools_mcp(servers = c("github", "slack"))
 }
 }
 \seealso{
-\href{https://posit-dev.github.io/mcptools/}{mcptools package} for configuration
+The \href{https://posit-dev.github.io/mcptools/}{mcptools package} for
+configuration, and \code{vignette("mcp")}.
 }

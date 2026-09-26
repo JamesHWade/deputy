@@ -2,25 +2,30 @@
 % Please edit documentation in R/approval-record.R
 \name{PermissionResultPending}
 \alias{PermissionResultPending}
-\title{Request a durable tool approval}
+\title{Pause a tool call for approval}
 \usage{
 PermissionResultPending(reason = "Approval required")
 }
 \arguments{
-\item{reason}{One non-empty string explaining the pending decision.}
+\item{reason}{Why the call needs approval, as one non-empty string.}
 }
 \value{
-A read-only S7 permission result.
+A \code{PermissionResultPending} object.
 }
 \description{
-Return this from a \link{Permissions} \code{can_use_tool} callback to suspend before
-execution. The Agent must have an \code{approval_dir}. Resumable tools must be
-registered with \code{convert = FALSE}; their functions accept raw JSON arguments.
-Tool outputs should be strings, explicit JSON, or ellmer Content values.
-Raw JSON shaped like a content record (\code{version}, \code{class}, \code{props}) is rejected
-because ellmer replay would reinterpret it as an S7 constructor.
-No approval is granted by constructing this value.
+Return this from a \code{can_use_tool} callback (see \link{Permissions}) to stop the
+run before the tool executes and save the pending call to disk. Approve or
+deny it later, possibly from another R process, with
+\code{agent$resume_approval()}; \code{\link[=approval_read]{approval_read()}} shows what is waiting.
+}
+\details{
+The agent needs an \code{approval_dir}, and the tool must be registered with
+\code{convert = FALSE}, so its function receives the raw JSON arguments. Tool
+results should be strings, JSON from \code{jsonlite::toJSON()}, or ellmer content
+objects. Inputs or results shaped like a list with \code{version}, \code{class} and
+\code{props} fields are rejected, because ellmer would read them back as
+serialized objects.
 }
 \seealso{
-\code{\link[=approval_read]{approval_read()}}, \link{Agent}
+\code{vignette("approvals")}, \code{\link[=approval_read]{approval_read()}}, \link{Agent}
 }

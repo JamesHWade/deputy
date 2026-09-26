@@ -4,39 +4,48 @@ NULL
 #' Create a permission policy
 #'
 #' @description
-#' A read-only S7 value controlling tool access. Use [permissions_check()] to
-#' evaluate a call. Read properties with `S7::prop(policy, "mode")` or `$`.
-#' To narrow an active Agent, use its `set_permission_mode()` method; replacing
-#' its policy or changing its properties is not supported.
+#' A `Permissions` object decides which tool calls an agent may make. Pass it
+#' to `Agent$new()`, or test a call with [permissions_check()].
+#' [PermissionMode] describes how each mode uses these settings.
 #'
-#' Directory grants are canonicalized at construction. The callback retains
-#' its caller-owned executable state. Read-only properties protect the public
-#' configuration; they are not an execution sandbox. Serialized policies are
-#' configuration records, not portable authority grants or a way to widen an
-#' existing Agent's authority.
+#' The object is read-only; read its fields with `$`. To restrict an agent
+#' further while it runs, call `agent$set_permission_mode()`. Permissions can
+#' be narrowed but not widened.
+#'
+#' A policy is not an OS sandbox: code run through `run_r_code` or `run_bash`
+#' can do anything your R session can.
 #'
 #' @param mode One of `"standard"`, `"plan"`, `"readonly"`, or `"full"`.
-#' @param file_read Allow file reading. One non-missing logical value.
-#' @param file_write `TRUE`, `FALSE`, or an existing absolute directory path.
-#' @param bash Allow shell commands. One non-missing logical value.
-#' @param r_code Allow R code execution. One non-missing logical value;
-#'   defaults to `FALSE`.
-#' @param web Allow web requests. One non-missing logical value.
-#' @param install_packages Allow package installation. One non-missing logical
-#'   value.
-#' @param can_use_tool A function accepting tool name, input, and context,
-#'   returning a [PermissionResultAllow], [PermissionResultDeny],
-#'   [PermissionResultPending], or `NULL`.
-#' @param tool_allowlist Character vector of allowed tool names, or `NULL`.
-#'   An empty vector denies all tools; `NULL` disables this gate.
+#' @param file_read Allow file reading. `TRUE` or `FALSE`.
+#' @param file_write `TRUE`, `FALSE`, or an existing absolute directory. A
+#'   directory allows writes only inside it and is resolved when the policy is
+#'   created. Defaults to the current working directory.
+#' @param bash Allow shell commands. `TRUE` or `FALSE`.
+#' @param r_code Allow R code execution. `TRUE` or `FALSE`.
+#' @param web Allow web access, including other tools that reach external
+#'   systems. `TRUE` or `FALSE`.
+#' @param install_packages Allow package installation. `TRUE` or `FALSE`.
+#' @param can_use_tool Optional function `(tool_name, tool_input, context)`
+#'   that returns [PermissionResultAllow()], [PermissionResultDeny()] or
+#'   [PermissionResultPending()]. Any other return value, including `NULL`,
+#'   denies the call with a warning, and so does an error. In standard mode
+#'   its answer is final: an allow skips the capability checks above. In
+#'   readonly mode it can only deny calls the mode would allow. Plan and full
+#'   modes never call it.
+#' @param tool_allowlist Character vector of allowed tool names, or `NULL`
+#'   (the default) to allow any name. An empty vector denies all tools.
 #' @param tool_denylist Character vector of denied tool names, or `NULL`.
-#' @param permission_prompt_tool_name Optional dedicated approval-tool name to
-#'   suggest in deny messages. Native capability-bearing tools cannot be used.
-#' @return A read-only `Permissions` S7 object.
+#' @param permission_prompt_tool_name Optional name of a tool the model can
+#'   call to ask for approval, such as `"ask_user"`. It is allowed in every
+#'   mode unless `tool_allowlist` or `tool_denylist` excludes it, and denials
+#'   from those lists point the model to it. Built-in file, code, web, install
+#'   and delegation tools can't be used.
+#' @return A `Permissions` object.
+#' @seealso `vignette("permissions")`
 #' @examples
 #' policy <- Permissions(file_write = FALSE)
 #' permissions_check(policy, "write_file", list(path = "output.txt"))
-#' S7::prop(policy, "file_write")
+#' policy$file_write
 #' @export
 Permissions <- S7::new_class(
   "Permissions",
@@ -164,13 +173,18 @@ local({
   S7::method(`$`, Permissions) <- function(x, name) S7::prop(x, name)
 })
 
-#' Evaluate a tool call against a permission policy
+#' Check a tool call against a permission policy
 #'
-#' @param permissions A [Permissions] S7 value.
+#' Returns the policy's decision for one tool call. It calls the policy's
+#' `can_use_tool` callback when the mode uses one, but runs no hooks. Use it
+#' to test a policy.
+#'
+#' @param permissions A [Permissions] object.
 #' @param tool_name Name of the tool.
-#' @param tool_input Arguments passed to the tool.
-#' @param context Additional context such as working directory, tool origin,
-#'   and annotations.
+#' @param tool_input Named list of arguments for the tool.
+#' @param context Optional named list of details the agent normally supplies,
+#'   such as `working_dir` (used to resolve relative paths) and
+#'   `tool_annotations`.
 #' @return A [PermissionResultAllow], [PermissionResultDeny], or
 #'   [PermissionResultPending].
 #' @examples
@@ -417,10 +431,12 @@ S7::method(print, Permissions) <- function(x, ...) {
 #' Create a read-only permission policy
 #'
 #' @description
-#' Creates a permission policy that only allows reading files.
-#' All write operations, code execution, and web access are denied.
+#' Creates a `"readonly"` policy. The agent can use the built-in file-reading
+#' tools such as `read_file`, `list_files` and `grep_files`. Writes, code
+#' execution, web access, delegation to subagents and custom tools are
+#' denied.
 #'
-#' @return A [Permissions] object
+#' @return A [Permissions] object.
 #'
 #' @examples
 #' perms <- permissions_readonly()
@@ -442,16 +458,15 @@ permissions_readonly <- function() {
 #' Create a standard permission policy
 #'
 #' @description
-#' Creates a permission policy suitable for most use cases.
-#' Allows reads of files accessible to the R process, confines file writes to
-#' the working directory. Denies arbitrary R code, bash commands, web access,
-#' and package installation. Grant code execution explicitly only when the
-#' model and task are trusted; process separation is not an OS sandbox.
+#' Creates a `"standard"` policy for everyday use. The agent can read any file
+#' your R session can read, and write files inside `working_dir`. R code, shell
+#' commands, web access and package installation are denied. Turn on code
+#' execution only when you trust the model and the task: the code runs with
+#' your user's access, not in an OS sandbox.
 #'
-#' @param working_dir Existing absolute root directory for file writes (default:
-#'   current directory). This does not restrict otherwise accessible file
-#'   reads.
-#' @return A [Permissions] object
+#' @param working_dir An existing absolute path to the directory the agent may
+#'   write to. Defaults to the current directory. Reads are not limited to it.
+#' @return A [Permissions] object.
 #'
 #' @examples
 #' perms <- permissions_standard()
@@ -473,14 +488,15 @@ permissions_standard <- function(working_dir = getwd()) {
 #' Create a planning permission policy
 #'
 #' @description
-#' Creates a permission policy for planning-oriented sessions.
-#' Only tools annotated as read-only are allowed, plus the permission prompt
-#' tool when configured.
+#' Creates a `"plan"` policy, for letting the model look around and propose a
+#' plan before it changes anything. Only tools annotated as read-only are
+#' allowed, plus the approval prompt tool. Web access is on, so read-only web
+#' tools such as `web_fetch` work. Writes and code execution are denied.
 #'
-#' @param permission_prompt_tool_name Optional dedicated approval-tool name that
-#'   the model can use to request explicit approval. Native capability-bearing
-#'   tools are rejected. Defaults to `"ask_user"`.
-#' @return A [Permissions] object
+#' @param permission_prompt_tool_name Name of the tool the model can call to
+#'   ask for approval, `"ask_user"` by default. `NULL` means none. Built-in
+#'   file, code, web, install and delegation tools can't be used.
+#' @return A [Permissions] object.
 #'
 #' @examples
 #' perms <- permissions_plan()
@@ -504,10 +520,14 @@ permissions_plan <- function(
 #' Create a full access permission policy
 #'
 #' @description
-#' Creates a permission policy that allows all operations.
-#' **Use with caution!** This bypasses all permission checks.
+#' Creates a `"full"` policy, which allows every tool call: writes anywhere
+#' your R session can write, R and shell code, web access and package
+#' installation. Capability flags, tool annotations and `can_use_tool` are not
+#' checked, though PreToolUse hooks still run and can deny a call. Use it only
+#' with a model and task you trust, ideally inside a container or other OS
+#' sandbox.
 #'
-#' @return A [Permissions] object
+#' @return A [Permissions] object.
 #'
 #' @examples
 #' perms <- permissions_full()

@@ -6,18 +6,19 @@ NULL
 #' Load a skill from a directory
 #'
 #' @description
-#' Loads a skill from a directory containing `SKILL.yaml` (metadata) and/or
-#' `SKILL.md` (system prompt extension). You can also pass a direct path to
-#' a `SKILL.md` file.
+#' Loads a skill from a directory containing `SKILL.yaml` (metadata and tools),
+#' `SKILL.md` (prompt text) or both, or from a single Markdown file. Loading a
+#' skill with tools runs its R files, so only load skills you trust.
 #'
-#' @param path Path to the skill directory
-#' @param check_requirements If TRUE (default), verify requirements are met
-#' @return A [Skill] object
+#' @param path Path to the skill directory or Markdown file.
+#' @param check_requirements If `TRUE` (the default), warn when required
+#'   packages are missing.
+#' @return A [Skill].
 #'
 #' @details
-#' The skill directory should contain one of:
-#'
-#' **SKILL.yaml** (required):
+#' `SKILL.yaml` needs a `name`. Each entry under `tools` names an R file in the
+#' skill directory and the object in it created with `ellmer::tool()`; entries
+#' that can't be loaded are skipped with a warning.
 #' ```yaml
 #' name: my_skill
 #' version: "1.0.0"
@@ -31,9 +32,8 @@ NULL
 #'     function: tool_my_tool
 #' ```
 #'
-#' **SKILL.md** (optional, or standalone file):
-#' Markdown content that will be appended to the agent's system prompt
-#' when this skill is loaded. Frontmatter is supported:
+#' The body of `SKILL.md` is added to the agent's system prompt. Its optional
+#' YAML front matter overrides fields from `SKILL.yaml`:
 #' ```yaml
 #' ---
 #' name: my_skill
@@ -42,9 +42,8 @@ NULL
 #'   packages: [dplyr]
 #' ---
 #' ```
-#'
-#' **tools.R** (optional):
-#' R file containing tool definitions referenced in SKILL.yaml.
+#' A skill without a name is named after its directory or file. Reading YAML
+#' needs the yaml package.
 #'
 #' @examples
 #' \dontrun{
@@ -174,7 +173,7 @@ load_skill_from_markdown <- function(path) {
 #'
 #' @param skill_path Path to skill directory
 #' @param tool_specs List of tool specifications from SKILL.yaml
-#' @return List of tool definitions
+#' @return List of tools
 #'
 #' @keywords internal
 load_skill_tools <- function(skill_path, tool_specs) {
@@ -242,19 +241,20 @@ load_skill_tools <- function(skill_path, tool_specs) {
   tools
 }
 
-#' Create a skill programmatically
+#' Create a skill in code
 #'
 #' @description
-#' Create a skill without loading from disk. Useful for defining skills
-#' inline in R code.
+#' Creates a [Skill] in R instead of loading one from disk. It is the same as
+#' `Skill()`, except that `version` defaults to `"1.0.0"`.
 #'
-#' @param name Skill name
-#' @param description Brief description
-#' @param prompt System prompt extension
-#' @param tools List of tools created with `ellmer::tool()`
-#' @param version Version string (default: "1.0.0")
-#' @param requires List of requirements (packages, providers)
-#' @return A [Skill] object
+#' @param name Skill name.
+#' @param description Short description.
+#' @param prompt Text to add to the system prompt.
+#' @param tools List of tools created with `ellmer::tool()`.
+#' @param version Version string. Defaults to `"1.0.0"`.
+#' @param requires List with optional `packages` and `providers` character
+#'   vectors.
+#' @return A [Skill].
 #'
 #' @examples
 #' \dontrun{
@@ -292,10 +292,13 @@ skill_create <- function(
 #' List available skills in a directory
 #'
 #' @description
-#' Scans a directory for subdirectories containing SKILL.yaml files.
+#' Finds skills in `path`: subdirectories that contain `SKILL.yaml` or
+#' `SKILL.md`, and Markdown files directly inside `path`.
 #'
-#' @param path Path to search for skills (default: "skills" in working dir)
-#' @return Data frame with skill names and paths
+#' @param path Directory to search. Defaults to `"skills"` in the working
+#'   directory.
+#' @return A data frame with `name` and `path` columns, empty if `path`
+#'   doesn't exist.
 #'
 #' @examples
 #' \dontrun{

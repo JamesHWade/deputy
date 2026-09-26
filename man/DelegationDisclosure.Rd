@@ -2,7 +2,7 @@
 % Please edit documentation in R/delegation-inspection.R
 \name{DelegationDisclosure}
 \alias{DelegationDisclosure}
-\title{Authorize and redact child conversation inspection}
+\title{Control who can inspect subagents}
 \usage{
 DelegationDisclosure(
   authorize = function(requester, scope) FALSE,
@@ -11,25 +11,28 @@ DelegationDisclosure(
 )
 }
 \arguments{
-\item{authorize}{Function of \code{requester} and fixed host \code{scope}; only an exact
-\code{TRUE} permits disclosure. Errors deny access without disclosing details.}
+\item{authorize}{A \verb{function(requester, scope)}. Only an exact \code{TRUE}
+allows access; anything else, including an error, denies it. \code{scope}
+holds the agent's \code{delegation_scope}, \code{agent_id} and \code{session_id}, or the
+\code{scope} given to \code{\link[=delegation_history]{delegation_history()}}.}
 
-\item{redact}{Function of \code{view} and \code{requester}, returning a redacted list.
-It may remove fields or content. It must not perform agent execution.}
+\item{redact}{A \verb{function(view, requester)} that returns \code{view}, as a list,
+without anything the requester shouldn't see. The default returns it
+unchanged.}
 
-\item{max_bytes}{Maximum serialized content-payload bytes in one disclosed
-snapshot or saved history, including replayed turn content but excluding
-shared R class/method metadata. Oversized disclosures fail explicitly;
-select fewer children or omit transcripts. Defaults to 16 MiB.
-Rich table projections also have a separate conservative 16 MiB size
-estimate limit; larger projections receive an explicit omission marker.}
+\item{max_bytes}{Maximum size, in bytes, of one disclosed result; defaults
+to 16 MiB. Larger results are an error, so ask for fewer subagents or no
+transcripts. Separately, data frames in tool results are replaced by a
+placeholder above an estimated 16 MiB.}
 }
 \value{
-Read-only \code{DelegationDisclosure} host configuration.
+A \code{DelegationDisclosure} object.
 }
 \description{
-Hosts authenticate requesters before calling inspection methods. Identifiers
-are routing locators, never access grants. Authorization runs before record
-lookup; redaction runs before each snapshot leaves Deputy. These trusted host
-callbacks never run as model tools. The default denies all disclosures.
+Decides who may read subagent results and history, through the inspection
+methods of \link{Agent} and \link{LeadAgent} or \code{\link[=delegation_history]{delegation_history()}}. Pass it as
+\code{delegation_disclosure}. \code{authorize} is where your application checks
+access; \code{redact} removes what the requester shouldn't see. By default every
+request is denied. Authenticate the requester first: a delegation ID alone
+never grants access.
 }

@@ -3,7 +3,7 @@
 \name{agent_definition}
 \alias{agent_definition}
 \alias{AgentDefinition}
-\title{Create an Agent Definition}
+\title{Define a subagent}
 \usage{
 AgentDefinition(
   name,
@@ -36,58 +36,65 @@ agent_definition(
 )
 }
 \arguments{
-\item{name}{Unique routing key for this Agent type. Names are trimmed,
-converted to lowercase, and must start with a letter followed only by
-letters, numbers, underscores, or hyphens.}
+\item{name}{Name used to select the subagent. It is trimmed and
+lowercased, and must start with a letter followed by letters, numbers,
+underscores or hyphens.}
 
-\item{description}{Brief description of what this agent does (shown to lead agent)}
+\item{description}{What the subagent does. The lead's model reads it when
+choosing where to delegate.}
 
-\item{prompt}{System prompt for this agent}
+\item{prompt}{System prompt for the subagent.}
 
-\item{tools}{Optional list of tools for this agent}
+\item{tools}{List of tools for the subagent. It doesn't inherit the lead's
+tools.}
 
-\item{model}{Model to use. \code{"inherit"} (the default) uses the parent's
-chat as it is. A bare model id such as \code{"gpt-5.6-luna"} uses the parent's
-provider, endpoint and credentials with that model. A \code{"provider/model"}
-string builds a new chat with \code{\link[ellmer:chat]{ellmer::chat()}}.}
+\item{model}{Model to use. \code{"inherit"} (the default) uses a copy of the
+lead's chat. A bare model id such as \code{"gpt-6-luna"} keeps the lead's
+provider and credentials but switches the model. A \code{"provider/model"}
+string such as \code{"anthropic/claude-sonnet-5"} creates a new chat with
+\code{\link[ellmer:chat]{ellmer::chat()}}.}
 
-\item{skills}{Optional list of skills to load}
+\item{skills}{List of \link{Skill} objects or skill directory paths to load.}
 
-\item{disallowed_tools}{Optional tool denylist for this sub-agent}
+\item{disallowed_tools}{Names of tools to remove from the subagent,
+including tools from skills. Case is ignored.}
 
-\item{memory}{Optional memory text appended to this sub-agent's prompt}
+\item{memory}{Notes appended to the subagent's system prompt under a
+"Memory" heading.}
 
-\item{mcp_servers}{Optional MCP server names to load for this sub-agent}
+\item{mcp_servers}{Names of MCP servers the subagent needs. Deputy doesn't
+connect to them: such a definition needs a \link{DelegationPolicy} with
+\code{resource_mode = "owned"}, whose \code{resources} function creates the MCP
+tools.}
 
-\item{initial_prompt}{Optional text prepended to delegated tasks}
+\item{initial_prompt}{Text sent ahead of every task delegated to this
+subagent.}
 
-\item{max_requests}{Optional non-negative whole-number sub-agent request limit}
+\item{max_requests}{Maximum model requests per delegation. The remaining
+budget of the lead's run also applies.}
 
-\item{permission_mode}{Optional permission mode. A child may keep the lead
-mode or narrow it to \code{"readonly"}; a \code{"full"} lead may select any mode.
-Use \code{disallowed_tools} and \code{max_requests} for additional limits.}
+\item{permission_mode}{Permission mode for the subagent; defaults to the
+lead's. It can otherwise only be \code{"readonly"}, unless the lead's mode is
+\code{"full"}. Use \code{disallowed_tools} and \code{max_requests} for finer limits.}
 }
 \value{
-A read-only \code{AgentDefinition} S7 object
+An \code{AgentDefinition} object.
 }
 \description{
-AgentDefinition describes a specialized agent that can be used by a lead
-agent to delegate tasks. It bundles together a system prompt, tools, and
-metadata about what the agent can do.
+Describe a subagent that a \link{LeadAgent} can delegate to: its name, a
+description the lead's model reads when choosing, a system prompt, tools
+and other settings. Each delegation creates a new subagent from the
+definition.
 }
 \details{
-This is a read-only S7 value. \code{agent_definition()} is an alias of
-\code{AgentDefinition()}; both construct the same class. Read fields with \code{$},
-\code{S7::prop()}, or \code{@}. \code{S7::props()} returns a plain property list for
-constructing a revised value. Canonical names, limits, and other fields
-cannot be changed after construction, including through LeadAgent snapshots.
+An \code{AgentDefinition} is read-only; read its fields with \code{$}. To change a
+field, build a new definition from \code{S7::props()}, as in the examples.
+\code{agent_definition()} and \code{AgentDefinition()} are the same function.
 
-Tools and read-only Skill values are composed directly. Executable tools
-nested in either value retain their closures, services, and caller-owned
-state without cloning. Read-only configuration does not freeze tool state.
-Use \code{\link[=agent_definition_write]{agent_definition_write()}} and
-\code{\link[=agent_definition_read]{agent_definition_read()}} with explicit host registries for portable YAML;
-\code{S7::props()} alone is not a portable serializer for executable objects.
+Tools and skills are stored as given, not copied, so a tool that keeps
+state in its closure shares that state wherever the definition is used. To
+save a definition as YAML, use \code{\link[=agent_definition_write]{agent_definition_write()}} and
+\code{\link[=agent_definition_read]{agent_definition_read()}}.
 }
 \examples{
 # Define a code review agent
@@ -106,7 +113,7 @@ do.call(agent_definition, fields)
 \dontrun{
 # Use with a lead agent
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   sub_agents = list(code_reviewer)
 )
 }

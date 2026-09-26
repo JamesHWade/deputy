@@ -2,30 +2,33 @@
 % Please edit documentation in R/errors.R
 \name{is_deputy_error}
 \alias{is_deputy_error}
-\title{Check if an object is a deputy error}
+\title{Check whether a condition is a Deputy error}
 \usage{
 is_deputy_error(x, class = NULL)
 }
 \arguments{
-\item{x}{Object to test}
+\item{x}{Object to test.}
 
-\item{class}{Optional specific error class to check for (without "deputy_" prefix)}
+\item{class}{Optional error class to check for, without the \code{"deputy_"}
+prefix, such as \code{"budget"}.}
 }
 \value{
-Logical indicating if \code{x} is a deputy error (of the specified class)
+\code{TRUE} if \code{x} has class \code{deputy_error} (and \verb{deputy_<class>} when
+\code{class} is given), otherwise \code{FALSE}.
 }
 \description{
-Tests whether an object is a deputy error condition.
+Tests whether \code{x} is an error signalled by Deputy, optionally of a specific
+class. See \link{deputy-errors} for the classes.
 }
 \examples{
 \dontrun{
-tryCatch(
-  abort_deputy("test"),
-  error = function(e) {
-    is_deputy_error(e)
-    # TRUE
-  }
+result <- tryCatch(
+  agent$run_sync("Summarise the logs"),
+  error = function(e) e
 )
+if (is_deputy_error(result, "budget")) {
+  message("A usage limit stopped the run.")
+}
 }
 
 }

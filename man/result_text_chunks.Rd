@@ -2,18 +2,17 @@
 % Please edit documentation in R/agent-result.R
 \name{result_text_chunks}
 \alias{result_text_chunks}
-\title{Inspect streamed text}
+\title{Get the streamed text chunks from a result}
 \usage{
 result_text_chunks(result)
 }
 \arguments{
-\item{result}{An \link{AgentResult} S7 value.}
+\item{result}{An \link{AgentResult}.}
 }
 \value{
-Character vector of text chunks; empty when none were emitted.
-Missing and non-character text payloads are ignored. Character-vector
-payloads are flattened in event order.
+A character vector of text chunks in order, or \code{character()} if
+there were none.
 }
 \description{
-Inspect streamed text
+Get the streamed text chunks from a result
 }

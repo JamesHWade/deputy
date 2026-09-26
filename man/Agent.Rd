@@ -2,63 +2,36 @@
 % Please edit documentation in R/agent.R
 \name{Agent}
 \alias{Agent}
-\title{Agent R6 Class}
+\title{Agent that runs tasks with tools}
 \description{
-The main class for creating AI agents that can use tools to accomplish tasks.
-Agent wraps an ellmer Chat object and adds agentic capabilities including
-multi-turn execution, permission enforcement, and streaming output.
+An \code{Agent} wraps an ellmer Chat and uses it to carry out tasks. The model can
+call tools over several turns while the agent applies permissions, hooks and
+usage limits and reports its progress as \link{AgentEvent} objects. Use
+\link{LeadAgent} when the agent should delegate work to subagents.
 
-\strong{Security Note:} Core agent fields are read-only from the public API after
-construction. Internal lifecycle methods may update the underlying state
-through private storage when required.
+An \code{Agent} also works as an ellmer Chat (\verb{$chat()}, \verb{$stream_async()},
+\verb{$get_turns()} and so on), so you can pass it to code that expects one, such
+as shinychat.
+
+Settings given to \verb{$new()}, such as \code{permissions}, \code{usage_limits} and
+\code{working_dir}, are read-only afterwards.
 }
-\section{Skill Methods}{
+\section{File checkpoints}{
 
-The following methods manage skills:
-
-\describe{
-\item{\verb{$load_skill(skill, allow_conflicts = FALSE)}}{Load a \link{Skill} into
-the agent. The \code{skill} parameter can be a Skill object or path to a
-skill directory. If \code{allow_conflicts} is FALSE (default), an error is
-thrown when skill tools conflict with existing tools. Set to TRUE to
-allow overwriting. Returns invisible self.}
-\item{\verb{$skills()}}{Get a named list of loaded \link{Skill} objects.}
-}
-}
-
-\section{MCP Methods}{
-
-The following methods manage MCP (Model Context Protocol) server tools:
-
-\describe{
-\item{\verb{$load_mcp(config = NULL, servers = NULL)}}{Load tools from MCP
-servers. The \code{config} parameter specifies the path to the MCP config
-file (defaults to \verb{~/.config/mcptools/config.json}). The \code{servers}
-parameter optionally filters to specific server names. Requires the
-mcptools package. Returns invisible self.}
-\item{\verb{$mcp_tools()}}{Get names of loaded MCP tools.}
-}
-}
-
-\section{File checkpoint methods}{
-
-When \code{enable_file_checkpointing = TRUE}, Deputy captures exact preimages for
-writes made through its native file tools.
-
-\describe{
-\item{\verb{$checkpoint(name = NULL, metadata = list())}}{Create a manual file
-checkpoint and return its checkpoint ID.}
-\item{\verb{$list_checkpoints()}}{List available file checkpoints.}
-\item{\verb{$rewind_files(checkpoint_id)}}{Restore files to a checkpoint and
-invalidate later file history. Conversation history is not changed.}
-}
+With \code{enable_file_checkpointing = TRUE}, the agent records the previous
+contents of files changed by \code{write_file}, \code{edit_file} and \code{multi_edit}.
+Changes made any other way, including by \code{run_r_code} or \code{run_bash}, are not
+recorded. A checkpoint is created at the start of every run, and
+\verb{$checkpoint()} creates one on demand. \verb{$rewind_files()} restores files to a
+checkpoint without changing the conversation. A file tool call that would
+exceed the checkpoint size limits is refused.
 }
 
 \examples{
 \dontrun{
 # Create an agent with file tools
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_file()
 )
 
@@ -97,23 +70,25 @@ agent$add_hook(HookMatcher(
 \section{Active bindings}{
   \if{html}{\out{<div class="r6-active-bindings">}}
   \describe{
-    \item{\code{agent_id}}{Stable Agent instance identifier. Read-only.}
+    \item{\code{agent_id}}{The agent's ID. Read-only.}
 
-    \item{\code{agent_name}}{Optional human-readable Agent name. Read-only.}
+    \item{\code{agent_name}}{The agent's name, or \code{NULL}. Read-only.}
 
-    \item{\code{run_context}}{Default canonical product context. Read-only.}
+    \item{\code{run_context}}{The \code{run_context} attached to every run. Read-only.}
 
     \item{\code{trusted_results}}{The \link{TrustedResults} policy, or \code{NULL}. Read-only.}
 
-    \item{\code{permissions}}{Permission policy for the agent. Read-only after construction.}
+    \item{\code{permissions}}{The agent's \link{Permissions}. Read-only; use
+\verb{$set_permission_mode()} to narrow them.}
 
-    \item{\code{usage_limits}}{Default per-run \link{UsageLimits}. Read-only after construction.}
+    \item{\code{usage_limits}}{The \link{UsageLimits} applied to each run. Read-only.}
 
-    \item{\code{context_policy}}{Automatic context-management policy. Read-only.}
+    \item{\code{context_policy}}{The agent's \link{ContextPolicy}. Read-only.}
 
-    \item{\code{working_dir}}{Working directory for file operations. Read-only after construction.}
+    \item{\code{working_dir}}{The directory file tools work in. Read-only.}
 
-    \item{\code{hooks}}{Hook registry for lifecycle events. Read-only after construction.}
+    \item{\code{hooks}}{The agent's \link{HookRegistry}. The field can't be replaced; add
+hooks with \verb{$add_hook()}.}
   }
   \if{html}{\out{</div>}}
 }
@@ -201,7 +176,7 @@ agent$add_hook(HookMatcher(
 \if{html}{\out{<a id="method-Agent-initialize"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-initialize}{}}}
 \subsection{\code{Agent$new()}}{
-  Create a new Agent.
+  Create a new agent.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$new(
@@ -231,57 +206,60 @@ agent$add_hook(HookMatcher(
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{chat}}{An ellmer Chat object created by \code{ellmer::chat()} or
-provider-specific functions like \code{ellmer::chat_openai()}.}
+      \item{\code{chat}}{An ellmer Chat, for example from \code{ellmer::chat()}.}
       \item{\code{tools}}{A list of tools created with \code{ellmer::tool()}. See
-\code{\link[=tools_file]{tools_file()}} and \code{\link[=tools_code]{tools_code()}} for built-in tool bundles.}
-      \item{\code{system_prompt}}{Optional system prompt. If provided, overrides the
-chat object's existing system prompt.}
-      \item{\code{permissions}}{A \link{Permissions} object controlling what the agent can do.
-Defaults to \code{\link[=permissions_standard]{permissions_standard()}}.}
-      \item{\code{usage_limits}}{\link{UsageLimits} applied independently to each run.
-Defaults to 25 model requests. Use \code{UsageLimits()} for no limits.}
+\code{\link[=tools_preset]{tools_preset()}}, \code{\link[=tools_file]{tools_file()}} and \code{\link[=tools_code]{tools_code()}} for built-in tools.}
+      \item{\code{system_prompt}}{Optional system prompt. Replaces the Chat's system
+prompt.}
+      \item{\code{permissions}}{A \link{Permissions} policy. Defaults to
+\code{\link[=permissions_standard]{permissions_standard()}} for \code{working_dir}.}
+      \item{\code{usage_limits}}{\link{UsageLimits} applied to each run separately.
+Defaults to 25 model requests per run. \code{UsageLimits()} sets no limits.}
       \item{\code{context_policy}}{A \link{ContextPolicy} controlling automatic compaction
-and durable offloading of large tool results.}
-      \item{\code{enable_file_checkpointing}}{Whether to journal exact file preimages
-for Deputy's mutating file tools. A checkpoint is created automatically
-at the beginning of every run.}
-      \item{\code{file_checkpoint_max_file_bytes}}{Maximum bytes captured for one
-file preimage. Defaults to 50 MiB.}
-      \item{\code{file_checkpoint_max_journal_bytes}}{Maximum aggregate serialized
-bytes for checkpoint records, markers, metadata, and pending captures.
-Defaults to 250 MiB.}
-      \item{\code{working_dir}}{Working directory for file operations. Defaults to
-current directory.}
-      \item{\code{session_id}}{Optional stable session identifier used for correlation.
-A unique identifier is generated by default.}
-      \item{\code{run_context}}{Immutable canonical JSON-compatible product context
-inherited by each run. Credential-like fields and runtime objects are
-rejected.}
-      \item{\code{agent_id}}{Optional stable identifier for this Agent instance.
-A unique identifier is generated by default.}
-      \item{\code{agent_name}}{Optional human-readable Agent name.}
-      \item{\code{fallback_chats}}{Ordered configured ellmer Chats, explicitly allowed
-to receive this conversation after a transient failure before any
-response. Templates are cloned; their connection/model settings are
-preserved and their history, system prompt, and tools are replaced by
-the Agent's. The selected Chat remains active for subsequent runs.
-Applies to governed task and structured requests. Pre-run automatic
-compaction retains the separate \link{ContextPolicy} summary-failure policy.}
-      \item{\code{approval_dir}}{Optional existing host-owned directory for durable tool
-approvals. Enables sequential tool execution and an execution journal.
-See \code{\link[=approval_read]{approval_read()}} and \verb{$resume_approval()}.}
-      \item{\code{delegation_scope}}{Plain host-owned scope for child disclosure.}
-      \item{\code{delegation_disclosure}}{Host-only \link{DelegationDisclosure}, deny by default.}
-      \item{\code{delegation_observation}}{Child activity bounds.}
-      \item{\code{trusted_results}}{Optional \link{TrustedResults} policy designating the
-only tools that produce each kind of host result. Fixed at construction;
-every published tool registry is checked against it.}
+and where large tool results are stored. The default compacts the
+conversation once it passes about 32,000 tokens.}
+      \item{\code{enable_file_checkpointing}}{If \code{TRUE}, record file changes so they
+can be undone with \verb{$rewind_files()}. See the "File checkpoints" section.}
+      \item{\code{file_checkpoint_max_file_bytes}}{Largest file, in bytes, whose
+previous contents a checkpoint can record. Defaults to 50 MiB.}
+      \item{\code{file_checkpoint_max_journal_bytes}}{Maximum total size, in bytes, of
+all checkpoint records. Defaults to 250 MiB.}
+      \item{\code{working_dir}}{Directory that file tools work in. Must exist.
+Defaults to the current directory.}
+      \item{\code{session_id}}{Optional session ID. One is generated if not given.}
+      \item{\code{run_context}}{Named list of JSON-compatible values (strings,
+numbers, logicals and nested lists) attached to every event and result,
+for example user or conversation IDs. Keys that look like credentials,
+such as \code{password} or \code{api_key}, are rejected.}
+      \item{\code{agent_id}}{Optional agent ID. One is generated if not given.}
+      \item{\code{agent_name}}{Optional human-readable name.}
+      \item{\code{fallback_chats}}{A list of ellmer Chats to try, in order, when a
+request fails with a transient error (a network failure or HTTP 408,
+429, 500, 502, 503 or 504) before the run has received any response or
+called any tool. Each must have no turns or tools; the agent copies it
+and gives it the agent's system prompt, history and tools. Once used, a
+fallback stays in use for later runs. Compaction summaries don't use
+these; see \code{summary_fallback_chats} in \code{\link[=ContextPolicy]{ContextPolicy()}}.}
+      \item{\code{approval_dir}}{A directory, which must already exist, where tool
+calls waiting for approval are saved, so you can decide them later
+with \verb{$resume_approval()}, even after restarting R. Tools that can wait
+for approval must be created with \code{ellmer::tool(convert = FALSE)}. When
+set, tools run one at a time. See \code{\link[=approval_read]{approval_read()}}.}
+      \item{\code{delegation_scope}}{Named list identifying what this agent belongs
+to, such as an owner or conversation ID. It is passed as \code{scope} to the
+\code{authorize} function of \code{delegation_disclosure}.}
+      \item{\code{delegation_disclosure}}{A \link{DelegationDisclosure} that decides who may
+inspect this agent's subagents. The default denies everyone.}
+      \item{\code{delegation_observation}}{A \link{DelegationObservation} setting how many
+subagent events are kept for \verb{$observe_subagents()}.}
+      \item{\code{trusted_results}}{Optional \link{TrustedResults} policy naming the one
+tool allowed to produce each type of trusted result. Registering a tool
+that could get around it is an error.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A new \code{Agent} object
+    A new \code{Agent} object.
   }
 }
 
@@ -289,16 +267,15 @@ every published tool registry is checked against it.}
 \if{html}{\out{<a id="method-Agent-retain_agent"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-retain_agent}{}}}
 \subsection{\code{Agent$retain_agent()}}{
-  Retain a specialist for explicit in-process follow-ups. The host transfers
-execution ownership to this Agent. Ordinary runs on the specialist reject
-until release. Its retained history, prompt, model, and tools cannot be
-changed through the specialist or another Agent sharing its Chat until
-the idle handle is released. Its tools and external resources remain
-host-owned. Retention replaces the Chat's tool callbacks with the
-specialist's governed runtime, preserving observers registered through
-that specialist's \verb{$on_tool_request()} and \verb{$on_tool_result()} methods.
-New observer registrations and hook configuration changes on the specialist
-or its aliases require release.
+  Retain another agent so you can send it more tasks with
+\verb{$continue_agent()}. The retained agent keeps its conversation between
+tasks.
+
+Until you call \verb{$release_agent()}, the retained agent can't be run
+directly, and its conversation, prompt, model, tools, hooks and tool
+observers can't be changed (observers it already has keep working). An
+agent can retain up to 32 others at a time. See
+\code{vignette("retained-agents", package = "deputy")}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$retain_agent(agent, usage_limits, max_runs = 32L)}
@@ -307,15 +284,16 @@ or its aliases require release.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{agent}}{A standalone Agent, with no durable approval or fallback.}
-      \item{\code{usage_limits}}{Explicit cumulative ceiling for the handle, or the
-allocation for one continuation. Both intersect the specialist and caller.}
-      \item{\code{max_runs}}{Finite retained invocation limit; default 32.}
+      \item{\code{agent}}{Another \code{Agent} (not a \code{LeadAgent}) with its own Chat and no
+\code{approval_dir}, \code{fallback_chats} or provider-native tools.}
+      \item{\code{usage_limits}}{\link{UsageLimits} for all of its tasks combined, also
+capped by the retained agent's own limits.}
+      \item{\code{max_runs}}{Maximum number of tasks. Defaults to 32.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    An opaque handle belonging only to this Agent.
+    A handle (a string) that only this agent can use.
   }
 }
 
@@ -323,11 +301,14 @@ allocation for one continuation. Both intersect the specialist and caller.}
 \if{html}{\out{<a id="method-Agent-retain_agent_graph"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-retain_agent_graph}{}}}
 \subsection{\code{Agent$retain_agent_graph()}}{
-  Retain a host-configured graph of curated Agents. One root owns all chats,
-budgets and descendant inspection. Limits accumulate until graph release.
-Root depth is zero; concurrency counts queued and running descendants,
-including callers waiting for their own children. Cycles may be configured,
-but calls into an active chat reject before dispatch.
+  Retain several agents at once and let them delegate to each other through
+tools you define in \code{routes}. This agent is the root of the graph and
+holds every conversation in it. The graph's usage limits add up across
+all delegated runs until you call \verb{$release_agent_graph()}.
+
+Routes may form a cycle, but delegating to an agent that is already
+running fails. An agent waiting on its own delegate still counts toward
+\code{max_concurrency}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$retain_agent_graph(
@@ -344,19 +325,26 @@ but calls into an active chat reject before dispatch.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{agents}}{Named list of distinct standalone Agents. \code{root} is reserved.}
-      \item{\code{routes}}{Named list keyed by \code{root} or an agent name. Each value is a
-named list of tools, each with \code{target}, \code{description} and \code{usage_limits}.}
-      \item{\code{usage_limits}}{Cumulative graph UsageLimits; max_requests is required.}
-      \item{\code{max_depth}}{Maximum descendant depth, with direct children at one.}
-      \item{\code{max_delegations}}{Maximum admitted invocations over the graph lifetime.}
-      \item{\code{max_concurrency}}{Maximum simultaneously admitted child invocations.}
-      \item{\code{max_runs}}{Maximum invocations of each retained conversation.}
+      \item{\code{agents}}{Named list of distinct agents, each meeting the conditions
+in \verb{$retain_agent()}. The name \code{root} is reserved for this agent.}
+      \item{\code{routes}}{Named list keyed by \code{root} or an agent name. Each element is
+a named list of delegation tools to add to that agent, where each tool
+is a list with \code{target} (an agent name), \code{description} and
+\code{usage_limits}.}
+      \item{\code{usage_limits}}{\link{UsageLimits} for the whole graph. \code{max_requests} is
+required.}
+      \item{\code{max_depth}}{Maximum delegation depth. This agent's direct delegates
+are at depth 1.}
+      \item{\code{max_delegations}}{Maximum number of delegations over the graph's
+lifetime.}
+      \item{\code{max_concurrency}}{Maximum number of delegations running at once.}
+      \item{\code{max_runs}}{Maximum number of tasks for each agent in the graph.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Named conversation handles, usable for explicit host follow-ups.
+    A named character vector of handles, one per agent, for use with
+\verb{$continue_agent()}.
   }
 }
 
@@ -364,14 +352,16 @@ named list of tools, each with \code{target}, \code{description} and \code{usage
 \if{html}{\out{<a id="method-Agent-delegation_graph_usage"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-delegation_graph_usage}{}}}
 \subsection{\code{Agent$delegation_graph_usage()}}{
-  Read cumulative graph usage, including active descendants.
+  Get the total usage of all delegated runs in this agent's
+graph, including runs still in progress. Errors if this agent doesn't own
+a graph.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$delegation_graph_usage()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    An AgentUsage value. This trusted host API grants no disclosure.
+    An \link{AgentUsage} object.
   }
 }
 
@@ -379,16 +369,17 @@ named list of tools, each with \code{target}, \code{description} and \code{usage
 \if{html}{\out{<a id="method-Agent-release_agent_graph"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-release_agent_graph}{}}}
 \subsection{\code{Agent$release_agent_graph()}}{
-  Release an idle graph, removing its route tools and handles.
-Borrowed tools and resources remain host-owned. Export inspection first.
-A new graph is a new host authorization; models cannot reset its budgets.
+  Release the graph, removing its route tools and handles.
+Errors if anything in it is still running. This also discards the
+graph's delegation records, so save them first with \verb{$export_subagents()}
+if you need them. The agents' own tools and connections are left open.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$release_agent_graph()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible NULL.
+    \code{NULL}, invisibly.
   }
 }
 
@@ -396,11 +387,11 @@ A new graph is a new host authorization; models cannot reset its budgets.
 \if{html}{\out{<a id="method-Agent-continue_agent_async"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-continue_agent_async}{}}}
 \subsection{\code{Agent$continue_agent_async()}}{
-  Continue a retained specialist with a new brief and explicit allocation.
-Failed and cancelled conversations require this explicit call to restart.
-Busy, changed, released and foreign conversations reject before dispatch.
-Hosts authorize control calls; a handle alone grants no access on another
-Agent. The returned promise is the wait handle and has one runtime consumer.
+  Send a retained agent its next task. It still has its earlier
+conversation. This errors, before any request is made, if the agent is
+busy, was changed or released, has used up \code{max_runs}, or the handle
+belongs to another agent. After a failed or cancelled task, call this
+again to carry on.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$continue_agent_async(handle, task, usage_limits)}
@@ -409,15 +400,18 @@ Agent. The returned promise is the wait handle and has one runtime consumer.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{handle}}{An owner-local handle from \verb{$retain_agent()}.}
-      \item{\code{task}}{A new bounded plain-text brief. Existing history is retained.}
-      \item{\code{usage_limits}}{Explicit \link{UsageLimits} allocation for this invocation.}
+      \item{\code{handle}}{A handle from this agent's \verb{$retain_agent()} or
+\verb{$retain_agent_graph()}.}
+      \item{\code{task}}{The next task, as one string of at most 64 KiB.}
+      \item{\code{usage_limits}}{\link{UsageLimits} for this task. It is also capped by
+what remains of the handle's total budget and by the retained agent's
+own limits.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Promise resolving to an AgentResult. Cancellation before dispatch
-returns zero usage and no run ID because no child run started.
+    A promise that resolves to an \link{AgentResult}. If the task is
+cancelled before it starts, the result has zero usage and no run ID.
   }
 }
 
@@ -439,7 +433,7 @@ returns zero usage and no run ID because no child run started.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    An AgentResult.
+    An \link{AgentResult}.
   }
 }
 
@@ -447,8 +441,9 @@ returns zero usage and no run ID because no child run started.
 \if{html}{\out{<a id="method-Agent-cancel_agent"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-cancel_agent}{}}}
 \subsection{\code{Agent$cancel_agent()}}{
-  Cancel the active retained invocation cooperatively. Repeated calls are
-harmless; cancellation retains partial history and does not restart work.
+  Ask a retained agent to stop its current task. The run stops at the next
+safe point and keeps the conversation so far. Calling this more than once
+is harmless.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$cancel_agent(handle, reason = "interrupted")}
@@ -457,13 +452,14 @@ harmless; cancellation retains partial history and does not restart work.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{handle}}{Owner-local conversation handle.}
-      \item{\code{reason}}{Stable cancellation reason.}
+      \item{\code{handle}}{A handle from \verb{$retain_agent()}.}
+      \item{\code{reason}}{Stop reason recorded on the cancelled run.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible logical indicating whether cancellation was requested.
+    \code{TRUE}, invisibly, if a task was cancelled; \code{FALSE} if the agent
+was idle.
   }
 }
 
@@ -471,11 +467,12 @@ harmless; cancellation retains partial history and does not restart work.
 \if{html}{\out{<a id="method-Agent-release_agent"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-release_agent}{}}}
 \subsection{\code{Agent$release_agent()}}{
-  Release an idle handle and its retained invocation snapshots. Export
-inspection history first if needed. Borrowed tools are never closed.
-Busy handles must be cancelled and awaited first. Release is explicit;
-handles otherwise live until their owning Agent is collected. Neither
-handles nor saved transcripts promise recovery after an R restart.
+  Stop retaining an agent so it can be used on its own again. This also
+discards its delegation records, so save them first with
+\verb{$export_subagents()} if you need them. Its tools and connections stay
+open. Errors while the agent is running: cancel it with \verb{$cancel_agent()}
+and wait for the task to end first. Agents in a graph are released with
+\verb{$release_agent_graph()}. Handles don't survive an R restart.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$release_agent(handle)}
@@ -484,12 +481,12 @@ handles nor saved transcripts promise recovery after an R restart.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{handle}}{Owner-local conversation handle.}
+      \item{\code{handle}}{A handle from \verb{$retain_agent()}.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible NULL.
+    \code{NULL}, invisibly.
   }
 }
 
@@ -497,23 +494,24 @@ handles nor saved transcripts promise recovery after an R restart.
 \if{html}{\out{<a id="method-Agent-list_subagents"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-list_subagents}{}}}
 \subsection{\code{Agent$list_subagents()}}{
-  List admitted subagent delegations in admission order, including live work.
-Status is \code{queued}, \code{running}, \code{completed}, \code{failed}, \code{stopped},
-\code{not_started}, or \code{suspended} (for supported approval suspensions).
-\code{completed} means the run stopped with \code{complete}, not verified task success.
-\code{stop_reason} retains the exact runtime reason. Identifiers and timestamps
-are \code{NA} until assigned. \code{completed_at} marks settlement of this invocation,
-including suspension. \code{hook_error} records observer errors independently.
-\code{input_error} identifies preparation rejection as \code{invalid}, \code{missing},
-\code{stale}, \code{unauthorized}, or \code{oversized}. These in-memory records are not
-durable jobs or a token event feed.
+  List this agent's delegations, oldest first, including ones still
+running. The records are kept in memory only.
+
+\code{status} is \code{"queued"}, \code{"running"}, \code{"completed"}, \code{"failed"},
+\code{"stopped"}, \code{"not_started"} or \code{"suspended"} (waiting for a tool
+approval). \code{"completed"} means the subagent finished normally, not that
+it did the task well; \code{stop_reason} gives the exact reason. IDs and times
+are \code{NA} until known, and \code{completed_at} is set when the run ends or is
+suspended. \code{input_error} says why a task was rejected before it ran:
+\code{"invalid"}, \code{"missing"}, \code{"stale"}, \code{"unauthorized"} or \code{"oversized"}.
+\code{hook_error} records errors from hooks watching the subagent.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$list_subagents()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Data frame with one row per admitted delegation
+    A data frame with one row per delegation.
   }
 }
 
@@ -521,7 +519,7 @@ durable jobs or a token event feed.
 \if{html}{\out{<a id="method-Agent-get_subagent_results"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_subagent_results}{}}}
 \subsection{\code{Agent$get_subagent_results()}}{
-  Get retained results from delegated sub-agent runs.
+  Get the results of delegated runs.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_subagent_results(agent_name = NULL, delegation_id = NULL)}
@@ -530,14 +528,15 @@ durable jobs or a token event feed.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{agent_name}}{Optional sub-agent name filter}
-      \item{\code{delegation_id}}{Optional delegation identifier filter}
+      \item{\code{agent_name}}{Only return results from subagents with this name.}
+      \item{\code{delegation_id}}{Only return the result of this delegation.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    List of \link{AgentResult} objects in admission order, with \code{NULL} for
-live, unstarted, or failed runs that did not return an AgentResult
+    A list of \link{AgentResult} objects, oldest first. It holds \code{NULL}
+for runs that are still going, never started, or failed without a
+result.
   }
 }
 
@@ -545,10 +544,10 @@ live, unstarted, or failed runs that did not return an AgentResult
 \if{html}{\out{<a id="method-Agent-get_subagent_messages"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_subagent_messages}{}}}
 \subsection{\code{Agent$get_subagent_messages()}}{
-  Get current or retained conversation turns for admitted delegations.
-Live snapshots contain available turns, not every in-flight token.
-Reading history does not add it to the lead's model context. Hosts must
-authorize and redact disclosures before exposing these records to users.
+  Get the conversation turns of each delegation. For a subagent that is
+still running, you get the turns completed so far. Reading them doesn't
+add anything to this agent's context. No disclosure checks are applied,
+so use \verb{$inspect_subagents()} before showing history to users.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_subagent_messages(agent_name = NULL, session_id = NULL)}
@@ -557,13 +556,14 @@ authorize and redact disclosures before exposing these records to users.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{agent_name}}{Optional sub-agent name filter}
-      \item{\code{session_id}}{Optional sub-agent session id filter}
+      \item{\code{agent_name}}{Only return turns from subagents with this name.}
+      \item{\code{session_id}}{Only return turns from the subagent with this session
+ID.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    List of turn histories
+    A list with one list of ellmer turns per delegation.
   }
 }
 
@@ -571,10 +571,9 @@ authorize and redact disclosures before exposing these records to users.
 \if{html}{\out{<a id="method-Agent-get_subagent_contexts"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_subagent_contexts}{}}}
 \subsection{\code{Agent$get_subagent_contexts()}}{
-  Inspect initial manifests or current model context in admission order.
-Initial manifests are immutable preparation receipts, separate from
-current working context and retained conversation turns. No provider
-requests or tool calls occur during inspection. Hosts authorize disclosure.
+  See what each subagent was given at the start, or what its model context
+holds now, oldest first. Nothing is sent to a model. No disclosure checks
+are applied.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_subagent_contexts(
@@ -587,18 +586,19 @@ requests or tool calls occur during inspection. Hosts authorize disclosure.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{delegation_id}}{Optional exact delegation identifier.}
-      \item{\code{view}}{\code{"initial"} for \link{DelegationManifest} values, \code{"current"} for
-available system prompts and working turns.}
-      \item{\code{redact}}{For initial manifests only, return an explicitly redacted
-portable view omitting task, instructions and source text. Metadata still
-requires host disclosure policy. The retained manifest is unchanged.}
+      \item{\code{delegation_id}}{Only return this delegation.}
+      \item{\code{view}}{\code{"initial"} returns the \link{DelegationManifest} recording what
+the subagent started with. \code{"current"} returns a list with its
+\code{system_prompt} and the \code{turns} in its model context.}
+      \item{\code{redact}}{If \code{TRUE} (only with \code{view = "initial"}), leave out the
+task, instructions and source text. Other metadata is still included.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A list; \code{NULL} entries mean no prepared context is available.
-Current context is retained at settlement; no matches returns \code{list()}.
+    A list with one entry per delegation, \code{NULL} where nothing is
+available. For a finished subagent, \code{"current"} shows its context when
+it finished.
   }
 }
 
@@ -606,7 +606,8 @@ Current context is retained at settlement; no matches returns \code{list()}.
 \if{html}{\out{<a id="method-Agent-observe_subagents"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-observe_subagents}{}}}
 \subsection{\code{Agent$observe_subagents()}}{
-  Observe bounded child activity without consuming or driving its stream.
+  Follow subagent activity as it happens. The returned subscription lets
+you poll for new events without affecting the subagents' runs.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$observe_subagents(requester, delegation_id = NULL, after = NULL)}
@@ -615,15 +616,18 @@ Current context is retained at settlement; no matches returns \code{list()}.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{requester}}{Host-authenticated request context.}
-      \item{\code{delegation_id}}{Optional child locator filter.}
-      \item{\code{after}}{Optional cursor returned by a subscription on this lead.}
+      \item{\code{requester}}{Whoever is asking, as identified by your app (for
+example a user ID). The \code{delegation_disclosure} policy checks it on
+every read.}
+      \item{\code{delegation_id}}{Only follow this delegation.}
+      \item{\code{after}}{A cursor from an earlier subscription on this agent, to
+resume from. \code{NULL} starts from now.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A \link{DelegationSubscription}. Snapshot, observation, cancellation
-and continuation are distinct operations. Closing it only detaches.
+    A \link{DelegationSubscription}. Closing it stops observing but
+doesn't stop any subagent.
   }
 }
 
@@ -631,9 +635,10 @@ and continuation are distinct operations. Closing it only detaches.
 \if{html}{\out{<a id="method-Agent-interrupt_subagent"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-interrupt_subagent}{}}}
 \subsection{\code{Agent$interrupt_subagent()}}{
-  Ask one child to stop cooperatively. This trusted host control API is
-separate from disclosure authorization; hosts must authorize the action
-before routing a user request here. It is never exposed as an agent tool.
+  Ask a running subagent to stop. It stops at the next safe point; in a
+delegation graph, its own delegations stop too. This doesn't consult
+\code{delegation_disclosure}, so check that the user may do this before
+calling it. Models can't call this method.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$interrupt_subagent(delegation_id, reason = "interrupted")}
@@ -642,13 +647,14 @@ before routing a user request here. It is never exposed as an agent tool.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{delegation_id}}{Exact admitted child locator.}
-      \item{\code{reason}}{Stable stop reason, default \code{"interrupted"}.}
+      \item{\code{delegation_id}}{The delegation to stop.}
+      \item{\code{reason}}{Stop reason to record. Defaults to \code{"interrupted"}.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible logical; FALSE for missing or already settled children.
+    \code{TRUE}, invisibly, if a run was stopped; \code{FALSE} if the
+delegation is unknown or already finished.
   }
 }
 
@@ -656,10 +662,12 @@ before routing a user request here. It is never exposed as an agent tool.
 \if{html}{\out{<a id="method-Agent-inspect_subagents"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-inspect_subagents}{}}}
 \subsection{\code{Agent$inspect_subagents()}}{
-  Inspect authorized child snapshots without executing or changing context.
-Runtime facts, model claims, per-run usage, retained transcript and initial
-manifest are separate. Retained conversations also report cumulative
-usage across invocations. Unknown usage is NULL.
+  Get a snapshot of each delegation that \code{requester} may see: its task, its
+outcome (what Deputy observed, kept apart from what the subagent
+claimed), usage, the \link{DelegationManifest} it started from and any errors.
+Retained agents also report their total usage across tasks; unknown usage
+is \code{NULL}. Each view passes through the \code{delegation_disclosure} policy,
+which may redact it. Errors if \code{requester} isn't allowed. Nothing is run.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$inspect_subagents(requester, delegation_id = NULL, transcript = FALSE)}
@@ -668,17 +676,19 @@ usage across invocations. Unknown usage is NULL.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{requester}}{Host-authenticated request context, never model arguments.}
-      \item{\code{delegation_id}}{Optional exact delegation locator, checked only after
-disclosure authorization. Unknown IDs return an empty list.}
-      \item{\code{transcript}}{Include public ellmer content records and replayed
-\code{turns}. Hidden thinking, provider JSON and display closures are omitted.}
+      \item{\code{requester}}{Whoever is asking, as identified by your app. Never pass
+values that came from a model.}
+      \item{\code{delegation_id}}{Only return this delegation. Unknown IDs give an
+empty list.}
+      \item{\code{transcript}}{If \code{TRUE}, also include the conversation, as
+\code{transcript} records and as ellmer \code{turns}. Hidden reasoning and raw
+provider data are left out.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Authorized and redacted read-only view lists. These are snapshots;
-modifying a returned list never changes the child or lead context.
+    A list of views, one per delegation. Changing them doesn't
+affect any agent.
   }
 }
 
@@ -686,8 +696,9 @@ modifying a returned list never changes the child or lead context.
 \if{html}{\out{<a id="method-Agent-export_subagents"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-export_subagents}{}}}
 \subsection{\code{Agent$export_subagents()}}{
-  Export authorized settled child history for host-owned durable storage.
-This is observation history, not a resumable Agent/session snapshot.
+  Export finished delegations, with their conversations, so you can store
+them and view them later with \code{\link[=delegation_history]{delegation_history()}}. The export is a
+record to read, not something you can resume.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$export_subagents(requester, delegation_id = NULL)}
@@ -701,9 +712,9 @@ This is observation history, not a resumable Agent/session snapshot.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Portable versioned list for \code{\link[=delegation_history]{delegation_history()}}. Export rejects
-active selected children. The host supplies current disclosure policy
-when reading it back. Only public ellmer records are retained.
+    A plain list for \code{\link[=delegation_history]{delegation_history()}}. Errors if a selected
+delegation is still running. Reading it back checks a
+\link{DelegationDisclosure} again.
   }
 }
 
@@ -711,7 +722,8 @@ when reading it back. Only public ellmer records are retained.
 \if{html}{\out{<a id="method-Agent-read_subagent_result"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-read_subagent_result}{}}}
 \subsection{\code{Agent$read_subagent_result()}}{
-  Read an authorized retained delegation-answer artifact.
+  Read part of a large result that a subagent saved, using a reference
+from its \verb{$inspect_subagents()} view. No tool or model is run.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$read_subagent_result(requester, delegation_id, reference, offset = 0L)}
@@ -721,14 +733,15 @@ when reading it back. Only public ellmer records are retained.
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{requester, delegation_id}}{See \verb{$inspect_subagents()}.}
-      \item{\code{reference}}{An exact reference included in the redacted authorized
-child view. Missing or expired artifacts fail explicitly.}
-      \item{\code{offset}}{Character offset for a bounded chunk, starting at zero.}
+      \item{\code{reference}}{A reference exactly as it appears in the delegation's
+view. Errors if it isn't there or the saved result is gone.}
+      \item{\code{offset}}{Character position to start reading from, starting at 0.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Existing bounded tool-result chunk; no tool or model executes.
+    The view after redaction: a list whose \code{result} holds up to
+8,192 characters from \code{offset}, with the next offset and total length.
   }
 }
 
@@ -736,11 +749,12 @@ child view. Missing or expired artifacts fail explicitly.}
 \if{html}{\out{<a id="method-Agent-run"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-run}{}}}
 \subsection{\code{Agent$run()}}{
-  Run an agentic task with semantic streaming events.
+  Run a task and stream its progress.
 
 Returns a generator that yields \link{AgentEvent} objects as the agent works.
-The agent will continue until the task is complete, a run limit is
-reached, or it is interrupted.
+The run continues until the model finishes, a usage limit is reached or
+it is interrupted. The \code{"stop"} event gives the reason, and \verb{$last_run()}
+then returns the \link{AgentResult}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$run(
@@ -757,24 +771,31 @@ reached, or it is interrupted.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{task}}{The task for the agent to perform}
-      \item{\code{usage_limits}}{Optional \link{UsageLimits} override for this run.}
-      \item{\code{include_partial_messages}}{If TRUE (default), yield partial text
-chunks as they stream. If FALSE, only yield \code{text_complete}.}
-      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
-for this run. Protected constructor identity fields cannot change.}
-      \item{\code{type}}{Optional ellmer type. Complete the task with tools, then
-extract from the conversation within the same run budget.}
-      \item{\code{validate}}{Optional synchronous function receiving ellmer's value.
-Return TRUE, FALSE, or non-empty correction feedback. Errors and NA
-are terminal.}
-      \item{\code{max_corrections}}{Maximum additional structured requests after
-invalid output. Defaults to zero; all attempts share the run budget.}
+      \item{\code{task}}{The task for the agent.}
+      \item{\code{usage_limits}}{\link{UsageLimits} for this run. \code{NULL} fields use the
+agent's limits.}
+      \item{\code{include_partial_messages}}{If \code{TRUE} (the default), yield a \code{"text"}
+event for each streamed chunk. If \code{FALSE}, skip them; the full text
+still arrives in the \code{"text_complete"} event.}
+      \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
+this run. It can't change or remove ID fields (keys ending in \code{id})
+that the agent already sets.}
+      \item{\code{type}}{Optional ellmer type, such as \code{ellmer::type_object()}. After
+the task, the agent extracts data of this type from the conversation
+into the result's \code{structured_output}. This counts toward the run's
+limits.}
+      \item{\code{validate}}{Optional function that checks the extracted value. Return
+\code{TRUE} to accept it, or \code{FALSE} or a message to reject it; a message is
+sent to the model as feedback. An error or any other return value, such
+as \code{NA}, ends the run with an error.}
+      \item{\code{max_corrections}}{How many times to ask the model to fix a rejected
+value. Defaults to 0. If the value is still rejected, the run errors.
+Every attempt counts toward the run's limits.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A generator yielding \link{AgentEvent} objects
+    A generator yielding \link{AgentEvent} objects.
   }
 }
 
@@ -782,10 +803,10 @@ invalid output. Defaults to zero; all attempts share the run budget.}
 \if{html}{\out{<a id="method-Agent-run_sync"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-run_sync}{}}}
 \subsection{\code{Agent$run_sync()}}{
-  Run an agentic task and block until completion.
+  Run a task and wait for it to finish.
 
-Convenience wrapper around \code{run()} that collects all events and returns
-an \link{AgentResult}.
+Runs \verb{$run()} to the end and returns the \link{AgentResult}, which holds
+every event.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$run_sync(
@@ -802,24 +823,29 @@ an \link{AgentResult}.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{task}}{The task for the agent to perform}
-      \item{\code{usage_limits}}{Optional \link{UsageLimits} override for this run.}
-      \item{\code{include_partial_messages}}{If TRUE (default), keep partial text
-events. If FALSE, suppress partials.}
-      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
-for this run. Protected constructor identity fields cannot change.}
-      \item{\code{type}}{Optional ellmer type. Complete the task with tools, then
-extract from the conversation within the same run budget.}
-      \item{\code{validate}}{Optional synchronous function receiving ellmer's value.
-Return TRUE, FALSE, or non-empty correction feedback. Errors and NA
-are terminal.}
-      \item{\code{max_corrections}}{Maximum additional structured requests after
-invalid output. Defaults to zero; all attempts share the run budget.}
+      \item{\code{task}}{The task for the agent.}
+      \item{\code{usage_limits}}{\link{UsageLimits} for this run. \code{NULL} fields use the
+agent's limits.}
+      \item{\code{include_partial_messages}}{Passed to \verb{$run()}. It doesn't change the
+returned result, which always includes the \code{"text"} events.}
+      \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
+this run. It can't change or remove ID fields (keys ending in \code{id})
+that the agent already sets.}
+      \item{\code{type}}{Optional ellmer type, such as \code{ellmer::type_object()}. After
+the task, the agent extracts data of this type from the conversation
+into \code{result$structured_output}. This counts toward the run's limits.}
+      \item{\code{validate}}{Optional function that checks the extracted value. Return
+\code{TRUE} to accept it, or \code{FALSE} or a message to reject it; a message is
+sent to the model as feedback. An error or any other return value, such
+as \code{NA}, ends the run with an error.}
+      \item{\code{max_corrections}}{How many times to ask the model to fix a rejected
+value. Defaults to 0. If the value is still rejected, the run errors.
+Every attempt counts toward the run's limits.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    An \link{AgentResult} object
+    An \link{AgentResult} object.
   }
 }
 
@@ -827,10 +853,9 @@ invalid output. Defaults to zero; all attempts share the run budget.}
 \if{html}{\out{<a id="method-Agent-chat"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-chat}{}}}
 \subsection{\code{Agent$chat()}}{
-  Send messages synchronously using the ellmer Chat interface.
-
-All requests pass through Deputy's run kernel. The return value matches
-\code{ellmer::Chat$chat()}; inspect \link{AgentResult} metadata with \verb{$last_run()}.
+  Send a message and return the reply, like \code{ellmer::Chat$chat()}, with the
+agent's tools, permissions, hooks and usage limits applied. \verb{$last_run()}
+then returns the full \link{AgentResult}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$chat(..., echo = NULL, run_context = list())}
@@ -839,15 +864,16 @@ All requests pass through Deputy's run kernel. The return value matches
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{...}}{User content accepted by ellmer.}
-      \item{\code{echo}}{Accepted for ellmer compatibility.}
-      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
-for this run.}
+      \item{\code{...}}{Message content, as for ellmer.}
+      \item{\code{echo}}{Print the reply unless this is \code{"none"} or \code{FALSE}. Defaults
+to \code{getOption("ellmer_echo", "none")}.}
+      \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
+this run.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    The final assistant text.
+    The reply text.
   }
 }
 
@@ -855,7 +881,7 @@ for this run.}
 \if{html}{\out{<a id="method-Agent-chat_async"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-chat_async}{}}}
 \subsection{\code{Agent$chat_async()}}{
-  Send messages asynchronously using the ellmer Chat interface.
+  Asynchronous version of \verb{$chat()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$chat_async(
@@ -868,16 +894,16 @@ for this run.}
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{...}}{User content accepted by ellmer.}
-      \item{\code{tool_mode}}{Whether ellmer executes tool calls concurrently or
-sequentially.}
-      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
-for this run.}
+      \item{\code{...}}{Message content, as for ellmer.}
+      \item{\code{tool_mode}}{\code{"concurrent"} runs the tool calls from one response in
+parallel; \code{"sequential"} runs them one at a time.}
+      \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
+this run.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A promise resolving to the final assistant text.
+    A promise that resolves to the reply text.
   }
 }
 
@@ -885,7 +911,9 @@ for this run.}
 \if{html}{\out{<a id="method-Agent-chat_structured"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-chat_structured}{}}}
 \subsection{\code{Agent$chat_structured()}}{
-  Send a structured request through the governed run kernel.
+  Extract structured data, like
+\code{ellmer::Chat$chat_structured()}, with the agent's permissions, hooks and
+usage limits applied.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$chat_structured(
@@ -902,22 +930,26 @@ for this run.}
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{...}}{User content accepted by ellmer.}
-      \item{\code{type}}{An ellmer structured-output type.}
-      \item{\code{echo}}{Echo mode forwarded to ellmer.}
-      \item{\code{convert}}{Whether ellmer converts the structured response.}
-      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
-for this run.}
-      \item{\code{validate}}{Optional synchronous function receiving ellmer's value.
-Return TRUE, FALSE, or non-empty correction feedback. Errors and NA
-are terminal.}
-      \item{\code{max_corrections}}{Maximum additional structured requests after
-invalid output. Defaults to zero; all attempts share the run budget.}
+      \item{\code{...}}{Message content, as for ellmer.}
+      \item{\code{type}}{An ellmer type describing the data, such as
+\code{ellmer::type_object()}.}
+      \item{\code{echo}}{Passed to ellmer.}
+      \item{\code{convert}}{Passed to ellmer: whether to convert the result to R
+objects.}
+      \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
+this run.}
+      \item{\code{validate}}{Optional function that checks the extracted value. Return
+\code{TRUE} to accept it, or \code{FALSE} or a message to reject it; a message is
+sent to the model as feedback. An error or any other return value, such
+as \code{NA}, ends the run with an error.}
+      \item{\code{max_corrections}}{How many times to ask the model to fix a rejected
+value. Defaults to 0. If the value is still rejected, the run errors.
+Every attempt counts toward the usage limits.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Structured response data.
+    The extracted data.
   }
 }
 
@@ -925,7 +957,7 @@ invalid output. Defaults to zero; all attempts share the run budget.}
 \if{html}{\out{<a id="method-Agent-chat_structured_async"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-chat_structured_async}{}}}
 \subsection{\code{Agent$chat_structured_async()}}{
-  Send an asynchronous structured request through Deputy.
+  Asynchronous version of \verb{$chat_structured()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$chat_structured_async(
@@ -942,22 +974,26 @@ invalid output. Defaults to zero; all attempts share the run budget.}
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{...}}{User content accepted by ellmer.}
-      \item{\code{type}}{An ellmer structured-output type.}
-      \item{\code{echo}}{Echo mode forwarded to ellmer.}
-      \item{\code{convert}}{Whether ellmer converts the structured response.}
-      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
-for this run.}
-      \item{\code{validate}}{Optional synchronous function receiving ellmer's value.
-Return TRUE, FALSE, or non-empty correction feedback. Errors and NA
-are terminal.}
-      \item{\code{max_corrections}}{Maximum additional structured requests after
-invalid output. Defaults to zero; all attempts share the run budget.}
+      \item{\code{...}}{Message content, as for ellmer.}
+      \item{\code{type}}{An ellmer type describing the data, such as
+\code{ellmer::type_object()}.}
+      \item{\code{echo}}{Passed to ellmer.}
+      \item{\code{convert}}{Passed to ellmer: whether to convert the result to R
+objects.}
+      \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
+this run.}
+      \item{\code{validate}}{Optional function that checks the extracted value. Return
+\code{TRUE} to accept it, or \code{FALSE} or a message to reject it; a message is
+sent to the model as feedback. An error or any other return value, such
+as \code{NA}, ends the run with an error.}
+      \item{\code{max_corrections}}{How many times to ask the model to fix a rejected
+value. Defaults to 0. If the value is still rejected, the run errors.
+Every attempt counts toward the usage limits.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A promise resolving to structured response data.
+    A promise that resolves to the extracted data.
   }
 }
 
@@ -965,7 +1001,8 @@ invalid output. Defaults to zero; all attempts share the run budget.}
 \if{html}{\out{<a id="method-Agent-stream"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-stream}{}}}
 \subsection{\code{Agent$stream()}}{
-  Stream synchronously using the ellmer Chat interface.
+  Stream a reply, like \code{ellmer::Chat$stream()}, with the agent's
+permissions, hooks and usage limits applied.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$stream(
@@ -980,18 +1017,20 @@ invalid output. Defaults to zero; all attempts share the run budget.}
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{...}}{User content accepted by ellmer.}
-      \item{\code{stream}}{Yield text or semantic ellmer content.}
+      \item{\code{...}}{Message content, as for ellmer.}
+      \item{\code{stream}}{\code{"text"} yields text chunks; \code{"content"} yields ellmer
+content objects, including tool requests and results.}
       \item{\code{controller}}{Optional ellmer stream controller.}
-      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
-for this run.}
-      \item{\code{type}}{Optional ellmer type for native structured streaming.
-Providers requiring schema-tool fallback must use \code{chat_structured()}.}
+      \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
+this run.}
+      \item{\code{type}}{Optional ellmer type for structured streaming, passed to
+ellmer. If the provider can't stream structured output, use
+\verb{$chat_structured()} instead.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A synchronous generator.
+    A generator.
   }
 }
 
@@ -999,11 +1038,9 @@ Providers requiring schema-tool fallback must use \code{chat_structured()}.}
 \if{html}{\out{<a id="method-Agent-stream_async"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-stream_async}{}}}
 \subsection{\code{Agent$stream_async()}}{
-  Stream asynchronously using the ellmer Chat interface.
-
-This is the primary interface for shinychat. It returns the same content
-stream as ellmer while enforcing Deputy permissions, hooks, limits,
-workspace resolution, context management, and run accounting.
+  Asynchronous version of \verb{$stream()}. This is the method shinychat uses:
+the stream is the same as ellmer's, with the agent's permissions, hooks,
+usage limits and compaction applied.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$stream_async(
@@ -1019,16 +1056,18 @@ workspace resolution, context management, and run accounting.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{...}}{User content accepted by ellmer, including shinychat's list of
-attachment-enabled \code{Content} objects.}
-      \item{\code{tool_mode}}{Whether ellmer executes tool calls concurrently or
-sequentially.}
-      \item{\code{stream}}{Yield text or semantic ellmer content.}
+      \item{\code{...}}{Message content, as for ellmer, including the attachment
+\code{Content} objects that shinychat sends.}
+      \item{\code{tool_mode}}{\code{"concurrent"} runs the tool calls from one response in
+parallel; \code{"sequential"} runs them one at a time.}
+      \item{\code{stream}}{\code{"text"} yields text chunks; \code{"content"} yields ellmer
+content objects, including tool requests and results.}
       \item{\code{controller}}{Optional ellmer stream controller.}
-      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
-for this run.}
-      \item{\code{type}}{Optional ellmer type for native structured streaming.
-Providers requiring schema-tool fallback must use \code{chat_structured()}.}
+      \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
+this run.}
+      \item{\code{type}}{Optional ellmer type for structured streaming, passed to
+ellmer. If the provider can't stream structured output, use
+\verb{$chat_structured()} instead.}
     }
     \if{html}{\out{</div>}}
   }
@@ -1041,14 +1080,14 @@ Providers requiring schema-tool fallback must use \code{chat_structured()}.}
 \if{html}{\out{<a id="method-Agent-last_run"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-last_run}{}}}
 \subsection{\code{Agent$last_run()}}{
-  Return the most recently completed governed run.
+  Get the result of the most recent run.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$last_run()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    An \link{AgentResult}, or \code{NULL} before the first run completes.
+    An \link{AgentResult}, or \code{NULL} before the first run finishes.
   }
 }
 
@@ -1056,15 +1095,14 @@ Providers requiring schema-tool fallback must use \code{chat_structured()}.}
 \if{html}{\out{<a id="method-Agent-last_compaction"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-last_compaction}{}}}
 \subsection{\code{Agent$last_compaction()}}{
-  Return the most recent compaction outcome.
+  Get the result of the most recent compaction.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$last_compaction()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A read-only \link{DeputyCompaction} S7 value, or \code{NULL} before
-compaction occurs.
+    A \link{DeputyCompaction}, or \code{NULL} if there hasn't been one.
   }
 }
 
@@ -1072,7 +1110,8 @@ compaction occurs.
 \if{html}{\out{<a id="method-Agent-resolve_tool_result"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-resolve_tool_result}{}}}
 \subsection{\code{Agent$resolve_tool_result()}}{
-  Resolve a durable tool-result reference.
+  Get the full value of a large tool result that was saved
+outside the model context.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$resolve_tool_result(reference)}
@@ -1081,16 +1120,14 @@ compaction occurs.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{reference}}{A \verb{deputy://tool-result/...} URI or reference text
-emitted into model context.}
+      \item{\code{reference}}{A \verb{deputy://tool-result/...} reference, or text
+containing one, such as the placeholder the model saw.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    The complete stored R value. Content evidence offloaded during
-compaction uses its public text representation.
-Compaction may retire superseded internal catalog URIs after installing
-their replacement; saved sessions retain their catalog snapshots.
+    The stored R value. ellmer content objects saved during
+compaction come back as text.
   }
 }
 
@@ -1098,7 +1135,8 @@ their replacement; saved sessions retain their catalog snapshots.
 \if{html}{\out{<a id="method-Agent-add_turn"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-add_turn}{}}}
 \subsection{\code{Agent$add_turn()}}{
-  Add a user/assistant turn pair, as in ellmer Chat.
+  Add a user turn and an assistant turn, as ellmer's
+\verb{$add_turn()} does.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$add_turn(user, assistant, log_tokens = TRUE)}
@@ -1109,12 +1147,12 @@ their replacement; saved sessions retain their catalog snapshots.
     \describe{
       \item{\code{user}}{User turn or content.}
       \item{\code{assistant}}{Assistant turn or content.}
-      \item{\code{log_tokens}}{Whether ellmer should log token metadata.}
+      \item{\code{log_tokens}}{Passed to ellmer's \verb{$add_turn()}.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self.
+    The agent, invisibly.
   }
 }
 
@@ -1122,10 +1160,11 @@ their replacement; saved sessions retain their catalog snapshots.
 \if{html}{\out{<a id="method-Agent-get_turns"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_turns}{}}}
 \subsection{\code{Agent$get_turns()}}{
-  Return the complete selected conversation, as in ellmer
-Chat. Compaction removes turns from model context, not from this
-transcript. Hosts can persist this view through their normal history
-API. Retained turns remain in memory until the conversation is replaced.
+  Get the whole conversation, as ellmer's \verb{$get_turns()}
+does. Unlike \verb{$get_context_turns()}, this includes turns that
+compaction removed from the model context, and the original tool
+results that \verb{$microcompact()} cleared. Removed turns stay in memory
+until \verb{$set_turns()} replaces the conversation.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_turns(include_system_prompt = FALSE)}
@@ -1147,9 +1186,9 @@ API. Retained turns remain in memory until the conversation is replaced.
 \if{html}{\out{<a id="method-Agent-get_context_turns"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_context_turns}{}}}
 \subsection{\code{Agent$get_context_turns()}}{
-  Return only the current model context. Unlike \code{get_turns()}
-and \code{turns()}, this view shrinks when compaction succeeds. Use it when
-inspecting or transferring the bounded input for a model request.
+  Get the turns the model currently sees. After compaction
+this is shorter than \verb{$get_turns()}, and tool results cleared by
+\verb{$microcompact()} show their marker.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_context_turns(include_system_prompt = FALSE)}
@@ -1158,8 +1197,8 @@ inspecting or transferring the bounded input for a model request.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{include_system_prompt}}{Include the current system prompt, including
-any installed compaction summary, as a turn.}
+      \item{\code{include_system_prompt}}{Include the system prompt, with any
+compaction summary, as a turn.}
     }
     \if{html}{\out{</div>}}
   }
@@ -1172,10 +1211,9 @@ any installed compaction summary, as a turn.}
 \if{html}{\out{<a id="method-Agent-set_turns"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-set_turns}{}}}
 \subsection{\code{Agent$set_turns()}}{
-  Replace the selected conversation and its model context,
-as in ellmer Chat. Clears the retained compacted prefix and summary,
-so host branch restoration cannot carry another branch's history.
-During a run, already accrued usage remains charged after replacement.
+  Replace the conversation, as ellmer's \verb{$set_turns()} does.
+This also drops any compaction summary and the turns compaction
+removed. During a run, usage counted so far still counts.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_turns(value)}
@@ -1189,7 +1227,7 @@ During a run, already accrued usage remains charged after replacement.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self.
+    The agent, invisibly.
   }
 }
 
@@ -1197,7 +1235,8 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-get_system_prompt"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_system_prompt}{}}}
 \subsection{\code{Agent$get_system_prompt()}}{
-  Return the system prompt, as in ellmer Chat.
+  Get the system prompt, as ellmer's \verb{$get_system_prompt()}
+does. After compaction it includes the conversation summary.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_system_prompt()}
@@ -1212,7 +1251,9 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-set_system_prompt"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-set_system_prompt}{}}}
 \subsection{\code{Agent$set_system_prompt()}}{
-  Replace the system prompt, as in ellmer Chat.
+  Replace the system prompt, as ellmer's
+\verb{$set_system_prompt()} does. After compaction, this also drops the
+conversation summary unless \code{value} still contains it.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_system_prompt(value)}
@@ -1226,7 +1267,7 @@ During a run, already accrued usage remains charged after replacement.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self.
+    The agent, invisibly.
   }
 }
 
@@ -1234,7 +1275,7 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-get_tools"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_tools}{}}}
 \subsection{\code{Agent$get_tools()}}{
-  Return registered tools, as in ellmer Chat.
+  Get the registered tools, as ellmer's \verb{$get_tools()} does.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_tools()}
@@ -1249,7 +1290,8 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-set_tools"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-set_tools}{}}}
 \subsection{\code{Agent$set_tools()}}{
-  Replace registered tools, preserving Deputy adaptation.
+  Replace all registered tools. The new tools are checked and
+wrapped as in \verb{$register_tools()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_tools(tools)}
@@ -1263,7 +1305,7 @@ During a run, already accrued usage remains charged after replacement.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self.
+    The agent, invisibly.
   }
 }
 
@@ -1271,7 +1313,7 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-get_tokens"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_tokens}{}}}
 \subsection{\code{Agent$get_tokens()}}{
-  Return provider token records, as in ellmer Chat.
+  Get token usage by turn, as ellmer's \verb{$get_tokens()} does.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_tokens(include_system_prompt = NULL)}
@@ -1280,12 +1322,12 @@ During a run, already accrued usage remains charged after replacement.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{include_system_prompt}}{Deprecated ellmer compatibility argument.}
+      \item{\code{include_system_prompt}}{Deprecated; passed to ellmer.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A token data frame.
+    A data frame.
   }
 }
 
@@ -1293,7 +1335,7 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-get_cost"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_cost}{}}}
 \subsection{\code{Agent$get_cost()}}{
-  Return provider cost records, as in ellmer Chat.
+  Get the estimated cost, as ellmer's \verb{$get_cost()} does.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_cost(include = c("all", "last"))}
@@ -1302,12 +1344,12 @@ During a run, already accrued usage remains charged after replacement.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{include}}{Return all costs or only the latest request.}
+      \item{\code{include}}{\code{"all"} for every turn or \code{"last"} for the latest request.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Provider cost information.
+    The cost, as returned by ellmer.
   }
 }
 
@@ -1315,7 +1357,7 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-token_count"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-token_count}{}}}
 \subsection{\code{Agent$token_count()}}{
-  Estimate tokens, as in ellmer Chat.
+  Count tokens, as ellmer's \verb{$token_count()} does.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$token_count(..., include = c("new", "complete"), type = NULL)}
@@ -1324,9 +1366,10 @@ During a run, already accrued usage remains charged after replacement.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{...}}{User content accepted by ellmer.}
-      \item{\code{include}}{Count only new content or the complete context.}
-      \item{\code{type}}{Optional provider content type.}
+      \item{\code{...}}{Message content, as for ellmer.}
+      \item{\code{include}}{\code{"new"} counts only the new content; \code{"complete"} counts
+the whole context too.}
+      \item{\code{type}}{Optional ellmer type, passed to ellmer.}
     }
     \if{html}{\out{</div>}}
   }
@@ -1339,7 +1382,7 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-get_provider"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_provider}{}}}
 \subsection{\code{Agent$get_provider()}}{
-  Return the ellmer provider.
+  Get the ellmer provider.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_provider()}
@@ -1354,14 +1397,14 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-get_model"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_model}{}}}
 \subsection{\code{Agent$get_model()}}{
-  Return the configured model name.
+  Get the model name.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_model()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Model identifier.
+    The model name.
   }
 }
 
@@ -1369,7 +1412,7 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-get_model_object"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_model_object}{}}}
 \subsection{\code{Agent$get_model_object()}}{
-  Return ellmer's configured model object.
+  Get ellmer's model object.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_model_object()}
@@ -1384,7 +1427,7 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-set_model"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-set_model}{}}}
 \subsection{\code{Agent$set_model()}}{
-  Replace the configured model.
+  Change the model.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_model(model)}
@@ -1393,12 +1436,12 @@ During a run, already accrued usage remains charged after replacement.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{model}}{Model identifier.}
+      \item{\code{model}}{Model name.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self.
+    The agent, invisibly.
   }
 }
 
@@ -1406,16 +1449,13 @@ During a run, already accrued usage remains charged after replacement.
 \if{html}{\out{<a id="method-Agent-register_tool"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-register_tool}{}}}
 \subsection{\code{Agent$register_tool()}}{
-  Register a tool with the agent.
+  Add a tool. Calls to it go through the agent's permission checks and
+hooks.
 
-Function tools are wrapped with Deputy's runtime enforcement. Known
-provider-native web tools are authorized once, before registration,
-because their execution occurs inside the provider rather than R. Native
-tools therefore require static permissions and cannot be registered with
-a custom \code{can_use_tool} callback.
-Existing names require explicit replacement. Every tool in a batch is
-validated and adapted before the registry changes. List element names
-do not rename tools; each tool's own name is authoritative.
+Provider-native web search and fetch tools run on the provider's
+servers, not in R, so they are checked once, when you register them. The
+permissions must have \code{web = TRUE}, list the tool in \code{tool_allowlist} and
+have no \code{can_use_tool} callback.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$register_tool(tool, replace = FALSE)}
@@ -1426,13 +1466,13 @@ do not rename tools; each tool's own name is authoritative.
     \describe{
       \item{\code{tool}}{A tool created with \code{ellmer::tool()} or a supported
 provider-native web tool.}
-      \item{\code{replace}}{Replace tools already registered under the same name?
-Defaults to FALSE. Duplicate names within a batch always fail.}
+      \item{\code{replace}}{If \code{TRUE}, replace a registered tool with the same name.
+If \code{FALSE} (the default), a name clash is an error.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self for chaining
+    The agent, invisibly, for chaining.
   }
 }
 
@@ -1440,7 +1480,9 @@ Defaults to FALSE. Duplicate names within a batch always fail.}
 \if{html}{\out{<a id="method-Agent-register_tools"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-register_tools}{}}}
 \subsection{\code{Agent$register_tools()}}{
-  Register multiple tools with the agent.
+  Add several tools, as \verb{$register_tool()} does. All of them are checked
+before any is added, so if one fails, none are added. List names are
+ignored: each tool keeps its own name.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$register_tools(tools, replace = FALSE)}
@@ -1449,15 +1491,16 @@ Defaults to FALSE. Duplicate names within a batch always fail.}
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{tools}}{A list of function tools or supported provider-native web
-tools.}
-      \item{\code{replace}}{Replace tools already registered under the same name?
-Defaults to FALSE. Duplicate names within a batch always fail.}
+      \item{\code{tools}}{A list of tools created with \code{ellmer::tool()} or supported
+provider-native web tools.}
+      \item{\code{replace}}{If \code{TRUE}, replace registered tools with the same names.
+If \code{FALSE} (the default), a name clash is an error. Two tools with the
+same name in \code{tools} are always an error.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self for chaining
+    The agent, invisibly, for chaining.
   }
 }
 
@@ -1465,7 +1508,8 @@ Defaults to FALSE. Duplicate names within a batch always fail.}
 \if{html}{\out{<a id="method-Agent-on_tool_request"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-on_tool_request}{}}}
 \subsection{\code{Agent$on_tool_request()}}{
-  Register an additional ellmer tool-request observer.
+  Add a callback that runs when the model requests a tool, as
+ellmer's \verb{$on_tool_request()} does.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$on_tool_request(callback)}
@@ -1479,7 +1523,7 @@ Defaults to FALSE. Duplicate names within a batch always fail.}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A function that removes the observer.
+    A function that removes the callback.
   }
 }
 
@@ -1487,7 +1531,8 @@ Defaults to FALSE. Duplicate names within a batch always fail.}
 \if{html}{\out{<a id="method-Agent-on_tool_result"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-on_tool_result}{}}}
 \subsection{\code{Agent$on_tool_result()}}{
-  Register an additional ellmer tool-result observer.
+  Add a callback that runs when a tool returns a result, as
+ellmer's \verb{$on_tool_result()} does.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$on_tool_result(callback)}
@@ -1501,7 +1546,7 @@ Defaults to FALSE. Duplicate names within a batch always fail.}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A function that removes the observer.
+    A function that removes the callback.
   }
 }
 
@@ -1509,10 +1554,9 @@ Defaults to FALSE. Duplicate names within a batch always fail.}
 \if{html}{\out{<a id="method-Agent-add_hook"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-add_hook}{}}}
 \subsection{\code{Agent$add_hook()}}{
-  Add a hook to the agent.
-
-Hooks are called at specific points during agent execution and can
-modify behavior (e.g., deny tool calls, log events).
+  Add a hook. Hooks run at set points in a run (see \link{HookEvent}). They can
+observe the run and, at some points, change it, for example by denying a
+tool call.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$add_hook(hook)}
@@ -1521,12 +1565,12 @@ modify behavior (e.g., deny tool calls, log events).
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{hook}}{A \link{HookMatcher} object}
+      \item{\code{hook}}{A \link{HookMatcher} object.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self for chaining
+    The agent, invisibly, for chaining.
   }
   \subsection{Examples}{
     \if{html}{\out{<div class="r example copy">}}
@@ -1551,14 +1595,15 @@ agent$add_hook(HookMatcher(
 \if{html}{\out{<a id="method-Agent-turns"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-turns}{}}}
 \subsection{\code{Agent$turns()}}{
-  Get the complete selected conversation, including compacted turns.
+  Get the whole conversation, including turns removed by compaction. The
+same as \verb{$get_turns()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$turns()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A list of Turn objects
+    A list of ellmer turns.
   }
 }
 
@@ -1566,7 +1611,7 @@ agent$add_hook(HookMatcher(
 \if{html}{\out{<a id="method-Agent-last_turn"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-last_turn}{}}}
 \subsection{\code{Agent$last_turn()}}{
-  Get the last turn in the conversation.
+  Get the last turn in the conversation with a given role.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$last_turn(role = c("assistant", "user", "system"))}
@@ -1575,12 +1620,12 @@ agent$add_hook(HookMatcher(
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{role}}{Role to filter by ("assistant", "user", or "system")}
+      \item{\code{role}}{\code{"assistant"}, \code{"user"} or \code{"system"}.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A Turn object or NULL
+    An ellmer turn, or \code{NULL}.
   }
 }
 
@@ -1588,14 +1633,14 @@ agent$add_hook(HookMatcher(
 \if{html}{\out{<a id="method-Agent-session_id"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-session_id}{}}}
 \subsection{\code{Agent$session_id()}}{
-  Get this agent's session identifier.
+  Get the agent's session ID.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$session_id()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Character session identifier
+    A string.
   }
 }
 
@@ -1603,14 +1648,14 @@ agent$add_hook(HookMatcher(
 \if{html}{\out{<a id="method-Agent-get_permission_mode"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_permission_mode}{}}}
 \subsection{\code{Agent$get_permission_mode()}}{
-  Get the active permission mode.
+  Get the current permission mode.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_permission_mode()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Character permission mode
+    The mode, such as \code{"standard"}.
   }
 }
 
@@ -1618,12 +1663,14 @@ agent$add_hook(HookMatcher(
 \if{html}{\out{<a id="method-Agent-set_permission_mode"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-set_permission_mode}{}}}
 \subsection{\code{Agent$set_permission_mode()}}{
-  Preserve or narrow the active permission mode for subsequent tool calls.
-Reapplying the current mode is a no-op. Widening or incomparable mode
-changes require a newly configured \code{Agent} so custom restrictions remain
-an immutable authority ceiling. When narrowing removes web access,
-registered provider-native web tools are removed before the new policy
-becomes active because Deputy cannot interpose on provider-side calls.
+  Switch to a narrower permission mode for later tool calls. Permissions
+can be narrowed but not widened: from \code{"full"} any mode is allowed, and
+\code{"standard"} and \code{"plan"} can only switch to \code{"readonly"}. Anything else
+is an error, so create a new \code{Agent} instead. Setting the current mode
+does nothing. The agent's other permission settings still apply within
+the new mode. If the new mode doesn't allow web access,
+provider-native web tools are removed, since Deputy can't check their
+calls.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_permission_mode(mode)}
@@ -1632,12 +1679,12 @@ becomes active because Deputy cannot interpose on provider-side calls.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{mode}}{Permission mode, see \link{PermissionMode}}
+      \item{\code{mode}}{Permission mode, see \link{PermissionMode}.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self
+    The agent, invisibly.
   }
 }
 
@@ -1645,16 +1692,18 @@ becomes active because Deputy cannot interpose on provider-side calls.
 \if{html}{\out{<a id="method-Agent-cost"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-cost}{}}}
 \subsection{\code{Agent$cost()}}{
-  Get cost information for the conversation.
+  Get token counts and estimated cost for the turns in the model context.
+Turns removed by compaction no longer count.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$cost()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A list with input, output, and cached token counts; total
-estimated cost; and \code{complete} and \code{missing} fields describing provider
-cost coverage. An incomplete total is \code{NA_real_}.
+    A list with \code{input}, \code{output} and \code{cached} token counts, the
+estimated \code{total} cost, \code{complete} (whether every response had a cost)
+and \code{missing} (how many didn't). \code{total} is \code{NA} when \code{complete} is
+\code{FALSE}.
   }
 }
 
@@ -1662,17 +1711,16 @@ cost coverage. An incomplete total is \code{NA_real_}.
 \if{html}{\out{<a id="method-Agent-usage"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-usage}{}}}
 \subsection{\code{Agent$usage()}}{
-  Get normalized usage for the complete in-memory conversation.
-
-Per-run usage is available on \link{AgentResult} and in the final \code{usage}
-event returned by \verb{$run()}.
+  Get usage for the turns in the model context. Turns removed by compaction
+no longer count, and \code{tool_calls} is always 0 here. For one run's usage,
+use \verb{$usage} on its \link{AgentResult} or the \code{"usage"} event from \verb{$run()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$usage()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    An \link{AgentUsage} object
+    An \link{AgentUsage} object.
   }
 }
 
@@ -1680,11 +1728,12 @@ event returned by \verb{$run()}.
 \if{html}{\out{<a id="method-Agent-interrupt"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-interrupt}{}}}
 \subsection{\code{Agent$interrupt()}}{
-  Request cancellation of the active stream.
+  Stop the current run, and any subagent runs it started.
 
-Cancellation is cooperative and takes effect at the next provider or tool
-boundary supported by ellmer. Active \link{McpConnection} calls terminate their
-owned connections and discard server session state.
+The run stops as soon as ellmer allows, usually during the current model
+request or before the next tool call. An \link{McpConnection} call in progress
+is stopped by closing its connection, which loses the server's session
+state.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$interrupt(reason = "interrupted")}
@@ -1693,12 +1742,13 @@ owned connections and discard server session state.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{reason}}{Stable reason stored on the terminal event}
+      \item{\code{reason}}{Stop reason recorded on the run's \code{"stop"} event and
+result.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible logical indicating whether a run was active
+    \code{TRUE}, invisibly, if anything was running.
   }
 }
 
@@ -1706,14 +1756,14 @@ owned connections and discard server session state.
 \if{html}{\out{<a id="method-Agent-provider"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-provider}{}}}
 \subsection{\code{Agent$provider()}}{
-  Get provider information.
+  Get the provider and model names.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$provider()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A list with provider name and model
+    A list with \code{name} and \code{model}.
   }
 }
 
@@ -1721,7 +1771,8 @@ owned connections and discard server session state.
 \if{html}{\out{<a id="method-Agent-save_session"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-save_session}{}}}
 \subsection{\code{Agent$save_session()}}{
-  Save the current session to an RDS file.
+  Save the conversation to an \code{.rds} file that \verb{$load_session()} can
+restore.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$save_session(path)}
@@ -1730,25 +1781,19 @@ owned connections and discard server session state.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{path}}{Path to save the session}
+      \item{\code{path}}{File path.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Details}{
-    The session file contains:
-\itemize{
-\item Conversation turns
-\item System prompt
-\item The cumulative compaction summary
-\item Retained compacted turns for the complete selected conversation
-\item Portable copies of offloaded tool results
-\item Effective run context
-\item File checkpoint state, when enabled
-\item Metadata (timestamp, version, provider info)
-}
+    The file holds the conversation (including turns removed by compaction),
+the system prompt and any compaction summary, copies of large tool
+results, the run context, file checkpoint state (when enabled) and some
+metadata, such as the time, Deputy version and provider. It doesn't hold
+tools, permissions, hooks or the Chat itself.
   }
   \subsection{Returns}{
-    Invisible path
+    The path, invisibly.
   }
 }
 
@@ -1756,7 +1801,7 @@ owned connections and discard server session state.
 \if{html}{\out{<a id="method-Agent-load_session"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-load_session}{}}}
 \subsection{\code{Agent$load_session()}}{
-  Load a session from an RDS file.
+  Load a conversation saved by \verb{$save_session()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$load_session(path)}
@@ -1765,23 +1810,20 @@ owned connections and discard server session state.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{path}}{Path to the session file}
+      \item{\code{path}}{Path to the session file.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Details}{
-    Tools, permissions, hooks, and the working directory are runtime policy
-and are never restored from a session file. Saved run context is
-validated before conversation state changes and merged with constructor
-context; protected identity conflicts fail the load. Compaction summaries
-and integrity-checked tool-result envelopes are restored as conversational
-state under the receiving Agent's session identity.
-Schema 3 preserves both the selected conversation and model context.
-Earlier development schemas are rejected; native host history remains
-independently readable through that host's restore API.
+    Tools, permissions, hooks and the working directory come from the agent
+you load into, not from the file. The saved \code{run_context} is merged into
+the agent's, and loading fails if they disagree on an ID field. Saved
+tool results and compaction summaries are restored under this agent's
+session ID. Files saved by early development versions of Deputy can't be
+loaded. Loading errors while a run is active.
   }
   \subsection{Returns}{
-    Invisible self
+    The agent, invisibly.
   }
 }
 
@@ -1789,14 +1831,15 @@ independently readable through that host's restore API.
 \if{html}{\out{<a id="method-Agent-pending_approval"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-pending_approval}{}}}
 \subsection{\code{Agent$pending_approval()}}{
-  Inspect the approval that suspended this Agent, or NULL.
+  Get the tool approval this agent is waiting on.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$pending_approval()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    An \link{ApprovalContinuation} or NULL. Its source includes the path.
+    An \link{ApprovalContinuation}, or \code{NULL} if nothing is waiting. Its
+\code{source$path} is the path to pass to \verb{$resume_approval()}.
   }
 }
 
@@ -1804,10 +1847,13 @@ independently readable through that host's restore API.
 \if{html}{\out{<a id="method-Agent-resume_approval"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-resume_approval}{}}}
 \subsection{\code{Agent$resume_approval()}}{
-  Resume a persisted pending tool approval under current and saved policy.
-Reattach a Chat, the same raw-argument tool definition, permission callback,
-session_id, agent_id, working_dir, and approval_dir after process restart.
-Existing completed effects are never replayed; duplicate decisions fail.
+  Approve or deny a tool call that is waiting for approval, then continue
+the run. Both the saved permissions and the agent's current permissions
+apply. After restarting R, first create an agent with the same
+\code{session_id}, \code{agent_id}, \code{working_dir} and \code{approval_dir}, the same tool
+definition (with \code{convert = FALSE}) and the permission callback. Tool
+calls that already ran are not run again, and each approval can be
+decided only once.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$resume_approval(
@@ -1821,17 +1867,21 @@ Existing completed effects are never replayed; duplicate decisions fail.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{path}}{Approval directory supplied by the approval event or snapshot.}
-      \item{\code{decision}}{Either "approve" or "deny".}
-      \item{\code{tool_input}}{Optional edited raw JSON argument list for approval.}
-      \item{\code{usage_limits}}{Optional explicit \link{UsageLimits} for the continuation.
-Escalation is bounded by the saved and current Agent limits. Previously
-observed usage is retained. NULL keeps the suspended run's limits.}
+      \item{\code{path}}{The approval's directory, from the \code{"approval"} event or
+\verb{$pending_approval()}.}
+      \item{\code{decision}}{\code{"approve"} or \code{"deny"}.}
+      \item{\code{tool_input}}{Optional named list of edited tool arguments to use
+instead of the original ones. Only allowed with \code{"approve"}.}
+      \item{\code{usage_limits}}{Optional \link{UsageLimits} for the resumed run. They
+can't exceed the agent's limits at the time of suspension or now, and
+usage from before the suspension still counts. \code{NULL} keeps the
+suspended run's limits.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    An \link{AgentResult}, including usage observed before suspension.
+    An \link{AgentResult}. Its usage includes the work done before the
+suspension.
   }
 }
 
@@ -1839,7 +1889,8 @@ observed usage is retained. NULL keeps the suspended run's limits.}
 \if{html}{\out{<a id="method-Agent-checkpoint"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-checkpoint}{}}}
 \subsection{\code{Agent$checkpoint()}}{
-  Create a reversible file checkpoint.
+  Create a file checkpoint that \verb{$rewind_files()} can restore. Needs
+\code{enable_file_checkpointing = TRUE}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$checkpoint(name = NULL, metadata = list())}
@@ -1848,8 +1899,8 @@ observed usage is retained. NULL keeps the suspended run's limits.}
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{name}}{Optional checkpoint label.}
-      \item{\code{metadata}}{Optional serializable metadata list.}
+      \item{\code{name}}{Optional label.}
+      \item{\code{metadata}}{Optional list of metadata to store with it.}
     }
     \if{html}{\out{</div>}}
   }
@@ -1862,14 +1913,14 @@ observed usage is retained. NULL keeps the suspended run's limits.}
 \if{html}{\out{<a id="method-Agent-list_checkpoints"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-list_checkpoints}{}}}
 \subsection{\code{Agent$list_checkpoints()}}{
-  List reversible file checkpoints.
+  List file checkpoints.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$list_checkpoints()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A data frame ordered from oldest to newest.
+    A data frame, oldest first.
   }
 }
 
@@ -1877,7 +1928,8 @@ observed usage is retained. NULL keeps the suspended run's limits.}
 \if{html}{\out{<a id="method-Agent-rewind_files"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-rewind_files}{}}}
 \subsection{\code{Agent$rewind_files()}}{
-  Rewind files to a checkpoint without changing conversation history.
+  Restore files to how they were at a checkpoint. Later checkpoints are
+discarded. The conversation doesn't change. Errors during a run.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$rewind_files(checkpoint_id)}
@@ -1886,13 +1938,14 @@ observed usage is retained. NULL keeps the suspended run's limits.}
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{checkpoint_id}}{ID returned by \verb{$checkpoint()} or present in a
-\code{file_checkpoint} run event.}
+      \item{\code{checkpoint_id}}{A checkpoint ID from \verb{$checkpoint()},
+\verb{$list_checkpoints()} or a \code{"file_checkpoint"} event.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A list describing the restored checkpoint and change count.
+    A list describing the checkpoint, including \code{restored_changes},
+the number of file changes undone.
   }
 }
 
@@ -1900,12 +1953,10 @@ observed usage is retained. NULL keeps the suspended run's limits.}
 \if{html}{\out{<a id="method-Agent-compact"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-compact}{}}}
 \subsection{\code{Agent$compact()}}{
-  Compact the conversation history to reduce context size.
-
-This method uses the LLM to generate a meaningful summary of older
-conversation turns, then replaces them with the summary appended to
-the system prompt. This preserves important context while reducing
-token usage.
+  Replace older turns in the model context with a summary, so later
+requests are smaller. The removed turns stay available from
+\verb{$get_turns()}. Errors during a run; runs compact automatically as set
+by the \link{ContextPolicy}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$compact(
@@ -1920,34 +1971,40 @@ token usage.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{keep_last}}{Number of recent turns to retain. \code{NULL} chooses a
-complete conversational boundary using the context policy's token
-target.}
-      \item{\code{summary}}{Optional custom summary to use instead of auto-generating.
-If NULL, the LLM will generate a summary focusing on key decisions,
-findings, files discussed, and task progress.}
-      \item{\code{fallback}}{What to do when LLM summary generation fails.}
-      \item{\code{automatic}}{Whether the run kernel triggered this compaction.}
-      \item{\code{estimated_tokens}}{Optional pre-compaction token estimate.}
+      \item{\code{keep_last}}{Number of recent turns to keep. \code{NULL} keeps as many
+recent turns as fit in \code{max_tokens * compact_to} of the context policy,
+starting at a user turn, or the last 4 turns if \code{max_tokens} is \code{NULL}.}
+      \item{\code{summary}}{Optional summary to use. If \code{NULL}, a \code{PreCompact} hook
+can supply one; otherwise the model writes one covering decisions,
+findings, files, errors and progress.}
+      \item{\code{fallback}}{\code{"error"} or \code{"text"}: what to do if the model can't
+write the summary. Defaults to the context policy's \code{fallback}.}
+      \item{\code{automatic}}{Set by the agent when a run compacts automatically.
+Leave it as \code{FALSE}.}
+      \item{\code{estimated_tokens}}{Optional token estimate before compaction,
+recorded in the result.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Details}{
-    The compaction process:
+    Compaction:
 \enumerate{
-\item Fires the PreCompact hook (can cancel or provide custom summary)
-\item If no custom summary, uses LLM to summarize compacted turns
-\item Appends summary to system prompt under "Previous Conversation Summary"
-\item Keeps only the most recent \code{keep_last} turns
+\item Fires the \code{PreCompact} hook, which can cancel compaction or supply a
+summary.
+\item Asks the model to summarise the older turns, unless a summary was
+supplied.
+\item Appends the summary to the system prompt under "Previous Conversation
+Summary".
+\item Keeps only the last \code{keep_last} turns in the model context.
 }
 
-LLM summary-generation failures are errors by default. A deterministic
-truncated-text summary is used only when \code{fallback = "text"} is
-explicitly configured. The returned object records that degraded method.
+If the model can't write a summary, \verb{$compact()} errors, unless
+\code{fallback = "text"}, which builds a plain summary from the first 200
+characters of each turn instead. The result's \code{method} shows which was
+used.
   }
   \subsection{Returns}{
-    A read-only \link{DeputyCompaction} S7 value describing the method
-and usage.
+    A \link{DeputyCompaction} describing what happened.
   }
 }
 
@@ -1960,13 +2017,13 @@ and usage.
 
 Every tool result before the last \code{keep_last} turns has its value
 replaced by \code{marker} in the model's context, unless its tool is named in
-\code{keep_tools}. Nothing is summarised and no model call is made. An
-earlier compaction summary and the compacted prefix are kept.
+\code{keep_tools}. Nothing is summarised and no model call is made. Any
+earlier compaction summary is kept. Errors during a run.
 
 Like compaction, this changes only what the model sees. \verb{$get_turns()},
-\verb{$last_turn()} and saved sessions keep the original results, so a host's
-conversation history is unchanged. \verb{$get_context_turns()} shows the
-markers.
+\verb{$last_turn()} and saved sessions keep the original results, so your
+app's conversation history is unchanged. \verb{$get_context_turns()} shows
+the markers.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$microcompact(
@@ -1995,7 +2052,7 @@ they are. \code{Inf} keeps every turn.}
 \if{html}{\out{<a id="method-Agent-print"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-print}{}}}
 \subsection{\code{Agent$print()}}{
-  Print the agent configuration.
+  Print a summary of the agent.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$print()}
@@ -2007,7 +2064,9 @@ they are. \code{Inf} keeps every turn.}
 \if{html}{\out{<a id="method-Agent-load_skill"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-load_skill}{}}}
 \subsection{\code{Agent$load_skill()}}{
-  Load a \link{Skill} into the agent.
+  Load a \link{Skill}: register its tools and append its prompt to the system
+prompt. Warns if packages the skill needs are missing or it expects a
+different provider.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$load_skill(skill, allow_conflicts = FALSE)}
@@ -2017,13 +2076,14 @@ they are. \code{Inf} keeps every turn.}
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{skill}}{A \link{Skill} object or path to a skill directory.}
-      \item{\code{allow_conflicts}}{If FALSE (default), error on tool name conflicts.
-Set TRUE to allow overwriting existing tools.}
+      \item{\code{allow_conflicts}}{If \code{TRUE}, the skill's tools replace registered
+tools with the same names, with a warning. If \code{FALSE} (the default), a
+name clash is an error.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self for chaining.
+    The agent, invisibly, for chaining.
   }
 }
 
@@ -2031,14 +2091,14 @@ Set TRUE to allow overwriting existing tools.}
 \if{html}{\out{<a id="method-Agent-skills"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-skills}{}}}
 \subsection{\code{Agent$skills()}}{
-  Get loaded skills.
+  Get the loaded skills.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$skills()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Named list of loaded \link{Skill} objects.
+    Named list of \link{Skill} objects.
   }
 }
 
@@ -2046,10 +2106,13 @@ Set TRUE to allow overwriting existing tools.}
 \if{html}{\out{<a id="method-Agent-load_mcp"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-load_mcp}{}}}
 \subsection{\code{Agent$load_mcp()}}{
-  Load tools from MCP (Model Context Protocol) servers.
+  Load tools from the MCP (Model Context Protocol) servers in an mcptools
+configuration file.
 
-Requires the mcptools package. Issues a warning if not installed or if
-tool fetching fails.
+Needs the mcptools package. If it isn't installed or the tools can't be
+fetched, this warns and loads nothing; \verb{$mcp_status()} records each
+attempt. If a reload fails, tools whose connections were closed are
+removed and the rest stay.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$load_mcp(config = NULL, servers = NULL, replace = FALSE)}
@@ -2058,18 +2121,18 @@ tool fetching fails.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{config}}{Path to MCP configuration file. If NULL (default), uses
-the mcptools default location (\verb{~/.config/mcptools/config.json}).}
-      \item{\code{servers}}{Optional character vector of server names to load from.
-If NULL, loads from all configured servers.}
-      \item{\code{replace}}{Refresh the selected servers' complete tool sets, removing
-obsolete tools, and explicitly replace other matching names. On failure,
-tools whose connections were invalidated are removed; working tools remain.}
+      \item{\code{config}}{Path to the configuration file. \code{NULL} uses the mcptools
+default, \verb{~/.config/mcptools/config.json}.}
+      \item{\code{servers}}{Names of the servers to load from. \code{NULL} loads from all
+of them.}
+      \item{\code{replace}}{If \code{TRUE}, replace the tools loaded earlier from these
+servers, dropping any a server no longer offers, and replace any other
+tools with the same names. If \code{FALSE}, a name clash is an error.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self for chaining
+    The agent, invisibly, for chaining.
   }
 }
 
@@ -2077,14 +2140,14 @@ tools whose connections were invalidated are removed; working tools remain.}
 \if{html}{\out{<a id="method-Agent-mcp_tools"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-mcp_tools}{}}}
 \subsection{\code{Agent$mcp_tools()}}{
-  Get names of loaded MCP tools.
+  Get the names of loaded MCP tools.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$mcp_tools()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Character vector of MCP tool names
+    A character vector.
   }
 }
 
@@ -2092,14 +2155,16 @@ tools whose connections were invalidated are removed; working tools remain.}
 \if{html}{\out{<a id="method-Agent-mcp_status"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-mcp_status}{}}}
 \subsection{\code{Agent$mcp_status()}}{
-  Get MCP runtime status records.
+  Get a log of \verb{$load_mcp()} calls.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$mcp_status()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Data frame describing MCP load attempts and registered tools
+    A data frame with one row per call: \code{status} (\code{"connected"},
+\code{"empty"}, \code{"failed"} or \code{"unavailable"}), \code{config}, \code{servers},
+\code{tools}, \code{loaded_at} and \code{error}.
   }
 }
 
@@ -2107,16 +2172,9 @@ tools whose connections were invalidated are removed; working tools remain.}
 \if{html}{\out{<a id="method-Agent-run_async"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-run_async}{}}}
 \subsection{\code{Agent$run_async()}}{
-  Run an agentic task asynchronously and resolve to an \link{AgentResult}.
-
-Uses the same run kernel as \verb{$stream_async()}, \verb{$stream()}, \verb{$chat()},
-and \verb{$run_sync()}. It collects the final response and run metadata rather
-than returning the content stream.
-
-Use this when an Agent is a \emph{worker} inside a larger async system, for
-example a delegated sub-agent executed from the tool of a parent chat
-that is itself streaming. Supply \code{type} to extract structured output
-after the tool-using task within the same run budget.
+  Run a task asynchronously. Works like \verb{$run_sync()} but returns a
+promise, so you can use it from async code, such as a Shiny app or a
+tool that runs another agent while its own chat is streaming.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$run_async(
@@ -2132,27 +2190,29 @@ after the tool-using task within the same run budget.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{task}}{The task for the agent to perform}
-      \item{\code{usage_limits}}{Optional \link{UsageLimits} override for this run. Unset
-fields fall back to the Agent's limits. With \code{on_exceed = "error"},
-hitting a limit rejects the promise with the structured limit error
-instead of resolving with a typed \code{stop_reason}.}
-      \item{\code{run_context}}{Canonical JSON-compatible context to add to or narrow
-for this run. Protected constructor identity fields cannot change.}
-      \item{\code{type}}{Optional ellmer type. Complete the task with tools, then
-extract from the conversation within the same run budget.}
-      \item{\code{validate}}{Optional synchronous function receiving ellmer's value.
-Return TRUE, FALSE, or non-empty correction feedback. Errors and NA
-are terminal.}
-      \item{\code{max_corrections}}{Maximum additional structured requests after
-invalid output. Defaults to zero; all attempts share the run budget.}
+      \item{\code{task}}{The task for the agent.}
+      \item{\code{usage_limits}}{\link{UsageLimits} for this run. \code{NULL} fields use the
+agent's limits.}
+      \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
+this run. It can't change or remove ID fields (keys ending in \code{id})
+that the agent already sets.}
+      \item{\code{type}}{Optional ellmer type, such as \code{ellmer::type_object()}. After
+the task, the agent extracts data of this type from the conversation
+into \code{result$structured_output}. This counts toward the run's limits.}
+      \item{\code{validate}}{Optional function that checks the extracted value. Return
+\code{TRUE} to accept it, or \code{FALSE} or a message to reject it; a message is
+sent to the model as feedback. An error or any other return value, such
+as \code{NA}, ends the run with an error.}
+      \item{\code{max_corrections}}{How many times to ask the model to fix a rejected
+value. Defaults to 0. If the value is still rejected, the run errors.
+Every attempt counts toward the run's limits.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A \code{promises::promise} resolving to an \link{AgentResult}. It is
-rejected if the provider stream fails or a limit configured with
-\code{on_exceed = "error"} is reached.
+    A promise that resolves to an \link{AgentResult}. It is rejected if
+the provider request fails or a limit with \code{on_exceed = "error"} is
+reached.
   }
 }
 

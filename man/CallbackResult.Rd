@@ -4,22 +4,21 @@
 \alias{CallbackResult}
 \alias{HookResult}
 \alias{PermissionResult}
-\title{Callback result value families}
+\title{Hook and permission results}
 \usage{
 HookResult()
 
 PermissionResult()
 }
 \description{
-Abstract S7 bases for hook and permission results. Construct a concrete
-result with \code{\link[=HookResultPreToolUse]{HookResultPreToolUse()}}, \code{\link[=HookResultPostToolUse]{HookResultPostToolUse()}},
-\code{\link[=HookResultPreCompact]{HookResultPreCompact()}}, \code{\link[=PermissionResultAllow]{PermissionResultAllow()}}, or
-\code{\link[=PermissionResultDeny]{PermissionResultDeny()}}. Test family membership with \code{S7::S7_inherits()}.
+\code{HookResult} and \code{PermissionResult} are the parent classes of the values
+that hook and permission callbacks return. You don't create them directly;
+use \code{\link[=HookResultPreToolUse]{HookResultPreToolUse()}}, \code{\link[=HookResultPostToolUse]{HookResultPostToolUse()}},
+\code{\link[=HookResultPreCompact]{HookResultPreCompact()}}, \code{\link[=PermissionResultAllow]{PermissionResultAllow()}},
+\code{\link[=PermissionResultDeny]{PermissionResultDeny()}} or \code{\link[=PermissionResultPending]{PermissionResultPending()}}. To test which kind
+a value is, use \code{S7::S7_inherits(x, PermissionResult)}.
 
-Result properties are read-only after construction. Read with \code{@},
-\code{S7::prop()}, or \code{$}; missing \code{$} fields return NULL. Use \code{S7::props()}
-for a plain list of properties and construct a new result to change a
-decision. S3 class tags and whole-result list indexing are not supported.
-Objects stored in \code{updated_tool_output} retain their own reference
-semantics; freezing a result does not freeze an environment inside it.
+Results are read-only. Read fields with \code{$} (a missing field gives \code{NULL}),
+\code{@} or \code{S7::prop()}, or get them all as a list with \code{S7::props()}. To change
+a decision, create a new result.
 }

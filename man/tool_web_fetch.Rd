@@ -10,31 +10,27 @@ A tool definition created with \code{ellmer::tool()}.
 tool_web_fetch(url)
 }
 \arguments{
-\item{url}{The URL of the web page to fetch (tool argument)}
+\item{url}{URL of the page to fetch.}
 }
 \value{
-When called directly, a character string containing the fetched and
-normalized page content.
+The page content as one string, cut at 50,000 characters.
 }
 \description{
-A tool that fetches the content of a web page and returns it as text
-or markdown. Requires the httr2 package for HTTP requests.
-
-For JavaScript-rendered pages, consider using the chromote package
-with a custom tool implementation.
+A tool that downloads a web page and returns its content as text or
+Markdown. Needs the httr2 package. For pages rendered with JavaScript, write
+your own tool with chromote.
 }
 \details{
-This tool uses httr2 to fetch web content and extracts text from HTML.
-If the rvest package is available, it extracts the main content more
-intelligently. If pandoc is available via rmarkdown, HTML is converted
-to markdown.
-
-The tool respects a 30-second timeout and follows redirects.
+Requests follow redirects and time out after 30 seconds. With rvest and xml2
+installed, the tool drops navigation, headers and footers and keeps the main
+content; with rmarkdown and pandoc available, it converts that HTML to
+Markdown. Otherwise it strips the tags. Content that isn't HTML is returned
+as is.
 }
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_web_fetch),
   permissions = Permissions(web = TRUE)
 )

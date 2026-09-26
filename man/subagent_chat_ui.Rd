@@ -3,7 +3,7 @@
 \name{subagent_chat_ui}
 \alias{subagent_chat_ui}
 \alias{subagent_chat_server}
-\title{Inspect child conversations in an optional Shiny panel}
+\title{Show subagent conversations in a Shiny panel}
 \usage{
 subagent_chat_ui(id, height = "420px")
 
@@ -21,37 +21,40 @@ subagent_chat_server(
 \arguments{
 \item{id}{Shiny module ID.}
 
-\item{height}{Height of the read-only child chat, default \code{"420px"}.}
+\item{height}{Height of the conversation view. Defaults to \code{"420px"}.}
 
-\item{lead}{A host-owned Agent or LeadAgent, or a function returning it.}
+\item{lead}{The \code{Agent} or \link{LeadAgent} whose subagents to show, or a
+function returning it.}
 
-\item{requester}{Function returning the authenticated host request context.}
+\item{requester}{A function returning the current user, as your
+\link{DelegationDisclosure} expects it. Access is checked on every update.}
 
-\item{history}{Optional reactive/function returning saved settled child
-history; returning NULL selects the live lead. No active recovery occurs.}
+\item{history}{Optional reactive or function returning history saved with
+\verb{$export_subagents()}, to show instead of the live agent. Return \code{NULL}
+to show the live agent.}
 
-\item{disclosure, scope}{For saved history, current \link{DelegationDisclosure} and
-fixed trusted host scope (or functions returning them). They must come from
-host ownership records, independently of the snapshot or browser input.}
+\item{disclosure, scope}{For saved history, the \link{DelegationDisclosure} and
+scope for \code{\link[=delegation_history]{delegation_history()}}, or functions returning them. Take them
+from your own records, not from the history or browser input.}
 
-\item{on_cancel}{Optional host-authorized \verb{function(delegation_id, requester)}.
-The callback owns action authorization and may call \code{interrupt_subagent()}.
-Omit it for a completely read-only panel. It is never invoked by selection,
-replay, observation or closing the panel.}
+\item{on_cancel}{Optional \verb{function(delegation_id, requester)} called when
+the user cancels a running subagent. Check that the requester may, then
+call the agent's \verb{$interrupt_subagent()}. Without it, there is no cancel
+button.}
 
-\item{poll_interval}{Poll interval in milliseconds, at least 100, default 250.}
+\item{poll_interval}{How often to check for updates, in milliseconds. At
+least 100; defaults to 250.}
 }
 \value{
-A bslib card. Requires optional shiny, shinychat >= 0.5.0, bslib,
-commonmark and xml2.
+\code{subagent_chat_ui()} returns a bslib card.
 
-\code{subagent_chat_server()} returns reactive \code{selected}, \code{views}, \code{notice}
-and \code{closed} values for host composition/testing. No runtime generator is
-returned or consumed. Optional packages are checked only when invoked.
+\code{subagent_chat_server()} returns a list of reactives: \code{selected}
+(the selected delegation ID), \code{views}, \code{notice} and \code{closed}.
 }
 \description{
-Compose this panel beside the host's lead chat. Activity cards select one
-separately retained child conversation. Public ellmer Content is rendered
-through shinychat's public APIs, including native tool cards and attachments.
-The panel has no prompt handler and cannot resume or approve a child.
+A read-only Shiny module to place next to your main chat. Cards list the
+agent's subagents; selecting one shows its conversation, with tool calls
+and attachments, and streams its current output. The panel has no input box
+and can't start, resume or approve work. It needs shiny, bslib, commonmark,
+xml2 and shinychat (>= 0.5.0).
 }

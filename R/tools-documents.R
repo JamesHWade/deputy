@@ -126,24 +126,21 @@ convert_to_markdown_markitdown <- function(path) {
   text
 }
 
-#' Convert a file to markdown using MarkItDown
+#' Convert a file to Markdown using MarkItDown
 #'
 #' @description
-#' Converts a local file to markdown text using Python
-#' [MarkItDown](https://github.com/microsoft/markitdown) via `reticulate`.
-#' This is useful for rich formats (e.g. DOCX, PPTX, PDF, HTML) when you want
-#' a markdown representation instead of raw file text.
+#' A tool that converts a local document, such as DOCX, PPTX, PDF or HTML, to
+#' Markdown with the Python library
+#' [MarkItDown](https://github.com/microsoft/markitdown).
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character string containing the converted
-#'   markdown.
+#' @return The Markdown text as one string.
 #'
-#' @param path Path to the file to convert (tool argument, not R function argument)
+#' @param path Path to the file to convert.
 #'
 #' @details
-#' Requires:
-#' - R package `reticulate`
-#' - Python module `markitdown` (e.g., `pip install 'markitdown[all]'`)
+#' Needs the reticulate package and the Python module `markitdown`
+#' (`pip install 'markitdown[all]'`).
 #'
 #' @examples
 #' \dontrun{

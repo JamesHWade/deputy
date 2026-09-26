@@ -7,17 +7,21 @@
 hook_limit_file_writes(allowed_dir)
 }
 \arguments{
-\item{allowed_dir}{Existing directory where writes are allowed. The path is
-canonicalized when the hook is created.}
+\item{allowed_dir}{An existing directory where writes are allowed. It is
+resolved to an absolute path when the hook is created.}
 }
 \value{
-A \link{HookMatcher} object
+A \link{HookMatcher}.
 }
 \description{
-Convenience function to create a PreToolUse hook that applies Deputy's
-canonical file-write permission policy to \code{write_file}, \code{edit_file}, and
-\code{multi_edit}. Prefer configuring \link{Permissions} as the Agent's authority
-policy; this helper is useful as an additional hook-level restriction.
+Creates a PreToolUse hook that denies \code{write_file}, \code{edit_file} and
+\code{multi_edit} calls outside \code{allowed_dir}, using the same path checks as
+\code{Permissions(file_write = allowed_dir)}. Setting \code{file_write} in the
+agent's \link{Permissions} is the main way to limit writes; this hook adds a
+second check.
+
+The hook returns a result for every call it checks, so PreToolUse hooks for
+these tools added after it don't run.
 }
 \examples{
 \dontrun{

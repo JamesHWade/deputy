@@ -1,22 +1,27 @@
-#' Adopt a curated Chat for owned delegation
+#' Turn an ellmer chat into a retained agent
 #'
-#' Makes an independent conversation copy and explicitly replaces its tool and
-#' request callbacks with Deputy governance. Provider configuration, model
-#' parameters, system prompt and executable tools are preserved. Tool closures
-#' remain shared host resources; copying a Chat is not a sandbox. The original
-#' Chat is unchanged. Use `owner$retain_agent()` to transfer an existing Agent.
+#' Copies a configured ellmer chat into a new agent that `owner` keeps for
+#' later calls, for example through a [delegation_tool()]. The copy keeps the
+#' provider, model settings, system prompt, tools and, optionally, turns, but
+#' drops callbacks such as `on_tool_request()`; the new agent's permissions
+#' and hooks apply instead. The original chat is unchanged but shares its
+#' tools, and any state they hold, with the copy. To keep an existing `Agent`,
+#' use `owner$retain_agent()`. See `vignette("retained-agents")`.
 #'
-#' @param chat A configured ellmer Chat with a public `clone()` method.
-#' @param owner The host-owned [Agent] that will invoke and inspect this specialist.
-#' @param permissions Explicit specialist [Permissions], also bounded by the
-#'   caller's current policy on every invocation.
-#' @param usage_limits Explicit cumulative [UsageLimits] for the retained handle.
-#' @param history Explicit `"retain"` or `"fresh"` choice for copied turns.
-#' @param callbacks Must be `"replace"` to acknowledge Deputy callback ownership.
-#' @param name Optional specialist display name.
-#' @param max_runs Maximum retained invocations, default 32.
-#' @return An owner-local conversation handle for [delegation_tool()] and the
-#'   owner's continuation, cancellation and release methods.
+#' @param chat A configured ellmer `Chat`.
+#' @param owner The [Agent] that will own and call the new agent.
+#' @param permissions [Permissions] for the new agent. The owner's current
+#'   permissions also apply to every call.
+#' @param usage_limits [UsageLimits] for all calls combined.
+#' @param history `"retain"` to copy the chat's turns, or `"fresh"` to start
+#'   with an empty history.
+#' @param callbacks Must be `"replace"`, to confirm that the chat's callbacks
+#'   are dropped.
+#' @param name Optional display name for the new agent.
+#' @param max_runs Maximum number of calls. Defaults to 32.
+#' @return A handle for [delegation_tool()] and for `owner`'s
+#'   `$continue_agent()`, `$cancel_agent()` and `$release_agent()`. It only
+#'   works with `owner`.
 #' @export
 adopt_chat <- function(
   chat,
@@ -64,22 +69,24 @@ adopt_chat <- function(
   owner$retain_agent(child, usage_limits, max_runs)
 }
 
-#' Delegate through a host-curated specialist
+#' Create a tool that calls a retained agent
 #'
-#' Register this tool only on its owning Agent. The model supplies a new task
-#' brief; ownership, provider, prompt, tools and budgets are fixed by the host.
-#' Every call uses the same continuation implementation as host follow-ups.
-#' Results are compact serializable delegation outcomes; full child history and
-#' live activity use the owner's independently authorized inspection APIs.
+#' Lets `owner`'s model send a task to a retained agent. The model writes only
+#' the task; you control the rest, including the agent's model, prompt, tools
+#' and budget. Each call continues the same conversation, like
+#' `owner$continue_agent()`, and returns a [DelegationOutcome] as JSON. Use
+#' the owner's inspection methods, such as `$inspect_subagents()`, for the
+#' full history.
 #'
-#' @param owner The [Agent] owning the retained conversation.
+#' @param owner The [Agent] that owns the retained agent. Register the tool on
+#'   this agent only.
 #' @param handle Handle returned by [adopt_chat()] or `owner$retain_agent()`.
-#' @param name Unique tool name selected by the host.
-#' @param description Description telling the caller when to use the specialist.
-#' @param usage_limits Explicit per-invocation allocation, intersected with the
-#'   remaining conversation and caller budgets.
-#' @return An ellmer tool. Direct calls outside its owner's governed tool runtime
-#'   reject. Registering the tool on another Agent also rejects.
+#' @param name Tool name, unique among the owner's tools.
+#' @param description Tells the model when to use this agent.
+#' @param usage_limits [UsageLimits] for each call. A call also can't exceed
+#'   the retained agent's remaining budget or the calling run's.
+#' @return An ellmer tool. Calling it outside a run of `owner`, or registering
+#'   it on another agent, is an error.
 #' @export
 delegation_tool <- function(owner, handle, name, description, usage_limits) {
   if (!inherits(owner, "Agent")) {

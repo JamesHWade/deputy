@@ -7,24 +7,26 @@
 PermissionResultDeny(reason, interrupt = FALSE)
 }
 \arguments{
-\item{reason}{Reason for denial (shown to the LLM)}
+\item{reason}{Why the call was denied. The model sees it.}
 
-\item{interrupt}{One non-missing logical value. If TRUE, stop the entire conversation (default FALSE)}
+\item{interrupt}{\code{TRUE} or \code{FALSE}. \code{TRUE} also stops the run, with stop
+reason \code{"permission_denied"}.}
 }
 \value{
-A \code{PermissionResultDeny} S7 object
+A \code{PermissionResultDeny} object.
 }
 \description{
-Returns a permission result that denies the tool from executing.
+Return this from a \code{can_use_tool} callback or a PermissionRequest hook to
+deny a tool call.
 }
 \examples{
 # Deny a tool call
 PermissionResultDeny(reason = "File write not allowed")
 
-# Deny and interrupt the conversation
+# Deny and stop the run
 PermissionResultDeny(reason = "Critical security violation", interrupt = TRUE)
 
 }
 \seealso{
-\link{CallbackResult} for read-only properties and S7 inspection.
+\link{CallbackResult} for reading result fields.
 }

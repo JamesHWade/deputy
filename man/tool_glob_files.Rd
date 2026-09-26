@@ -10,18 +10,19 @@ A tool definition created with \code{ellmer::tool()}.
 tool_glob_files(pattern = "*", path = ".", recursive = TRUE)
 }
 \arguments{
-\item{pattern}{Glob pattern to match (tool argument)}
+\item{pattern}{Glob pattern to match.}
 
-\item{path}{Base directory to search (tool argument)}
+\item{path}{Directory to search. Defaults to the working directory.}
 
-\item{recursive}{If TRUE, search subdirectories recursively (tool argument)}
+\item{recursive}{If \code{TRUE} (the default), search subdirectories.}
 }
 \value{
-When called directly, a character summary of paths matching the
-glob pattern.
+A text listing of matching paths, relative to \code{path}.
 }
 \description{
-Search for files under a directory using shell-style glob matching.
+A tool that finds files and directories matching a glob pattern such as
+\code{"*.R"} or \code{"R/*.R"}. \code{*} and \verb{?} don't match \code{/}; \verb{**} matches across
+directories.
 }
 \examples{
 directory <- tempfile()

@@ -8,23 +8,26 @@ delegation_disclosure_abort <- function() {
   )
 }
 
-#' Authorize and redact child conversation inspection
+#' Control who can inspect subagents
 #'
-#' Hosts authenticate requesters before calling inspection methods. Identifiers
-#' are routing locators, never access grants. Authorization runs before record
-#' lookup; redaction runs before each snapshot leaves Deputy. These trusted host
-#' callbacks never run as model tools. The default denies all disclosures.
-#' @param authorize Function of `requester` and fixed host `scope`; only an exact
-#'   `TRUE` permits disclosure. Errors deny access without disclosing details.
-#' @param redact Function of `view` and `requester`, returning a redacted list.
-#'   It may remove fields or content. It must not perform agent execution.
-#' @param max_bytes Maximum serialized content-payload bytes in one disclosed
-#'   snapshot or saved history, including replayed turn content but excluding
-#'   shared R class/method metadata. Oversized disclosures fail explicitly;
-#'   select fewer children or omit transcripts. Defaults to 16 MiB.
-#'   Rich table projections also have a separate conservative 16 MiB size
-#'   estimate limit; larger projections receive an explicit omission marker.
-#' @return Read-only `DelegationDisclosure` host configuration.
+#' Decides who may read subagent results and history, through the inspection
+#' methods of [Agent] and [LeadAgent] or [delegation_history()]. Pass it as
+#' `delegation_disclosure`. `authorize` is where your application checks
+#' access; `redact` removes what the requester shouldn't see. By default every
+#' request is denied. Authenticate the requester first: a delegation ID alone
+#' never grants access.
+#' @param authorize A `function(requester, scope)`. Only an exact `TRUE`
+#'   allows access; anything else, including an error, denies it. `scope`
+#'   holds the agent's `delegation_scope`, `agent_id` and `session_id`, or the
+#'   `scope` given to [delegation_history()].
+#' @param redact A `function(view, requester)` that returns `view`, as a list,
+#'   without anything the requester shouldn't see. The default returns it
+#'   unchanged.
+#' @param max_bytes Maximum size, in bytes, of one disclosed result; defaults
+#'   to 16 MiB. Larger results are an error, so ask for fewer subagents or no
+#'   transcripts. Separately, data frames in tool results are replaced by a
+#'   placeholder above an estimated 16 MiB.
+#' @return A `DelegationDisclosure` object.
 #' @export
 DelegationDisclosure <- S7::new_class(
   "DelegationDisclosure",
@@ -56,18 +59,24 @@ DelegationDisclosure <- S7::new_class(
   }
 )
 
-#' Inspect a compact delegation outcome
+#' Result of a delegation
 #'
-#' Runtime identity and stop facts are separate from model-authored answer and
-#' claims. `completed` means execution ended normally, not verified task success.
-#' Outcomes are produced by [LeadAgent] and are read-only portable values.
-#' @param runtime Plain runtime identity, status and stop-reason record.
-#' @param answer Bounded model-authored answer text.
-#' @param references Scoped artifact locators, with provenance and availability.
-#'   References never confer authorization, verification or approval.
-#' @param claims Model-authored missing-evidence and unresolved-work claims.
-#'   `NULL` means not supplied, not that no work or evidence is missing.
-#' @return A read-only `DelegationOutcome`.
+#' How one delegation ended. The runtime's record (IDs, `status`,
+#' `stop_reason`) is kept apart from what the subagent's model said (`answer`
+#' and `claims`). A `"completed"` status means the run ended normally, not
+#' that the task succeeded. [LeadAgent] returns outcomes from
+#' `$parallel_delegate()` and, as JSON, from the `delegate_to_agent` tool.
+#' Fields are read with `$`.
+#' @param runtime List of IDs, `status`, `stop_reason` and other facts
+#'   recorded by the runtime.
+#' @param answer The subagent's final reply, cut to 8 KiB. A longer reply is
+#'   saved in full in `references`.
+#' @param references Saved artifacts, such as the full answer or large tool
+#'   results, with their origin and whether they are still available.
+#' @param claims The subagent's report of `missing_evidence` and
+#'   `unresolved_work` from its structured output. `NULL` means it didn't
+#'   report, not that nothing is missing.
+#' @return A `DelegationOutcome` object.
 #' @export
 DelegationOutcome <- S7::new_class(
   "DelegationOutcome",
@@ -953,20 +962,21 @@ lead_inspect_subagents <- function(
   inspection_bound(views, disclosure)
 }
 
-#' Replay authorized settled child history
+#' Replay saved subagent history
 #'
-#' Replays host-owned snapshots from `LeadAgent$export_subagents()` using public
-#' ellmer Content records. No Chat, model request, tools, or active execution is
-#' restored. Hosts own durable storage and authenticate the supplied history;
-#' this function does not treat stored scope or IDs as authorization.
-#' @param history A portable snapshot produced by `export_subagents()`.
-#' @param requester Authenticated host request context.
-#' @param disclosure A freshly host-bound [DelegationDisclosure].
-#' @param scope Current host scope, matched exactly against the saved scope after
-#'   authorization. Obtain it from the host's own durable ownership record.
-#' @return Authorized, redacted child views with native ellmer `turns` added for
-#'   read-only rendering. Artifact availability is `unresolved` until the host
-#'   checks its retained storage; saved availability is never treated as current.
+#' Turns a snapshot from `$export_subagents()` back into ellmer turns for
+#' display, for example in [subagent_chat_server()]. Replaying never runs
+#' tools, calls a model or restores a chat. Access is checked again with
+#' `disclosure`; the IDs and scope stored in `history` grant nothing.
+#' @param history A snapshot from `$export_subagents()`.
+#' @param requester Who is asking, passed to `disclosure`. Authenticate it
+#'   first.
+#' @param disclosure A [DelegationDisclosure] for this request.
+#' @param scope The scope the history belongs to, from your own records rather
+#'   than from `history`. It must match the saved scope exactly.
+#' @return A list with one redacted view per subagent, each with ellmer
+#'   `turns`. Artifact references are marked `availability = "unresolved"`,
+#'   since the saved status may be stale.
 #' @export
 delegation_history <- function(history, requester, disclosure, scope) {
   inspection_authorize(disclosure, requester, scope)

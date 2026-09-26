@@ -7,16 +7,16 @@
 HookResultPreCompact(continue = TRUE, summary = NULL)
 }
 \arguments{
-\item{continue}{One non-missing logical value. If FALSE, cancels the compaction}
+\item{continue}{\code{TRUE} or \code{FALSE}. \code{FALSE} cancels the compaction.}
 
-\item{summary}{Optional custom summary to use for compaction}
+\item{summary}{Optional summary to use instead of generating one.}
 }
 \value{
-A \code{HookResultPreCompact} S7 object
+A \code{HookResultPreCompact} object.
 }
 \description{
-Return this from a PreCompact hook callback to control whether compaction
-should proceed.
+Return this from a PreCompact hook to cancel compaction or to supply the
+summary yourself.
 }
 \examples{
 # Allow compaction
@@ -30,5 +30,5 @@ HookResultPreCompact(summary = "Previous conversation discussed X, Y, Z.")
 
 }
 \seealso{
-\link{CallbackResult} for read-only properties and S7 inspection.
+\link{CallbackResult} for reading result fields.
 }

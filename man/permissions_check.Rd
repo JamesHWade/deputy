@@ -2,26 +2,29 @@
 % Please edit documentation in R/permissions.R
 \name{permissions_check}
 \alias{permissions_check}
-\title{Evaluate a tool call against a permission policy}
+\title{Check a tool call against a permission policy}
 \usage{
 permissions_check(permissions, tool_name, tool_input, context = list())
 }
 \arguments{
-\item{permissions}{A \link{Permissions} S7 value.}
+\item{permissions}{A \link{Permissions} object.}
 
 \item{tool_name}{Name of the tool.}
 
-\item{tool_input}{Arguments passed to the tool.}
+\item{tool_input}{Named list of arguments for the tool.}
 
-\item{context}{Additional context such as working directory, tool origin,
-and annotations.}
+\item{context}{Optional named list of details the agent normally supplies,
+such as \code{working_dir} (used to resolve relative paths) and
+\code{tool_annotations}.}
 }
 \value{
 A \link{PermissionResultAllow}, \link{PermissionResultDeny}, or
 \link{PermissionResultPending}.
 }
 \description{
-Evaluate a tool call against a permission policy
+Returns the policy's decision for one tool call. It calls the policy's
+\code{can_use_tool} callback when the mode uses one, but runs no hooks. Use it
+to test a policy.
 }
 \examples{
 permissions_check(permissions_readonly(), "read_file", list(path = "x.txt"))

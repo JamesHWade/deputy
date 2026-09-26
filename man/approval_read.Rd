@@ -2,28 +2,29 @@
 % Please edit documentation in R/approval-record.R
 \name{approval_read}
 \alias{approval_read}
-\title{Inspect a durable approval continuation}
+\title{Read a pending approval}
 \usage{
 approval_read(path)
 }
 \arguments{
-\item{path}{Path to an approval directory returned on the \code{approval} event.}
+\item{path}{Path to an approval directory, as given in the \code{approval} event.}
 }
 \value{
-An \link{ApprovalContinuation} inspection value.
+An \link{ApprovalContinuation}.
 }
 \description{
-Read an approval directory without loading a Chat or running any tools.
-Snapshots are read-only S7 values; they are inspection records, not grants.
-Use \code{agent$resume_approval(path, decision = "approve")} or \code{"deny"} to
-consume a pending decision. Edited inputs are supplied through \code{tool_input}.
+Reads an approval directory and returns the paused tool call, its status
+and the usage so far, without loading a chat or running tools. To act on a
+pending approval, call \code{agent$resume_approval(path, "approve")} or
+\code{"deny"}, passing any edited inputs as \code{tool_input}.
 
-Only \code{pending} records can resume. An \code{executing} record may have produced
-effects; an interrupted \code{resuming} or \code{continuing} record also requires host
-reconciliation. These records cannot automatically retry. OS locks prevent
-concurrent consumers and are released when the owning process exits.
+Only a \code{"pending"} approval can be resumed, and only once. A record
+interrupted while \code{"resuming"}, \code{"executing"} or \code{"continuing"} can't be
+resumed or retried: its tool may already have run, so check the effects
+yourself. File locks stop two processes resuming the same approval at
+once, but nothing guarantees that a tool runs exactly once.
 
-Approval directories contain private conversation and tool data. The host
-owns storage, access control, retention, and associations with its conversation
-store. They never contain serialized tools, callbacks, or Chat clients.
+Approval directories hold the conversation and tool inputs, so keep them
+private; access control and clean-up are up to you. They never contain
+tools, callbacks or chat clients.
 }

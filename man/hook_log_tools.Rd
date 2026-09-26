@@ -2,19 +2,21 @@
 % Please edit documentation in R/hooks.R
 \name{hook_log_tools}
 \alias{hook_log_tools}
-\title{Create a hook that logs all tool calls}
+\title{Create a hook that logs tool calls}
 \usage{
 hook_log_tools(verbose = FALSE)
 }
 \arguments{
-\item{verbose}{If TRUE, include tool result in log}
+\item{verbose}{If \code{TRUE}, also print the first 100 characters of each
+successful result.}
 }
 \value{
-A \link{HookMatcher} object
+A \link{HookMatcher}.
 }
 \description{
-Convenience function to create a PostToolUse hook that logs tool calls
-using the cli package.
+Creates a PostToolUse hook that prints a cli line after each tool call,
+saying whether it succeeded or failed. It returns a result for every call,
+so PostToolUse hooks added after it don't run. Add it last.
 }
 \examples{
 \dontrun{

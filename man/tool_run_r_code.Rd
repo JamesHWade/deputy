@@ -10,33 +10,28 @@ A tool definition created with \code{ellmer::tool()}.
 tool_run_r_code(code)
 }
 \arguments{
-\item{code}{R code to execute (tool argument)}
+\item{code}{R code to run.}
 }
 \value{
-When called directly, a character string containing captured output
-and the returned value.
+The captured output and the printed value as one string.
 }
 \description{
-A tool that executes R code and returns the result. It runs in a separate
-process for fault isolation and timeout enforcement (requires callr).
-}
-\details{
-This tool intentionally uses R's code evaluation capabilities to execute
-arbitrary R code provided by the LLM. This is a core feature for agentic
-workflows where the agent needs to perform data analysis or other R tasks.
+A tool that runs model-written R code and returns its printed output and
+value. Each call starts a fresh R process, so nothing carries over between
+calls; for a persistent session, use \link{RSession}. Calls time out after 30
+seconds.
 
-The execution boundary is explicit:
-\itemize{
-\item Code runs in a separate callr subprocess, not an OS security sandbox
-\item A timeout prevents runaway execution
-\item The Permissions system can disable this tool entirely
-}
+The code runs with your user account's access to files and the network. The
+separate process protects your R session from crashes; it is not a sandbox.
+The default permissions deny this tool; allow it with \code{r_code = TRUE} in
+\code{\link[=Permissions]{Permissions()}}. For an OS sandbox, use \code{\link[=tools_mcp_repl]{tools_mcp_repl()}}.
 }
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  tools = list(tool_run_r_code)
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = list(tool_run_r_code),
+  permissions = Permissions(r_code = TRUE)
 )
 }
 

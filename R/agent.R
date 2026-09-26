@@ -3,52 +3,29 @@ NULL
 
 # Agent class for deputy
 
-#' Agent R6 Class
+#' Agent that runs tasks with tools
 #'
 #' @description
-#' The main class for creating AI agents that can use tools to accomplish tasks.
-#' Agent wraps an ellmer Chat object and adds agentic capabilities including
-#' multi-turn execution, permission enforcement, and streaming output.
+#' An `Agent` wraps an ellmer Chat and uses it to carry out tasks. The model can
+#' call tools over several turns while the agent applies permissions, hooks and
+#' usage limits and reports its progress as [AgentEvent] objects. Use
+#' [LeadAgent] when the agent should delegate work to subagents.
 #'
-#' **Security Note:** Core agent fields are read-only from the public API after
-#' construction. Internal lifecycle methods may update the underlying state
-#' through private storage when required.
+#' An `Agent` also works as an ellmer Chat (`$chat()`, `$stream_async()`,
+#' `$get_turns()` and so on), so you can pass it to code that expects one, such
+#' as shinychat.
 #'
-#' @section Skill Methods:
-#' The following methods manage skills:
+#' Settings given to `$new()`, such as `permissions`, `usage_limits` and
+#' `working_dir`, are read-only afterwards.
 #'
-#' \describe{
-#'   \item{`$load_skill(skill, allow_conflicts = FALSE)`}{Load a [Skill] into
-#'     the agent. The `skill` parameter can be a Skill object or path to a
-#'     skill directory. If `allow_conflicts` is FALSE (default), an error is
-#'     thrown when skill tools conflict with existing tools. Set to TRUE to
-#'     allow overwriting. Returns invisible self.}
-#'   \item{`$skills()`}{Get a named list of loaded [Skill] objects.}
-#' }
-#'
-#' @section MCP Methods:
-#' The following methods manage MCP (Model Context Protocol) server tools:
-#'
-#' \describe{
-#'   \item{`$load_mcp(config = NULL, servers = NULL)`}{Load tools from MCP
-#'     servers. The `config` parameter specifies the path to the MCP config
-#'     file (defaults to `~/.config/mcptools/config.json`). The `servers`
-#'     parameter optionally filters to specific server names. Requires the
-#'     mcptools package. Returns invisible self.}
-#'   \item{`$mcp_tools()`}{Get names of loaded MCP tools.}
-#' }
-#'
-#' @section File checkpoint methods:
-#' When `enable_file_checkpointing = TRUE`, Deputy captures exact preimages for
-#' writes made through its native file tools.
-#'
-#' \describe{
-#'   \item{`$checkpoint(name = NULL, metadata = list())`}{Create a manual file
-#'     checkpoint and return its checkpoint ID.}
-#'   \item{`$list_checkpoints()`}{List available file checkpoints.}
-#'   \item{`$rewind_files(checkpoint_id)`}{Restore files to a checkpoint and
-#'     invalidate later file history. Conversation history is not changed.}
-#' }
+#' @section File checkpoints:
+#' With `enable_file_checkpointing = TRUE`, the agent records the previous
+#' contents of files changed by `write_file`, `edit_file` and `multi_edit`.
+#' Changes made any other way, including by `run_r_code` or `run_bash`, are not
+#' recorded. A checkpoint is created at the start of every run, and
+#' `$checkpoint()` creates one on demand. `$rewind_files()` restores files to a
+#' checkpoint without changing the conversation. A file tool call that would
+#' exceed the checkpoint size limits is refused.
 #'
 #' @include agent-approval.R agent-stream.R agent-session.R agent-context.R agent-tool-callbacks.R agent-tool-records.R
 #' @importFrom later run_now
@@ -59,7 +36,7 @@ NULL
 #' \dontrun{
 #' # Create an agent with file tools
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = tools_file()
 #' )
 #'
@@ -80,55 +57,58 @@ Agent <- R6::R6Class(
 
   public = list(
     #' @description
-    #' Create a new Agent.
+    #' Create a new agent.
     #'
-    #' @param chat An ellmer Chat object created by `ellmer::chat()` or
-    #'   provider-specific functions like `ellmer::chat_openai()`.
+    #' @param chat An ellmer Chat, for example from `ellmer::chat()`.
     #' @param tools A list of tools created with `ellmer::tool()`. See
-    #'   [tools_file()] and [tools_code()] for built-in tool bundles.
-    #' @param system_prompt Optional system prompt. If provided, overrides the
-    #'   chat object's existing system prompt.
-    #' @param permissions A [Permissions] object controlling what the agent can do.
-    #'   Defaults to [permissions_standard()].
-    #' @param usage_limits [UsageLimits] applied independently to each run.
-    #'   Defaults to 25 model requests. Use `UsageLimits()` for no limits.
+    #'   [tools_preset()], [tools_file()] and [tools_code()] for built-in tools.
+    #' @param system_prompt Optional system prompt. Replaces the Chat's system
+    #'   prompt.
+    #' @param permissions A [Permissions] policy. Defaults to
+    #'   [permissions_standard()] for `working_dir`.
+    #' @param usage_limits [UsageLimits] applied to each run separately.
+    #'   Defaults to 25 model requests per run. `UsageLimits()` sets no limits.
     #' @param context_policy A [ContextPolicy] controlling automatic compaction
-    #'   and durable offloading of large tool results.
-    #' @param enable_file_checkpointing Whether to journal exact file preimages
-    #'   for Deputy's mutating file tools. A checkpoint is created automatically
-    #'   at the beginning of every run.
-    #' @param file_checkpoint_max_file_bytes Maximum bytes captured for one
-    #'   file preimage. Defaults to 50 MiB.
-    #' @param file_checkpoint_max_journal_bytes Maximum aggregate serialized
-    #'   bytes for checkpoint records, markers, metadata, and pending captures.
-    #'   Defaults to 250 MiB.
-    #' @param working_dir Working directory for file operations. Defaults to
-    #'   current directory.
-    #' @param session_id Optional stable session identifier used for correlation.
-    #'   A unique identifier is generated by default.
-    #' @param run_context Immutable canonical JSON-compatible product context
-    #'   inherited by each run. Credential-like fields and runtime objects are
-    #'   rejected.
-    #' @param agent_id Optional stable identifier for this Agent instance.
-    #'   A unique identifier is generated by default.
-    #' @param agent_name Optional human-readable Agent name.
-    #' @param fallback_chats Ordered configured ellmer Chats, explicitly allowed
-    #'   to receive this conversation after a transient failure before any
-    #'   response. Templates are cloned; their connection/model settings are
-    #'   preserved and their history, system prompt, and tools are replaced by
-    #'   the Agent's. The selected Chat remains active for subsequent runs.
-    #'   Applies to governed task and structured requests. Pre-run automatic
-    #'   compaction retains the separate [ContextPolicy] summary-failure policy.
-    #' @param approval_dir Optional existing host-owned directory for durable tool
-    #'   approvals. Enables sequential tool execution and an execution journal.
-    #'   See [approval_read()] and `$resume_approval()`.
-    #' @param delegation_scope Plain host-owned scope for child disclosure.
-    #' @param delegation_disclosure Host-only [DelegationDisclosure], deny by default.
-    #' @param delegation_observation Child activity bounds.
-    #' @param trusted_results Optional [TrustedResults] policy designating the
-    #'   only tools that produce each kind of host result. Fixed at construction;
-    #'   every published tool registry is checked against it.
-    #' @return A new `Agent` object
+    #'   and where large tool results are stored. The default compacts the
+    #'   conversation once it passes about 32,000 tokens.
+    #' @param enable_file_checkpointing If `TRUE`, record file changes so they
+    #'   can be undone with `$rewind_files()`. See the "File checkpoints" section.
+    #' @param file_checkpoint_max_file_bytes Largest file, in bytes, whose
+    #'   previous contents a checkpoint can record. Defaults to 50 MiB.
+    #' @param file_checkpoint_max_journal_bytes Maximum total size, in bytes, of
+    #'   all checkpoint records. Defaults to 250 MiB.
+    #' @param working_dir Directory that file tools work in. Must exist.
+    #'   Defaults to the current directory.
+    #' @param session_id Optional session ID. One is generated if not given.
+    #' @param run_context Named list of JSON-compatible values (strings,
+    #'   numbers, logicals and nested lists) attached to every event and result,
+    #'   for example user or conversation IDs. Keys that look like credentials,
+    #'   such as `password` or `api_key`, are rejected.
+    #' @param agent_id Optional agent ID. One is generated if not given.
+    #' @param agent_name Optional human-readable name.
+    #' @param fallback_chats A list of ellmer Chats to try, in order, when a
+    #'   request fails with a transient error (a network failure or HTTP 408,
+    #'   429, 500, 502, 503 or 504) before the run has received any response or
+    #'   called any tool. Each must have no turns or tools; the agent copies it
+    #'   and gives it the agent's system prompt, history and tools. Once used, a
+    #'   fallback stays in use for later runs. Compaction summaries don't use
+    #'   these; see `summary_fallback_chats` in [ContextPolicy()].
+    #' @param approval_dir A directory, which must already exist, where tool
+    #'   calls waiting for approval are saved, so you can decide them later
+    #'   with `$resume_approval()`, even after restarting R. Tools that can wait
+    #'   for approval must be created with `ellmer::tool(convert = FALSE)`. When
+    #'   set, tools run one at a time. See [approval_read()].
+    #' @param delegation_scope Named list identifying what this agent belongs
+    #'   to, such as an owner or conversation ID. It is passed as `scope` to the
+    #'   `authorize` function of `delegation_disclosure`.
+    #' @param delegation_disclosure A [DelegationDisclosure] that decides who may
+    #'   inspect this agent's subagents. The default denies everyone.
+    #' @param delegation_observation A [DelegationObservation] setting how many
+    #'   subagent events are kept for `$observe_subagents()`.
+    #' @param trusted_results Optional [TrustedResults] policy naming the one
+    #'   tool allowed to produce each type of trusted result. Registering a tool
+    #'   that could get around it is an error.
+    #' @return A new `Agent` object.
     initialize = function(
       chat,
       tools = list(),
@@ -275,40 +255,50 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Retain a specialist for explicit in-process follow-ups. The host transfers
-    #' execution ownership to this Agent. Ordinary runs on the specialist reject
-    #' until release. Its retained history, prompt, model, and tools cannot be
-    #' changed through the specialist or another Agent sharing its Chat until
-    #' the idle handle is released. Its tools and external resources remain
-    #' host-owned. Retention replaces the Chat's tool callbacks with the
-    #' specialist's governed runtime, preserving observers registered through
-    #' that specialist's `$on_tool_request()` and `$on_tool_result()` methods.
-    #' New observer registrations and hook configuration changes on the specialist
-    #' or its aliases require release.
-    #' @param agent A standalone Agent, with no durable approval or fallback.
-    #' @param usage_limits Explicit cumulative ceiling for the handle, or the
-    #'   allocation for one continuation. Both intersect the specialist and caller.
-    #' @param max_runs Finite retained invocation limit; default 32.
-    #' @return An opaque handle belonging only to this Agent.
+    #' Retain another agent so you can send it more tasks with
+    #' `$continue_agent()`. The retained agent keeps its conversation between
+    #' tasks.
+    #'
+    #' Until you call `$release_agent()`, the retained agent can't be run
+    #' directly, and its conversation, prompt, model, tools, hooks and tool
+    #' observers can't be changed (observers it already has keep working). An
+    #' agent can retain up to 32 others at a time. See
+    #' `vignette("retained-agents", package = "deputy")`.
+    #' @param agent Another `Agent` (not a `LeadAgent`) with its own Chat and no
+    #'   `approval_dir`, `fallback_chats` or provider-native tools.
+    #' @param usage_limits [UsageLimits] for all of its tasks combined, also
+    #'   capped by the retained agent's own limits.
+    #' @param max_runs Maximum number of tasks. Defaults to 32.
+    #' @return A handle (a string) that only this agent can use.
     retain_agent = function(agent, usage_limits, max_runs = 32L) {
       retain_conversation(self, agent, usage_limits, max_runs)
     },
 
     #' @description
-    #' Retain a host-configured graph of curated Agents. One root owns all chats,
-    #' budgets and descendant inspection. Limits accumulate until graph release.
-    #' Root depth is zero; concurrency counts queued and running descendants,
-    #' including callers waiting for their own children. Cycles may be configured,
-    #' but calls into an active chat reject before dispatch.
-    #' @param agents Named list of distinct standalone Agents. `root` is reserved.
-    #' @param routes Named list keyed by `root` or an agent name. Each value is a
-    #'   named list of tools, each with `target`, `description` and `usage_limits`.
-    #' @param usage_limits Cumulative graph UsageLimits; max_requests is required.
-    #' @param max_depth Maximum descendant depth, with direct children at one.
-    #' @param max_delegations Maximum admitted invocations over the graph lifetime.
-    #' @param max_concurrency Maximum simultaneously admitted child invocations.
-    #' @param max_runs Maximum invocations of each retained conversation.
-    #' @return Named conversation handles, usable for explicit host follow-ups.
+    #' Retain several agents at once and let them delegate to each other through
+    #' tools you define in `routes`. This agent is the root of the graph and
+    #' holds every conversation in it. The graph's usage limits add up across
+    #' all delegated runs until you call `$release_agent_graph()`.
+    #'
+    #' Routes may form a cycle, but delegating to an agent that is already
+    #' running fails. An agent waiting on its own delegate still counts toward
+    #' `max_concurrency`.
+    #' @param agents Named list of distinct agents, each meeting the conditions
+    #'   in `$retain_agent()`. The name `root` is reserved for this agent.
+    #' @param routes Named list keyed by `root` or an agent name. Each element is
+    #'   a named list of delegation tools to add to that agent, where each tool
+    #'   is a list with `target` (an agent name), `description` and
+    #'   `usage_limits`.
+    #' @param usage_limits [UsageLimits] for the whole graph. `max_requests` is
+    #'   required.
+    #' @param max_depth Maximum delegation depth. This agent's direct delegates
+    #'   are at depth 1.
+    #' @param max_delegations Maximum number of delegations over the graph's
+    #'   lifetime.
+    #' @param max_concurrency Maximum number of delegations running at once.
+    #' @param max_runs Maximum number of tasks for each agent in the graph.
+    #' @return A named character vector of handles, one per agent, for use with
+    #'   `$continue_agent()`.
     retain_agent_graph = function(
       agents,
       routes,
@@ -330,8 +320,10 @@ Agent <- R6::R6Class(
       )
     },
 
-    #' @description Read cumulative graph usage, including active descendants.
-    #' @return An AgentUsage value. This trusted host API grants no disclosure.
+    #' @description Get the total usage of all delegated runs in this agent's
+    #' graph, including runs still in progress. Errors if this agent doesn't own
+    #' a graph.
+    #' @return An [AgentUsage] object.
     delegation_graph_usage = function() {
       tree <- private$.delegation_tree
       if (is.null(tree) || !identical(delegation_tree_root(tree), self)) {
@@ -340,23 +332,27 @@ Agent <- R6::R6Class(
       tree_usage(tree)
     },
 
-    #' @description Release an idle graph, removing its route tools and handles.
-    #' Borrowed tools and resources remain host-owned. Export inspection first.
-    #' A new graph is a new host authorization; models cannot reset its budgets.
-    #' @return Invisible NULL.
+    #' @description Release the graph, removing its route tools and handles.
+    #' Errors if anything in it is still running. This also discards the
+    #' graph's delegation records, so save them first with `$export_subagents()`
+    #' if you need them. The agents' own tools and connections are left open.
+    #' @return `NULL`, invisibly.
     release_agent_graph = function() release_agent_graph(self),
 
     #' @description
-    #' Continue a retained specialist with a new brief and explicit allocation.
-    #' Failed and cancelled conversations require this explicit call to restart.
-    #' Busy, changed, released and foreign conversations reject before dispatch.
-    #' Hosts authorize control calls; a handle alone grants no access on another
-    #' Agent. The returned promise is the wait handle and has one runtime consumer.
-    #' @param handle An owner-local handle from `$retain_agent()`.
-    #' @param task A new bounded plain-text brief. Existing history is retained.
-    #' @param usage_limits Explicit [UsageLimits] allocation for this invocation.
-    #' @return Promise resolving to an AgentResult. Cancellation before dispatch
-    #'   returns zero usage and no run ID because no child run started.
+    #' Send a retained agent its next task. It still has its earlier
+    #' conversation. This errors, before any request is made, if the agent is
+    #' busy, was changed or released, has used up `max_runs`, or the handle
+    #' belongs to another agent. After a failed or cancelled task, call this
+    #' again to carry on.
+    #' @param handle A handle from this agent's `$retain_agent()` or
+    #'   `$retain_agent_graph()`.
+    #' @param task The next task, as one string of at most 64 KiB.
+    #' @param usage_limits [UsageLimits] for this task. It is also capped by
+    #'   what remains of the handle's total budget and by the retained agent's
+    #'   own limits.
+    #' @return A promise that resolves to an [AgentResult]. If the task is
+    #'   cancelled before it starts, the result has zero usage and no run ID.
     continue_agent_async = function(handle, task, usage_limits) {
       continue_conversation(self, handle, task, usage_limits)
     },
@@ -364,7 +360,7 @@ Agent <- R6::R6Class(
     #' @description
     #' Blocking version of `$continue_agent_async()`.
     #' @param handle,task,usage_limits See `$continue_agent_async()`.
-    #' @return An AgentResult.
+    #' @return An [AgentResult].
     continue_agent = function(handle, task, usage_limits) {
       private$resolve_promise(self$continue_agent_async(
         handle,
@@ -374,11 +370,13 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Cancel the active retained invocation cooperatively. Repeated calls are
-    #' harmless; cancellation retains partial history and does not restart work.
-    #' @param handle Owner-local conversation handle.
-    #' @param reason Stable cancellation reason.
-    #' @return Invisible logical indicating whether cancellation was requested.
+    #' Ask a retained agent to stop its current task. The run stops at the next
+    #' safe point and keeps the conversation so far. Calling this more than once
+    #' is harmless.
+    #' @param handle A handle from `$retain_agent()`.
+    #' @param reason Stop reason recorded on the cancelled run.
+    #' @return `TRUE`, invisibly, if a task was cancelled; `FALSE` if the agent
+    #'   was idle.
     cancel_agent = function(handle, reason = "interrupted") {
       entry <- conversation_entry(self, handle)
       if (!entry$busy || !length(entry$ids)) {
@@ -388,28 +386,30 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Release an idle handle and its retained invocation snapshots. Export
-    #' inspection history first if needed. Borrowed tools are never closed.
-    #' Busy handles must be cancelled and awaited first. Release is explicit;
-    #' handles otherwise live until their owning Agent is collected. Neither
-    #' handles nor saved transcripts promise recovery after an R restart.
-    #' @param handle Owner-local conversation handle.
-    #' @return Invisible NULL.
+    #' Stop retaining an agent so it can be used on its own again. This also
+    #' discards its delegation records, so save them first with
+    #' `$export_subagents()` if you need them. Its tools and connections stay
+    #' open. Errors while the agent is running: cancel it with `$cancel_agent()`
+    #' and wait for the task to end first. Agents in a graph are released with
+    #' `$release_agent_graph()`. Handles don't survive an R restart.
+    #' @param handle A handle from `$retain_agent()`.
+    #' @return `NULL`, invisibly.
     release_agent = function(handle) release_conversation(self, handle),
 
     #' @description
-    #' List admitted subagent delegations in admission order, including live work.
-    #' Status is `queued`, `running`, `completed`, `failed`, `stopped`,
-    #' `not_started`, or `suspended` (for supported approval suspensions).
-    #' `completed` means the run stopped with `complete`, not verified task success.
-    #' `stop_reason` retains the exact runtime reason. Identifiers and timestamps
-    #' are `NA` until assigned. `completed_at` marks settlement of this invocation,
-    #' including suspension. `hook_error` records observer errors independently.
-    #' `input_error` identifies preparation rejection as `invalid`, `missing`,
-    #' `stale`, `unauthorized`, or `oversized`. These in-memory records are not
-    #' durable jobs or a token event feed.
+    #' List this agent's delegations, oldest first, including ones still
+    #' running. The records are kept in memory only.
     #'
-    #' @return Data frame with one row per admitted delegation
+    #' `status` is `"queued"`, `"running"`, `"completed"`, `"failed"`,
+    #' `"stopped"`, `"not_started"` or `"suspended"` (waiting for a tool
+    #' approval). `"completed"` means the subagent finished normally, not that
+    #' it did the task well; `stop_reason` gives the exact reason. IDs and times
+    #' are `NA` until known, and `completed_at` is set when the run ends or is
+    #' suspended. `input_error` says why a task was rejected before it ran:
+    #' `"invalid"`, `"missing"`, `"stale"`, `"unauthorized"` or `"oversized"`.
+    #' `hook_error` records errors from hooks watching the subagent.
+    #'
+    #' @return A data frame with one row per delegation.
     list_subagents = function() {
       runs <- lead_delegation_records(self)
       if (length(runs) == 0) {
@@ -473,12 +473,13 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get retained results from delegated sub-agent runs.
+    #' Get the results of delegated runs.
     #'
-    #' @param agent_name Optional sub-agent name filter
-    #' @param delegation_id Optional delegation identifier filter
-    #' @return List of [AgentResult] objects in admission order, with `NULL` for
-    #'   live, unstarted, or failed runs that did not return an AgentResult
+    #' @param agent_name Only return results from subagents with this name.
+    #' @param delegation_id Only return the result of this delegation.
+    #' @return A list of [AgentResult] objects, oldest first. It holds `NULL`
+    #'   for runs that are still going, never started, or failed without a
+    #'   result.
     get_subagent_results = function(agent_name = NULL, delegation_id = NULL) {
       runs <- lead_delegation_records(self)
       if (!is.null(agent_name)) {
@@ -497,14 +498,15 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get current or retained conversation turns for admitted delegations.
-    #' Live snapshots contain available turns, not every in-flight token.
-    #' Reading history does not add it to the lead's model context. Hosts must
-    #' authorize and redact disclosures before exposing these records to users.
+    #' Get the conversation turns of each delegation. For a subagent that is
+    #' still running, you get the turns completed so far. Reading them doesn't
+    #' add anything to this agent's context. No disclosure checks are applied,
+    #' so use `$inspect_subagents()` before showing history to users.
     #'
-    #' @param agent_name Optional sub-agent name filter
-    #' @param session_id Optional sub-agent session id filter
-    #' @return List of turn histories
+    #' @param agent_name Only return turns from subagents with this name.
+    #' @param session_id Only return turns from the subagent with this session
+    #'   ID.
+    #' @return A list with one list of ellmer turns per delegation.
     get_subagent_messages = function(agent_name = NULL, session_id = NULL) {
       runs <- lead_delegation_records(self, messages = TRUE)
       if (!is.null(agent_name)) {
@@ -524,18 +526,18 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Inspect initial manifests or current model context in admission order.
-    #' Initial manifests are immutable preparation receipts, separate from
-    #' current working context and retained conversation turns. No provider
-    #' requests or tool calls occur during inspection. Hosts authorize disclosure.
-    #' @param delegation_id Optional exact delegation identifier.
-    #' @param view `"initial"` for [DelegationManifest] values, `"current"` for
-    #'   available system prompts and working turns.
-    #' @param redact For initial manifests only, return an explicitly redacted
-    #'   portable view omitting task, instructions and source text. Metadata still
-    #'   requires host disclosure policy. The retained manifest is unchanged.
-    #' @return A list; `NULL` entries mean no prepared context is available.
-    #'   Current context is retained at settlement; no matches returns `list()`.
+    #' See what each subagent was given at the start, or what its model context
+    #' holds now, oldest first. Nothing is sent to a model. No disclosure checks
+    #' are applied.
+    #' @param delegation_id Only return this delegation.
+    #' @param view `"initial"` returns the [DelegationManifest] recording what
+    #'   the subagent started with. `"current"` returns a list with its
+    #'   `system_prompt` and the `turns` in its model context.
+    #' @param redact If `TRUE` (only with `view = "initial"`), leave out the
+    #'   task, instructions and source text. Other metadata is still included.
+    #' @return A list with one entry per delegation, `NULL` where nothing is
+    #'   available. For a finished subagent, `"current"` shows its context when
+    #'   it finished.
     get_subagent_contexts = function(
       delegation_id = NULL,
       view = "initial",
@@ -545,12 +547,16 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Observe bounded child activity without consuming or driving its stream.
-    #' @param requester Host-authenticated request context.
-    #' @param delegation_id Optional child locator filter.
-    #' @param after Optional cursor returned by a subscription on this lead.
-    #' @return A [DelegationSubscription]. Snapshot, observation, cancellation
-    #'   and continuation are distinct operations. Closing it only detaches.
+    #' Follow subagent activity as it happens. The returned subscription lets
+    #' you poll for new events without affecting the subagents' runs.
+    #' @param requester Whoever is asking, as identified by your app (for
+    #'   example a user ID). The `delegation_disclosure` policy checks it on
+    #'   every read.
+    #' @param delegation_id Only follow this delegation.
+    #' @param after A cursor from an earlier subscription on this agent, to
+    #'   resume from. `NULL` starts from now.
+    #' @return A [DelegationSubscription]. Closing it stops observing but
+    #'   doesn't stop any subagent.
     observe_subagents = function(
       requester,
       delegation_id = NULL,
@@ -560,12 +566,14 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Ask one child to stop cooperatively. This trusted host control API is
-    #' separate from disclosure authorization; hosts must authorize the action
-    #' before routing a user request here. It is never exposed as an agent tool.
-    #' @param delegation_id Exact admitted child locator.
-    #' @param reason Stable stop reason, default `"interrupted"`.
-    #' @return Invisible logical; FALSE for missing or already settled children.
+    #' Ask a running subagent to stop. It stops at the next safe point; in a
+    #' delegation graph, its own delegations stop too. This doesn't consult
+    #' `delegation_disclosure`, so check that the user may do this before
+    #' calling it. Models can't call this method.
+    #' @param delegation_id The delegation to stop.
+    #' @param reason Stop reason to record. Defaults to `"interrupted"`.
+    #' @return `TRUE`, invisibly, if a run was stopped; `FALSE` if the
+    #'   delegation is unknown or already finished.
     interrupt_subagent = function(delegation_id, reason = "interrupted") {
       delegation_id <- delegation_text(delegation_id, "delegation_id")
       reason <- delegation_text(reason, "reason")
@@ -583,17 +591,21 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Inspect authorized child snapshots without executing or changing context.
-    #' Runtime facts, model claims, per-run usage, retained transcript and initial
-    #' manifest are separate. Retained conversations also report cumulative
-    #' usage across invocations. Unknown usage is NULL.
-    #' @param requester Host-authenticated request context, never model arguments.
-    #' @param delegation_id Optional exact delegation locator, checked only after
-    #'   disclosure authorization. Unknown IDs return an empty list.
-    #' @param transcript Include public ellmer content records and replayed
-    #'   `turns`. Hidden thinking, provider JSON and display closures are omitted.
-    #' @return Authorized and redacted read-only view lists. These are snapshots;
-    #'   modifying a returned list never changes the child or lead context.
+    #' Get a snapshot of each delegation that `requester` may see: its task, its
+    #' outcome (what Deputy observed, kept apart from what the subagent
+    #' claimed), usage, the [DelegationManifest] it started from and any errors.
+    #' Retained agents also report their total usage across tasks; unknown usage
+    #' is `NULL`. Each view passes through the `delegation_disclosure` policy,
+    #' which may redact it. Errors if `requester` isn't allowed. Nothing is run.
+    #' @param requester Whoever is asking, as identified by your app. Never pass
+    #'   values that came from a model.
+    #' @param delegation_id Only return this delegation. Unknown IDs give an
+    #'   empty list.
+    #' @param transcript If `TRUE`, also include the conversation, as
+    #'   `transcript` records and as ellmer `turns`. Hidden reasoning and raw
+    #'   provider data are left out.
+    #' @return A list of views, one per delegation. Changing them doesn't
+    #'   affect any agent.
     inspect_subagents = function(
       requester,
       delegation_id = NULL,
@@ -615,12 +627,13 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Export authorized settled child history for host-owned durable storage.
-    #' This is observation history, not a resumable Agent/session snapshot.
+    #' Export finished delegations, with their conversations, so you can store
+    #' them and view them later with [delegation_history()]. The export is a
+    #' record to read, not something you can resume.
     #' @param requester,delegation_id See `$inspect_subagents()`.
-    #' @return Portable versioned list for [delegation_history()]. Export rejects
-    #'   active selected children. The host supplies current disclosure policy
-    #'   when reading it back. Only public ellmer records are retained.
+    #' @return A plain list for [delegation_history()]. Errors if a selected
+    #'   delegation is still running. Reading it back checks a
+    #'   [DelegationDisclosure] again.
     export_subagents = function(requester, delegation_id = NULL) {
       views <- lead_inspect_subagents(
         self,
@@ -641,12 +654,14 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Read an authorized retained delegation-answer artifact.
+    #' Read part of a large result that a subagent saved, using a reference
+    #' from its `$inspect_subagents()` view. No tool or model is run.
     #' @param requester,delegation_id See `$inspect_subagents()`.
-    #' @param reference An exact reference included in the redacted authorized
-    #'   child view. Missing or expired artifacts fail explicitly.
-    #' @param offset Character offset for a bounded chunk, starting at zero.
-    #' @return Existing bounded tool-result chunk; no tool or model executes.
+    #' @param reference A reference exactly as it appears in the delegation's
+    #'   view. Errors if it isn't there or the saved result is gone.
+    #' @param offset Character position to start reading from, starting at 0.
+    #' @return The view after redaction: a list whose `result` holds up to
+    #'   8,192 characters from `offset`, with the next offset and total length.
     read_subagent_result = function(
       requester,
       delegation_id,
@@ -705,26 +720,34 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Run an agentic task with semantic streaming events.
+    #' Run a task and stream its progress.
     #'
     #' Returns a generator that yields [AgentEvent] objects as the agent works.
-    #' The agent will continue until the task is complete, a run limit is
-    #' reached, or it is interrupted.
+    #' The run continues until the model finishes, a usage limit is reached or
+    #' it is interrupted. The `"stop"` event gives the reason, and `$last_run()`
+    #' then returns the [AgentResult].
     #'
-    #' @param task The task for the agent to perform
-    #' @param usage_limits Optional [UsageLimits] override for this run.
-    #' @param include_partial_messages If TRUE (default), yield partial text
-    #'   chunks as they stream. If FALSE, only yield `text_complete`.
-    #' @param run_context Canonical JSON-compatible context to add to or narrow
-    #'   for this run. Protected constructor identity fields cannot change.
-    #' @return A generator yielding [AgentEvent] objects
-    #' @param type Optional ellmer type. Complete the task with tools, then
-    #'   extract from the conversation within the same run budget.
-    #' @param validate Optional synchronous function receiving ellmer's value.
-    #'   Return TRUE, FALSE, or non-empty correction feedback. Errors and NA
-    #'   are terminal.
-    #' @param max_corrections Maximum additional structured requests after
-    #'   invalid output. Defaults to zero; all attempts share the run budget.
+    #' @param task The task for the agent.
+    #' @param usage_limits [UsageLimits] for this run. `NULL` fields use the
+    #'   agent's limits.
+    #' @param include_partial_messages If `TRUE` (the default), yield a `"text"`
+    #'   event for each streamed chunk. If `FALSE`, skip them; the full text
+    #'   still arrives in the `"text_complete"` event.
+    #' @param run_context Named list merged into the agent's `run_context` for
+    #'   this run. It can't change or remove ID fields (keys ending in `id`)
+    #'   that the agent already sets.
+    #' @return A generator yielding [AgentEvent] objects.
+    #' @param type Optional ellmer type, such as `ellmer::type_object()`. After
+    #'   the task, the agent extracts data of this type from the conversation
+    #'   into the result's `structured_output`. This counts toward the run's
+    #'   limits.
+    #' @param validate Optional function that checks the extracted value. Return
+    #'   `TRUE` to accept it, or `FALSE` or a message to reject it; a message is
+    #'   sent to the model as feedback. An error or any other return value, such
+    #'   as `NA`, ends the run with an error.
+    #' @param max_corrections How many times to ask the model to fix a rejected
+    #'   value. Defaults to 0. If the value is still rejected, the run errors.
+    #'   Every attempt counts toward the run's limits.
     run = function(
       task,
       usage_limits = NULL,
@@ -761,25 +784,30 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Run an agentic task and block until completion.
+    #' Run a task and wait for it to finish.
     #'
-    #' Convenience wrapper around `run()` that collects all events and returns
-    #' an [AgentResult].
+    #' Runs `$run()` to the end and returns the [AgentResult], which holds
+    #' every event.
     #'
-    #' @param task The task for the agent to perform
-    #' @param usage_limits Optional [UsageLimits] override for this run.
-    #' @param include_partial_messages If TRUE (default), keep partial text
-    #'   events. If FALSE, suppress partials.
-    #' @param run_context Canonical JSON-compatible context to add to or narrow
-    #'   for this run. Protected constructor identity fields cannot change.
-    #' @return An [AgentResult] object
-    #' @param type Optional ellmer type. Complete the task with tools, then
-    #'   extract from the conversation within the same run budget.
-    #' @param validate Optional synchronous function receiving ellmer's value.
-    #'   Return TRUE, FALSE, or non-empty correction feedback. Errors and NA
-    #'   are terminal.
-    #' @param max_corrections Maximum additional structured requests after
-    #'   invalid output. Defaults to zero; all attempts share the run budget.
+    #' @param task The task for the agent.
+    #' @param usage_limits [UsageLimits] for this run. `NULL` fields use the
+    #'   agent's limits.
+    #' @param include_partial_messages Passed to `$run()`. It doesn't change the
+    #'   returned result, which always includes the `"text"` events.
+    #' @param run_context Named list merged into the agent's `run_context` for
+    #'   this run. It can't change or remove ID fields (keys ending in `id`)
+    #'   that the agent already sets.
+    #' @return An [AgentResult] object.
+    #' @param type Optional ellmer type, such as `ellmer::type_object()`. After
+    #'   the task, the agent extracts data of this type from the conversation
+    #'   into `result$structured_output`. This counts toward the run's limits.
+    #' @param validate Optional function that checks the extracted value. Return
+    #'   `TRUE` to accept it, or `FALSE` or a message to reject it; a message is
+    #'   sent to the model as feedback. An error or any other return value, such
+    #'   as `NA`, ends the run with an error.
+    #' @param max_corrections How many times to ask the model to fix a rejected
+    #'   value. Defaults to 0. If the value is still rejected, the run errors.
+    #'   Every attempt counts toward the run's limits.
     run_sync = function(
       task,
       usage_limits = NULL,
@@ -825,15 +853,15 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Send messages synchronously using the ellmer Chat interface.
-    #'
-    #' All requests pass through Deputy's run kernel. The return value matches
-    #' `ellmer::Chat$chat()`; inspect [AgentResult] metadata with `$last_run()`.
-    #' @param ... User content accepted by ellmer.
-    #' @param echo Accepted for ellmer compatibility.
-    #' @param run_context Canonical JSON-compatible context to add to or narrow
-    #'   for this run.
-    #' @return The final assistant text.
+    #' Send a message and return the reply, like `ellmer::Chat$chat()`, with the
+    #' agent's tools, permissions, hooks and usage limits applied. `$last_run()`
+    #' then returns the full [AgentResult].
+    #' @param ... Message content, as for ellmer.
+    #' @param echo Print the reply unless this is `"none"` or `FALSE`. Defaults
+    #'   to `getOption("ellmer_echo", "none")`.
+    #' @param run_context Named list merged into the agent's `run_context` for
+    #'   this run.
+    #' @return The reply text.
     chat = function(..., echo = NULL, run_context = list()) {
       effective_run_context <- merge_run_context(
         private$.run_context,
@@ -853,13 +881,13 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Send messages asynchronously using the ellmer Chat interface.
-    #' @param ... User content accepted by ellmer.
-    #' @param tool_mode Whether ellmer executes tool calls concurrently or
-    #'   sequentially.
-    #' @param run_context Canonical JSON-compatible context to add to or narrow
-    #'   for this run.
-    #' @return A promise resolving to the final assistant text.
+    #' Asynchronous version of `$chat()`.
+    #' @param ... Message content, as for ellmer.
+    #' @param tool_mode `"concurrent"` runs the tool calls from one response in
+    #'   parallel; `"sequential"` runs them one at a time.
+    #' @param run_context Named list merged into the agent's `run_context` for
+    #'   this run.
+    #' @return A promise that resolves to the reply text.
     chat_async = function(
       ...,
       tool_mode = c("concurrent", "sequential"),
@@ -882,19 +910,25 @@ Agent <- R6::R6Class(
         promises::then(function(result) result$response)
     },
 
-    #' @description Send a structured request through the governed run kernel.
-    #' @param ... User content accepted by ellmer.
-    #' @param type An ellmer structured-output type.
-    #' @param echo Echo mode forwarded to ellmer.
-    #' @param convert Whether ellmer converts the structured response.
-    #' @param run_context Canonical JSON-compatible context to add to or narrow
-    #'   for this run.
-    #' @return Structured response data.
-    #' @param validate Optional synchronous function receiving ellmer's value.
-    #'   Return TRUE, FALSE, or non-empty correction feedback. Errors and NA
-    #'   are terminal.
-    #' @param max_corrections Maximum additional structured requests after
-    #'   invalid output. Defaults to zero; all attempts share the run budget.
+    #' @description Extract structured data, like
+    #' `ellmer::Chat$chat_structured()`, with the agent's permissions, hooks and
+    #' usage limits applied.
+    #' @param ... Message content, as for ellmer.
+    #' @param type An ellmer type describing the data, such as
+    #'   `ellmer::type_object()`.
+    #' @param echo Passed to ellmer.
+    #' @param convert Passed to ellmer: whether to convert the result to R
+    #'   objects.
+    #' @param run_context Named list merged into the agent's `run_context` for
+    #'   this run.
+    #' @return The extracted data.
+    #' @param validate Optional function that checks the extracted value. Return
+    #'   `TRUE` to accept it, or `FALSE` or a message to reject it; a message is
+    #'   sent to the model as feedback. An error or any other return value, such
+    #'   as `NA`, ends the run with an error.
+    #' @param max_corrections How many times to ask the model to fix a rejected
+    #'   value. Defaults to 0. If the value is still rejected, the run errors.
+    #'   Every attempt counts toward the usage limits.
     chat_structured = function(
       ...,
       type,
@@ -915,19 +949,23 @@ Agent <- R6::R6Class(
       ))
     },
 
-    #' @description Send an asynchronous structured request through Deputy.
-    #' @param ... User content accepted by ellmer.
-    #' @param type An ellmer structured-output type.
-    #' @param echo Echo mode forwarded to ellmer.
-    #' @param convert Whether ellmer converts the structured response.
-    #' @param run_context Canonical JSON-compatible context to add to or narrow
-    #'   for this run.
-    #' @return A promise resolving to structured response data.
-    #' @param validate Optional synchronous function receiving ellmer's value.
-    #'   Return TRUE, FALSE, or non-empty correction feedback. Errors and NA
-    #'   are terminal.
-    #' @param max_corrections Maximum additional structured requests after
-    #'   invalid output. Defaults to zero; all attempts share the run budget.
+    #' @description Asynchronous version of `$chat_structured()`.
+    #' @param ... Message content, as for ellmer.
+    #' @param type An ellmer type describing the data, such as
+    #'   `ellmer::type_object()`.
+    #' @param echo Passed to ellmer.
+    #' @param convert Passed to ellmer: whether to convert the result to R
+    #'   objects.
+    #' @param run_context Named list merged into the agent's `run_context` for
+    #'   this run.
+    #' @return A promise that resolves to the extracted data.
+    #' @param validate Optional function that checks the extracted value. Return
+    #'   `TRUE` to accept it, or `FALSE` or a message to reject it; a message is
+    #'   sent to the model as feedback. An error or any other return value, such
+    #'   as `NA`, ends the run with an error.
+    #' @param max_corrections How many times to ask the model to fix a rejected
+    #'   value. Defaults to 0. If the value is still rejected, the run errors.
+    #'   Every attempt counts toward the usage limits.
     chat_structured_async = function(
       ...,
       type,
@@ -959,15 +997,18 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Stream synchronously using the ellmer Chat interface.
-    #' @param ... User content accepted by ellmer.
-    #' @param stream Yield text or semantic ellmer content.
+    #' Stream a reply, like `ellmer::Chat$stream()`, with the agent's
+    #' permissions, hooks and usage limits applied.
+    #' @param ... Message content, as for ellmer.
+    #' @param stream `"text"` yields text chunks; `"content"` yields ellmer
+    #'   content objects, including tool requests and results.
     #' @param controller Optional ellmer stream controller.
-    #' @param run_context Canonical JSON-compatible context to add to or narrow
-    #'   for this run.
-    #' @return A synchronous generator.
-    #' @param type Optional ellmer type for native structured streaming.
-    #'   Providers requiring schema-tool fallback must use `chat_structured()`.
+    #' @param run_context Named list merged into the agent's `run_context` for
+    #'   this run.
+    #' @return A generator.
+    #' @param type Optional ellmer type for structured streaming, passed to
+    #'   ellmer. If the provider can't stream structured output, use
+    #'   `$chat_structured()` instead.
     stream = function(
       ...,
       stream = c("text", "content"),
@@ -992,22 +1033,22 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Stream asynchronously using the ellmer Chat interface.
-    #'
-    #' This is the primary interface for shinychat. It returns the same content
-    #' stream as ellmer while enforcing Deputy permissions, hooks, limits,
-    #' workspace resolution, context management, and run accounting.
-    #' @param ... User content accepted by ellmer, including shinychat's list of
-    #'   attachment-enabled `Content` objects.
-    #' @param tool_mode Whether ellmer executes tool calls concurrently or
-    #'   sequentially.
-    #' @param stream Yield text or semantic ellmer content.
+    #' Asynchronous version of `$stream()`. This is the method shinychat uses:
+    #' the stream is the same as ellmer's, with the agent's permissions, hooks,
+    #' usage limits and compaction applied.
+    #' @param ... Message content, as for ellmer, including the attachment
+    #'   `Content` objects that shinychat sends.
+    #' @param tool_mode `"concurrent"` runs the tool calls from one response in
+    #'   parallel; `"sequential"` runs them one at a time.
+    #' @param stream `"text"` yields text chunks; `"content"` yields ellmer
+    #'   content objects, including tool requests and results.
     #' @param controller Optional ellmer stream controller.
-    #' @param run_context Canonical JSON-compatible context to add to or narrow
-    #'   for this run.
+    #' @param run_context Named list merged into the agent's `run_context` for
+    #'   this run.
     #' @return An asynchronous generator suitable for `shinychat::chat_append()`.
-    #' @param type Optional ellmer type for native structured streaming.
-    #'   Providers requiring schema-tool fallback must use `chat_structured()`.
+    #' @param type Optional ellmer type for structured streaming, passed to
+    #'   ellmer. If the provider can't stream structured output, use
+    #'   `$chat_structured()` instead.
     stream_async = function(
       ...,
       tool_mode = c("concurrent", "sequential"),
@@ -1034,26 +1075,24 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Return the most recently completed governed run.
-    #' @return An [AgentResult], or `NULL` before the first run completes.
+    #' Get the result of the most recent run.
+    #' @return An [AgentResult], or `NULL` before the first run finishes.
     last_run = function() {
       private$.last_run_result
     },
 
-    #' @description Return the most recent compaction outcome.
-    #' @return A read-only [DeputyCompaction] S7 value, or `NULL` before
-    #'   compaction occurs.
+    #' @description Get the result of the most recent compaction.
+    #' @return A [DeputyCompaction], or `NULL` if there hasn't been one.
     last_compaction = function() {
       private$.last_compaction
     },
 
-    #' @description Resolve a durable tool-result reference.
-    #' @param reference A `deputy://tool-result/...` URI or reference text
-    #'   emitted into model context.
-    #' @return The complete stored R value. Content evidence offloaded during
-    #'   compaction uses its public text representation.
-    #'   Compaction may retire superseded internal catalog URIs after installing
-    #'   their replacement; saved sessions retain their catalog snapshots.
+    #' @description Get the full value of a large tool result that was saved
+    #' outside the model context.
+    #' @param reference A `deputy://tool-result/...` reference, or text
+    #'   containing one, such as the placeholder the model saw.
+    #' @return The stored R value. ellmer content objects saved during
+    #'   compaction come back as text.
     resolve_tool_result = function(reference) {
       read_tool_result_envelope(
         reference,
@@ -1062,21 +1101,23 @@ Agent <- R6::R6Class(
       )$value
     },
 
-    #' @description Add a user/assistant turn pair, as in ellmer Chat.
+    #' @description Add a user turn and an assistant turn, as ellmer's
+    #' `$add_turn()` does.
     #' @param user User turn or content.
     #' @param assistant Assistant turn or content.
-    #' @param log_tokens Whether ellmer should log token metadata.
-    #' @return Invisible self.
+    #' @param log_tokens Passed to ellmer's `$add_turn()`.
+    #' @return The agent, invisibly.
     add_turn = function(user, assistant, log_tokens = TRUE) {
       check_conversation_lease(self, NULL)
       private$.chat$add_turn(user, assistant, log_tokens = log_tokens)
       invisible(self)
     },
 
-    #' @description Return the complete selected conversation, as in ellmer
-    #'   Chat. Compaction removes turns from model context, not from this
-    #'   transcript. Hosts can persist this view through their normal history
-    #'   API. Retained turns remain in memory until the conversation is replaced.
+    #' @description Get the whole conversation, as ellmer's `$get_turns()`
+    #'   does. Unlike `$get_context_turns()`, this includes turns that
+    #'   compaction removed from the model context, and the original tool
+    #'   results that `$microcompact()` cleared. Removed turns stay in memory
+    #'   until `$set_turns()` replaces the conversation.
     #' @param include_system_prompt Include the system prompt as a turn.
     #' @return A list of ellmer turns.
     get_turns = function(include_system_prompt = FALSE) {
@@ -1095,11 +1136,11 @@ Agent <- R6::R6Class(
       turns
     },
 
-    #' @description Return only the current model context. Unlike `get_turns()`
-    #'   and `turns()`, this view shrinks when compaction succeeds. Use it when
-    #'   inspecting or transferring the bounded input for a model request.
-    #' @param include_system_prompt Include the current system prompt, including
-    #'   any installed compaction summary, as a turn.
+    #' @description Get the turns the model currently sees. After compaction
+    #'   this is shorter than `$get_turns()`, and tool results cleared by
+    #'   `$microcompact()` show their marker.
+    #' @param include_system_prompt Include the system prompt, with any
+    #'   compaction summary, as a turn.
     #' @return A list of ellmer turns.
     get_context_turns = function(include_system_prompt = FALSE) {
       if (
@@ -1112,12 +1153,11 @@ Agent <- R6::R6Class(
       private$.chat$get_turns()
     },
 
-    #' @description Replace the selected conversation and its model context,
-    #'   as in ellmer Chat. Clears the retained compacted prefix and summary,
-    #'   so host branch restoration cannot carry another branch's history.
-    #'   During a run, already accrued usage remains charged after replacement.
+    #' @description Replace the conversation, as ellmer's `$set_turns()` does.
+    #'   This also drops any compaction summary and the turns compaction
+    #'   removed. During a run, usage counted so far still counts.
     #' @param value A list of ellmer turns.
-    #' @return Invisible self.
+    #' @return The agent, invisibly.
     set_turns = function(value) {
       check_conversation_lease(self, NULL)
       usage <- if (isTRUE(private$run_active)) private$current_run_usage()
@@ -1144,15 +1184,18 @@ Agent <- R6::R6Class(
       invisible(self)
     },
 
-    #' @description Return the system prompt, as in ellmer Chat.
+    #' @description Get the system prompt, as ellmer's `$get_system_prompt()`
+    #' does. After compaction it includes the conversation summary.
     #' @return The system prompt or `NULL`.
     get_system_prompt = function() {
       private$.chat$get_system_prompt()
     },
 
-    #' @description Replace the system prompt, as in ellmer Chat.
+    #' @description Replace the system prompt, as ellmer's
+    #' `$set_system_prompt()` does. After compaction, this also drops the
+    #' conversation summary unless `value` still contains it.
     #' @param value The new system prompt or `NULL`.
-    #' @return Invisible self.
+    #' @return The agent, invisibly.
     set_system_prompt = function(value) {
       check_conversation_lease(self, NULL)
       previous_summary <- private$.compaction_summary
@@ -1171,15 +1214,16 @@ Agent <- R6::R6Class(
       invisible(self)
     },
 
-    #' @description Return registered tools, as in ellmer Chat.
+    #' @description Get the registered tools, as ellmer's `$get_tools()` does.
     #' @return A named list of ellmer tool definitions.
     get_tools = function() {
       private$.chat$get_tools()
     },
 
-    #' @description Replace registered tools, preserving Deputy adaptation.
+    #' @description Replace all registered tools. The new tools are checked and
+    #' wrapped as in `$register_tools()`.
     #' @param tools A list of ellmer tool definitions.
-    #' @return Invisible self.
+    #' @return The agent, invisibly.
     set_tools = function(tools) {
       check_conversation_lease(self, NULL)
       had_result_reader <- isTRUE(private$.tool_result_reader_registered)
@@ -1194,9 +1238,9 @@ Agent <- R6::R6Class(
       invisible(self)
     },
 
-    #' @description Return provider token records, as in ellmer Chat.
-    #' @param include_system_prompt Deprecated ellmer compatibility argument.
-    #' @return A token data frame.
+    #' @description Get token usage by turn, as ellmer's `$get_tokens()` does.
+    #' @param include_system_prompt Deprecated; passed to ellmer.
+    #' @return A data frame.
     get_tokens = function(include_system_prompt = NULL) {
       if (is.null(include_system_prompt)) {
         return(private$.chat$get_tokens())
@@ -1204,17 +1248,18 @@ Agent <- R6::R6Class(
       private$.chat$get_tokens(include_system_prompt = include_system_prompt)
     },
 
-    #' @description Return provider cost records, as in ellmer Chat.
-    #' @param include Return all costs or only the latest request.
-    #' @return Provider cost information.
+    #' @description Get the estimated cost, as ellmer's `$get_cost()` does.
+    #' @param include `"all"` for every turn or `"last"` for the latest request.
+    #' @return The cost, as returned by ellmer.
     get_cost = function(include = c("all", "last")) {
       private$.chat$get_cost(include = match.arg(include))
     },
 
-    #' @description Estimate tokens, as in ellmer Chat.
-    #' @param ... User content accepted by ellmer.
-    #' @param include Count only new content or the complete context.
-    #' @param type Optional provider content type.
+    #' @description Count tokens, as ellmer's `$token_count()` does.
+    #' @param ... Message content, as for ellmer.
+    #' @param include `"new"` counts only the new content; `"complete"` counts
+    #'   the whole context too.
+    #' @param type Optional ellmer type, passed to ellmer.
     #' @return Estimated token count.
     token_count = function(
       ...,
@@ -1228,27 +1273,27 @@ Agent <- R6::R6Class(
       )
     },
 
-    #' @description Return the ellmer provider.
+    #' @description Get the ellmer provider.
     #' @return An ellmer provider object.
     get_provider = function() {
       private$.chat$get_provider()
     },
 
-    #' @description Return the configured model name.
-    #' @return Model identifier.
+    #' @description Get the model name.
+    #' @return The model name.
     get_model = function() {
       private$.chat$get_model()
     },
 
-    #' @description Return ellmer's configured model object.
+    #' @description Get ellmer's model object.
     #' @return An ellmer model object, including parameters and extra arguments.
     get_model_object = function() {
       private$.chat$get_model_object()
     },
 
-    #' @description Replace the configured model.
-    #' @param model Model identifier.
-    #' @return Invisible self.
+    #' @description Change the model.
+    #' @param model Model name.
+    #' @return The agent, invisibly.
     set_model = function(model) {
       check_conversation_lease(self, NULL)
       private$.chat$set_model(model)
@@ -1256,33 +1301,33 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Register a tool with the agent.
+    #' Add a tool. Calls to it go through the agent's permission checks and
+    #' hooks.
     #'
-    #' Function tools are wrapped with Deputy's runtime enforcement. Known
-    #' provider-native web tools are authorized once, before registration,
-    #' because their execution occurs inside the provider rather than R. Native
-    #' tools therefore require static permissions and cannot be registered with
-    #' a custom `can_use_tool` callback.
-    #' Existing names require explicit replacement. Every tool in a batch is
-    #' validated and adapted before the registry changes. List element names
-    #' do not rename tools; each tool's own name is authoritative.
+    #' Provider-native web search and fetch tools run on the provider's
+    #' servers, not in R, so they are checked once, when you register them. The
+    #' permissions must have `web = TRUE`, list the tool in `tool_allowlist` and
+    #' have no `can_use_tool` callback.
     #' @param tool A tool created with `ellmer::tool()` or a supported
     #'   provider-native web tool.
-    #' @param replace Replace tools already registered under the same name?
-    #'   Defaults to FALSE. Duplicate names within a batch always fail.
-    #' @return Invisible self for chaining
+    #' @param replace If `TRUE`, replace a registered tool with the same name.
+    #'   If `FALSE` (the default), a name clash is an error.
+    #' @return The agent, invisibly, for chaining.
     register_tool = function(tool, replace = FALSE) {
       self$register_tools(list(tool), replace = replace)
     },
 
     #' @description
-    #' Register multiple tools with the agent.
+    #' Add several tools, as `$register_tool()` does. All of them are checked
+    #' before any is added, so if one fails, none are added. List names are
+    #' ignored: each tool keeps its own name.
     #'
-    #' @param tools A list of function tools or supported provider-native web
-    #'   tools.
-    #' @param replace Replace tools already registered under the same name?
-    #'   Defaults to FALSE. Duplicate names within a batch always fail.
-    #' @return Invisible self for chaining
+    #' @param tools A list of tools created with `ellmer::tool()` or supported
+    #'   provider-native web tools.
+    #' @param replace If `TRUE`, replace registered tools with the same names.
+    #'   If `FALSE` (the default), a name clash is an error. Two tools with the
+    #'   same name in `tools` are always an error.
+    #' @return The agent, invisibly, for chaining.
     register_tools = function(tools, replace = FALSE) {
       check_conversation_lease(self, NULL)
       existing <- private$.chat$get_tools()
@@ -1296,28 +1341,29 @@ Agent <- R6::R6Class(
       invisible(self)
     },
 
-    #' @description Register an additional ellmer tool-request observer.
+    #' @description Add a callback that runs when the model requests a tool, as
+    #' ellmer's `$on_tool_request()` does.
     #' @param callback A function with one `request` argument.
-    #' @return A function that removes the observer.
+    #' @return A function that removes the callback.
     on_tool_request = function(callback) {
       register_tool_observer(self, "request", callback)
     },
 
-    #' @description Register an additional ellmer tool-result observer.
+    #' @description Add a callback that runs when a tool returns a result, as
+    #' ellmer's `$on_tool_result()` does.
     #' @param callback A function with one `result` argument.
-    #' @return A function that removes the observer.
+    #' @return A function that removes the callback.
     on_tool_result = function(callback) {
       register_tool_observer(self, "result", callback)
     },
 
     #' @description
-    #' Add a hook to the agent.
+    #' Add a hook. Hooks run at set points in a run (see [HookEvent]). They can
+    #' observe the run and, at some points, change it, for example by denying a
+    #' tool call.
     #'
-    #' Hooks are called at specific points during agent execution and can
-    #' modify behavior (e.g., deny tool calls, log events).
-    #'
-    #' @param hook A [HookMatcher] object
-    #' @return Invisible self for chaining
+    #' @param hook A [HookMatcher] object.
+    #' @return The agent, invisibly, for chaining.
     #'
     #' @examples
     #' \dontrun{
@@ -1344,18 +1390,19 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get the complete selected conversation, including compacted turns.
+    #' Get the whole conversation, including turns removed by compaction. The
+    #' same as `$get_turns()`.
     #'
-    #' @return A list of Turn objects
+    #' @return A list of ellmer turns.
     turns = function() {
       self$get_turns()
     },
 
     #' @description
-    #' Get the last turn in the conversation.
+    #' Get the last turn in the conversation with a given role.
     #'
-    #' @param role Role to filter by ("assistant", "user", or "system")
-    #' @return A Turn object or NULL
+    #' @param role `"assistant"`, `"user"` or `"system"`.
+    #' @return An ellmer turn, or `NULL`.
     last_turn = function(role = c("assistant", "user", "system")) {
       role <- match.arg(role)
       current <- private$.chat$last_turn(role = role)
@@ -1400,31 +1447,33 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get this agent's session identifier.
+    #' Get the agent's session ID.
     #'
-    #' @return Character session identifier
+    #' @return A string.
     session_id = function() {
       private$.session_id
     },
 
     #' @description
-    #' Get the active permission mode.
+    #' Get the current permission mode.
     #'
-    #' @return Character permission mode
+    #' @return The mode, such as `"standard"`.
     get_permission_mode = function() {
       self$permissions$mode
     },
 
     #' @description
-    #' Preserve or narrow the active permission mode for subsequent tool calls.
-    #' Reapplying the current mode is a no-op. Widening or incomparable mode
-    #' changes require a newly configured `Agent` so custom restrictions remain
-    #' an immutable authority ceiling. When narrowing removes web access,
-    #' registered provider-native web tools are removed before the new policy
-    #' becomes active because Deputy cannot interpose on provider-side calls.
+    #' Switch to a narrower permission mode for later tool calls. Permissions
+    #' can be narrowed but not widened: from `"full"` any mode is allowed, and
+    #' `"standard"` and `"plan"` can only switch to `"readonly"`. Anything else
+    #' is an error, so create a new `Agent` instead. Setting the current mode
+    #' does nothing. The agent's other permission settings still apply within
+    #' the new mode. If the new mode doesn't allow web access,
+    #' provider-native web tools are removed, since Deputy can't check their
+    #' calls.
     #'
-    #' @param mode Permission mode, see [PermissionMode]
-    #' @return Invisible self
+    #' @param mode Permission mode, see [PermissionMode].
+    #' @return The agent, invisibly.
     set_permission_mode = function(mode) {
       check_conversation_access(self, NULL)
       mode <- validate_permission_mode_value(mode)
@@ -1514,44 +1563,47 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get cost information for the conversation.
+    #' Get token counts and estimated cost for the turns in the model context.
+    #' Turns removed by compaction no longer count.
     #'
-    #' @return A list with input, output, and cached token counts; total
-    #'   estimated cost; and `complete` and `missing` fields describing provider
-    #'   cost coverage. An incomplete total is `NA_real_`.
+    #' @return A list with `input`, `output` and `cached` token counts, the
+    #'   estimated `total` cost, `complete` (whether every response had a cost)
+    #'   and `missing` (how many didn't). `total` is `NA` when `complete` is
+    #'   `FALSE`.
     cost = function() {
       summary <- provider_usage_summary(private$.chat)
       summary[c("input", "output", "cached", "total", "complete", "missing")]
     },
 
     #' @description
-    #' Get normalized usage for the complete in-memory conversation.
+    #' Get usage for the turns in the model context. Turns removed by compaction
+    #' no longer count, and `tool_calls` is always 0 here. For one run's usage,
+    #' use `$usage` on its [AgentResult] or the `"usage"` event from `$run()`.
     #'
-    #' Per-run usage is available on [AgentResult] and in the final `usage`
-    #' event returned by `$run()`.
-    #'
-    #' @return An [AgentUsage] object
+    #' @return An [AgentUsage] object.
     usage = function() {
       agent_usage_snapshot(private$.chat)
     },
 
     #' @description
-    #' Request cancellation of the active stream.
+    #' Stop the current run, and any subagent runs it started.
     #'
-    #' Cancellation is cooperative and takes effect at the next provider or tool
-    #' boundary supported by ellmer. Active [McpConnection] calls terminate their
-    #' owned connections and discard server session state.
+    #' The run stops as soon as ellmer allows, usually during the current model
+    #' request or before the next tool call. An [McpConnection] call in progress
+    #' is stopped by closing its connection, which loses the server's session
+    #' state.
     #'
-    #' @param reason Stable reason stored on the terminal event
-    #' @return Invisible logical indicating whether a run was active
+    #' @param reason Stop reason recorded on the run's `"stop"` event and
+    #'   result.
+    #' @return `TRUE`, invisibly, if anything was running.
     interrupt = function(reason = "interrupted") {
       private$interrupt_run(reason)
     },
 
     #' @description
-    #' Get provider information.
+    #' Get the provider and model names.
     #'
-    #' @return A list with provider name and model
+    #' @return A list with `name` and `model`.
     provider = function() {
       provider <- private$.chat$get_provider()
       list(
@@ -1561,21 +1613,18 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Save the current session to an RDS file.
+    #' Save the conversation to an `.rds` file that `$load_session()` can
+    #' restore.
     #'
-    #' @param path Path to save the session
-    #' @return Invisible path
+    #' @param path File path.
+    #' @return The path, invisibly.
     #'
     #' @details
-    #' The session file contains:
-    #' - Conversation turns
-    #' - System prompt
-    #' - The cumulative compaction summary
-    #' - Retained compacted turns for the complete selected conversation
-    #' - Portable copies of offloaded tool results
-    #' - Effective run context
-    #' - File checkpoint state, when enabled
-    #' - Metadata (timestamp, version, provider info)
+    #' The file holds the conversation (including turns removed by compaction),
+    #' the system prompt and any compaction summary, copies of large tool
+    #' results, the run context, file checkpoint state (when enabled) and some
+    #' metadata, such as the time, Deputy version and provider. It doesn't hold
+    #' tools, permissions, hooks or the Chat itself.
     save_session = function(path) {
       tryCatch(
         {
@@ -1598,21 +1647,18 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Load a session from an RDS file.
+    #' Load a conversation saved by `$save_session()`.
     #'
-    #' @param path Path to the session file
-    #' @return Invisible self
+    #' @param path Path to the session file.
+    #' @return The agent, invisibly.
     #'
     #' @details
-    #' Tools, permissions, hooks, and the working directory are runtime policy
-    #' and are never restored from a session file. Saved run context is
-    #' validated before conversation state changes and merged with constructor
-    #' context; protected identity conflicts fail the load. Compaction summaries
-    #' and integrity-checked tool-result envelopes are restored as conversational
-    #' state under the receiving Agent's session identity.
-    #' Schema 3 preserves both the selected conversation and model context.
-    #' Earlier development schemas are rejected; native host history remains
-    #' independently readable through that host's restore API.
+    #' Tools, permissions, hooks and the working directory come from the agent
+    #' you load into, not from the file. The saved `run_context` is merged into
+    #' the agent's, and loading fails if they disagree on an ID field. Saved
+    #' tool results and compaction summaries are restored under this agent's
+    #' session ID. Files saved by early development versions of Deputy can't be
+    #' loaded. Loading errors while a run is active.
     load_session = function(path) {
       check_conversation_lease(self, NULL)
       if (isTRUE(private$run_active)) {
@@ -1653,8 +1699,9 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Inspect the approval that suspended this Agent, or NULL.
-    #' @return An [ApprovalContinuation] or NULL. Its source includes the path.
+    #' Get the tool approval this agent is waiting on.
+    #' @return An [ApprovalContinuation], or `NULL` if nothing is waiting. Its
+    #'   `source$path` is the path to pass to `$resume_approval()`.
     pending_approval = function() {
       if (is.null(private$.pending_approval_path)) {
         return(NULL)
@@ -1663,17 +1710,24 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Resume a persisted pending tool approval under current and saved policy.
-    #' Reattach a Chat, the same raw-argument tool definition, permission callback,
-    #' session_id, agent_id, working_dir, and approval_dir after process restart.
-    #' Existing completed effects are never replayed; duplicate decisions fail.
-    #' @param path Approval directory supplied by the approval event or snapshot.
-    #' @param decision Either "approve" or "deny".
-    #' @param tool_input Optional edited raw JSON argument list for approval.
-    #' @param usage_limits Optional explicit [UsageLimits] for the continuation.
-    #'   Escalation is bounded by the saved and current Agent limits. Previously
-    #'   observed usage is retained. NULL keeps the suspended run's limits.
-    #' @return An [AgentResult], including usage observed before suspension.
+    #' Approve or deny a tool call that is waiting for approval, then continue
+    #' the run. Both the saved permissions and the agent's current permissions
+    #' apply. After restarting R, first create an agent with the same
+    #' `session_id`, `agent_id`, `working_dir` and `approval_dir`, the same tool
+    #' definition (with `convert = FALSE`) and the permission callback. Tool
+    #' calls that already ran are not run again, and each approval can be
+    #' decided only once.
+    #' @param path The approval's directory, from the `"approval"` event or
+    #'   `$pending_approval()`.
+    #' @param decision `"approve"` or `"deny"`.
+    #' @param tool_input Optional named list of edited tool arguments to use
+    #'   instead of the original ones. Only allowed with `"approve"`.
+    #' @param usage_limits Optional [UsageLimits] for the resumed run. They
+    #'   can't exceed the agent's limits at the time of suspension or now, and
+    #'   usage from before the suspension still counts. `NULL` keeps the
+    #'   suspended run's limits.
+    #' @return An [AgentResult]. Its usage includes the work done before the
+    #'   suspension.
     resume_approval = function(
       path,
       decision = c("approve", "deny"),
@@ -1686,10 +1740,11 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Create a reversible file checkpoint.
+    #' Create a file checkpoint that `$rewind_files()` can restore. Needs
+    #' `enable_file_checkpointing = TRUE`.
     #'
-    #' @param name Optional checkpoint label.
-    #' @param metadata Optional serializable metadata list.
+    #' @param name Optional label.
+    #' @param metadata Optional list of metadata to store with it.
     #' @return The checkpoint ID.
     checkpoint = function(name = NULL, metadata = list()) {
       store <- private$require_file_checkpoint_store()
@@ -1710,19 +1765,21 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' List reversible file checkpoints.
+    #' List file checkpoints.
     #'
-    #' @return A data frame ordered from oldest to newest.
+    #' @return A data frame, oldest first.
     list_checkpoints = function() {
       private$require_file_checkpoint_store()$list_checkpoints()
     },
 
     #' @description
-    #' Rewind files to a checkpoint without changing conversation history.
+    #' Restore files to how they were at a checkpoint. Later checkpoints are
+    #' discarded. The conversation doesn't change. Errors during a run.
     #'
-    #' @param checkpoint_id ID returned by `$checkpoint()` or present in a
-    #'   `file_checkpoint` run event.
-    #' @return A list describing the restored checkpoint and change count.
+    #' @param checkpoint_id A checkpoint ID from `$checkpoint()`,
+    #'   `$list_checkpoints()` or a `"file_checkpoint"` event.
+    #' @return A list describing the checkpoint, including `restored_changes`,
+    #'   the number of file changes undone.
     rewind_files = function(checkpoint_id) {
       if (isTRUE(private$run_active)) {
         cli::cli_abort(
@@ -1748,35 +1805,39 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Compact the conversation history to reduce context size.
+    #' Replace older turns in the model context with a summary, so later
+    #' requests are smaller. The removed turns stay available from
+    #' `$get_turns()`. Errors during a run; runs compact automatically as set
+    #' by the [ContextPolicy].
     #'
-    #' This method uses the LLM to generate a meaningful summary of older
-    #' conversation turns, then replaces them with the summary appended to
-    #' the system prompt. This preserves important context while reducing
-    #' token usage.
-    #'
-    #' @param keep_last Number of recent turns to retain. `NULL` chooses a
-    #'   complete conversational boundary using the context policy's token
-    #'   target.
-    #' @param summary Optional custom summary to use instead of auto-generating.
-    #'   If NULL, the LLM will generate a summary focusing on key decisions,
-    #'   findings, files discussed, and task progress.
-    #' @param fallback What to do when LLM summary generation fails.
-    #' @param automatic Whether the run kernel triggered this compaction.
-    #' @param estimated_tokens Optional pre-compaction token estimate.
-    #' @return A read-only [DeputyCompaction] S7 value describing the method
-    #'   and usage.
+    #' @param keep_last Number of recent turns to keep. `NULL` keeps as many
+    #'   recent turns as fit in `max_tokens * compact_to` of the context policy,
+    #'   starting at a user turn, or the last 4 turns if `max_tokens` is `NULL`.
+    #' @param summary Optional summary to use. If `NULL`, a `PreCompact` hook
+    #'   can supply one; otherwise the model writes one covering decisions,
+    #'   findings, files, errors and progress.
+    #' @param fallback `"error"` or `"text"`: what to do if the model can't
+    #'   write the summary. Defaults to the context policy's `fallback`.
+    #' @param automatic Set by the agent when a run compacts automatically.
+    #'   Leave it as `FALSE`.
+    #' @param estimated_tokens Optional token estimate before compaction,
+    #'   recorded in the result.
+    #' @return A [DeputyCompaction] describing what happened.
     #'
     #' @details
-    #' The compaction process:
-    #' 1. Fires the PreCompact hook (can cancel or provide custom summary)
-    #' 2. If no custom summary, uses LLM to summarize compacted turns
-    #' 3. Appends summary to system prompt under "Previous Conversation Summary"
-    #' 4. Keeps only the most recent `keep_last` turns
+    #' Compaction:
+    #' 1. Fires the `PreCompact` hook, which can cancel compaction or supply a
+    #'    summary.
+    #' 2. Asks the model to summarise the older turns, unless a summary was
+    #'    supplied.
+    #' 3. Appends the summary to the system prompt under "Previous Conversation
+    #'    Summary".
+    #' 4. Keeps only the last `keep_last` turns in the model context.
     #'
-    #' LLM summary-generation failures are errors by default. A deterministic
-    #' truncated-text summary is used only when `fallback = "text"` is
-    #' explicitly configured. The returned object records that degraded method.
+    #' If the model can't write a summary, `$compact()` errors, unless
+    #' `fallback = "text"`, which builds a plain summary from the first 200
+    #' characters of each turn instead. The result's `method` shows which was
+    #' used.
     compact = function(
       keep_last = NULL,
       summary = NULL,
@@ -1822,13 +1883,13 @@ Agent <- R6::R6Class(
     #'
     #' Every tool result before the last `keep_last` turns has its value
     #' replaced by `marker` in the model's context, unless its tool is named in
-    #' `keep_tools`. Nothing is summarised and no model call is made. An
-    #' earlier compaction summary and the compacted prefix are kept.
+    #' `keep_tools`. Nothing is summarised and no model call is made. Any
+    #' earlier compaction summary is kept. Errors during a run.
     #'
     #' Like compaction, this changes only what the model sees. `$get_turns()`,
-    #' `$last_turn()` and saved sessions keep the original results, so a host's
-    #' conversation history is unchanged. `$get_context_turns()` shows the
-    #' markers.
+    #' `$last_turn()` and saved sessions keep the original results, so your
+    #' app's conversation history is unchanged. `$get_context_turns()` shows
+    #' the markers.
     #'
     #' @param keep_last Number of recent turns whose tool results are left as
     #'   they are. `Inf` keeps every turn.
@@ -1912,7 +1973,7 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Print the agent configuration.
+    #' Print a summary of the agent.
     print = function() {
       cli::cat_line(cli::cli_format_method({
         provider_info <- self$provider()
@@ -1942,12 +2003,15 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Load a [Skill] into the agent.
+    #' Load a [Skill]: register its tools and append its prompt to the system
+    #' prompt. Warns if packages the skill needs are missing or it expects a
+    #' different provider.
     #'
     #' @param skill A [Skill] object or path to a skill directory.
-    #' @param allow_conflicts If FALSE (default), error on tool name conflicts.
-    #'   Set TRUE to allow overwriting existing tools.
-    #' @return Invisible self for chaining.
+    #' @param allow_conflicts If `TRUE`, the skill's tools replace registered
+    #'   tools with the same names, with a warning. If `FALSE` (the default), a
+    #'   name clash is an error.
+    #' @return The agent, invisibly, for chaining.
     load_skill = function(skill, allow_conflicts = FALSE) {
       check_conversation_lease(self, NULL)
       if (is.character(skill)) {
@@ -2063,9 +2127,9 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get loaded skills.
+    #' Get the loaded skills.
     #'
-    #' @return Named list of loaded [Skill] objects.
+    #' @return Named list of [Skill] objects.
     skills = function() {
       if (is.null(private$loaded_skills)) {
         return(list())
@@ -2074,19 +2138,22 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Load tools from MCP (Model Context Protocol) servers.
+    #' Load tools from the MCP (Model Context Protocol) servers in an mcptools
+    #' configuration file.
     #'
-    #' Requires the mcptools package. Issues a warning if not installed or if
-    #' tool fetching fails.
+    #' Needs the mcptools package. If it isn't installed or the tools can't be
+    #' fetched, this warns and loads nothing; `$mcp_status()` records each
+    #' attempt. If a reload fails, tools whose connections were closed are
+    #' removed and the rest stay.
     #'
-    #' @param config Path to MCP configuration file. If NULL (default), uses
-    #'   the mcptools default location (`~/.config/mcptools/config.json`).
-    #' @param servers Optional character vector of server names to load from.
-    #'   If NULL, loads from all configured servers.
-    #' @param replace Refresh the selected servers' complete tool sets, removing
-    #'   obsolete tools, and explicitly replace other matching names. On failure,
-    #'   tools whose connections were invalidated are removed; working tools remain.
-    #' @return Invisible self for chaining
+    #' @param config Path to the configuration file. `NULL` uses the mcptools
+    #'   default, `~/.config/mcptools/config.json`.
+    #' @param servers Names of the servers to load from. `NULL` loads from all
+    #'   of them.
+    #' @param replace If `TRUE`, replace the tools loaded earlier from these
+    #'   servers, dropping any a server no longer offers, and replace any other
+    #'   tools with the same names. If `FALSE`, a name clash is an error.
+    #' @return The agent, invisibly, for chaining.
     load_mcp = function(config = NULL, servers = NULL, replace = FALSE) {
       check_conversation_lease(self, NULL)
       if (!rlang::is_bool(replace)) {
@@ -2210,17 +2277,19 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get names of loaded MCP tools.
+    #' Get the names of loaded MCP tools.
     #'
-    #' @return Character vector of MCP tool names
+    #' @return A character vector.
     mcp_tools = function() {
       private$loaded_mcp_tools
     },
 
     #' @description
-    #' Get MCP runtime status records.
+    #' Get a log of `$load_mcp()` calls.
     #'
-    #' @return Data frame describing MCP load attempts and registered tools
+    #' @return A data frame with one row per call: `status` (`"connected"`,
+    #'   `"empty"`, `"failed"` or `"unavailable"`), `config`, `servers`,
+    #'   `tools`, `loaded_at` and `error`.
     mcp_status = function() {
       records <- private$loaded_mcp_status
       if (length(records) == 0) {
@@ -2252,34 +2321,29 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Run an agentic task asynchronously and resolve to an [AgentResult].
+    #' Run a task asynchronously. Works like `$run_sync()` but returns a
+    #' promise, so you can use it from async code, such as a Shiny app or a
+    #' tool that runs another agent while its own chat is streaming.
     #'
-    #' Uses the same run kernel as `$stream_async()`, `$stream()`, `$chat()`,
-    #' and `$run_sync()`. It collects the final response and run metadata rather
-    #' than returning the content stream.
-    #'
-    #' Use this when an Agent is a *worker* inside a larger async system, for
-    #' example a delegated sub-agent executed from the tool of a parent chat
-    #' that is itself streaming. Supply `type` to extract structured output
-    #' after the tool-using task within the same run budget.
-    #'
-    #' @param task The task for the agent to perform
-    #' @param usage_limits Optional [UsageLimits] override for this run. Unset
-    #'   fields fall back to the Agent's limits. With `on_exceed = "error"`,
-    #'   hitting a limit rejects the promise with the structured limit error
-    #'   instead of resolving with a typed `stop_reason`.
-    #' @param run_context Canonical JSON-compatible context to add to or narrow
-    #'   for this run. Protected constructor identity fields cannot change.
-    #' @return A `promises::promise` resolving to an [AgentResult]. It is
-    #'   rejected if the provider stream fails or a limit configured with
-    #'   `on_exceed = "error"` is reached.
-    #' @param type Optional ellmer type. Complete the task with tools, then
-    #'   extract from the conversation within the same run budget.
-    #' @param validate Optional synchronous function receiving ellmer's value.
-    #'   Return TRUE, FALSE, or non-empty correction feedback. Errors and NA
-    #'   are terminal.
-    #' @param max_corrections Maximum additional structured requests after
-    #'   invalid output. Defaults to zero; all attempts share the run budget.
+    #' @param task The task for the agent.
+    #' @param usage_limits [UsageLimits] for this run. `NULL` fields use the
+    #'   agent's limits.
+    #' @param run_context Named list merged into the agent's `run_context` for
+    #'   this run. It can't change or remove ID fields (keys ending in `id`)
+    #'   that the agent already sets.
+    #' @return A promise that resolves to an [AgentResult]. It is rejected if
+    #'   the provider request fails or a limit with `on_exceed = "error"` is
+    #'   reached.
+    #' @param type Optional ellmer type, such as `ellmer::type_object()`. After
+    #'   the task, the agent extracts data of this type from the conversation
+    #'   into `result$structured_output`. This counts toward the run's limits.
+    #' @param validate Optional function that checks the extracted value. Return
+    #'   `TRUE` to accept it, or `FALSE` or a message to reject it; a message is
+    #'   sent to the model as feedback. An error or any other return value, such
+    #'   as `NA`, ends the run with an error.
+    #' @param max_corrections How many times to ask the model to fix a rejected
+    #'   value. Defaults to 0. If the value is still rejected, the run errors.
+    #'   Every attempt counts toward the run's limits.
     run_async = function(
       task,
       usage_limits = NULL,
@@ -2312,7 +2376,7 @@ Agent <- R6::R6Class(
     }
   ),
   active = list(
-    #' @field agent_id Stable Agent instance identifier. Read-only.
+    #' @field agent_id The agent's ID. Read-only.
     agent_id = function(value) {
       if (missing(value)) {
         return(private$.agent_id)
@@ -2320,7 +2384,7 @@ Agent <- R6::R6Class(
       cli_abort("Cannot modify agent: agent_id is immutable after construction")
     },
 
-    #' @field agent_name Optional human-readable Agent name. Read-only.
+    #' @field agent_name The agent's name, or `NULL`. Read-only.
     agent_name = function(value) {
       if (missing(value)) {
         return(private$.agent_name)
@@ -2330,7 +2394,7 @@ Agent <- R6::R6Class(
       )
     },
 
-    #' @field run_context Default canonical product context. Read-only.
+    #' @field run_context The `run_context` attached to every run. Read-only.
     run_context = function(value) {
       if (missing(value)) {
         return(clone_run_context(private$.run_context))
@@ -2350,7 +2414,8 @@ Agent <- R6::R6Class(
       )
     },
 
-    #' @field permissions Permission policy for the agent. Read-only after construction.
+    #' @field permissions The agent's [Permissions]. Read-only; use
+    #'   `$set_permission_mode()` to narrow them.
     permissions = function(value) {
       if (missing(value)) {
         return(private$.permissions)
@@ -2360,7 +2425,7 @@ Agent <- R6::R6Class(
       )
     },
 
-    #' @field usage_limits Default per-run [UsageLimits]. Read-only after construction.
+    #' @field usage_limits The [UsageLimits] applied to each run. Read-only.
     usage_limits = function(value) {
       if (missing(value)) {
         return(private$.usage_limits)
@@ -2370,7 +2435,7 @@ Agent <- R6::R6Class(
       )
     },
 
-    #' @field context_policy Automatic context-management policy. Read-only.
+    #' @field context_policy The agent's [ContextPolicy]. Read-only.
     context_policy = function(value) {
       if (missing(value)) {
         return(normalize_context_policy(private$.context_policy))
@@ -2380,7 +2445,7 @@ Agent <- R6::R6Class(
       )
     },
 
-    #' @field working_dir Working directory for file operations. Read-only after construction.
+    #' @field working_dir The directory file tools work in. Read-only.
     working_dir = function(value) {
       if (missing(value)) {
         return(private$.working_dir)
@@ -2390,7 +2455,8 @@ Agent <- R6::R6Class(
       )
     },
 
-    #' @field hooks Hook registry for lifecycle events. Read-only after construction.
+    #' @field hooks The agent's [HookRegistry]. The field can't be replaced; add
+    #'   hooks with `$add_hook()`.
     hooks = function(value) {
       if (missing(value)) {
         return(private$.hooks)

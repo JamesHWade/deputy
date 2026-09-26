@@ -7,11 +7,13 @@
 permissions_readonly()
 }
 \value{
-A \link{Permissions} object
+A \link{Permissions} object.
 }
 \description{
-Creates a permission policy that only allows reading files.
-All write operations, code execution, and web access are denied.
+Creates a \code{"readonly"} policy. The agent can use the built-in file-reading
+tools such as \code{read_file}, \code{list_files} and \code{grep_files}. Writes, code
+execution, web access, delegation to subagents and custom tools are
+denied.
 }
 \examples{
 perms <- permissions_readonly()

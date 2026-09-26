@@ -7,17 +7,18 @@
 permissions_plan(permission_prompt_tool_name = "ask_user")
 }
 \arguments{
-\item{permission_prompt_tool_name}{Optional dedicated approval-tool name that
-the model can use to request explicit approval. Native capability-bearing
-tools are rejected. Defaults to \code{"ask_user"}.}
+\item{permission_prompt_tool_name}{Name of the tool the model can call to
+ask for approval, \code{"ask_user"} by default. \code{NULL} means none. Built-in
+file, code, web, install and delegation tools can't be used.}
 }
 \value{
-A \link{Permissions} object
+A \link{Permissions} object.
 }
 \description{
-Creates a permission policy for planning-oriented sessions.
-Only tools annotated as read-only are allowed, plus the permission prompt
-tool when configured.
+Creates a \code{"plan"} policy, for letting the model look around and propose a
+plan before it changes anything. Only tools annotated as read-only are
+allowed, plus the approval prompt tool. Web access is on, so read-only web
+tools such as \code{web_fetch} work. Writes and code execution are denied.
 }
 \examples{
 perms <- permissions_plan()

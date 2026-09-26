@@ -2,62 +2,62 @@
 % Please edit documentation in R/permission-policy.R
 \name{PermissionMode}
 \alias{PermissionMode}
-\title{Permission modes for agent tool access}
+\title{Permission modes}
 \usage{
 PermissionMode
 }
 \description{
-Permission modes control the overall behavior of tool permission checking:
+\code{PermissionMode} lists the modes a \link{Permissions} policy can use. In every
+mode, \code{tool_denylist} and \code{tool_allowlist} are checked first, and the
+approval prompt tool (\code{permission_prompt_tool_name}) is then allowed.
 \itemize{
-\item \code{"standard"} - Check each tool against the configured capabilities
-\item \code{"plan"} - Allow annotated read-only tools within configured capabilities
-plus human approval prompts
-\item \code{"readonly"} - Deny all write/execute tools
-\item \code{"full"} - Allow all tools (dangerous, use with caution)
-}
-}
-\section{Tool Annotations}{
-
-
-Permissions use tool annotations (from \code{\link[ellmer:tool_annotations]{ellmer::tool_annotations()}}) to
-determine tool behavior. Available annotations:
-
-\strong{read_only_hint} (logical, default: FALSE)
-
-Indicates the tool only reads data and doesn't modify state. Annotations are
-descriptive metadata, not an authority grant: \code{"readonly"} mode allows known
-Deputy read tools or explicit allowlist entries, subject to destructive and
-open-world capability checks. Examples: \code{tool_read_file}, \code{tool_list_files},
-\code{tool_search}.
-
-\strong{destructive_hint} (logical, default: TRUE)
-
-Indicates the tool may cause destructive/irreversible changes.
-Tools with \code{destructive_hint = TRUE} require explicit permission.
-Examples: \code{tool_write_file}, \code{tool_delete_file}, \code{tool_run_bash}
-
-\strong{open_world_hint} (logical, default: TRUE)
-
-Indicates the tool may interact with external systems.
-Used for network calls, package installation, etc.
-Examples: \code{tool_web_search}, \code{tool_install_package}
-
-\strong{idempotent_hint} (logical, default: FALSE)
-
-Indicates repeated calls produce the same result.
-This annotation alone does not authorize automatic retries.
-
-Missing annotations remain absent on the tool. For custom tools, permission
-checks assume modification, possible destruction, external access, and no
-idempotence unless stated otherwise. If \code{read_only_hint = TRUE}, an omitted
-destructive annotation is ignored; an explicit TRUE still denies read-only
-use. Native tools continue to require their named capabilities. A custom
-permission callback can explicitly authorize a tool in standard mode;
-full mode bypasses annotation checks but still honors tool gating.
+\item \code{"standard"}: checks built-in tools against the capability flags
+(\code{file_read}, \code{file_write}, \code{bash}, \code{r_code}, \code{web}, \code{install_packages})
+and custom tools against their annotations. If the policy has a
+\code{can_use_tool} callback, its answer is final and these checks are
+skipped.
+\item \code{"readonly"}: allows the built-in file-reading tools, the web tools when
+\code{web = TRUE}, and tools on \code{tool_allowlist}. It denies writes, code
+execution, destructive tools and, unless \code{web = TRUE}, open-world tools.
+\code{can_use_tool} can deny calls this mode would allow, but can't allow
+others.
+\item \code{"plan"}: allows only tools annotated as read-only, plus the approval
+prompt tool. Open-world tools also need \code{web = TRUE}. \code{can_use_tool} is
+not called.
+\item \code{"full"}: allows every call. Capability flags and annotations are not
+checked, and \code{can_use_tool} is not called.
 }
 
-\section{Creating Tools with Annotations}{
+A denied call can still be allowed by a PermissionRequest hook (see
+\link{HookEvent}).
+}
+\section{Tool annotations}{
 
+
+Custom tools are checked through their annotations, set with
+\code{\link[ellmer:tool_annotations]{ellmer::tool_annotations()}}. A missing annotation takes a cautious
+default:
+\itemize{
+\item \code{read_only_hint} (default \code{FALSE}): the tool only reads data. Plan mode
+allows only these tools.
+\item \code{destructive_hint} (default \code{TRUE}, or \code{FALSE} when \code{read_only_hint = TRUE}): the tool may make irreversible changes. Destructive tools are
+denied in plan and readonly modes, and in standard mode when both
+\code{file_write} and \code{bash} are off.
+\item \code{open_world_hint} (default \code{TRUE}): the tool may reach external systems.
+Open-world tools are denied unless \code{web = TRUE}, except in full mode.
+\item \code{idempotent_hint} (default \code{FALSE}): repeated calls have the same effect.
+Permission checks don't use it.
+}
+
+So in standard mode an unannotated custom tool needs \code{web = TRUE}, and plan
+and readonly modes deny it. Built-in tools such as \code{write_file} and
+\code{run_bash} are checked against their capability flag instead.
+}
+
+\section{Annotating tools}{
+
+
+Set annotations when you create a tool:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{# Read-only tool
 tool_search <- ellmer::tool(
@@ -80,7 +80,8 @@ tool_delete <- ellmer::tool(
   arguments = list(path = ellmer::type_string("File path")),
   annotations = ellmer::tool_annotations(
     read_only_hint = FALSE,
-    destructive_hint = TRUE
+    destructive_hint = TRUE,
+    open_world_hint = FALSE
   )
 )
 }\if{html}{\out{</div>}}

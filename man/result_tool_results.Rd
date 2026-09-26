@@ -2,16 +2,16 @@
 % Please edit documentation in R/agent-result.R
 \name{result_tool_results}
 \alias{result_tool_results}
-\title{Inspect completed tool calls}
+\title{Get the finished tool calls from a result}
 \usage{
 result_tool_results(result)
 }
 \arguments{
-\item{result}{An \link{AgentResult} S7 value.}
+\item{result}{An \link{AgentResult}.}
 }
 \value{
-List of \code{tool_end} events.
+A list of \code{"tool_end"} events.
 }
 \description{
-Inspect completed tool calls
+Get the finished tool calls from a result
 }

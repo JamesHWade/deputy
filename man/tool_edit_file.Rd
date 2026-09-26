@@ -10,21 +10,21 @@ A tool definition created with \code{ellmer::tool()}.
 tool_edit_file(path, old_text, new_text, replace_all = FALSE)
 }
 \arguments{
-\item{path}{Path to the file to edit (tool argument)}
+\item{path}{Path to the file to edit.}
 
-\item{old_text}{Existing text to replace (tool argument)}
+\item{old_text}{Text to replace.}
 
-\item{new_text}{Replacement text (tool argument)}
+\item{new_text}{Replacement text.}
 
-\item{replace_all}{If TRUE, replace all matches instead of requiring a
-unique match (tool argument)}
+\item{replace_all}{If \code{TRUE}, replace every occurrence of \code{old_text}.}
 }
 \value{
-When called directly, a character status message describing the
-edit and replacement count.
+A status message with the number of replacements.
 }
 \description{
-Replace a specific text span in an existing file.
+A tool that replaces exact text in an existing file. Unless \code{replace_all} is
+\code{TRUE}, \code{old_text} must appear exactly once. Line endings and the rest of
+the file are left as they were.
 }
 \examples{
 path <- tempfile(fileext = ".txt")

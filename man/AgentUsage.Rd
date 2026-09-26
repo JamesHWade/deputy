@@ -2,7 +2,7 @@
 % Please edit documentation in R/run-usage.R
 \name{AgentUsage}
 \alias{AgentUsage}
-\title{Create an agent usage record}
+\title{Create a usage record}
 \usage{
 AgentUsage(
   requests = 0L,
@@ -14,33 +14,32 @@ AgentUsage(
 )
 }
 \arguments{
-\item{requests}{Number of model requests attributed to the run.}
+\item{requests}{Number of model requests.}
 
-\item{tool_calls}{Number of requested tool calls, including calls rejected
-before execution.}
+\item{tool_calls}{Number of tool calls requested, including denied calls.}
 
-\item{input_tokens}{Provider-reported input tokens.}
+\item{input_tokens}{Input tokens reported by the provider.}
 
-\item{output_tokens}{Provider-reported output tokens.}
+\item{output_tokens}{Output tokens reported by the provider.}
 
-\item{cached_tokens}{Provider-reported cached input tokens. These are
-reported separately and are not added again to \code{total_tokens}.}
+\item{cached_tokens}{Cached input tokens reported by the provider. They
+aren't added to \code{total_tokens}.}
 
-\item{cost_usd}{Provider-reported estimated cost in US dollars, or \code{NA_real_}
-when the provider did not report complete cost information.}
+\item{cost_usd}{Estimated cost in US dollars, or \code{NA_real_} if the cost of
+some responses is unknown.}
 }
 \value{
-A read-only \code{AgentUsage} S7 object.
+An \code{AgentUsage} object.
 }
 \description{
-\code{AgentUsage()} creates a normalized usage record. \code{AgentResult$usage} and
-run \code{usage}/\code{stop} events are scoped to that run, while \link{Agent}\verb{$usage()}
-describes the complete in-memory conversation at the time it is called.
+A usage record counts model requests, tool calls, tokens and estimated cost.
+\link{AgentResult}\verb{$usage} and the \code{"usage"} and \code{"stop"} events cover a single
+run. \link{Agent}\verb{$usage()} covers the turns currently in the model context, so
+turns removed by compaction no longer count there. You rarely need to call
+\code{AgentUsage()} yourself.
 
-This is a read-only S7 value. Its \code{total_tokens} property is calculated from
-input plus output tokens at construction. Read properties
-with \code{$} or \code{S7::prop()}; \code{S7::props()} returns a plain named-list snapshot
-for reporting or serialization. Construct a new value for different usage.
+Records are read-only. Read fields with \code{$}; \code{S7::props()} returns them all
+as a plain list, which is handy for logging.
 }
 \examples{
 AgentUsage(
@@ -57,6 +56,6 @@ S7::props(usage)
 \section{Additional properties}{
 
 \describe{
-\item{\code{@total_tokens}}{Input plus output tokens, without adding cached input
-again. Read-only.}
+\item{\code{@total_tokens}}{\code{input_tokens + output_tokens}.}
 }}
+

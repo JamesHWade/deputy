@@ -1,32 +1,37 @@
 #' @include delegation-input.R
 NULL
 
-#' Inspect the prepared initial context of a delegation
+#' Record what a subagent started with
 #'
-#' A read-only S7 receipt produced by LeadAgent preparation. It describes the
-#' supplied initial context, not later provider framing, hooks, compaction, or
-#' runtime state. It never grants access or installs tools or permissions.
+#' Holds what a subagent was given when a delegation started: the task,
+#' evidence, system prompt, first message, model, tool names, and its
+#' permission and context settings. A [LeadAgent] keeps one in memory for each
+#' delegation; read them with `$get_subagent_contexts()`. A manifest covers
+#' the starting point only, not what happened during the run.
 #'
-#' @param input Plain normalized [DelegationInput] properties.
-#' @param definition Declarative definition identity and prompt material.
-#' @param sources Ordered resolved text sources and content digests.
-#' @param scope Host-bound owner and conversation identifiers.
-#' @param system_prompt Prepared system prompt, including static memory/skills.
-#' @param message Prepared first user message, including initial prompt and evidence.
-#' @param model Selected model name; no provider credentials.
-#' @param tools Registered tool names, not unconditional grants of permission.
-#' @param policies Policy identifiers and non-executable settings.
-#' @param size Byte counts and a public complete-context token estimate when known.
-#' @param schema_version Portable record schema. Currently `1L`.
+#' @param input The task, as a list of [DelegationInput] fields.
+#' @param definition The definition's name, prompt, memory, initial prompt and
+#'   skill names, plus an `id` hash.
+#' @param sources The evidence given to the subagent, each with a SHA-256
+#'   `digest` of its text.
+#' @param scope The lead's `delegation_scope`.
+#' @param system_prompt The subagent's system prompt, including memory and
+#'   skills.
+#' @param message The first message sent to the subagent, including the
+#'   definition's `initial_prompt` and the evidence.
+#' @param model The model name. Credentials are never recorded.
+#' @param tools Names of the subagent's tools.
+#' @param policies A summary of the permission, context and [DelegationPolicy]
+#'   settings, with hashes that identify them. Callbacks are not recorded.
+#' @param size `text_bytes`, `manifest_bytes` and `estimated_tokens` (`NULL`
+#'   when unknown). The token count is an estimate, not a billed count.
+#' @param schema_version Format version; must be `1L`.
 #' @details
-#' Hosts normally obtain these values from `LeadAgent$get_subagent_contexts()`.
-#' `S7::props()` returns portable plain records suitable for host JSON/RDS storage.
-#' Constructing or restoring a receipt does not recreate an Agent. The host owns
-#' disclosure authorization and storage; the LeadAgent retains receipts in memory.
-#' Evidence hashes identify bytes, not truth or authorization. Size estimates are
-#' estimates, not billed token counts. Fresh working context and retained history
-#' remain separately inspectable after compaction (ADR-0017).
-#' @return A read-only `DelegationManifest` S7 value.
+#' To store a manifest, save `S7::props(x)` (plain lists) and rebuild it with
+#' `do.call(DelegationManifest, record)`. A manifest includes the task and
+#' evidence text, so check who may see it before showing it to users;
+#' `$get_subagent_contexts(redact = TRUE)` leaves that text out.
+#' @return A `DelegationManifest` object.
 #' @export
 DelegationManifest <- S7::new_class(
   "DelegationManifest",

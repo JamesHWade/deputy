@@ -116,44 +116,35 @@ validate_skill_requirement_data <- function(value) {
   invisible(NULL)
 }
 
-#' Declarative Skill Configuration
+#' Reusable instructions and tools
 #'
 #' @description
-#' A read-only S7 value bundling a prompt extension, original ellmer tools,
-#' and declared package and provider requirements. Load a Skill into an
-#' [Agent] with `agent$load_skill(skill)`.
+#' A skill bundles extra system prompt text, tools, and the packages and
+#' providers it needs, so you can add them to an [Agent] in one step with
+#' `agent$load_skill(skill)`.
 #'
-#' @param name Non-empty skill name, retained as supplied.
-#' @param version Non-empty version string. Defaults to `"0.0.0"`;
-#'   [skill_create()] retains its `"1.0.0"` default.
+#' @param name Skill name.
+#' @param version Version string. Defaults to `"0.0.0"` ([skill_create()]
+#'   defaults to `"1.0.0"`).
 #' @param description Optional description.
-#' @param prompt Optional system prompt extension.
+#' @param prompt Optional text to add to the system prompt.
 #' @param tools List of tools created with `ellmer::tool()`.
-#' @param requires List with optional `packages` and `providers` entries.
-#'   Each entry contains strings, or is NULL or an empty sequence.
-#'   Other declarative metadata is retained but not evaluated.
-#' @param path Optional path to the skill directory. Construction does not
-#'   inspect or load this path.
+#' @param requires List with optional `packages` and `providers` entries, each
+#'   a character vector. Other entries are kept but not checked. It must hold
+#'   only plain data, not functions or environments.
+#' @param path Optional path to the skill directory. It is recorded, not read.
 #'
 #' @details
-#' Construct skills with `Skill(...)`, [skill_create()], or [skill_load()].
-#' Read properties with `$`, `@`, or `S7::prop()`. To revise configuration,
-#' edit `S7::props(skill)` and pass that list to `do.call(Skill, fields)`.
-#' Individual and bulk property replacement are rejected, including initially
-#' NULL fields. Requirements are declarative package/provider sequences.
+#' Create skills with `Skill()`, [skill_create()], or [skill_load()]. Skills
+#' are read-only: read fields with `$`, and to change one, edit
+#' `S7::props(skill)` and pass the list back to `Skill()` with `do.call()`, as
+#' in the example.
 #'
-#' Executable tools are composed without cloning. Their closures, clients,
-#' services, and caller-owned environments retain their original semantics;
-#' read-only Skill configuration does not freeze state inside those tools.
-#' Neither construction nor [skill_check_requirements()] executes tool code.
-#' [skill_load()] remains the explicit boundary that can source declared tools.
+#' Tools are stored as given, not copied, so any state they hold is shared
+#' with the originals. Creating a skill or checking its requirements never runs
+#' tool code; [skill_load()] runs the R files a skill's tools come from.
 #'
-#' RDS can preserve the value and serializable R object graphs after Deputy
-#' loads in the receiving process. It is not a portable transport for live
-#' services or connections. AgentDefinition YAML uses explicit host registries
-#' to attach skills; it does not embed executable Skill objects.
-#'
-#' @return A read-only `Skill` S7 value.
+#' @return A read-only `Skill` S7 object.
 #' @examples
 #' concise <- Skill("concise", prompt = "Answer in one short paragraph.")
 #' fields <- S7::props(concise)
@@ -221,17 +212,20 @@ local({
   S7::method(`$`, Skill) <- function(x, name) S7::prop(x, name)
 })
 
-#' Check Skill Requirements
+#' Check a skill's requirements
 #'
 #' @description
-#' Report missing packages and provider compatibility for a [Skill]. This
-#' function does not install packages, load the skill, or execute its tools.
+#' Checks whether the packages a [Skill] needs are installed and, if you give
+#' `current_provider`, whether the skill supports that provider. Nothing is
+#' installed, loaded or run.
 #'
-#' @param skill A [Skill] value.
-#' @param current_provider Optional current provider name. Known aliases are
-#'   normalized; other provider names use case-insensitive exact matching.
-#'   NULL skips the provider check.
-#' @return A list with `ok`, `missing`, `provider_mismatch`,
+#' @param skill A [Skill].
+#' @param current_provider Optional provider name, such as `"openai"` or
+#'   `"anthropic"`. Common aliases match their provider (`"claude"` and
+#'   `"chat_anthropic"` both mean `"anthropic"`); other names must match
+#'   exactly, ignoring case. `NULL` skips the provider check.
+#' @return A list with `ok` (`TRUE` if nothing is missing or mismatched),
+#'   `missing` (such as `"package:readr"`), `provider_mismatch`,
 #'   `current_provider`, and `required_providers`.
 #' @examples
 #' skill <- Skill("calculator", requires = list(packages = "stats"))

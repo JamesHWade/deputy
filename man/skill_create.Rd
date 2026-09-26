@@ -2,7 +2,7 @@
 % Please edit documentation in R/skills.R
 \name{skill_create}
 \alias{skill_create}
-\title{Create a skill programmatically}
+\title{Create a skill in code}
 \usage{
 skill_create(
   name,
@@ -14,24 +14,25 @@ skill_create(
 )
 }
 \arguments{
-\item{name}{Skill name}
+\item{name}{Skill name.}
 
-\item{description}{Brief description}
+\item{description}{Short description.}
 
-\item{prompt}{System prompt extension}
+\item{prompt}{Text to add to the system prompt.}
 
-\item{tools}{List of tools created with \code{ellmer::tool()}}
+\item{tools}{List of tools created with \code{ellmer::tool()}.}
 
-\item{version}{Version string (default: "1.0.0")}
+\item{version}{Version string. Defaults to \code{"1.0.0"}.}
 
-\item{requires}{List of requirements (packages, providers)}
+\item{requires}{List with optional \code{packages} and \code{providers} character
+vectors.}
 }
 \value{
-A \link{Skill} object
+A \link{Skill}.
 }
 \description{
-Create a skill without loading from disk. Useful for defining skills
-inline in R code.
+Creates a \link{Skill} in R instead of loading one from disk. It is the same as
+\code{Skill()}, except that \code{version} defaults to \code{"1.0.0"}.
 }
 \examples{
 \dontrun{

@@ -2,35 +2,34 @@
 % Please edit documentation in R/tools-interactive.R
 \name{set_ask_user_callback}
 \alias{set_ask_user_callback}
-\title{Set callback for non-interactive user input}
+\title{Set a process-wide handler for ask_user}
 \usage{
 set_ask_user_callback(callback)
 }
 \arguments{
-\item{callback}{A function that takes \code{questions} in Deputy's structured
-question format. Each question has \code{question}, \code{header},
-\code{options} (list with \code{label} and \code{description}), and \code{multiSelect}.
-Should return a named list mapping question text to selected label(s).
-For multi-select, join labels with ", ".
-Set to NULL to clear the callback.}
+\item{callback}{A function that takes \code{questions}, a list in which each
+question has \code{question}, \code{header}, \code{options} (each with \code{label} and
+\code{description}) and \code{multiSelect}. It returns a named list mapping each
+question's text to the chosen label; join several labels with \code{", "}.
+\code{NULL} removes the callback.}
 }
 \value{
-Invisibly returns the previous callback (or NULL).
+The previous callback (or \code{NULL}), invisibly.
 }
 \description{
-Sets a legacy process-wide callback for non-interactive sessions. This
-fallback cannot isolate concurrent Agents or Shiny sessions. New code should
-bind a handler to a tool instance with \code{\link[=tools_interactive]{tools_interactive()}}.
+Sets a callback that answers questions for every \code{ask_user} tool without its
+own handler, including \link{tool_ask_user}. It is used instead of \code{readline()},
+even in interactive sessions. Because it is shared by the whole R process, it
+can't tell concurrent agents or Shiny sessions apart; for those, give each
+agent its own handler with \code{\link[=tools_interactive]{tools_interactive()}}.
 }
 \examples{
 \dontrun{
-# Legacy fallback for a single-Agent script:
+# For a single-agent script: always pick the first option
 set_ask_user_callback(function(questions) {
-  # Display questions in modal and collect answers
   answers <- list()
   for (q in questions) {
-    # Collect one answer for each question.
-    answers[[q$question]] <- selected_label
+    answers[[q$question]] <- q$options[[1]]$label
   }
   answers
 })
