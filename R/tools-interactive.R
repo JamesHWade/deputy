@@ -1,3 +1,6 @@
+#' @include callback-result.R
+NULL
+
 # Interactive tools for human-in-the-loop workflows
 #
 # This implements Deputy's structured ask_user tool:
@@ -203,7 +206,12 @@ ask_user_impl <- function(questions, callback = NULL, context = list()) {
   answers
 }
 
-ask_user_tool_impl <- function(questions, callback = NULL, context = list()) {
+ask_user_tool_impl <- function(
+  questions,
+  callback = NULL,
+  context = list(),
+  allow_deferred = TRUE
+) {
   if (is.character(questions) && length(questions) == 1) {
     parsed <- tryCatch(
       jsonlite::fromJSON(questions, simplifyVector = FALSE),
@@ -229,10 +237,7 @@ ask_user_tool_impl <- function(questions, callback = NULL, context = list()) {
         callback = callback,
         context = context
       )
-      list(
-        questions = questions,
-        answers = answers
-      )
+      ask_user_result(questions, answers, allow_deferred)
     },
     interrupt = function(e) {
       rlang::cnd_signal(e)
@@ -253,7 +258,110 @@ ask_user_tool_impl <- function(questions, callback = NULL, context = list()) {
   )
 }
 
-new_ask_user_tool <- function(callback = NULL, context = list()) {
+# A host handler returns answers, a promise for answers, or AskUserDeferred().
+ask_user_result <- function(questions, answers, allow_deferred = TRUE) {
+  if (promises::is.promising(answers)) {
+    return(promises::then(
+      answers,
+      onFulfilled = function(value) {
+        ask_user_result(questions, value, allow_deferred)
+      },
+      onRejected = function(e) {
+        ellmer::tool_reject(paste0(
+          "Failed to get user input: ",
+          conditionMessage(e)
+        ))
+      }
+    ))
+  }
+  if (!S7::S7_inherits(answers, AskUserDeferred)) {
+    return(list(questions = questions, answers = answers))
+  }
+  if (!allow_deferred) {
+    abort_deputy(
+      c(
+        "Delegated agents cannot defer human input to a later turn.",
+        "i" = "Return the answers, or a promise for them, from the handler."
+      ),
+      class = "human_input_unavailable",
+      questions = questions
+    )
+  }
+  value <- list(
+    questions = questions,
+    status = "deferred",
+    instructions = answers@instructions
+  )
+  if (!length(answers@extra)) {
+    return(value)
+  }
+  ellmer::ContentToolResult(value = value, extra = answers@extra)
+}
+
+#' Defer answers to a later user turn
+#'
+#' @description
+#' Return `AskUserDeferred()` from a [tools_interactive()] handler when the host
+#' shows the questions without waiting for them, as a chat interface does. The
+#' tool result tells the model that the questions are displayed and that it
+#' should end its turn; the person's answers then arrive in their next message.
+#'
+#' A handler that must wait inside the current run can instead return a
+#' `promises::promise()` resolving to the named answers list. Deferred answers
+#' keep the run short and make the reply an ordinary user turn, which a host
+#' can persist, quote and cancel like any other message.
+#'
+#' @param instructions One string telling the model what happens next. The
+#'   default asks it to end its turn without answering for the person.
+#' @param extra Optional named list stored as `ellmer::ContentToolResult()`
+#'   `extra`, for example a host display for the questions.
+#' @return A read-only `AskUserDeferred` S7 object.
+#' @seealso [tools_interactive()]
+#' @examples
+#' handler <- function(questions, context) {
+#'   # Show `questions` in the host UI, then return without waiting.
+#'   AskUserDeferred()
+#' }
+#' tools <- tools_interactive(callback = handler)
+#' @export
+AskUserDeferred <- S7::new_class(
+  "AskUserDeferred",
+  package = "deputy",
+  properties = list(
+    instructions = readonly_property("instructions", S7::class_character),
+    extra = readonly_property("extra", S7::class_list)
+  ),
+  constructor = function(
+    instructions = paste(
+      "The questions are now displayed to the person.",
+      "End your turn with at most one short sentence.",
+      "Do not answer the questions for them or assume a choice;",
+      "their answers will arrive in their next message."
+    ),
+    extra = list()
+  ) {
+    instructions <- validate_callback_text(
+      instructions,
+      "instructions",
+      optional = FALSE
+    )
+    if (!is.list(extra) || (length(extra) && !rlang::is_named(extra))) {
+      cli::cli_abort("{.arg extra} must be a named list")
+    }
+    value <- S7::new_object(
+      S7::S7_object(),
+      instructions = instructions,
+      extra = extra
+    )
+    freeze_value(value)
+  }
+)
+
+new_ask_user_tool <- function(
+  callback = NULL,
+  context = list(),
+  allow_deferred = TRUE
+) {
   callback <- validate_ask_user_callback(callback)
   context <- validate_ask_user_context(context)
 
@@ -262,7 +370,8 @@ new_ask_user_tool <- function(callback = NULL, context = list()) {
       ask_user_tool_impl(
         questions,
         callback = callback,
-        context = context
+        context = context,
+        allow_deferred = allow_deferred
       )
     },
     name = "ask_user",
@@ -424,7 +533,10 @@ tool_ask_user <- new_ask_user_tool()
 #'
 #' @param callback Optional handler with signature `function(questions,
 #'   context)`. It should return a named list that maps each question text to
-#'   the selected label or labels. When omitted, interactive sessions use
+#'   the selected label or labels, a promise resolving to that list, or
+#'   [AskUserDeferred()] when the answers will arrive in the person's next
+#'   message. Shiny hosts cannot block for input, so they use one of the latter
+#'   two forms. When omitted, interactive sessions use
 #'   `readline()` and non-interactive sessions may use the legacy callback from
 #'   [set_ask_user_callback()].
 #' @param context Named list of stable host routing values, such as `agent_id`

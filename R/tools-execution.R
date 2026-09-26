@@ -109,25 +109,48 @@ attr(tool_run_r_code, "deputy_workspace_runner") <-
     run_r_code_impl(arguments$code, working_dir = working_dir)
   }
 
+# A non-zero exit is a failed step: the model sees the status and both streams.
+bash_result <- function(output, errors, status) {
+  text <- paste(
+    c(output, if (length(errors)) c("[stderr]", errors)),
+    collapse = "\n"
+  )
+  if (!identical(status, 0L)) {
+    ellmer::tool_reject(paste0(
+      "Command exited with status ",
+      status,
+      if (nzchar(text)) paste0(":\n", text) else " (no output)"
+    ))
+  }
+  if (!nzchar(text)) "Command executed successfully (no output)" else text
+}
+
 run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
   # Use callr for reliable timeout enforcement if available
   if (rlang::is_installed("callr")) {
-    tryCatch(
-      {
-        result <- callr::r(
-          function(cmd) {
-            system(cmd, intern = TRUE)
-          },
-          args = list(cmd = command),
-          timeout = timeout,
-          wd = working_dir
-        )
-        if (length(result) == 0) {
-          "Command executed successfully (no output)"
-        } else {
-          paste(result, collapse = "\n")
-        }
-      },
+    # The shell inherits the child's stderr, so this file captures its errors.
+    stderr_file <- tempfile("deputy-bash-", fileext = ".txt")
+    on.exit(unlink(stderr_file), add = TRUE)
+    result <- tryCatch(
+      callr::r(
+        function(cmd) {
+          # system(intern = TRUE) errors on status 127 (command not found);
+          # the shell has already written its message to stderr.
+          output <- tryCatch(
+            suppressWarnings(system(cmd, intern = TRUE)),
+            error = function(e) structure(character(), status = 127L)
+          )
+          status <- attr(output, "status")
+          list(
+            output = as.character(output),
+            status = if (is.null(status)) 0L else as.integer(status)
+          )
+        },
+        args = list(cmd = command),
+        timeout = timeout,
+        wd = working_dir,
+        stderr = stderr_file
+      ),
       error = function(e) {
         if (inherits(e, "callr_timeout_error")) {
           ellmer::tool_reject(sprintf(
@@ -141,6 +164,12 @@ run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
         ))
       }
     )
+    errors <- if (file.exists(stderr_file)) {
+      readLines(stderr_file, warn = FALSE)
+    } else {
+      character()
+    }
+    bash_result(result$output, errors, result$status)
   } else {
     # Keep the host process directory unchanged in the fallback path.
     command <- paste("cd", shQuote(working_dir), "&&", command)
@@ -171,7 +200,9 @@ run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
 #'
 #' @format A tool definition created with `ellmer::tool()`.
 #' @return When called directly, a character string containing command output
-#'   or a success message.
+#'   (standard error follows a `[stderr]` line) or a success message. A
+#'   command that exits with a non-zero status is rejected with its status
+#'   and output, so the model sees the step failed.
 #'
 #' @param command The bash command to execute (tool argument)
 #'

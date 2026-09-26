@@ -8,7 +8,10 @@ tools_interactive(callback = NULL, context = list())
 }
 \arguments{
 \item{callback}{Optional handler with signature \verb{function(questions, context)}. It should return a named list that maps each question text to
-the selected label or labels. When omitted, interactive sessions use
+the selected label or labels, a promise resolving to that list, or
+\code{\link[=AskUserDeferred]{AskUserDeferred()}} when the answers will arrive in the person's next
+message. Shiny hosts cannot block for input, so they use one of the latter
+two forms. When omitted, interactive sessions use
 \code{readline()} and non-interactive sessions may use the legacy callback from
 \code{\link[=set_ask_user_callback]{set_ask_user_callback()}}.}
 

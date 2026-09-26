@@ -457,14 +457,40 @@ test_that("tool_run_bash rejects subprocess timeouts readably", {
 })
 
 test_that("tool_run_bash handles command not found", {
-  result <- tryCatch(
+  skip_on_os("windows")
+  error <- tryCatch(
     tool_run_bash("nonexistent_command_xyz123"),
-    ellmer_tool_reject = function(e) e$message,
-    error = function(e) e$message
+    ellmer_tool_reject = identity
   )
 
-  # Should indicate failure somehow
-  expect_true(is.character(result))
+  expect_s3_class(error, "ellmer_tool_reject")
+  expect_match(conditionMessage(error), "exited with status 127")
+  expect_match(conditionMessage(error), "nonexistent_command_xyz123")
+})
+
+test_that("tool_run_bash reports a failed command with its status and output", {
+  skip_on_os("windows")
+  error <- tryCatch(
+    run_bash_impl("echo partial; echo broken >&2; exit 3"),
+    ellmer_tool_reject = identity
+  )
+
+  expect_s3_class(error, "ellmer_tool_reject")
+  expect_match(conditionMessage(error), "exited with status 3")
+  expect_match(conditionMessage(error), "partial")
+  expect_match(conditionMessage(error), "[stderr]\nbroken", fixed = TRUE)
+  expect_error(run_bash_impl("false"), "status 1 (no output)", fixed = TRUE)
+})
+
+test_that("tool_run_bash keeps stderr from a successful command", {
+  skip_on_os("windows")
+  result <- run_bash_impl("echo done; echo note >&2")
+
+  expect_identical(result, "done\n[stderr]\nnote")
+  expect_identical(
+    run_bash_impl("true"),
+    "Command executed successfully (no output)"
+  )
 })
 
 test_that("tool_run_r_code requires callr for process isolation", {

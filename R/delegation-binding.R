@@ -364,20 +364,17 @@ bind_delegation_host <- function(
         "Delegated human input requires DelegationPolicy(human_input = ...)."
       )
     }
-    interactive_tool <- tools_interactive(
+    interactive_tool <- new_ask_user_tool(
       policy$human_input,
       context = function() {
         child_private$hook_context(scope = private$delegation_scope)
-      }
-    )[[1L]]
+      },
+      allow_deferred = FALSE
+    )
     child$register_tool(
       ellmer::tool(
         function(questions) {
-          jsonlite::toJSON(
-            interactive_tool(questions),
-            auto_unbox = TRUE,
-            null = "null"
-          )
+          delegated_ask_user_json(interactive_tool(questions))
         },
         name = interactive_tool@name,
         description = interactive_tool@description,
@@ -427,3 +424,12 @@ local({
   S7::method(`$`, DelegationPolicy) <- function(x, name) S7::prop(x, name)
   S7::method(`$`, DelegationResources) <- function(x, name) S7::prop(x, name)
 })
+
+# A delegated handler may answer now or through a promise; either way the child
+# receives the answers as JSON within its current run.
+delegated_ask_user_json <- function(result) {
+  if (promises::is.promising(result)) {
+    return(promises::then(result, delegated_ask_user_json))
+  }
+  jsonlite::toJSON(result, auto_unbox = TRUE, null = "null")
+}
