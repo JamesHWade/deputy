@@ -14,7 +14,9 @@ tool_run_bash(command)
 }
 \value{
 When called directly, a character string containing command output
-or a success message.
+(standard error follows a \verb{[stderr]} line) or a success message. A
+command that exits with a non-zero status is rejected with its status
+and output, so the model sees the step failed.
 }
 \description{
 A tool that executes bash/shell commands and returns the output.
