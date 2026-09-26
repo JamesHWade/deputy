@@ -14,12 +14,13 @@ create_content_stream_chat <- function(
   state$on_tool_result <- function(result) invisible(NULL)
   state$tool_executed <- FALSE
 
-  tool <- ellmer::tool(
+  # Stands in for Deputy's own tool of the same name.
+  tool <- mark_native_tool(ellmer::tool(
     fun = function(path) tool_result,
     name = tool_name,
     description = "Read a test file.",
     arguments = list(path = ellmer::type_string("File path"))
-  )
+  ))
 
   add_assistant_turn <- function(contents, input, output, cost) {
     state$turns <- c(

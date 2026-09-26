@@ -318,7 +318,7 @@ test_that("relative native tool paths execute inside Agent working_dir", {
       do.call(agent$get_tools()[["write_file"]], request@arguments)
     }
   )
-  mock$tool <- ellmer::tool(
+  mock$tool <- mark_native_tool(ellmer::tool(
     fun = function(path) {
       writeLines("after", path)
       path
@@ -326,7 +326,7 @@ test_that("relative native tool paths execute inside Agent working_dir", {
     name = "write_file",
     description = "Write a test file.",
     arguments = list(path = ellmer::type_string("File path"))
-  )
+  ))
   agent <- Agent$new(
     chat = mock$chat,
     tools = list(mock$tool),

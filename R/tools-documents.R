@@ -177,3 +177,6 @@ tool_read_markdown <- ellmer::tool(
     destructive_hint = FALSE
   )
 )
+
+# Deputy's own tools; see mark_native_tool().
+tool_read_markdown <- mark_native_tool(tool_read_markdown)

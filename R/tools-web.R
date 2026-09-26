@@ -461,3 +461,7 @@ parse_duckduckgo_results <- function(html, max_results = 10) {
 
   results
 }
+
+# Deputy's own tools; see mark_native_tool().
+tool_web_fetch <- mark_native_tool(tool_web_fetch)
+tool_web_search <- mark_native_tool(tool_web_search)

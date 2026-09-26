@@ -624,7 +624,9 @@ delegation. MCP uses qualified mcptools releases (1.0.2, 1.0.3; an exact list,
 not a minimum) for transport/schema/invocation and a narrow read-only descriptor
 bridge because those releases drop annotations. Exact
 server selection happens before connection. Reconnecting invalidates old
-tool handles. MCP names never acquire native file or approval-tool privileges.
+tool handles. MCP names never acquire native file or approval-tool privileges;
+nor do host, skill or package tools. Only tools marked by `mark_native_tool()`
+(Deputy's own) get native-name grants; name restrictions apply to all (#216).
 `mcp_console_connection()` adapts MCP Console 0.0.4 through the same
 `McpConnection`: an explicit, version-checked executable, sandbox-widening
 arguments and unreviewed project config refused, `send` governed as

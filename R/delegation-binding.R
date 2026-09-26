@@ -372,7 +372,7 @@ bind_delegation_host <- function(
       allow_deferred = FALSE
     )
     child$register_tool(
-      ellmer::tool(
+      mark_native_tool(ellmer::tool(
         function(questions) {
           delegated_ask_user_json(interactive_tool(questions))
         },
@@ -380,7 +380,7 @@ bind_delegation_host <- function(
         description = interactive_tool@description,
         arguments = interactive_tool@arguments@properties,
         annotations = interactive_tool@annotations
-      ),
+      )),
       replace = TRUE
     )
     binding$manifest$human_input <- "host-bound"

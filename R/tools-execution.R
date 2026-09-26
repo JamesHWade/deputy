@@ -236,3 +236,7 @@ attr(tool_run_bash, "deputy_workspace_runner") <-
   function(arguments, working_dir) {
     run_bash_impl(arguments$command, working_dir = working_dir)
   }
+
+# Deputy's own tools; see mark_native_tool().
+tool_run_r_code <- mark_native_tool(tool_run_r_code)
+tool_run_bash <- mark_native_tool(tool_run_bash)
