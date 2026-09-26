@@ -2,28 +2,33 @@
 % Please edit documentation in R/hooks.R
 \name{HookMatcher}
 \alias{HookMatcher}
-\title{Match a lifecycle hook}
+\title{Create a hook}
 \usage{
 HookMatcher(event, callback, pattern = NULL, timeout = 0)
 }
 \arguments{
 \item{event}{One of \link{HookEvent}.}
 
-\item{callback}{Function accepting the arguments documented for the event
-in \link{HookEvent}, or \code{...}.}
+\item{callback}{A function taking the arguments listed for \code{event} in
+\link{HookEvent}, or \code{...}. \code{HookMatcher()} errors if the arguments don't fit.}
 
-\item{pattern}{Optional regular expression filtering tool names.}
+\item{pattern}{Optional regular expression matched against the tool name.
+A hook with a pattern only fires for events that have a tool name.}
 
-\item{timeout}{Maximum callback time in seconds. Zero runs in the caller's
-process. Positive values use a clean \code{\link[callr:r]{callr::r()}} subprocess, where
-caller-process state and side effects are not available.}
+\item{timeout}{Time limit for the callback, in seconds. The default, 0,
+runs the callback in your R session with no limit. A positive value runs
+it in a fresh R process with \code{\link[callr:r]{callr::r()}}. That process can't see your
+global variables or attached packages (call functions as \code{pkg::fn()}),
+and its printed output and other side effects stay there.}
 }
 \value{
-A \code{HookMatcher} S7 object.
+A \code{HookMatcher} object.
 }
 \description{
-An S7 value defining when a callback runs. Configuration is read-only after
-construction; callback closures retain their caller-owned environments.
+\code{HookMatcher()} pairs a callback with a \link[=HookEvent]{hook event} and,
+optionally, a tool-name pattern. Add it to an agent with
+\code{agent$add_hook()}. The object is read-only; read its fields with \code{@} or
+\code{S7::prop()}.
 }
 \examples{
 hook <- HookMatcher(

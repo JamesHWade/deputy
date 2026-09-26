@@ -2,7 +2,7 @@
 % Please edit documentation in R/agent-job.R
 \name{AgentJob}
 \alias{AgentJob}
-\title{AgentJob read-only durable inspection}
+\title{Background job record}
 \usage{
 AgentJob(
   path,
@@ -33,61 +33,76 @@ AgentJob(
 )
 }
 \arguments{
-\item{path}{Committed job directory.}
+\item{path}{The job directory.}
 
-\item{revision}{Immutable record revision.}
+\item{revision}{Revision number; it goes up with each update.}
 
-\item{id}{Stable job identifier.}
+\item{id}{Job ID.}
 
-\item{status}{Durable lifecycle status.}
+\item{status}{One of \code{"queued"}, \code{"running"}, \code{"resuming"},
+\code{"approval_pending"}, \code{"completed"}, \code{"failed"}, \code{"cancelled"} or
+\code{"indeterminate"}. The last four are final.}
 
-\item{task}{Submitted task text.}
+\item{task}{The task text.}
 
-\item{owner_id}{Host owner identifier.}
+\item{owner_id}{The \code{owner_id} given to \code{\link[=job_create]{job_create()}}.}
 
-\item{definition_revision}{Host Agent-definition revision.}
+\item{definition_revision}{The \code{definition_revision} given to
+\code{\link[=job_create]{job_create()}}.}
 
-\item{context_revision}{Host source-context revision.}
+\item{context_revision}{The \code{context_revision} given to \code{\link[=job_create]{job_create()}}.}
 
-\item{usage_limits}{Reserved usage ceiling.}
+\item{usage_limits}{\link{UsageLimits} for the job.}
 
-\item{usage}{Observed usage.}
+\item{usage}{\link{AgentUsage} so far.}
 
-\item{associations}{Portable host associations.}
+\item{associations}{The \code{associations} list given to \code{\link[=job_create]{job_create()}}.}
 
-\item{manifest}{Portable Agent and graph manifest.}
+\item{manifest}{The agent setup saved by \code{\link[=job_create]{job_create()}}, which \code{\link[=job_run]{job_run()}}
+checks the rebuilt agent against.}
 
-\item{allocation}{Original allocation reservation.}
+\item{allocation}{The usage limits set aside when the job was created.}
 
-\item{reservations}{Durable reservation state.}
+\item{reservations}{Whether that allocation is still held or has been
+released.}
 
-\item{pending_approval}{Persisted approval inspection, or NULL.}
+\item{pending_approval}{Details of the approval the job is waiting for,
+including its \code{path}, or \code{NULL}.}
 
-\item{pending_decision}{Persisted decision receipt, or NULL.}
+\item{pending_decision}{The approval decision being applied (\code{decision},
+\code{tool_input}, \code{recorded_at}), or \code{NULL}.}
 
-\item{transitions}{Bounded lifecycle transitions.}
+\item{transitions}{Status changes, each with \code{from}, \code{to}, \code{at} and
+\code{reason}. Only the latest 128 are kept.}
 
-\item{events}{Bounded runtime events.}
+\item{events}{Simplified run events: at most the latest 512, fewer if
+needed to stay within the storage limit.}
 
-\item{result}{Portable terminal result summary, or NULL.}
+\item{result}{Summary of the final \link{AgentResult} (\code{response},
+\code{stop_reason}, \code{usage} and so on), or \code{NULL}.}
 
-\item{error}{Portable terminal error summary, or NULL.}
+\item{error}{Summary of the error that ended the job (\code{class}, \code{message}
+and so on), or \code{NULL}.}
 
-\item{cleanup}{Cleanup ownership and ledger state.}
+\item{cleanup}{Who is responsible for cleaning up the job's resources, and
+whether cleanup has run.}
 
-\item{runtime}{Portable runtime snapshot.}
+\item{runtime}{State saved while the job ran, such as the tool calls it
+executed.}
 
-\item{graph}{Portable graph snapshot, or NULL.}
+\item{graph}{Usage and limits of the retained agent graph, or \code{NULL} for a
+single agent.}
 
-\item{source}{Portable correlation metadata.}
+\item{source}{IDs of the agents, sessions and runs involved.}
 
-\item{control}{Portable independent cancellation state.}
+\item{control}{Cancellation state: whether \code{\link[=job_cancel]{job_cancel()}} was called, and
+its reason.}
 }
 \value{
-A read-only S7 AgentJob value.
+An \code{AgentJob} object.
 }
 \description{
-AgentJob values are returned by job_read and job_run. They contain portable
-lifecycle and outcome data, never Agents, Chats, tools, callbacks,
-credentials, connections, promises or cleanup closures.
+A read-only snapshot of a background job, returned by \code{\link[=job_read]{job_read()}},
+\code{\link[=job_run]{job_run()}} and \code{\link[=job_cancel]{job_cancel()}}. Read fields with \code{$}. It holds plain data
+only, never an agent, chat, tools, callbacks or credentials.
 }

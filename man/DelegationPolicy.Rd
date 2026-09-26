@@ -2,7 +2,7 @@
 % Please edit documentation in R/delegation-binding.R
 \name{DelegationPolicy}
 \alias{DelegationPolicy}
-\title{Bind host policy and resources to delegated agents}
+\title{Configure subagent tools, hooks and user input}
 \usage{
 DelegationPolicy(
   resource_mode = "shared",
@@ -13,57 +13,59 @@ DelegationPolicy(
 )
 }
 \arguments{
-\item{resource_mode}{\code{"shared"} borrows definition and skill tool closures
-without closing them. \code{"exclusive"} borrows them while holding a process-local
-lease on \code{resource_key}; overlapping delegations fail before dispatch.
-\code{"owned"} uses \code{resources} to construct tools for each child. Definition
-tools and tools in skills are prohibited in this mode.}
+\item{resource_mode}{How subagents get their tools. \code{"shared"} (the
+default) uses the tool objects from the definition and its skills
+directly, so any state they hold is shared between subagents.
+\code{"exclusive"} does the same, but only one delegation at a time may hold
+\code{resource_key}; an overlapping one fails before it starts. \code{"owned"}
+calls \code{resources} to build new tools for each subagent, and the definition
+and its skills may not have tools. Deputy never closes shared or
+exclusive tools.}
 
-\item{resource_key}{Required non-empty host identifier for exclusive resources.
-Hosts sharing a resource across leads must use the same key. This is a
-process-local concurrency guard, not a cross-process lock or access grant.}
+\item{resource_key}{Resource name for \code{"exclusive"} mode, required there
+and not allowed otherwise. Leads sharing a resource must use the same
+key. The lock works within one R process only.}
 
-\item{resources}{For owned mode, \verb{function(agent, definition, context)} returning
-\link{DelegationResources}. The fresh child supplies public identity and workspace
-APIs for constructing an \link{RSession} or \link{McpConnection}. Do not start a run or
-mutate the child's policy, hooks or registry in the factory. Clean up partial
-construction on error before returning. Named MCP selections in definitions
-require this factory; delegation never opens a package-global MCP connection.}
+\item{resources}{For \code{"owned"} mode, a \verb{function(agent, definition, context)}
+that builds tools for the new subagent \code{agent} (for example with an
+\link{RSession} or \link{McpConnection}) and returns them, with a cleanup function,
+as \link{DelegationResources}. Don't run or modify \code{agent}; Deputy registers
+the tools itself. If the function fails, it should first clean up
+anything it created. Definitions with \code{mcp_servers} need this mode.}
 
-\item{human_input}{Optional \verb{function(questions, context)} used to rebind an
-explicitly selected local \code{ask_user} tool. It receives current Agent, session,
-run, parent and delegation identifiers, plus host scope and run context.
-It does not add a tool or approve an action. Without it, selecting \code{ask_user}
-fails before dispatch; the process-global fallback is never used by children.}
+\item{human_input}{Optional \verb{function(questions, context)} that answers
+\code{ask_user} questions from subagents whose definition includes that tool.
+\code{context} holds the subagent's IDs, the lead's \code{delegation_scope} and the
+run context. Return the answers or a promise of them; \code{\link[=AskUserDeferred]{AskUserDeferred()}}
+isn't supported. Without it, delegating to a definition with \code{ask_user}
+fails. Subagents never use \code{\link[=set_ask_user_callback]{set_ask_user_callback()}}.}
 
-\item{observers}{Additional lead hook event names to forward live to children.
-\code{PreToolUse}, \code{PostToolUse}, and \code{PostToolUseFailure} always apply. Other lead
-observers are opt-in. \code{PermissionRequest} and delegation lifecycle events
-cannot be forwarded. The child has its own registry; forwarding shares the
-host callbacks explicitly, without cloning their captured resources.}
+\item{observers}{Extra hook events for which the lead's hooks also run when
+a subagent fires them. The lead's \code{PreToolUse}, \code{PostToolUse} and
+\code{PostToolUseFailure} hooks always do. \code{PermissionRequest},
+\code{SubagentStart} and \code{SubagentStop} can't be added.}
 }
 \value{
-A read-only \code{DelegationPolicy} S7 object.
+A \code{DelegationPolicy} object.
 }
 \description{
-A host-only, read-only policy for \link{LeadAgent}. It is runtime configuration,
-not model input or portable session state. Callback environments remain
-owned by the host; fresh conversations do not isolate their state.
+Tells a \link{LeadAgent} how subagents get their tools, which lead hooks run for
+subagent events, and how subagents ask the user questions. Pass it as
+\code{LeadAgent$new(delegation_policy = )}. See \code{vignette("delegation")}.
 }
 \details{
-Children keep the lead's admission-time permission ceiling and recheck its
-current restrictions before each tool call. Definition restrictions also apply
-to factory, skill and MCP tools. Provider-native tools are rejected because
-Deputy cannot interpose on their execution. Workspaces and checkpoint journals
-are shared with the lead; this policy provides no OS sandbox.
+A subagent never has more permissions than the lead had when the
+delegation started, and each of its tool calls is also checked against the
+lead's current permissions. \code{disallowed_tools} also removes tools from
+skills and \code{resources}. Provider-native tools, such as a provider's
+built-in web search, aren't allowed because Deputy can't check their calls.
+Subagents share the lead's working directory and file checkpoints; this is
+not an OS sandbox.
 
-Child durable approval/continuation is not supported yet. A lead configured
-with \code{approval_dir} rejects delegation before resource construction or provider
-work. A permission callback returning \link{PermissionResultPending} in a child
-rejects the operation without executing it. Supplied text cannot grant approval.
-Use the existing \link{Agent} approval APIs for standalone approval workflows.
+Subagents can't pause for durable approval: a lead with \code{approval_dir}
+can't delegate, and a \link{PermissionResultPending} result for a subagent's
+tool call rejects the call. Use a standalone \link{Agent} for durable approvals.
 
-Stateless parallel responders receive governance but never invoke resource
-factories or acquire tools, interactive handlers, or exclusive leases.
-The initial \link{DelegationManifest} records the effective binding without callbacks.
+Subagents started by \verb{$parallel_delegate()} have no tools, so \code{resources},
+\code{human_input} and \code{resource_key} don't apply to them.
 }

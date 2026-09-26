@@ -1,0 +1,123 @@
+---
+title: "MCP servers"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{MCP servers}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+[Model Context Protocol](https://modelcontextprotocol.io/) (MCP) servers
+provide tools, documents ("resources") and prompt templates to any client that
+speaks the protocol. Deputy connects to them through the
+[mcptools](https://posit-dev.github.io/mcptools/) package, and treats their
+tools like any other: every call goes through the agent's permissions, hooks
+and usage limits.
+
+Configure servers in mcptools' configuration file,
+`~/.config/mcptools/config.json` by default. The mcptools documentation
+explains the format.
+
+Deputy works with mcptools 1.0.2 and 1.0.3, and refuses other versions until
+they have been tested. It relies on parts of mcptools that aren't yet public
+API.
+
+## Load tools from a server
+
+`tools_mcp()` connects to the servers you name and returns their tools:
+
+```{r}
+library(deputy)
+
+agent <- Agent$new(
+  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  tools = c(tools_file(), tools_mcp(servers = "github"))
+)
+```
+
+Name servers exactly as they appear in the config file. If mcptools isn't
+installed or the servers offer no tools, `tools_mcp()` warns and returns an
+empty list. `agent$load_mcp()` does the same for an existing agent, and
+`agent$mcp_status()` reports each load attempt.
+
+Deputy keeps the annotations each server declares for its tools, so
+permissions can judge them. Tools without annotations get the cautious
+defaults described in [Tools](tools.html): with the default permissions, a
+tool that might reach the network needs `web = TRUE`. A server's tool is never
+confused with a built-in one: a remote tool called `read_file` is judged by its
+own annotations, not given Deputy's file permissions, and file checkpoints
+don't cover MCP tools. Deputy can't see what a server does with a call, so
+connect only to servers you trust.
+
+When a server restarts or reconnects, its old tools stop working. Reload them
+with `agent$load_mcp(servers = "github", replace = TRUE)`, which also removes
+tools the server no longer offers. Tools from other servers are left alone.
+
+## A connection per conversation
+
+`tools_mcp()` shares one connection per server across your R session. When
+each conversation needs its own connection, for example in a Shiny app, or
+when you want resources and prompts as well as tools, use `McpConnection`. It
+belongs to one agent, and you choose exactly which tools, resources and
+prompts it exposes:
+
+```{r}
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  permissions = Permissions(web = TRUE)
+)
+
+connection <- McpConnection$new(
+  config = "~/.config/mcptools/config.json",
+  server = "evidence",
+  agent = agent,
+  tools = "inspect_evidence",
+  resources = "evidence://report/current",
+  prompts = "summarize"
+)
+
+agent$register_tools(c(connection$tools(), connection$capability_tools()))
+```
+
+`$tools()` returns the allowed tools. `$capability_tools()` returns tools for
+reading the allowed resources and prompts; with several connections on one
+agent, give each a distinct `prefix` so their names don't clash. These tools
+need `web = TRUE`, because the content comes from outside R.
+
+The allow lists can't change after the connection is created. Your code can
+browse what the server offers with `$discover("tools")` (or `"resources"`,
+`"resource_templates"`, `"prompts"`), but discovering an item doesn't allow it.
+`$read_resource(uri)` and `$get_prompt(name, arguments)` fetch allowed items
+directly; a fetched prompt is returned to you, not added to any chat.
+
+Calls return promises, and a connection handles one request at a time: a
+second request while one is running fails with a busy error, while other
+connections carry on. Call `$close()` when the conversation ends, for example
+from `session$onSessionEnded()` in Shiny. `$cancel()` kills the connection and
+discards the server's session state, as does a request timeout. Tools from a
+closed connection stop working; create a new connection to continue.
+
+### Slow servers
+
+mcptools waits about four seconds for each reply from a server that runs as a
+local process, and doesn't check that a reply belongs to the request it
+answers. A late reply could therefore become the answer to the next call.
+Deputy checks every reply's ID, and when a server doesn't answer in time or
+answers out of order, the call fails with a `deputy_mcp_desynchronized` error
+and the connection closes. The server's session state is lost, so create a new
+connection. Tools loaded with `tools_mcp()` stop that server on the first lost
+reply.
+
+## Sandboxed interpreters
+
+mcp-repl and MCP Console are MCP servers that run R (and, for MCP Console,
+Python and SQL) inside an OS sandbox. Deputy has dedicated helpers for them
+that check the sandbox is really on: see [Running R code](code-execution.html).

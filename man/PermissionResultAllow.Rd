@@ -7,13 +7,15 @@
 PermissionResultAllow(message = NULL)
 }
 \arguments{
-\item{message}{Optional message to display}
+\item{message}{Optional note stored on the result. Deputy doesn't show it
+to the model or the user.}
 }
 \value{
-A \code{PermissionResultAllow} S7 object
+A \code{PermissionResultAllow} object.
 }
 \description{
-Returns a permission result that allows the tool to execute.
+Return this from a \code{can_use_tool} callback or a PermissionRequest hook to
+allow a tool call.
 }
 \examples{
 # Allow a tool call
@@ -24,5 +26,5 @@ PermissionResultAllow(message = "Tool approved by custom callback")
 
 }
 \seealso{
-\link{CallbackResult} for read-only properties and S7 inspection.
+\link{CallbackResult} for reading result fields.
 }

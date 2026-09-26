@@ -10,22 +10,23 @@ A tool definition created with \code{ellmer::tool()}.
 tool_read_file(path, pages = NULL)
 }
 \arguments{
-\item{path}{Path to the file to read (tool argument, not R function argument)}
+\item{path}{Path to the file to read.}
 
-\item{pages}{Optional PDF page selection. Accepts comma-separated pages and
-ranges (e.g. \code{"1,3-5"}). Only supported for PDF files.}
+\item{pages}{Optional PDF page selection, such as \code{"1,3-5"}. Only valid for
+PDF files.}
 }
 \value{
-When called directly, a character string with the file contents, or
-a structured list when selected PDF pages are requested.
+The file contents as one string. When \code{pages} is given, a list with
+the page count and the text of each selected page.
 }
 \description{
-A tool that reads the contents of a file and returns it as a string.
+A tool that reads a file and returns its contents as text. Reading PDFs
+needs the pdftools package (or the Python module pypdf through reticulate).
 }
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_read_file)
 )
 }

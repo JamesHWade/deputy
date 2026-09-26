@@ -7,13 +7,16 @@
 skills_list(path = "skills")
 }
 \arguments{
-\item{path}{Path to search for skills (default: "skills" in working dir)}
+\item{path}{Directory to search. Defaults to \code{"skills"} in the working
+directory.}
 }
 \value{
-Data frame with skill names and paths
+A data frame with \code{name} and \code{path} columns, empty if \code{path}
+doesn't exist.
 }
 \description{
-Scans a directory for subdirectories containing SKILL.yaml files.
+Finds skills in \code{path}: subdirectories that contain \code{SKILL.yaml} or
+\code{SKILL.md}, and Markdown files directly inside \code{path}.
 }
 \examples{
 \dontrun{

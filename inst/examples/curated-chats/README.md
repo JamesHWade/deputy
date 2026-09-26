@@ -1,13 +1,23 @@
-# Curated chats with retained conversations
+# Curated chats as retained specialists
 
-Run `shiny::runApp(system.file("examples/curated-chats", package = "deputy"))`.
-The local deterministic transport needs httpuv, callr, shiny, bslib and shinychat;
-it makes no paid requests. Ask both specialists, select either invocation, then
-follow up with the analyst. The new invocation has a new run/delegation ID and
-the same conversation ID, including its earlier evidence. Cancellation is
-cooperative and does not automatically restart a specialist.
+A Shiny app that turns two configured ellmer chats, an analyst and an auditor,
+into specialists an agent can consult. Each keeps its own conversation across
+follow-ups.
 
-`composition.R` also accepts your existing heterogeneous ellmer chats:
+```r
+shiny::runApp(system.file("examples/curated-chats", package = "deputy"))
+```
+
+It needs shiny, bslib, shinychat (0.5.0 or later), httpuv, commonmark and
+xml2. A local test server stands in for the model, so there are no API keys or
+paid requests.
+
+Ask both specialists, select either one to read its conversation, then follow
+up with the analyst. The follow-up gets new run and delegation IDs but keeps
+the conversation ID and earlier evidence. Cancelling a specialist doesn't
+restart it.
+
+`composition.R` also works with your own chats:
 
 ```r
 setup <- curated_conversations(caller_chat, analyst_chat, auditor_chat, disclosure)
@@ -17,18 +27,15 @@ setup$owner$continue_agent(setup$handles$analyst,
   deputy::UsageLimits(max_requests = 2))
 ```
 
-The example chooses read-only specialist policy. Adjust that host policy for your
-own workflow. `adopt_chat()` makes an isolated copy, preserves configured provider,
-prompt and tools, and explicitly replaces its callbacks with Deputy governance.
-`history = "retain"` copies selected turns; `"fresh"` starts without turns.
-Executable tool closures can still share external resources, which the host owns.
-Use `retain_agent()` instead when transferring an already governed Agent.
+`adopt_chat()` copies a chat with its provider, system prompt and tools, and
+replaces its callbacks so the owning agent's permissions and hooks apply.
+`history = "retain"` copies its turns; `"fresh"` starts without them. The copy
+shares the original's tool functions and whatever they touch. The example
+makes the specialists readonly; adjust that for your own use. Use
+`retain_agent()` to hand over an existing `Agent` instead.
 
-The model can supply only a task brief. It cannot select another Chat, add tools,
-change prompts, release handles or reset their cumulative budget. Inspect child
-history through an authenticated `DelegationDisclosure`; inspection does not grant
-control or advance execution. Export needed history before `release_agent()`.
-
-This example is one caller and two retained specialists. Recursive children,
-durable approval and restart recovery are separate work; successful fixture
-execution makes no claim about model quality or output correctness.
+Each specialist reaches the model as a `delegation_tool()` (`ask_analyst`,
+`ask_auditor`) that takes only a task: the model can't pick another chat, add
+tools, change prompts, release the specialist or reset its budget.
+`disclosure` (a `DelegationDisclosure()`) decides who may read the
+conversations. Export any history you need before `release_agent()`.

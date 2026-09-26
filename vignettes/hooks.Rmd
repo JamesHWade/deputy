@@ -15,325 +15,198 @@ knitr::opts_chunk$set(
 )
 ```
 
-Hooks run R callbacks before or after an agent action. Use them to report
-tool activity with cli, reject a tool call, or record results for your app.
+A hook is an R function that Deputy calls at a fixed point in a run: before a
+tool runs, after it returns, when the run stops, and so on. Use hooks to log
+what an agent does, keep an audit trail, block particular tool calls, or stop
+a run early.
 
-## Hook Events
+## Add a hook
 
-deputy fires hooks at these events:
+Create a hook with `HookMatcher()`, naming the event and the callback, and add
+it to an agent:
 
-| Event | Callback Signature | Purpose |
-|-------|-------------------|---------|
-| `PreToolUse` | `function(tool_name, tool_input, context)` | Before a tool runs (can allow/deny) |
-| `PostToolUse` | `function(tool_name, tool_result, tool_error, context)` | After a tool completes |
-| `Notification` | `function(message, context)` | Informational runtime notices |
-| `Stop` | `function(reason, context)` | When the agent finishes |
-| `SubagentStop` | `function(agent_name, task, result, context)` | When a sub-agent finishes |
-| `UserPromptSubmit` | `function(prompt, context)` | When user submits input |
-| `PreCompact` | `function(turns_to_compact, turns_to_keep, context)` | Before conversation compaction |
-| `SessionStart` | `function(context)` | When a session starts |
-| `SessionEnd` | `function(reason, context)` | When a session ends |
-
-## Creating Hooks
-
-Hooks are S7 values created with `HookMatcher()`. Their configuration is
-read-only after construction. Use `S7::prop(hook, "event")` to read a property
-and `hook_matches(hook, "write_file")` to test a tool name. Callback closures
-retain their caller-owned state.
-
-Hooks are created with `HookMatcher()`:
-
-```{r, eval = FALSE}
+```{r}
 library(deputy)
 
-hook <- HookMatcher(
+log_tool <- HookMatcher(
   event = "PostToolUse",
   callback = function(tool_name, tool_result, tool_error, context) {
-    cli::cli_alert_info("Tool {tool_name} completed")
-    HookResultPostToolUse()
+    cli::cli_inform("{tool_name} finished")
+    NULL
   }
 )
-```
 
-Add hooks to an agent with `add_hook()`:
-
-```{r, eval = FALSE}
-agent$add_hook(hook)
-```
-
-Hooks run in the caller's R process by default, so callbacks can use ordinary
-R state and side effects. Set a positive `timeout` only when you deliberately
-want a clean `callr` subprocess with a hard deadline. An isolated callback
-cannot rely on caller-process state; qualify package functions such as
-`deputy::HookResultPostToolUse()` when using that mode.
-
-Hook result constructors return read-only S7 values. Inspect properties with
-`@`, `$`, or `S7::prop()` and use `S7::props()` for a plain record. To change a
-decision, construct a new result. Nested output objects retain their identity.
-
-```{r hook-result-values, eval = TRUE}
-library(deputy)
-blocked <- HookResultPreToolUse("deny", reason = "Read only")
-S7::S7_inherits(blocked, HookResult)
-blocked$permission
-S7::props(HookResultPreCompact(continue = FALSE))
-```
-
-`continue` must be one non-missing logical value; optional text must be NULL
-or one non-missing string. `suppress_output` keeps its `isTRUE()` coercion.
-Errors raised while constructing results inside callbacks follow the existing
-hook error path: PreToolUse fails closed; other events log and continue.
-
-### Filtering by Tool Name
-
-The optional `pattern` argument is a regex that filters which tools the hook
-applies to:
-
-```{r, eval = FALSE}
-# Only fires for bash commands
-HookMatcher(
-  event = "PreToolUse",
-  pattern = "^run_bash$",
-  callback = function(tool_name, tool_input, context) {
-    cli::cli_alert_warning("Bash command: {tool_input$command}")
-    HookResultPreToolUse(permission = "allow")
-  }
-)
-```
-
-## Pre-Built Hooks
-
-deputy includes several ready-made hooks:
-
-### Logging Tool Calls
-
-`hook_log_tools()` logs every tool call using cli:
-
-```{r hooks-log-demo}
-library(deputy)
-
-chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
 agent <- Agent$new(
-  chat = chat,
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_file(),
   permissions = permissions_readonly()
 )
-agent$add_hook(hook_log_tools(verbose = TRUE))
-
-result <- agent$run_sync("What files are in the current directory?")
+agent$add_hook(log_tool)
 ```
 
-### Blocking Dangerous Bash Commands
+For tool events, `pattern` is a regular expression that limits the hook to
+matching tool names. `hook_matches()` tells you whether a hook applies to a
+tool:
 
-`hook_block_dangerous_bash()` blocks patterns like `rm -rf`, `sudo`,
-`chmod 777`, and more:
+```{r, eval = TRUE}
+library(deputy)
 
-```{r, eval = FALSE}
-agent$add_hook(hook_block_dangerous_bash())
+watch_writes <- HookMatcher(
+  event = "PreToolUse",
+  pattern = "^(write_file|edit_file|multi_edit)$",
+  callback = function(tool_name, tool_input, context) {
+    cli::cli_inform("{tool_name}: {tool_input$path}")
+    NULL
+  }
+)
+hook_matches(watch_writes, "edit_file")
+hook_matches(watch_writes, "read_file")
+```
 
-# Optionally add your own patterns
+## Events
+
+| Event | Fires | Callback arguments |
+|---|---|---|
+| `PreToolUse` | before a tool runs | `tool_name, tool_input, context` |
+| `PostToolUse` | after a tool returns | `tool_name, tool_result, tool_error, context` |
+| `PostToolUseFailure` | after a tool fails | `tool_name, tool_result, tool_error, context` |
+| `PermissionRequest` | when the permission policy denies a call | `tool_name, tool_input, permission_result, context` |
+| `SessionStart` | at the start of each run | `context` |
+| `UserPromptSubmit` | at the start of each run, with the task | `prompt, context` |
+| `Stop` | at the end of each run | `reason, context` |
+| `SessionEnd` | at the end of each run, after `Stop` | `reason, context` |
+| `SubagentStart` | when a subagent starts a delegated task | `agent_name, task, context` |
+| `SubagentStop` | when a subagent finishes | `agent_name, task, result, context` |
+| `PreCompact` | before older turns are summarised | `turns_to_compact, turns_to_keep, context` |
+| `PostCompact` | after a summary is installed | `result, context` |
+| `Notification` | when Deputy reports something, such as a denied call | `message, context` |
+| `ConfigChange` | when `set_permission_mode()` changes the mode | `key, old_value, new_value, context` |
+
+`context` is a named list with the working directory, the agent and run
+identifiers, and fields specific to the event, such as the tool's annotations
+for `PreToolUse` or the run's usage for `Stop`. `?HookEvent` lists them all.
+
+## Block a tool call
+
+A `PreToolUse` hook runs after the permission policy has allowed a call, and
+can still deny it. Return `HookResultPreToolUse()`:
+
+```{r}
+no_secrets <- HookMatcher(
+  event = "PreToolUse",
+  pattern = "^write_file$",
+  callback = function(tool_name, tool_input, context) {
+    if (grepl("\\.env$|secrets", tool_input$path)) {
+      return(HookResultPreToolUse("deny", reason = "Don't write to secret files."))
+    }
+    NULL
+  }
+)
+agent$add_hook(no_secrets)
+```
+
+The model sees the reason and can try something else. A `PreToolUse` hook
+can only take permissions away: calls the policy denies never reach it.
+
+## Allow a denied call
+
+A `PermissionRequest` hook runs only when the policy denies a call, and can
+allow the call anyway. Use it to ask a person before running something the
+policy would refuse:
+
+```{r}
+ask_before_code <- HookMatcher(
+  event = "PermissionRequest",
+  pattern = "^run_r_code$",
+  callback = function(tool_name, tool_input, permission_result, context) {
+    cat(tool_input$code, sep = "\n")
+    if (isTRUE(utils::askYesNo("Run this R code?", default = FALSE))) {
+      return(PermissionResultAllow())
+    }
+    NULL
+  }
+)
+agent$add_hook(ask_before_code)
+```
+
+Returning `NULL` keeps the denial, and `PermissionResultDeny()` replaces its
+reason. An allowed call runs with your R session's access, so treat this hook
+as part of the permission policy.
+
+## Stop a run from a hook
+
+`PostToolUse` hooks see each tool's result or error. Return
+`HookResultPostToolUse(continue = FALSE)` to end the run after the current
+tool:
+
+```{r}
+stop_on_error <- HookMatcher(
+  event = "PostToolUse",
+  callback = function(tool_name, tool_result, tool_error, context) {
+    if (!is.null(tool_error)) {
+      cli::cli_alert_danger("{tool_name} failed: {tool_error}")
+      return(HookResultPostToolUse(continue = FALSE, stop_reason = "tool_failed"))
+    }
+    NULL
+  }
+)
+```
+
+`HookResultPreToolUse()` also takes `continue` and `stop_reason`. Both take
+`additional_context`, text that Deputy appends to the system prompt.
+
+## Built-in hooks
+
+`hook_log_tools()` prints a line after each tool call saying whether it
+succeeded. `verbose = TRUE` adds a short preview of the result:
+
+```{r}
+agent$add_hook(hook_log_tools(verbose = TRUE))
+```
+
+`hook_block_dangerous_bash()` denies shell commands that match patterns such
+as `rm -rf`, `sudo` and `chmod 777`. Add your own patterns with
+`additional_patterns`:
+
+```{r}
 agent$add_hook(hook_block_dangerous_bash(
   additional_patterns = c("DROP\\s+TABLE", "TRUNCATE")
 ))
 ```
 
-### Limiting File Writes
+A pattern list catches accidents, not a determined adversary, so don't rely on
+it to make `run_bash` safe.
 
-Set `Permissions(file_write = output_dir)` to restrict native file writes
-to a directory. `hook_limit_file_writes()` adds a second check using the same
-path rules for `write_file`, `edit_file`, and
-`multi_edit`. The directory must already exist:
+`hook_limit_file_writes(dir)` denies writes and edits outside `dir`, applying
+the same path rules as `Permissions(file_write = dir)`. Use it to add a second
+check, or to confine writes more tightly for one agent than its policy does.
 
-```{r, eval = FALSE}
-output_dir <- file.path(getwd(), "output")
-dir.create(output_dir, showWarnings = FALSE)
+## Order and errors
 
-agent$add_hook(hook_limit_file_writes(output_dir))
-```
+Hooks for an event run in the order you added them, and the first hook that
+returns something other than `NULL` decides; later hooks for that event don't
+run. So return `NULL` from hooks that only observe, and add hooks that can deny
+a call before hooks that might allow it. The built-in hooks return `NULL`
+unless they deny a call.
 
-## Custom PreToolUse Hooks
+If a `PreToolUse` hook throws an error, Deputy denies the tool call. An error
+in any other hook is reported and the run carries on. `agent$hooks$last_errors()`
+lists recent hook errors.
 
-`PreToolUse` hooks can allow or deny tool calls. Return
-`HookResultPreToolUse()` with `permission = "allow"` or `"deny"`:
+## Run a hook in a separate process
 
-```{r, eval = FALSE}
-hook_no_secrets <- HookMatcher(
-  event = "PreToolUse",
-  pattern = "^write_file$",
-  callback = function(tool_name, tool_input, context) {
-    path <- tool_input$path
-    if (is.null(path)) {
-      path <- ""
-    }
-    if (grepl("\\.env$|secrets", path)) {
-      HookResultPreToolUse(
-        permission = "deny",
-        reason = "Cannot write to secret files"
-      )
-    } else {
-      HookResultPreToolUse(permission = "allow")
-    }
-  }
-)
-```
+Hooks run in your R session by default, so they can read and update your
+objects. Give `HookMatcher()` a positive `timeout` (in seconds) to run the
+callback in a fresh R process that is killed if it takes too long. That
+process can't see your session's objects, so refer to package functions with
+`::`, for example `deputy::HookResultPreToolUse()`.
 
-## Custom PostToolUse Hooks
+## Hooks or results?
 
-`PostToolUse` hooks run after a tool completes. Use them for logging,
-metrics, or conditional stopping:
+Hooks are for reacting while a run is in progress. To analyse a run afterwards,
+use the `AgentResult` instead: `result_tool_calls()`, `result_tool_results()`
+and `result$events` hold the same information, without any hook state to
+manage.
 
-```{r hooks-audit-demo}
-hook_audit <- HookMatcher(
-  event = "PostToolUse",
-  callback = function(tool_name, tool_result, tool_error, context) {
-    if (!is.null(tool_error)) {
-      cli::cli_alert_danger("{tool_name} failed: {tool_error}")
-    } else {
-      cli::cli_alert_success("{tool_name} completed")
-    }
-    HookResultPostToolUse()
-  }
-)
-
-chat <- ellmer::chat_openai(model = "gpt-5.6-luna")
-agent <- Agent$new(
-  chat = chat,
-  tools = tools_file(),
-  permissions = permissions_readonly()
-)
-agent$add_hook(hook_audit)
-
-result <- agent$run_sync("What files are in the current directory?")
-
-# For post-hoc analysis, use AgentResult instead of hook state:
-result_tool_calls(result)
-```
-
-Set `continue = FALSE` to stop the agent after a tool call:
-
-```{r, eval = FALSE}
-HookResultPostToolUse(continue = FALSE)
-```
-
-## Session Lifecycle Hooks
-
-Session hooks fire at the start and end of a session:
-
-```{r, eval = FALSE}
-HookMatcher(
-  event = "SessionStart",
-  callback = function(context) {
-    cli::cli_inform("Session started at {Sys.time()}")
-    NULL
-  }
-)
-```
-
-## Notification Hooks
-
-`Notification` hooks are useful for informational events that should not alter
-control flow, such as permission-denied guidance, session-load notices, or
-compaction fallbacks:
-
-```{r, eval = FALSE}
-agent$add_hook(HookMatcher(
-  event = "Notification",
-  callback = function(message, context) {
-    cli::cli_alert_info("[{context$code}] {message}")
-    NULL
-  }
-))
-```
-
-## Error Handling in Hooks
-
-If a `PreToolUse` hook throws an error, Deputy fails closed and denies the tool
-call. Other hook errors are logged and the run continues. You can inspect
-recent hook errors with:
-
-```{r, eval = FALSE}
-agent$hooks$last_errors()
-```
-
-## Approval before a tool call
-
-The installed recipe defines `approval_gate()` and `approval_after_install()`:
-
-```{r approval-recipe-load, eval = TRUE}
-source(system.file("examples", "approval-gates.R", package = "deputy"))
-```
-
-`approval_gate()` calls the `ask_user` tool from `tools_interactive()` directly
-inside a `PreToolUse` callback. The handler belongs to this hook instance; it
-does not use the process-wide callback. The question includes the exact tool
-name and arguments. Only the exact answer `"Approve"` permits execution;
-missing answers, cancellation, and handler errors cannot approve a call.
-
-Here is an executable dry run with a host that declines the request:
-
-```{r approval-simple-demo, eval = TRUE}
-decline <- function(questions, context) {
-  setNames(list("Deny"), questions[[1]]$question)
-}
-gate <- approval_gate(callback = decline)
-S7::prop(gate, "callback")(
-  "write_file", list(path = "report.txt", content = "Draft"),
-  context = list(run_id = "example-run")
-)$permission
-```
-
-Register approval hooks **before all other matching hooks**, including audit
-and Stop hooks. The registry returns the first non-NULL result, so an earlier
-allow or audit result can bypass a later hook. These recipes return NULL after
-approval, for unarmed gates, and after recording receipts so later hooks still
-run and can deny the call.
-
-Attach a fresh hook to an Agent whose permissions already allow the relevant
-operation. Hooks can narrow permissions; approval cannot widen that ceiling.
-In an interactive R terminal, omit `callback` to use the normal user prompt.
-In a hosted application, supply your own synchronous human-input handler.
-This recipe is not a durable pause/resume mechanism.
-
-```{r, eval = FALSE}
-agent$add_hook(approval_gate(callback = my_approval_handler))
-```
-
-## Approval after an earlier installation
-
-Hook context supplies `run_id`, not a mutable history of earlier calls.
-`approval_after_install()` accumulates successful installation receipts in its
-own environment, keyed by that run ID. Its `PreToolUse` callback reads that
-state before `push_changes`; `Stop` removes it. Create a fresh set per Agent.
-The callbacks use `timeout = 0` so they share caller-process state.
-
-This recipe assumes dedicated `install_dependency` and `push_changes` tools.
-The install tool must return `list(installed = TRUE)` only after success.
-A failed install does not arm the gate. Matching arbitrary shell text would
-not reliably identify these operations.
-
-```{r approval-stateful-demo, eval = TRUE}
-hooks <- approval_after_install(callback = decline)
-run <- list(run_id = "installation-run")
-S7::prop(hooks[[1]], "callback")(
-  "install_dependency", list(installed = TRUE), NULL, run
-)
-S7::prop(hooks[[2]], "callback")("push_changes", list(remote = "origin"), run)$permission
-# A different run has no installation receipt.
-S7::prop(hooks[[2]], "callback")(
-  "push_changes", list(remote = "origin"), list(run_id = "another-run")
-)
-S7::prop(hooks[[3]], "callback")("end_turn", run)
-```
-
-Attach all three hooks together:
-
-```{r, eval = FALSE}
-for (hook in approval_after_install(callback = my_approval_handler)) {
-  agent$add_hook(hook)
-}
-```
-
-The example returns `NULL` before an installation because it demonstrates
-that particular sequence policy. Use the unconditional gate if every push
-needs approval. Neither recipe grants permission or performs an installation
-or a push by itself.
+[Human input and approvals](approvals.html) shows hooks that ask a person to
+approve a tool call before it runs.

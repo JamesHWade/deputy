@@ -1002,38 +1002,53 @@ job_mark_recovery <- function(path, record, lock, reason) {
   record
 }
 
-#' AgentJob read-only durable inspection
+#' Background job record
 #'
-#' AgentJob values are returned by job_read and job_run. They contain portable
-#' lifecycle and outcome data, never Agents, Chats, tools, callbacks,
-#' credentials, connections, promises or cleanup closures.
-#' @param path Committed job directory.
-#' @param revision Immutable record revision.
-#' @param id Stable job identifier.
-#' @param status Durable lifecycle status.
-#' @param task Submitted task text.
-#' @param owner_id Host owner identifier.
-#' @param definition_revision Host Agent-definition revision.
-#' @param context_revision Host source-context revision.
-#' @param usage_limits Reserved usage ceiling.
-#' @param usage Observed usage.
-#' @param associations Portable host associations.
-#' @param manifest Portable Agent and graph manifest.
-#' @param allocation Original allocation reservation.
-#' @param reservations Durable reservation state.
-#' @param pending_approval Persisted approval inspection, or NULL.
-#' @param pending_decision Persisted decision receipt, or NULL.
-#' @param transitions Bounded lifecycle transitions.
-#' @param events Bounded runtime events.
-#' @param result Portable terminal result summary, or NULL.
-#' @param error Portable terminal error summary, or NULL.
-#' @param cleanup Cleanup ownership and ledger state.
-#' @param runtime Portable runtime snapshot.
-#' @param graph Portable graph snapshot, or NULL.
-#' @param source Portable correlation metadata.
-#' @param control Portable independent cancellation state.
+#' A read-only snapshot of a background job, returned by [job_read()],
+#' [job_run()] and [job_cancel()]. Read fields with `$`. It holds plain data
+#' only, never an agent, chat, tools, callbacks or credentials.
+#' @param path The job directory.
+#' @param revision Revision number; it goes up with each update.
+#' @param id Job ID.
+#' @param status One of `"queued"`, `"running"`, `"resuming"`,
+#'   `"approval_pending"`, `"completed"`, `"failed"`, `"cancelled"` or
+#'   `"indeterminate"`. The last four are final.
+#' @param task The task text.
+#' @param owner_id The `owner_id` given to [job_create()].
+#' @param definition_revision The `definition_revision` given to
+#'   [job_create()].
+#' @param context_revision The `context_revision` given to [job_create()].
+#' @param usage_limits [UsageLimits] for the job.
+#' @param usage [AgentUsage] so far.
+#' @param associations The `associations` list given to [job_create()].
+#' @param manifest The agent setup saved by [job_create()], which [job_run()]
+#'   checks the rebuilt agent against.
+#' @param allocation The usage limits set aside when the job was created.
+#' @param reservations Whether that allocation is still held or has been
+#'   released.
+#' @param pending_approval Details of the approval the job is waiting for,
+#'   including its `path`, or `NULL`.
+#' @param pending_decision The approval decision being applied (`decision`,
+#'   `tool_input`, `recorded_at`), or `NULL`.
+#' @param transitions Status changes, each with `from`, `to`, `at` and
+#'   `reason`. Only the latest 128 are kept.
+#' @param events Simplified run events: at most the latest 512, fewer if
+#'   needed to stay within the storage limit.
+#' @param result Summary of the final [AgentResult] (`response`,
+#'   `stop_reason`, `usage` and so on), or `NULL`.
+#' @param error Summary of the error that ended the job (`class`, `message`
+#'   and so on), or `NULL`.
+#' @param cleanup Who is responsible for cleaning up the job's resources, and
+#'   whether cleanup has run.
+#' @param runtime State saved while the job ran, such as the tool calls it
+#'   executed.
+#' @param graph Usage and limits of the retained agent graph, or `NULL` for a
+#'   single agent.
+#' @param source IDs of the agents, sessions and runs involved.
+#' @param control Cancellation state: whether [job_cancel()] was called, and
+#'   its reason.
 #'
-#' @return A read-only S7 AgentJob value.
+#' @return An `AgentJob` object.
 #' @export
 AgentJob <- S7::new_class(
   "AgentJob",
@@ -1259,23 +1274,38 @@ job_control_record <- function(id, control_id) {
   )
 }
 
-#' Create a durable host-owned Agent job
+#' Create a background job
 #'
-#' The Agent is inspected into a portable manifest. It is never serialized;
-#' the host supplies a binder again when [job_run()] consumes the job.
+#' Saves a task in a new job directory so that [job_run()] can run it later,
+#' possibly in another R process. The agent isn't saved: Deputy records its
+#' setup (model, system prompt, tools, permissions, conversation and so on),
+#' and `job_run()` checks that the agent you rebuild matches it.
 #'
-#' @param directory Parent directory owned by the host.
-#' @param agent Idle ordinary [Agent] whose exact manifest is retained.
-#' @param task Non-empty task text.
-#' @param owner_id Host owner or tenant identifier.
-#' @param definition_revision Host revision for the Agent definition.
-#' @param context_revision Host revision for source context.
-#' @param usage_limits [UsageLimits] reserved for this job.
-#' @param associations Portable host conversation associations.
-#' @param max_bytes Maximum bytes for each immutable store. Active job revisions
-#'   must also leave 1 MiB + 128 KiB per revision for cleanup and terminal
-#'   settlement; admission fails if the initial record and reserve cannot fit.
-#' @return The committed job directory.
+#' The agent must be idle and must be a plain [Agent] (not a [LeadAgent]) or
+#' the root of a graph from `agent$retain_agent_graph()`. Fallback chats and
+#' provider-native tools aren't supported.
+#'
+#' @param directory Directory to create the job directory in. It is created
+#'   if needed.
+#' @param agent The [Agent] to describe. `bind` in [job_run()] must rebuild an
+#'   agent with the same setup.
+#' @param task The task, as one non-empty string.
+#' @param owner_id ID of the user or tenant that owns the job.
+#' @param definition_revision Your label (a string or number) for the current
+#'   version of the agent's configuration. [job_run()] runs the job only if
+#'   `authorize` returns the same value.
+#' @param context_revision Your label (a string or number) for the current
+#'   version of the context the agent works from, checked the same way.
+#' @param usage_limits [UsageLimits] for the job.
+#' @param associations Optional plain list of your own data to keep with the
+#'   job, such as a conversation ID.
+#' @param max_bytes Size limit for the job's saved record, in bytes (50 MiB
+#'   by default). While the job is active, the record must stay below half
+#'   this limit minus about 1.1 MiB, which is kept free for the final result
+#'   and cleanup. `job_create()` errors if the first record is too big.
+#' @return The path to the new job directory. Keep it to run, read or cancel
+#'   the job.
+#' @seealso `vignette("background-jobs")`
 #' @export
 job_create <- function(
   directory,
@@ -1401,10 +1431,13 @@ job_create <- function(
   path
 }
 
-#' Read a durable Agent job without binding or executing it
+#' Read a background job
 #'
-#' @param path Committed directory returned by [job_create()].
-#' @return A read-only [AgentJob] inspection value.
+#' Returns the job's saved state. It doesn't rebuild the agent, call the model
+#' or run tools, so it's safe to use for status displays.
+#'
+#' @param path Job directory returned by [job_create()].
+#' @return An [AgentJob].
 #' @export
 job_read <- function(path) {
   loaded <- job_record_read(path)
@@ -1705,21 +1738,35 @@ job_bound_agent <- function(bound) {
   list(agent = agent, cleanup = cleanup)
 }
 
-#' Consume one durable Agent job
+#' Run a background job
 #'
-#' The host controls authorization, Agent reconstruction, and resource
-#' cleanup. The execution lock is held from the durable running transition
-#' through runtime detachment and terminal persistence.
+#' Runs a queued job, or resumes one waiting for approval, in the current R
+#' process and returns when the run ends. It calls `authorize` first; a
+#' refusal errors and leaves the job untouched. It then calls `bind`; if that
+#' fails, or the rebuilt agent doesn't match the setup saved by
+#' [job_create()], the job fails. A running job is locked, so a second
+#' `job_run()` on it errors.
 #'
-#' @param path Committed directory returned by [job_create()].
-#' @param bind Function receiving an [AgentJob] and returning an Agent or a
-#'   list with fields agent and cleanup.
-#' @param authorize Function receiving an [AgentJob] and returning the exact
-#'   identity receipt with job_id, owner_id, definition_revision, and
-#'   context_revision.
-#' @param decision Approval decision, approve or deny, for a pending job.
-#' @param tool_input Optional edited raw input for a pending approval.
-#' @return A read-only [AgentJob] inspection value.
+#' A finished job is returned unchanged, and so is a job waiting for approval
+#' unless you pass `decision`. If a previous `job_run()` stopped partway, for
+#' example because its process was killed, the job is marked `"indeterminate"`
+#' and not run again: a tool may already have had effects, so check what
+#' happened before creating new work.
+#'
+#' @param path Job directory returned by [job_create()].
+#' @param bind Function that takes the [AgentJob] and returns the rebuilt
+#'   [Agent], or `list(agent = , cleanup = )` where `cleanup` is a function
+#'   that `job_run()` calls when it is done with the agent.
+#' @param authorize Function that takes the [AgentJob] and returns a list of
+#'   your app's current `job_id`, `owner_id`, `definition_revision` and
+#'   `context_revision` for it; the job runs only if they match the saved
+#'   values. Look them up rather than copying them from the job, and signal an
+#'   error to refuse.
+#' @param decision `"approve"` or `"deny"`, to resume a job waiting for
+#'   approval.
+#' @param tool_input Optional edited tool arguments (a named list) to approve
+#'   with.
+#' @return The updated [AgentJob].
 #' @export
 job_run <- function(
   path,
@@ -2192,17 +2239,18 @@ job_run <- function(
   )
 }
 
-#' Request durable cooperative cancellation of an Agent job
+#' Cancel a background job
 #'
-#' The small control store is independent from the execution store, so a
-#' cancellation request can be recorded while a worker owns the execution
-#' lock. The worker observes it at runtime checkpoints and through its bounded
-#' interrupt poller.
+#' Records a request to cancel the job. A queued job, or one waiting for
+#' approval, is cancelled straight away. A job that is running stops at the
+#' next point where its process checks for cancellation, so the job returned
+#' here may still be `"running"`. A job left `"running"` by a process that
+#' died is marked `"indeterminate"`. Cancelling a finished job does nothing.
 #'
-#' @param path Committed directory returned by [job_create()].
-#' @param authorize Function returning the exact job identity receipt.
-#' @param reason Host cancellation reason.
-#' @return A read-only [AgentJob] inspection value.
+#' @param path Job directory returned by [job_create()].
+#' @param authorize Function that checks the request, as in [job_run()].
+#' @param reason Reason to record, as one string.
+#' @return The updated [AgentJob].
 #' @export
 job_cancel <- function(path, authorize, reason = "cancelled") {
   if (!is.function(authorize)) {

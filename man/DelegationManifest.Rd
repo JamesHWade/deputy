@@ -2,7 +2,7 @@
 % Please edit documentation in R/delegation-manifest.R
 \name{DelegationManifest}
 \alias{DelegationManifest}
-\title{Inspect the prepared initial context of a delegation}
+\title{Record what a subagent started with}
 \usage{
 DelegationManifest(
   input,
@@ -19,42 +19,47 @@ DelegationManifest(
 )
 }
 \arguments{
-\item{input}{Plain normalized \link{DelegationInput} properties.}
+\item{input}{The task, as a list of \link{DelegationInput} fields.}
 
-\item{definition}{Declarative definition identity and prompt material.}
+\item{definition}{The definition's name, prompt, memory, initial prompt and
+skill names, plus an \code{id} hash.}
 
-\item{sources}{Ordered resolved text sources and content digests.}
+\item{sources}{The evidence given to the subagent, each with a SHA-256
+\code{digest} of its text.}
 
-\item{scope}{Host-bound owner and conversation identifiers.}
+\item{scope}{The lead's \code{delegation_scope}.}
 
-\item{system_prompt}{Prepared system prompt, including static memory/skills.}
+\item{system_prompt}{The subagent's system prompt, including memory and
+skills.}
 
-\item{message}{Prepared first user message, including initial prompt and evidence.}
+\item{message}{The first message sent to the subagent, including the
+definition's \code{initial_prompt} and the evidence.}
 
-\item{model}{Selected model name; no provider credentials.}
+\item{model}{The model name. Credentials are never recorded.}
 
-\item{tools}{Registered tool names, not unconditional grants of permission.}
+\item{tools}{Names of the subagent's tools.}
 
-\item{policies}{Policy identifiers and non-executable settings.}
+\item{policies}{A summary of the permission, context and \link{DelegationPolicy}
+settings, with hashes that identify them. Callbacks are not recorded.}
 
-\item{size}{Byte counts and a public complete-context token estimate when known.}
+\item{size}{\code{text_bytes}, \code{manifest_bytes} and \code{estimated_tokens} (\code{NULL}
+when unknown). The token count is an estimate, not a billed count.}
 
-\item{schema_version}{Portable record schema. Currently \code{1L}.}
+\item{schema_version}{Format version; must be \code{1L}.}
 }
 \value{
-A read-only \code{DelegationManifest} S7 value.
+A \code{DelegationManifest} object.
 }
 \description{
-A read-only S7 receipt produced by LeadAgent preparation. It describes the
-supplied initial context, not later provider framing, hooks, compaction, or
-runtime state. It never grants access or installs tools or permissions.
+Holds what a subagent was given when a delegation started: the task,
+evidence, system prompt, first message, model, tool names, and its
+permission and context settings. A \link{LeadAgent} keeps one in memory for each
+delegation; read them with \verb{$get_subagent_contexts()}. A manifest covers
+the starting point only, not what happened during the run.
 }
 \details{
-Hosts normally obtain these values from \code{LeadAgent$get_subagent_contexts()}.
-\code{S7::props()} returns portable plain records suitable for host JSON/RDS storage.
-Constructing or restoring a receipt does not recreate an Agent. The host owns
-disclosure authorization and storage; the LeadAgent retains receipts in memory.
-Evidence hashes identify bytes, not truth or authorization. Size estimates are
-estimates, not billed token counts. Fresh working context and retained history
-remain separately inspectable after compaction (ADR-0017).
+To store a manifest, save \code{S7::props(x)} (plain lists) and rebuild it with
+\code{do.call(DelegationManifest, record)}. A manifest includes the task and
+evidence text, so check who may see it before showing it to users;
+\verb{$get_subagent_contexts(redact = TRUE)} leaves that text out.
 }

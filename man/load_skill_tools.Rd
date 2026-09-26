@@ -12,7 +12,7 @@ load_skill_tools(skill_path, tool_specs)
 \item{tool_specs}{List of tool specifications from SKILL.yaml}
 }
 \value{
-List of tool definitions
+List of tools
 }
 \description{
 Load tools from skill directory

@@ -2,23 +2,24 @@
 % Please edit documentation in R/agent-job.R
 \name{job_cancel}
 \alias{job_cancel}
-\title{Request durable cooperative cancellation of an Agent job}
+\title{Cancel a background job}
 \usage{
 job_cancel(path, authorize, reason = "cancelled")
 }
 \arguments{
-\item{path}{Committed directory returned by \code{\link[=job_create]{job_create()}}.}
+\item{path}{Job directory returned by \code{\link[=job_create]{job_create()}}.}
 
-\item{authorize}{Function returning the exact job identity receipt.}
+\item{authorize}{Function that checks the request, as in \code{\link[=job_run]{job_run()}}.}
 
-\item{reason}{Host cancellation reason.}
+\item{reason}{Reason to record, as one string.}
 }
 \value{
-A read-only \link{AgentJob} inspection value.
+The updated \link{AgentJob}.
 }
 \description{
-The small control store is independent from the execution store, so a
-cancellation request can be recorded while a worker owns the execution
-lock. The worker observes it at runtime checkpoints and through its bounded
-interrupt poller.
+Records a request to cancel the job. A queued job, or one waiting for
+approval, is cancelled straight away. A job that is running stops at the
+next point where its process checks for cancellation, so the job returned
+here may still be \code{"running"}. A job left \code{"running"} by a process that
+died is marked \code{"indeterminate"}. Cancelling a finished job does nothing.
 }

@@ -2,13 +2,14 @@
 % Please edit documentation in R/delegation-observation.R
 \name{DelegationSubscription}
 \alias{DelegationSubscription}
-\title{Read bounded child activity without driving execution}
+\title{Subscription to subagent events}
 \description{
-Create through \code{Agent$observe_subagents()}. The runtime consumes each
-child stream once; subscriptions only observe retained public events.
-Authorization is rechecked on every read, including snapshot and reconnect.
-Sequence numbers are monotonic across one lead's transient stream, not per
-child. Cursors are locators and cannot authorize access.
+Reads an agent's subagent events; create one with
+\code{Agent$observe_subagents()}. \verb{$snapshot()} returns the current state and
+\verb{$poll()} the events since the last read. Reading never affects the
+subagents, and every read checks access again with the agent's
+\link{DelegationDisclosure}. Event sequence numbers count across all of the
+agent's subagents. A cursor marks a position; it doesn't grant access.
 }
 \section{Methods}{
 \subsection{Public methods}{
@@ -23,7 +24,8 @@ child. Cursors are locators and cannot authorize access.
 \if{html}{\out{<a id="method-DelegationSubscription-initialize"></a>}}
 \if{latex}{\out{\hypertarget{method-DelegationSubscription-initialize}{}}}
 \subsection{\code{DelegationSubscription$new()}}{
-  Create an authorized cursor. Normally use the lead method.
+  Create a subscription, usually through
+\code{Agent$observe_subagents()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{DelegationSubscription$new(lead, requester, delegation_id = NULL, after = NULL)}
@@ -32,11 +34,12 @@ child. Cursors are locators and cannot authorize access.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{lead}}{An Agent owning delegated conversations.}
-      \item{\code{requester}}{Host-authenticated request context.}
-      \item{\code{delegation_id}}{Optional child locator filter.}
-      \item{\code{after}}{A cursor previously returned by this lead, or NULL to start
-at its current sequence. Foreign/future cursors fail explicitly.}
+      \item{\code{lead}}{The \code{Agent} or \link{LeadAgent} to follow.}
+      \item{\code{requester}}{Who is reading, passed to the disclosure functions.
+Authenticate it first.}
+      \item{\code{delegation_id}}{Optional delegation ID, to follow one subagent.}
+      \item{\code{after}}{A cursor from this agent to resume from, or \code{NULL} to start
+now. A cursor from another agent is an error.}
     }
     \if{html}{\out{</div>}}
   }
@@ -46,9 +49,8 @@ at its current sequence. Foreign/future cursors fail explicitly.}
 \if{html}{\out{<a id="method-DelegationSubscription-snapshot"></a>}}
 \if{latex}{\out{\hypertarget{method-DelegationSubscription-snapshot}{}}}
 \subsection{\code{DelegationSubscription$snapshot()}}{
-  Return an authorized snapshot and its matching event cursor.
-This resets the subscription cursor. The snapshot is copied before host
-redaction; subsequent polls contain only events after that boundary.
+  Get the subagents' current state and move the cursor to
+now, so the next \verb{$poll()} returns only later events.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{DelegationSubscription$snapshot(transcript = FALSE)}
@@ -57,12 +59,13 @@ redaction; subsequent polls contain only events after that boundary.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{transcript}}{Include public child transcripts. Defaults to FALSE.}
+      \item{\code{transcript}}{Whether to include transcripts. Defaults to \code{FALSE}.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    List with \code{children} and \code{cursor}. Inspection never starts work.
+    A list with \code{children}, one redacted view per subagent, and
+\code{cursor}.
   }
 }
 
@@ -70,20 +73,20 @@ redaction; subsequent polls contain only events after that boundary.
 \if{html}{\out{<a id="method-DelegationSubscription-poll"></a>}}
 \if{latex}{\out{\hypertarget{method-DelegationSubscription-poll}{}}}
 \subsection{\code{DelegationSubscription$poll()}}{
-  Read retained events since this cursor, advancing on success.
-No generator is consumed. A slow reader gets explicit \code{gaps} for lost
-sequence ranges; obtain a snapshot to recover retained public history.
-Filtering children can make an evicted stream range irrelevant to the
-selected child, but the gap is still reported conservatively.
+  Get the events since the last read and advance the cursor.
+Ranges of events dropped before you read them are listed in \code{gaps};
+call \verb{$snapshot()} to catch up. When following one subagent, a gap may
+only cover other subagents' events.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{DelegationSubscription$poll()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    List with \code{events}, \code{gaps}, and next \code{cursor}. Event redaction
-receives \code{list(kind = "event", event = envelope)}; remove \code{event} to hide
-it. Redaction errors do not advance the cursor or affect child execution.
+    A list with \code{events}, \code{gaps} and \code{cursor}. Each event goes
+through the disclosure \code{redact} function as
+\code{list(kind = "event", event = event)}; remove \code{event} to hide it. If
+\code{redact} errors, the cursor doesn't move.
   }
 }
 
@@ -91,14 +94,14 @@ it. Redaction errors do not advance the cursor or affect child execution.
 \if{html}{\out{<a id="method-DelegationSubscription-close"></a>}}
 \if{latex}{\out{\hypertarget{method-DelegationSubscription-close}{}}}
 \subsection{\code{DelegationSubscription$close()}}{
-  Detach this reader. Does not cancel or resume a child.
+  Stop reading; the subagents keep running.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{DelegationSubscription$close()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisibly NULL. Repeated closes are harmless; reads then fail.
+    \code{NULL}, invisibly. Later reads error.
   }
 }
 

@@ -2,7 +2,7 @@
 % Please edit documentation in R/trusted-results.R
 \name{TrustedResults}
 \alias{TrustedResults}
-\title{Designate trusted tools as the only producers of host results}
+\title{Designate trusted tools}
 \usage{
 TrustedResults(
   ...,
@@ -13,79 +13,74 @@ TrustedResults(
 }
 \arguments{
 \item{...}{Named pairs \code{result_type = "tool_name"}. Result types must be
-unique identifiers (letters, numbers, dots, underscores, hyphens). Each tool
-may produce only one result type.}
+unique, start with a letter or number, and contain only letters, numbers,
+dots, underscores and hyphens. Each tool may produce only one result type.}
 
 \item{on_result}{Optional function called with the \code{"trusted_result"}
 \link{AgentEvent} as soon as the trusted tool returns, before the model sees
-any output. Use it to update a Shiny \code{reactiveValues()} or a host store.
-If it signals an error, the result event is still recorded, a
+any output. Use it to update a Shiny \code{reactiveValues()} or your own
+store. If it signals an error, the result event is still recorded, a
 \code{"trusted_result_delivery_failed"} notification is emitted, and the model
 receives a tool error instead of the value.}
 
-\item{exempt_tools}{Character vector of local function tool names that the
-host asserts cannot bypass a trusted tool despite write or open-world
-annotations.}
+\item{exempt_tools}{Names of local function tools that may write or reach
+external systems but can't produce a trusted result. Listing a tool here
+is your promise; Deputy can't check it. MCP, provider, code-running and
+delegation tools can't be exempted.}
 
 \item{model_receipt}{If \code{TRUE}, the model receives a receipt naming the
 result ID and type instead of the value, so it cannot restate the values.
-Defaults to \code{FALSE}, which sends the model the same value as the host.}
+Defaults to \code{FALSE}, which sends the model the same value your app gets.}
 }
 \value{
-A read-only \code{TrustedResults} S7 value.
+A \code{TrustedResults} object. It is read-only; read fields with \code{$}.
 }
 \description{
-A read-only S7 policy implementing the trusted mini-agent pattern of Will
-Landau and Sam Parmar (\href{https://trustedminiagents.dev}{\emph{Trusted Mini-Agents}};
-see their \href{https://trustedminiagents.dev/definition.html}{definition}).
-Each named result type is produced by exactly one registered local tool.
-When that tool returns successfully, Deputy delivers its value verbatim to
-the host through a \code{"trusted_result"} \link{AgentEvent}, \code{\link[=result_trusted_results]{result_trusted_results()}},
-and the optional \code{on_result} callback. The value does not have to pass
-through model text.
+\code{TrustedResults()} names, for each kind of result, the one tool allowed to
+produce it. When that tool returns, Deputy passes its value unchanged to
+your app: as a \code{"trusted_result"} \link{AgentEvent}, through
+\code{\link[=result_trusted_results]{result_trusted_results()}}, and to the optional \code{on_result} callback. The
+value never has to pass through model text. This implements the trusted
+mini-agent pattern of Will Landau and Sam Parmar
+(\href{https://trustedminiagents.dev}{\emph{Trusted Mini-Agents}}; see their
+\href{https://trustedminiagents.dev/definition.html}{definition}).
 
-An Agent created with a policy checks its complete tool registry whenever
-tools are published: at construction, \verb{$set_tools()}, \verb{$register_tools()},
-skill and MCP loading, cloning, and graph route installation. Registration
-fails, leaving the previous registry intact, when:
+To keep each trusted tool the only source of its results, an agent with a
+policy checks all its tools whenever they change, including at
+construction, in \verb{$set_tools()} and \verb{$register_tools()}, and when loading
+skills or MCP tools. The change errors, and the previous tools stay in
+place, if:
 \itemize{
-\item a designated trusted tool is missing from the registry;
-\item a trusted tool is not a local function tool (it is provider-native or
-MCP), executes code, or delegates to another Agent;
-\item any other tool executes model-supplied code or delegates to another Agent
-(\code{run_r_code}, \code{run_bash}, R session tools, delegation and graph route
-tools). These tools could produce a result of any kind;
-\item any other tool's effective annotations permit writes
-(\code{read_only_hint} not \code{TRUE}, or an explicit \code{destructive_hint = TRUE})
-or the open world (\code{open_world_hint} not \code{FALSE}), unless the host names it in \code{exempt_tools}. Unannotated tools,
-including MCP REPL and console tools, use the conservative defaults from
-ADR-0007 and are rejected.
+\item a trusted tool is missing;
+\item a trusted tool is not a local function tool (for example, it is an MCP or
+provider tool), runs code, or delegates to another agent;
+\item another tool runs model-supplied code or delegates (\code{run_r_code},
+\code{run_bash}, \code{install_package}, R session tools, delegation and graph
+route tools), since it could produce any result;
+\item another tool isn't annotated with both \code{read_only_hint = TRUE} and
+\code{open_world_hint = FALSE}, or is annotated \code{destructive_hint = TRUE},
+and isn't listed in \code{exempt_tools}. Tools without annotations, including
+MCP REPL and console tools, fail this check.
 }
 
-Exemptions are the host's explicit assertion that a local function tool
-cannot produce a trusted kind of result. MCP, provider-native, code-execution,
-and delegation tools cannot be exempted. The policy is fixed at construction;
-it constrains which tools may be registered alongside trusted ones and does
-not grant permission to call any tool. Permissions, hooks, and durable
-approvals still govern every call.
+The policy can't be changed after construction. It only limits which tools
+may sit alongside trusted ones and doesn't allow any call: permissions,
+hooks and approvals still apply to every call.
 
-A \link{LeadAgent} accepts the policy for its whole delegation tree. Its own
-\code{delegate_to_agent} tool is allowed because every child inherits the policy:
-each definition's tools must pass the same check, and a designated tool may
-live in the lead or in children but must be the same tool everywhere. A
-child's designated tool must be declared in its definition's \code{tools} or in
-\link{Skill} values; skill directories load when the child is built and cannot
-supply one. Child
-trusted results are recorded in the lead's run and delivered to its
-\code{on_result}, with the child's correlation fields. Graph routes and other
-composition tools are still rejected.
+A trusted tool runs only when the model calls it through the agent. Calling
+it from your own code or from inside another tool errors, and no result is
+published. The event's \code{arguments} are the values the tool received, after
+ellmer's type conversion and Deputy's path resolution.
 
-A trusted tool runs only as the tool of the Agent's own governed request, so
-permissions, hooks, and approvals always precede it. Calls from host code or
-from inside another tool fail without publishing a result.
-
-Tool argument values given to the trusted tool are recorded in the event
-after ellmer's argument conversion and Deputy's path resolution.
+A \link{LeadAgent} applies the policy to its subagents too. Its
+\code{delegate_to_agent} tool is allowed because every subagent inherits the
+policy: each definition's tools must pass the same checks, and a trusted
+tool may live in the lead or in subagents but must be the same tool
+everywhere. A subagent's trusted tool must be listed in its definition's
+\code{tools} or in \link{Skill} values, not loaded from a skill directory. Subagent
+trusted results are recorded in the lead's run and passed to its
+\code{on_result}, with the subagent's IDs. Graph routes and other tools that
+compose agents are still rejected.
 }
 \examples{
 policy <- TrustedResults(
@@ -104,3 +99,4 @@ policy$results
 \describe{
 \item{\code{@results}}{Named character vector mapping result types to tool names.}
 }}
+

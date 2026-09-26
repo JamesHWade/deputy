@@ -2,29 +2,26 @@
 % Please edit documentation in R/tools-bundles.R
 \name{tools_code}
 \alias{tools_code}
-\title{Code execution tools}
+\title{Get the code execution tools}
 \usage{
 tools_code()
 }
 \value{
-A list of tool definitions
+A list of tools.
 }
 \description{
-Returns a list of tools for code execution:
-\itemize{
-\item \code{run_r_code} - Execute R code in a separate process
-\item \code{run_bash} - Execute bash commands
-}
-
-\strong{Note:} These tools execute trusted code and require explicit permissions.
-Process separation is not an OS sandbox; \code{\link[=permissions_standard]{permissions_standard()}} denies
-both tools.
+Returns \code{run_r_code} and \code{run_bash}. Both run model-written code with your
+user account's access. Each call runs in a separate process, which is not a
+sandbox. \code{\link[=permissions_standard]{permissions_standard()}} denies both tools; allow them with
+\code{r_code = TRUE} and \code{bash = TRUE} in \code{\link[=Permissions]{Permissions()}}. For an OS sandbox, use
+\code{\link[=tools_mcp_repl]{tools_mcp_repl()}}.
 }
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  tools = tools_code()
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = tools_code(),
+  permissions = Permissions(r_code = TRUE, bash = TRUE)
 )
 }
 

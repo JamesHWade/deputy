@@ -22,7 +22,8 @@ test_that("hook_block_dangerous_bash blocks dangerous commands", {
     tool_input = list(command = "ls -la"),
     context = list()
   )
-  expect_equal(safe_result$permission, "allow")
+  # No objection returns NULL so later hooks still run.
+  expect_null(safe_result)
 })
 
 test_that("hook_block_dangerous_bash blocks privilege escalation", {
@@ -262,11 +263,7 @@ test_that("hook_block_dangerous_bash allows safe commands", {
 
   for (cmd in safe_commands) {
     result <- hook@callback("run_bash", list(command = cmd), list())
-    expect_equal(
-      result$permission,
-      "allow",
-      info = paste("Command should be allowed:", cmd)
-    )
+    expect_null(result, info = paste("Command should be allowed:", cmd))
   }
 })
 
@@ -285,10 +282,7 @@ test_that("hook_block_dangerous_bash accepts custom patterns", {
   )
 
   # Default patterns should now be allowed (since we replaced them)
-  expect_equal(
-    hook@callback("run_bash", list(command = "rm -rf /"), list())$permission,
-    "allow"
-  )
+  expect_null(hook@callback("run_bash", list(command = "rm -rf /"), list()))
 })
 
 test_that("hook_block_dangerous_bash accepts additional patterns", {
@@ -462,7 +456,7 @@ test_that("hook_limit_file_writes restricts directory", {
     tool_input = list(path = file.path(temp_dir, "test.txt")),
     context = list()
   )
-  expect_equal(inside_result$permission, "allow")
+  expect_null(inside_result)
 
   # Write outside allowed dir - should deny
   outside_result <- hook@callback(
@@ -527,7 +521,7 @@ test_that("hook_limit_file_writes covers every native file mutation tool", {
       list()
     )
 
-    expect_equal(inside$permission, "allow", info = tool_name)
+    expect_null(inside, info = tool_name)
     expect_equal(outside$permission, "deny", info = tool_name)
   }
 })
@@ -552,6 +546,59 @@ test_that("hook_limit_file_writes rejects symlink escapes", {
   )
 
   expect_equal(result$permission, "deny")
+})
+
+test_that("built-in hooks let later hooks for the same event run", {
+  withr::local_tempdir(pattern = "deputy-test") -> allowed_dir
+  allowed_dir <- normalizePath(allowed_dir, mustWork = TRUE)
+  seen <- character()
+  recorder <- function(event) {
+    HookMatcher(
+      event = event,
+      callback = function(...) {
+        seen <<- c(seen, event)
+        NULL
+      }
+    )
+  }
+
+  registry <- HookRegistry$new()
+  registry$add(hook_block_dangerous_bash())
+  registry$add(hook_limit_file_writes(allowed_dir))
+  registry$add(hook_log_tools())
+  registry$add(recorder("PreToolUse"))
+  registry$add(recorder("PostToolUse"))
+
+  expect_null(registry$fire(
+    "PreToolUse",
+    tool_name = "run_bash",
+    tool_input = list(command = "ls -la"),
+    context = list()
+  ))
+  expect_null(registry$fire(
+    "PreToolUse",
+    tool_name = "write_file",
+    tool_input = list(path = file.path(allowed_dir, "notes.txt")),
+    context = list()
+  ))
+  suppressMessages(expect_null(registry$fire(
+    "PostToolUse",
+    tool_name = "read_file",
+    tool_result = "contents",
+    tool_error = NULL,
+    context = list()
+  )))
+  expect_equal(seen, c("PreToolUse", "PreToolUse", "PostToolUse"))
+
+  # A denial still stops later hooks.
+  denied <- registry$fire(
+    "PreToolUse",
+    tool_name = "run_bash",
+    tool_input = list(command = "rm -rf /"),
+    context = list()
+  )
+  expect_equal(denied$permission, "deny")
+  expect_length(seen, 3L)
 })
 
 # Hook timeout tests

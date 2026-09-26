@@ -20,20 +20,19 @@ validate_callback_text <- function(value, arg, optional = TRUE) {
   value
 }
 
-#' Callback result value families
+#' Hook and permission results
 #'
 #' @description
-#' Abstract S7 bases for hook and permission results. Construct a concrete
-#' result with [HookResultPreToolUse()], [HookResultPostToolUse()],
-#' [HookResultPreCompact()], [PermissionResultAllow()], or
-#' [PermissionResultDeny()]. Test family membership with `S7::S7_inherits()`.
+#' `HookResult` and `PermissionResult` are the parent classes of the values
+#' that hook and permission callbacks return. You don't create them directly;
+#' use [HookResultPreToolUse()], [HookResultPostToolUse()],
+#' [HookResultPreCompact()], [PermissionResultAllow()],
+#' [PermissionResultDeny()] or [PermissionResultPending()]. To test which kind
+#' a value is, use `S7::S7_inherits(x, PermissionResult)`.
 #'
-#' Result properties are read-only after construction. Read with `@`,
-#' `S7::prop()`, or `$`; missing `$` fields return NULL. Use `S7::props()`
-#' for a plain list of properties and construct a new result to change a
-#' decision. S3 class tags and whole-result list indexing are not supported.
-#' Objects stored in `updated_tool_output` retain their own reference
-#' semantics; freezing a result does not freeze an environment inside it.
+#' Results are read-only. Read fields with `$` (a missing field gives `NULL`),
+#' `@` or `S7::prop()`, or get them all as a list with `S7::props()`. To change
+#' a decision, create a new result.
 #' @name CallbackResult
 #' @export
 HookResult <- S7::new_class("HookResult", package = "deputy", abstract = TRUE)
@@ -54,15 +53,18 @@ local({
 #' Create a PreToolUse hook result
 #'
 #' @description
-#' Return this from a PreToolUse hook callback to control tool execution.
+#' Return this from a PreToolUse hook to allow or deny a tool call. A hook can
+#' only deny calls that the permission policy has already allowed.
 #'
-#' @param permission Either `"allow"` or `"deny"`
-#' @param reason Reason for denial (shown to the LLM)
-#' @param continue One non-missing logical value. If FALSE, stop the agent after this hook
-#' @param additional_context Optional text to append to the running context
-#' @param stop_reason Optional stop reason used when `continue = FALSE`
-#' @seealso [CallbackResult] for read-only properties and S7 inspection.
-#' @return A `HookResultPreToolUse` S7 object
+#' @param permission Either `"allow"` or `"deny"`.
+#' @param reason Why the call was denied. The model sees it.
+#' @param continue `TRUE` or `FALSE`. `FALSE` stops the run.
+#' @param additional_context Optional text to add to the agent's system prompt.
+#'   It stays there for later turns; the same text is only added once.
+#' @param stop_reason Optional stop reason used when `continue = FALSE`.
+#'   Defaults to `"hook_requested_stop"`.
+#' @seealso [CallbackResult] for reading result fields.
+#' @return A `HookResultPreToolUse` object.
 #'
 #' @examples
 #' # Allow a tool call
@@ -120,18 +122,22 @@ HookResultPreToolUse <- S7::new_class(
 #' Create a PostToolUse hook result
 #'
 #' @description
-#' Return this from a PostToolUse hook callback.
+#' Return this from a PostToolUse hook to stop the run or to change what the
+#' agent's `tool_end` event reports. The model always sees the tool's real
+#' result.
 #'
-#' @param continue One non-missing logical value. If FALSE, stop the agent after this hook
-#' @param suppress_output Coerced with `isTRUE()`. Whether to suppress the result on Deputy's emitted
-#'   `tool_end` event. This does not remove the result from model context.
-#' @param updated_tool_output Optional replacement value for Deputy's emitted
-#'   `tool_end` event. ellmer does not support rewriting the model-visible
-#'   in-flight result from this callback.
-#' @param additional_context Optional text to append to the running context
-#' @param stop_reason Optional stop reason used when `continue = FALSE`
-#' @seealso [CallbackResult] for read-only properties and S7 inspection.
-#' @return A `HookResultPostToolUse` S7 object
+#' @param continue `TRUE` or `FALSE`. `FALSE` stops the run after this tool
+#'   call.
+#' @param suppress_output If `TRUE`, leave the result out of the `tool_end`
+#'   event.
+#' @param updated_tool_output Optional value to report in the `tool_end` event
+#'   instead of the tool's result.
+#' @param additional_context Optional text to add to the agent's system prompt.
+#'   It stays there for later turns; the same text is only added once.
+#' @param stop_reason Optional stop reason used when `continue = FALSE`.
+#'   Defaults to `"hook_requested_stop"`.
+#' @seealso [CallbackResult] for reading result fields.
+#' @return A `HookResultPostToolUse` object.
 #'
 #' @examples
 #' # Continue execution
@@ -186,13 +192,13 @@ HookResultPostToolUse <- S7::new_class(
 #' Create a PreCompact hook result
 #'
 #' @description
-#' Return this from a PreCompact hook callback to control whether compaction
-#' should proceed.
+#' Return this from a PreCompact hook to cancel compaction or to supply the
+#' summary yourself.
 #'
-#' @param continue One non-missing logical value. If FALSE, cancels the compaction
-#' @param summary Optional custom summary to use for compaction
-#' @seealso [CallbackResult] for read-only properties and S7 inspection.
-#' @return A `HookResultPreCompact` S7 object
+#' @param continue `TRUE` or `FALSE`. `FALSE` cancels the compaction.
+#' @param summary Optional summary to use instead of generating one.
+#' @seealso [CallbackResult] for reading result fields.
+#' @return A `HookResultPreCompact` object.
 #'
 #' @examples
 #' # Allow compaction
@@ -229,11 +235,13 @@ HookResultPreCompact <- S7::new_class(
 #' Create an allow permission result
 #'
 #' @description
-#' Returns a permission result that allows the tool to execute.
+#' Return this from a `can_use_tool` callback or a PermissionRequest hook to
+#' allow a tool call.
 #'
-#' @param message Optional message to display
-#' @seealso [CallbackResult] for read-only properties and S7 inspection.
-#' @return A `PermissionResultAllow` S7 object
+#' @param message Optional note stored on the result. Deputy doesn't show it
+#'   to the model or the user.
+#' @seealso [CallbackResult] for reading result fields.
+#' @return A `PermissionResultAllow` object.
 #'
 #' @examples
 #' # Allow a tool call
@@ -267,18 +275,20 @@ PermissionResultAllow <- S7::new_class(
 #' Create a deny permission result
 #'
 #' @description
-#' Returns a permission result that denies the tool from executing.
+#' Return this from a `can_use_tool` callback or a PermissionRequest hook to
+#' deny a tool call.
 #'
-#' @param reason Reason for denial (shown to the LLM)
-#' @param interrupt One non-missing logical value. If TRUE, stop the entire conversation (default FALSE)
-#' @seealso [CallbackResult] for read-only properties and S7 inspection.
-#' @return A `PermissionResultDeny` S7 object
+#' @param reason Why the call was denied. The model sees it.
+#' @param interrupt `TRUE` or `FALSE`. `TRUE` also stops the run, with stop
+#'   reason `"permission_denied"`.
+#' @seealso [CallbackResult] for reading result fields.
+#' @return A `PermissionResultDeny` object.
 #'
 #' @examples
 #' # Deny a tool call
 #' PermissionResultDeny(reason = "File write not allowed")
 #'
-#' # Deny and interrupt the conversation
+#' # Deny and stop the run
 #' PermissionResultDeny(reason = "Critical security violation", interrupt = TRUE)
 #'
 #' @export

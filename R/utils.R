@@ -72,15 +72,15 @@ read_provider_tool_call_id <- function(reader, source, object) {
   NULL
 }
 
-#' Resolve symlinks in a path (follows symlink chains)
+#' Resolve a chain of symlinks
 #'
-#' Recursively resolves symlinks to get the final target path.
-#' Handles symlink chains up to a maximum depth to prevent infinite loops.
+#' Follows symlinks until it reaches a path that isn't one, giving up after
+#' `max_depth` links so that circular links can't loop forever.
 #'
 #' @param path Path to resolve
-#' @param max_depth Maximum recursion depth (default 20)
-#' @return Resolved path, or `NA_character_` if path doesn't exist or resolution
-#'   fails. Callers should check for NA before using the result.
+#' @param max_depth Maximum number of links to follow (default 20)
+#' @return The final path, or `NA_character_` if a path doesn't exist, can't
+#'   be read or the chain is too long. Check for `NA` before using the result.
 #' @noRd
 resolve_symlinks <- function(path, max_depth = 20) {
   if (max_depth <= 0) {
@@ -127,11 +127,12 @@ resolve_symlinks <- function(path, max_depth = 20) {
 
 #' Expand home directory and normalize a path
 #'
-#' Expands ~ and ~user patterns, then normalizes the path.
-#' This prevents bypass attempts using home directory references.
+#' Expands `~` and `~user`, then normalizes the path with forward slashes, so
+#' paths written in different ways compare equal.
 #'
 #' @param path Path to expand
-#' @return Expanded and normalized path
+#' @return The normalized path, or `NA_character_` if `path` is empty or can't
+#'   be normalized
 #' @noRd
 expand_and_normalize <- function(path) {
   if (is.null(path) || !is.character(path) || nchar(path) == 0) {
@@ -269,22 +270,19 @@ resolve_path_components <- function(path, max_depth = 40L) {
   }
 }
 
-#' Check if a path is within a directory (secure)
+#' Check whether a path is inside a directory
 #'
-#' This function handles both existing and non-existing paths correctly.
-#' It resolves symlinks, expands home directory references, and normalizes
-#' paths before comparison.
+#' Works for paths that don't exist yet. Resolves symlinks (including a
+#' dangling final link), expands `~` and normalizes both paths before
+#' comparing them. Any path containing `..` is rejected.
 #'
-#' **Security Note:** This function is subject to TOCTOU (time-of-check-time-of-use)
-#' race conditions. The filesystem state may change between the check and actual
-#' file operations. For critical security:
-#' 1. Use `validate_path_at_operation()` which performs check immediately before I/O
-#' 2. Call this function as close to the file operation as possible
-#' 3. Consider sandboxed execution environments for high-security scenarios
+#' The answer can go stale if the filesystem changes before the file is used
+#' (a time-of-check to time-of-use race), so call this right before the file
+#' operation, or use `validate_path_at_operation()`. It is not a sandbox.
 #'
 #' @param path Path to check
 #' @param dir Directory to check against
-#' @return Logical indicating if path is within dir
+#' @return `TRUE` if `path` is `dir` or inside it, otherwise `FALSE`
 #' @noRd
 is_path_within <- function(path, dir) {
   # Early validation
@@ -327,13 +325,15 @@ is_path_within <- function(path, dir) {
   startsWith(path_with_sep, dir) || identical(path, sub("/$", "", dir))
 }
 
-#' Check for path traversal attempts
+#' Check for path traversal patterns
 #'
-#' Detects patterns that might be used to escape from a restricted directory.
-#' Note: This does NOT block absolute paths - those are handled by is_path_within().
+#' Flags `..` anywhere in the path and a leading `~`, which could reach
+#' outside a directory. Absolute paths are not flagged; `is_path_within()`
+#' checks those.
 #'
 #' @param path Path to check
-#' @return Logical indicating if path contains traversal patterns
+#' @return `TRUE` if the path contains a traversal pattern or isn't a
+#'   character value
 #' @noRd
 has_path_traversal <- function(path) {
   if (is.null(path) || !is.character(path)) {
@@ -347,9 +347,9 @@ has_path_traversal <- function(path) {
 
 #' Check whether a path is absolute
 #'
-#' Recognizes POSIX, Windows drive-letter, and Windows UNC paths. This helper
-#' deliberately does not expand or normalize the path; callers that accept
-#' untrusted input should reject traversal syntax before resolving it.
+#' Recognizes POSIX, Windows drive-letter and Windows UNC paths. It doesn't
+#' expand or normalize the path, so check untrusted input for traversal
+#' patterns before resolving it.
 #'
 #' @param path Path to inspect
 #' @return A length-one logical
@@ -361,18 +361,19 @@ is_absolute_path <- function(path) {
     grepl("^(/|[A-Za-z]:[/\\\\]|\\\\\\\\)", path)
 }
 
-#' Validate path and perform operation atomically (TOCTOU mitigation)
+#' Check a path, then run a file operation on it
 #'
-#' This function reduces the TOCTOU window by performing the path validation
-#' immediately before the file operation. It should be used instead of
-#' separating the check from the operation.
+#' Validates the path immediately before running `operation`, which narrows
+#' (but doesn't remove) the window in which the filesystem can change between
+#' the check and the use. Prefer this to checking a path separately.
 #'
 #' @param path Path to validate
 #' @param allowed_dir Directory the path must be within (NULL to skip check)
 #' @param operation Function to perform if validation passes. Receives the
 #'   normalized path as its first argument.
 #' @param ... Additional arguments passed to operation
-#' @return Result of operation, or throws error if validation fails
+#' @return Result of `operation`. Errors if the path is empty, contains `..`
+#'   or a leading `~`, can't be normalized, or is outside `allowed_dir`.
 #' @noRd
 validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
   # Validate path format
@@ -425,16 +426,16 @@ validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
   operation(normalized, ...)
 }
 
-#' Secure file write with atomic path validation
+#' Write a file after checking its path
 #'
-#' Writes content to a file with path validation performed immediately
-#' before the write operation to minimize TOCTOU window.
+#' Checks the path with `validate_path_at_operation()` just before writing,
+#' and creates the parent directory if needed.
 #'
 #' @param path Path to write to
 #' @param content Content to write
 #' @param allowed_dir Directory the path must be within (NULL to skip check)
 #' @param append Whether to append to existing file
-#' @return Invisible NULL on success, throws error on failure
+#' @return `NULL`, invisibly. Errors if the path check or the write fails.
 #' @noRd
 secure_write_file <- function(
   path,
@@ -463,14 +464,14 @@ secure_write_file <- function(
   )
 }
 
-#' Secure file read with atomic path validation
+#' Read a file after checking its path
 #'
-#' Reads content from a file with path validation performed immediately
-#' before the read operation to minimize TOCTOU window.
+#' Checks the path with `validate_path_at_operation()` just before reading.
 #'
 #' @param path Path to read from
 #' @param allowed_dir Directory the path must be within (NULL to skip check)
-#' @return File contents as character vector
+#' @return The file contents as one string, with lines joined by `"\n"`.
+#'   Errors if the file doesn't exist.
 #' @noRd
 secure_read_file <- function(path, allowed_dir = NULL) {
   validate_path_at_operation(
@@ -491,7 +492,7 @@ secure_read_file <- function(path, allowed_dir = NULL) {
 #' Format cost as dollars
 #'
 #' @param cost Numeric cost value
-#' @return Formatted string
+#' @return A string such as `"$0.0123"`, or `"unknown"` for `NULL` or `NA`
 #' @noRd
 format_cost <- function(cost) {
   if (is.null(cost) || is.na(cost)) {
@@ -500,7 +501,9 @@ format_cost <- function(cost) {
   sprintf("$%.4f", cost)
 }
 
-#' Get tool annotation value safely
+#' Get a tool annotation value
+#'
+#' Warns, and returns `default`, if the annotations can't be read.
 #'
 #' @param tool A tool definition
 #' @param annotation Name of the annotation
@@ -545,7 +548,9 @@ truncate_string <- function(x, max_length = 100, suffix = "...") {
   paste0(substr(x, 1, max_length - nchar(suffix)), suffix)
 }
 
-#' Validate that an object is an ellmer Chat
+#' Check that an object is an ellmer Chat
+#'
+#' Errors with class `deputy_error` if it isn't.
 #'
 #' @param x Object to validate
 #' @param arg_name Name of the argument (for error messages)
@@ -562,6 +567,9 @@ validate_chat <- function(x, arg_name = "chat") {
 }
 
 #' Parse Markdown frontmatter
+#'
+#' Reads the YAML block between `---` lines at the top of a Markdown file.
+#' Warns and returns empty `meta` if the YAML can't be parsed.
 #'
 #' @param path Path to a Markdown file
 #' @return List with `meta` (list) and `body` (character)

@@ -2,16 +2,17 @@
 % Please edit documentation in R/agent-result.R
 \name{result_is_success}
 \alias{result_is_success}
-\title{Inspect run success}
+\title{Check whether a run completed}
 \usage{
 result_is_success(result)
 }
 \arguments{
-\item{result}{An \link{AgentResult} S7 value.}
+\item{result}{An \link{AgentResult}.}
 }
 \value{
-Whether the stop reason is \code{"complete"}.
+\code{TRUE} if the stop reason is \code{"complete"}, meaning the model
+finished on its own. It doesn't check the answer.
 }
 \description{
-Inspect run success
+Check whether a run completed
 }

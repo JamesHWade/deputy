@@ -1,53 +1,51 @@
-#' Own an isolated MCP client connection
+#' MCP server connection
 #'
 #' @description
-#' A host-owned connection to one configured server. A separate R worker keeps
-#' mcptools' connection registry independent of other connections. mcptools owns
-#' transport and authentication; the selected server owns execution.
-#'
-#' This temporary adapter is qualified for mcptools 1.0.2 and 1.0.3 and uses
-#' their internal request and shutdown functions. Public replacements are tracked upstream in
-#' issues 129 and 130. Other versions fail explicitly.
+#' A connection to one MCP server, owned by one agent. Use it instead of
+#' [tools_mcp()] when you need a fixed list of allowed tools, resources and
+#' prompts, a request timeout, or control over when the server stops. Each
+#' connection runs its own mcptools client in a separate R process. Requires
+#' mcptools 1.0.2 or 1.0.3.
 #'
 #' @details
-#' Construct an Agent first, then bind a connection to it. Tool, resource URI and
-#' prompt allowlists are fixed at construction. Discovery never expands them.
-#' Register the tools returned by `$tools()` to apply the Agent's normal
-#' permissions, hooks and budgets. Direct host methods use the connection's
-#' allowlists but do not constitute an Agent run.
+#' Create the [Agent] first, then the connection. The allowlists are fixed when
+#' the connection is created; `$discover()` never adds to them. Register
+#' `$tools()` on the agent so that calls go through its permissions, hooks and
+#' limits. The other methods call the server directly, outside any agent run.
 #'
-#' Calls return promises, with at most one active call per connection. A concurrent
-#' call fails with a busy error; unrelated connections and the host event loop remain
-#' available. The host must call `$close()` when its conversation ends.
-#' `$cancel()` terminates the connection and its process tree, discarding server
-#' session state. It does not promise a state-preserving interpreter interrupt.
-#' Timeouts also close the connection; old tools cannot reconnect implicitly.
+#' Methods that contact the server return promises. A connection handles one
+#' request at a time; a second request made meanwhile errors, but other
+#' connections are not blocked. Call `$close()` when the conversation ends.
+#' `$cancel()`, and any request that times out, stop the connection and
+#' discard the server's session state; its tools then stop working.
 #'
-#' The qualified mcptools releases wait about 4 seconds for a stdio reply and
-#' do not match replies to requests. If a server does not answer in that
-#' window, or a reply does not match its request, the call fails with a
-#' `deputy_mcp_desynchronized` error and the connection closes, because a late
-#' reply would otherwise answer the next request. The server's session state is
-#' lost; create a new connection to continue.
+#' mcptools waits about 4 seconds for a stdio server's reply and doesn't match
+#' replies to requests, so a late or mismatched reply fails the call with a
+#' `deputy_mcp_desynchronized` error and closes the connection. Create a new
+#' connection to continue.
 #'
-#' Owner identifiers and run context prevent accidental cross-Agent reuse; the
-#' host remains responsible for authentication and assigning those identifiers.
-#' Connections and executable tools are not portable saved-session state.
+#' The connection is tied to the agent's ID, session and run context: its tools
+#' can't be registered on another agent and stop working if the agent's session
+#' changes. Connections are not saved with the agent's session.
 #'
 #' @export
 McpConnection <- R6::R6Class(
   "McpConnection",
   cloneable = FALSE,
   public = list(
-    #' @description Connect and discover tools from one exact server entry.
+    #' @description Start the server and connect to it.
     #' @param config Path to an mcptools JSON configuration.
-    #' @param server Exact configured server name.
-    #' @param agent Agent whose identity, session and run context own this connection.
-    #' @param tools Exact tool names the host allows. Empty by default.
-    #' @param resources Exact resource URIs the host allows. Empty by default.
-    #' @param prompts Exact prompt names the host allows. Empty by default.
-    #' @param timeout Maximum seconds for each request.
-    #' @param startup_timeout Maximum seconds for client and server startup.
+    #' @param server Name of the server in `config`.
+    #' @param agent The agent that owns the connection. The server starts in its
+    #'   working directory.
+    #' @param tools Names of the server tools to allow. None by default. The
+    #'   connection fails if the server doesn't offer all of them.
+    #' @param resources Resource URIs to allow. None by default.
+    #' @param prompts Prompt names to allow. None by default.
+    #' @param timeout Maximum seconds for each request. A request that takes
+    #'   longer closes the connection.
+    #' @param startup_timeout Maximum seconds for the client and server to
+    #'   start.
     initialize = function(
       config,
       server,
@@ -188,8 +186,10 @@ McpConnection <- R6::R6Class(
       invisible(self)
     },
 
-    #' @description Inspect local connection state and fixed host allowances.
-    #' @return A list. This is local process state, not a remote health probe.
+    #' @description Report the connection's state and allowlists.
+    #' @return A list with the connection's ID, server, owner, `state`, the
+    #'   `reason` it closed, its allowlists and version details. It doesn't
+    #'   contact the server.
     status = function() {
       if (private$state %in% c("idle", "busy") && !private$worker$is_alive()) {
         private$terminate("crashed")
@@ -206,10 +206,12 @@ McpConnection <- R6::R6Class(
       )
     },
 
-    #' @description Inspect one catalogue page without registering or authorizing items.
+    #' @description List one page of what the server offers. Listing an item
+    #'   doesn't allow it.
     #' @param kind One of `"tools"`, `"resources"`, `"resource_templates"`, `"prompts"`.
-    #' @param cursor Opaque cursor returned by a previous page, or NULL.
-    #' @return A promise for one server result with connection provenance.
+    #' @param cursor Cursor from a previous page, or `NULL` for the first page.
+    #' @return A promise for a list with `source` (the server and connection)
+    #'   and the server's `result`.
     discover = function(
       kind = c("tools", "resources", "resource_templates", "prompts"),
       cursor = NULL
@@ -238,18 +240,19 @@ McpConnection <- R6::R6Class(
       )
     },
 
-    #' @description Read one explicitly allowed resource URI.
-    #' @param uri Exact allowed resource URI. Returned links are never fetched automatically.
-    #' @return A promise for the upstream resource result and connection provenance.
+    #' @description Read an allowed resource.
+    #' @param uri An allowed resource URI. Links in the result are not followed.
+    #' @return A promise for a list with `source` and the server's `result`.
     read_resource = function(uri) {
       private$check_allowed(uri, "resources")
       private$request("resources/read", list(uri = uri), provenance = TRUE)
     },
 
-    #' @description Retrieve one explicitly allowed prompt without changing any Chat.
-    #' @param name Exact allowed prompt name.
-    #' @param arguments Named list of prompt argument strings.
-    #' @return A promise for the upstream prompt result and connection provenance.
+    #' @description Get an allowed prompt. The prompt is not added to any
+    #'   conversation.
+    #' @param name An allowed prompt name.
+    #' @param arguments Named list of strings to fill in the prompt.
+    #' @return A promise for a list with `source` and the server's `result`.
     get_prompt = function(name, arguments = list()) {
       private$check_allowed(name, "prompts")
       if (
@@ -280,8 +283,9 @@ McpConnection <- R6::R6Class(
       )
     },
 
-    #' @description Build allowed tool handles for explicit Agent registration.
-    #' @return A named list of ellmer tools, bound to this connection and owner.
+    #' @description Create tools for the allowed server tools, to register on
+    #'   the owning agent.
+    #' @return A named list of ellmer tools.
     tools = function() {
       private$check_current()
       result <- lapply(private$allowed$tools, function(name) {
@@ -327,11 +331,14 @@ McpConnection <- R6::R6Class(
       result
     },
 
-    #' @description Build resource and prompt tools restricted to the fixed host allowlists.
-    #' @param prefix Tool name prefix. Use distinct prefixes when registering
-    #'   capability tools from multiple connections. Must contain 1 to 50
-    #'   letters, digits, underscores or hyphens.
-    #' @return A named list of ellmer tools for explicit Agent registration.
+    #' @description Create `<prefix>_read_resource` and `<prefix>_get_prompt`
+    #'   tools that let the model read allowed resources and get allowed
+    #'   prompts. Each is created only if its allowlist isn't empty. Prompts
+    #'   that need arguments can't be fetched this way.
+    #' @param prefix Prefix for the tool names: 1 to 50 letters, digits,
+    #'   underscores or hyphens. Use a different prefix for each connection on
+    #'   the same agent.
+    #' @return A named list of ellmer tools, possibly empty.
     capability_tools = function(prefix = "mcp") {
       private$check_current()
       if (
@@ -380,15 +387,17 @@ McpConnection <- R6::R6Class(
       result
     },
 
-    #' @description End the connection and discard its server session state.
-    #' @return Invisibly, NULL. Repeated calls are harmless.
+    #' @description Stop the connection at once and discard the server's
+    #'   session state.
+    #' @return `NULL`, invisibly. Safe to call more than once.
     cancel = function() {
       private$terminate("cancelled")
       invisible(NULL)
     },
 
-    #' @description Close transport when idle, then terminate the client process tree.
-    #' @return Invisibly, NULL. Closing an active call rejects its promise.
+    #' @description Close the connection. If no request is running, the server
+    #'   is first asked to shut down; then its processes are stopped.
+    #' @return `NULL`, invisibly. A request still running is rejected.
     close = function() {
       if (identical(private$state, "idle") && private$worker$is_alive()) {
         tryCatch(

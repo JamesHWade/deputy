@@ -3,164 +3,120 @@ NULL
 
 # Hook system for deputy agents
 
-#' Hook events supported by deputy
+#' Hook events
 #'
 #' @description
-#' Hook events are fired at specific points during agent execution. Each event
-#' type has a specific callback signature and context structure.
+#' `HookEvent` lists the events you can attach a hook to with [HookMatcher()].
 #'
-#' @section Event Types:
+#' When several hooks match an event, they run in the order they were added.
+#' The first callback that returns a non-`NULL` value decides the outcome, and
+#' the remaining hooks for that event don't run. If a PreToolUse callback
+#' errors or times out, the tool call is denied. Errors in other callbacks are
+#' reported and the run continues.
 #'
-#' **PreToolUse** - Before a tool is executed (can deny)
+#' @section Events:
 #'
-#' Callback signature: `function(tool_name, tool_input, context)`
-#' - `tool_name`: Name of the tool being called (character)
-#' - `tool_input`: Named list of arguments passed to the tool
-#' - `context`: Common correlation fields plus `tool_call_id` and
-#'   `tool_annotations` (if available)
-#' - Return: [HookResultPreToolUse()] to allow/deny
+#' Each entry shows the event with its callback's arguments, then when it
+#' fires.
 #'
-#' **PostToolUse** - After a tool completes
+#' * `PreToolUse(tool_name, tool_input, context)`: before a tool runs, once
+#'   the permission policy has allowed it.
+#' * `PostToolUse(tool_name, tool_result, tool_error, context)`: after a tool
+#'   call finishes, whether or not it failed.
+#' * `PostToolUseFailure(tool_name, tool_result, tool_error, context)`: after
+#'   `PostToolUse`, when the tool failed.
+#' * `PermissionRequest(tool_name, tool_input, permission_result, context)`:
+#'   when the permission policy denies a call.
+#' * `SessionStart(context)`: at the start of each run.
+#' * `UserPromptSubmit(prompt, context)`: at the start of each run, after
+#'   `SessionStart`.
+#' * `Stop(reason, context)`: at the end of each run.
+#' * `SessionEnd(reason, context)`: at the end of each run, after `Stop`.
+#' * `SubagentStart(agent_name, task, context)`: when a subagent starts a
+#'   delegated task.
+#' * `SubagentStop(agent_name, task, result, context)`: when a subagent
+#'   finishes.
+#' * `PreCompact(turns_to_compact, turns_to_keep, context)`: before older
+#'   turns are summarised.
+#' * `PostCompact(result, context)`: after compaction.
+#' * `Notification(message, context)`: when the agent reports something, such
+#'   as a denied call.
+#' * `ConfigChange(key, old_value, new_value, context)`: when
+#'   `set_permission_mode()` changes the mode.
 #'
-#' Callback signature: `function(tool_name, tool_result, tool_error, context)`
-#' - `tool_name`: Name of the tool that was called (character)
-#' - `tool_result`: Result returned by the tool (or NULL on error)
-#' - `tool_error`: Error message if tool failed (or NULL on success)
-#' - `context`: Common correlation fields plus `tool_call_id`
-#' - Return: [HookResultPostToolUse()] to continue/stop
+#' `tool_input` is the named list of tool arguments. After a successful call
+#' `tool_error` is `NULL`; after a failure `tool_result` is `NULL` and
+#' `tool_error` holds the error message. `reason` is the stop reason, such as
+#' `"complete"`, `"request_limit"`, `"cost_limit"`, `"tool_loop"`,
+#' `"hook_requested_stop"` or `"provider_error"`. `result` is the subagent's
+#' result for `SubagentStop` and the [DeputyCompaction] for `PostCompact`. For
+#' `ConfigChange`, `key` is `"permission_mode"`.
 #'
-#' **PostToolUseFailure** - After a tool reports an error
+#' Four events use the callback's return value:
 #'
-#' Callback signature: `function(tool_name, tool_result, tool_error, context)`
-#' - Same arguments as PostToolUse, fired only when `tool_error` is not NULL
+#' * `PreToolUse`: return [HookResultPreToolUse()] to allow or deny the call,
+#'   or to stop the run.
+#' * `PostToolUse`: return [HookResultPostToolUse()] to stop the run or to
+#'   change what the `tool_end` event shows.
+#' * `PermissionRequest`: return [PermissionResultAllow()] to allow the call
+#'   anyway, or [PermissionResultDeny()] to change the reason.
+#' * `PreCompact`: return [HookResultPreCompact()] to cancel compaction or to
+#'   supply your own summary.
 #'
-#' **Stop** - When the agent stops
+#' Other events ignore the return value. Returning `NULL` means "no decision".
 #'
-#' Callback signature: `function(reason, context)`
-#' - `reason`: Why the agent stopped (for example `"complete"`,
-#'   `"request_limit"`, `"cost_limit"`, `"cost_unavailable"`, `"tool_loop"`,
-#'   or `"provider_error"`)
-#' - `context`: Common correlation fields plus `usage` and `cost`; native
-#'   `run()` also includes `total_turns`
-#' - Return: NULL (informational only)
+#' @section Context:
 #'
-#' **SubagentStop** - When a sub-agent completes (LeadAgent only)
+#' `context` is a named list. Every event includes:
 #'
-#' Callback signature: `function(agent_name, task, result, context)`
-#' - `agent_name`: Name of the sub-agent that completed (character)
-#' - `task`: The task that was delegated (character)
-#' - `result`: Result returned by the sub-agent
-#' - `context`: Common correlation fields plus parent/child Agent and run IDs
-#' - Return: NULL (informational only)
+#' * `working_dir`: the agent's working directory.
+#' * `agent_id`, `agent_name`, `session_id`: the agent's identifiers.
+#' * `run_id`: the current run, when one is active.
+#' * `run_context`: the run's `run_context` list.
+#' * `parent_agent_id`, `parent_run_id`, `delegation_id`: set in subagent runs.
 #'
-#' **SubagentStart** - When a delegated sub-agent starts (LeadAgent only)
+#' Some events add fields:
 #'
-#' Callback signature: `function(agent_name, task, context)`
-#' - `agent_name`: Name of the sub-agent that started
-#' - `task`: The delegated task
-#' - `context`: Common correlation fields plus parent/child Agent IDs
+#' * `tool_call_id`, `permission_mode`, `usage`, `usage_limits` (tool events):
+#'   the call's ID, the permission mode, the run's [AgentUsage] so far and its
+#'   [UsageLimits].
+#' * `tool_annotations`, `tool_arguments`, `tool_metadata` (PreToolUse,
+#'   PermissionRequest): the tool's annotations, declared arguments and
+#'   [tool_metadata()], when available.
+#' * `usage`, `cost` (Stop, SessionEnd): the run's [AgentUsage] and the
+#'   conversation's cost, as returned by `agent$cost()`.
+#' * `total_turns`, `compact_count` (PreCompact, PostCompact): the number of
+#'   turns in the conversation and the number being summarised.
+#' * `automatic` (PostCompact): `TRUE` when compaction ran automatically
+#'   during a run rather than through `compact()`.
+#' * `child_agent_id`, `child_run_id`, `status` (SubagentStart, SubagentStop):
+#'   the subagent's identifiers and status.
+#' * `level`, `code` (Notification): a severity such as `"info"` or
+#'   `"warning"`, and a notification code when there is one.
+#' * `permissions`, `provider`, `tools_count` (SessionStart): the agent's
+#'   [Permissions], a list with the provider `name` and `model`, and the
+#'   number of registered tools.
 #'
-#' **PermissionRequest** - When permission policy denies a tool call
-#'
-#' Callback signature: `function(tool_name, tool_input, permission_result, context)`
-#' - Return: [PermissionResultAllow()] to override the denial, or
-#'   [PermissionResultDeny()] to replace the denial reason
-#'
-#' **ConfigChange** - When runtime configuration changes
-#'
-#' Callback signature: `function(key, old_value, new_value, context)`
-#'
-#' **UserPromptSubmit** - When a user prompt is submitted
-#'
-#' Callback signature: `function(prompt, context)`
-#' - `prompt`: The user's prompt text (character)
-#' - `context`: Common correlation fields
-#' - Return: NULL (informational only)
-#'
-#' **Notification** - Informational runtime notice
-#'
-#' Callback signature: `function(message, context)`
-#' - `message`: The notification text (character)
-#' - `context`: Common correlation fields plus `level`, `code`, and any
-#'   event-specific metadata
-#' - Return: NULL (informational only)
-#'
-#' **PreCompact** - Before conversation compaction
-#'
-#' Hook signature: `function(turns_to_compact, turns_to_keep, context)`
-#' - `turns_to_compact`: List of turns that will be compacted into a summary
-#' - `turns_to_keep`: List of recent turns that will be preserved
-#' - `context`: Common correlation fields plus `total_turns` and `compact_count`
-#' - Return: [HookResultPreCompact()] to allow/cancel or provide custom summary
-#'
-#' **PostCompact** - After conversation compaction
-#'
-#' Hook signature: `function(result, context)`
-#' - `result`: The `DeputyCompaction` outcome, including method and usage
-#' - `context`: Common correlation fields plus `compact_count` and `automatic`
-#' - Return: NULL (informational only)
-#'
-#' **SessionStart** - When an agent session begins
-#'
-#' Callback signature: `function(context)`
-#' - `context`: Common correlation fields plus `permissions`, `provider`, and
-#'   `tools_count`
-#' - Return: NULL (informational only)
-#'
-#' **SessionEnd** - When an agent session ends
-#'
-#' Callback signature: `function(reason, context)`
-#' - `reason`: Why the agent stopped (for example `"complete"`,
-#'   `"request_limit"`, `"cost_unavailable"`, `"tool_loop"`, or
-#'   `"hook_requested_stop"`)
-#' - `context`: Common correlation fields plus `usage` and `cost`; native
-#'   `run()` also includes `total_turns`
-#' - Return: NULL (informational only)
-#'
-#' @section Context Structure:
-#'
-#' The context parameter is always a named list. Common fields:
-#' - `working_dir`: The agent's current working directory
-#' - `run_context`: Immutable canonical product context for the active run
-#' - `agent_id`: Stable identifier for the Agent instance
-#' - `agent_name`: Optional human-readable Agent name
-#' - `parent_agent_id`: Parent Agent identifier for delegated runs
-#' - `parent_run_id`: Parent run identifier for delegated runs
-#' - `delegation_id`: Delegation identifier for delegated runs and tools
-#' - `tool_annotations`: (PreToolUse only) Tool annotations from ellmer if available
-#' - `tool_call_id`: Canonical tool lifecycle identifier
-#' - `usage`: Run-scoped [AgentUsage] for tool and terminal lifecycle hooks
-#' - `usage_limits`: Active [UsageLimits] for tool lifecycle hooks
-#' - `run_id`: Identifier for the active run
-#' - `total_turns`: (native Stop, PreCompact, native SessionEnd) Conversation turns
-#' - `cost`: (Stop, SessionEnd) List with `input`, `output`, `cached`, and `total`
-#' - `compact_count`: (PreCompact only) Number of turns being compacted
-#' - `automatic`: (PostCompact only) Whether the run kernel triggered compaction
-#' - `level`: (Notification only) Informational severity such as `"info"` or `"warning"`
-#' - `code`: (Notification only) Stable notification code when available
-#' - `permissions`: (SessionStart only) The agent's permissions configuration
-#' - `provider`: (SessionStart only) List with `name` and `model`
-#' - `tools_count`: (SessionStart only) Number of registered tools
-#'
+#' @seealso `vignette("hooks")`
 #' @examples
 #' \dontrun{
-#' # PreToolUse callback example
+#' # Log each tool call. Returning NULL leaves the decision to other hooks.
 #' agent$add_hook(HookMatcher(
 #'   event = "PreToolUse",
 #'   callback = function(tool_name, tool_input, context) {
 #'     message("Tool: ", tool_name, " in ", context$working_dir)
-#'     HookResultPreToolUse(permission = "allow")
+#'     NULL
 #'   }
 #' ))
 #'
-#' # PostToolUse callback example
+#' # Stop the run when a tool fails
 #' agent$add_hook(HookMatcher(
 #'   event = "PostToolUse",
 #'   callback = function(tool_name, tool_result, tool_error, context) {
 #'     if (!is.null(tool_error)) {
-#'       warning("Tool failed: ", tool_error)
+#'       return(HookResultPostToolUse(continue = FALSE))
 #'     }
-#'     HookResultPostToolUse()
+#'     NULL
 #'   }
 #' ))
 #' }
@@ -185,20 +141,25 @@ HookEvent <- c(
   "SessionEnd"
 )
 
-#' Match a lifecycle hook
+#' Create a hook
 #'
 #' @description
-#' An S7 value defining when a callback runs. Configuration is read-only after
-#' construction; callback closures retain their caller-owned environments.
+#' `HookMatcher()` pairs a callback with a [hook event][HookEvent] and,
+#' optionally, a tool-name pattern. Add it to an agent with
+#' `agent$add_hook()`. The object is read-only; read its fields with `@` or
+#' `S7::prop()`.
 #'
 #' @param event One of [HookEvent].
-#' @param callback Function accepting the arguments documented for the event
-#'   in [HookEvent], or `...`.
-#' @param pattern Optional regular expression filtering tool names.
-#' @param timeout Maximum callback time in seconds. Zero runs in the caller's
-#'   process. Positive values use a clean [callr::r()] subprocess, where
-#'   caller-process state and side effects are not available.
-#' @return A `HookMatcher` S7 object.
+#' @param callback A function taking the arguments listed for `event` in
+#'   [HookEvent], or `...`. `HookMatcher()` errors if the arguments don't fit.
+#' @param pattern Optional regular expression matched against the tool name.
+#'   A hook with a pattern only fires for events that have a tool name.
+#' @param timeout Time limit for the callback, in seconds. The default, 0,
+#'   runs the callback in your R session with no limit. A positive value runs
+#'   it in a fresh R process with [callr::r()]. That process can't see your
+#'   global variables or attached packages (call functions as `pkg::fn()`),
+#'   and its printed output and other side effects stay there.
+#' @return A `HookMatcher` object.
 #' @seealso [hook_matches()]
 #' @examples
 #' hook <- HookMatcher(
@@ -251,8 +212,8 @@ HookMatcher <- S7::new_class(
 #'
 #' @param hook A [HookMatcher].
 #' @param tool_name One tool name, or `NULL`. A hook without a pattern matches
-#'   every name, including `NULL`; a pattern requires a non-NULL name.
-#' @return One logical value.
+#'   every name, including `NULL`; a hook with a pattern never matches `NULL`.
+#' @return `TRUE` or `FALSE`.
 #' @export
 hook_matches <- S7::new_generic(
   "hook_matches",
@@ -286,11 +247,12 @@ S7::method(print, HookMatcher) <- function(x, ...) {
   invisible(x)
 }
 
-#' HookRegistry R6 Class
+#' Hook registry
 #'
 #' @description
-#' Manages a collection of hooks for an agent. Handles registration,
-#' matching, and execution of hooks.
+#' Holds an agent's hooks, finds the ones that match an event, and runs them.
+#' Each agent has its own registry in `agent$hooks`; add hooks with
+#' `agent$add_hook()`.
 #'
 #' @keywords internal
 HookRegistry <- R6::R6Class(
@@ -298,7 +260,7 @@ HookRegistry <- R6::R6Class(
 
   public = list(
     #' @description
-    #' Create a new HookRegistry.
+    #' Create an empty registry.
     initialize = function() {
       private$assert_configurable()
       private$hooks <- list()
@@ -307,8 +269,8 @@ HookRegistry <- R6::R6Class(
     #' @description
     #' Add a hook to the registry.
     #'
-    #' @param hook A [HookMatcher] object
-    #' @return Invisible self for chaining
+    #' @param hook A [HookMatcher].
+    #' @return The registry, invisibly.
     add = function(hook) {
       private$assert_configurable()
       if (!S7::S7_inherits(hook, HookMatcher)) {
@@ -319,11 +281,11 @@ HookRegistry <- R6::R6Class(
     },
 
     #' @description
-    #' Get all hooks for a specific event.
+    #' Get the hooks that match an event.
     #'
-    #' @param event The event type
-    #' @param tool_name Optional tool name for filtering
-    #' @return List of matching HookMatcher objects
+    #' @param event A [HookEvent].
+    #' @param tool_name Optional tool name to match against hook patterns.
+    #' @return A list of [HookMatcher] objects.
     get_hooks = function(event, tool_name = NULL) {
       matching <- list()
       for (hook in private$hooks) {
@@ -335,18 +297,19 @@ HookRegistry <- R6::R6Class(
     },
 
     #' @description
-    #' Fire hooks for an event and return the first non-NULL result.
+    #' Run the matching hooks in the order they were added and return the
+    #' first non-`NULL` result. Later hooks don't run.
     #'
-    #' Hook errors are handled as follows:
 
-    #' - **PreToolUse**: Errors result in denial (fail-safe security behavior)
-    #' - **Other events**: Errors are logged prominently and stored in the
-    #'   `last_errors` field, but execution continues to prevent cascade failures
+    #' A failing callback is recorded in `last_errors()`. For PreToolUse the
+    #' failure denies the tool call; for other events it is reported and the
+    #' next hook runs.
     #'
-    #' @param event The event type
-    #' @param tool_name Optional tool name for filtering (also passed to callback)
-    #' @param ... Arguments to pass to the callback
-    #' @return The first non-NULL hook result, or NULL
+    #' @param event A [HookEvent].
+    #' @param tool_name Optional tool name, matched against hook patterns and
+    #'   passed to the callback.
+    #' @param ... Other arguments for the callback.
+    #' @return The first non-`NULL` result, or `NULL`.
     fire = function(event, tool_name = NULL, ...) {
       hooks <- self$get_hooks(event, tool_name)
 
@@ -439,18 +402,18 @@ HookRegistry <- R6::R6Class(
     },
 
     #' @description
-    #' Get errors from recent hook executions.
+    #' Get the errors raised by hook callbacks since the registry was created
+    #' or last cleared. Use it to check logging hooks, whose failures don't
+    #' stop the run.
     #'
-    #' Useful for programmatic checking of hook health, especially for
-    #' audit/logging hooks where failures are logged but not fatal.
-    #'
-    #' @return List of error records, each containing event, tool_name, error, timestamp
+    #' @return A list of records with `event`, `tool_name`, `error` and
+    #'   `timestamp`.
     last_errors = function() {
       private$hook_errors
     },
 
     #' @description
-    #' Clear the error history.
+    #' Clear the recorded errors.
     clear_errors = function() {
       private$hook_errors <- list()
       invisible(self)
@@ -458,7 +421,7 @@ HookRegistry <- R6::R6Class(
 
     #' @description
     #' Get the number of registered hooks.
-    #' @return Integer count
+    #' @return An integer.
     count = function() {
       length(private$hooks)
     },
@@ -506,14 +469,16 @@ HookRegistry <- R6::R6Class(
   )
 )
 
-#' Create a hook that logs all tool calls
+#' Create a hook that logs tool calls
 #'
 #' @description
-#' Convenience function to create a PostToolUse hook that logs tool calls
-#' using the cli package.
+#' Creates a PostToolUse hook that prints a cli line after each tool call,
+#' saying whether it succeeded or failed. It returns `NULL`, so hooks added
+#' after it still run.
 #'
-#' @param verbose If TRUE, include tool result in log
-#' @return A [HookMatcher] object
+#' @param verbose If `TRUE`, also print the first 100 characters of each
+#'   successful result.
+#' @return A [HookMatcher].
 #'
 #' @examples
 #' \dontrun{
@@ -540,7 +505,8 @@ hook_log_tools <- function(verbose = FALSE) {
           cli::cli_alert_info(paste0("Result: ", result_preview))
         }
       }
-      HookResultPostToolUse()
+      # Only observes: let later PostToolUse hooks run.
+      NULL
     }
   )
 }
@@ -548,42 +514,37 @@ hook_log_tools <- function(verbose = FALSE) {
 #' Create a hook that blocks dangerous bash commands
 #'
 #' @description
-#' Convenience function to create a PreToolUse hook that blocks potentially
-#' dangerous bash commands. Default patterns include:
+#' Creates a PreToolUse hook that denies `run_bash` commands matching any of a
+#' set of regular expressions (case-insensitive). The default patterns cover:
 #'
-#' **File system destruction:**
-#' `rm -rf`, `mkfs`, `dd if=`, writes to `/dev/`
+#' * file system destruction: `rm -rf`, `mkfs`, `dd if=`, writes to `/dev/`;
+#' * privilege escalation: `sudo`, `su -`, `chmod 777`, `chown root`,
+#'   `setuid`;
+#' * code execution: `eval`, `exec`, `source $VAR`, backticks, `$(...)`,
+#'   `python -c` and similar one-liners;
+#' * process manipulation: `kill -9`, `killall`, `pkill -9`, fork bombs;
+#' * system files and services: `crontab`, `systemctl`, `/etc/passwd`,
+#'   `/etc/shadow`, `/etc/sudoers`;
+#' * credentials and history: `printenv`, reading `.ssh`, `.aws` or `.env`
+#'   files, clearing shell history;
+#' * network exfiltration: `curl -X POST`, `wget --post`, `nc -e`, `netcat`,
+#'   reverse shells;
+#' * obfuscation: variable expansion, piping `base64` output to a shell,
+#'   hex and octal escapes, quote splitting, backslash escapes.
 #'
-#' **Privilege escalation:**
-#' `sudo`, `su -`, `chmod 777`, `chown`, `setuid`
+#' The patterns are broad, so they also block some harmless commands. A
+#' denylist can't catch every obfuscated command either. To keep shell
+#' commands contained, turn off `bash` in [Permissions] or run the agent in a
+#' container or other OS sandbox.
 #'
-#' **Code execution:**
-#' `eval`, `exec`, `source` (with variables), backticks
+#' The hook returns a denial for a matching command and `NULL` otherwise, so
+#' hooks added after it still see the commands it lets through.
 #'
-#' **Process manipulation:**
-#' `kill -9`, `killall`, `pkill`, fork bombs
-#'
-#' **System modification:**
-#' `crontab`, `systemctl`, `/etc/passwd`, `/etc/shadow`
-#'
-#' **Network exfiltration:**
-#' `curl -X POST`, `wget --post`, `nc -e`, `netcat`, reverse shells
-#'
-#' **Obfuscation detection:**
-#' Variable expansion in commands, base64 piping, hex/octal escapes,
-#' quote splitting, backslash escapes
-#'
-#' **Security Note:** This is defense-in-depth and cannot catch all possible
-#' obfuscation techniques. For high-security environments, consider:
-#' 1. Using sandboxed execution (Docker, firejail)
-#' 2. Disabling bash entirely via [Permissions]
-#' 3. Using a command whitelist instead of blacklist
-#'
-#' @param patterns Character vector of regex patterns to block.
-#'   Default includes comprehensive dangerous patterns.
-#' @param additional_patterns Optional character vector of additional
-#'   patterns to block alongside defaults.
-#' @return A [HookMatcher] object
+#' @param patterns Character vector of regular expressions to block. `NULL`
+#'   (the default) uses the built-in patterns.
+#' @param additional_patterns Optional character vector of extra patterns to
+#'   block as well.
+#' @return A [HookMatcher].
 #'
 #' @examples
 #' \dontrun{
@@ -758,13 +719,13 @@ hook_block_dangerous_bash <- function(
       command <- tool_input$command %||% ""
 
       if (grepl(combined_pattern, command, ignore.case = TRUE)) {
-        HookResultPreToolUse(
+        return(HookResultPreToolUse(
           permission = "deny",
           reason = "Blocked: potentially dangerous command pattern detected"
-        )
-      } else {
-        HookResultPreToolUse(permission = "allow")
+        ))
       }
+      # No objection: let later PreToolUse hooks decide.
+      NULL
     }
   )
 }
@@ -772,14 +733,18 @@ hook_block_dangerous_bash <- function(
 #' Create a hook that limits file writes to a directory
 #'
 #' @description
-#' Convenience function to create a PreToolUse hook that applies Deputy's
-#' canonical file-write permission policy to `write_file`, `edit_file`, and
-#' `multi_edit`. Prefer configuring [Permissions] as the Agent's authority
-#' policy; this helper is useful as an additional hook-level restriction.
+#' Creates a PreToolUse hook that denies `write_file`, `edit_file` and
+#' `multi_edit` calls outside `allowed_dir`, using the same path checks as
+#' `Permissions(file_write = allowed_dir)`. Setting `file_write` in the
+#' agent's [Permissions] is the main way to limit writes; this hook adds a
+#' second check.
 #'
-#' @param allowed_dir Existing directory where writes are allowed. The path is
-#'   canonicalized when the hook is created.
-#' @return A [HookMatcher] object
+#' The hook returns a denial for a write outside `allowed_dir` and `NULL`
+#' otherwise, so hooks added after it still see the writes it lets through.
+#'
+#' @param allowed_dir An existing directory where writes are allowed. It is
+#'   resolved to an absolute path when the hook is created.
+#' @return A [HookMatcher].
 #'
 #' @examples
 #' \dontrun{
@@ -806,13 +771,13 @@ hook_limit_file_writes <- function(allowed_dir) {
     callback = function(tool_name, tool_input, context) {
       result <- permissions_check(permissions, tool_name, tool_input, context)
       if (identical(result$decision, "deny")) {
-        HookResultPreToolUse(
+        return(HookResultPreToolUse(
           permission = "deny",
           reason = result$reason
-        )
-      } else {
-        HookResultPreToolUse(permission = "allow")
+        ))
       }
+      # No objection: let later PreToolUse hooks decide.
+      NULL
     }
   )
 }

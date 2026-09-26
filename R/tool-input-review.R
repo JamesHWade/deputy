@@ -1,28 +1,28 @@
-#' Tabulate tool arguments for human review
+#' Tabulate a tool call's arguments for review
 #'
 #' @description
-#' Builds a data frame with one row per argument field, pairing the model's
-#' proposed value with the tool's declared ellmer type and description. Nested
-#' objects are flattened to dotted paths such as `plan.treatment`. Use it in a
-#' `can_use_tool` callback, PreToolUse hook, or durable approval review to show a
-#' reviewer a table instead of `dput()` text.
+#' Builds a data frame with one row per argument, pairing the value the model
+#' proposed with the tool's declared type and description. Nested objects are
+#' flattened to dotted names such as `plan.treatment`. Use it in a
+#' `can_use_tool` callback, a `PreToolUse` hook or an approval screen to show a
+#' person a table instead of `dput()` output.
 #'
-#' Permission callbacks and PreToolUse hooks receive the registered tool's
-#' declared arguments as `context$tool_arguments`. Values are formatted for
-#' display only. Validate inputs in the tool itself; review does not establish
-#' that a value is correct.
+#' Permission callbacks and `PreToolUse` hooks get the tool's declared
+#' arguments as `context$tool_arguments`. The table is for display only;
+#' validate inputs in the tool itself.
 #'
-#' @param tool_input Named list of proposed arguments, as given to permission
-#'   callbacks and hooks or found in `pending$request$tool_input`.
+#' @param tool_input Named list of proposed arguments, as passed to permission
+#'   callbacks and hooks, or the `request$tool_input` of a pending approval
+#'   from [approval_read()].
 #' @param tool_arguments The tool's declared arguments: an ellmer `TypeObject`
-#'   such as `context$tool_arguments` or `tool@arguments`, or `NULL` when no
-#'   declaration is available.
+#'   such as `context$tool_arguments` or `tool@arguments`, or `NULL` if you
+#'   don't have one.
 #' @return A data frame with character columns `argument`, `type`,
-#'   `description`, and `value`, and logical columns `required` and `declared`.
-#'   Undeclared input fields are kept with `declared = FALSE`; declared fields
-#'   missing from the input have value `NA`. Argument names are paths joined
-#'   with dots for display; the `"paths"` attribute holds each row's path as a
-#'   character vector, which stays exact when a name itself contains a dot.
+#'   `description` and `value`, and logical columns `required` and `declared`.
+#'   Input fields the tool doesn't declare are kept with `declared = FALSE`;
+#'   declared fields missing from the input have value `NA`. The `"paths"`
+#'   attribute holds each row's path as a character vector, which stays exact
+#'   when a name itself contains a dot.
 #' @examples
 #' arguments <- ellmer::type_object(
 #'   city = ellmer::type_string("City to forecast"),

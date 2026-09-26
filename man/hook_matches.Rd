@@ -10,10 +10,10 @@ hook_matches(hook, tool_name = NULL)
 \item{hook}{A \link{HookMatcher}.}
 
 \item{tool_name}{One tool name, or \code{NULL}. A hook without a pattern matches
-every name, including \code{NULL}; a pattern requires a non-NULL name.}
+every name, including \code{NULL}; a hook with a pattern never matches \code{NULL}.}
 }
 \value{
-One logical value.
+\code{TRUE} or \code{FALSE}.
 }
 \description{
 Test whether a hook matches a tool name

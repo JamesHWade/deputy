@@ -3,30 +3,26 @@
 #' Fetch web page content
 #'
 #' @description
-#' A tool that fetches the content of a web page and returns it as text
-#' or markdown. Requires the httr2 package for HTTP requests.
-#'
-#' For JavaScript-rendered pages, consider using the chromote package
-#' with a custom tool implementation.
+#' A tool that downloads a web page and returns its content as text or
+#' Markdown. Needs the httr2 package. For pages rendered with JavaScript, write
+#' your own tool with chromote.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character string containing the fetched and
-#'   normalized page content.
+#' @return The page content as one string, cut at 50,000 characters.
 #'
-#' @param url The URL of the web page to fetch (tool argument)
+#' @param url URL of the page to fetch.
 #'
 #' @details
-#' This tool uses httr2 to fetch web content and extracts text from HTML.
-#' If the rvest package is available, it extracts the main content more
-#' intelligently. If pandoc is available via rmarkdown, HTML is converted
-#' to markdown.
-#'
-#' The tool respects a 30-second timeout and follows redirects.
+#' Requests follow redirects and time out after 30 seconds. With rvest and xml2
+#' installed, the tool drops navigation, headers and footers and keeps the main
+#' content; with rmarkdown and pandoc available, it converts that HTML to
+#' Markdown. Otherwise it strips the tags. Content that isn't HTML is returned
+#' as is.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = list(tool_web_fetch),
 #'   permissions = Permissions(web = TRUE)
 #' )
@@ -101,25 +97,21 @@ tool_web_fetch <- ellmer::tool(
 #' Search the web
 #'
 #' @description
-#' A tool that performs a web search and returns results. Uses DuckDuckGo's
-#' HTML search results by default.
+#' A tool that searches the web with DuckDuckGo's HTML search page and returns
+#' the title, URL and snippet of each result. Needs the httr2 package. For
+#' better results, use a provider's own search tool (see [tools_web()]) or a
+#' dedicated search API.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character string containing formatted search
-#'   results.
+#' @return The numbered results as one string.
 #'
-#' @param query The search query (tool argument)
-#' @param num_results Maximum number of results to return (tool argument)
-#'
-#' @details
-#' This tool searches the web using DuckDuckGo and returns a list of results
-#' with titles, URLs, and snippets. For more sophisticated search needs,
-#' consider using a dedicated search API.
+#' @param query The search query.
+#' @param num_results Maximum number of results to return. Defaults to 10.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = list(tool_web_search),
 #'   permissions = Permissions(web = TRUE)
 #' )

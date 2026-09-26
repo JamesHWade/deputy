@@ -10,27 +10,23 @@ A tool definition created with \code{ellmer::tool()}.
 tool_web_search(query, num_results = 10)
 }
 \arguments{
-\item{query}{The search query (tool argument)}
+\item{query}{The search query.}
 
-\item{num_results}{Maximum number of results to return (tool argument)}
+\item{num_results}{Maximum number of results to return. Defaults to 10.}
 }
 \value{
-When called directly, a character string containing formatted search
-results.
+The numbered results as one string.
 }
 \description{
-A tool that performs a web search and returns results. Uses DuckDuckGo's
-HTML search results by default.
-}
-\details{
-This tool searches the web using DuckDuckGo and returns a list of results
-with titles, URLs, and snippets. For more sophisticated search needs,
-consider using a dedicated search API.
+A tool that searches the web with DuckDuckGo's HTML search page and returns
+the title, URL and snippet of each result. Needs the httr2 package. For
+better results, use a provider's own search tool (see \code{\link[=tools_web]{tools_web()}}) or a
+dedicated search API.
 }
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_web_search),
   permissions = Permissions(web = TRUE)
 )

@@ -1,4 +1,4 @@
-# External experiment orchestration. Deputy provides governed runs and ellmer
+# External experiment orchestration. Deputy runs the agents and ellmer
 # provides summaries, content, tools and structured output. Scoring stays here.
 history_answer_type <- function() {
   ellmer::type_object(

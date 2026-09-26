@@ -2,7 +2,7 @@
 % Please edit documentation in R/context-policy.R
 \name{DeputyCompaction}
 \alias{DeputyCompaction}
-\title{Record a conversation compaction outcome}
+\title{Create a compaction result}
 \usage{
 DeputyCompaction(
   method,
@@ -17,38 +17,37 @@ DeputyCompaction(
 )
 }
 \arguments{
-\item{method}{Outcome: \code{"none"}, \code{"cancelled"}, \code{"custom"}, \code{"hook"},
-\code{"llm"}, or \code{"text"}.}
+\item{method}{How the summary was made: \code{"llm"} (by the model), \code{"text"}
+(the plain fallback), \code{"custom"} (passed to \verb{$compact()}) or \code{"hook"}
+(from a \code{PreCompact} hook). \code{"none"} means there was nothing to compact
+and \code{"cancelled"} means a hook cancelled it.}
 
-\item{automatic}{Whether the run triggered compaction automatically.}
+\item{automatic}{Whether a run compacted automatically.}
 
-\item{turns_compacted}{Number of turns removed from the active context.}
+\item{turns_compacted}{Number of turns removed from the model context.}
 
-\item{turns_kept}{Number of retained turns.}
+\item{turns_kept}{Number of turns kept.}
 
-\item{estimated_tokens}{Estimated context size before compaction, or \code{NULL}
-when unavailable.}
+\item{estimated_tokens}{Estimated context size before compaction, or \code{NULL}.}
 
-\item{usage}{An \link{AgentUsage} value for summary generation, including failed
-attempts. Unknown provider costs remain unknown.}
+\item{usage}{\link{AgentUsage} of the summary requests, including failed ones.}
 
-\item{summary}{Installed summary text, or \code{NULL} when no replacement occurred.}
+\item{summary}{The summary text, or \code{NULL} if nothing was replaced.}
 
-\item{attempts}{List of summary attempt records containing \code{fallback_index},
-\code{provider}, \code{model}, \code{usage}, and the original \code{condition} (or \code{NULL}).}
+\item{attempts}{List of summary attempts, each with \code{fallback_index},
+\code{provider}, \code{model}, \code{usage} and the error \code{condition} (or \code{NULL}).}
 
-\item{run_id}{Governed run identifier, or \code{NULL} for manual compaction.}
+\item{run_id}{ID of the run that compacted, or \code{NULL} for a manual
+compaction.}
 }
 \value{
-A read-only \code{DeputyCompaction} S7 object.
+A \code{DeputyCompaction} object.
 }
 \description{
-\link{Agent}\verb{$compact()} and \verb{$last_compaction()} return this read-only S7 value.
-\code{$} and \code{S7::prop()} read its properties. \code{S7::props()} returns a plain list
-for explicit reporting; nested usage must also be projected for JSON.
-Original provider conditions in \code{attempts} retain their identity and any
-reference semantics. Reporting code should select safe evidence fields
-rather than serialize arbitrary conditions or provider objects.
+Describes one compaction. \link{Agent}\verb{$compact()} and \verb{$last_compaction()}
+return it; you rarely need to create one yourself. It is read-only; read
+fields with \code{$}. \code{attempts} holds the original error conditions, so pick
+out the fields you need rather than saving or logging it whole.
 }
 \examples{
 outcome <- DeputyCompaction("custom", FALSE, 4, 2, summary = "Earlier work")
@@ -58,5 +57,6 @@ S7::props(outcome$usage)
 \section{Additional properties}{
 
 \describe{
-\item{\code{@compacted_at}}{Construction time as a \code{POSIXct} value. Read-only.}
+\item{\code{@compacted_at}}{When the result was created, as a \code{POSIXct} value.}
 }}
+

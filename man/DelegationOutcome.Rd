@@ -2,26 +2,32 @@
 % Please edit documentation in R/delegation-inspection.R
 \name{DelegationOutcome}
 \alias{DelegationOutcome}
-\title{Inspect a compact delegation outcome}
+\title{Result of a delegation}
 \usage{
 DelegationOutcome(runtime, answer = "", references = list(), claims = list())
 }
 \arguments{
-\item{runtime}{Plain runtime identity, status and stop-reason record.}
+\item{runtime}{List of IDs, \code{status}, \code{stop_reason} and other facts
+recorded by the runtime.}
 
-\item{answer}{Bounded model-authored answer text.}
+\item{answer}{The subagent's final reply, cut to 8 KiB. A longer reply is
+saved in full in \code{references}.}
 
-\item{references}{Scoped artifact locators, with provenance and availability.
-References never confer authorization, verification or approval.}
+\item{references}{Saved artifacts, such as the full answer or large tool
+results, with their origin and whether they are still available.}
 
-\item{claims}{Model-authored missing-evidence and unresolved-work claims.
-\code{NULL} means not supplied, not that no work or evidence is missing.}
+\item{claims}{The subagent's report of \code{missing_evidence} and
+\code{unresolved_work} from its structured output. \code{NULL} means it didn't
+report, not that nothing is missing.}
 }
 \value{
-A read-only \code{DelegationOutcome}.
+A \code{DelegationOutcome} object.
 }
 \description{
-Runtime identity and stop facts are separate from model-authored answer and
-claims. \code{completed} means execution ended normally, not verified task success.
-Outcomes are produced by \link{LeadAgent} and are read-only portable values.
+How one delegation ended. The runtime's record (IDs, \code{status},
+\code{stop_reason}) is kept apart from what the subagent's model said (\code{answer}
+and \code{claims}). A \code{"completed"} status means the run ended normally, not
+that the task succeeded. \link{LeadAgent} returns outcomes from
+\verb{$parallel_delegate()} and, as JSON, from the \code{delegate_to_agent} tool.
+Fields are read with \code{$}.
 }

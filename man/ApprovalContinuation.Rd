@@ -2,7 +2,7 @@
 % Please edit documentation in R/approval-record.R
 \name{ApprovalContinuation}
 \alias{ApprovalContinuation}
-\title{Durable approval inspection value}
+\title{Pending approval record}
 \usage{
 ApprovalContinuation(
   id,
@@ -19,32 +19,44 @@ ApprovalContinuation(
 )
 }
 \arguments{
-\item{id}{Stable approval identifier.}
+\item{id}{Approval ID.}
 
-\item{status}{Pending, executing, or terminal state.}
+\item{status}{One of \code{"pending"}, \code{"resuming"}, \code{"executing"},
+\code{"continuing"}, \code{"completed"}, \code{"stopped"} or \code{"indeterminate"}.}
 
-\item{request}{Named record containing tool name, inputs, and reason.}
+\item{request}{List describing the paused call: \code{tool_call_id}, \code{name},
+\code{tool_input}, \code{reason}, and \code{kind} (\code{"tool"}, or \code{"budget"} when a usage
+limit caused the pause).}
 
-\item{decision}{Recorded host decision, or NULL.}
+\item{decision}{The recorded decision (\code{decision} and \code{tool_input}), or
+\code{NULL} if there is none yet.}
 
-\item{context}{Canonical host run context.}
+\item{context}{The run's \code{run_context}.}
 
-\item{usage}{Observed \link{AgentUsage}, including work before suspension.}
+\item{usage}{\link{AgentUsage} so far, including work before the pause.}
 
-\item{usage_limits}{Governing \link{UsageLimits}.}
+\item{usage_limits}{\link{UsageLimits} of the paused run. Resuming reuses them
+unless you pass others.}
 
-\item{budget_ceiling}{Original Agent budget ceiling for explicit escalation.}
+\item{budget_ceiling}{The agent's \link{UsageLimits} from the original run.
+Limits passed to \code{resume_approval()} can't go beyond these or the agent's
+current limits.}
 
-\item{permissions}{Saved static permission ceiling and callback requirement.}
+\item{permissions}{The saved permission policy, as a list. Resumed tool
+calls must be allowed by both it and the agent's current policy.
+\code{callback_required} says whether \code{can_use_tool} must be set again before
+resuming.}
 
-\item{effects}{Execution journal entries.}
+\item{effects}{Log of tool calls the run has executed, with their status.}
 
-\item{source}{Session, Agent, and source-run correlation.}
+\item{source}{IDs of the session, agent and run that paused. \code{\link[=approval_read]{approval_read()}}
+adds \code{path}, the approval directory.}
 }
 \value{
-An \code{ApprovalContinuation} S7 value.
+An \code{ApprovalContinuation} object.
 }
 \description{
-A read-only view of a durable approval. Normally obtained with \code{\link[=approval_read]{approval_read()}}.
-Constructing a value does not persist it or authorize execution.
+A read-only snapshot of a saved approval, returned by \code{\link[=approval_read]{approval_read()}} and
+\code{agent$pending_approval()}. Read fields with \code{$}. You rarely need to create
+one yourself; doing so doesn't save it or approve anything.
 }

@@ -78,7 +78,8 @@ tool_eda_summary <- ellmer::tool(
   ),
   annotations = ellmer::tool_annotations(
     read_only_hint = TRUE,
-    destructive_hint = FALSE
+    destructive_hint = FALSE,
+    open_world_hint = FALSE
   )
 )
 
@@ -189,6 +190,7 @@ tool_describe_column <- ellmer::tool(
   ),
   annotations = ellmer::tool_annotations(
     read_only_hint = TRUE,
-    destructive_hint = FALSE
+    destructive_hint = FALSE,
+    open_world_hint = FALSE
   )
 )

@@ -2,30 +2,32 @@
 % Please edit documentation in R/chat-composition.R
 \name{delegation_tool}
 \alias{delegation_tool}
-\title{Delegate through a host-curated specialist}
+\title{Create a tool that calls a retained agent}
 \usage{
 delegation_tool(owner, handle, name, description, usage_limits)
 }
 \arguments{
-\item{owner}{The \link{Agent} owning the retained conversation.}
+\item{owner}{The \link{Agent} that owns the retained agent. Register the tool on
+this agent only.}
 
 \item{handle}{Handle returned by \code{\link[=adopt_chat]{adopt_chat()}} or \code{owner$retain_agent()}.}
 
-\item{name}{Unique tool name selected by the host.}
+\item{name}{Tool name, unique among the owner's tools.}
 
-\item{description}{Description telling the caller when to use the specialist.}
+\item{description}{Tells the model when to use this agent.}
 
-\item{usage_limits}{Explicit per-invocation allocation, intersected with the
-remaining conversation and caller budgets.}
+\item{usage_limits}{\link{UsageLimits} for each call. A call also can't exceed
+the retained agent's remaining budget or the calling run's.}
 }
 \value{
-An ellmer tool. Direct calls outside its owner's governed tool runtime
-reject. Registering the tool on another Agent also rejects.
+An ellmer tool. Calling it outside a run of \code{owner}, or registering
+it on another agent, is an error.
 }
 \description{
-Register this tool only on its owning Agent. The model supplies a new task
-brief; ownership, provider, prompt, tools and budgets are fixed by the host.
-Every call uses the same continuation implementation as host follow-ups.
-Results are compact serializable delegation outcomes; full child history and
-live activity use the owner's independently authorized inspection APIs.
+Lets \code{owner}'s model send a task to a retained agent. The model writes only
+the task; you control the rest, including the agent's model, prompt, tools
+and budget. Each call continues the same conversation, like
+\code{owner$continue_agent()}, and returns a \link{DelegationOutcome} as JSON. Use
+the owner's inspection methods, such as \verb{$inspect_subagents()}, for the
+full history.
 }

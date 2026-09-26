@@ -1,0 +1,295 @@
+---
+title: "Human input and approvals"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Human input and approvals}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+Some decisions belong to a person. Deputy lets the model ask questions while it
+works, and gives you three ways to hold a tool call until someone approves it:
+
+- a hook that asks straight away and waits for the answer;
+- a durable approval that stops the run, writes it to disk, and resumes later,
+  even in a new R session;
+- a Shiny module that shows the pending call and lets the reviewer edit its
+  inputs before approving.
+
+## Let the model ask questions
+
+`tools_interactive()` returns an `ask_user` tool. The model sends one to four
+multiple-choice questions, and your handler returns the answers as a named list
+that maps each question to the chosen label:
+
+```{r}
+library(deputy)
+
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = c(
+    tools_file(),
+    tools_interactive(
+      callback = function(questions, context) {
+        answers <- lapply(questions, function(q) q$options[[1]]$label)
+        setNames(answers, vapply(questions, `[[`, "", "question"))
+      }
+    )
+  )
+)
+```
+
+That handler always picks the first option, which is only useful for testing.
+At the R console, leave out `callback` and the tool asks with `readline()`,
+where the person can also type a free answer instead of picking an option.
+
+Each question has `question`, a short `header`, two to four `options` (each
+with a `label` and `description`), and `multiSelect`. For a multi-select
+question, join the chosen labels with `", "`.
+
+A handler can answer in three ways:
+
+- return the answers directly, as above;
+- return a promise that resolves to the answers, when it has to wait for a
+  person without blocking R, as in Shiny;
+- return `AskUserDeferred()`, which tells the model the questions are on
+  screen and it should end its turn. The answers then arrive as the person's
+  next message, like any other chat message.
+
+A subagent's handler can return answers or a promise, but not
+`AskUserDeferred()`, because the answers have to arrive before the subagent's
+run ends.
+
+The `context` argument of `tools_interactive()` passes routing values to the
+handler, such as the IDs your app uses to find the right browser session. Each
+call to `tools_interactive()` creates a separate tool, so agents in different
+Shiny sessions never share a handler. (`set_ask_user_callback()` sets one
+handler for the whole R process; it exists for single-agent scripts and
+shouldn't be used in apps.)
+
+## Ask before a tool runs
+
+Deputy ships a small recipe, `approval-gates.R`, that turns a `PreToolUse`
+hook into an approval prompt. Load it:
+
+```{r approval-recipe-load, eval = TRUE}
+source(system.file("examples", "approval-gates.R", package = "deputy"))
+```
+
+`approval_gate()` asks, through an `ask_user` handler, whether to run each
+matching tool call (by default `run_bash` and `write_file`). The question shows
+the tool name and every argument with its declared type. Only the answer
+`"Approve"` lets the call run; any other answer, a cancelled prompt, or an
+error in the handler denies it.
+
+Here it is with a handler that always declines:
+
+```{r approval-simple-demo, eval = TRUE}
+decline <- function(questions, context) {
+  setNames(list("Deny"), questions[[1]]$question)
+}
+gate <- approval_gate(callback = decline)
+S7::prop(gate, "callback")(
+  "write_file",
+  list(path = "report.txt", content = "Draft"),
+  context = list(run_id = "example-run")
+)$permission
+```
+
+Add the gate to an agent whose permissions already allow the tools it guards.
+A hook can deny a call the policy allows, but it can't allow one the policy
+denies:
+
+```{r}
+agent$add_hook(approval_gate(callback = my_approval_handler))
+```
+
+Add approval hooks before other hooks for the same event that return a
+result. The first hook to return a result decides, so an earlier hook that
+allows the call would skip the approval. The gate returns `NULL` after an
+approval, so hooks added after it still run.
+
+The recipe also has `approval_after_install()`, which asks before
+`push_changes` only if an `install_dependency` tool succeeded earlier in the
+same run. It shows how hooks can share state keyed by `context$run_id`:
+
+```{r approval-stateful-demo, eval = TRUE}
+hooks <- approval_after_install(callback = decline)
+run <- list(run_id = "installation-run")
+# PostToolUse: record a successful installation.
+S7::prop(hooks[[1]], "callback")(
+  "install_dependency", list(installed = TRUE), NULL, run
+)
+# PreToolUse: this run installed something, so pushing needs approval.
+S7::prop(hooks[[2]], "callback")("push_changes", list(remote = "origin"), run)$permission
+# Another run installed nothing, so the hook has no opinion.
+S7::prop(hooks[[2]], "callback")(
+  "push_changes", list(remote = "origin"), list(run_id = "another-run")
+)
+```
+
+Add all three hooks with a loop:
+`for (hook in approval_after_install(my_handler)) agent$add_hook(hook)`.
+
+A gate hook blocks the run while it waits for an answer. That is fine at the
+console. When the answer may take hours, or the app can't block, use a durable
+approval instead.
+
+## Pause a run until someone decides
+
+A durable approval stops the run before the tool executes and saves everything
+needed to continue. Nothing is left waiting in memory: the approval can be
+decided later, by another process, after R has restarted.
+
+It needs three things:
+
+- an existing, private directory passed to `Agent$new(approval_dir = )`;
+- a permission callback that returns `PermissionResultPending(reason)` for the
+  calls that need a decision;
+- tools registered with `convert = FALSE`, so they receive the raw JSON
+  arguments and can check them. The reviewer may edit those arguments, so the
+  tool must validate its own inputs.
+
+```{r}
+approval_dir <- file.path(tempdir(), "approvals")
+dir.create(approval_dir, showWarnings = FALSE)
+
+export_report <- ellmer::tool(
+  function(name) {
+    if (!is.character(name) || length(name) != 1L || is.na(name)) {
+      cli::cli_abort("{.arg name} must be a single string.")
+    }
+    paste("Exported", name)
+  },
+  name = "export_report",
+  description = "Export a named report.",
+  arguments = list(name = ellmer::type_string()),
+  convert = FALSE,
+  annotations = ellmer::tool_annotations(
+    read_only_hint = FALSE,
+    destructive_hint = FALSE,
+    open_world_hint = FALSE
+  )
+)
+
+make_agent <- function() {
+  Agent$new(
+    chat = ellmer::chat("openai/gpt-6-luna"),
+    tools = list(export_report),
+    permissions = Permissions(
+      can_use_tool = function(tool_name, tool_input, context) {
+        PermissionResultPending("A person must approve every export.")
+      }
+    ),
+    approval_dir = approval_dir,
+    working_dir = approval_dir,
+    session_id = "report-session",
+    agent_id = "report-agent"
+  )
+}
+
+agent <- make_agent()
+result <- agent$run_sync("Export the annual report.")
+result$stop_reason
+#> [1] "approval_pending"
+```
+
+The run stops with `"approval_pending"`. `agent$pending_approval()` describes
+the call, and its `source$path` is what you store to find it again:
+
+```{r}
+pending <- agent$pending_approval()
+pending$request$tool_name
+pending$request$tool_input
+approval_path <- pending$source$path
+```
+
+`approval_read(approval_path)` returns the same description without a chat or
+an agent, so a review screen or another process can show it. To decide, build
+an agent with the same tools, permission callback, IDs, working directory and
+approval directory, and resume:
+
+```{r}
+resumed <- make_agent()
+result <- resumed$resume_approval(
+  approval_path,
+  "approve",
+  tool_input = list(name = "annual report (reviewed)")
+)
+# or: resumed$resume_approval(approval_path, "deny")
+```
+
+`tool_input` is optional; leave it out to approve the call exactly as the model
+proposed it. When a mismatched agent tries to resume, for example with a
+different tool definition or working directory, Deputy refuses. The permission
+callback runs again on resume, and the approval can't be used to run a tool the
+policy doesn't allow.
+
+### What to expect
+
+If the model asked for several tools at once and one of them needs a decision,
+the calls before it keep their results and the calls after it don't run. On
+resume, the model is told those later calls weren't executed, so it can ask for
+them again. Calls that already ran are never repeated.
+
+With `approval_dir` set, a usage limit reached when the model asks for a tool
+also pauses the run as a pending approval, instead of ending it. To let it
+continue with a bigger budget, pass
+`usage_limits = UsageLimits(...)` to `resume_approval()`. The new limits can't
+exceed the agent's own limits, and usage from before the pause still counts.
+
+Each approval can be decided once. If R crashes while an approved tool is
+running, the record stays in the `"executing"` state and can't be resumed,
+because Deputy can't tell whether the tool finished. Check the tool's own
+records (did the report get exported?) and decide what to do. Approvals are
+not transactions, and a power cut can lose the latest state.
+
+The approval directory holds the conversation and tool arguments, so keep it
+private, and link each approval to its owner in your own database. Each saved
+state is limited to 25 MiB. Subagents can't pause for durable approval; see
+[Trusted mini-agents](trusted-mini-agents.html) for a pattern that works
+around this.
+
+## Review a pending call in Shiny
+
+`approval_review_ui()` and `approval_review_server()` show a pending approval
+as a form: one row per argument, with its declared type and description, and
+the value the model proposed. The reviewer can edit simple values (text,
+numbers, logicals and choices from a list) and then approve or deny.
+
+```{r}
+ui <- bslib::page_fluid(approval_review_ui("review"))
+
+server <- function(input, output, session) {
+  agent <- make_agent()
+  approval_review_server("review", agent)
+}
+```
+
+By default the module resumes the approval in the Shiny process, which blocks
+it while the model continues. In a deployed app, pass `decide`, a function that
+runs the continuation elsewhere (for example with mirai) and returns a promise.
+
+`tool_input_review()` builds the same table as a data frame, for use in your
+own UI, a hook, or a permission callback:
+
+```{r, eval = TRUE}
+arguments <- ellmer::type_object(
+  city = ellmer::type_string("City to forecast"),
+  days = ellmer::type_integer("Number of days")
+)
+tool_input_review(list(city = "Oslo", days = 3L), arguments)
+```
+
+Permission callbacks and hooks receive a tool's declared arguments as
+`context$tool_arguments`, so a review can be built wherever a call is
+intercepted. [Trusted mini-agents](trusted-mini-agents.html) puts these pieces
+together in a complete app.

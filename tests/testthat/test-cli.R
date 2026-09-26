@@ -225,7 +225,7 @@ test_that("the event walker consumes callable generators through stop", {
       tool_name = "read_file",
       tool_error = simpleError("denied")
     ),
-    list(type = "stop", total_turns = 1L),
+    list(type = "stop", usage = AgentUsage(requests = 1)),
     list(type = "text", text = "must not be consumed")
   )
   agent <- list(
@@ -303,7 +303,11 @@ test_that("task mode drains and renders the agent generator", {
       cli_test_generator(
         list(
           list(type = "text", text = "task response"),
-          list(type = "stop", total_turns = 2L, cost = list(total = 0))
+          list(
+            type = "stop",
+            usage = AgentUsage(requests = 2),
+            cost = list(total = 0)
+          )
         ),
         state
       )
@@ -322,7 +326,11 @@ test_that("task mode drains and renders the agent generator", {
   expect_identical(state$generator_calls, 2L)
   expect_true(any(grepl("task response", output, fixed = TRUE)))
   expect_true(any(grepl("Running task", messages, fixed = TRUE)))
-  expect_true(any(grepl("Completed in", messages, fixed = TRUE)))
+  expect_true(any(grepl(
+    "Completed in 2 model request",
+    messages,
+    fixed = TRUE
+  )))
 })
 
 test_that("task mode fails when the agent does not complete", {
@@ -333,7 +341,7 @@ test_that("task mode fails when the agent does not complete", {
         list(
           type = "stop",
           reason = "provider_error",
-          total_turns = 1L,
+          usage = AgentUsage(requests = 1),
           cost = list(total = 0)
         )
       ))
@@ -361,7 +369,11 @@ test_that("interactive mode runs prompts until a quit command", {
       state$tasks <- c(state$tasks, task)
       cli_test_generator(list(
         list(type = "text", text = "interactive response"),
-        list(type = "stop", total_turns = 1L, cost = list(total = 0))
+        list(
+          type = "stop",
+          usage = AgentUsage(requests = 1),
+          cost = list(total = 0)
+        )
       ))
     }
   )
@@ -378,4 +390,25 @@ test_that("interactive mode runs prompts until a quit command", {
   expect_identical(state$input_index, 2L)
   expect_true(any(grepl("interactive response", output, fixed = TRUE)))
   expect_true(any(grepl("Goodbye", messages, fixed = TRUE)))
+})
+
+test_that("the stop message counts the run's model requests", {
+  withr::local_options(cli.num_colors = 1)
+  agent <- Agent$new(create_mock_chat(responses = list("Done.")))
+  result <- agent$run_sync("Say done")
+  stop_event <- Filter(
+    function(event) identical(event$type, "stop"),
+    result$events
+  )[[1]]
+
+  messages <- capture.output(
+    capture.output(cli_render_event(stop_event), type = "output"),
+    type = "message"
+  )
+
+  expect_true(any(grepl(
+    "Completed in 1 model request",
+    messages,
+    fixed = TRUE
+  )))
 })

@@ -1,0 +1,314 @@
+---
+title: "Briefing and inspecting subagents"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Briefing and inspecting subagents}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+[Subagents](multi-agent.html) covers defining subagents and letting a lead
+delegate to them. This article is about everything around a delegation: what
+a subagent is given, what it hands back, and how to show its work to the people
+using your app without showing them anything they shouldn't see.
+
+## Write a structured brief
+
+A plain string is a fine task. When the task needs more structure,
+`DelegationInput()` separates the instruction from its constraints, the
+evidence to use, the expected deliverable and when to stop:
+
+```{r}
+library(deputy)
+
+brief <- DelegationInput(
+  "Assess the reported concentration.",
+  constraints = "Keep the reported units.",
+  evidence = list(list(source_id = "assay-17", revision = "r3")),
+  deliverable = "A conclusion that cites the source revision.",
+  stop_conditions = "State the uncertainty if the method is missing."
+)
+```
+
+`stop_conditions` are instructions to the model. They don't set limits;
+`UsageLimits` and permissions do that.
+
+The `evidence` entries refer to documents that your application supplies when
+it creates the lead, as `delegation_sources`. Each source is a text record
+with an ID, a revision, the owner and conversation it belongs to, and
+optionally the subagents allowed to see it:
+
+```{r}
+lead <- LeadAgent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  sub_agents = list(
+    agent_definition("reviewer", "Reviews evidence", "Keep units explicit.")
+  ),
+  delegation_scope = list(owner_id = "team-a", conversation_id = "review-17"),
+  delegation_sources = list(list(
+    source_id = "assay-17",
+    revision = "r3",
+    owner_id = "team-a",
+    conversation_id = "review-17",
+    text = "Reported concentration: 12 mg/L.",
+    allowed_agents = "reviewer"
+  ))
+)
+
+lead$parallel_delegate(list(reviewer = brief))
+```
+
+Deputy puts the text of each cited source into the subagent's first message.
+A reference must match the lead's scope and the exact revision, and the source
+must allow that subagent; otherwise the delegation is rejected before any model
+request, and `list_subagents()$input_error` says why. Leave out
+`allowed_agents` to allow every subagent; `character()` allows none.
+
+The model can write the same kind of brief when it calls `delegate_to_agent`
+itself, and can pick sources by ID and revision, but it can't supply source
+text or change the scope. Your application decides what the sources contain
+and who may use them. They are a snapshot: to update a source, create a new
+lead.
+
+A delegation whose prepared prompt, first message or manifest is larger than
+64 KiB is rejected before any request. `LeadAgent$new(delegation_max_bytes = )`
+changes the limit.
+
+### See what a subagent was given
+
+`lead$get_subagent_contexts()` shows the prepared input for each delegation: a
+`DelegationManifest` with the system prompt, the first message, the resolved
+sources and their digests, the model, the tool names and the sizes. With
+`view = "current"` it shows the subagent's working context instead.
+
+```{r}
+id <- lead$list_subagents()$delegation_id[[1]]
+lead$get_subagent_contexts(id)
+lead$get_subagent_contexts(id, view = "current")
+lead$get_subagent_contexts(id, redact = TRUE) # metadata only, no text
+```
+
+## Give each subagent its own resources
+
+A subagent's tools are the objects in its definition, so every delegation to
+that definition shares them, along with anything their closures hold, such as
+a database connection. `DelegationPolicy()` controls this with
+`resource_mode`:
+
+- `"shared"`, the default, lets every delegation use the definition's tools as
+  they are. Deputy never closes them.
+- `"exclusive"` also shares them, but while one delegation holds the resource
+  named by `resource_key`, another delegation that needs it fails instead of
+  sharing it. This only coordinates delegations within one R process.
+- `"owned"` builds fresh tools for every delegation with a factory function,
+  and cleans them up afterwards.
+
+For example, to give each delegation its own R session:
+
+```{r}
+policy <- DelegationPolicy(
+  resource_mode = "owned",
+  resources = function(agent, definition, context) {
+    worker <- RSession$new(agent)
+    DelegationResources(worker$tools(), cleanup = worker$close)
+  }
+)
+
+lead <- LeadAgent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  permissions = permissions_full(), # the R session runs with your account's access
+  sub_agents = list(
+    agent_definition("analyst", "Analyses data", "Check the data before modelling.")
+  ),
+  delegation_policy = policy
+)
+```
+
+The factory gets the new subagent before its first request. It should only
+build tools, not run anything. If it fails, it must clean up whatever it
+created; once it returns, Deputy calls `cleanup` exactly once, after the
+delegation finishes or fails. Cleanup errors appear in
+`list_subagents()$cleanup_error`. In owned mode, definitions can't carry tools
+of their own, and a definition that names `mcp_servers` needs a factory to
+create those connections.
+
+Lead hooks for `PreToolUse`, `PostToolUse` and `PostToolUseFailure` always run
+for subagent tool calls. List other events in `observers` to forward those too.
+
+### Subagents that ask questions
+
+A subagent that should be able to ask the user something needs an `ask_user`
+tool (include `tools_interactive()` in its definition) and a handler on the
+policy. The handler receives the subagent's identifiers, so your app can route
+the question to the right place:
+
+```{r}
+policy <- DelegationPolicy(
+  human_input = function(questions, context) {
+    ask_in_app(
+      questions,
+      owner = context$scope$owner_id,
+      delegation_id = context$delegation_id
+    )
+  }
+)
+```
+
+`ask_in_app()` stands in for your own code. Without a handler, a subagent with
+`ask_user` fails before it starts. An answer from a person is just an answer:
+it doesn't approve any tool call.
+
+## What a delegation returns
+
+When a subagent finishes, the `delegate_to_agent` tool returns a compact JSON
+summary, a `DelegationOutcome`, rather than the subagent's whole conversation.
+Its `runtime` part holds facts Deputy recorded: status, stop reason and
+identifiers. Its `answer` and optional `claims` (missing evidence, unresolved
+work) are what the model wrote, and nobody has checked them. `parallel_delegate()`
+returns the same outcomes as `batch$outcomes`.
+
+Answers are capped at 8 KiB. A longer answer is stored like a [large tool
+result](conversations.html#large-tool-results), and the outcome includes a
+reference to the full text.
+
+## Show subagent work to users
+
+The subagent's full conversation stays out of the lead's context, but you may
+want to show it to the user. `list_subagents()`, `get_subagent_results()` and
+`get_subagent_messages()` return everything to your code without any checks.
+The inspection methods below go through a `DelegationDisclosure`, which your
+app configures to decide who may see what:
+
+```{r}
+disclosure <- DelegationDisclosure(
+  authorize = function(requester, scope) {
+    identical(requester$user_id, scope$owner_id)
+  },
+  redact = function(view, requester) {
+    view # remove whatever this user shouldn't see
+  }
+)
+
+lead <- LeadAgent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  sub_agents = definitions,
+  delegation_scope = list(owner_id = "user-1", conversation_id = "chat-1"),
+  delegation_disclosure = disclosure
+)
+
+views <- lead$inspect_subagents(current_user, transcript = TRUE)
+views[[1]]$outcome$runtime
+views[[1]]$turns
+```
+
+`authorize` must return exactly `TRUE` to allow access, and runs before Deputy
+looks anything up, so a denied user can't tell whether a delegation exists.
+`redact` sees each view before it's returned. The default disclosure denies
+everything. `requester` is whatever your app uses to identify the signed-in
+user; Deputy doesn't authenticate anyone.
+
+`views[[1]]$turns` holds the subagent's conversation as ellmer turns, ready to
+render. Treat the text as untrusted when you display it.
+
+### Save and replay subagent history
+
+`export_subagents()` returns finished subagent histories as a plain list you
+can store, and `delegation_history()` turns a stored list back into views,
+checking access again with the disclosure and scope you pass in:
+
+```{r}
+history <- lead$export_subagents(current_user)
+saveRDS(history, "subagent-history.rds")
+
+restored <- delegation_history(
+  readRDS("subagent-history.rds"),
+  current_user,
+  disclosure,
+  scope = scope_from_your_database
+)
+```
+
+Take `scope` from your own records, not from the saved file. Replaying history
+only displays it: nothing is run, resumed or approved.
+`read_subagent_result()` reads an answer that was stored separately because it
+was too long.
+
+## Watch subagents live
+
+`observe_subagents()` returns a subscription that reads subagent activity as it
+happens, without slowing the subagents down:
+
+```{r}
+reader <- lead$observe_subagents(current_user)
+reader$snapshot(transcript = FALSE)
+
+promise <- lead$parallel_delegate_async(c(analyst = "Analyse the evidence."))
+
+update <- reader$poll()
+update$events
+update$gaps
+reader$close()
+```
+
+`poll()` returns the events since the last read. Events are kept in a buffer of
+256 events or 1 MiB, whichever fills first. A reader that falls behind gets
+`gaps` for the events it missed and can call `snapshot()` to catch up. To
+reconnect later, pass the last `update$cursor` as `after`. Closing a reader
+never stops a subagent. Every read checks the disclosure again, and `redact`
+also receives each event (as `list(kind = "event", event = ...)`). Adjust the
+buffer with `DelegationObservation()`.
+
+To stop one subagent, call `lead$interrupt_subagent(delegation_id)`. That is a
+control action, separate from viewing, so check that the user may cancel
+before you call it.
+
+## A subagent panel for Shiny
+
+`subagent_chat_ui()` and `subagent_chat_server()` add a panel next to your
+lead chat: a strip of activity cards, one per delegation, and the selected
+subagent's conversation, rendered with shinychat's tool cards. The panel is
+read-only; it has no input box and can't resume anything.
+
+```{r}
+ui <- bslib::page_fluid(
+  bslib::layout_columns(
+    shinychat::chat_ui("chat"),
+    subagent_chat_ui("subagents")
+  )
+)
+
+server <- function(input, output, session) {
+  subagent_chat_server(
+    "subagents",
+    lead,
+    requester = function() current_user(session),
+    on_cancel = function(delegation_id, requester) {
+      if (may_cancel(requester, delegation_id)) {
+        lead$interrupt_subagent(delegation_id, "user_cancelled")
+      }
+    }
+  )
+}
+```
+
+Every poll checks the disclosure again, and denied access clears the panel. A
+cancel button appears only if you pass `on_cancel`. To show saved history
+instead of a live lead, pass `history`, together with `disclosure` and `scope`
+from your own records. The panel needs shinychat 0.5.0 or later, bslib,
+commonmark and xml2.
+
+The package includes a demo that needs no API key. It runs two specialists
+against a local test server and shows tool output, a plot, a failure,
+cancellation, revoked access and replayed history:
+
+```{r}
+shiny::runApp(system.file("examples", "subagent-chats", package = "deputy"))
+```

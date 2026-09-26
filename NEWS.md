@@ -1,535 +1,533 @@
 # deputy (development version)
 
-* `edit_file` and `multi_edit` now change only the replaced text. They
-  previously rewrote the whole file through `readLines()`/`writeLines()`,
-  converting CRLF line endings to LF and adding a final newline. Matching still
-  reads every CRLF as LF, so multi-line edits written with `"\n"` apply in
-  Windows and mixed files; new lines take the edited line's ending. Files are
-  compared and written as bytes, so non-UTF-8 content is kept (#217).
+* A `can_use_tool` permission callback can no longer allow a call that the
+  rest of the policy denies. In standard mode its allow used to skip the
+  capability checks, so a callback that allowed everything it didn't block
+  let the model run R code with `r_code = FALSE` or write outside the
+  `file_write` directory. Plan and full modes ignored the callback. It is now
+  called in every mode, for each call the policy allows, and can deny the call
+  or pause it for approval. To allow a call the policy denies, use a
+  `PermissionRequest` hook.
 
-* `run_bash` no longer reports a failed command as successful. A non-zero
-  exit status, including a command that is not found, is now a tool
-  rejection naming the status, and standard error is returned after a
-  `[stderr]` line instead of being discarded.
+* Read-only and plan policies now allow a `LeadAgent`'s own
+  `delegate_to_agent` tool, so a lead created with `permissions_readonly()` or
+  `permissions_plan()` can delegate. Its subagents still can't use a less
+  strict mode than the lead, and other tools named `delegate_to_agent` are
+  still denied.
 
-* `ask_user` handlers from `tools_interactive()` can now serve hosts that
-  cannot block for input, such as Shiny. A handler may return a promise for
-  the answers, which the tool awaits within the run, or `AskUserDeferred()`,
-  which shows the questions and asks the model to end its turn so the answers
-  arrive as the person's next message. `AskUserDeferred(extra = )` attaches a
-  host display to the tool result. Delegated agents accept promises and reject
-  deferral, since their answers must return within the child's run.
+* `hook_log_tools()`, `hook_block_dangerous_bash()` and
+  `hook_limit_file_writes()` now return `NULL` when they don't deny a call, so
+  hooks added after them for the same event still run.
 
-* `Agent$microcompact()` clears old tool results from the model's context,
-  as Posit Assistant's `/microcompact` does: results before the last
-  `keep_last` turns become a marker unless their tool is in `keep_tools`. No
-  model call is made, and an earlier compaction summary is kept, which
-  `$set_turns()` would drop. As with compaction, only the model's context
-  changes: `$get_turns()`, `$last_turn()` and saved sessions keep the
-  original results (#209).
+* `Agent$usage()` and `Agent$cost()` now include turns that compaction removed
+  from the model's context, and `Agent$usage()$tool_calls` counts the tool
+  calls the model asked for instead of always being 0.
 
-* An `AgentDefinition` `model` given as a bare model id, such as
-  `"gpt-5.6-luna"`, now runs the sub-agent on the lead's provider, endpoint and
-  credentials with that model. This lets a child use a cheaper model on a
-  gateway client built outside ellmer. `"inherit"` and `"provider/model"`
-  strings behave as before. Model ids that themselves contain `/` still need
-  the `"provider/model"` form.
+* The command-line app now reports how many model requests a run made,
+  instead of "NA turn(s)".
 
-* `TrustedResults()` implements the trusted mini-agent pattern from Will
+* `edit_file` and `multi_edit` now change only the text they replace, instead
+  of rewriting the file, which converted CRLF to LF and added a final newline.
+  Non-UTF-8 bytes are kept too. Search text written with `"\n"` still matches
+  CRLF and mixed files, and new lines take the ending of the line they replace
+  (#217).
+
+* `run_bash` now treats a non-zero exit status, including "command not
+  found", as an error and tells the model the status. Standard error is
+  returned after a `[stderr]` line instead of being discarded (#215).
+
+* `tools_interactive()` handlers can now answer without blocking, for apps
+  such as Shiny. A handler may return a promise for the answers, or
+  `AskUserDeferred()` to show the questions and have the model end its turn so
+  the answers arrive as the user's next message. `AskUserDeferred(extra = )`
+  attaches display data to the tool result. Subagents accept promises but not
+  deferral (#215).
+
+* New `Agent$microcompact()` replaces old tool results in the model's context
+  with a short marker, like Posit Assistant's `/microcompact`. Results in the
+  last `keep_last` turns, or from tools in `keep_tools`, are kept. It makes no
+  model call, keeps any earlier compaction summary, and leaves the original
+  results in `$get_turns()`, `$last_turn()` and saved sessions (#209).
+
+* `agent_definition(model = )` can now be a bare model id such as
+  `"gpt-6-luna"`, which runs the subagent with that model on the lead's
+  provider, endpoint and credentials, including gateway clients built outside
+  ellmer. `"inherit"` and `"provider/model"` work as before; ids containing `/`
+  still need the `"provider/model"` form (#210).
+
+* New `TrustedResults()` supports the trusted mini-agent pattern from Will
   Landau and Sam Parmar's
-  [*Trusted Mini-Agents*](https://trustedminiagents.dev) (#197). Pass it as
-  `Agent$new(trusted_results = )` to name the single local tool that produces
-  each kind of result. Its verbatim return value reaches the host as a
-  `"trusted_result"` event, read with `result_trusted_results()`, and through
-  an optional `on_result` callback, all before the model sees any output.
-  Every published tool registry is checked. Code execution, delegation, and
-  tools that may write or reach the open world are rejected unless a local
-  tool is explicitly listed in `exempt_tools`. With `model_receipt = TRUE`
-  the model gets a receipt instead of the values. See ADR-0030.
+  [*Trusted Mini-Agents*](https://trustedminiagents.dev): pass it to
+  `Agent$new(trusted_results = )` to name the one local tool that may produce
+  each kind of result. That tool's return value reaches your app unchanged, as
+  a `"trusted_result"` event (see `result_trusted_results()`) and through an
+  optional `on_result` callback, before the model sees it; with
+  `model_receipt = TRUE` the model gets only a receipt. Registration fails if
+  another tool could produce results: code execution and delegation tools
+  always, and tools that may write or reach the open world unless listed in
+  `exempt_tools` (#197).
 
-* Permission callbacks and PreToolUse hooks receive the registered tool's
-  argument types as `context$tool_arguments`. `tool_input_review()` turns a
-  proposed input into a per-field table of type, description, and value.
-  The approval-gates recipe now uses it instead of `dput()` (#197).
+* Permission callbacks and `PreToolUse` hooks now get the tool's argument
+  types in `context$tool_arguments`. New `tool_input_review()` turns a proposed
+  tool input into a table of each field's type, description and value (#197).
 
-* `LeadAgent$new(trusted_results = )` applies a trusted-results policy to the
-  whole delegation tree. Every child inherits it, each definition's tools must
-  pass the no-bypass check, and a designated tool must be the same tool
-  wherever it appears. Child trusted results reach the lead's `on_result` and
-  run events (#197).
+* `LeadAgent$new(trusted_results = )` applies the policy to all subagents:
+  each definition's tools must pass the same check, a designated tool must be
+  the same tool everywhere, and subagents' trusted results reach the lead's
+  `on_result` and run events (#197).
 
-* `approval_review_ui()` and `approval_review_server()` are a Shiny module
+* New `approval_review_ui()` and `approval_review_server()` are a Shiny module
   for reviewing a pending durable approval. They show each argument's type,
   description and value, let the reviewer edit simple fields, and approve or
-  deny. A host `decide` function can run the continuation elsewhere (#197).
+  deny. Pass `decide` to carry out the decision elsewhere, such as in a
+  background process (#197).
 
-* `inst/examples/trusted-results/` is a three-area chat, review and results
-  app, adapted from Landau and Parmar's R template and weather example. Only the trusted forecast tool can fill the results panel (#197).
+* New `inst/examples/trusted-results/` app, adapted from Landau and Parmar's R
+  template and weather example, shows chat, input review and results side by
+  side. Only the forecast tool can fill the results panel (#197).
 
-* New article, `vignette("trusted-mini-agents")`, explains Landau and
-  Parmar's trusted mini-agent pattern and how Deputy enforces each of its
-  rules (#197).
+* New `vignette("trusted-mini-agents")` explains Landau and Parmar's trusted
+  mini-agent pattern and how Deputy enforces each of its rules (#197).
 
-* `mcp_console_connection()` connects an Agent to one
-  [MCP Console](https://github.com/t-kalinowski/mcp-console) server, a
+* New `mcp_console_connection()` connects an agent to an
+  [MCP Console](https://github.com/t-kalinowski/mcp-console) 0.0.4 server, a
   sandboxed workbench that keeps R, Python and DuckDB SQL state for a
-  conversation (#190). The host names a qualified executable (MCP Console
-  0.0.4, checked with `--version`). Deputy refuses `--no-sandbox`, overrides
-  that could widen the filesystem, add a proxy or select a remote target, and
-  an unreviewed `.agents/console/config.yaml`, and closes the connection
-  unless the server reports its native sandbox with restricted networking.
-  `send` is governed as shell-class code execution. Dependency preparation
-  runs outside the sandbox, so it needs `dependencies = "allow"` on the
-  connection and `install_packages` in the Agent's permissions. `timeout_ms`
-  is capped at 2500 ms; long cells return a running marker and the model
-  polls. `mcp_console_control()` interrupts or restarts the session, and
-  `close()` asks the server to shut down before stopping it. Recordings stay
-  under `.agents/console/sessions/` in the Agent's working directory, reported
-  in `status()$execution`. See ADR-0029.
+  conversation, and `mcp_console_control()` interrupts or restarts it (#190).
+  Deputy refuses `--no-sandbox`, options that widen file access, add a proxy
+  or select a remote target, and an unreviewed `.agents/console/config.yaml`,
+  and closes the connection unless the server reports its sandbox with
+  restricted networking. `send` counts as shell code execution and needs the
+  `bash` and `web` permissions; installing dependencies runs outside the
+  sandbox and also needs `dependencies = "allow"` and
+  `install_packages = TRUE`. `timeout_ms` is capped at 2500 ms, so long cells
+  return a running marker and the model polls. MCP Console records every call
+  and result, unredacted, under `.agents/console/sessions/` in the agent's
+  working directory.
 
-* Deputy temporarily requires the GitHub development version of coro (`>= 1.1.0.9000`).
-  CRAN coro 1.1.0 recompiles every generator instance, which cost about 0.3 to
-  0.7 s of CPU per model request. The dependency returns to CRAN once coro
-  releases the fix (#192).
+* Deputy temporarily requires coro >= 1.1.0.9000 from GitHub: CRAN coro 1.1.0
+  recompiles every generator, costing 0.3 to 0.7 seconds of CPU per model
+  request. Deputy will return to CRAN coro once the fix is released (#192).
 
-* MCP stdio calls fail closed when a reply is lost. The qualified mcptools
-  releases wait about 4 seconds for a stdio reply and take the next output
-  line without checking its JSON-RPC id, so a slow reply used to become the
-  next call's answer. `McpConnection` now sends every request, tool calls
-  included, through one exchange that requires the reply for that request's
-  id. A missing or mismatched reply stops the server, closes the connection
-  and raises a `deputy_mcp_desynchronized` error saying its session state is
-  lost. `tools_mcp()` tools, which cannot see the reply id, stop the server
-  on the first lost reply. `mcp_repl_connection()` and `tools_mcp_repl()`
-  forward mcp-repl's `timeout_ms` capped at 3000 ms (also when omitted), so
-  long cells return mcp-repl's busy result and the model polls with a later
-  call (#196).
+* `McpConnection` now checks the JSON-RPC id of every MCP stdio reply. The
+  supported mcptools releases wait about 4 seconds for a reply, then take the
+  next output line without checking its id, so a slow reply could become the
+  answer to the next call. A missing or mismatched reply now stops the server,
+  losing its session state, and signals a `deputy_mcp_desynchronized` error;
+  `tools_mcp()` tools, which can't see reply ids, stop the server on the first
+  lost reply. `mcp_repl_connection()` and `tools_mcp_repl()` cap mcp-repl's
+  `timeout_ms` at 3000 ms, also when it is omitted, so long cells return a
+  busy result and the model polls (#196).
 
-* MCP connections, `tools_mcp()` and `mcp_repl_connection()` accept CRAN
-  mcptools 1.0.3, whose client sources are identical to 1.0.2. Both runtime
-  gates and the producer-test skips share one explicit list of qualified
-  releases; other versions still fail closed and the error names the
-  qualified releases (#195).
+* `McpConnection`, `tools_mcp()` and `mcp_repl_connection()` now support CRAN
+  mcptools 1.0.3 as well as 1.0.2. Other versions are refused with an error
+  that lists the supported ones (#195).
 
-* Model requests and tool calls spend less CPU on internal probes. Usage
-  snapshots reuse ellmer's token table until the conversation changes. Deputy
-  no longer repeats calls it has already seen fail (token tables for unpaired
-  tool-result turns, token counting for providers without it) and skips
-  tool-context lookups outside nested R session calls. Run generators are
-  defined once per package, not once per run. Results are unchanged (#185).
+* Model requests and tool calls use less CPU (#185).
 
-* `job_create()`, `job_run()`, `job_read()` and `job_cancel()` persist governed
-  work for host-owned schedulers. Durable jobs preserve graph budgets, source
-  revisions, tool effects and standalone pending approvals across process
-  boundaries. Interrupted executions become indeterminate instead of silently
-  repeating side effects; cancellation remains cooperative (#42).
+* New `job_create()`, `job_run()`, `job_read()` and `job_cancel()` save an
+  agent task to disk for your own scheduler to run later, in any R process. A
+  job keeps the definition and context revisions you supply, its budgets,
+  completed tool effects and any pending approval. A job interrupted mid-run
+  is marked indeterminate instead of retried, so side effects aren't repeated;
+  `job_cancel()` asks a running job to stop at its next checkpoint (#42).
 
-* `ContextFork()` and `fork_agent()` initialize independent retained specialists
-  from authorized host-selected native ellmer turns. Fork manifests record source
-  identity, revision and bounds; continuations recheck source access and apply
-  current parent and child governance (#62).
+* New `ContextFork()` and `fork_agent()` start a retained specialist from a
+  copy of turns you select from another conversation, either its transcript or
+  its current model context. Each continuation rechecks that the source may
+  still be read. The copy is inert: tool bindings and private provider data
+  are dropped, and current permissions apply (#62).
 
-* Child inspection and observation preserve duration values, units and missing
-  values, including data-frame columns. Child chat panels display nested native
-  content through shinychat with bounded path labels and explicit omissions,
-  while retaining the original payload for authorized replay (#166, #167).
+* Subagent inspection and observation now keep `difftime` values, their units
+  and missing values, including in data-frame columns. The subagent chat panel
+  shows content nested in tool results, labels where it came from, notes
+  anything left out, and keeps the original for replay (#166, #167).
 
-* `Agent$retain_agent_graph()` configures recursive specialist routes with
-  shared lifetime budgets, bounded depth and concurrency, subtree cancellation,
-  and root-authorized descendant chats. A deterministic three-level example
-  exercises the real streaming runtime (#169).
+* New `Agent$retain_agent_graph()` sets up retained specialists that delegate
+  to each other along routes you declare. The graph shares one lifetime budget
+  with limits on depth, delegations and concurrency; cancelling a run cancels
+  everything beneath it; and the root controls who may view each specialist's
+  conversation. See `inst/examples/recursive-agents/` (#169).
 
-* `adopt_chat()` and `delegation_tool()` compose independently configured chats
-  through an ordinary Agent, preserving selected provider, prompt, tools and
-  history with explicit callback ownership and governed follow-ups (#168).
+* New `adopt_chat()` turns a configured ellmer chat into a retained
+  specialist, copying its provider, system prompt, tools and optionally its
+  history, and replacing its callbacks so the owning agent's permissions and
+  hooks apply. `delegation_tool()` gives the owning agent a tool for sending
+  it tasks (#168).
 
-* `Agent$retain_agent()` and explicit continuation methods preserve specialist
-  conversations with owner-local handles, busy rejection, cumulative budgets,
-  cancellation and release. Ordinary Agents now share child inspection,
-  observation and optional chat panels with LeadAgent (#152).
+* New `Agent$retain_agent()` keeps a specialist agent and its conversation for
+  repeated use: continue it with `$continue_agent()` or
+  `$continue_agent_async()`, stop it with `$cancel_agent()` and free it with
+  `$release_agent()`. Its budget is cumulative, the handle works only with the
+  agent that retained it, and continuing it while it runs is an error. Plain
+  `Agent`s now have the subagent inspection and observation methods too
+  (#152).
 
-* A trusted mini-agent example now demonstrates reviewed scientific inputs, a
-  designated computation, and tool-owned results separate from model commentary
-  (#154).
+* New `inst/examples/trusted-mini-agent/` app: a subagent proposes inputs for
+  a small plant-weight analysis, a person reviews them, and only a designated
+  R tool produces the result (#154).
 
-* `subagent_chat_ui()` and `subagent_chat_server()` compose an optional read-only
-  child conversation panel with native shinychat tool cards, retained attachments,
-  live activity, authorized saved-history replay and separate host cancellation.
-  A deterministic local demo covers concurrent and repeated specialists (#158).
+* New `subagent_chat_ui()` and `subagent_chat_server()` add a read-only Shiny
+  panel showing each subagent's live activity and conversation, with shinychat
+  tool cards and attachments. It can replay saved history and shows a cancel
+  button if you supply `on_cancel`. See `inst/examples/subagent-chats/`
+  (#158).
 
-* `LeadAgent$observe_subagents()` provides authorized snapshots and bounded
-  child event cursors without driving execution. Overflow and omitted content
-  are explicit, readers detach independently, and targeted host cancellation
-  uses the separate `interrupt_subagent()` control (#157).
+* New `LeadAgent$observe_subagents()` returns a subscription for following
+  subagent activity: a snapshot, then new events each time you poll, with
+  access checked on every read. Events dropped from the limited buffer, or too
+  large to keep, are reported as gaps. Closing a subscription doesn't stop
+  anything; `$interrupt_subagent()` cancels a subagent (#157).
 
-* `LeadAgent` returns compact `DelegationOutcome` values and offers authorized,
-  redacted child inspection through `DelegationDisclosure`. Large answers use
-  existing artifact offloading; settled native ellmer history can be exported
-  and replayed without executing tools or changing the lead context (#153).
+* Delegation now returns a `DelegationOutcome`, keeping the subagent's reply
+  separate from its history. `DelegationDisclosure()` decides who may inspect
+  subagents with `$inspect_subagents()`, `$read_subagent_result()` and
+  `$export_subagents()`, which return redacted views. `delegation_history()`
+  replays exported history without running tools or changing the lead's
+  context. Long replies are offloaded like large tool results (#153).
 
-* `LeadAgent` binds child governance and resource ownership through `DelegationPolicy()` and records it in initial manifests. Shared closures remain explicit; owned factories release child resources after settlement or failed setup, and exclusive leases reject overlapping use. Child human input requires a host handler, and unsupported delegated durable approvals fail explicitly (#151).
+* New `DelegationPolicy()` controls subagents' tools and human input. Tools
+  can be shared, held exclusively (overlapping use is an error), or built per
+  delegation by a factory returning `DelegationResources()`, which are cleaned
+  up when the subagent finishes or fails to start. A subagent using `ask_user`
+  needs a handler from the policy, and durable approvals in subagents are an
+  error for now. Each delegation's manifest records the policy (#151).
 
-* `DelegationInput` supplies bounded task instructions and scoped evidence
-  references for ordinary and parallel delegation. `LeadAgent` rejects invalid
-  evidence before requests and retains immutable initial `DelegationManifest`
-  receipts, separately from working context and retained child chats. Plain
-  string tasks still work. Directly invoked children now respond to lead
-  interruption, and status polling avoids materializing transcripts (#149).
-  Child messages encode brief fields separately from resolved evidence, including
-  empty evidence, so supplied text cannot forge the serialized source list.
-  Parallel delegates enforce the lead's token cap and retain failed input and
-  unstarted sibling records when a batch brief is malformed.
+* New `DelegationInput()` describes a delegated task as a brief (task,
+  constraints, evidence, deliverable and stop conditions); plain strings still
+  work. Evidence names exact revisions of records passed to
+  `LeadAgent$new(delegation_sources = )` and is checked before any request;
+  each delegation's `DelegationManifest` records what the subagent received,
+  and text in a brief can't pose as the evidence list. Directly invoked
+  subagents now stop when the lead is interrupted, parallel delegation
+  enforces the lead's token limit, and a malformed brief no longer loses the
+  other tasks in a batch (#149).
 
-* `LeadAgent$list_subagents()` exposes admitted and running delegations in
-  admission order, with exact stop reasons and separate observer errors. Ordinary
-  and parallel delegation share lifecycle accounting; stopped runs no longer
-  appear completed. Lead interruption also reaches active ordinary subagents,
-  and queued batch work remains inspectable after cancellation (#150).
+* `LeadAgent$list_subagents()` now lists queued and running delegations in the
+  order they were accepted, with exact stop reasons and any hook error; stopped
+  runs no longer appear completed. Interrupting the lead interrupts its running
+  subagents, and queued parallel tasks stay listed after cancellation (#150).
 
-* The Shiny chat example shows summarization progress and an expandable accepted
-  summary without changing the transcript. Its notice follows the selected
-  conversation and clears busy status after failed or cancelled runs. Chat
-  methods now accept dynamic dots (`!!!`), including shinychat's native input
-  forwarding, and the example no longer registers overlapping tool bundles.
+* `Agent$chat()`, `$stream()` and their async versions accept dynamic dots
+  (`!!!`), so shinychat can pass its input straight through. The Shiny chat
+  example now shows compaction progress and the summary.
 
-* `Agent$get_turns()` and `turns()` retain the complete selected conversation
-  across compaction, so shinychat native history keeps later replies. Use
-  `get_context_turns()` to inspect the bounded model context. Snapshot schema 3
-  preserves both views; earlier development snapshot schemas are rejected
-  (#146).
+* `Agent$get_turns()` and `Agent$turns()` now return the whole conversation
+  after compaction, so shinychat history keeps every reply; new
+  `Agent$get_context_turns()` returns what the model receives. Saved sessions
+  (schema 3) store both, and sessions saved with earlier development schemas
+  can't be loaded (#146).
 
-* `RSession$new(agent, tools = ...)` lets R code call selected registered tools
-  through `tools$...` and retain their results as ordinary R data. Nested calls
-  use Agent permissions, hooks, limits and enclosing execution provenance.
-  Tools must use `convert = FALSE`; the worker remains explicitly trusted and
-  nested durable approvals are unsupported (#186).
+* `RSession$new(agent, tools = )` lets model-written R code call selected
+  registered tools as `tools$name(...)`, through the agent's permissions,
+  hooks and limits, and keep the results as R data. The tools must use
+  `convert = FALSE` and can't pause for durable approval (#186).
 
-* `RSession` provides conversation-scoped trusted R workers with persistent
-  variables, ordered console and plot results, queued calls, cancellation and
-  explicit state-loss recovery. Native rich tool results now obey separate
-  text and image context allowances while retaining full display evidence
-  and offload artifacts (#143).
+* New `RSession` gives a conversation a persistent R process for `run_r_code`:
+  variables persist between calls, output and plots come back in order, and
+  calls queue. `$cancel()` or a timeout discards the variables, and the next
+  call says so. The code runs with your account's access and is not sandboxed.
+  New `ContextPolicy()` arguments `max_tool_result_images` and
+  `max_tool_result_image_bytes` limit images in tool results separately from
+  text; the full result stays available for display (#143).
 
-* `mcp_repl_connection()` gives an Agent an independent sandboxed mcp-repl
-  session. `mcp_repl_control()` requests upstream interrupt/reset controls and
-  preserves their reported outcomes. Agent interruption cancels active owned
-  MCP connections; plots and bounded transcript previews retain upstream
-  ellmer content and artifact handling (#69).
+* New `mcp_repl_connection()` gives an agent its own sandboxed mcp-repl
+  session; `mcp_repl_control()` interrupts or resets it and reports the
+  outcome. Interrupting the agent cancels its active MCP connections. Plots and
+  output previews come back as ellmer content (#69).
 
-* `McpConnection` binds an independent MCP client worker to one Agent and
-  session. Hosts can inspect catalogue pages and explicitly allow tools,
-  resource URIs and prompts. Calls return promises; cancellation, timeout and
-  closure invalidate the connection's tools. This temporary adapter is
-  qualified for mcptools 1.0.2 while public client APIs are developed (#48, #99).
+* New `McpConnection` connects one agent to an MCP server through a client in
+  a separate R process. You can page through the server's tools, resources and
+  prompts, and must allow each one before use. Calls return promises; after a
+  cancellation, timeout or `close()` the connection's tools stop working. It
+  supports mcptools 1.0.2 and is a stopgap until mcptools has a public client
+  API (#48, #99).
 
-* `PermissionResultPending()` suspends raw-argument tool calls in Agents with
-  an `approval_dir`. `approval_read()` inspects the durable state and
-  `Agent$resume_approval()` consumes an approval, denial, edited input, or
-  explicit budget decision under saved and current authority. Completed
-  effects are journaled and interrupted executions require host reconciliation.
-  The host owns conversation associations and private storage (#43).
+* New durable approvals: in an agent with an `approval_dir`, a permission
+  callback can return `PermissionResultPending()` to pause a tool call and
+  save it to disk for a person to decide later, even in another R process.
+  `approval_read()` shows the pending call, and `Agent$resume_approval()`
+  approves it (optionally with edited input or a higher budget) or denies it,
+  checking both the saved and the current permissions. The tool must use
+  `convert = FALSE`. Completed tool effects are logged, a call interrupted
+  mid-run can't be resumed and must be checked by hand, and your app tracks
+  which conversation each approval belongs to (#43).
 
-* Hook and permission result constructors now return read-only S7 values.
-  Use `S7::S7_inherits()` for concrete or family membership and `S7::props()`
-  for plain records. Continuation/interruption flags and text are validated;
-  `suppress_output` keeps its `isTRUE()` coercion. Lifecycle decisions and
-  original tool-output object references are preserved (#129).
+* Hook and permission result constructors, such as `HookResultPreToolUse()`
+  and `PermissionResultAllow()`, now return read-only S7 objects. Check their
+  class with `S7::S7_inherits()` (for example against `HookResult` or
+  `PermissionResult`) and use `S7::props()` for a plain list. `continue` and
+  `interrupt` must be a single `TRUE` or `FALSE`, and text fields must be
+  strings; `suppress_output` is still coerced with `isTRUE()` (#129).
 
-* `Skill()` now constructs a read-only S7 configuration value. Use
-  `skill_check_requirements(skill)` instead of the former instance method,
-  and `S7::props()` to prepare revised configuration. `skill_create()` and
-  `skill_load()` retain their defaults and loading behavior; executable tool
-  closures and services remain caller-owned (#127).
+* `Skill()` now returns a read-only S7 object. `skill$check_requirements()` is
+  replaced by `skill_check_requirements(skill)`; to change a skill, build a new
+  one from `S7::props(skill)`. `skill_create()` and `skill_load()` are
+  unchanged (#127).
 
-* `agent_definition()` and `AgentDefinition()` now construct the same read-only
-  S7 value. Use `S7::props()` to prepare a revised definition. Routing names,
-  tool and skill registry identity, YAML version 1, and delegated permission
-  and request limits retain their existing behavior (#125).
+* `agent_definition()` and `AgentDefinition()` are now the same constructor
+  and return a read-only S7 object; build a changed definition from
+  `S7::props()`. Names, YAML files and delegated limits work as before (#125).
 
-* `AgentUsage()` and `UsageLimits()` now construct read-only S7 values.
-  Constructors and `$` property reads retain their existing names; use
-  `S7::props()` for plain reporting records instead of list indexing or
-  `unclass()`. Accounting, missing-cost behavior, and delegated budget
-  intersections retain their existing semantics (#121).
+* `AgentUsage()` and `UsageLimits()` now return read-only S7 objects. `$`
+  still reads fields; use `S7::props()` instead of `[[` or `unclass()` for a
+  plain list (#121).
 
-* `AgentResult()` and `Permissions()` now construct read-only S7 values. Use
+* `AgentResult()` and `Permissions()` now return read-only S7 objects, and
+  their `$new()` and methods are removed. Inspect results with
   `result_n_turns()`, `result_tool_calls()`, `result_tool_results()`,
-  `result_text_chunks()`, and `result_is_success()` to inspect results, and
-  `permissions_check()` to evaluate policies. `$` field reads remain available;
-  `$new()` and instance methods are removed. Permission constructors reject
-  malformed flags and callbacks while Agent mode changes still only narrow
-  the configured authority ceiling (#117).
+  `result_text_chunks()` and `result_is_success()`, and test a policy with
+  `permissions_check()`. `$` still reads fields. `Permissions()` now rejects
+  malformed flags and callbacks (#117).
 
-* `AgentEvent()` and `HookMatcher()` are S7 values with read-only properties.
-  Construct matchers with `HookMatcher(...)` and test names with
-  `hook_matches()`. Event types use `event$type` instead of S3 subtype classes;
-  `event$data` exposes the payload and flat `$` reads remain available (#59).
+* `AgentEvent()` and `HookMatcher()` now return read-only S7 objects. Create
+  matchers with `HookMatcher(...)` instead of `HookMatcher$new()`, and test a
+  tool name with `hook_matches()`. Check an event's type with `event$type`
+  instead of its S3 class; `event$data` holds the payload, and `$` still reads
+  its fields directly (#59).
 
-* `ContextPolicy()` and `DeputyCompaction()` now create read-only S7 values.
-  Read properties with `$` or `S7::prop()` and use `S7::props()` for explicit
-  reporting. Summary Chat isolation, fallback destinations, and original
-  provider conditions are preserved (#123).
+* `ContextPolicy()` and `DeputyCompaction()` now return read-only S7 objects.
+  Read fields with `$`, or use `S7::props()` for a plain list (#123).
 
-* Object summaries use cli formatting, wrap at the configured terminal width,
-  and preserve literal braces in user values and stdout capture (#58).
+* `print()` methods now format with cli, wrap to the console width, show
+  braces in your values literally, and write to stdout so `capture.output()`
+  works (#58).
 
-* Compaction summaries now include tool evidence through ellmer's public content
-  formatter, preserving field names and relationships in structured results
-  while excluding tool-result display metadata. Previously a source returned by
-  a tool could disappear from the summary input.
-* A caller-owned history-recovery experiment compares identical prepared context
-  with and without bounded, scoped source retrieval. It requires all three
-  authorized checkpoints, verifies source revisions against their text, and
-  includes a scenario where a later host instruction
-  supersedes an earlier eligibility rule. It records
-  paired outcomes, provenance, usage, latency and effect counts without adding a
-  persistence API or recursive-analysis runtime (#112).
+* Compaction summaries now include tool results, formatted by ellmer so
+  structured results keep their field names. Previously a source returned by a
+  tool could be missing from the summarizer's input.
 
-* `ContextPolicy()` governs automatic compaction under the active run's identity,
-  shared usage limits, and cancellation controller. Explicit
-  `summary_fallback_chats` recover transient summary failures independently of
-  task fallback. Summary attempts remain inspectable, accepted summaries survive
-  task fallback, and interrupted or failed compaction preserves the active
-  context. Between-round compaction preserves completed tool effects and usage
-  (#111).
+* New `inst/examples/history-recovery/` experiment tests whether a compacted
+  agent answers better when it can also search and read the earlier
+  conversation, including after a later instruction replaces an earlier rule
+  (#112).
 
-* Split runtime, permission, checkpoint, and built-in tool support into cohesive
-  modules, with tests grouped by behavior. Public class interfaces and session
-  formats are unchanged by the mechanical extraction.
+* Automatic compaction now runs within the current run: it shares the run's
+  usage limits, stops when the run is interrupted, and can happen between
+  tool rounds without losing completed tool calls or usage. New
+  `ContextPolicy(summary_fallback_chats = )` lists chats to try in order when
+  the summary request fails with a transient error, separately from the
+  agent's `fallback_chats`. A failed or interrupted compaction leaves the
+  context unchanged, an accepted summary survives a later task fallback, and
+  each summary attempt is recorded (#111).
 
-* Use released ellmer >= 0.5.0 for public request callbacks, model objects,
-  conversation trace IDs, and native structured streaming.
-* Structured output now uses ellmer types throughout. `run()`, `run_sync()`,
-  and `run_async()` can complete tool work and then extract structured data
-  under one budget. Optional application validation has bounded corrections
-  and attempt evidence. The pre-CRAN `output_format` argument, JSON parser,
-  validation wrapper, and jsonvalidate dependency have been removed.
-* Agents and LeadAgents accept ordered, explicitly configured fallback Chats
-  for transient failures before any response or tool request. Partial output
-  and completed effects prevent replay. Failed dispatches remain accounted for,
-  missing costs stay unknown, and observer removal follows the selected Chat.
-* Optional OpenTelemetry integration adds Deputy run/governance evidence around
-  ellmer spans, including async parent-child correlation. Content is omitted
-  from Deputy traces; upstream message capture remains an explicit opt-in.
-  A runnable external evaluation example joins fixed cases to run IDs.
-* Limit errors retain the completed `last_run()` result for inspection.
+* Deputy now requires ellmer 0.5.0 or later.
 
-* The CLI now defaults to OpenAI with `gpt-5.6-luna`. OpenAI examples also
-  select Luna explicitly, with documented Terra and Sol overrides. Explicit
-  model choices, other providers' defaults, and caller-supplied Chats are
-  preserved (#106).
+* Structured output now uses ellmer types. Pass `type` to `$run()`,
+  `$run_sync()` or `$run_async()` and the agent finishes its tool calls, then
+  returns structured data within the same budget. An optional `validate`
+  function can ask for up to `max_corrections` corrections, and each attempt
+  is recorded. The `output_format` argument, its JSON parsing and validation
+  helpers, and the jsonvalidate dependency are removed.
 
-* The standalone `09-debate.R` example runs opposing stateless responders,
-  formats their arguments side by side, and synthesizes completed results
-  using a reusable, tool-free `debate` skill. Failed perspectives remain
-  inspectable and prevent synthesis (#40).
+* `Agent$new()` and `LeadAgent$new()` accept `fallback_chats`, tried in order
+  when a request fails with a transient error before any response or tool
+  request. A request isn't retried once output has arrived or a tool has run.
+  Failed requests still count toward usage, and unknown costs stay unknown.
 
-* `LeadAgent$parallel_delegate()` and `$parallel_delegate_async()` run fresh,
-  tool-free responders in bounded concurrent waves. Batches preserve named
-  partial results, record child runs, reserve request budgets, and support host
-  cancellation. Failed provider dispatches count toward request limits. Child
-  Chats isolate runtime callbacks as well as history and tools (#39).
+* With otel installed and a tracer configured, each run gets a `deputy.run`
+  span around ellmer's spans, including for async runs and subagents, with
+  events for permission decisions, hooks, compaction, fallbacks and
+  delegation. These spans contain no prompts, tool arguments or results;
+  ellmer's message capture stays opt-in. The standalone `10-evaluation.R`
+  example joins evaluation cases to run IDs.
 
-* `tool_metadata()` reports tool origin, supplied annotations, missing fields,
-  and effective defaults through registration, cloning, and delegation. MCP
-  loading preserves server annotations using a qualified mcptools 1.0.2 bridge,
-  selects exact server names before connecting, and rejects stale tool handles
-  after reconnection. MCP tool names do not grant native-tool privileges or
-  rewrite remote paths. Delegated Agents take their tool registry from their
-  definition rather than inheriting the parent's tools (#50).
+* After a run stops with a limit error, `Agent$last_run()` still returns its
+  result.
 
-* Tool registration validates complete batches before changing the registry.
-  Duplicate names now fail unless the host explicitly uses `replace = TRUE`;
-  duplicate names within a batch always fail. Constructor tools, skills,
-  and `set_tools()` share validation. Missing custom-tool annotations remain
-  visible and use conservative permission defaults, including possible
-  external access (#49).
+* The `deputy` command-line tool now defaults to OpenAI's `gpt-5.6-luna`.
+  Models you choose, other providers' defaults and chats you supply are
+  unchanged (#106).
 
-* `agent_definition_read()`, `agent_definition_write()`, and
-  `agent_definitions()` add portable YAML definitions, explicit tool/skill
-  registries, and discovery from `.deputy/agents/` (#41).
+* New standalone example `09-debate.R`: two subagents argue for and against a
+  question in parallel, and a moderator weighs their arguments with the
+  bundled `debate` skill. If either side fails, the script stops before the
+  moderator (#40).
 
-* Required packages now report standard installation guidance with the feature
-  that needs them; skill YAML frontmatter no longer silently loses metadata when
-  yaml is unavailable (#57).
+* New `LeadAgent$parallel_delegate()` and `$parallel_delegate_async()` ask
+  several tool-free subagents for one reply each, in parallel, at most
+  `max_active` at a time. Results come back by name, including partial results
+  when some fail. Each request is reserved from the lead's budget in advance,
+  failed requests count toward limits, and batches can be cancelled. Each
+  subagent starts from a fresh chat without the lead's history, tools or
+  callbacks (#39).
 
-* `Agent` is now a governed, drop-in chat: `chat()`, `chat_async()`, `stream()`,
-  `stream_async()`, `run_sync()`, and `run_async()` are adapters over one async
-  run kernel. The public backend escape hatch and separate `run_shiny()` bridge
-  are removed. shinychat can consume `agent$stream_async()` directly, including
-  attachment content, while permissions, hooks, limits, checkpoints, and
-  accounting remain active. `LeadAgent` delegation now uses `run_async()` and
-  no longer blocks the R process.
+* New `tool_metadata()` reports each tool's origin, declared and missing
+  annotations, and the defaults used, including after cloning and delegation.
+  MCP tools now keep the server's annotations, connect only to the servers you
+  name, and stop working after their connection reconnects. An MCP tool named
+  like a built-in tool gets none of its privileges, and its path arguments are
+  not rewritten. Subagents take their tools from their definition instead of
+  inheriting the lead's (#50).
 
-* New `ContextPolicy()` enables automatic pre-request context compaction and
-  durable offloading of large tool results. Compaction reports whether it used
-  the LLM, a hook, or an explicitly configured text fallback, and includes its
-  own usage. Version 2 saved sessions retain cumulative summaries and portable
-  copies of offloaded results. Chunkable text sidecars keep model retrieval
-  memory-bounded, and explicit relative offload roots remain stable after the
-  policy is created. Native file and code tools execute against the Agent
-  workspace without changing the R process working directory. Replacing turns
-  clears Deputy-owned compacted conversation state while preserving other
-  prompt content. Automatic compaction honors run limits before making its
-  summary request. Prompt-owned routing and compaction boundaries cannot
-  collide with ordinary user headings or summary text, and replacing a prompt
-  resets hook-context de-duplication state.
-  Loading a saved session transactionally replaces the receiver's active
-  offloaded-result set, so results from an earlier conversation cannot leak
-  into later session saves.
-  `LeadAgent` accepts the same policy and propagates it to delegated agents.
-  Prompt updates and sub-agent registration preserve cumulative compaction
-  state, while post-tool hooks inspect the original result before large values
-  are represented to the model by bounded references.
+* Registering a tool whose name is taken is now an error unless you pass
+  `replace = TRUE`; duplicate names within a batch are always an error. Each
+  batch is checked in full before any tool is added, from `Agent$new()`,
+  `$register_tools()`, `$set_tools()` or a skill. A custom tool without
+  annotations is treated as possibly writing, destructive and reaching outside
+  the workspace (#49).
 
-* Concurrent `LeadAgent` delegations reserve their child budgets before launch,
-  so siblings share the lead's remaining usage limits instead of each receiving
-  the full balance. Cloned lead agents also recreate their delegate tool against
-  the clone's own registry, hooks, and run history.
+* New `agent_definition_read()`, `agent_definition_write()` and
+  `agent_definitions()` read and write agent definitions as YAML files, by
+  default in `.deputy/agents/`. Tools and skills are looked up by name in
+  registries you supply; reading a file never runs code (#41).
 
-* The `deputy` command now ships as a tested Rapp 0.4 package executable for
-  one-off `rx` use and persistent `ir tool install` launchers. Its task and
-  interactive modes now consume streaming generators correctly, report tool
-  failures, and restore persisted sessions from an installed package.
+* A missing suggested package now triggers the standard install prompt, naming
+  the feature that needs it. Loading a skill with YAML front matter now
+  requires yaml instead of silently dropping the metadata (#57).
 
-* `Agent$new()` and per-run methods now accept immutable, canonical
-  JSON-compatible `run_context`. Results, hooks, saved sessions, and
-  delegated agents retain that context, while paired tool events and delegated
-  results expose Agent, run, parent, tool-call, and delegation identifiers.
-  The drop-in `chat*()` and `stream*()` methods accept the same per-run context
-  narrowing so product hosts do not need a separate execution bridge.
-  Generated correlation identifiers no longer advance R's global RNG stream.
+* `Agent` can now stand in for an ellmer chat: `$chat()`, `$chat_async()`,
+  `$stream()` and `$stream_async()` work like ellmer's, and they, `$run_sync()`
+  and `$run_async()` all apply the agent's permissions, hooks, limits,
+  checkpoints and usage tracking. shinychat can use `agent$stream_async()`
+  directly, attachments included. `run_shiny()` and public access to the
+  wrapped chat are removed, and `LeadAgent` delegation no longer blocks the R
+  process.
 
-* Deputy now has a deliberate 53-symbol public API centered on native agents,
-  tools, permissions, hooks, skills, delegation, and run usage. Sessions use a
-  stable `session_id` for correlation and explicit `Agent$save_session()` and
-  `Agent$load_session()` calls for persistence.
+* New `ContextPolicy()` compacts the conversation automatically before a
+  request when it gets too long, reporting whether it used the model, a
+  `PreCompact` hook or the text fallback, and its own usage. It also stores
+  large tool results on disk behind a short reference the model can read in
+  chunks; `PostToolUse` hooks still see the full result, and a relative
+  `offload_dir` is resolved when the policy is created. Saved sessions keep
+  the summary and offloaded results, and loading a session replaces the
+  agent's offloaded results so they can't leak into later saves. `$set_turns()`
+  clears the summary but keeps the rest of the system prompt, and `LeadAgent`
+  passes the policy to its subagents.
 
-* Removed the pre-release Agent SDK/Claude facades, Claude settings loader,
-  automatic session stores, vendor tool and permission aliases, deprecated run
-  arguments, todo tools, and redundant convenience exports. Saved sessions and
-  file-checkpoint journals now use strict native schemas; unsupported earlier
-  payloads are rejected rather than migrated.
+* File and code tools now run in the agent's `working_dir` without changing
+  R's working directory.
 
-* `Agent$provider()` no longer errors with "Can't get S7 properties with `$`"
-  against current ellmer. ellmer moved `model` off `Provider` onto a new `Model`
-  class, so `provider@model` fails for every provider and the `$` fallback threw
-  from inside the error handler. The model is now read with `Chat$get_model()`.
+* Concurrent delegations from a `LeadAgent` now share its remaining usage
+  limits instead of each receiving the full balance. A cloned `LeadAgent` now
+  delegates with the clone's own subagents, hooks and run history.
 
-* `Agent$set_permission_mode()` now preserves constructor permissions as an
-  immutable authority ceiling. Reapplying the current mode is a no-op; other
-  changes may only narrow authority. Delegated agents use the same rule and
-  retain lead capability, tool-gate, callback, and write-root restrictions.
+* The `deputy` command-line tool is now a Rapp 0.4 executable: run it once
+  with `rx` or install a launcher with `ir tool install`. Its task and
+  interactive modes now stream correctly, report tool failures and can resume
+  saved sessions.
 
-* `agent_definition()` now validates and canonicalizes AgentDefinition routing
-  keys and fields. `LeadAgent` rejects duplicate names and keeps its registry
-  private behind a read-only snapshot, so delegation, displayed definitions,
-  and the lead prompt cannot diverge (#79).
+* `Agent$new()` and every run method accept `run_context`, a JSON-compatible
+  list of your own identifiers, such as a user or conversation ID, which is
+  attached to results, hook contexts, saved sessions and subagents. ID fields
+  set when the agent was created can't be changed per run. Tool events and
+  subagent results also carry agent, run, parent, tool call and delegation
+  IDs, and generating them no longer advances R's random number generator.
 
-* `Agent` now rejects a provider tool request whose name is missing,
-  unreadable, or malformed before it reaches usage accounting, permissions,
-  hooks, or execution (#26).
+* The public API is now smaller, centred on agents, tools, permissions, hooks,
+  skills, delegation and usage. Removed: the pre-release Agent SDK and Claude
+  compatibility functions, the Claude settings loader, automatic session
+  stores, vendor tool and permission aliases, deprecated run arguments, the
+  todo tools and redundant convenience exports. Each agent has a stable
+  `session_id`, and conversations are saved and loaded only with
+  `Agent$save_session()` and `Agent$load_session()`; sessions and file
+  checkpoints from earlier versions can't be loaded.
 
-* `hook_limit_file_writes()` now delegates path decisions to the canonical
-  permission policy, rejects sibling-prefix and symlink escapes, and covers all
-  native file mutation tools (#75).
+* `Agent$provider()` no longer fails with "Can't get S7 properties with `$`"
+  on current ellmer, which moved the model from `Provider` to a new `Model`
+  class.
 
-* `HookMatcher$new()` now runs callbacks in the caller's process by default,
-  validates timeout configuration at construction, and preserves detailed
-  subprocess errors when isolated execution is explicitly requested. It also
-  rejects callbacks that cannot accept an event's arguments and regex patterns
-  that do not compile (#35, #36, #74).
+* `Agent$set_permission_mode()` can now only keep or narrow the permissions
+  the agent was created with. Subagents follow the same rule and keep all the
+  lead's restrictions: capability flags, tool allow and deny lists, permission
+  callback and write directory.
 
-* `Skill$check_requirements()` now treats malformed or unmatched provider names
-  as mismatches while preserving compatibility when a skill and chat name the
-  same generic provider. Internal provider normalization returns `NA` for
-  unknown names as documented (#30).
+* `agent_definition()` now validates its fields and lowercases names.
+  `LeadAgent` rejects duplicate names, and `$sub_agent_defs` is a read-only
+  copy: add definitions with `$register_sub_agent()` so delegation and the
+  lead's prompt stay in sync (#79).
 
-* `compact()` now summarizes on a clone of the agent's own chat instead of
-  constructing a new provider. Previously any provider other than OpenAI,
-  Anthropic, or Google fell through to `ellmer::chat_openai("gpt-4o-mini")`,
-  sending conversation history to OpenAI when `OPENAI_API_KEY` happened to be
-  set. The summary clone preserves configured provider behavior while removing
-  tools and callbacks and suppressing console echo.
+* `Agent` now rejects a tool request with a missing or malformed tool name
+  before it reaches usage accounting, permissions, hooks or the tool (#26).
 
-* `tool_run_r_code()` now rejects timed-out or failed `callr` subprocesses with
-  readable tool errors instead of failing later while formatting an unbound
-  result (#27).
+* `hook_limit_file_writes()` now checks paths the same way permissions do,
+  blocks escapes through symlinks and through paths that only share a prefix
+  (`/data2` when `/data` is allowed), and covers every built-in file-writing
+  tool (#75).
 
-* `tool_run_bash()` now detects a subprocess timeout from the condition class
-  instead of matching the word "timeout" in the error message. `callr` reports a
-  timeout as "callr timed out", which never contains the matched word, so a
-  timed-out command was reported to the model as a generic "Command failed"
-  with no indication that a timeout was the cause. This brings `run_bash` in
-  line with the `run_r_code` timeout handling from #27.
+* `HookMatcher()` callbacks now run in your R process by default; a positive
+  `timeout` runs them in a subprocess and reports their full error messages.
+  `HookMatcher()` also validates `timeout`, and rejects callbacks that can't
+  accept the event's arguments and patterns that aren't valid regular
+  expressions (#35, #36, #74).
 
-* `Agent$cost()` now returns `NA` when any provider cost record is unavailable,
-  with `complete` and `missing` fields that distinguish an observed zero from
-  an unknown total. Run cost limits fail closed with the typed stop reason
-  `"cost_unavailable"` instead of enforcing an understated total (#29).
+* `skill_check_requirements()` now treats malformed or unknown provider names
+  as not matching, while a skill and chat that name the same generic provider
+  still match (#30).
 
-* Deputy now stops after three consecutive completed tool calls with the same
-  canonical request and result. The `"tool_loop"` stop reason remains stable
-  when surrounding response text differs trivially, while changing results
-  reset the counter for legitimate polling progress (#34).
+* `Agent$compact()` now summarizes with a copy of the agent's own chat, with
+  tools and callbacks removed. Previously, providers other than OpenAI,
+  Anthropic and Google fell back to `ellmer::chat_openai("gpt-4o-mini")`, which
+  sent the conversation to OpenAI whenever `OPENAI_API_KEY` was set.
 
-* The default `permissions_standard()` policy and partial direct
-  `Permissions$new()` policies no longer grant arbitrary R execution, and
-  `tools_preset("standard")` no longer registers `run_r_code`. Built-in R and
-  shell tools are explicitly trusted-code tools.
-  New `tools_mcp_repl()` verifies an exact `read-only` or `workspace-write`
-  mcp-repl configuration and refuses missing, inherited, external, or
-  unrestricted sandbox modes before loading tools (#32).
+* `run_r_code` and `run_bash` now tell the model when a command timed out or
+  its subprocess failed, instead of failing internally or reporting a generic
+  "Command failed" (#27).
 
-* Provider-native web tools now honor their documented `tools_web()` contract.
-  Deputy passes through only known native search and fetch tools after an
-  explicit, fail-closed registration-time web permission check; unsupported
-  provider-side tools remain rejected because their execution cannot be
-  intercepted by Deputy. Custom request-time permission callbacks cannot
-  authorize native tools because their arguments and run context are not
-  available for interception. Narrowing away web access atomically removes any
-  registered provider-native web tools before the new policy becomes active.
+* `Agent$cost()` now returns `NA` when the cost of any request is unknown; its
+  `complete` and `missing` fields tell a real zero from an unknown total. A run
+  with a cost limit stops with reason `"cost_unavailable"` when its cost can't
+  be known, rather than enforcing an understated total (#29).
 
-* `tools_interactive()` now creates an `ask_user` tool with an instance-scoped
-  human-input handler and routing context, allowing concurrent Agents to remain
-  isolated. Missing handlers signal `deputy_human_input_unavailable`;
-  `set_ask_user_callback()` remains a legacy process-wide fallback (#76).
+* A run now stops with reason `"tool_loop"` after three consecutive identical
+  tool calls that return the same result. Small differences in the model's
+  surrounding text don't reset the count, but a changed result does, so
+  polling still works (#34).
+
+* `permissions_standard()`, and `Permissions()` policies that don't set
+  `r_code`, no longer allow running R code, and `tools_preset("standard")` no
+  longer includes `run_r_code`. The built-in R and shell tools run code with
+  your account's access and are not sandboxed. For sandboxed R, new
+  `tools_mcp_repl()` loads mcp-repl only with the `read-only` or
+  `workspace-write` sandbox, and refuses missing, inherited, external or
+  unrestricted sandbox settings (#32).
+
+* `tools_web()` now behaves as documented. Provider-run web search and fetch
+  tools are checked against the `web` permission at registration, because
+  Deputy can't see their individual calls (so a `can_use_tool` callback can't
+  approve them either); other provider-side tools are refused. Narrowing
+  permissions to remove web access removes these tools.
+
+* `tools_interactive()` now takes a `callback` and `context` for its
+  `ask_user` tool, so concurrent agents, such as one per Shiny session, each
+  get their own handler. Without a handler, `ask_user` signals
+  `deputy_human_input_unavailable`. `set_ask_user_callback()` remains as a
+  process-wide fallback for single-agent scripts (#76).
 
 # deputy 0.0.0.9000
 
-* Added semantic content streaming with `tool_start`, `tool_end`, `usage`, and
-  `file_checkpoint` events, stable run IDs, cooperative `Agent$interrupt()`,
-  and run usage on `AgentResult`.
-* Added `UsageLimits()` and `AgentUsage()` for per-run request, tool-call,
-  input/output/total-token, and estimated-cost accounting and enforcement,
-  including remaining-limit inheritance and aggregation for synchronous
-  delegated agents.
-* Added persisted, bounded byte-exact file checkpoints and rewind through
-  `Agent` for Deputy write and edit tools; lead and delegated agents share one
-  workspace journal. Serialized state is size-bounded and loads are
-  root-validated and transactional.
-* Hardened permission checks so all mutating file tools enforce configured
-  roots and readonly mode fails closed for unknown, mutating, destructive, and
-  disallowed open-world tools. Constructor permissions, workspace roots, and
-  tools remain authoritative when a saved conversation is loaded.
-* Post-tool hook output replacement and suppression now apply to emitted tool
-  lifecycle events; interrupting permission denials stop active streams.
-* Added lazy, cancellable `run_shiny()` lifecycle management with the Agent's
-  run limits, file-root confinement, automatic checkpoints, and incomplete-tool
-  recovery; active runs now reject conflicting load, rewind, and compaction
-  mutations.
-* Added MCP status reporting and richer sub-agent run metadata.
-* Initial development version
-* Core `Agent` class with streaming `run()` and blocking `run_sync()` methods
+* Streaming now emits `tool_start`, `tool_end`, `usage` and `file_checkpoint`
+  events. Each run has a stable ID, `Agent$interrupt()` asks a running agent to
+  stop, and `AgentResult` includes the run's usage.
+* New `UsageLimits()` and `AgentUsage()` track and limit requests, tool calls,
+  input, output and total tokens, and estimated cost for each run. Subagents
+  inherit the lead's remaining limits, and their usage is added to the lead's.
+* New file checkpoints: Deputy's write and edit tools save each file's exact
+  bytes before changing it, so the agent can rewind them. The lead and its
+  subagents share one checkpoint journal per workspace, which has a size limit
+  and is kept in saved sessions.
+* Stricter permission checks: every file-writing tool respects the allowed
+  write directory, and `"readonly"` mode denies unknown, writing, destructive
+  and disallowed open-world tools. Loading a saved conversation keeps the
+  agent's own permissions, workspace and tools.
+* When a `PostToolUse` hook replaces or suppresses a tool's output, streamed
+  tool events show the change too. `PermissionResultDeny(interrupt = TRUE)`
+  now stops an active stream.
+* New `run_shiny()` runs an agent for Shiny with the agent's limits, file
+  roots and checkpoints. It starts lazily, can be cancelled, and recovers from
+  incomplete tool calls. While a run is active, loading a session, rewinding
+  files or compacting is an error.
+* MCP status reporting and more detailed subagent run metadata.
+* Initial development version.
+* Core `Agent` class with streaming `run()` and blocking `run_sync()` methods.
 * Built-in tools: `tool_read_file`, `tool_write_file`, `tool_list_files`,
-  `tool_run_r_code`, `tool_run_bash`, `tool_read_csv`
-* Tool bundles: `tools_file()`, `tools_code()`, `tools_data()`, `tools_all()`
-* Permission system with `permissions_readonly()`, `permissions_standard()`,
-  `permissions_full()`, and custom `Permissions` class
-* Hook system with `HookMatcher` and events:
-  `PreToolUse`, `PostToolUse`, `Stop`, `UserPromptSubmit`, `PreCompact`
-* Multi-agent support with `agent_definition()` and `LeadAgent`
-* Skills system with `skill_load()`, `skill_create()`, and `Skill` class
-* Explicit session persistence via `Agent$save_session()` and
-  `Agent$load_session()`
-* Provider-agnostic design works with any ellmer-supported LLM
+  `tool_run_r_code`, `tool_run_bash`, `tool_read_csv`.
+* Tool bundles: `tools_file()`, `tools_code()`, `tools_data()`, `tools_all()`.
+* Permissions with `permissions_readonly()`, `permissions_standard()`,
+  `permissions_full()` and custom `Permissions`.
+* Hooks with `HookMatcher` for the `PreToolUse`, `PostToolUse`, `Stop`,
+  `UserPromptSubmit` and `PreCompact` events.
+* Delegation with `agent_definition()` and `LeadAgent`.
+* Skills with `skill_load()`, `skill_create()` and `Skill`.
+* Saving and loading conversations with `Agent$save_session()` and
+  `Agent$load_session()`.
+* Works with any chat provider that ellmer supports.

@@ -7,48 +7,42 @@
 hook_block_dangerous_bash(patterns = NULL, additional_patterns = NULL)
 }
 \arguments{
-\item{patterns}{Character vector of regex patterns to block.
-Default includes comprehensive dangerous patterns.}
+\item{patterns}{Character vector of regular expressions to block. \code{NULL}
+(the default) uses the built-in patterns.}
 
-\item{additional_patterns}{Optional character vector of additional
-patterns to block alongside defaults.}
+\item{additional_patterns}{Optional character vector of extra patterns to
+block as well.}
 }
 \value{
-A \link{HookMatcher} object
+A \link{HookMatcher}.
 }
 \description{
-Convenience function to create a PreToolUse hook that blocks potentially
-dangerous bash commands. Default patterns include:
-
-\strong{File system destruction:}
-\code{rm -rf}, \code{mkfs}, \verb{dd if=}, writes to \verb{/dev/}
-
-\strong{Privilege escalation:}
-\code{sudo}, \verb{su -}, \verb{chmod 777}, \code{chown}, \code{setuid}
-
-\strong{Code execution:}
-\code{eval}, \code{exec}, \code{source} (with variables), backticks
-
-\strong{Process manipulation:}
-\code{kill -9}, \code{killall}, \code{pkill}, fork bombs
-
-\strong{System modification:}
-\code{crontab}, \code{systemctl}, \verb{/etc/passwd}, \verb{/etc/shadow}
-
-\strong{Network exfiltration:}
-\verb{curl -X POST}, \code{wget --post}, \code{nc -e}, \code{netcat}, reverse shells
-
-\strong{Obfuscation detection:}
-Variable expansion in commands, base64 piping, hex/octal escapes,
-quote splitting, backslash escapes
-
-\strong{Security Note:} This is defense-in-depth and cannot catch all possible
-obfuscation techniques. For high-security environments, consider:
-\enumerate{
-\item Using sandboxed execution (Docker, firejail)
-\item Disabling bash entirely via \link{Permissions}
-\item Using a command whitelist instead of blacklist
+Creates a PreToolUse hook that denies \code{run_bash} commands matching any of a
+set of regular expressions (case-insensitive). The default patterns cover:
+\itemize{
+\item file system destruction: \code{rm -rf}, \code{mkfs}, \verb{dd if=}, writes to \verb{/dev/};
+\item privilege escalation: \code{sudo}, \verb{su -}, \verb{chmod 777}, \verb{chown root},
+\code{setuid};
+\item code execution: \code{eval}, \code{exec}, \code{source $VAR}, backticks, \verb{$(...)},
+\code{python -c} and similar one-liners;
+\item process manipulation: \code{kill -9}, \code{killall}, \code{pkill -9}, fork bombs;
+\item system files and services: \code{crontab}, \code{systemctl}, \verb{/etc/passwd},
+\verb{/etc/shadow}, \verb{/etc/sudoers};
+\item credentials and history: \code{printenv}, reading \code{.ssh}, \code{.aws} or \code{.env}
+files, clearing shell history;
+\item network exfiltration: \verb{curl -X POST}, \code{wget --post}, \code{nc -e}, \code{netcat},
+reverse shells;
+\item obfuscation: variable expansion, piping \code{base64} output to a shell,
+hex and octal escapes, quote splitting, backslash escapes.
 }
+
+The patterns are broad, so they also block some harmless commands. A
+denylist can't catch every obfuscated command either. To keep shell
+commands contained, turn off \code{bash} in \link{Permissions} or run the agent in a
+container or other OS sandbox.
+
+The hook returns a denial for a matching command and \code{NULL} otherwise, so
+hooks added after it still see the commands it lets through.
 }
 \examples{
 \dontrun{

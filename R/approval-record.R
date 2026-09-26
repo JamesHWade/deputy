@@ -15,18 +15,22 @@ approval_abort <- function(
   )
 }
 
-#' Request a durable tool approval
+#' Pause a tool call for approval
 #'
-#' Return this from a [Permissions] `can_use_tool` callback to suspend before
-#' execution. The Agent must have an `approval_dir`. Resumable tools must be
-#' registered with `convert = FALSE`; their functions accept raw JSON arguments.
-#' Tool outputs should be strings, explicit JSON, or ellmer Content values.
-#' Raw JSON shaped like a content record (`version`, `class`, `props`) is rejected
-#' because ellmer replay would reinterpret it as an S7 constructor.
-#' No approval is granted by constructing this value.
-#' @param reason One non-empty string explaining the pending decision.
-#' @return A read-only S7 permission result.
-#' @seealso [approval_read()], [Agent]
+#' Return this from a `can_use_tool` callback (see [Permissions]) to stop the
+#' run before the tool executes and save the pending call to disk. Approve or
+#' deny it later, possibly from another R process, with
+#' `agent$resume_approval()`; [approval_read()] shows what is waiting.
+#'
+#' The agent needs an `approval_dir`, and the tool must be registered with
+#' `convert = FALSE`, so its function receives the raw JSON arguments. Tool
+#' results should be strings, JSON from `jsonlite::toJSON()`, or ellmer content
+#' objects. Inputs or results shaped like a list with `version`, `class` and
+#' `props` fields are rejected, because ellmer would read them back as
+#' serialized objects.
+#' @param reason Why the call needs approval, as one non-empty string.
+#' @return A `PermissionResultPending` object.
+#' @seealso `vignette("approvals")`, [approval_read()], [Agent]
 #' @export
 PermissionResultPending <- S7::new_class(
   "PermissionResultPending",
@@ -49,24 +53,25 @@ PermissionResultPending <- S7::new_class(
   }
 )
 
-#' Inspect a durable approval continuation
+#' Read a pending approval
 #'
 #' @description
-#' Read an approval directory without loading a Chat or running any tools.
-#' Snapshots are read-only S7 values; they are inspection records, not grants.
-#' Use `agent$resume_approval(path, decision = "approve")` or `"deny"` to
-#' consume a pending decision. Edited inputs are supplied through `tool_input`.
+#' Reads an approval directory and returns the paused tool call, its status
+#' and the usage so far, without loading a chat or running tools. To act on a
+#' pending approval, call `agent$resume_approval(path, "approve")` or
+#' `"deny"`, passing any edited inputs as `tool_input`.
 #'
-#' Only `pending` records can resume. An `executing` record may have produced
-#' effects; an interrupted `resuming` or `continuing` record also requires host
-#' reconciliation. These records cannot automatically retry. OS locks prevent
-#' concurrent consumers and are released when the owning process exits.
+#' Only a `"pending"` approval can be resumed, and only once. A record
+#' interrupted while `"resuming"`, `"executing"` or `"continuing"` can't be
+#' resumed or retried: its tool may already have run, so check the effects
+#' yourself. File locks stop two processes resuming the same approval at
+#' once, but nothing guarantees that a tool runs exactly once.
 #'
-#' Approval directories contain private conversation and tool data. The host
-#' owns storage, access control, retention, and associations with its conversation
-#' store. They never contain serialized tools, callbacks, or Chat clients.
-#' @param path Path to an approval directory returned on the `approval` event.
-#' @return An [ApprovalContinuation] inspection value.
+#' Approval directories hold the conversation and tool inputs, so keep them
+#' private; access control and clean-up are up to you. They never contain
+#' tools, callbacks or chat clients.
+#' @param path Path to an approval directory, as given in the `approval` event.
+#' @return An [ApprovalContinuation].
 #' @export
 approval_read <- function(path) {
   record <- approval_store_read(path)
@@ -75,23 +80,35 @@ approval_read <- function(path) {
   approval_snapshot(record)
 }
 
-#' Durable approval inspection value
+#' Pending approval record
 #'
 #' @description
-#' A read-only view of a durable approval. Normally obtained with [approval_read()].
-#' Constructing a value does not persist it or authorize execution.
-#' @param id Stable approval identifier.
-#' @param status Pending, executing, or terminal state.
-#' @param request Named record containing tool name, inputs, and reason.
-#' @param decision Recorded host decision, or NULL.
-#' @param context Canonical host run context.
-#' @param usage Observed [AgentUsage], including work before suspension.
-#' @param usage_limits Governing [UsageLimits].
-#' @param budget_ceiling Original Agent budget ceiling for explicit escalation.
-#' @param permissions Saved static permission ceiling and callback requirement.
-#' @param effects Execution journal entries.
-#' @param source Session, Agent, and source-run correlation.
-#' @return An `ApprovalContinuation` S7 value.
+#' A read-only snapshot of a saved approval, returned by [approval_read()] and
+#' `agent$pending_approval()`. Read fields with `$`. You rarely need to create
+#' one yourself; doing so doesn't save it or approve anything.
+#' @param id Approval ID.
+#' @param status One of `"pending"`, `"resuming"`, `"executing"`,
+#'   `"continuing"`, `"completed"`, `"stopped"` or `"indeterminate"`.
+#' @param request List describing the paused call: `tool_call_id`, `name`,
+#'   `tool_input`, `reason`, and `kind` (`"tool"`, or `"budget"` when a usage
+#'   limit caused the pause).
+#' @param decision The recorded decision (`decision` and `tool_input`), or
+#'   `NULL` if there is none yet.
+#' @param context The run's `run_context`.
+#' @param usage [AgentUsage] so far, including work before the pause.
+#' @param usage_limits [UsageLimits] of the paused run. Resuming reuses them
+#'   unless you pass others.
+#' @param budget_ceiling The agent's [UsageLimits] from the original run.
+#'   Limits passed to `resume_approval()` can't go beyond these or the agent's
+#'   current limits.
+#' @param permissions The saved permission policy, as a list. Resumed tool
+#'   calls must be allowed by both it and the agent's current policy.
+#'   `callback_required` says whether `can_use_tool` must be set again before
+#'   resuming.
+#' @param effects Log of tool calls the run has executed, with their status.
+#' @param source IDs of the session, agent and run that paused. [approval_read()]
+#'   adds `path`, the approval directory.
+#' @return An `ApprovalContinuation` object.
 #' @export
 ApprovalContinuation <- S7::new_class(
   "ApprovalContinuation",

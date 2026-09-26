@@ -2,7 +2,7 @@
 library(deputy)
 rlang::check_installed("yaml", reason = "to run this example")
 chat <- ellmer::chat_openai(
-  model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-5.6-luna")
+  model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-6-luna")
 )
 
 skill_dir <- tempfile("deputy-skill-")

@@ -1,7 +1,7 @@
 # Run with Rscript after installing deputy and setting OPENAI_API_KEY.
 library(deputy)
 chat <- ellmer::chat_openai(
-  model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-5.6-luna")
+  model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-6-luna")
 )
 
 agent <- Agent$new(
@@ -13,10 +13,10 @@ agent <- Agent$new(
 first <- agent$run_sync("Remember that my example project is called Cedar.")
 session_file <- tempfile(fileext = ".rds")
 agent$save_session(session_file)
-# A new Agent provides the backend and permission ceiling for the resumed chat.
+# The new agent's own tools and permissions apply to the restored conversation.
 resumed <- Agent$new(
   chat = ellmer::chat_openai(
-    model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-5.6-luna")
+    model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-6-luna")
   ),
   tools = list(),
   usage_limits = UsageLimits(max_requests = 3)

@@ -4,7 +4,7 @@
 \alias{agent_definition_read}
 \alias{agent_definition_write}
 \alias{agent_definitions}
-\title{Read, write, and discover AgentDefinition files}
+\title{Read and write agent definition files}
 \usage{
 agent_definition_read(path, tools = list(), skills = list())
 
@@ -23,62 +23,60 @@ agent_definitions(
 )
 }
 \arguments{
-\item{path}{A YAML file for reading/writing, or a directory for discovery.
-Discovery defaults to \code{.deputy/agents} in the current project and reads
-\code{.yaml} and \code{.yml} files in that directory, without recursion.}
+\item{path}{Path to a YAML file. For \code{agent_definitions()}, a directory,
+by default \code{.deputy/agents} under the working directory; only the \code{.yaml}
+and \code{.yml} files directly inside it are read.}
 
-\item{tools}{Named list of ellmer tool objects available to the definition.
-Registry keys are case-sensitive symbols, such as \code{read_file}.}
+\item{tools}{Named list of ellmer tools. Files refer to tools by these
+names, such as \code{read_file}. Names are case-sensitive.}
 
-\item{skills}{Named list of \link{Skill} objects or skill paths approved by the
-host. Files reference these keys, never literal paths.}
+\item{skills}{Named list of \link{Skill} objects or skill directory paths. Files
+refer to skills by these names, never by path.}
 
-\item{definition}{An \link[=agent_definition]{AgentDefinition} to write. Each tool
-and skill must match exactly one entry in its supplied registry.}
+\item{definition}{An \link[=agent_definition]{AgentDefinition} to write. Each of
+its tools and skills must appear exactly once in \code{tools} or \code{skills}.}
 
 \item{overwrite}{Whether to replace an existing file. Defaults to \code{FALSE}.}
 }
 \value{
-\code{agent_definition_read()} returns a read-only \code{AgentDefinition}
-S7 value.
-\code{agent_definition_write()} invisibly returns \code{path}.
-\code{agent_definitions()} returns a named list of definitions keyed by their
-canonical routing names, ready for \code{LeadAgent$new(sub_agents = ...)}.
-A missing discovery directory returns an empty list. Invalid files or
-duplicate names abort the entire discovery operation.
+\code{agent_definition_read()} returns an \code{AgentDefinition}.
+\code{agent_definition_write()} returns \code{path}, invisibly.
+\code{agent_definitions()} returns a list of definitions named by definition
+name, ready for \code{LeadAgent$new(sub_agents = ...)}. It returns an empty
+list if the directory doesn't exist, and errors if any file is invalid or
+two files use the same name.
 }
 \description{
-Deputy's versioned YAML format represents every field in
-\code{\link[=agent_definition]{agent_definition()}}. Tools and skills are symbolic references resolved only
-through explicit host-supplied registries. Reading a file does not load
-packages, source R code, connect MCP servers, or instantiate an Agent.
+Save an \code{\link[=agent_definition]{agent_definition()}} as a YAML file, read one back, or read every
+definition in a directory. Files refer to tools and skills by name; you
+supply the actual objects through the \code{tools} and \code{skills} arguments.
+Reading a file never runs R code, loads packages or connects to MCP
+servers.
 }
 \section{Format version 1}{
 
-A file is one YAML mapping with \code{version: 1} and the fields of
-\code{\link[=agent_definition]{agent_definition()}}. \code{name}, \code{description}, and \code{prompt} are required.
-Optional fields use the constructor defaults. \code{tools} and \code{skills} are
-sequences of registry keys; \code{disallowed_tools}, \code{memory}, and \code{mcp_servers}
-are sequences of strings. \code{model}, \code{initial_prompt}, and \code{permission_mode}
-are strings, and \code{max_requests} is a non-negative integer. Explicit \code{null} is
-accepted only for constructor fields that allow \code{NULL}.
+A file is a YAML mapping with \code{version: 1} and the arguments of
+\code{\link[=agent_definition]{agent_definition()}} as fields. \code{name}, \code{description} and \code{prompt} are
+required; the other fields default as in \code{\link[=agent_definition]{agent_definition()}}. \code{tools} and
+\code{skills} are lists of registry names, and \code{disallowed_tools}, \code{memory} and
+\code{mcp_servers} are lists of strings; a single string also works for a
+one-item list. \code{model}, \code{initial_prompt} and \code{permission_mode} are strings,
+and \code{max_requests} is a non-negative integer. \code{null} is allowed only for
+fields whose default is \code{NULL}.
 
-Unknown fields, versions, references, duplicate keys, and YAML evaluation
-tags are rejected. YAML type inference applies: quote strings such as
-\code{"yes"} or \code{"123"}. Empty sequences are written as \verb{[]} and optional NULL
-values as \code{null}. Writing canonicalizes formatting; it does not preserve
-comments or names attached to R lists or character sequences. Object order
-and registry identity are preserved. A single string is accepted as shorthand
-for a one-element sequence. Only regular files of at most 1 MiB are read.
-Files are written as UTF-8 with LF line endings on every platform.
-Writes use a temporary file in the destination directory and replace the
-destination only after writing succeeds.
-With \code{overwrite = FALSE}, installing the file requires hard-link support
-from the filesystem so a concurrently created destination is never replaced.
+Unknown fields or versions, unknown tool or skill names, duplicate keys and
+\code{!expr} tags are errors. YAML guesses types, so quote strings such as
+\code{"yes"} or \code{"123"}. Files larger than 1 MiB are rejected.
 
-A definition describes a subagent. Permission modes and request limits
-remain bounded by its LeadAgent. Nested \code{sub_agents}, host credentials,
-runtime objects, and executable code are not part of this format.
+Files are written as UTF-8 with LF line endings. Rewriting a file drops its
+comments. Each file is written to a temporary file first and moved into
+place when complete. With \code{overwrite = FALSE}, the file system must support
+hard links; that is how an existing file is guaranteed never to be
+replaced.
+
+The format has no place for credentials, R code or nested subagents. A
+subagent's permission mode and request limit are still capped by its
+\link{LeadAgent}.
 }
 
 \examples{

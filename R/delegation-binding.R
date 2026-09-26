@@ -1,53 +1,55 @@
 #' @include value-properties.R
 NULL
 
-#' Bind host policy and resources to delegated agents
+#' Configure subagent tools, hooks and user input
 #'
-#' A host-only, read-only policy for [LeadAgent]. It is runtime configuration,
-#' not model input or portable session state. Callback environments remain
-#' owned by the host; fresh conversations do not isolate their state.
+#' Tells a [LeadAgent] how subagents get their tools, which lead hooks run for
+#' subagent events, and how subagents ask the user questions. Pass it as
+#' `LeadAgent$new(delegation_policy = )`. See `vignette("delegation")`.
 #'
-#' @param resource_mode `"shared"` borrows definition and skill tool closures
-#'   without closing them. `"exclusive"` borrows them while holding a process-local
-#'   lease on `resource_key`; overlapping delegations fail before dispatch.
-#'   `"owned"` uses `resources` to construct tools for each child. Definition
-#'   tools and tools in skills are prohibited in this mode.
-#' @param resource_key Required non-empty host identifier for exclusive resources.
-#'   Hosts sharing a resource across leads must use the same key. This is a
-#'   process-local concurrency guard, not a cross-process lock or access grant.
-#' @param resources For owned mode, `function(agent, definition, context)` returning
-#'   [DelegationResources]. The fresh child supplies public identity and workspace
-#'   APIs for constructing an [RSession] or [McpConnection]. Do not start a run or
-#'   mutate the child's policy, hooks or registry in the factory. Clean up partial
-#'   construction on error before returning. Named MCP selections in definitions
-#'   require this factory; delegation never opens a package-global MCP connection.
-#' @param human_input Optional `function(questions, context)` used to rebind an
-#'   explicitly selected local `ask_user` tool. It receives current Agent, session,
-#'   run, parent and delegation identifiers, plus host scope and run context.
-#'   It does not add a tool or approve an action. Without it, selecting `ask_user`
-#'   fails before dispatch; the process-global fallback is never used by children.
-#' @param observers Additional lead hook event names to forward live to children.
-#'   `PreToolUse`, `PostToolUse`, and `PostToolUseFailure` always apply. Other lead
-#'   observers are opt-in. `PermissionRequest` and delegation lifecycle events
-#'   cannot be forwarded. The child has its own registry; forwarding shares the
-#'   host callbacks explicitly, without cloning their captured resources.
+#' @param resource_mode How subagents get their tools. `"shared"` (the
+#'   default) uses the tool objects from the definition and its skills
+#'   directly, so any state they hold is shared between subagents.
+#'   `"exclusive"` does the same, but only one delegation at a time may hold
+#'   `resource_key`; an overlapping one fails before it starts. `"owned"`
+#'   calls `resources` to build new tools for each subagent, and the definition
+#'   and its skills may not have tools. Deputy never closes shared or
+#'   exclusive tools.
+#' @param resource_key Resource name for `"exclusive"` mode, required there
+#'   and not allowed otherwise. Leads sharing a resource must use the same
+#'   key. The lock works within one R process only.
+#' @param resources For `"owned"` mode, a `function(agent, definition, context)`
+#'   that builds tools for the new subagent `agent` (for example with an
+#'   [RSession] or [McpConnection]) and returns them, with a cleanup function,
+#'   as [DelegationResources]. Don't run or modify `agent`; Deputy registers
+#'   the tools itself. If the function fails, it should first clean up
+#'   anything it created. Definitions with `mcp_servers` need this mode.
+#' @param human_input Optional `function(questions, context)` that answers
+#'   `ask_user` questions from subagents whose definition includes that tool.
+#'   `context` holds the subagent's IDs, the lead's `delegation_scope` and the
+#'   run context. Return the answers or a promise of them; [AskUserDeferred()]
+#'   isn't supported. Without it, delegating to a definition with `ask_user`
+#'   fails. Subagents never use [set_ask_user_callback()].
+#' @param observers Extra hook events for which the lead's hooks also run when
+#'   a subagent fires them. The lead's `PreToolUse`, `PostToolUse` and
+#'   `PostToolUseFailure` hooks always do. `PermissionRequest`,
+#'   `SubagentStart` and `SubagentStop` can't be added.
 #' @details
-#' Children keep the lead's admission-time permission ceiling and recheck its
-#' current restrictions before each tool call. Definition restrictions also apply
-#' to factory, skill and MCP tools. Provider-native tools are rejected because
-#' Deputy cannot interpose on their execution. Workspaces and checkpoint journals
-#' are shared with the lead; this policy provides no OS sandbox.
+#' A subagent never has more permissions than the lead had when the
+#' delegation started, and each of its tool calls is also checked against the
+#' lead's current permissions. `disallowed_tools` also removes tools from
+#' skills and `resources`. Provider-native tools, such as a provider's
+#' built-in web search, aren't allowed because Deputy can't check their calls.
+#' Subagents share the lead's working directory and file checkpoints; this is
+#' not an OS sandbox.
 #'
-#' Child durable approval/continuation is not supported yet. A lead configured
-#' with `approval_dir` rejects delegation before resource construction or provider
-#' work. A permission callback returning [PermissionResultPending] in a child
-#' rejects the operation without executing it. Supplied text cannot grant approval.
-#' Use the existing [Agent] approval APIs for standalone approval workflows.
+#' Subagents can't pause for durable approval: a lead with `approval_dir`
+#' can't delegate, and a [PermissionResultPending] result for a subagent's
+#' tool call rejects the call. Use a standalone [Agent] for durable approvals.
 #'
-#' Stateless parallel responders receive governance but never invoke resource
-#' factories or acquire tools, interactive handlers, or exclusive leases.
-#' The initial [DelegationManifest] records the effective binding without callbacks.
-#' @return A read-only `DelegationPolicy` S7 object.
+#' Subagents started by `$parallel_delegate()` have no tools, so `resources`,
+#' `human_input` and `resource_key` don't apply to them.
+#' @return A `DelegationPolicy` object.
 #' @export
 DelegationPolicy <- S7::new_class(
   "DelegationPolicy",
@@ -106,15 +108,17 @@ DelegationPolicy <- S7::new_class(
   }
 )
 
-#' Return resources owned by one delegation
+#' Return tools from a resource factory
 #'
-#' @param tools List of ellmer function tools constructed for the supplied child.
-#' @param cleanup Zero-argument synchronous function releasing all constructed
-#'   resources. Deputy calls it once after settlement, cancellation, or subsequent
-#'   setup failure, including rejected tools. It must not resume or approve work.
-#'   Cleanup errors are retained separately in `list_subagents()$cleanup_error`.
-#'   Cancellation is cooperative; borrowed resources are never closed by Deputy.
-#' @return A read-only runtime `DelegationResources` value, not a portable receipt.
+#' The value returned by a [DelegationPolicy] `resources` function: the tools
+#' built for one subagent and a function that releases them.
+#'
+#' @param tools List of ellmer tools built for this subagent.
+#' @param cleanup A function with no arguments that releases what the factory
+#'   created. Deputy calls it once when the delegation ends, including after a
+#'   failure during setup such as a rejected tool. Errors are recorded in the
+#'   `cleanup_error` column of `$list_subagents()`.
+#' @return A `DelegationResources` object.
 #' @seealso [DelegationPolicy]
 #' @export
 DelegationResources <- S7::new_class(

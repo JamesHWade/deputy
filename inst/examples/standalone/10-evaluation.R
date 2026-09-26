@@ -1,5 +1,5 @@
 # A small external runner: replace these cases and the scoring rule with your
-# application's dataset. Deputy supplies governed results, not a scoring DSL.
+# application's dataset. Deputy supplies the run results, not a scoring framework.
 library(deputy)
 cases <- data.frame(
   id = c("addition", "capital"),
@@ -13,7 +13,7 @@ cases <- data.frame(
 rows <- lapply(seq_len(nrow(cases)), function(i) {
   agent <- Agent$new(
     ellmer::chat_openai(
-      model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-5.6-luna")
+      model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-6-luna")
     ),
     permissions = permissions_readonly(),
     usage_limits = UsageLimits(max_requests = 2),

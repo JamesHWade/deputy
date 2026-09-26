@@ -1,8 +1,8 @@
 ---
-title: "Example: Structured Data Extraction Pipeline"
+title: "Extraction pipeline"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Example: Structured Data Extraction Pipeline}
+  %\VignetteIndexEntry{Extraction pipeline}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -15,296 +15,228 @@ knitr::opts_chunk$set(
 )
 ```
 
-This example builds a pipeline that extracts structured metadata from an R
-package's source files. Each step is a separate agent call, with the output
-of one step feeding into the next.
+This recipe extracts metadata from an R package's source in three steps, each
+a separate agent run whose typed output feeds the next:
 
-Use separate steps when you need to inspect or validate an intermediate
-result before continuing. Here, you can review the extracted metadata before
-asking for categories and a report.
+1. Extract: read `DESCRIPTION` and `R/`, and return the package's metadata.
+2. Categorise: tag the package and summarise each exported function.
+3. Report: write a short summary for people.
 
-## The Pipeline
+Splitting the work lets you check each intermediate result before paying for
+the next step, and keeps each prompt small and specific. For open-ended
+exploration where the next step depends on what was found, see the [data
+analysis agent](example-data-analysis.html).
 
-Our pipeline has three steps:
+## Step 1: extract
 
-1. **Extract** -- Read package files and extract raw metadata as JSON
-2. **Enrich** -- Categorise and annotate the extracted metadata
-3. **Report** -- Produce a human-readable summary
+Describe the output with ellmer types. An array of objects comes back as a data
+frame:
 
-The first two steps use ellmer types for structured results. The final step
-returns a report as text.
-
-## Step 1: Extract Package Metadata
-
-The first agent reads the DESCRIPTION file and key R source files, then
-extracts structured information:
-
-```{r step1-schema}
+```{r step1-type}
 library(deputy)
 
-extract_schema <- list(
-  type = "object",
-  properties = list(
-    name = list(type = "string"),
-    title = list(type = "string"),
-    version = list(type = "string"),
-    authors = list(
-      type = "array",
-      items = list(
-        type = "object",
-        properties = list(
-          name = list(type = "string"),
-          role = list(type = "string")
-        ),
-        required = c("name", "role")
-      )
-    ),
-    dependencies = list(
-      type = "array",
-      items = list(type = "string")
-    ),
-    exported_functions = list(
-      type = "array",
-      items = list(
-        type = "object",
-        properties = list(
-          name = list(type = "string"),
-          file = list(type = "string")
-        ),
-        required = c("name")
-      )
+metadata_type <- ellmer::type_object(
+  name = ellmer::type_string(),
+  title = ellmer::type_string(),
+  version = ellmer::type_string(),
+  authors = ellmer::type_array(
+    ellmer::type_object(
+      name = ellmer::type_string(),
+      role = ellmer::type_string()
     )
   ),
-  required = c("name", "title", "version", "authors", "dependencies",
-    "exported_functions")
+  dependencies = ellmer::type_array(ellmer::type_string()),
+  exported_functions = ellmer::type_array(
+    ellmer::type_object(
+      name = ellmer::type_string(),
+      file = ellmer::type_string()
+    )
+  )
 )
 ```
 
-```{r step1-run}
-chat <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
+The extractor can read files but not change them:
 
+```{r step1-run}
 extractor <- Agent$new(
-  chat = chat,
-  tools = tools_file(),
+  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  tools = tools_preset("minimal"),
   permissions = permissions_readonly(),
-  system_prompt = "You are a metadata extractor. Read the package
-    DESCRIPTION file and scan R/ source files for exported functions
-    (look for @export roxygen tags). Return structured JSON only."
+  system_prompt = "You extract package metadata. Read DESCRIPTION, and find
+    exported functions by looking for @export tags in R/."
 )
 
 step1 <- extractor$run_sync(
-  "Extract metadata from this R package. Read DESCRIPTION and scan
-   the R/ directory for exported functions.",
-  type = ellmer::type_from_schema(jsonlite::toJSON(extract_schema, auto_unbox = TRUE))
+  "Extract the metadata of the R package in the working directory.",
+  type = metadata_type
 )
-
 if (!result_is_success(step1)) {
   cli::cli_abort("Extraction stopped early: {step1$stop_reason}.")
 }
 
-pkg_metadata <- step1$structured_output
-pkg_metadata$name
-pkg_metadata$version
-length(pkg_metadata$exported_functions)
+metadata <- step1$structured_output
+metadata$version
+metadata$exported_functions
 ```
 
-## Step 2: Enrich with Categorisation
+Before moving on, this is the place to check the extraction, for example that
+the version matches `DESCRIPTION` or that no exported function is missing.
 
-The second agent takes the extracted JSON and adds categorisation and
-summaries:
+## Step 2: categorise
 
-```{r step2-schema}
-enrich_schema <- list(
-  type = "object",
-  properties = list(
-    name = list(type = "string"),
-    title = list(type = "string"),
-    version = list(type = "string"),
-    category_tags = list(
-      type = "array",
-      items = list(
-        type = "string",
-        enum = c("data", "modeling", "visualization", "infrastructure",
-          "testing", "io", "web", "cli")
-      )
-    ),
-    complexity = list(
-      type = "string",
-      enum = c("simple", "moderate", "complex")
-    ),
-    functions = list(
-      type = "array",
-      items = list(
-        type = "object",
-        properties = list(
-          name = list(type = "string"),
-          summary = list(type = "string")
-        ),
-        required = c("name", "summary")
-      )
+The second agent gets the first step's output as JSON in its task, and may read
+source files to understand what each function does:
+
+```{r step2}
+summary_type <- ellmer::type_object(
+  categories = ellmer::type_array(
+    ellmer::type_enum(c(
+      "data", "modeling", "visualization", "infrastructure",
+      "testing", "io", "web", "cli"
+    ))
+  ),
+  complexity = ellmer::type_enum(c("simple", "moderate", "complex")),
+  functions = ellmer::type_array(
+    ellmer::type_object(
+      name = ellmer::type_string(),
+      summary = ellmer::type_string("One sentence on what the function does.")
     )
-  ),
-  required = c("name", "title", "version", "category_tags",
-    "complexity", "functions")
-)
-```
-
-```{r step2-run}
-chat2 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
-
-enricher <- Agent$new(
-  chat = chat2,
-  tools = tools_file(),
-  permissions = permissions_readonly(),
-  system_prompt = "You are a package analyst. Given package metadata,
-    categorise the package, assess its complexity, and write a one-line
-    summary of each exported function. You may read source files to
-    understand what functions do. Return structured JSON only."
-)
-
-# Pass the extracted metadata as context
-step2 <- enricher$run_sync(
-  paste(
-    "Enrich this package metadata with categorisation and function summaries.",
-    "Read the source files if needed to understand what functions do.",
-    "",
-    "Package metadata:",
-    jsonlite::toJSON(pkg_metadata, auto_unbox = TRUE, pretty = TRUE)
-  ),
-  type = ellmer::type_from_schema(jsonlite::toJSON(enrich_schema, auto_unbox = TRUE))
-)
-
-if (!result_is_success(step2)) {
-  cli::cli_abort("Enrichment stopped early: {step2$stop_reason}.")
-}
-enriched <- step2$structured_output
-enriched$category_tags
-enriched$complexity
-```
-
-## Step 3: Generate Report
-
-The third agent takes the enriched data and produces a readable report:
-
-```{r step3-run}
-chat3 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
-
-reporter <- Agent$new(
-  chat = chat3,
-  system_prompt = "You are a technical writer. Given enriched package
-    metadata, produce a clear, concise package summary report in
-    markdown format. Include sections for overview, key functions,
-    dependencies, and recommendations."
-)
-
-step3 <- reporter$run_sync(
-  paste(
-    "Write a package summary report from this enriched metadata:",
-    jsonlite::toJSON(enriched, auto_unbox = TRUE, pretty = TRUE)
   )
 )
+
+categoriser <- Agent$new(
+  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  tools = tools_preset("minimal"),
+  permissions = permissions_readonly(),
+  system_prompt = "You categorise R packages and summarise their functions.
+    Read source files when a function's name isn't enough."
+)
+
+step2 <- categoriser$run_sync(
+  paste(
+    "Categorise this package and summarise each exported function.",
+    jsonlite::toJSON(metadata, auto_unbox = TRUE, pretty = TRUE),
+    sep = "\n\n"
+  ),
+  type = summary_type
+)
+if (!result_is_success(step2)) {
+  cli::cli_abort("Categorisation stopped early: {step2$stop_reason}.")
+}
+
+summaries <- step2$structured_output
+summaries$complexity
+summaries$functions
+```
+
+## Step 3: report
+
+The last step needs no tools and returns text:
+
+```{r step3}
+reporter <- Agent$new(
+  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  system_prompt = "You write short, plain package summaries in Markdown, with
+    sections for overview, key functions and dependencies."
+)
+
+step3 <- reporter$run_sync(paste(
+  "Write a summary of this package.",
+  jsonlite::toJSON(
+    list(metadata = metadata, summaries = summaries),
+    auto_unbox = TRUE,
+    pretty = TRUE
+  ),
+  sep = "\n\n"
+))
 
 cat(step3$response)
 ```
 
-## Putting It Together
-
-Wrap the pipeline in a reusable function:
+## Put it in a function
 
 ```{r pipeline-function}
-extraction_pipeline <- function(package_dir = ".") {
-  # Step 1: Extract
-  chat1 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
-  extractor <- Agent$new(
-    chat = chat1,
-    tools = tools_file(),
-    permissions = permissions_readonly(),
-    working_dir = package_dir,
-    system_prompt = "Extract package metadata. Read DESCRIPTION and
-      scan R/ for exported functions. Return structured JSON only."
-  )
-
-  step1 <- extractor$run_sync(
-    "Extract metadata from this R package.",
-    type = ellmer::type_from_schema(jsonlite::toJSON(extract_schema, auto_unbox = TRUE))
-  )
-
-  if (!result_is_success(step1)) {
-    cli::cli_abort("Extraction stopped early: {step1$stop_reason}.")
+summarise_package <- function(package_dir = ".") {
+  run_step <- function(system_prompt, task, type = NULL, tools = list()) {
+    agent <- Agent$new(
+      chat = ellmer::chat("anthropic/claude-sonnet-5"),
+      tools = tools,
+      permissions = permissions_readonly(),
+      working_dir = package_dir,
+      system_prompt = system_prompt
+    )
+    result <- agent$run_sync(task, type = type)
+    if (!result_is_success(result)) {
+      cli::cli_abort("A step stopped early: {result$stop_reason}.")
+    }
+    result
   }
+  as_json <- function(x) jsonlite::toJSON(x, auto_unbox = TRUE)
 
-  # Step 2: Enrich
-  chat2 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
-  enricher <- Agent$new(
-    chat = chat2,
-    tools = tools_file(),
-    permissions = permissions_readonly(),
-    working_dir = package_dir,
-    system_prompt = "Categorise and summarise package functions.
-      Return structured JSON only."
+  step1 <- run_step(
+    "You extract package metadata from DESCRIPTION and R/.",
+    "Extract the metadata of the R package in the working directory.",
+    type = metadata_type,
+    tools = tools_preset("minimal")
+  )
+  step2 <- run_step(
+    "You categorise R packages and summarise their functions.",
+    paste("Categorise this package:", as_json(step1$structured_output)),
+    type = summary_type,
+    tools = tools_preset("minimal")
+  )
+  step3 <- run_step(
+    "You write short, plain package summaries in Markdown.",
+    paste(
+      "Summarise this package:",
+      as_json(list(step1$structured_output, step2$structured_output))
+    )
   )
 
-  step2 <- enricher$run_sync(
-    paste("Enrich this metadata:", jsonlite::toJSON(
-      step1$structured_output,
-      auto_unbox = TRUE
-    )),
-    type = ellmer::type_from_schema(jsonlite::toJSON(enrich_schema, auto_unbox = TRUE))
-  )
-
-  if (!result_is_success(step2)) {
-    cli::cli_abort("Enrichment stopped early: {step2$stop_reason}.")
-  }
-
-  # Step 3: Report
-  chat3 <- ellmer::chat_anthropic(model = "claude-sonnet-4-20250514")
-  reporter <- Agent$new(chat = chat3)
-
-  step3 <- reporter$run_sync(
-    paste("Write a package summary:", jsonlite::toJSON(
-      step2$structured_output,
-      auto_unbox = TRUE, pretty = TRUE
-    ))
-  )
-
-  costs <- c(step1$cost$total, step2$cost$total, step3$cost$total)
-
+  costs <- c(step1$usage$cost_usd, step2$usage$cost_usd, step3$usage$cost_usd)
   list(
     metadata = step1$structured_output,
-    enriched = step2$structured_output,
+    summaries = step2$structured_output,
     report = step3$response,
-    total_cost = if (anyNA(costs)) NA_real_ else sum(costs)
+    cost_usd = sum(costs)
   )
 }
 
-# Usage
-result <- extraction_pipeline(".")
-cat(result$report)
+pipeline <- summarise_package(".")
+cat(pipeline$report)
 ```
 
-## Error Handling Between Steps
+`sum()` returns `NA` if any step's cost is unknown, which is what you want: an
+incomplete total shouldn't pass for a real one.
 
-Check `is_success()` before passing a result to the next step. Use `validate`
-for application rules; invalid output or an unavailable validator signals an
-error, and bounded corrections are opt-in:
+## When a step fails
 
-```{r error-handling}
-step <- extractor$run_sync(
-  "Extract metadata.",
-  type = ellmer::type_from_schema(jsonlite::toJSON(extract_schema, auto_unbox = TRUE))
+A step can stop early because it hit a limit, or return a value that has the
+right shape but the wrong content. `result_is_success()` catches the first.
+For the second, pass a `validate` function, and optionally let the model
+correct itself with `max_corrections`:
+
+```{r validation}
+step1 <- extractor$run_sync(
+  "Extract the metadata of the R package in the working directory.",
+  type = metadata_type,
+  validate = function(x) {
+    if (nrow(x$exported_functions) > 0) {
+      TRUE
+    } else {
+      "No exported functions found. Look for @export tags in R/."
+    }
+  },
+  max_corrections = 1
 )
-
-if (!result_is_success(step)) {
-  cli::cli_abort("Agent stopped early: {step$stop_reason}")
-}
-
-# Safe to use the parsed output
-parsed <- step$structured_output
 ```
 
-## Next Steps
+[Structured output](structured-output.html) covers validation in detail.
 
-- `vignette("structured-output")` -- JSON schema output and validation
-- `vignette("permissions")` -- Permission presets and read-only mode
-- `vignette("example-code-review")` -- Multi-agent orchestration with
-  LeadAgent
+## Next steps
+
+- [Structured output](structured-output.html): types, validation and
+  corrections.
+- [Permissions and limits](permissions.html): read-only agents and budgets.
+- [Multi-agent code review](example-code-review.html): let a lead agent decide
+  which specialists to use.
