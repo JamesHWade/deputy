@@ -78,7 +78,7 @@ policy <- Permissions(
 | `install_packages` | package installation | `FALSE` |
 | `tool_allowlist` | if set, only these tools may run | `NULL` |
 | `tool_denylist` | these tools never run | `NULL` |
-| `can_use_tool` | a function that decides each call (see below) | `NULL` |
+| `can_use_tool` | a function that can deny or pause calls the rest of the policy allows (see below) | `NULL` |
 | `permission_prompt_tool_name` | a tool the model may always call to ask for approval | `NULL` |
 | `mode` | `"standard"`, `"readonly"`, `"plan"` or `"full"` | `"standard"` |
 
@@ -139,19 +139,14 @@ intercept their calls. To give an agent more permissions, create a new agent.
 
 ## Decide each call with a callback
 
-A `can_use_tool` function receives the tool name, its arguments and a context
-list, and returns `PermissionResultAllow()`, `PermissionResultDeny(reason)` or
+A `can_use_tool` function adds your own rules on top of a policy. Deputy
+calls it, in every mode, for each call the rest of the policy allows. It
+receives the tool name, its arguments and a context list, and returns
+`PermissionResultAllow()`, `PermissionResultDeny(reason)` or
 `PermissionResultPending(reason)`. Any other return value, or an error, denies
 the call.
 
-In `"standard"` mode the callback has the final say: when it allows a call,
-Deputy skips the capability checks. To add a rule on top of a policy rather
-than replace it, deny what you want to block and hand everything else to
-`permissions_check()` on a policy without the callback:
-
 ```{r}
-base <- Permissions(file_write = getwd())
-
 policy <- Permissions(
   file_write = getwd(),
   can_use_tool = function(tool_name, tool_input, context) {
@@ -159,16 +154,18 @@ policy <- Permissions(
     if (tool_name == "write_file" && grepl("^\\.env|secrets", path)) {
       return(PermissionResultDeny("Don't write to secret files."))
     }
-    permissions_check(base, tool_name, tool_input, context)
+    PermissionResultAllow()
   }
 )
 ```
 
-In `"readonly"` mode the callback can only deny calls that the mode would
-otherwise allow. `"plan"` and `"full"` modes don't call it. The context list
-includes the working directory, the tool's annotations and argument types, and
-the run's identifiers. A [PreToolUse hook](hooks.html) is often simpler when
-you only want to block a few calls.
+The callback can deny a call or pause it, but it can't allow a call the rest
+of the policy denies. The context list includes the working directory, the
+tool's annotations and argument types, and the run's identifiers. A
+[PreToolUse hook](hooks.html) is often simpler when you only want to block a
+few calls, and a
+[PermissionRequest hook](hooks.html#allow-a-denied-call) can allow a call the
+policy denies, for example after asking you.
 
 Tools that run on the provider's servers, such as Anthropic's web search,
 can't be checked per call. An agent whose policy has a callback refuses to

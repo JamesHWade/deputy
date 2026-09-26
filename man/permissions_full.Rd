@@ -12,8 +12,8 @@ A \link{Permissions} object.
 \description{
 Creates a \code{"full"} policy, which allows every tool call: writes anywhere
 your R session can write, R and shell code, web access and package
-installation. Capability flags, tool annotations and \code{can_use_tool} are not
-checked, though PreToolUse hooks still run and can deny a call. Use it only
+installation. Capability flags and tool annotations are not checked,
+though PreToolUse hooks still run and can deny a call. Use it only
 with a model and task you trust, ideally inside a container or other OS
 sandbox.
 }

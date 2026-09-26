@@ -1,5 +1,14 @@
 # deputy (development version)
 
+* A `can_use_tool` permission callback can no longer allow a call that the
+  rest of the policy denies. In standard mode its allow used to skip the
+  capability checks, so a callback that allowed everything it didn't block
+  let the model run R code with `r_code = FALSE` or write outside the
+  `file_write` directory. Plan and full modes ignored the callback. It is now
+  called in every mode, for each call the policy allows, and can deny the call
+  or pause it for approval. To allow a call the policy denies, use a
+  `PermissionRequest` hook.
+
 * `hook_log_tools()`, `hook_block_dangerous_bash()` and
   `hook_limit_file_writes()` now return `NULL` when they don't deny a call, so
   hooks added after them for the same event still run.

@@ -105,9 +105,33 @@ no_secrets <- HookMatcher(
 agent$add_hook(no_secrets)
 ```
 
-The model sees the reason and can try something else. Hooks can only take
-permissions away: a hook that returns `"allow"` doesn't override a denial from
-the policy.
+The model sees the reason and can try something else. A `PreToolUse` hook
+can only take permissions away: calls the policy denies never reach it.
+
+## Allow a denied call
+
+A `PermissionRequest` hook runs only when the policy denies a call, and can
+allow the call anyway. Use it to ask a person before running something the
+policy would refuse:
+
+```{r}
+ask_before_code <- HookMatcher(
+  event = "PermissionRequest",
+  pattern = "^run_r_code$",
+  callback = function(tool_name, tool_input, permission_result, context) {
+    cat(tool_input$code, sep = "\n")
+    if (isTRUE(utils::askYesNo("Run this R code?", default = FALSE))) {
+      return(PermissionResultAllow())
+    }
+    NULL
+  }
+)
+agent$add_hook(ask_before_code)
+```
+
+Returning `NULL` keeps the denial, and `PermissionResultDeny()` replaces its
+reason. An allowed call runs with your R session's access, so treat this hook
+as part of the permission policy.
 
 ## Stop a run from a hook
 

@@ -38,11 +38,11 @@ systems. \code{TRUE} or \code{FALSE}.}
 
 \item{can_use_tool}{Optional function \verb{(tool_name, tool_input, context)}
 that returns \code{\link[=PermissionResultAllow]{PermissionResultAllow()}}, \code{\link[=PermissionResultDeny]{PermissionResultDeny()}} or
-\code{\link[=PermissionResultPending]{PermissionResultPending()}}. Any other return value, including \code{NULL},
-denies the call with a warning, and so does an error. In standard mode
-its answer is final: an allow skips the capability checks above. In
-readonly mode it can only deny calls the mode would allow. Plan and full
-modes never call it.}
+\code{\link[=PermissionResultPending]{PermissionResultPending()}}. It is called, in every mode, for each call
+the rest of the policy allows, so it can deny a call or pause it for
+approval but can't allow a call the policy denies. Any other return
+value, including \code{NULL}, denies the call with a warning, and so does an
+error.}
 
 \item{tool_allowlist}{Character vector of allowed tool names, or \code{NULL}
 (the default) to allow any name. An empty vector denies all tools.}

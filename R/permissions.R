@@ -27,11 +27,11 @@ NULL
 #' @param install_packages Allow package installation. `TRUE` or `FALSE`.
 #' @param can_use_tool Optional function `(tool_name, tool_input, context)`
 #'   that returns [PermissionResultAllow()], [PermissionResultDeny()] or
-#'   [PermissionResultPending()]. Any other return value, including `NULL`,
-#'   denies the call with a warning, and so does an error. In standard mode
-#'   its answer is final: an allow skips the capability checks above. In
-#'   readonly mode it can only deny calls the mode would allow. Plan and full
-#'   modes never call it.
+#'   [PermissionResultPending()]. It is called, in every mode, for each call
+#'   the rest of the policy allows, so it can deny a call or pause it for
+#'   approval but can't allow a call the policy denies. Any other return
+#'   value, including `NULL`, denies the call with a warning, and so does an
+#'   error.
 #' @param tool_allowlist Character vector of allowed tool names, or `NULL`
 #'   (the default) to allow any name. An empty vector denies all tools.
 #' @param tool_denylist Character vector of denied tool names, or `NULL`.
@@ -176,8 +176,8 @@ local({
 #' Check a tool call against a permission policy
 #'
 #' Returns the policy's decision for one tool call. It calls the policy's
-#' `can_use_tool` callback when the mode uses one, but runs no hooks. Use it
-#' to test a policy.
+#' `can_use_tool` callback if the rest of the policy allows the call, but runs
+#' no hooks. Use it to test a policy.
 #'
 #' @param permissions A [Permissions] object.
 #' @param tool_name Name of the tool.
@@ -215,26 +215,6 @@ S7::method(permissions_check, Permissions) <- function(
     return(gating_result)
   }
 
-  # The internal result reader must remain vetoable even in modes that
-  # otherwise short-circuit custom callbacks. An allow result does not
-  # override the remaining mode and capability checks.
-  callback_checked <- FALSE
-  if (isTRUE(allowlist_exempt)) {
-    callback_result <- permission_check_callback(
-      permissions,
-      tool_name,
-      tool_input,
-      context
-    )
-    callback_checked <- TRUE
-    if (
-      !is.null(callback_result) &&
-        !S7::S7_inherits(callback_result, PermissionResultAllow)
-    ) {
-      return(callback_result)
-    }
-  }
-
   # Allow the configured prompt tool so gated workflows can request
   # explicit human approval, provided it passed explicit tool gating.
   if (
@@ -244,7 +224,30 @@ S7::method(permissions_check, Permissions) <- function(
     return(PermissionResultAllow())
   }
 
-  # Mode-based shortcuts
+  mode_result <- permission_check_mode(
+    permissions,
+    tool_name,
+    tool_input,
+    context,
+    allowlist_exempt = allowlist_exempt
+  )
+  if (!S7::S7_inherits(mode_result, PermissionResultAllow)) {
+    return(mode_result)
+  }
+
+  # The callback refines what the mode and capabilities allow: it can deny
+  # a call or pause it for approval, but never allow a call they deny.
+  permission_apply_callback_veto(permissions, tool_name, tool_input, context)
+}
+
+# Mode and capability checks, without the custom callback.
+permission_check_mode <- function(
+  permissions,
+  tool_name,
+  tool_input,
+  context,
+  allowlist_exempt = FALSE
+) {
   if (permissions@mode == "full") {
     return(PermissionResultAllow())
   }
@@ -279,118 +282,98 @@ S7::method(permissions_check, Permissions) <- function(
   }
 
   if (permissions@mode == "readonly") {
-    tool_id <- normalize_native_tool_id(tool_name)
-    explicitly_allowed <- permission_tool_name_in_list(
+    return(permission_check_readonly_mode(
+      permissions,
       tool_name,
-      permissions@tool_allowlist
-    ) ||
-      isTRUE(allowlist_exempt)
-
-    # Native mutating tools remain denied even if their annotations are
-    # incorrect. MCP tools are classified by metadata, not remote names.
-    if (!is_mcp_tool_context(context) && permission_is_write_tool(tool_name)) {
-      return(PermissionResultDeny(
-        reason = "Permission denied: readonly mode active"
-      ))
-    }
-    if (isTRUE(annotations$destructive_hint)) {
-      return(PermissionResultDeny(
-        reason = paste0(
-          "Permission denied: tool is destructive and readonly mode ",
-          "is active"
-        )
-      ))
-    }
-    if (isTRUE(annotations$open_world_hint) && !isTRUE(permissions@web)) {
-      return(PermissionResultDeny(
-        reason = paste0(
-          "Permission denied: tool can access external resources and ",
-          "web access is disabled"
-        )
-      ))
-    }
-
-    if (
-      !is_mcp_tool_context(context) &&
-        is_permission_file_read_tool(tool_name)
-    ) {
-      if (!isTRUE(permissions@file_read)) {
-        return(PermissionResultDeny(
-          reason = "File reading is not allowed"
-        ))
-      }
-      return(permission_apply_callback_veto(
-        permissions,
-        tool_name,
-        tool_input,
-        context
-      ))
-    }
-
-    if (
-      !is_mcp_tool_context(context) &&
-        tool_id %in% c("web_search", "web_fetch")
-    ) {
-      if (!isTRUE(permissions@web)) {
-        return(PermissionResultDeny(
-          reason = "Web access is not allowed in readonly mode"
-        ))
-      }
-      return(permission_apply_callback_veto(
-        permissions,
-        tool_name,
-        tool_input,
-        context
-      ))
-    }
-    if (isTRUE(explicitly_allowed)) {
-      if (isTRUE(callback_checked)) {
-        return(PermissionResultAllow())
-      }
-      return(permission_apply_callback_veto(
-        permissions,
-        tool_name,
-        tool_input,
-        context
-      ))
-    }
-    return(PermissionResultDeny(
-      reason = paste0(
-        "Permission denied: readonly mode requires a known read tool ",
-        "or an explicit tool allowlist entry"
-      )
+      annotations,
+      context,
+      allowlist_exempt = allowlist_exempt
     ))
   }
 
   if (permissions@mode == "plan") {
-    plan_result <- permission_check_plan_mode(
+    return(permission_check_plan_mode(
       permissions,
       tool_name,
       tool_input,
       context
-    )
-    if (!is.null(plan_result)) {
-      return(plan_result)
-    }
-  }
-
-  # Custom callback takes precedence in standard mode.
-  callback_result <- if (isTRUE(callback_checked)) {
-    NULL
-  } else {
-    permission_check_callback(
-      permissions,
-      tool_name,
-      tool_input,
-      context
-    )
-  }
-  if (!is.null(callback_result)) {
-    return(callback_result)
+    ))
   }
 
   # Tool-specific checks (with annotation awareness)
   permission_check_tool_specific(permissions, tool_name, tool_input, context)
+}
+
+permission_check_readonly_mode <- function(
+  permissions,
+  tool_name,
+  annotations,
+  context,
+  allowlist_exempt = FALSE
+) {
+  tool_id <- normalize_native_tool_id(tool_name)
+  explicitly_allowed <- permission_tool_name_in_list(
+    tool_name,
+    permissions@tool_allowlist
+  ) ||
+    isTRUE(allowlist_exempt)
+
+  # Native mutating tools remain denied even if their annotations are
+  # incorrect. MCP tools are classified by metadata, not remote names.
+  if (!is_mcp_tool_context(context) && permission_is_write_tool(tool_name)) {
+    return(PermissionResultDeny(
+      reason = "Permission denied: readonly mode active"
+    ))
+  }
+  if (isTRUE(annotations$destructive_hint)) {
+    return(PermissionResultDeny(
+      reason = paste0(
+        "Permission denied: tool is destructive and readonly mode ",
+        "is active"
+      )
+    ))
+  }
+  if (isTRUE(annotations$open_world_hint) && !isTRUE(permissions@web)) {
+    return(PermissionResultDeny(
+      reason = paste0(
+        "Permission denied: tool can access external resources and ",
+        "web access is disabled"
+      )
+    ))
+  }
+
+  if (
+    !is_mcp_tool_context(context) &&
+      is_permission_file_read_tool(tool_name)
+  ) {
+    if (!isTRUE(permissions@file_read)) {
+      return(PermissionResultDeny(
+        reason = "File reading is not allowed"
+      ))
+    }
+    return(PermissionResultAllow())
+  }
+
+  if (
+    !is_mcp_tool_context(context) &&
+      tool_id %in% c("web_search", "web_fetch")
+  ) {
+    if (!isTRUE(permissions@web)) {
+      return(PermissionResultDeny(
+        reason = "Web access is not allowed in readonly mode"
+      ))
+    }
+    return(PermissionResultAllow())
+  }
+  if (isTRUE(explicitly_allowed)) {
+    return(PermissionResultAllow())
+  }
+  PermissionResultDeny(
+    reason = paste0(
+      "Permission denied: readonly mode requires a known read tool ",
+      "or an explicit tool allowlist entry"
+    )
+  )
 }
 
 S7::method(print, Permissions) <- function(x, ...) {
@@ -522,8 +505,8 @@ permissions_plan <- function(
 #' @description
 #' Creates a `"full"` policy, which allows every tool call: writes anywhere
 #' your R session can write, R and shell code, web access and package
-#' installation. Capability flags, tool annotations and `can_use_tool` are not
-#' checked, though PreToolUse hooks still run and can deny a call. Use it only
+#' installation. Capability flags and tool annotations are not checked,
+#' though PreToolUse hooks still run and can deny a call. Use it only
 #' with a model and task you trust, ideally inside a container or other OS
 #' sandbox.
 #'

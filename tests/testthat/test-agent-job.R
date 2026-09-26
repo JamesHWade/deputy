@@ -822,7 +822,12 @@ test_that("job_create rejects an Agent with an outstanding approval", {
       name = "effect",
       description = "Record an observable effect",
       arguments = list(value = ellmer::type_string()),
-      convert = FALSE
+      convert = FALSE,
+      annotations = ellmer::tool_annotations(
+        read_only_hint = FALSE,
+        destructive_hint = FALSE,
+        open_world_hint = FALSE
+      )
     )),
     permissions = Permissions(can_use_tool = function(...) {
       PermissionResultPending("Review this operation")

@@ -9,24 +9,24 @@ PermissionMode
 \description{
 \code{PermissionMode} lists the modes a \link{Permissions} policy can use. In every
 mode, \code{tool_denylist} and \code{tool_allowlist} are checked first, and the
-approval prompt tool (\code{permission_prompt_tool_name}) is then allowed.
+approval prompt tool (\code{permission_prompt_tool_name}) is then allowed
+without further checks.
 \itemize{
 \item \code{"standard"}: checks built-in tools against the capability flags
 (\code{file_read}, \code{file_write}, \code{bash}, \code{r_code}, \code{web}, \code{install_packages})
-and custom tools against their annotations. If the policy has a
-\code{can_use_tool} callback, its answer is final and these checks are
-skipped.
+and custom tools against their annotations.
 \item \code{"readonly"}: allows the built-in file-reading tools, the web tools when
 \code{web = TRUE}, and tools on \code{tool_allowlist}. It denies writes, code
 execution, destructive tools and, unless \code{web = TRUE}, open-world tools.
-\code{can_use_tool} can deny calls this mode would allow, but can't allow
-others.
 \item \code{"plan"}: allows only tools annotated as read-only, plus the approval
-prompt tool. Open-world tools also need \code{web = TRUE}. \code{can_use_tool} is
-not called.
+prompt tool. Open-world tools also need \code{web = TRUE}.
 \item \code{"full"}: allows every call. Capability flags and annotations are not
-checked, and \code{can_use_tool} is not called.
+checked.
 }
+
+If the policy has a \code{can_use_tool} callback, it is called in every mode for
+each call the rest of the policy allows. It can deny the call or pause it
+for approval, but it can't allow a call the policy denies.
 
 A denied call can still be allowed by a PermissionRequest hook (see
 \link{HookEvent}).

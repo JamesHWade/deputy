@@ -23,8 +23,8 @@ A \link{PermissionResultAllow}, \link{PermissionResultDeny}, or
 }
 \description{
 Returns the policy's decision for one tool call. It calls the policy's
-\code{can_use_tool} callback when the mode uses one, but runs no hooks. Use it
-to test a policy.
+\code{can_use_tool} callback if the rest of the policy allows the call, but runs
+no hooks. Use it to test a policy.
 }
 \examples{
 permissions_check(permissions_readonly(), "read_file", list(path = "x.txt"))
