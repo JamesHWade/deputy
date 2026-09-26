@@ -474,6 +474,12 @@ Permissions configured at construction are an immutable authority ceiling.
 `Agent$set_permission_mode()` may keep or narrow a policy but cannot widen it;
 delegated agents are bounded by the same rule and by their lead's restrictions.
 
+`can_use_tool` runs in every mode, after gating and mode/capability checks,
+and only for calls those allow: it can deny or suspend, never widen.
+PermissionRequest hooks are the explicit override for denied calls. Readonly
+and plan modes admit the native `delegate_to_agent` tool because children
+cannot use a less strict mode. See ADR-0031.
+
 ### AgentDefinition Routing
 
 `agent_definition()` canonicalizes names to lowercase routing keys. A

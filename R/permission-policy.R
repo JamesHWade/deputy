@@ -12,12 +12,17 @@
 #'   (`file_read`, `file_write`, `bash`, `r_code`, `web`, `install_packages`)
 #'   and custom tools against their annotations.
 #' * `"readonly"`: allows the built-in file-reading tools, the web tools when
-#'   `web = TRUE`, and tools on `tool_allowlist`. It denies writes, code
-#'   execution, destructive tools and, unless `web = TRUE`, open-world tools.
+#'   `web = TRUE`, `delegate_to_agent` and tools on `tool_allowlist`. It
+#'   denies writes, code execution, destructive tools and, unless
+#'   `web = TRUE`, open-world tools.
 #' * `"plan"`: allows only tools annotated as read-only, plus the approval
-#'   prompt tool. Open-world tools also need `web = TRUE`.
+#'   prompt tool and `delegate_to_agent`. Open-world tools also need
+#'   `web = TRUE`.
 #' * `"full"`: allows every call. Capability flags and annotations are not
 #'   checked.
+#'
+#' A [LeadAgent]'s subagents can't use a less strict mode than their lead,
+#' and each of their tool calls is also checked against the lead's policy.
 #'
 #' If the policy has a `can_use_tool` callback, it is called in every mode for
 #' each call the rest of the policy allows. It can deny the call or pause it

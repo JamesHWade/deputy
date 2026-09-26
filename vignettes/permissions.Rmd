@@ -114,7 +114,10 @@ The `mode` argument changes how the capabilities are applied:
 | `"full"` | every call |
 
 In every mode, `tool_denylist` and `tool_allowlist` are checked first, and the
-tool named by `permission_prompt_tool_name` is always allowed.
+tool named by `permission_prompt_tool_name` is always allowed. Read-only and
+plan modes also allow a lead agent to delegate: its
+[subagents](multi-agent.html#permissions-and-budgets) can't use a less strict
+mode than the lead.
 
 ## Narrow an agent's permissions
 

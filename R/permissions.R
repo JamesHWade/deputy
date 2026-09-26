@@ -365,6 +365,14 @@ permission_check_readonly_mode <- function(
     }
     return(PermissionResultAllow())
   }
+  # Subagents inherit this mode and every subagent tool call is rechecked
+  # against the lead's policy, so delegating can't widen what runs.
+  if (
+    !is_mcp_tool_context(context) &&
+      identical(tool_id, "delegate_to_agent")
+  ) {
+    return(PermissionResultAllow())
+  }
   if (isTRUE(explicitly_allowed)) {
     return(PermissionResultAllow())
   }
@@ -415,9 +423,9 @@ S7::method(print, Permissions) <- function(x, ...) {
 #'
 #' @description
 #' Creates a `"readonly"` policy. The agent can use the built-in file-reading
-#' tools such as `read_file`, `list_files` and `grep_files`. Writes, code
-#' execution, web access, delegation to subagents and custom tools are
-#' denied.
+#' tools such as `read_file`, `list_files` and `grep_files`, and a
+#' [LeadAgent] can delegate to subagents, which are read-only too. Writes,
+#' code execution, web access and custom tools are denied.
 #'
 #' @return A [Permissions] object.
 #'
@@ -473,8 +481,9 @@ permissions_standard <- function(working_dir = getwd()) {
 #' @description
 #' Creates a `"plan"` policy, for letting the model look around and propose a
 #' plan before it changes anything. Only tools annotated as read-only are
-#' allowed, plus the approval prompt tool. Web access is on, so read-only web
-#' tools such as `web_fetch` work. Writes and code execution are denied.
+#' allowed, plus the approval prompt tool and delegation to subagents, which
+#' can't use a less strict mode. Web access is on, so read-only web tools such
+#' as `web_fetch` work. Writes and code execution are denied.
 #'
 #' @param permission_prompt_tool_name Name of the tool the model can call to
 #'   ask for approval, `"ask_user"` by default. `NULL` means none. Built-in

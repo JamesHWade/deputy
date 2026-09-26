@@ -383,3 +383,70 @@ test_that("delegated S7 policies preserve ceilings after serialization", {
   expect_snapshot(error = TRUE, child$permissions <- permissions_full())
   expect_snapshot(error = TRUE, child$set_permission_mode("full"))
 })
+
+test_that("read-only and plan policies allow delegate_to_agent", {
+  annotations <- list(
+    read_only_hint = FALSE,
+    open_world_hint = FALSE,
+    idempotent_hint = FALSE,
+    destructive_hint = FALSE
+  )
+  context <- list(tool_annotations = annotations)
+  input <- list(agent_name = "reviewer", task = "Review it")
+  for (policy in list(
+    permissions_readonly(),
+    permissions_plan(),
+    Permissions(mode = "plan", web = FALSE, file_write = FALSE)
+  )) {
+    decision <- permissions_check(policy, "delegate_to_agent", input, context)
+    expect_s7_class(decision, PermissionResultAllow)
+  }
+
+  # An MCP tool doesn't gain the delegation exception from its name.
+  mcp <- c(context, list(tool_metadata = list(source = list(type = "mcp"))))
+  expect_s7_class(
+    permissions_check(permissions_readonly(), "delegate_to_agent", input, mcp),
+    PermissionResultDeny
+  )
+
+  # A callback can still deny the delegation.
+  vetoed <- Permissions(
+    mode = "readonly",
+    file_write = FALSE,
+    can_use_tool = function(...) PermissionResultDeny("No delegation")
+  )
+  expect_identical(
+    permissions_check(vetoed, "delegate_to_agent", input, context)$reason,
+    "No delegation"
+  )
+})
+
+test_that("a read-only lead delegates to a read-only subagent", {
+  for (mode in c("readonly", "plan")) {
+    server <- local_runtime_server(list(
+      runtime_reply(
+        tool = "delegate_to_agent",
+        arguments = list(agent_name = "reviewer", task = "Review it")
+      ),
+      runtime_reply("Looks fine."),
+      runtime_reply("The reviewer found no problems.")
+    ))
+    lead <- LeadAgent$new(
+      ellmer::chat_openai_compatible(
+        base_url = server$url,
+        credentials = function() "fixture",
+        model = "gpt-4o-mini",
+        echo = "none"
+      ),
+      sub_agents = list(agent_definition("reviewer", "Reviews", "Review.")),
+      permissions = Permissions(mode = mode, file_write = FALSE)
+    )
+
+    result <- lead$run_sync("Delegate the review")
+
+    expect_identical(result$stop_reason, "complete", info = mode)
+    runs <- lead$list_subagents()
+    expect_identical(runs$status, "completed", info = mode)
+    expect_length(server$requests(), 3L)
+  }
+})

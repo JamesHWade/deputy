@@ -17,8 +17,9 @@ A \link{Permissions} object.
 \description{
 Creates a \code{"plan"} policy, for letting the model look around and propose a
 plan before it changes anything. Only tools annotated as read-only are
-allowed, plus the approval prompt tool. Web access is on, so read-only web
-tools such as \code{web_fetch} work. Writes and code execution are denied.
+allowed, plus the approval prompt tool and delegation to subagents, which
+can't use a less strict mode. Web access is on, so read-only web tools such
+as \code{web_fetch} work. Writes and code execution are denied.
 }
 \examples{
 perms <- permissions_plan()

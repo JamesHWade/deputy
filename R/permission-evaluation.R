@@ -432,6 +432,15 @@ permission_check_plan_mode <- function(
     ))
   }
 
+  # Subagents inherit plan or read-only mode and every subagent tool call is
+  # rechecked against the lead's policy, so delegating can't widen what runs.
+  if (
+    !is_mcp_tool_context(context) &&
+      identical(normalize_native_tool_id(tool_name), "delegate_to_agent")
+  ) {
+    return(PermissionResultAllow())
+  }
+
   if (!isTRUE(annotations$read_only_hint)) {
     return(PermissionResultDeny(
       reason = paste0(

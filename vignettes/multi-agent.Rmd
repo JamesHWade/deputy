@@ -136,11 +136,9 @@ write directory, allow and deny lists, and callback, and adds the definition's
 | `"plan"` | `"plan"`, `"readonly"` |
 | `"full"` | any mode |
 
-The lead's model also needs permission to call `delegate_to_agent`. Read-only
-and plan modes allow only reading tools, so the model of a lead in those modes
-can't delegate. To stop a lead and its subagents from changing files, give the
-lead `Permissions(file_write = FALSE)` and the subagents
-`permission_mode = "readonly"`.
+A lead in read-only or plan mode can still delegate, because its subagents
+can't use a less strict mode. A lead created with `permissions_readonly()` and
+all its subagents can read files but can't write them or run code.
 
 The lead's `PreToolUse`, `PostToolUse` and `PostToolUseFailure` hooks also run
 for subagent tool calls, and each subagent call is checked against the lead's

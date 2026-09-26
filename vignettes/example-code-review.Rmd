@@ -81,7 +81,7 @@ lead <- LeadAgent$new(
     specific task, then merge their findings: remove duplicates, sort by
     severity (critical, warning, suggestion), and give a file path and a
     concrete fix for each finding.",
-  permissions = Permissions(file_write = FALSE),
+  permissions = permissions_readonly(),
   usage_limits = UsageLimits(max_requests = 20)
 )
 
@@ -89,10 +89,9 @@ lead$available_sub_agents()
 #> [1] "bug_hunter"     "style_reviewer" "doc_checker"
 ```
 
-The lead may delegate but not write files, and the reviewers run in read-only
-mode, so nobody changes a file. The lead can't use `permissions_readonly()`
-itself: read-only mode allows only reading tools, so it would deny the lead's
-own `delegate_to_agent` calls.
+The lead and the reviewers all run in read-only mode, so nobody changes a
+file. Read-only mode still lets the lead delegate, because its subagents can't
+use a less strict mode than the lead.
 
 To follow along while it runs, log each reviewer as it finishes, and each tool
 call:

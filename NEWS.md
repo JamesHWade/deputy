@@ -9,6 +9,10 @@
   or pause it for approval. To allow a call the policy denies, use a
   `PermissionRequest` hook.
 
+* Read-only and plan policies now allow `delegate_to_agent`, so a lead created
+  with `permissions_readonly()` or `permissions_plan()` can delegate. Its
+  subagents still can't use a less strict mode than the lead.
+
 * `hook_log_tools()`, `hook_block_dangerous_bash()` and
   `hook_limit_file_writes()` now return `NULL` when they don't deny a call, so
   hooks added after them for the same event still run.

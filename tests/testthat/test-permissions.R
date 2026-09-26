@@ -295,16 +295,9 @@ test_that("readonly still enforces capability fields before annotations", {
     list(),
     read_only_web
   )
-  delegation <- permissions_check(
-    permissions,
-    "delegate_to_agent",
-    list(),
-    list(tool_annotations = list(read_only_hint = FALSE))
-  )
 
   expect_s7_class(web, PermissionResultDeny)
   expect_s7_class(unknown_web, PermissionResultDeny)
-  expect_s7_class(delegation, PermissionResultDeny)
   expect_s7_class(
     permissions_check(
       permissions,
