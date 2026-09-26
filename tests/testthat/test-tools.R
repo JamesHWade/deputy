@@ -630,6 +630,45 @@ test_that("edit tools leave mixed line endings outside the edit unchanged", {
   expect_identical(edit_test_bytes(path), "alpha\r\ndelta\ngamma\r\n")
 })
 
+test_that("edit_file matches LF edits across CRLF lines in a mixed file", {
+  path <- edit_test_file("alpha\r\nbeta\ngamma\r\n")
+
+  # The replacement's new line takes the edited line's CRLF ending.
+  tool_edit_file(path, "alpha\nbeta", "one\ntwo")
+
+  expect_identical(edit_test_bytes(path), "one\r\ntwo\ngamma\r\n")
+})
+
+test_that("edit_file handles edits that start at a CRLF line break", {
+  path <- edit_test_file("alpha\r\nbeta\r\n")
+
+  tool_edit_file(path, "\nbeta", "\ngamma")
+
+  expect_identical(edit_test_bytes(path), "alpha\r\ngamma\r\n")
+})
+
+test_that("edit_file replaces every CRLF-file match with replace_all", {
+  path <- edit_test_file("x = 1\r\nx = 2\r\n")
+
+  result <- tool_edit_file(path, "x", "y", replace_all = TRUE)
+
+  expect_match(result, "2 replacements", fixed = TRUE)
+  expect_identical(edit_test_bytes(path), "y = 1\r\ny = 2\r\n")
+})
+
+test_that("edit_file keeps non-UTF-8 bytes outside the edit", {
+  path <- withr::local_tempfile(fileext = ".txt")
+  latin1 <- c(charToRaw("caf"), as.raw(0xe9), charToRaw("\nold\n"))
+  writeBin(latin1, path)
+
+  tool_edit_file(path, "old", "new")
+
+  expect_identical(
+    readBin(path, "raw", n = 100L),
+    c(charToRaw("caf"), as.raw(0xe9), charToRaw("\nnew\n"))
+  )
+})
+
 test_that("tools_preset returns correct tools for data", {
   tools <- tools_preset("data")
   expect_type(tools, "list")

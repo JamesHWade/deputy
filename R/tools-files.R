@@ -1,64 +1,78 @@
 # Native filesystem tools for deputy agents
 
-# Count fixed-string matches in text.
-count_fixed_matches <- function(text, pattern) {
-  matches <- gregexpr(pattern, text, fixed = TRUE)[[1]]
-  if (length(matches) == 1 && identical(matches[[1]], -1L)) {
-    return(0L)
-  }
-  length(matches)
-}
-
-# Edit tools change only the replaced text. The file's other bytes, its line
-# endings and whether it ends with a newline, are kept. When every newline is
-# CRLF, text is matched with LF so edits written with "\n" still apply.
-read_edit_text <- function(path) {
-  text <- rawToChar(readBin(path, "raw", n = file.size(path)))
-  Encoding(text) <- "UTF-8"
-  newlines <- count_fixed_matches(text, "\n")
-  crlf <- newlines > 0L && count_fixed_matches(text, "\r\n") == newlines
-  if (crlf) {
-    text <- gsub("\r\n", "\n", text, fixed = TRUE)
-  }
-  list(text = text, crlf = crlf)
-}
-
-write_edit_text <- function(path, text, crlf) {
-  if (crlf) {
-    text <- gsub("\r\n", "\n", text, fixed = TRUE)
-    text <- gsub("\n", "\r\n", text, fixed = TRUE)
-  }
-  writeBin(charToRaw(text), path)
-}
-
-# Apply a fixed-string replacement with safety checks for edit tools.
-replace_fixed_text <- function(text, old_text, new_text, replace_all = FALSE) {
+# Edit tools replace exact text in a file's bytes and leave every other byte,
+# line ending and the final newline unchanged. Matching uses a view in which
+# each CRLF reads as LF, as readLines() and read_file present lines, and each
+# match is mapped back to the original bytes. Bytes are compared directly, so
+# files in any encoding keep their content.
+replace_fixed_bytes <- function(
+  bytes,
+  old_text,
+  new_text,
+  replace_all = FALSE
+) {
   if (!nzchar(old_text)) {
     cli_abort("{.arg old_text} must not be empty.")
   }
-
-  occurrences <- count_fixed_matches(text, old_text)
-  if (occurrences == 0L) {
+  lf <- as.raw(10L)
+  cr <- as.raw(13L)
+  n <- length(bytes)
+  # CR bytes that begin a CRLF pair are hidden from the matching view.
+  pair_cr <- bytes == cr & c(bytes[-1L] == lf, FALSE)
+  keep <- which(!pair_cr)
+  view <- rawToChar(bytes[keep])
+  pattern <- charToRaw(lf_newlines(old_text))
+  starts <- gregexpr(rawToChar(pattern), view, fixed = TRUE, useBytes = TRUE)[[
+    1L
+  ]]
+  if (identical(starts[[1L]], -1L)) {
     cli_abort("{.arg old_text} was not found in the file.")
   }
-
-  if (!isTRUE(replace_all) && occurrences > 1L) {
+  if (!isTRUE(replace_all) && length(starts) > 1L) {
     cli_abort(c(
-      "{.arg old_text} matched {occurrences} locations.",
+      "{.arg old_text} matched {length(starts)} locations.",
       "i" = "Set {.code replace_all = TRUE} to replace all of them."
     ))
   }
-
-  updated <- if (isTRUE(replace_all)) {
-    gsub(old_text, new_text, text, fixed = TRUE)
-  } else {
-    sub(old_text, new_text, text, fixed = TRUE)
+  if (!isTRUE(replace_all)) {
+    starts <- starts[1L]
   }
 
-  list(
-    text = updated,
-    replacements = if (isTRUE(replace_all)) occurrences else 1L
-  )
+  newlines <- which(bytes == lf)
+  ends_crlf <- function(i) i > 1L & pair_cr[pmax(i - 1L, 1L)]
+  pieces <- list()
+  cursor <- 1L
+  for (s in starts) {
+    from <- keep[[s]]
+    to <- keep[[s + length(pattern) - 1L]]
+    if (bytes[[from]] == lf && from > 1L && pair_cr[[from - 1L]]) {
+      from <- from - 1L
+    }
+    # New lines take the ending of the line being edited.
+    following <- newlines[newlines >= from][1L]
+    crlf <- if (is.na(following)) {
+      length(newlines) > 0L && all(ends_crlf(newlines))
+    } else {
+      ends_crlf(following)
+    }
+    replacement <- lf_newlines(new_text)
+    if (crlf) {
+      replacement <- gsub("\n", "\r\n", replacement, fixed = TRUE)
+    }
+    if (from > cursor) {
+      pieces[[length(pieces) + 1L]] <- bytes[cursor:(from - 1L)]
+    }
+    pieces[[length(pieces) + 1L]] <- charToRaw(replacement)
+    cursor <- to + 1L
+  }
+  if (cursor <= n) {
+    pieces[[length(pieces) + 1L]] <- bytes[cursor:n]
+  }
+  list(bytes = do.call(c, pieces), replacements = length(starts))
+}
+
+lf_newlines <- function(text) {
+  gsub("\r\n", "\n", enc2utf8(text), fixed = TRUE)
 }
 
 # Parse multi-edit operations from a list or JSON string.
@@ -331,14 +345,13 @@ tool_edit_file <- ellmer::tool(
 
     tryCatch(
       {
-        original <- read_edit_text(path)
-        updated <- replace_fixed_text(
-          original$text,
+        updated <- replace_fixed_bytes(
+          readBin(path, "raw", n = file.size(path)),
           old_text = old_text,
           new_text = new_text,
           replace_all = replace_all
         )
-        write_edit_text(path, updated$text, original$crlf)
+        writeBin(updated$bytes, path)
 
         paste(
           "Successfully edited",
@@ -403,22 +416,21 @@ tool_multi_edit <- ellmer::tool(
     tryCatch(
       {
         operations <- parse_multi_edits(edits)
-        original <- read_edit_text(path)
-        text <- original$text
+        bytes <- readBin(path, "raw", n = file.size(path))
         total_replacements <- 0L
 
         for (edit in operations) {
-          result <- replace_fixed_text(
-            text,
+          result <- replace_fixed_bytes(
+            bytes,
             old_text = edit$old_text,
             new_text = edit$new_text,
             replace_all = edit$replace_all
           )
-          text <- result$text
+          bytes <- result$bytes
           total_replacements <- total_replacements + result$replacements
         }
 
-        write_edit_text(path, text, original$crlf)
+        writeBin(bytes, path)
 
         paste(
           "Successfully applied",
