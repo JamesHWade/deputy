@@ -2,6 +2,31 @@
 
 ## deputy (development version)
 
+- Native tool names no longer grant native permission treatment to other
+  tools ([\#216](https://github.com/JamesHWade/deputy/issues/216)). A
+  host, skill or package tool named `read_file`, `ask_user`, `web_fetch`
+  or any other native name (including variants such as `"Read-File"`) is
+  now checked like any other custom tool: missing annotations take the
+  conservative defaults, readonly mode does not treat it as a known
+  read, and plan mode’s prompt-tool shortcut applies only to Deputy’s
+  own `ask_user`. The name’s restrictions, such as readonly’s denial of
+  write tools and write-path limits, still apply. A host-chosen prompt
+  tool name keeps its shortcut, and direct
+  [`permissions_check()`](https://jameshwade.github.io/deputy/reference/permissions_check.md)
+  calls, including ones built from
+  [`tool_metadata()`](https://jameshwade.github.io/deputy/reference/tool_metadata.md),
+  keep name-based classification.
+
+- `edit_file` and `multi_edit` now change only the replaced text. They
+  previously rewrote the whole file through
+  [`readLines()`](https://rdrr.io/r/base/readLines.html)/[`writeLines()`](https://rdrr.io/r/base/writeLines.html),
+  converting CRLF line endings to LF and adding a final newline.
+  Matching still reads every CRLF as LF, so multi-line edits written
+  with `"\n"` apply in Windows and mixed files; new lines take the
+  edited line’s ending. Files are compared and written as bytes, so
+  non-UTF-8 content is kept
+  ([\#217](https://github.com/JamesHWade/deputy/issues/217)).
+
 - A `can_use_tool` permission callback can no longer allow a call that
   the rest of the policy denies. In standard mode its allow used to skip
   the capability checks, so a callback that allowed everything it didn’t
