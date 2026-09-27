@@ -395,7 +395,11 @@ holds every conversation in it. The graph's usage limits add up across
 all delegated runs until you call <code>$release_agent_graph()</code>.</p>
 <p>Routes may form a cycle, but delegating to an agent that is already
 running fails. An agent waiting on its own delegate still counts toward
-<code>max_concurrency</code>.</p><div class="section">
+<code>max_concurrency</code>.</p>
+<p>Each agent keeps its own permissions, and each of its tool calls is also
+checked against the current permissions of every agent above it, so an
+agent in read-only or plan mode can use its route tools and its
+delegates are held to that mode too.</p><div class="section">
 <h4 id="usage-2">Usage<a class="anchor" aria-label="anchor" href="#usage-2"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">retain_agent_graph</span><span class="op">(</span></span>
 <span>  <span class="va">agents</span>,</span>

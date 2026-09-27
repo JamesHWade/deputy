@@ -2,10 +2,9 @@
 
 Creates a `"readonly"` policy. The agent can use the built-in
 file-reading tools such as `read_file`, `list_files` and `grep_files`,
-and a
-[LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
-can delegate to subagents, which are read-only too. Writes, code
-execution, web access and custom tools are denied.
+and can delegate to its subagents and retained agents, which are held to
+read-only mode too. Writes, code execution, web access and custom tools
+are denied.
 
 ## Usage
 

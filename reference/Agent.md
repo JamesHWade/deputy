@@ -444,6 +444,11 @@ Routes may form a cycle, but delegating to an agent that is already
 running fails. An agent waiting on its own delegate still counts toward
 `max_concurrency`.
 
+Each agent keeps its own permissions, and each of its tool calls is also
+checked against the current permissions of every agent above it, so an
+agent in read-only or plan mode can use its route tools and its
+delegates are held to that mode too.
+
 #### Usage
 
     Agent$retain_agent_graph(

@@ -314,8 +314,9 @@ or destructive tools</td>
 <p>In every mode, <code>tool_denylist</code> and
 <code>tool_allowlist</code> are checked first, and the tool named by
 <code>permission_prompt_tool_name</code> is always allowed. Read-only
-and plan modes also allow a lead agent to delegate: its <a href="multi-agent.html#permissions-and-budgets">subagents</a> can’t use
-a less strict mode than the lead.</p>
+and plan modes also let an agent delegate to its <a href="multi-agent.html#permissions-and-budgets">subagents</a> and <a href="retained-agents.html">retained agents</a>. Every tool call those
+agents make is also checked against the delegating agent’s permissions,
+so they are held to the same mode.</p>
 </div>
 <div class="section level2">
 <h2 id="narrow-an-agents-permissions">Narrow an agent’s permissions<a class="anchor" aria-label="anchor" href="#narrow-an-agents-permissions"></a>

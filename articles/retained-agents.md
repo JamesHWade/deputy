@@ -90,6 +90,11 @@ code makes it. The tool returns the same compact
 [outcome](https://jameshwade.github.io/deputy/articles/delegation.html#what-a-delegation-returns)
 as ordinary delegation.
 
+The specialist keeps its own permissions, and each of its tool calls
+must also pass the owner’s current permissions. An owner in read-only or
+plan mode can still use the tool, and the specialist is then held to
+that mode too.
+
 ### Start from an ellmer chat
 
 If you already have configured ellmer chats, perhaps with their own
@@ -181,8 +186,9 @@ request.
 
 Permissions and tool hooks apply all the way down: a call made by the
 reviewer must also pass the analyst’s and the root’s permissions and
-`PreToolUse` hooks. Each specialist keeps its own provider, prompt and
-tools.
+`PreToolUse` hooks. A root in read-only or plan mode can still use its
+routes, and that mode then applies to the whole graph. Each specialist
+keeps its own provider, prompt and tools.
 
 The root sees the whole graph through the same methods as a lead agent:
 `list_subagents()`, `inspect_subagents()`, `observe_subagents()` and

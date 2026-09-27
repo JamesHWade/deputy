@@ -45,3 +45,10 @@ delegation_tool(owner, handle, name, description, usage_limits)
 
 An ellmer tool. Calling it outside a run of `owner`, or registering it
 on another agent, is an error.
+
+## Details
+
+The retained agent keeps its own permissions, and each of its tool calls
+is also checked against the owner's current permissions. An owner in
+read-only or plan mode can use the tool, and the retained agent is then
+held to that mode too.

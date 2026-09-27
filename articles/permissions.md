@@ -107,9 +107,12 @@ The `mode` argument changes how the capabilities are applied:
 
 In every mode, `tool_denylist` and `tool_allowlist` are checked first,
 and the tool named by `permission_prompt_tool_name` is always allowed.
-Read-only and plan modes also allow a lead agent to delegate: its
+Read-only and plan modes also let an agent delegate to its
 [subagents](https://jameshwade.github.io/deputy/articles/multi-agent.html#permissions-and-budgets)
-can’t use a less strict mode than the lead.
+and [retained
+agents](https://jameshwade.github.io/deputy/articles/retained-agents.md).
+Every tool call those agents make is also checked against the delegating
+agent’s permissions, so they are held to the same mode.
 
 ## Narrow an agent’s permissions
 

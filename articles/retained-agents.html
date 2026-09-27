@@ -176,6 +176,10 @@ budget and everything else are fixed by your code:</p>
 <p>Every call continues the same conversation, whether the model or your
 code makes it. The tool returns the same compact <a href="delegation.html#what-a-delegation-returns">outcome</a> as ordinary
 delegation.</p>
+<p>The specialist keeps its own permissions, and each of its tool calls
+must also pass the owner’s current permissions. An owner in read-only or
+plan mode can still use the tool, and the specialist is then held to
+that mode too.</p>
 <div class="section level3">
 <h3 id="start-from-an-ellmer-chat">Start from an ellmer chat<a class="anchor" aria-label="anchor" href="#start-from-an-ellmer-chat"></a>
 </h3>
@@ -257,8 +261,9 @@ already in flight can overshoot them; request limits are checked before
 each request.</p>
 <p>Permissions and tool hooks apply all the way down: a call made by the
 reviewer must also pass the analyst’s and the root’s permissions and
-<code>PreToolUse</code> hooks. Each specialist keeps its own provider,
-prompt and tools.</p>
+<code>PreToolUse</code> hooks. A root in read-only or plan mode can
+still use its routes, and that mode then applies to the whole graph.
+Each specialist keeps its own provider, prompt and tools.</p>
 <p>The root sees the whole graph through the same methods as a lead
 agent: <code>list_subagents()</code>, <code>inspect_subagents()</code>,
 <code>observe_subagents()</code> and <code>interrupt_subagent()</code>,

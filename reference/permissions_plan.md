@@ -2,9 +2,10 @@
 
 Creates a `"plan"` policy, for letting the model look around and propose
 a plan before it changes anything. Only tools annotated as read-only are
-allowed, plus the approval prompt tool and delegation to subagents,
-which can't use a less strict mode. Web access is on, so read-only web
-tools such as `web_fetch` work. Writes and code execution are denied.
+allowed, plus the approval prompt tool and delegation to the agent's
+subagents and retained agents, which are held to plan mode too. Web
+access is on, so read-only web tools such as `web_fetch` work. Writes
+and code execution are denied.
 
 ## Usage
 

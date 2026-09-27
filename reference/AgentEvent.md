@@ -102,7 +102,7 @@ parent and delegation IDs in subagent runs.
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-09-26 23:28:42
+#>   timestamp: 2026-09-27 01:10:49
 #>   task: Analyze data.csv
 
 # Create a text event

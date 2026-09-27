@@ -119,6 +119,13 @@ the retained agent's remaining budget or the calling run's.</p></dd>
     <p>An ellmer tool. Calling it outside a run of <code>owner</code>, or registering
 it on another agent, is an error.</p>
     </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>The retained agent keeps its own permissions, and each of its tool calls is
+also checked against the owner's current permissions. An owner in
+read-only or plan mode can use the tool, and the retained agent is then
+held to that mode too.</p>
+    </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>

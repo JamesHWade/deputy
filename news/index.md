@@ -11,13 +11,19 @@
   can deny the call or pause it for approval. To allow a call the policy
   denies, use a `PermissionRequest` hook.
 
-- Read-only and plan policies now allow a `LeadAgent`’s own
-  `delegate_to_agent` tool, so a lead created with
+- Read-only and plan policies now allow an agent’s own delegation tools:
+  a `LeadAgent`’s `delegate_to_agent`, and the
+  [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
+  and `retain_agent_graph()` route tools that call its retained agents.
+  An agent created with
   [`permissions_readonly()`](https://jameshwade.github.io/deputy/reference/permissions_readonly.md)
   or
   [`permissions_plan()`](https://jameshwade.github.io/deputy/reference/permissions_plan.md)
-  can delegate. Its subagents still can’t use a less strict mode than
-  the lead, and other tools named `delegate_to_agent` are still denied.
+  can therefore delegate, and each tool call its subagents and retained
+  agents make is still checked against its policy, so they can’t write
+  or run code either. A custom tool doesn’t qualify by using one of
+  these names
+  ([\#227](https://github.com/JamesHWade/deputy/issues/227)).
 
 - [`hook_log_tools()`](https://jameshwade.github.io/deputy/reference/hook_log_tools.md),
   [`hook_block_dangerous_bash()`](https://jameshwade.github.io/deputy/reference/hook_block_dangerous_bash.md)
