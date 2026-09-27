@@ -763,7 +763,21 @@ test_that("only Deputy's ask_user takes the plan-mode prompt shortcut", {
   )
 })
 
-test_that("direct policy queries without tool metadata keep name-based classification", {
+test_that("direct policy queries keep name-based classification", {
+  # A preflight built from the public tool_metadata() has no runtime flag.
+  public_context <- list(
+    tool_metadata = tool_metadata(tool_read_file),
+    tool_annotations = tool_read_file@annotations
+  )
+  expect_s7_class(
+    permissions_check(
+      permissions_readonly(),
+      "read_file",
+      list(),
+      public_context
+    ),
+    PermissionResultAllow
+  )
   expect_s7_class(
     permissions_check(permissions_readonly(), "read_file", list(), list()),
     PermissionResultAllow

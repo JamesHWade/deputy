@@ -66,11 +66,11 @@ is_native_tool <- function(tool) {
   )
 }
 
-# A runtime permission context names the executable's origin in its tool
-# metadata. A direct policy query without that metadata keeps name-based
-# classification, as does a provider-native tool checked at registration.
+# The Agent runtime records whether each requested tool is Deputy's own in
+# .deputy_native_tool. A context without that flag comes from a direct policy
+# query (including one built from the public tool_metadata()), job records
+# saved before the flag existed, or provider-native registration, and keeps
+# name-based classification.
 permission_trusts_native_name <- function(context) {
-  !is_mcp_tool_context(context) &&
-    (is.null(context$tool_metadata$source) ||
-      isTRUE(context$.deputy_native_tool))
+  !is_mcp_tool_context(context) && !isFALSE(context$.deputy_native_tool)
 }

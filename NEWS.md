@@ -8,8 +8,8 @@
   read, and plan mode's prompt-tool shortcut applies only to Deputy's own
   `ask_user`. The name's restrictions, such as readonly's denial of write
   tools and write-path limits, still apply. A host-chosen prompt tool name
-  keeps its shortcut, and `permissions_check()` calls without tool metadata
-  keep name-based classification.
+  keeps its shortcut, and direct `permissions_check()` calls, including ones
+  built from `tool_metadata()`, keep name-based classification.
 
 * `edit_file` and `multi_edit` now change only the replaced text. They
   previously rewrote the whole file through `readLines()`/`writeLines()`,
