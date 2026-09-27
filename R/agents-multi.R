@@ -555,7 +555,7 @@ LeadAgent <- R6::R6Class(
       )
       attr(tool, "deputy_delegation_tool") <- TRUE
       attr(tool, "deputy_internal_tool") <- deputy_delegation_tool_marker
-      tool
+      mark_native_tool(tool)
     },
 
     # Create a sub-agent from a definition

@@ -365,7 +365,7 @@ new_ask_user_tool <- function(
   callback <- validate_ask_user_callback(callback)
   context <- validate_ask_user_context(context)
 
-  ellmer::tool(
+  mark_native_tool(ellmer::tool(
     fun = function(questions) {
       ask_user_tool_impl(
         questions,
@@ -400,7 +400,7 @@ new_ask_user_tool <- function(
       destructive_hint = FALSE,
       open_world_hint = FALSE
     )
-  )
+  ))
 }
 
 #' Validate questions structure

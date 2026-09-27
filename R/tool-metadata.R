@@ -45,3 +45,32 @@ tool_metadata <- function(tool) {
 is_mcp_tool_context <- function(context) {
   identical(context$tool_metadata$source$type, "mcp")
 }
+
+# Deputy's own tools carry this private marker. Permission policy gives native
+# names (read_file, run_bash, ask_user, ...) their native treatment only for
+# marked tools, never for a host, skill, package or MCP tool that shares a
+# name. The marker is an attribute, so tool_metadata() and approval
+# fingerprints are unchanged.
+deputy_native_tool_marker <- new.env(parent = emptyenv())
+
+mark_native_tool <- function(tool) {
+  attr(tool, "deputy_native_tool") <- deputy_native_tool_marker
+  tool
+}
+
+is_native_tool <- function(tool) {
+  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  identical(
+    attr(source, "deputy_native_tool", exact = TRUE),
+    deputy_native_tool_marker
+  )
+}
+
+# The Agent runtime records whether each requested tool is Deputy's own in
+# .deputy_native_tool. A context without that flag comes from a direct policy
+# query (including one built from the public tool_metadata()), job records
+# saved before the flag existed, or provider-native registration, and keeps
+# name-based classification.
+permission_trusts_native_name <- function(context) {
+  !is_mcp_tool_context(context) && !isFALSE(context$.deputy_native_tool)
+}
