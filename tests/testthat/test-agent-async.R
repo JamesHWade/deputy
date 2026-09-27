@@ -123,7 +123,6 @@ test_that("run_async enforces tool-call limits and releases the run", {
   calls <- 0L
   agent <- Agent$new(
     chat = chat,
-    tools = list(tool_read_file),
     usage_limits = UsageLimits(max_tool_calls = 1)
   )
   result <- resolve_async_value(agent$run_async("x"))
