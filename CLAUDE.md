@@ -356,6 +356,11 @@ Examples use `ellmer::chat("openai/gpt-6-luna")` and
 from the `articles:` sections in `_pkgdown.yml`, so a new article only needs to
 be listed there.
 
+The site's look is `template:` in `_pkgdown.yml` (light colours) and
+`pkgdown/extra.scss` (dark colours, layout, and `@font-face` rules for the
+IBM Plex files in `pkgdown/assets/fonts/`). Define colours as `--deputy-*`
+variables there rather than literals in rules, so both themes stay in step.
+
 ## Architecture
 
 `McpConnection` is the temporary client integration, qualified for an explicit
