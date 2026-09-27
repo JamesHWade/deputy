@@ -365,20 +365,18 @@ test_that("tool_read_file returns tool_reject for missing file", {
 })
 
 test_that("tool_write_file handles write errors gracefully", {
-  # Skip on Windows - absolute Unix paths behave differently
-  skip_on_os("windows")
+  # Nobody can write below a regular file, not even root.
+  parent <- withr::local_tempfile()
+  writeLines("x", parent)
 
-  # Try to write to a directory that doesn't exist
-  result <- tryCatch(
-    tool_write_file("/nonexistent/deep/path/file.txt", "content"),
-    ellmer_tool_reject = function(e) e,
-    error = function(e) e
-  )
+  result <- suppressWarnings(tryCatch(
+    tool_write_file(file.path(parent, "file.txt"), "content"),
+    ellmer_tool_reject = function(e) e
+  ))
 
-  # Should be some kind of error
-  expect_true(
-    inherits(result, "error") || inherits(result, "ellmer_tool_reject")
-  )
+  expect_s3_class(result, "ellmer_tool_reject")
+  expect_match(conditionMessage(result), "Error writing file")
+  expect_equal(readLines(parent), "x")
 })
 
 test_that("tool_list_files returns tool_reject for nonexistent directory", {
