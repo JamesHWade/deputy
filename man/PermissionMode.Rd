@@ -16,18 +16,23 @@ without further checks.
 (\code{file_read}, \code{file_write}, \code{bash}, \code{r_code}, \code{web}, \code{install_packages})
 and custom tools against their annotations.
 \item \code{"readonly"}: allows the built-in file-reading tools, the web tools when
-\code{web = TRUE}, a \link{LeadAgent}'s own \code{delegate_to_agent} tool and tools on
+\code{web = TRUE}, the agent's own delegation tools and tools on
 \code{tool_allowlist}. It denies writes, code execution, destructive tools
 and, unless \code{web = TRUE}, open-world tools.
 \item \code{"plan"}: allows only tools annotated as read-only, plus the approval
-prompt tool and a \link{LeadAgent}'s own \code{delegate_to_agent} tool. Open-world
-tools also need \code{web = TRUE}.
+prompt tool and the agent's own delegation tools. Open-world tools also
+need \code{web = TRUE}.
 \item \code{"full"}: allows every call. Capability flags and annotations are not
 checked.
 }
 
-A \link{LeadAgent}'s subagents can't use a less strict mode than their lead,
-and each of their tool calls is also checked against the lead's policy.
+An agent's own delegation tools are a \link{LeadAgent}'s \code{delegate_to_agent}
+tool and the tools that call its retained agents, from \code{\link[=delegation_tool]{delegation_tool()}}
+and \verb{$retain_agent_graph()}. Another tool doesn't qualify by using the same
+name. Each tool call a subagent or retained agent makes is also checked
+against the policy of the agent that delegated to it, so in read-only or
+plan mode that agent's delegates are held to the same mode. A \link{LeadAgent}'s
+subagents also can't use a less strict mode than their lead.
 
 If the policy has a \code{can_use_tool} callback, it is called in every mode for
 each call the rest of the policy allows. It can deny the call or pause it

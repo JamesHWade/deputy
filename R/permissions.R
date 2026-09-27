@@ -365,9 +365,9 @@ permission_check_readonly_mode <- function(
     }
     return(PermissionResultAllow())
   }
-  # Subagents inherit this mode and every subagent tool call is rechecked
-  # against the lead's policy, so delegating can't widen what runs.
-  if (permission_is_lead_delegation(tool_name, context)) {
+  # Every tool call a subagent or retained agent makes is also checked against
+  # this policy, so delegating can't widen what runs.
+  if (permission_is_own_delegation(tool_name, context)) {
     return(PermissionResultAllow())
   }
   if (isTRUE(explicitly_allowed)) {
@@ -420,9 +420,9 @@ S7::method(print, Permissions) <- function(x, ...) {
 #'
 #' @description
 #' Creates a `"readonly"` policy. The agent can use the built-in file-reading
-#' tools such as `read_file`, `list_files` and `grep_files`, and a
-#' [LeadAgent] can delegate to subagents, which are read-only too. Writes,
-#' code execution, web access and custom tools are denied.
+#' tools such as `read_file`, `list_files` and `grep_files`, and can delegate
+#' to its subagents and retained agents, which are held to read-only mode too.
+#' Writes, code execution, web access and custom tools are denied.
 #'
 #' @return A [Permissions] object.
 #'
@@ -478,9 +478,10 @@ permissions_standard <- function(working_dir = getwd()) {
 #' @description
 #' Creates a `"plan"` policy, for letting the model look around and propose a
 #' plan before it changes anything. Only tools annotated as read-only are
-#' allowed, plus the approval prompt tool and delegation to subagents, which
-#' can't use a less strict mode. Web access is on, so read-only web tools such
-#' as `web_fetch` work. Writes and code execution are denied.
+#' allowed, plus the approval prompt tool and delegation to the agent's
+#' subagents and retained agents, which are held to plan mode too. Web access
+#' is on, so read-only web tools such as `web_fetch` work. Writes and code
+#' execution are denied.
 #'
 #' @param permission_prompt_tool_name Name of the tool the model can call to
 #'   ask for approval, `"ask_user"` by default. `NULL` means none. Built-in

@@ -9,11 +9,13 @@
   or pause it for approval. To allow a call the policy denies, use a
   `PermissionRequest` hook.
 
-* Read-only and plan policies now allow a `LeadAgent`'s own
-  `delegate_to_agent` tool, so a lead created with `permissions_readonly()` or
-  `permissions_plan()` can delegate. Its subagents still can't use a less
-  strict mode than the lead, and other tools named `delegate_to_agent` are
-  still denied.
+* Read-only and plan policies now allow an agent's own delegation tools: a
+  `LeadAgent`'s `delegate_to_agent`, and the `delegation_tool()` and
+  `retain_agent_graph()` route tools that call its retained agents. An agent
+  created with `permissions_readonly()` or `permissions_plan()` can therefore
+  delegate, and each tool call its subagents and retained agents make is
+  still checked against its policy, so they can't write or run code either.
+  A custom tool doesn't qualify by using one of these names (#227).
 
 * `hook_log_tools()`, `hook_block_dangerous_bash()` and
   `hook_limit_file_writes()` now return `NULL` when they don't deny a call, so

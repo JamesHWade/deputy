@@ -12,6 +12,7 @@ recursive_fixture <- function(
   max_delegations = 8L,
   max_concurrency = 2L,
   leaf_tool = NULL,
+  root_permissions = permissions_full(),
   middle_permissions = permissions_full(),
   graph_limits = NULL,
   leaf_responses = NULL,
@@ -52,7 +53,7 @@ recursive_fixture <- function(
   )
   root <- Agent$new(
     runtime_chat(root_server),
-    permissions = permissions_full(),
+    permissions = root_permissions,
     delegation_disclosure = DelegationDisclosure(authorize = function(
       requester,
       ...
@@ -303,6 +304,36 @@ test_that("the immediate ancestor's permissions bound grandchild effects", {
   fixture$root$release_agent_graph()
 })
 
+
+test_that("read-only and plan roots use routes and bound every descendant", {
+  for (mode in c("readonly", "plan")) {
+    effects <- 0L
+    tool <- ellmer::tool(
+      function() {
+        effects <<- effects + 1L
+        "written"
+      },
+      name = "write_evidence",
+      description = "Write",
+      arguments = list()
+    )
+    fixture <- recursive_fixture(
+      leaf_tool = tool,
+      root_permissions = Permissions(mode = mode, file_write = FALSE)
+    )
+    fixture$configure()
+    result <- suppressWarnings(fixture$root$run_sync("compose"))
+    expect_identical(trimws(result$response), "root synthesis", info = mode)
+    # Both routes ran, but the root's mode still bounds the grandchild.
+    expect_identical(
+      vapply(fixture$servers, function(x) length(x$requests()), integer(1)),
+      c(2L, 2L, 2L),
+      info = mode
+    )
+    expect_identical(effects, 0L, info = mode)
+    fixture$root$release_agent_graph()
+  }
+})
 
 test_that("tree tool and observed token ceilings constrain real descendants", {
   for (case in list(

@@ -78,6 +78,11 @@ adopt_chat <- function(
 #' the owner's inspection methods, such as `$inspect_subagents()`, for the
 #' full history.
 #'
+#' The retained agent keeps its own permissions, and each of its tool calls is
+#' also checked against the owner's current permissions. An owner in
+#' read-only or plan mode can use the tool, and the retained agent is then
+#' held to that mode too.
+#'
 #' @param owner The [Agent] that owns the retained agent. Register the tool on
 #'   this agent only.
 #' @param handle Handle returned by [adopt_chat()] or `owner$retain_agent()`.
@@ -172,6 +177,7 @@ make_delegation_tool <- function(
   )
   attr(tool, "deputy_composition_owner") <- caller
   attr(tool, "deputy_composition_invoke") <- invoke
+  attr(tool, "deputy_internal_tool") <- deputy_composition_tool_marker
   tool
 }
 

@@ -283,6 +283,11 @@ Agent <- R6::R6Class(
     #' Routes may form a cycle, but delegating to an agent that is already
     #' running fails. An agent waiting on its own delegate still counts toward
     #' `max_concurrency`.
+    #'
+    #' Each agent keeps its own permissions, and each of its tool calls is also
+    #' checked against the current permissions of every agent above it, so an
+    #' agent in read-only or plan mode can use its route tools and its
+    #' delegates are held to that mode too.
     #' @param agents Named list of distinct agents, each meeting the conditions
     #'   in `$retain_agent()`. The name `root` is reserved for this agent.
     #' @param routes Named list keyed by `root` or an agent name. Each element is

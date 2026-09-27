@@ -31,3 +31,9 @@ and budget. Each call continues the same conversation, like
 the owner's inspection methods, such as \verb{$inspect_subagents()}, for the
 full history.
 }
+\details{
+The retained agent keeps its own permissions, and each of its tool calls is
+also checked against the owner's current permissions. An owner in
+read-only or plan mode can use the tool, and the retained agent is then
+held to that mode too.
+}
