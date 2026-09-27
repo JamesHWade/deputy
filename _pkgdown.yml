@@ -2,7 +2,38 @@ url: https://jameshwade.github.io/deputy/
 
 template:
   bootstrap: 5
-  bootswatch: flatly
+  light-switch: true
+  # Colours come from the logo: the rust of the mesa, the ink of the coat and
+  # a sheet of paper behind them. pkgdown/extra.scss holds the dark theme, the
+  # layout rules and the @font-face rules for the IBM Plex files in
+  # pkgdown/assets/fonts, so pages load no fonts from elsewhere.
+  bslib:
+    base_font: >-
+      "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif
+    heading_font: >-
+      "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif
+    code_font: >-
+      "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace
+    font-size-base: 1rem
+    line-height-base: 1.6
+    body-bg: "#fbfaf7"
+    body-color: "#1f2126"
+    primary: "#a63f1f"
+    secondary: "#5c6370"
+    link-color: "#a63f1f"
+    link-decoration: none
+    border-color: "#e4ded4"
+    border-radius: 0.25rem
+    headings-font-weight: 600
+    headings-color: "#15171f"
+    code-color: "#1f2126"
+    navbar-bg: "#fbfaf7"
+  theme: arrow-light
+  theme-dark: arrow-dark
+
+home:
+  sidebar:
+    structure: [links, license, dev]
 
 search:
   # pkgdown renders every Markdown file in the root, including the files

@@ -1,0 +1,562 @@
+// Deputy's site theme, layered over pkgdown's Bootstrap 5 template.
+//
+// _pkgdown.yml sets the light colours and fonts through bslib. This file sets
+// the dark colours and the rules bslib variables cannot reach: the navbar,
+// the reading width, code, tables, the reference index and the sidebars.
+// Every colour here is a --deputy-* variable so the two themes stay in step.
+
+// Fonts: IBM Plex, latin subset, from pkgdown/assets/fonts (SIL OFL).
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/ibm-plex-sans-latin-400-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../../fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../../fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../../fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2");
+}
+
+:root,
+[data-bs-theme="light"] {
+  --deputy-ink: #15171f;
+  --deputy-muted: #5c6370;
+  --deputy-rule: #e4ded4;
+  --deputy-rule-strong: #cfc6b8;
+  --deputy-accent: #a63f1f;
+  --deputy-accent-rgb: 166, 63, 31;
+  --deputy-code-bg: #f3f0ea;
+  --deputy-inline-code-bg: rgba(21, 23, 31, 0.055);
+  --deputy-mark: rgba(224, 169, 58, 0.35);
+}
+
+[data-bs-theme="dark"] {
+  --deputy-ink: #f1eee8;
+  --deputy-muted: #a3a8b3;
+  --deputy-rule: #2d3139;
+  --deputy-rule-strong: #3d424c;
+  --deputy-accent: #ec8f67;
+  --deputy-accent-rgb: 236, 143, 103;
+  --deputy-code-bg: #1c1f25;
+  --deputy-inline-code-bg: rgba(241, 238, 232, 0.08);
+  --deputy-mark: rgba(224, 169, 58, 0.3);
+
+  --bs-body-bg: #14161b;
+  --bs-body-bg-rgb: 20, 22, 27;
+  --bs-body-color: #e2dfd9;
+  --bs-body-color-rgb: 226, 223, 217;
+  --bs-emphasis-color: #f1eee8;
+  --bs-heading-color: #f1eee8;
+  --bs-secondary-color: #a3a8b3;
+  --bs-border-color: #2d3139;
+  --bs-primary: #ec8f67;
+  --bs-primary-rgb: 236, 143, 103;
+  --bs-link-color: #ec8f67;
+  --bs-link-color-rgb: 236, 143, 103;
+  --bs-link-hover-color: #f4b193;
+  --bs-link-hover-color-rgb: 244, 177, 147;
+  --bs-code-color: #e2dfd9;
+}
+
+// Reading width and type scale ==============================================
+
+// pkgdown raises the body to 18px on very wide screens; keep one size so the
+// line length stays near 75 characters.
+@include media-breakpoint-up(xxl) {
+  body {
+    font-size: 1rem;
+  }
+}
+
+.row > main {
+  max-width: 46rem;
+}
+
+main {
+  h1,
+  .h1 {
+    font-size: 2rem;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+  }
+
+  h2,
+  .h2 {
+    font-size: 1.4rem;
+    letter-spacing: -0.01em;
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  h3,
+  .h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 2rem;
+  }
+
+  h4,
+  .h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+  }
+
+  p,
+  li {
+    max-width: 42rem;
+  }
+
+  // Links in running text are underlined, so they are links without colour.
+  p a,
+  li a,
+  td a,
+  dd a {
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--deputy-accent-rgb), 0.35);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+
+    &:hover {
+      text-decoration-color: var(--deputy-accent);
+    }
+  }
+
+
+  hr {
+    border-color: var(--deputy-rule);
+    opacity: 1;
+  }
+}
+
+.page-header {
+  border-bottom: 0;
+  margin-bottom: 1.25rem;
+
+  h1 {
+    margin-bottom: 0.25rem;
+  }
+
+  // The "Source:" line under an article title.
+  small,
+  .dont-index {
+    color: var(--deputy-muted);
+    font-size: 0.85rem;
+  }
+}
+
+img.logo {
+  width: 88px;
+}
+
+@include media-breakpoint-up(sm) {
+  .page-header,
+  .template-home .page-header {
+    min-height: 0;
+  }
+}
+
+.template-home img.logo {
+  width: 112px;
+}
+
+::selection {
+  background: var(--deputy-mark);
+}
+
+// Navbar =====================================================================
+
+.navbar {
+  background: var(--bs-body-bg);
+  border-bottom: 1px solid var(--deputy-rule);
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+
+[data-bs-theme="dark"] .navbar {
+  background: var(--bs-body-bg);
+}
+
+.navbar-brand {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--deputy-ink);
+}
+
+.navbar .nav-text {
+  font-family: $font-family-monospace;
+  font-size: 0.75rem;
+  color: var(--deputy-muted);
+}
+
+.navbar .nav-link {
+  color: var(--bs-body-color);
+  font-size: 0.95rem;
+}
+
+.nav-item .nav-link:hover {
+  background: none;
+  color: var(--deputy-accent);
+}
+
+// The current section is marked by a rule under its name, not a grey pill.
+.nav-item.active .nav-link {
+  background: none;
+  color: var(--deputy-ink);
+  box-shadow: inset 0 -2px 0 var(--deputy-accent);
+  border-radius: 0;
+}
+
+@include media-breakpoint-down(lg) {
+  .nav-item.active .nav-link {
+    box-shadow: inset 2px 0 0 var(--deputy-accent);
+    padding-left: 0.75rem;
+  }
+}
+
+.dropdown-menu {
+  --bs-dropdown-bg: var(--bs-body-bg);
+  --bs-dropdown-border-color: var(--deputy-rule);
+  --bs-dropdown-link-hover-bg: rgba(var(--deputy-accent-rgb), 0.08);
+  --bs-dropdown-link-active-bg: rgba(var(--deputy-accent-rgb), 0.14);
+  --bs-dropdown-link-active-color: var(--deputy-ink);
+  --bs-dropdown-header-color: var(--deputy-muted);
+  font-size: 0.925rem;
+  max-height: 70vh;
+  box-shadow: 0 6px 24px rgba(21, 23, 31, 0.08);
+}
+
+.dropdown-header {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding-top: 0.75rem;
+}
+
+input[type="search"] {
+  background-color: transparent;
+  border-color: var(--deputy-rule);
+  font-size: 0.9rem;
+
+  &:focus {
+    border-color: var(--deputy-accent);
+    box-shadow: 0 0 0 0.15rem rgba(var(--deputy-accent-rgb), 0.2);
+  }
+}
+
+// Code =======================================================================
+
+code {
+  font-size: 0.875em;
+}
+
+:not(pre) > code {
+  background: var(--deputy-inline-code-bg);
+  border-radius: 0.2rem;
+  padding: 0.1em 0.3em;
+}
+
+pre {
+  background: var(--deputy-code-bg);
+  border: 1px solid var(--deputy-rule);
+  border-radius: 0.3rem;
+  padding: 0.9rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+[data-bs-theme="dark"] {
+  pre {
+    background: var(--deputy-code-bg);
+  }
+
+  :not(pre) > code {
+    background: var(--deputy-inline-code-bg);
+  }
+}
+
+// Printed output ("#>") reads as output, not as more code.
+pre code .co {
+  font-style: normal;
+}
+
+// A function name that links to its reference page is coloured, not
+// underlined; the underline under a code chip reads as a rendering fault.
+:not(pre) > code a:any-link,
+a:any-link > code {
+  color: var(--deputy-accent);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+}
+
+main p a:has(> code),
+main li a:has(> code),
+main td a:has(> code) {
+  text-decoration: none;
+}
+
+pre code a:any-link {
+  text-decoration-color: rgba(var(--deputy-accent-rgb), 0.35);
+  text-underline-offset: 0.15em;
+}
+
+.btn-copy-ex {
+  font-size: 0.75rem;
+  color: var(--deputy-muted);
+  background: var(--bs-body-bg);
+  border: 1px solid var(--deputy-rule);
+}
+
+// Tables =====================================================================
+
+main table {
+  font-size: 0.925rem;
+  margin: 1.25rem 0 1.5rem;
+
+  th {
+    font-weight: 600;
+    border-bottom: 2px solid var(--deputy-rule-strong);
+    vertical-align: bottom;
+  }
+
+  td,
+  th {
+    padding: 0.5rem 0.75rem 0.5rem 0;
+    border-color: var(--deputy-rule);
+  }
+
+  td {
+    vertical-align: top;
+  }
+}
+
+// Sidebars and table of contents =============================================
+
+aside {
+  font-size: 0.9rem;
+
+  h2,
+  #toc > h2 {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--deputy-muted);
+    margin-top: 2rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .list-unstyled li {
+    margin-bottom: 0.3rem;
+  }
+}
+
+#toc > .nav {
+  border-left: 1px solid var(--deputy-rule);
+
+  a.nav-link {
+    color: var(--deputy-muted);
+    padding: 0.2rem 0 0.2rem 0.85rem;
+    margin: 0 0 0 -1px;
+    border-left: 2px solid transparent;
+    border-radius: 0;
+
+    &:hover,
+    &:focus {
+      background: none;
+      color: var(--deputy-ink);
+    }
+
+    &.active {
+      background: none;
+      color: var(--deputy-ink);
+      border-left-color: var(--deputy-accent);
+    }
+  }
+
+  .nav a.nav-link {
+    margin-left: -1px;
+    padding-left: 1.6rem;
+    font-size: 0.85rem;
+  }
+}
+
+.dev-status img {
+  height: 20px;
+}
+
+@include media-breakpoint-down(md) {
+  .row > aside {
+    background: none;
+    border-top: 1px solid var(--deputy-rule);
+    border-radius: 0;
+  }
+}
+
+// Reference index: name and title side by side ==============================
+
+.template-reference-index {
+  main h2 {
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--deputy-rule);
+  }
+
+  main h2 + p,
+  .section-desc {
+    color: var(--deputy-muted);
+  }
+
+  dl {
+    margin: 0.75rem 0 1rem;
+  }
+
+  dt {
+    margin-top: 0.4rem;
+  }
+
+  dd {
+    padding-left: 0;
+    margin-bottom: 0.4rem;
+    color: var(--bs-body-color);
+  }
+
+  dt code {
+    background: none;
+    padding: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  @include media-breakpoint-up(md) {
+    dl {
+      display: grid;
+      grid-template-columns: minmax(14rem, max-content) 1fr;
+      column-gap: 1.5rem;
+      row-gap: 0;
+    }
+
+    dt,
+    dd {
+      margin: 0;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid var(--deputy-rule);
+    }
+  }
+}
+
+// Reference topics ===========================================================
+
+.template-reference-topic {
+  main h2 {
+    font-size: 1.15rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--deputy-rule);
+  }
+
+  // Argument lists.
+  dl dt {
+    font-family: $font-family-monospace;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-top: 0.75rem;
+  }
+
+  dl dd {
+    padding-left: 1.25rem;
+  }
+
+  .ref-usage {
+    border-left: 2px solid var(--deputy-accent);
+  }
+}
+
+// Articles index and changelog ==============================================
+
+.template-article-index {
+  main h2,
+  main h3 {
+    font-size: 1.1rem;
+    padding-top: 1rem;
+    margin-top: 2rem;
+    border-top: 1px solid var(--deputy-rule);
+  }
+
+  main h3 + p {
+    color: var(--deputy-muted);
+  }
+
+  dl {
+    margin-bottom: 1rem;
+  }
+
+  dt {
+    font-weight: 500;
+    margin-top: 0.35rem;
+  }
+
+  dd {
+    padding-left: 0;
+    color: var(--deputy-muted);
+    margin-bottom: 0;
+  }
+}
+
+.template-news main h2 {
+  font-size: 1.2rem;
+  font-family: $font-family-monospace;
+  padding-top: 1rem;
+  border-top: 1px solid var(--deputy-rule);
+}
+
+// Footer =====================================================================
+
+footer {
+  border-top-color: var(--deputy-rule);
+  color: var(--deputy-muted);
+  font-size: 0.8rem;
+  margin-top: 4rem;
+  padding-top: 1.25rem;
+}
