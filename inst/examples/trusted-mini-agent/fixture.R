@@ -110,6 +110,7 @@ study_fixture <- function(plan) {
       )
       on.exit(server$stop(), add = TRUE)
       saveRDS(port, file.path(directory, "port.rds"))
+      file.create(file.path(directory, "ready"))
       repeat {
         httpuv::service(50)
       }
@@ -117,7 +118,7 @@ study_fixture <- function(plan) {
     args = list(directory = directory, plan = plan)
   )
   deadline <- Sys.time() + 10
-  while (!file.exists(file.path(directory, "port.rds"))) {
+  while (!file.exists(file.path(directory, "ready"))) {
     if (!process$is_alive() || Sys.time() > deadline) {
       process$kill()
       cli::cli_abort("The local study fixture did not start.")
