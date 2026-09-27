@@ -8,7 +8,7 @@ test_that("tool_call_limit is NULL by default", {
 
 test_that("on_tool_request enforces tool_call_limit", {
   mock_chat <- create_mock_chat()
-  agent <- Agent$new(chat = mock_chat)
+  agent <- Agent$new(chat = mock_chat, tools = list(tool_read_file))
 
   # Activate callback-based limits (simulating the governed stream setup)
   agent$.__enclos_env__$private$tool_call_limit <- 2L
@@ -59,7 +59,7 @@ test_that("on_tool_request enforces cost limit in callback mode", {
 
 test_that("on_tool_request skips limit checks when tool_call_limit is NULL", {
   mock_chat <- create_mock_chat()
-  agent <- Agent$new(chat = mock_chat)
+  agent <- Agent$new(chat = mock_chat, tools = list(tool_read_file))
 
   # Ensure limit is NULL (default -- run/run_sync path)
   expect_null(agent$.__enclos_env__$private$tool_call_limit)
@@ -309,6 +309,7 @@ test_that("stream_async checkpoints rooted file writes", {
   )
   agent <- Agent$new(
     chat = mock$chat,
+    tools = list(tool_write_file),
     permissions = permissions_standard(root),
     enable_file_checkpointing = TRUE,
     working_dir = root
