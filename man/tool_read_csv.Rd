@@ -10,24 +10,23 @@ A tool definition created with \code{ellmer::tool()}.
 tool_read_csv(path, n_max = 1000, show_head = 10)
 }
 \arguments{
-\item{path}{Path to the CSV file to read (tool argument)}
+\item{path}{Path to the CSV file.}
 
-\item{n_max}{Maximum number of rows to read (tool argument)}
+\item{n_max}{Maximum number of rows to read. Defaults to 1000.}
 
-\item{show_head}{Number of rows to show in preview (tool argument)}
+\item{show_head}{Number of rows to show. Defaults to 10.}
 }
 \value{
-When called directly, a character summary of the CSV structure and
-preview rows.
+The summary as one string.
 }
 \description{
-A tool that reads a CSV file and returns a summary of its structure
-along with the first few rows.
+A tool that reads a CSV file and summarises it: row and column counts,
+column types and the first few rows.
 }
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_read_csv)
 )
 }

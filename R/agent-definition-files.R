@@ -1,55 +1,53 @@
-#' Read, write, and discover AgentDefinition files
+#' Read and write agent definition files
 #'
 #' @description
-#' Deputy's versioned YAML format represents every field in
-#' [agent_definition()]. Tools and skills are symbolic references resolved only
-#' through explicit host-supplied registries. Reading a file does not load
-#' packages, source R code, connect MCP servers, or instantiate an Agent.
+#' Save an [agent_definition()] as a YAML file, read one back, or read every
+#' definition in a directory. Files refer to tools and skills by name; you
+#' supply the actual objects through the `tools` and `skills` arguments.
+#' Reading a file never runs R code, loads packages or connects to MCP
+#' servers.
 #'
-#' @param path A YAML file for reading/writing, or a directory for discovery.
-#'   Discovery defaults to `.deputy/agents` in the current project and reads
-#'   `.yaml` and `.yml` files in that directory, without recursion.
-#' @param tools Named list of ellmer tool objects available to the definition.
-#'   Registry keys are case-sensitive symbols, such as `read_file`.
-#' @param skills Named list of [Skill] objects or skill paths approved by the
-#'   host. Files reference these keys, never literal paths.
-#' @param definition An [AgentDefinition][agent_definition] to write. Each tool
-#'   and skill must match exactly one entry in its supplied registry.
+#' @param path Path to a YAML file. For `agent_definitions()`, a directory,
+#'   by default `.deputy/agents` under the working directory; only the `.yaml`
+#'   and `.yml` files directly inside it are read.
+#' @param tools Named list of ellmer tools. Files refer to tools by these
+#'   names, such as `read_file`. Names are case-sensitive.
+#' @param skills Named list of [Skill] objects or skill directory paths. Files
+#'   refer to skills by these names, never by path.
+#' @param definition An [AgentDefinition][agent_definition] to write. Each of
+#'   its tools and skills must appear exactly once in `tools` or `skills`.
 #' @param overwrite Whether to replace an existing file. Defaults to `FALSE`.
 #'
-#' @return `agent_definition_read()` returns a read-only `AgentDefinition`
-#'   S7 value.
-#'   `agent_definition_write()` invisibly returns `path`.
-#'   `agent_definitions()` returns a named list of definitions keyed by their
-#'   canonical routing names, ready for `LeadAgent$new(sub_agents = ...)`.
-#'   A missing discovery directory returns an empty list. Invalid files or
-#'   duplicate names abort the entire discovery operation.
+#' @return `agent_definition_read()` returns an `AgentDefinition`.
+#'   `agent_definition_write()` returns `path`, invisibly.
+#'   `agent_definitions()` returns a list of definitions named by definition
+#'   name, ready for `LeadAgent$new(sub_agents = ...)`. It returns an empty
+#'   list if the directory doesn't exist, and errors if any file is invalid or
+#'   two files use the same name.
 #'
 #' @section Format version 1:
-#' A file is one YAML mapping with `version: 1` and the fields of
-#' [agent_definition()]. `name`, `description`, and `prompt` are required.
-#' Optional fields use the constructor defaults. `tools` and `skills` are
-#' sequences of registry keys; `disallowed_tools`, `memory`, and `mcp_servers`
-#' are sequences of strings. `model`, `initial_prompt`, and `permission_mode`
-#' are strings, and `max_requests` is a non-negative integer. Explicit `null` is
-#' accepted only for constructor fields that allow `NULL`.
+#' A file is a YAML mapping with `version: 1` and the arguments of
+#' [agent_definition()] as fields. `name`, `description` and `prompt` are
+#' required; the other fields default as in [agent_definition()]. `tools` and
+#' `skills` are lists of registry names, and `disallowed_tools`, `memory` and
+#' `mcp_servers` are lists of strings; a single string also works for a
+#' one-item list. `model`, `initial_prompt` and `permission_mode` are strings,
+#' and `max_requests` is a non-negative integer. `null` is allowed only for
+#' fields whose default is `NULL`.
 #'
-#' Unknown fields, versions, references, duplicate keys, and YAML evaluation
-#' tags are rejected. YAML type inference applies: quote strings such as
-#' `"yes"` or `"123"`. Empty sequences are written as `[]` and optional NULL
-#' values as `null`. Writing canonicalizes formatting; it does not preserve
-#' comments or names attached to R lists or character sequences. Object order
-#' and registry identity are preserved. A single string is accepted as shorthand
-#' for a one-element sequence. Only regular files of at most 1 MiB are read.
-#' Files are written as UTF-8 with LF line endings on every platform.
-#' Writes use a temporary file in the destination directory and replace the
-#' destination only after writing succeeds.
-#' With `overwrite = FALSE`, installing the file requires hard-link support
-#' from the filesystem so a concurrently created destination is never replaced.
+#' Unknown fields or versions, unknown tool or skill names, duplicate keys and
+#' `!expr` tags are errors. YAML guesses types, so quote strings such as
+#' `"yes"` or `"123"`. Files larger than 1 MiB are rejected.
 #'
-#' A definition describes a subagent. Permission modes and request limits
-#' remain bounded by its LeadAgent. Nested `sub_agents`, host credentials,
-#' runtime objects, and executable code are not part of this format.
+#' Files are written as UTF-8 with LF line endings. Rewriting a file drops its
+#' comments. Each file is written to a temporary file first and moved into
+#' place when complete. With `overwrite = FALSE`, the file system must support
+#' hard links; that is how an existing file is guaranteed never to be
+#' replaced.
+#'
+#' The format has no place for credentials, R code or nested subagents. A
+#' subagent's permission mode and request limit are still capped by its
+#' [LeadAgent].
 #'
 #' @examples
 #' if (requireNamespace("yaml", quietly = TRUE)) {

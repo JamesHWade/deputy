@@ -2,24 +2,27 @@
 % Please edit documentation in R/skill.R
 \name{skill_check_requirements}
 \alias{skill_check_requirements}
-\title{Check Skill Requirements}
+\title{Check a skill's requirements}
 \usage{
 skill_check_requirements(skill, current_provider = NULL)
 }
 \arguments{
-\item{skill}{A \link{Skill} value.}
+\item{skill}{A \link{Skill}.}
 
-\item{current_provider}{Optional current provider name. Known aliases are
-normalized; other provider names use case-insensitive exact matching.
-NULL skips the provider check.}
+\item{current_provider}{Optional provider name, such as \code{"openai"} or
+\code{"anthropic"}. Common aliases match their provider (\code{"claude"} and
+\code{"chat_anthropic"} both mean \code{"anthropic"}); other names must match
+exactly, ignoring case. \code{NULL} skips the provider check.}
 }
 \value{
-A list with \code{ok}, \code{missing}, \code{provider_mismatch},
+A list with \code{ok} (\code{TRUE} if nothing is missing or mismatched),
+\code{missing} (such as \code{"package:readr"}), \code{provider_mismatch},
 \code{current_provider}, and \code{required_providers}.
 }
 \description{
-Report missing packages and provider compatibility for a \link{Skill}. This
-function does not install packages, load the skill, or execute its tools.
+Checks whether the packages a \link{Skill} needs are installed and, if you give
+\code{current_provider}, whether the skill supports that provider. Nothing is
+installed, loaded or run.
 }
 \examples{
 skill <- Skill("calculator", requires = list(packages = "stats"))

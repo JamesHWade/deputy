@@ -1,50 +1,49 @@
-#' Connect an Agent to an independent sandboxed REPL
+#' Connect an agent to a sandboxed mcp-repl session
 #'
 #' @description
-#' Creates a [McpConnection] for one explicitly configured mcp-repl server.
-#' Each connection owns an independent client and upstream interpreter session.
-#' Register its `$tools()` on the supplied Agent to retain normal permissions,
-#' hooks, budgets and execution provenance.
+#' Starts one mcp-repl server from an mcptools configuration and connects it to
+#' `agent`. mcp-repl runs R inside an OS sandbox and keeps variables between
+#' calls; each connection has its own R session. Register `connection$tools()`
+#' on the agent so that calls go through its permissions, hooks and limits.
+#' The server entry must pass `--sandbox`, as described in [tools_mcp_repl()].
 #'
 #' @param config Path to an mcptools configuration. Defaults to
 #'   `~/.config/mcptools/config.json`.
-#' @param agent Agent that owns the connection.
-#' @param server Exact configured mcp-repl server name.
-#' @param sandbox Required explicit upstream sandbox policy.
-#' @param timeout Maximum seconds for one MCP request. This is distinct from
-#'   mcp-repl's `timeout_ms`, which can return a busy result while code continues.
-#'   Deputy forwards at most 3000 ms as `timeout_ms` (see Details).
-#' @param startup_timeout Maximum seconds for client/server startup.
-#' @return A [McpConnection]. The host must close it when the conversation ends.
+#' @param agent The agent that owns the connection.
+#' @param server Name of the mcp-repl server in `config`.
+#' @param sandbox The sandbox mode the server must be configured with.
+#' @param timeout Maximum seconds to wait for one MCP request before closing
+#'   the connection. This is separate from the per-call `timeout_ms` limit
+#'   described in Details.
+#' @param startup_timeout Maximum seconds for the client and server to start.
+#' @return A [McpConnection]. Call its `$close()` method when the conversation
+#'   ends.
 #'
 #' @details
-#' The producer contract is qualified with mcptools 1.0.2 or 1.0.3 and mcp-repl 0.3.0.
-#' The executable must be installed and configured by the host. mcp-repl owns
-#' interpreter startup, sandbox enforcement, reset, interrupt, rich content and
-#' oversized-output artifacts. The client requires its `repl(input, timeout_ms)`
-#' tool contract; it does not infer a binary version from the executable name.
+#' Supported with mcptools 1.0.2 or 1.0.3 and mcp-repl 0.3.0. You install and
+#' configure the mcp-repl executable yourself; it handles the sandbox,
+#' interrupts, resets, rich output and large outputs. The connection errors if
+#' the server's `repl` tool doesn't take exactly the arguments `input` and
+#' `timeout_ms`.
 #'
-#' Each `repl` call forwards `timeout_ms` capped at 3000 ms, and 3000 ms when
-#' it is omitted (mcp-repl would otherwise wait up to 60 s). The qualified
-#' mcptools releases wait only about 4 seconds for a stdio reply, and a reply
-#' that misses that window would desynchronize the connection. Work that takes
-#' longer keeps running in the interpreter: the call returns mcp-repl's busy
-#' result, and a later call with empty `input` retrieves the remaining output.
-#' The registered tool description tells the model this.
+#' mcptools waits only about 4 seconds for a reply, so each `repl` call waits at
+#' most 3 seconds: `timeout_ms` is capped at 3000 and defaults to 3000 (instead
+#' of mcp-repl's 60 seconds). Longer work keeps running: the call returns a busy
+#' result, and a later call with empty `input` collects the rest of the output.
+#' The tool description tells the model this.
 #'
-#' A busy interpreter result is upstream output, not a completed calculation.
-#' After such a response, [mcp_repl_control()] can request an interrupt or reset.
-#' An active client request cannot accept a second request: use `$cancel()` to
-#' terminate the connection and discard state, or wait for the request to return.
-#' Interrupting the owning Agent also cancels its active MCP connections.
+#' A busy result means the code hasn't finished. Use [mcp_repl_control()] to
+#' interrupt it or reset the session. A connection handles one request at a
+#' time; `$cancel()` ends the connection and discards the R session.
+#' Interrupting the agent also cancels its active MCP connections.
 #'
 #' @export
 #' @examples
 #' \dontrun{
-#' agent <- Agent$new(chat = ellmer::chat("openai/gpt-5.6-luna"))
+#' agent <- Agent$new(chat = ellmer::chat("openai/gpt-6-luna"))
 #' connection <- mcp_repl_connection(agent = agent)
 #' agent$register_tools(connection$tools())
-#' # In a Shiny host: session$onSessionEnded(function() connection$close())
+#' # In a Shiny app: session$onSessionEnded(function() connection$close())
 #' connection$close()
 #' }
 mcp_repl_connection <- function(
@@ -98,17 +97,18 @@ mcp_repl_connection <- function(
   connection
 }
 
-#' Request an upstream REPL interrupt or reset
+#' Interrupt or reset an mcp-repl session
 #'
-#' Sends mcp-repl's documented Ctrl-C or Ctrl-D input through the same connection.
-#' Interrupt is best effort; reset requests a fresh interpreter and discards its
-#' state. The returned upstream result describes what happened. Neither action
-#' is treated as proof of success merely because a request was sent.
+#' Sends Ctrl-C (`"interrupt"`) or Ctrl-D (`"reset"`) to the R session behind a
+#' [mcp_repl_connection()]. An interrupt may not stop the code. A reset starts
+#' a fresh interpreter and discards its variables. Check the returned result to
+#' see what happened.
 #'
 #' @param connection A connection created by [mcp_repl_connection()].
 #' @param action `"interrupt"` or `"reset"`.
-#' @return A promise for the upstream ellmer-compatible result. This is a direct
-#'   host operation, not an Agent run. Busy client connections reject overlap.
+#' @return A promise for mcp-repl's reply. The call goes straight to the
+#'   server, not through the agent, and errors if the connection is already
+#'   handling a request.
 #' @export
 mcp_repl_control <- function(connection, action = c("interrupt", "reset")) {
   action <- match.arg(action)

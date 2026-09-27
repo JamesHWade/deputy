@@ -13,21 +13,24 @@ HookResultPreToolUse(
 )
 }
 \arguments{
-\item{permission}{Either \code{"allow"} or \code{"deny"}}
+\item{permission}{Either \code{"allow"} or \code{"deny"}.}
 
-\item{reason}{Reason for denial (shown to the LLM)}
+\item{reason}{Why the call was denied. The model sees it.}
 
-\item{continue}{One non-missing logical value. If FALSE, stop the agent after this hook}
+\item{continue}{\code{TRUE} or \code{FALSE}. \code{FALSE} stops the run.}
 
-\item{additional_context}{Optional text to append to the running context}
+\item{additional_context}{Optional text to add to the agent's system prompt.
+It stays there for later turns; the same text is only added once.}
 
-\item{stop_reason}{Optional stop reason used when \code{continue = FALSE}}
+\item{stop_reason}{Optional stop reason used when \code{continue = FALSE}.
+Defaults to \code{"hook_requested_stop"}.}
 }
 \value{
-A \code{HookResultPreToolUse} S7 object
+A \code{HookResultPreToolUse} object.
 }
 \description{
-Return this from a PreToolUse hook callback to control tool execution.
+Return this from a PreToolUse hook to allow or deny a tool call. A hook can
+only deny calls that the permission policy has already allowed.
 }
 \examples{
 # Allow a tool call
@@ -41,5 +44,5 @@ HookResultPreToolUse(
 
 }
 \seealso{
-\link{CallbackResult} for read-only properties and S7 inspection.
+\link{CallbackResult} for reading result fields.
 }

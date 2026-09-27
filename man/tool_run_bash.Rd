@@ -10,24 +10,25 @@ A tool definition created with \code{ellmer::tool()}.
 tool_run_bash(command)
 }
 \arguments{
-\item{command}{The bash command to execute (tool argument)}
+\item{command}{The shell command to run.}
 }
 \value{
-When called directly, a character string containing command output
-(standard error follows a \verb{[stderr]} line) or a success message. A
-command that exits with a non-zero status is rejected with its status
-and output, so the model sees the step failed.
+The command's output as one string, with standard error after a
+\verb{[stderr]} line. A command that exits with a non-zero status is reported
+to the model as a failed tool call, with its status and output.
 }
 \description{
-A tool that executes bash/shell commands and returns the output.
-\strong{Use with caution!} This can execute arbitrary system commands.
+A tool that runs a shell command and returns its output. The model can run
+any command your user account can, and nothing is sandboxed. Commands time
+out after 30 seconds. The default permissions deny this tool; allow it with
+\code{bash = TRUE} in \code{\link[=Permissions]{Permissions()}}.
 }
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = list(tool_run_bash),
-  permissions = permissions_full()  # Required for bash
+  permissions = Permissions(bash = TRUE)
 )
 }
 

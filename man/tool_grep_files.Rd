@@ -16,21 +16,23 @@ tool_grep_files(
 )
 }
 \arguments{
-\item{pattern}{Regex pattern to search for (tool argument)}
+\item{pattern}{Regular expression to search for.}
 
-\item{path}{Base directory to search (tool argument)}
+\item{path}{Directory to search. Defaults to the working directory.}
 
-\item{recursive}{If TRUE, search subdirectories recursively (tool argument)}
+\item{recursive}{If \code{TRUE} (the default), search subdirectories.}
 
-\item{ignore_case}{If TRUE, ignore case when matching (tool argument)}
+\item{ignore_case}{If \code{TRUE}, ignore case.}
 
-\item{max_matches}{Maximum matching lines to return (tool argument)}
+\item{max_matches}{Maximum number of matching lines to return. Defaults to
+100.}
 }
 \value{
-When called directly, a character summary of matching file lines.
+Matching lines formatted as \code{file:line: text}.
 }
 \description{
-Search text files under a directory and return matching lines.
+A tool that searches the lines of files under a directory with a
+Perl-compatible regular expression.
 }
 \examples{
 directory <- tempfile()

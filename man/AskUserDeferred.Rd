@@ -16,26 +16,28 @@ AskUserDeferred(
 \item{instructions}{One string telling the model what happens next. The
 default asks it to end its turn without answering for the person.}
 
-\item{extra}{Optional named list stored as \code{ellmer::ContentToolResult()}
-\code{extra}, for example a host display for the questions.}
+\item{extra}{Optional named list stored in the tool result's \code{extra} field
+(see \code{ellmer::ContentToolResult()}), for example data your app uses to
+display the questions.}
 }
 \value{
 A read-only \code{AskUserDeferred} S7 object.
 }
 \description{
-Return \code{AskUserDeferred()} from a \code{\link[=tools_interactive]{tools_interactive()}} handler when the host
-shows the questions without waiting for them, as a chat interface does. The
-tool result tells the model that the questions are displayed and that it
-should end its turn; the person's answers then arrive in their next message.
+Return \code{AskUserDeferred()} from a \code{\link[=tools_interactive]{tools_interactive()}} handler when your app
+shows the questions without waiting for the answers, as a chat interface
+does. The tool result tells the model that the questions are on screen and
+that it should end its turn; the person's answers arrive as their next
+message.
 
-A handler that must wait inside the current run can instead return a
-\code{promises::promise()} resolving to the named answers list. Deferred answers
-keep the run short and make the reply an ordinary user turn, which a host
-can persist, quote and cancel like any other message.
+A handler that must wait within the run can instead return a
+\code{promises::promise()} for the answers. Deferring keeps runs short, and the
+answers arrive as an ordinary user message. Subagents can't defer; their
+handler must return the answers or a promise.
 }
 \examples{
 handler <- function(questions, context) {
-  # Show `questions` in the host UI, then return without waiting.
+  # Show `questions` in your app, then return without waiting.
   AskUserDeferred()
 }
 tools <- tools_interactive(callback = handler)

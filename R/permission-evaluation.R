@@ -76,6 +76,17 @@ permission_is_allowlist_exempt <- function(tool_name, context) {
     )
 }
 
+# An agent's own delegation tool: a LeadAgent's delegate_to_agent, or a
+# delegation_tool() or graph route tool that calls a retained agent. Each is
+# identified by Deputy's private marker rather than by its name, which any
+# registered tool could use.
+permission_is_own_delegation <- function(tool_name, context) {
+  marker <- context$.deputy_internal_tool
+  identical(marker, deputy_composition_tool_marker) ||
+    (identical(marker, deputy_delegation_tool_marker) &&
+      identical(normalize_native_tool_id(tool_name), "delegate_to_agent"))
+}
+
 permission_check_tool_gating <- function(
   permissions,
   tool_name,
@@ -450,6 +461,12 @@ permission_check_plan_mode <- function(
         tool_name
       )
     ))
+  }
+
+  # Every tool call a subagent or retained agent makes is also checked against
+  # this policy, so delegating can't widen what runs.
+  if (permission_is_own_delegation(tool_name, context)) {
+    return(PermissionResultAllow())
   }
 
   if (!isTRUE(annotations$read_only_hint)) {

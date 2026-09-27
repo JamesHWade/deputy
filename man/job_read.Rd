@@ -2,16 +2,17 @@
 % Please edit documentation in R/agent-job.R
 \name{job_read}
 \alias{job_read}
-\title{Read a durable Agent job without binding or executing it}
+\title{Read a background job}
 \usage{
 job_read(path)
 }
 \arguments{
-\item{path}{Committed directory returned by \code{\link[=job_create]{job_create()}}.}
+\item{path}{Job directory returned by \code{\link[=job_create]{job_create()}}.}
 }
 \value{
-A read-only \link{AgentJob} inspection value.
+An \link{AgentJob}.
 }
 \description{
-Read a durable Agent job without binding or executing it
+Returns the job's saved state. It doesn't rebuild the agent, call the model
+or run tools, so it's safe to use for status displays.
 }

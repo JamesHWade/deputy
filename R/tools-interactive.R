@@ -43,31 +43,30 @@ resolve_ask_user_context <- function(context) {
   validate_ask_user_context(context)
 }
 
-#' Set callback for non-interactive user input
+#' Set a process-wide handler for ask_user
 #'
 #' @description
-#' Sets a legacy process-wide callback for non-interactive sessions. This
-#' fallback cannot isolate concurrent Agents or Shiny sessions. New code should
-#' bind a handler to a tool instance with [tools_interactive()].
+#' Sets a callback that answers questions for every `ask_user` tool without its
+#' own handler, including [tool_ask_user]. It is used instead of `readline()`,
+#' even in interactive sessions. Because it is shared by the whole R process, it
+#' can't tell concurrent agents or Shiny sessions apart; for those, give each
+#' agent its own handler with [tools_interactive()].
 #'
-#' @param callback A function that takes `questions` in Deputy's structured
-#'   question format. Each question has `question`, `header`,
-#'   `options` (list with `label` and `description`), and `multiSelect`.
-#'   Should return a named list mapping question text to selected label(s).
-#'   For multi-select, join labels with ", ".
-#'   Set to NULL to clear the callback.
+#' @param callback A function that takes `questions`, a list in which each
+#'   question has `question`, `header`, `options` (each with `label` and
+#'   `description`) and `multiSelect`. It returns a named list mapping each
+#'   question's text to the chosen label; join several labels with `", "`.
+#'   `NULL` removes the callback.
 #'
-#' @return Invisibly returns the previous callback (or NULL).
+#' @return The previous callback (or `NULL`), invisibly.
 #'
 #' @examples
 #' \dontrun{
-#' # Legacy fallback for a single-Agent script:
+#' # For a single-agent script: always pick the first option
 #' set_ask_user_callback(function(questions) {
-#'   # Display questions in modal and collect answers
 #'   answers <- list()
 #'   for (q in questions) {
-#'     # Collect one answer for each question.
-#'     answers[[q$question]] <- selected_label
+#'     answers[[q$question]] <- q$options[[1]]$label
 #'   }
 #'   answers
 #' })
@@ -130,12 +129,11 @@ parse_user_response <- function(response, options, multi_select = FALSE) {
 
 #' Ask user questions (internal implementation)
 #'
-#' @param questions List of structured question objects
-#' @param callback Optional instance-scoped handler. It receives `questions`
-#'   and the resolved `context`. When omitted, the legacy process-wide fallback
-#'   is used.
-#' @param context Named routing context or a zero-argument function that returns
-#'   it.
+#' @param questions List of question objects.
+#' @param callback Optional handler for this tool. It receives `questions` and
+#'   the resolved `context`. When omitted, the callback from
+#'   [set_ask_user_callback()] is used, then `readline()`.
+#' @param context Named list, or a function with no arguments that returns one.
 #' @return Named list mapping question text to selected answers
 #' @keywords internal
 ask_user_impl <- function(questions, callback = NULL, context = list()) {
@@ -301,25 +299,27 @@ ask_user_result <- function(questions, answers, allow_deferred = TRUE) {
 #' Defer answers to a later user turn
 #'
 #' @description
-#' Return `AskUserDeferred()` from a [tools_interactive()] handler when the host
-#' shows the questions without waiting for them, as a chat interface does. The
-#' tool result tells the model that the questions are displayed and that it
-#' should end its turn; the person's answers then arrive in their next message.
+#' Return `AskUserDeferred()` from a [tools_interactive()] handler when your app
+#' shows the questions without waiting for the answers, as a chat interface
+#' does. The tool result tells the model that the questions are on screen and
+#' that it should end its turn; the person's answers arrive as their next
+#' message.
 #'
-#' A handler that must wait inside the current run can instead return a
-#' `promises::promise()` resolving to the named answers list. Deferred answers
-#' keep the run short and make the reply an ordinary user turn, which a host
-#' can persist, quote and cancel like any other message.
+#' A handler that must wait within the run can instead return a
+#' `promises::promise()` for the answers. Deferring keeps runs short, and the
+#' answers arrive as an ordinary user message. Subagents can't defer; their
+#' handler must return the answers or a promise.
 #'
 #' @param instructions One string telling the model what happens next. The
 #'   default asks it to end its turn without answering for the person.
-#' @param extra Optional named list stored as `ellmer::ContentToolResult()`
-#'   `extra`, for example a host display for the questions.
+#' @param extra Optional named list stored in the tool result's `extra` field
+#'   (see `ellmer::ContentToolResult()`), for example data your app uses to
+#'   display the questions.
 #' @return A read-only `AskUserDeferred` S7 object.
 #' @seealso [tools_interactive()]
 #' @examples
 #' handler <- function(questions, context) {
-#'   # Show `questions` in the host UI, then return without waiting.
+#'   # Show `questions` in your app, then return without waiting.
 #'   AskUserDeferred()
 #' }
 #' tools <- tools_interactive(callback = handler)
@@ -459,48 +459,34 @@ validate_questions <- function(questions) {
   TRUE
 }
 
-#' Ask user tool
+#' Ask the user questions
 #'
 #' @description
-#' A tool that allows the agent to ask the user clarifying questions and
-#' receive their responses. This enables human-in-the-loop workflows where
-#' the agent can request clarification or choices from the user.
+#' A tool that lets the model ask the user one to four multiple-choice
+#' questions and wait for the answers.
 #'
-#' @param questions JSON string or list of structured question objects.
-#'   Each question should have: `question` (string), `header` (string, max 12 chars),
-#'   `options` (list of objects with `label` and `description`), and optionally
-#'   `multiSelect` (logical).
+#' @param questions A JSON string or list of 1 to 4 questions. Each has
+#'   `question` (the full text), `header` (a label of at most 12 characters),
+#'   `options` (2 to 4, each with `label` and `description`) and, optionally,
+#'   `multiSelect`.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a list containing the original `questions`
-#'   and a named `answers` list.
+#' @return A list with the `questions` and a named `answers` list that maps
+#'   each question's text to the chosen label. Several labels are joined with
+#'   `", "`, and a person can also type their own answer.
 #'
 #' @details
-#' **Input format:**
-#' - `questions`: Array of 1-4 question objects
-#' - Each question has:
-#'   - `question`: The full question text
-#'   - `header`: Short label (max 12 chars)
-#'   - `options`: Array of 2-4 options, each with `label` and `description`
-#'   - `multiSelect`: Whether multiple selections are allowed
-#'
-#' **Output format:**
-#' - Returns a list with two elements:
-#'   - `questions`: The original questions array (echoed back)
-#'   - `answers`: Named list mapping question text to selected label(s)
-#' - For multi-select, labels are joined with ", "
-#' - Users can also type free-form responses
-#'
-#' In interactive R sessions, the tool uses `readline()` to get input. The
-#' exported object uses [set_ask_user_callback()] only as a legacy process-wide
-#' fallback. Non-interactive and concurrent hosts should create an isolated
-#' tool with [tools_interactive()].
+#' This tool asks through the callback set with [set_ask_user_callback()] if
+#' there is one, and otherwise with `readline()` in an interactive session.
+#' With neither, the call errors. In a Shiny app, or anywhere several agents
+#' share one R process, use [tools_interactive()] to give each agent its own
+#' handler.
 #'
 #' @examples
 #' \dontrun{
 #' # Add to agent's tools
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = c(tools_file(), tool_ask_user)
 #' )
 #'
@@ -518,39 +504,38 @@ validate_questions <- function(questions) {
 #' # }
 #' }
 #'
-#' @seealso [tools_interactive()] for instance-scoped non-interactive usage
+#' @seealso [tools_interactive()] to give each agent its own handler.
 #'
 #' @export
 tool_ask_user <- new_ask_user_tool()
 
-#' Tools for interactive workflows
+#' Create an ask_user tool with its own handler
 #'
 #' @description
-#' Returns a list of tools that enable human-in-the-loop interactions.
-#' Currently includes `tool_ask_user` (`ask_user`) for asking
-#' clarifying questions. Supply `callback` in non-interactive or concurrent
-#' hosts so each Agent receives its own handler.
+#' Returns a list holding one `ask_user` tool (see [tool_ask_user]) that sends
+#' questions to `callback`. Give each agent its own tool when several agents or
+#' Shiny sessions share one R process, or when the session isn't interactive.
 #'
-#' @param callback Optional handler with signature `function(questions,
-#'   context)`. It should return a named list that maps each question text to
-#'   the selected label or labels, a promise resolving to that list, or
-#'   [AskUserDeferred()] when the answers will arrive in the person's next
-#'   message. Shiny hosts cannot block for input, so they use one of the latter
-#'   two forms. When omitted, interactive sessions use
-#'   `readline()` and non-interactive sessions may use the legacy callback from
-#'   [set_ask_user_callback()].
-#' @param context Named list of stable host routing values, such as `agent_id`
-#'   and `session_id`, or a zero-argument function returning that list. A
-#'   function is resolved for each question request.
+#' @param callback A function of `questions` and `context` that returns a
+#'   named list mapping each question's text to the chosen label or labels, a
+#'   promise for that list, or [AskUserDeferred()] when the answers will come in
+#'   the person's next message. Shiny apps can't wait for input, so they return
+#'   a promise or `AskUserDeferred()`. If `NULL`, the tool uses the
+#'   [set_ask_user_callback()] callback if one is set, and otherwise
+#'   `readline()` in an interactive session.
+#' @param context A named list passed to `callback`, such as `agent_id` and
+#'   `session_id` values that tell your app where to show the questions, or a
+#'   function with no arguments that returns one. A function is called each
+#'   time the model asks.
 #'
-#' @return A list of tool definitions.
+#' @return A list of tools.
 #'
 #' @examples
 #' \dontrun{
 #' agent_id <- "agent-review"
 #' session_id <- "session-review"
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = c(
 #'     tools_file(),
 #'     tools_interactive(

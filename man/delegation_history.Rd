@@ -2,28 +2,29 @@
 % Please edit documentation in R/delegation-inspection.R
 \name{delegation_history}
 \alias{delegation_history}
-\title{Replay authorized settled child history}
+\title{Replay saved subagent history}
 \usage{
 delegation_history(history, requester, disclosure, scope)
 }
 \arguments{
-\item{history}{A portable snapshot produced by \code{export_subagents()}.}
+\item{history}{A snapshot from \verb{$export_subagents()}.}
 
-\item{requester}{Authenticated host request context.}
+\item{requester}{Who is asking, passed to \code{disclosure}. Authenticate it
+first.}
 
-\item{disclosure}{A freshly host-bound \link{DelegationDisclosure}.}
+\item{disclosure}{A \link{DelegationDisclosure} for this request.}
 
-\item{scope}{Current host scope, matched exactly against the saved scope after
-authorization. Obtain it from the host's own durable ownership record.}
+\item{scope}{The scope the history belongs to, from your own records rather
+than from \code{history}. It must match the saved scope exactly.}
 }
 \value{
-Authorized, redacted child views with native ellmer \code{turns} added for
-read-only rendering. Artifact availability is \code{unresolved} until the host
-checks its retained storage; saved availability is never treated as current.
+A list with one redacted view per subagent, each with ellmer
+\code{turns}. Artifact references are marked \code{availability = "unresolved"},
+since the saved status may be stale.
 }
 \description{
-Replays host-owned snapshots from \code{LeadAgent$export_subagents()} using public
-ellmer Content records. No Chat, model request, tools, or active execution is
-restored. Hosts own durable storage and authenticate the supplied history;
-this function does not treat stored scope or IDs as authorization.
+Turns a snapshot from \verb{$export_subagents()} back into ellmer turns for
+display, for example in \code{\link[=subagent_chat_server]{subagent_chat_server()}}. Replaying never runs
+tools, calls a model or restores a chat. Access is checked again with
+\code{disclosure}; the IDs and scope stored in \code{history} grant nothing.
 }

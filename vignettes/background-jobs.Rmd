@@ -1,34 +1,39 @@
 ---
-title: "Host-scheduled background jobs"
+title: "Background jobs"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Host-scheduled background jobs}
+  %\VignetteIndexEntry{Background jobs}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include=FALSE}
+```{r, include = FALSE}
 knitr::opts_chunk$set(eval = FALSE, collapse = TRUE, comment = "#>")
 ```
 
-A host can queue a task in one R process, execute it in another, and inspect its
-outcome after both processes exit. Deputy stores execution state and uses the
-ordinary governed Agent runtime. Your application owns the scheduler, worker
-processes, authentication, resource factories and conversation archive.
+Some agent work shouldn't run inside the process that asked for it: a Shiny
+app that queues a long analysis, or a batch of tasks spread over workers. The
+job functions let you queue a task in one R process, run it in another, and
+check the result later, even after both have exited.
 
-## Queue and run a job
+Deputy stores each job's state in a directory on disk and runs it with the
+ordinary agent, so permissions, hooks and limits apply as usual. Your
+application supplies the rest: the scheduler that starts workers (callr,
+mirai, cron, a queue), user authentication, and the code that rebuilds the
+agent in the worker.
 
-Build the same configured Agent at admission and in the worker. Stable identities
-and explicit definition and context revisions let Deputy reject an incompatible
-binding before a model request or tool execution.
+## Queue a job
+
+Write one function that builds the agent, and call it both when you queue the
+job and in the worker:
 
 ```{r}
 library(deputy)
 
-make_worker <- function() {
+make_agent <- function() {
   Agent$new(
-    ellmer::chat_openai(model = "gpt-5.6-luna"),
-    system_prompt = "Summarize the supplied report evidence.",
+    ellmer::chat("openai/gpt-6-luna"),
+    system_prompt = "Summarise the report you are given.",
     agent_id = "report-agent",
     session_id = "report-session",
     permissions = permissions_readonly(),
@@ -38,29 +43,36 @@ make_worker <- function() {
 
 path <- job_create(
   directory = "jobs",
-  agent = make_worker(),
-  task = "Explain the supplied report evidence.",
-  owner_id = "report-owner",
-  definition_revision = "report-definition-1",
-  context_revision = "report-context-1",
+  agent = make_agent(),
+  task = "Summarise the quarterly report.",
+  owner_id = "user-17",
+  definition_revision = "report-agent-v1",
+  context_revision = "q3-report",
   usage_limits = UsageLimits(max_requests = 4),
-  associations = list(conversation_id = "report-conversation")
+  associations = list(conversation_id = "chat-42")
 )
-job_read(path)
 ```
 
-The host stores `path` and dispatches a worker through its chosen scheduler.
-`job_run()` runs synchronously in that worker; it does not start a process or
-register a recurring task itself.
+`job_create()` records the task, a description of the agent, and the
+revisions and owner you supply, and returns the job's directory. Store that
+path with the request in your own database. The revisions are labels you
+choose for the version of the agent's configuration and of the input data. If
+either has changed by the time the job runs, the worker refuses to run it, so
+bump them whenever something the job depends on changes, including anything
+the tools' code relies on.
 
-`job_read()` only inspects the committed record. It does not bind an Agent,
-call a provider or execute a tool, so hosts can use it for status displays and
-recovery decisions.
+`job_read(path)` returns the job's status and details. It never builds an
+agent or calls a model, so it's safe to use for status pages.
+
+## Run it in a worker
+
+In the worker, `job_run()` rebuilds the agent with your `bind` function, asks
+your `authorize` function whether the job may still run, and runs it to the
+end:
 
 ```{r}
 authorize_job <- function(job) {
-  # Application code authenticates the requester and checks current access.
-  current <- lookup_authorized_job(job$id)
+  current <- look_up_job_in_your_database(job$id)
   list(
     job_id = current$id,
     owner_id = current$owner_id,
@@ -69,8 +81,9 @@ authorize_job <- function(job) {
   )
 }
 
-outcome <- job_run(path,
-  bind = function(job) make_worker(),
+outcome <- job_run(
+  path,
+  bind = function(job) make_agent(),
   authorize = authorize_job
 )
 outcome$status
@@ -78,69 +91,60 @@ outcome$result
 outcome$usage
 ```
 
-`lookup_authorized_job()` belongs to your application. It must consult current
-authorization and revisions, rather than simply echoing the stored job. Reading
-a job also requires whatever access controls the host applies to its storage.
-An `AgentJob` is a read-only inspection value; it contains no live Agent, tools,
-callbacks, provider clients or credentials.
+`authorize` should check your current records, not echo the job back: Deputy
+compares its answer with the job and refuses to run when they differ. `bind`
+returns the agent, or `list(agent = agent, cleanup = function() ...)` if the
+worker should clean up resources, such as an R session or MCP connection, after
+the job. `job_run()` blocks until the job finishes; it doesn't start processes
+or schedule anything itself.
 
-The binder reconstructs the admitted configuration and selected conversation
-context, including stable Agent and session identities and the working directory.
-Definition revisions must cover external resource configuration and tool closure
-state that a public tool fingerprint cannot inspect. A factory can return
-`list(agent = agent, cleanup = function() ...)` to transfer resource cleanup to
-the worker. Returning an Agent alone leaves external resources host-owned.
+The job directory holds the task and results, so protect it like the rest of
+your application's data.
 
-## Restart, decisions and cancellation
+## Restarts, approvals and cancellation
 
-Queued work can be claimed after its creating process exits. This includes a
-queued graph root: the worker restores the saved graph ledger, reservations and
-limits before dispatching any node. A terminal job is returned without binding
-resources or dispatching another request. Losing a worker after execution may
-have begun leaves an **indeterminate** job. Its allocation remains reserved;
-`job_run()` will return that terminal inspection rather than rebinding or
-rerunning it. An external effect may have completed without its result being
-committed, so the host must reconcile that uncertainty before creating new work.
+A queued job can be run by any process, at any time after it was created.
+Running a finished job again just returns its stored outcome.
 
-A standalone Agent configured for durable approval can stop at an
-`approval_pending` boundary. Resume that boundary using the existing approval
-protocol through the job API. Approval recovery is supported for a standalone
-Agent only; a pending approval inside a retained graph is rejected rather than
-being replayed:
+If a worker dies while a job is running, the job becomes `"indeterminate"`.
+Deputy won't run it again, because a tool may have done something (sent an
+email, written a file) before the crash. Check for those effects yourself
+before queueing a replacement. The job's budget stays reserved.
+
+A job whose agent uses [durable approvals](approvals.html) can stop in the
+`"approval_pending"` state. Continue it through `job_run()` with a decision,
+from a worker that builds the agent with the same permission callback:
 
 ```{r}
-outcome <- job_run(path,
-  bind = host_reconstruct_approved_agent,
+outcome <- job_run(
+  path,
+  bind = function(job) make_agent(),
   authorize = authorize_job,
   decision = "approve"
 )
-# Or, from a host control while the worker is running:
+```
+
+Completed tool calls are kept and not repeated, and the usage from before the
+pause still counts.
+
+`job_cancel()` asks a job to stop. It can be called from another process while
+the job is running; the worker notices at its next check and stops:
+
+```{r}
 job_cancel(path, authorize = authorize_job, reason = "user_cancelled")
 ```
 
-The host's `host_reconstruct_approved_agent()` supplies the configured resources
-and current permission callback. Approval recovery keeps prior usage and completed
-effect evidence. It does not replay completed tool calls. Cancellation is
-cooperative and has a separate control record, so requesting it does not wait for
-the execution record's lock. A process that disappears cannot certify cleanup;
-the persisted cleanup disposition reports that separately from the task outcome.
-If a task result was produced before binder cleanup failed, its bounded result
-summary remains available alongside the cleanup failure.
+If a worker fails after producing a result but before its cleanup finishes,
+the job keeps the result and reports the cleanup failure separately.
 
-## Graphs and conversation storage
+## Graphs of agents
 
-An explicitly configured graph root can own a job. Reconstruct the same nodes,
-routes and source contexts in the binder. Deputy preserves cumulative usage,
-consumed admissions, continuation counts and graph limits; a new worker does not
-receive a fresh budget. Historical delegation correlations remain in the job
-record. They do not recreate live child handles or grant transcript access.
+A job can run the root of a [graph of retained
+specialists](retained-agents.html#a-graph-of-specialists). The `bind` function
+must rebuild the same agents and routes. The job remembers the graph's usage
+so far, so a new worker continues with the remaining budget rather than a fresh
+one. Approvals inside a graph aren't supported yet.
 
-Jobs currently accept ordinary Agents and explicit graph roots with one provider
-per node. A retained child cannot be detached into an independent job, and
-durable approvals inside a retained graph remain unsupported. Provider-native
-tools cannot supply the per-effect callbacks required by the durable journal.
-
-Saved conversation text, a shinychat branch and a provider batch identifier serve
-different purposes. None replaces the job's authority, allocation, lifecycle and
-effect records. ellmer continues to own native turns and content; shinychat or
-another host store continues to own conversation persistence and branch selection.
+A job's agents can't have `fallback_chats`, and can't use tools that run on the
+provider's side, because Deputy has to record each tool call as it happens.
+Create and run jobs only while the agents involved are idle.

@@ -10,26 +10,25 @@
 
 Run tasks with language models and R tools using 'ellmer'. Control tool access with permissions, set limits on requests and usage, and inspect responses, tool calls, and the reason each run stopped. Supports streaming output, 'Shiny' applications, saved conversations, file checkpoints, and delegation to other agents.
 }
-\section{Main Functions}{
+\section{Main functions}{
 
 \itemize{
-\item \link{Agent} - The main class for creating agents
-\item \link{LeadAgent} - Coordinate specialized delegated agents
-\item \code{\link[=tools_preset]{tools_preset()}} - Choose a set of built-in tools
-\item \code{\link[=UsageLimits]{UsageLimits()}} - Set request, tool, token, and cost limits
-\item \code{\link[=permissions_standard]{permissions_standard()}} - Standard permission policy
-\item \code{\link[=permissions_plan]{permissions_plan()}} - Planning permission policy
-\item \code{\link[=permissions_readonly]{permissions_readonly()}} - Read-only permission policy
+\item \link{Agent}: runs a task with an ellmer Chat, tools, permissions and limits.
+\item \link{LeadAgent}: an agent that delegates tasks to subagents.
+\item \code{\link[=tools_preset]{tools_preset()}}: picks a set of built-in tools.
+\item \code{\link[=UsageLimits]{UsageLimits()}}: caps requests, tool calls, tokens and cost.
+\item \code{\link[=permissions_standard]{permissions_standard()}}, \code{\link[=permissions_plan]{permissions_plan()}} and
+\code{\link[=permissions_readonly]{permissions_readonly()}}: ready-made permission policies.
 }
 }
 
-\section{Getting Started}{
+\section{Getting started}{
 
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{library(deputy)
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_preset("minimal"),
   permissions = permissions_readonly(),
   usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),

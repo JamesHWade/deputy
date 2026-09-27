@@ -2,7 +2,7 @@
 % Please edit documentation in R/delegation-input.R
 \name{DelegationInput}
 \alias{DelegationInput}
-\title{Describe a task-specific delegation input}
+\title{Describe a task for a subagent}
 \usage{
 DelegationInput(
   task,
@@ -13,35 +13,37 @@ DelegationInput(
 )
 }
 \arguments{
-\item{task}{One non-empty UTF-8 task string. Whitespace is preserved.}
+\item{task}{The task, as a single non-empty string.}
 
-\item{constraints}{Task constraints, as a character vector.}
+\item{constraints}{Constraints on the task, as a character vector.}
 
-\item{evidence}{Ordered unnamed list of plain records with \code{source_id} and
-exact \code{revision}. References resolve only against the LeadAgent's host-owned
-scoped source snapshot. They are not paths, URLs or access grants.}
+\item{evidence}{Sources to give the subagent: an unnamed list of lists,
+each with the \code{source_id} and exact \code{revision} of a record passed to
+\link{LeadAgent} as \code{delegation_sources}. They are not file paths or URLs.}
 
 \item{deliverable}{Optional description of the expected output.}
 
-\item{stop_conditions}{Text instructions about when to stop. These do not
-install runtime limits, permissions or approval decisions.}
+\item{stop_conditions}{When to stop, as a character vector. These are
+instructions for the model; use \link{UsageLimits} to enforce limits.}
 }
 \value{
-A read-only \code{DelegationInput} S7 value.
+A \code{DelegationInput} object.
 }
 \description{
-\link{AgentDefinition} describes a reusable role. \code{DelegationInput} supplies one
-task, instructions and ordered evidence references without granting authority.
-String tasks remain supported and are equivalent to \code{DelegationInput(task)}.
+An \link{AgentDefinition} describes a reusable subagent; a \code{DelegationInput}
+describes one task for it: what to do, constraints, evidence, the expected
+deliverable and when to stop. A plain string task is the same as
+\code{DelegationInput(task)}.
 }
 \details{
-This read-only S7 value contains only portable text and lists. There are at
-most 64 entries in each vector/reference list and a 1 MiB serialized-input
-ceiling. A LeadAgent enforces its smaller configured admission ceiling on
-resolved context. Unsupported multimodal or executable content is rejected.
-\code{S7::props()} gives a portable record; \code{do.call(DelegationInput, record)}
-validates it again. JSON readers should preserve record lists, for example
-\code{jsonlite::fromJSON(json, simplifyVector = FALSE)}. No runtime state is restored.
+\code{constraints}, \code{evidence} and \code{stop_conditions} hold up to 64 entries
+each, and the whole input must be under 1 MiB. A \link{LeadAgent} also applies
+its \code{delegation_max_bytes} limit, 64 KiB by default.
+
+The object is read-only; read its fields with \code{$}. To store it, save
+\code{S7::props(x)} and rebuild it with \code{do.call(DelegationInput, record)}. When
+reading the record from JSON, keep lists intact with
+\code{jsonlite::fromJSON(json, simplifyVector = FALSE)}.
 }
 \examples{
 DelegationInput("Review the contrast", constraints = "Preserve units")

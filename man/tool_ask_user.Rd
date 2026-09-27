@@ -2,7 +2,7 @@
 % Please edit documentation in R/tools-interactive.R
 \name{tool_ask_user}
 \alias{tool_ask_user}
-\title{Ask user tool}
+\title{Ask the user questions}
 \format{
 A tool definition created with \code{ellmer::tool()}.
 }
@@ -10,54 +10,32 @@ A tool definition created with \code{ellmer::tool()}.
 tool_ask_user(questions)
 }
 \arguments{
-\item{questions}{JSON string or list of structured question objects.
-Each question should have: \code{question} (string), \code{header} (string, max 12 chars),
-\code{options} (list of objects with \code{label} and \code{description}), and optionally
-\code{multiSelect} (logical).}
+\item{questions}{A JSON string or list of 1 to 4 questions. Each has
+\code{question} (the full text), \code{header} (a label of at most 12 characters),
+\code{options} (2 to 4, each with \code{label} and \code{description}) and, optionally,
+\code{multiSelect}.}
 }
 \value{
-When called directly, a list containing the original \code{questions}
-and a named \code{answers} list.
+A list with the \code{questions} and a named \code{answers} list that maps
+each question's text to the chosen label. Several labels are joined with
+\code{", "}, and a person can also type their own answer.
 }
 \description{
-A tool that allows the agent to ask the user clarifying questions and
-receive their responses. This enables human-in-the-loop workflows where
-the agent can request clarification or choices from the user.
+A tool that lets the model ask the user one to four multiple-choice
+questions and wait for the answers.
 }
 \details{
-\strong{Input format:}
-\itemize{
-\item \code{questions}: Array of 1-4 question objects
-\item Each question has:
-\itemize{
-\item \code{question}: The full question text
-\item \code{header}: Short label (max 12 chars)
-\item \code{options}: Array of 2-4 options, each with \code{label} and \code{description}
-\item \code{multiSelect}: Whether multiple selections are allowed
-}
-}
-
-\strong{Output format:}
-\itemize{
-\item Returns a list with two elements:
-\itemize{
-\item \code{questions}: The original questions array (echoed back)
-\item \code{answers}: Named list mapping question text to selected label(s)
-}
-\item For multi-select, labels are joined with ", "
-\item Users can also type free-form responses
-}
-
-In interactive R sessions, the tool uses \code{readline()} to get input. The
-exported object uses \code{\link[=set_ask_user_callback]{set_ask_user_callback()}} only as a legacy process-wide
-fallback. Non-interactive and concurrent hosts should create an isolated
-tool with \code{\link[=tools_interactive]{tools_interactive()}}.
+This tool asks through the callback set with \code{\link[=set_ask_user_callback]{set_ask_user_callback()}} if
+there is one, and otherwise with \code{readline()} in an interactive session.
+With neither, the call errors. In a Shiny app, or anywhere several agents
+share one R process, use \code{\link[=tools_interactive]{tools_interactive()}} to give each agent its own
+handler.
 }
 \examples{
 \dontrun{
 # Add to agent's tools
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = c(tools_file(), tool_ask_user)
 )
 
@@ -77,5 +55,5 @@ agent <- Agent$new(
 
 }
 \seealso{
-\code{\link[=tools_interactive]{tools_interactive()}} for instance-scoped non-interactive usage
+\code{\link[=tools_interactive]{tools_interactive()}} to give each agent its own handler.
 }

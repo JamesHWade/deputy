@@ -2,30 +2,28 @@
 % Please edit documentation in R/tools-bundles.R
 \name{tools_file}
 \alias{tools_file}
-\title{File operation tools}
+\title{Get the basic file tools}
 \usage{
 tools_file()
 }
 \value{
-A list of tool definitions
+A list of tools.
 }
 \description{
-Returns a list of tools for file operations:
-\itemize{
-\item \code{read_file} - Read file contents
-\item \code{write_file} - Write content to files
-\item \code{list_files} - List directory contents
-}
+Returns \code{read_file}, \code{read_markdown}, \code{write_file} and \code{list_files}. The
+editing and search tools, such as \link{tool_edit_file} and \link{tool_grep_files},
+are separate.
 }
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_file()
 )
 }
 
 }
 \seealso{
-\link{tool_read_file}, \link{tool_write_file}, \link{tool_list_files}
+\link{tool_read_file}, \link{tool_read_markdown}, \link{tool_write_file},
+\link{tool_list_files}
 }

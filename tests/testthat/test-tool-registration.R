@@ -174,14 +174,18 @@ test_that("missing annotations stay absent and use conservative permissions", {
     )
   }
   seen <- NULL
-  policy <- Permissions(can_use_tool = function(
-    tool_name,
-    tool_input,
-    context
-  ) {
-    seen <<- context$tool_annotations
-    PermissionResultAllow()
-  })
+  # The callback only sees calls the policy allows, so allow web access.
+  policy <- Permissions(
+    web = TRUE,
+    can_use_tool = function(
+      tool_name,
+      tool_input,
+      context
+    ) {
+      seen <<- context$tool_annotations
+      PermissionResultAllow()
+    }
+  )
   expect_s7_class(
     permissions_check(
       policy,

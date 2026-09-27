@@ -4,80 +4,93 @@ template:
   bootstrap: 5
   bootswatch: flatly
 
+search:
+  # pkgdown renders every Markdown file in the root, including the files
+  # written for coding agents. Keep those out of the site search.
+  exclude: [AGENTS.html, CLAUDE.html, CONTEXT.html]
+
 navbar:
   structure:
-    left: [intro, articles, reference]
+    left: [intro, articles, reference, news]
     right: [search, github]
   components:
     intro:
       text: Get started
       href: articles/getting-started.html
-    articles:
-      text: Articles
-      menu:
-      - text: "Guides"
-      - text: Tools and Tool Bundles
-        href: articles/tools.html
-      - text: Permissions and Safety
-        href: articles/permissions.html
-      - text: Hooks
-        href: articles/hooks.html
-      - text: "---"
-      - text: "Apps"
-      - text: Shiny Chat
-        href: articles/example-shiny-chat.html
-      - text: "---"
-      - text: "Advanced"
-      - text: Multi-Agent Orchestration
-        href: articles/multi-agent.html
-      - text: Background Jobs
-        href: articles/background-jobs.html
-      - text: Structured Output
-        href: articles/structured-output.html
-      - text: Runtime Integration and Evaluation
-        href: articles/runtime-integration.html
-      - text: "---"
-      - text: "Recipes"
-      - text: Data Analysis Agent
-        href: articles/example-data-analysis.html
-      - text: Extraction Pipeline
-        href: articles/example-extraction-pipeline.html
-      - text: Code Review (Multi-Agent)
-        href: articles/example-code-review.html
+
+articles:
+- title: Get started
+  contents:
+  - getting-started
+
+- title: Guides
+  navbar: Guides
+  desc: How each part of an agent works.
+  contents:
+  - tools
+  - permissions
+  - hooks
+  - approvals
+  - structured-output
+  - conversations
+  - code-execution
+  - mcp
+
+- title: Multiple agents
+  navbar: Multiple agents
+  desc: Hand parts of a task to other agents.
+  contents:
+  - multi-agent
+  - delegation
+  - retained-agents
+
+- title: In applications
+  navbar: In applications
+  desc: Run agents inside Shiny apps, schedulers and monitored services.
+  contents:
+  - example-shiny-chat
+  - background-jobs
+  - runtime-integration
+
+- title: Patterns and recipes
+  navbar: Patterns and recipes
+  desc: Complete worked examples.
+  contents:
+  - trusted-mini-agents
+  - example-data-analysis
+  - example-extraction-pipeline
+  - example-code-review
 
 reference:
-- title: Agent
-
-  desc: Run a task and inspect its response, tool calls, and usage.
+- title: Agents
+  desc: Create an agent, run a task, and inspect what happened.
   contents:
   - Agent
-  - adopt_chat
-  - delegation_tool
   - AgentResult
+  - result_is_success
   - result_n_turns
+  - result_text_chunks
   - result_tool_calls
   - result_tool_results
-  - result_trusted_results
-  - result_text_chunks
-  - result_is_success
   - AgentEvent
   - AgentUsage
   - UsageLimits
+
+- title: Conversations and context
+  desc: Keep long conversations within the model's context window.
+  contents:
   - ContextPolicy
   - DeputyCompaction
 
-- title: Background jobs
-  desc: Persist and dispatch governed work through a host-owned scheduler.
+- title: Built-in tools
+  desc: Tools for files, data, the web and code, and presets that bundle them.
   contents:
-  - AgentJob
-  - job_create
-  - job_read
-  - job_run
-  - job_cancel
-
-- title: Tools
-  desc: Built-in tools and tool bundles
-  contents:
+  - tools_preset
+  - tools_file
+  - tools_code
+  - tools_data
+  - tools_web
+  - tools_all
   - tool_read_file
   - tool_read_markdown
   - tool_write_file
@@ -86,122 +99,120 @@ reference:
   - tool_list_files
   - tool_glob_files
   - tool_grep_files
-  - tool_run_r_code
-  - RSession
-  - tool_run_bash
   - tool_read_csv
+  - tool_run_r_code
+  - tool_run_bash
   - tool_web_fetch
   - tool_web_search
-  - tool_ask_user
-  - tools_file
-  - tools_code
-  - tools_data
-  - tools_web
-  - tools_all
-  - tools_preset
-  - tools_interactive
-  - AskUserDeferred
-  - tools_mcp
-  - McpConnection
   - tool_metadata
-  - tool_input_review
+
+- title: Running code
+  desc: Persistent R sessions and OS-sandboxed interpreters.
+  contents:
+  - RSession
   - tools_mcp_repl
   - mcp_repl_connection
   - mcp_repl_control
   - mcp_console_connection
   - mcp_console_control
-  - set_ask_user_callback
+
+- title: MCP servers
+  desc: Use tools, resources and prompts from Model Context Protocol servers.
+  contents:
+  - tools_mcp
+  - McpConnection
 
 - title: Permissions
-
-  desc: Control what agents can do
+  desc: Decide which tool calls an agent may make.
   contents:
   - Permissions
-  - TrustedResults
-  - permissions_check
-  - PermissionMode
-  - PermissionResultAllow
-  - PermissionResultDeny
-  - PermissionResultPending
-  - ApprovalContinuation
-  - approval_read
-  - approval_review_ui
   - permissions_standard
   - permissions_readonly
   - permissions_plan
   - permissions_full
+  - PermissionMode
+  - permissions_check
+  - PermissionResultAllow
+  - PermissionResultDeny
+  - PermissionResultPending
+
+- title: Human input and approvals
+  desc: Ask a person questions, and hold tool calls until someone approves them.
+  contents:
+  - tools_interactive
+  - tool_ask_user
+  - AskUserDeferred
+  - set_ask_user_callback
+  - approval_read
+  - ApprovalContinuation
+  - approval_review_ui
+  - tool_input_review
+
+- title: Trusted results
+  desc: Make one tool the only source of each kind of result.
+  contents:
+  - TrustedResults
+  - result_trusted_results
 
 - title: Hooks
-  desc: Intercept and customize agent behavior
+  desc: Run R code at fixed points in an agent's lifecycle.
   contents:
   - HookEvent
   - HookMatcher
   - hook_matches
-  - CallbackResult
-  - HookResultPreToolUse
-  - HookResultPostToolUse
-  - HookResultPreCompact
   - hook_log_tools
   - hook_block_dangerous_bash
   - hook_limit_file_writes
+  - HookResultPreToolUse
+  - HookResultPostToolUse
+  - HookResultPreCompact
+  - CallbackResult
 
 - title: Skills
-  desc: Load reusable instructions for an agent.
+  desc: Package instructions and tools for reuse.
   contents:
   - Skill
-  - skill_load
   - skill_create
-  - skill_check_requirements
+  - skill_load
   - skills_list
+  - skill_check_requirements
 
-- title: Multi-Agent
-
-  desc: Coordinate multiple specialized agents
+- title: Subagents
+  desc: Delegate parts of a task from a lead agent to specialists.
   contents:
   - LeadAgent
+  - agent_definition
+  - agent_definition_read
   - DelegationInput
-  - DelegationManifest
-  - ContextFork
-  - fork_agent
   - DelegationPolicy
   - DelegationResources
-  - DelegationDisclosure
+  - DelegationManifest
   - DelegationOutcome
+  - DelegationDisclosure
+  - delegation_history
   - DelegationObservation
   - DelegationSubscription
   - subagent_chat_ui
-  - delegation_history
-  - agent_definition
-  - agent_definition_read
+
+- title: Retained specialists
+  desc: Keep a specialist's conversation across several delegations.
+  contents:
+  - adopt_chat
+  - delegation_tool
+  - ContextFork
+  - fork_agent
+
+- title: Background jobs
+  desc: Queue work in one R process and run it in another.
+  contents:
+  - job_create
+  - job_run
+  - job_read
+  - job_cancel
+  - AgentJob
 
 - title: Errors
-  desc: Catch errors by class and inspect their details.
+  desc: Catch Deputy errors by class.
   contents:
   - deputy-errors
   - is_deputy_error
-
-articles:
-- title: Intro
-  navbar: ~
-  contents:
-  - getting-started
-- title: Guides
-  contents:
-  - tools
-  - permissions
-  - trusted-mini-agents
-  - hooks
-- title: Apps
-  contents:
-  - example-shiny-chat
-- title: Advanced
-  contents:
-  - multi-agent
-  - background-jobs
-  - structured-output
-  - runtime-integration
-- title: Recipes
-  contents:
-  - example-data-analysis
-  - example-extraction-pipeline
-  - example-code-review

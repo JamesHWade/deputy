@@ -2,37 +2,37 @@
 % Please edit documentation in R/tool-input-review.R
 \name{tool_input_review}
 \alias{tool_input_review}
-\title{Tabulate tool arguments for human review}
+\title{Tabulate a tool call's arguments for review}
 \usage{
 tool_input_review(tool_input, tool_arguments = NULL)
 }
 \arguments{
-\item{tool_input}{Named list of proposed arguments, as given to permission
-callbacks and hooks or found in \code{pending$request$tool_input}.}
+\item{tool_input}{Named list of proposed arguments, as passed to permission
+callbacks and hooks, or the \code{request$tool_input} of a pending approval
+from \code{\link[=approval_read]{approval_read()}}.}
 
 \item{tool_arguments}{The tool's declared arguments: an ellmer \code{TypeObject}
-such as \code{context$tool_arguments} or \code{tool@arguments}, or \code{NULL} when no
-declaration is available.}
+such as \code{context$tool_arguments} or \code{tool@arguments}, or \code{NULL} if you
+don't have one.}
 }
 \value{
 A data frame with character columns \code{argument}, \code{type},
-\code{description}, and \code{value}, and logical columns \code{required} and \code{declared}.
-Undeclared input fields are kept with \code{declared = FALSE}; declared fields
-missing from the input have value \code{NA}. Argument names are paths joined
-with dots for display; the \code{"paths"} attribute holds each row's path as a
-character vector, which stays exact when a name itself contains a dot.
+\code{description} and \code{value}, and logical columns \code{required} and \code{declared}.
+Input fields the tool doesn't declare are kept with \code{declared = FALSE};
+declared fields missing from the input have value \code{NA}. The \code{"paths"}
+attribute holds each row's path as a character vector, which stays exact
+when a name itself contains a dot.
 }
 \description{
-Builds a data frame with one row per argument field, pairing the model's
-proposed value with the tool's declared ellmer type and description. Nested
-objects are flattened to dotted paths such as \code{plan.treatment}. Use it in a
-\code{can_use_tool} callback, PreToolUse hook, or durable approval review to show a
-reviewer a table instead of \code{dput()} text.
+Builds a data frame with one row per argument, pairing the value the model
+proposed with the tool's declared type and description. Nested objects are
+flattened to dotted names such as \code{plan.treatment}. Use it in a
+\code{can_use_tool} callback, a \code{PreToolUse} hook or an approval screen to show a
+person a table instead of \code{dput()} output.
 
-Permission callbacks and PreToolUse hooks receive the registered tool's
-declared arguments as \code{context$tool_arguments}. Values are formatted for
-display only. Validate inputs in the tool itself; review does not establish
-that a value is correct.
+Permission callbacks and \code{PreToolUse} hooks get the tool's declared
+arguments as \code{context$tool_arguments}. The table is for display only;
+validate inputs in the tool itself.
 }
 \examples{
 arguments <- ellmer::type_object(

@@ -2,7 +2,7 @@
 % Please edit documentation in R/agent-job.R
 \name{job_create}
 \alias{job_create}
-\title{Create a durable host-owned Agent job}
+\title{Create a background job}
 \usage{
 job_create(
   directory,
@@ -17,30 +17,48 @@ job_create(
 )
 }
 \arguments{
-\item{directory}{Parent directory owned by the host.}
+\item{directory}{Directory to create the job directory in. It is created
+if needed.}
 
-\item{agent}{Idle ordinary \link{Agent} whose exact manifest is retained.}
+\item{agent}{The \link{Agent} to describe. \code{bind} in \code{\link[=job_run]{job_run()}} must rebuild an
+agent with the same setup.}
 
-\item{task}{Non-empty task text.}
+\item{task}{The task, as one non-empty string.}
 
-\item{owner_id}{Host owner or tenant identifier.}
+\item{owner_id}{ID of the user or tenant that owns the job.}
 
-\item{definition_revision}{Host revision for the Agent definition.}
+\item{definition_revision}{Your label (a string or number) for the current
+version of the agent's configuration. \code{\link[=job_run]{job_run()}} runs the job only if
+\code{authorize} returns the same value.}
 
-\item{context_revision}{Host revision for source context.}
+\item{context_revision}{Your label (a string or number) for the current
+version of the context the agent works from, checked the same way.}
 
-\item{usage_limits}{\link{UsageLimits} reserved for this job.}
+\item{usage_limits}{\link{UsageLimits} for the job.}
 
-\item{associations}{Portable host conversation associations.}
+\item{associations}{Optional plain list of your own data to keep with the
+job, such as a conversation ID.}
 
-\item{max_bytes}{Maximum bytes for each immutable store. Active job revisions
-must also leave 1 MiB + 128 KiB per revision for cleanup and terminal
-settlement; admission fails if the initial record and reserve cannot fit.}
+\item{max_bytes}{Size limit for the job's saved record, in bytes (50 MiB
+by default). While the job is active, the record must stay below half
+this limit minus about 1.1 MiB, which is kept free for the final result
+and cleanup. \code{job_create()} errors if the first record is too big.}
 }
 \value{
-The committed job directory.
+The path to the new job directory. Keep it to run, read or cancel
+the job.
 }
 \description{
-The Agent is inspected into a portable manifest. It is never serialized;
-the host supplies a binder again when \code{\link[=job_run]{job_run()}} consumes the job.
+Saves a task in a new job directory so that \code{\link[=job_run]{job_run()}} can run it later,
+possibly in another R process. The agent isn't saved: Deputy records its
+setup (model, system prompt, tools, permissions, conversation and so on),
+and \code{job_run()} checks that the agent you rebuild matches it.
+}
+\details{
+The agent must be idle and must be a plain \link{Agent} (not a \link{LeadAgent}) or
+the root of a graph from \code{agent$retain_agent_graph()}. Fallback chats and
+provider-native tools aren't supported.
+}
+\seealso{
+\code{vignette("background-jobs")}
 }

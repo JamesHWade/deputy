@@ -2,25 +2,25 @@
 % Please edit documentation in R/tool-metadata.R
 \name{tool_metadata}
 \alias{tool_metadata}
-\title{Inspect a tool's origin and annotation coverage}
+\title{Inspect a tool's origin and annotations}
 \usage{
 tool_metadata(tool)
 }
 \arguments{
-\item{tool}{An ellmer function tool or supported provider-native tool.}
+\item{tool}{An ellmer tool, or a provider's built-in tool.}
 }
 \value{
-A list with \code{name}, \code{source}, supplied \code{annotations},
-\code{missing_annotations}, and \code{effective_annotations}. Source types are
-\code{"function"}, \code{"package"} (with package name), \code{"provider"}, or \code{"mcp"}
-(with exact server and tool names). Unknown origins are not guessed from
-tool names. Effective annotations describe the conservative defaults;
-permission modes, capabilities, lists, and callbacks still decide access.
+A list with \code{name}, \code{source}, \code{annotations} (as declared),
+\code{missing_annotations}, and \code{effective_annotations} (the declared values,
+with cautious defaults filling the gaps). \code{source$type} is \code{"function"},
+\code{"package"} (with \code{package}), \code{"provider"}, or \code{"mcp"} (with \code{server} and
+\code{tool}). Whether a call is allowed still depends on the agent's
+permissions.
 }
 \description{
-Returns metadata for the executable source of an ellmer tool, including
-tools wrapped by an Agent or copied into a delegated Agent. This does not
-call the tool, connect a server, or authorize execution.
+Reports where a tool comes from and which annotations it declares. It works
+on tools as you created them and on the wrapped copies an agent or subagent
+holds. The tool is not called.
 }
 \examples{
 tool_metadata(tool_read_file)

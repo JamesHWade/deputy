@@ -13,24 +13,28 @@ HookResultPostToolUse(
 )
 }
 \arguments{
-\item{continue}{One non-missing logical value. If FALSE, stop the agent after this hook}
+\item{continue}{\code{TRUE} or \code{FALSE}. \code{FALSE} stops the run after this tool
+call.}
 
-\item{suppress_output}{Coerced with \code{isTRUE()}. Whether to suppress the result on Deputy's emitted
-\code{tool_end} event. This does not remove the result from model context.}
+\item{suppress_output}{If \code{TRUE}, leave the result out of the \code{tool_end}
+event.}
 
-\item{updated_tool_output}{Optional replacement value for Deputy's emitted
-\code{tool_end} event. ellmer does not support rewriting the model-visible
-in-flight result from this callback.}
+\item{updated_tool_output}{Optional value to report in the \code{tool_end} event
+instead of the tool's result.}
 
-\item{additional_context}{Optional text to append to the running context}
+\item{additional_context}{Optional text to add to the agent's system prompt.
+It stays there for later turns; the same text is only added once.}
 
-\item{stop_reason}{Optional stop reason used when \code{continue = FALSE}}
+\item{stop_reason}{Optional stop reason used when \code{continue = FALSE}.
+Defaults to \code{"hook_requested_stop"}.}
 }
 \value{
-A \code{HookResultPostToolUse} S7 object
+A \code{HookResultPostToolUse} object.
 }
 \description{
-Return this from a PostToolUse hook callback.
+Return this from a PostToolUse hook to stop the run or to change what the
+agent's \code{tool_end} event reports. The model always sees the tool's real
+result.
 }
 \examples{
 # Continue execution
@@ -41,5 +45,5 @@ HookResultPostToolUse(continue = FALSE)
 
 }
 \seealso{
-\link{CallbackResult} for read-only properties and S7 inspection.
+\link{CallbackResult} for reading result fields.
 }
