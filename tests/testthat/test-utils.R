@@ -68,6 +68,27 @@ test_that("has_path_traversal allows safe paths", {
   expect_false(has_path_traversal("/Users/test/file.txt"))
 })
 
+test_that("has_path_traversal matches .. only as a whole path segment", {
+  # Dots inside a name are not parent references
+  expect_false(has_path_traversal("notes..v2.md"))
+  expect_false(has_path_traversal("subdir/notes..v2.md"))
+  expect_false(has_path_traversal("..hidden"))
+  expect_false(has_path_traversal("a..b/c..d/file.txt"))
+  expect_false(has_path_traversal("file.."))
+
+  # A .. segment is flagged with either separator and in any position
+  expect_true(has_path_traversal(".."))
+  expect_true(has_path_traversal("foo/.."))
+  expect_true(has_path_traversal("foo\\..\\bar"))
+  expect_true(has_path_traversal("..\\escape.txt"))
+  expect_true(has_path_traversal("/tmp/allowed/../escape.txt"))
+
+  # Windows trims trailing dots and spaces, so these are flagged too
+  expect_true(has_path_traversal(".../escape.txt"))
+  expect_true(has_path_traversal("foo/.. /escape.txt"))
+  expect_true(has_path_traversal("foo/..."))
+})
+
 test_that("truncate_string works correctly", {
   # Short strings unchanged
   expect_equal(truncate_string("hello", 10), "hello")

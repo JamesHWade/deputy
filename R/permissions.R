@@ -16,7 +16,10 @@ NULL
 #' can do anything your R session can.
 #'
 #' @param mode One of `"standard"`, `"plan"`, `"readonly"`, or `"full"`.
-#' @param file_read Allow file reading. `TRUE` or `FALSE`.
+#' @param file_read Allow file reading. `TRUE` or `FALSE`. Reads aren't
+#'   limited to a directory: with `TRUE`, the file tools can read any file the
+#'   R process can, including credential files such as `~/.Renviron`. Use
+#'   `can_use_tool` to refuse particular paths.
 #' @param file_write `TRUE`, `FALSE`, or an existing absolute directory. A
 #'   directory allows writes only inside it and is resolved when the policy is
 #'   created. Defaults to the current working directory.
