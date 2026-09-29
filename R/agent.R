@@ -2919,6 +2919,25 @@ Agent <- R6::R6Class(
         if (is.function(workspace_runner)) {
           return(workspace_runner(arguments, private$.working_dir))
         }
+        write_root <- private$execution_write_root(execution_id)
+        if (!is.null(write_root)) {
+          # A file or link changed since the permission check must not move
+          # the write outside the directory the policy checked.
+          return(tryCatch(
+            validate_path_at_operation(
+              arguments$path,
+              write_root,
+              function(path) do.call(tool, arguments)
+            ),
+            deputy_unsafe_path = function(error) {
+              ellmer::tool_reject(paste(
+                "The path no longer resolves inside the allowed directory;",
+                "a file or link in it changed after the permission check:",
+                arguments$path
+              ))
+            }
+          ))
+        }
         source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||%
           tool
         cancel <- attr(source, "deputy_mcp_cancel_active", exact = TRUE) %||%

@@ -22,7 +22,10 @@ NULL
 #'   `can_use_tool` to refuse particular paths.
 #' @param file_write `TRUE`, `FALSE`, or an existing absolute directory. A
 #'   directory allows writes only inside it and is resolved when the policy is
-#'   created. Defaults to the current working directory.
+#'   created. The path is checked when the model asks to write and again just
+#'   before writing, so a symbolic link swapped in between is refused. The
+#'   second check narrows the window for such a swap but can't remove it.
+#'   Defaults to the current working directory.
 #' @param bash Allow shell commands. `TRUE` or `FALSE`.
 #' @param r_code Allow R code execution. `TRUE` or `FALSE`.
 #' @param web Allow web access, including other tools that reach external

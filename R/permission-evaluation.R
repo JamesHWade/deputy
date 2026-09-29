@@ -207,6 +207,24 @@ permission_check_tool_specific <- function(
   permission_check_annotation_capabilities(permissions, context)
 }
 
+# The directory a write tool's path was checked against. This mirrors
+# `permission_check_named_capability()`: a standard-mode policy with a
+# directory grant checks the path of every non-MCP tool with a native write
+# name. NULL when no directory check applied, as in full mode.
+permission_enforced_write_root <- function(permissions, tool_name, context) {
+  if (
+    permissions@mode %in%
+      c("full", "readonly", "plan") ||
+      !is.character(permissions@file_write) ||
+      is_mcp_tool_context(context) ||
+      !normalize_native_tool_id(tool_name) %in%
+        c("write_file", "edit_file", "multi_edit")
+  ) {
+    return(NULL)
+  }
+  permissions@file_write
+}
+
 permission_check_named_capability <- function(
   permissions,
   tool_name,

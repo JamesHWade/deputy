@@ -364,69 +364,56 @@ is_absolute_path <- function(path) {
     grepl("^(/|[A-Za-z]:[/\\\\]|\\\\\\\\)", path)
 }
 
-#' Check a path, then run a file operation on it
+#' Check a path again, then run a file operation on it
 #'
-#' Validates the path immediately before running `operation`, which narrows
-#' (but doesn't remove) the window in which the filesystem can change between
-#' the check and the use. Prefer this to checking a path separately.
+#' Checks that `path` is inside `allowed_dir` immediately before running
+#' `operation`, with the containment test the permission policy uses
+#' (`is_path_within_permission_root()`), so both checks agree. The permission
+#' check and the write are separate steps and a symbolic link can change
+#' between them. Checking again narrows that window; R can't open a file
+#' without following links, so it doesn't close it.
 #'
-#' @param path Path to validate
-#' @param allowed_dir Directory the path must be within (NULL to skip check)
-#' @param operation Function to perform if validation passes. Receives the
-#'   normalized path as its first argument.
+#' @param path Path the operation will use
+#' @param allowed_dir Existing absolute directory the path must be within
+#' @param operation Function run with `path` if the check passes
 #' @param ... Additional arguments passed to operation
-#' @return Result of `operation`. Errors if the path is empty, contains `..`
-#'   or a leading `~`, can't be normalized, or is outside `allowed_dir`.
+#' @return Result of `operation`. Signals `deputy_unsafe_path` if the path is
+#'   empty, contains a `..` segment or a leading `~`, or doesn't resolve
+#'   inside `allowed_dir`.
 #' @noRd
 validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
-  # Validate path format
-
-  if (is.null(path) || !is.character(path) || nchar(path) == 0) {
-    cli_abort(c(
-      "Invalid path",
-      "x" = "Path must be a non-empty string"
-    ))
+  if (!is_nonempty_string(path)) {
+    abort_deputy(
+      c("Invalid path", "x" = "Path must be a non-empty string"),
+      class = "unsafe_path"
+    )
   }
 
-  # Check for path traversal patterns
   if (has_path_traversal(path)) {
-    cli_abort(c(
-      "Path traversal detected",
-      "x" = "Path contains potentially dangerous patterns (.. or ~)",
-      "i" = "Use absolute paths within the allowed directory"
-    ))
+    abort_deputy(
+      c(
+        "Path traversal detected",
+        "x" = "Path contains potentially dangerous patterns (.. or ~)",
+        "i" = "Use absolute paths within the allowed directory"
+      ),
+      class = "unsafe_path"
+    )
   }
 
-  # Expand and normalize the path
-  normalized <- expand_and_normalize(path)
-  if (is.na(normalized)) {
-    cli_abort(c(
-      "Path normalization failed",
-      "x" = "Could not normalize path: {.path {path}}"
-    ))
-  }
-
-  # If allowed_dir is specified, validate containment
-  if (!is.null(allowed_dir)) {
-    # Re-resolve symlinks RIGHT BEFORE the check (minimize TOCTOU window)
-    if (file.exists(normalized)) {
-      resolved <- resolve_symlinks(normalized)
-      if (!is.na(resolved)) {
-        normalized <- resolved
-      }
-    }
-
-    if (!is_path_within(normalized, allowed_dir)) {
-      cli_abort(c(
+  root <- canonical_permission_root(allowed_dir)
+  if (is.na(root) || !is_path_within_permission_root(path, root)) {
+    abort_deputy(
+      c(
         "Path outside allowed directory",
         "x" = "Path {.path {path}} is not within {.path {allowed_dir}}",
         "i" = "File operations are restricted to the allowed directory"
-      ))
-    }
+      ),
+      class = "unsafe_path"
+    )
   }
 
   # Perform the operation immediately after validation
-  operation(normalized, ...)
+  operation(path, ...)
 }
 
 #' Write a file after checking its path

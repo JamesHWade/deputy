@@ -1,5 +1,12 @@
 # deputy (development version)
 
+* A write restricted to a `file_write` directory is checked again just
+  before `write_file`, `edit_file` or `multi_edit` runs. If a file or
+  symbolic link in the path changed after the permission check so that the
+  path now resolves outside the directory, the call is refused instead of
+  writing there. A write that a `PermissionRequest` hook allowed outside the
+  directory is not checked again (#219).
+
 * File writes restricted to a directory no longer refuse names that merely
   contain two dots, such as `notes..v2.md`. Only a `..` path segment counts as
   path traversal (#219).
