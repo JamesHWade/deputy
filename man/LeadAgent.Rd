@@ -95,6 +95,8 @@ its answer. See \code{vignette("multi-agent")}.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_sync"><a href='../../deputy/html/Agent.html#method-Agent-run_sync'><code>Agent$run_sync()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="save_session"><a href='../../deputy/html/Agent.html#method-Agent-save_session'><code>Agent$save_session()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="session_id"><a href='../../deputy/html/Agent.html#method-Agent-session_id'><code>Agent$session_id()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_chat"><a href='../../deputy/html/Agent.html#method-Agent-set_chat'><code>Agent$set_chat()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_context_policy"><a href='../../deputy/html/Agent.html#method-Agent-set_context_policy'><code>Agent$set_context_policy()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_model"><a href='../../deputy/html/Agent.html#method-Agent-set_model'><code>Agent$set_model()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_permission_mode"><a href='../../deputy/html/Agent.html#method-Agent-set_permission_mode'><code>Agent$set_permission_mode()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_system_prompt"><a href='../../deputy/html/Agent.html#method-Agent-set_system_prompt'><code>Agent$set_system_prompt()</code></a></span></li>
@@ -213,16 +215,20 @@ results are recorded in the lead's run and passed to its \code{on_result}.}
 \if{html}{\out{<a id="method-LeadAgent-register_sub_agent"></a>}}
 \if{latex}{\out{\hypertarget{method-LeadAgent-register_sub_agent}{}}}
 \subsection{\code{LeadAgent$register_sub_agent()}}{
-  Add a subagent definition. Errors if its name is already registered.
+  Add a subagent definition, or replace one with the same name, for
+example to give a subagent a different set of tools. Delegations that
+are already running keep the definition they started with.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{LeadAgent$register_sub_agent(definition)}
+    \preformatted{LeadAgent$register_sub_agent(definition, replace = FALSE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{definition}}{An \code{\link[=agent_definition]{agent_definition()}} object}
+      \item{\code{replace}}{If \code{TRUE}, replace a registered definition with the same
+name. If \code{FALSE} (the default), a name clash is an error.}
     }
     \if{html}{\out{</div>}}
   }

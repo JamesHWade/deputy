@@ -1007,7 +1007,8 @@ Agent <- R6::R6Class(
     #' @param ... Message content, as for ellmer.
     #' @param stream `"text"` yields text chunks; `"content"` yields ellmer
     #'   content objects, including tool requests and results.
-    #' @param controller Optional ellmer stream controller.
+    #' @param controller Optional ellmer stream controller. As in ellmer, a
+    #'   cancelled controller is reset when the new run starts.
     #' @param run_context Named list merged into the agent's `run_context` for
     #'   this run.
     #' @return A generator.
@@ -1034,6 +1035,7 @@ Agent <- R6::R6Class(
         controller = controller,
         stream_type = type
       )
+      reset_stream_controller(controller)
       private$sync_stream_generator(governed_run$stream)
     },
 
@@ -1047,7 +1049,8 @@ Agent <- R6::R6Class(
     #'   parallel; `"sequential"` runs them one at a time.
     #' @param stream `"text"` yields text chunks; `"content"` yields ellmer
     #'   content objects, including tool requests and results.
-    #' @param controller Optional ellmer stream controller.
+    #' @param controller Optional ellmer stream controller. As in ellmer, a
+    #'   cancelled controller is reset when the new run starts.
     #' @param run_context Named list merged into the agent's `run_context` for
     #'   this run.
     #' @return An asynchronous generator suitable for `shinychat::chat_append()`.
@@ -1068,7 +1071,7 @@ Agent <- R6::R6Class(
         private$.run_context,
         run_context
       )
-      private$start_governed_stream(
+      governed_run <- private$start_governed_stream(
         messages = rlang::list2(...),
         limits = self$usage_limits,
         run_context = effective_run_context,
@@ -1076,7 +1079,9 @@ Agent <- R6::R6Class(
         stream = stream,
         controller = controller,
         stream_type = type
-      )$stream
+      )
+      reset_stream_controller(controller)
+      governed_run$stream
     },
 
     #' @description
@@ -1303,6 +1308,39 @@ Agent <- R6::R6Class(
       check_conversation_lease(self, NULL)
       private$.chat$set_model(model)
       invisible(self)
+    },
+
+    #' @description
+    #' Replace the Chat the agent sends requests to, for example to continue a
+    #' conversation with a model from another provider. The conversation,
+    #' system prompt and tools move to the new Chat, and the agent's
+    #' permissions, hooks, tool observers and usage limits keep applying.
+    #' Reasoning content ([ellmer::ContentThinking]) is dropped from the
+    #' history, because each provider accepts only its own. Subagents created
+    #' after the change use the new Chat.
+    #'
+    #' To change the model within one provider, use `$set_model()`. The
+    #' replaced Chat is left with no tools or tool callbacks. Callbacks you
+    #' registered directly on it are not moved; register them with
+    #' `$on_tool_request()` and `$on_tool_result()` instead.
+    #' @param chat An ellmer Chat with no turns or tools. Its system prompt is
+    #'   replaced by the agent's. Provider-native tools can't move between
+    #'   Chats: remove them with `$set_tools()` first.
+    #' @return The agent, invisibly.
+    set_chat = function(chat) {
+      replace_agent_chat(self, chat)
+    },
+
+    #' @description
+    #' Replace the [ContextPolicy], for example to compact at a different size
+    #' after switching to a model with a larger or smaller context window. The
+    #' new policy applies from the next run.
+    #' @param context_policy A [ContextPolicy]. It must use the same
+    #'   `offload_dir` as the current policy, because large tool results that
+    #'   were already saved are read back from there.
+    #' @return The agent, invisibly.
+    set_context_policy = function(context_policy) {
+      replace_context_policy(self, context_policy)
     },
 
     #' @description
@@ -2451,14 +2489,16 @@ Agent <- R6::R6Class(
       )
     },
 
-    #' @field context_policy The agent's [ContextPolicy]. Read-only.
+    #' @field context_policy The agent's [ContextPolicy]. Read-only; use
+    #'   `$set_context_policy()` to replace it.
     context_policy = function(value) {
       if (missing(value)) {
         return(normalize_context_policy(private$.context_policy))
       }
-      cli_abort(
-        "Cannot modify agent: context_policy is immutable after construction"
-      )
+      cli_abort(c(
+        "Cannot assign the agent's context_policy",
+        "i" = "Use {.code $set_context_policy()} to replace it."
+      ))
     },
 
     #' @field working_dir The directory file tools work in. Read-only.

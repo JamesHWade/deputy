@@ -185,27 +185,41 @@ LeadAgent <- R6::R6Class(
     },
 
     #' @description
-    #' Add a subagent definition. Errors if its name is already registered.
+    #' Add a subagent definition, or replace one with the same name, for
+    #' example to give a subagent a different set of tools. Delegations that
+    #' are already running keep the definition they started with.
     #'
     #' @param definition An [agent_definition()] object
+    #' @param replace If `TRUE`, replace a registered definition with the same
+    #'   name. If `FALSE` (the default), a name clash is an error.
     #' @return The lead, invisibly.
-    register_sub_agent = function(definition) {
+    register_sub_agent = function(definition, replace = FALSE) {
       check_conversation_lease(self, NULL)
       if (!S7::S7_inherits(definition, AgentDefinition)) {
         cli_abort("{.arg definition} must be an AgentDefinition object")
       }
+      if (!rlang::is_bool(replace)) {
+        cli_abort("{.arg replace} must be TRUE or FALSE")
+      }
 
       definition <- copy_agent_definition(definition)
-      if (definition$name %in% names(private$.sub_agent_defs)) {
-        cli_abort(
-          "AgentDefinition {.val {definition$name}} is already registered"
-        )
+      name <- definition$name
+      previous <- private$.sub_agent_defs[[name]]
+      if (!is.null(previous) && !replace) {
+        cli_abort(c(
+          "AgentDefinition {.val {name}} is already registered",
+          "i" = "Use {.code replace = TRUE} to replace it."
+        ))
       }
-      private$.sub_agent_defs[[definition$name]] <- definition
+      private$.sub_agent_defs[[name]] <- definition
       tryCatch(
         private$check_trusted_tools(private$.chat$get_tools()),
         error = function(error) {
-          private$.sub_agent_defs[[definition$name]] <- NULL
+          if (is.null(previous)) {
+            private$.sub_agent_defs[[name]] <- NULL
+          } else {
+            private$.sub_agent_defs[[name]] <- previous
+          }
           rlang::cnd_signal(error)
         }
       )
@@ -219,7 +233,11 @@ LeadAgent <- R6::R6Class(
       )
       private$.chat$set_system_prompt(new_prompt)
 
-      cli_alert_info("Registered sub-agent: {.val {definition$name}}")
+      if (is.null(previous)) {
+        cli_alert_info("Registered sub-agent: {.val {name}}")
+      } else {
+        cli_alert_info("Replaced sub-agent: {.val {name}}")
+      }
       invisible(self)
     },
 

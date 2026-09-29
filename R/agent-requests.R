@@ -309,6 +309,103 @@ try_chat_fallback <- function(agent, condition) {
   TRUE
 }
 
+# Agent$set_chat(): a host-selected replacement, moved between runs the way
+# try_chat_fallback() moves a failed request. The new Chat receives the prompt,
+# the history and this Agent's own adapted tools; the old Chat keeps no Deputy
+# callbacks, observers or tools that could run outside the Agent.
+replace_agent_chat <- function(agent, chat) {
+  private <- agent$.__enclos_env__$private
+  if (isTRUE(private$run_active)) {
+    conversation_abort("Wait for the active run before replacing the Chat.")
+  }
+  if (!is.null(private$.pending_approval_path)) {
+    approval_abort(
+      "This Agent has a pending approval; resume or deny it before replacing the Chat."
+    )
+  }
+  check_conversation_lease(agent, NULL)
+  validate_chat(chat)
+  if (inherits(chat, "Agent")) {
+    abort_deputy("{.arg chat} must be an ellmer Chat, not an Agent")
+  }
+  check_incoming_conversation(chat)
+  old <- private$.chat
+  if (identical(chat, old)) {
+    return(invisible(agent))
+  }
+  if (length(chat$get_turns()) || length(chat$get_tools())) {
+    abort_deputy("The new Chat must have no conversation turns or tools")
+  }
+  tools <- old$get_tools()
+  native <- names(tools)[vapply(
+    tools,
+    inherits,
+    logical(1),
+    what = "ellmer::ToolBuiltIn"
+  )]
+  if (length(native)) {
+    abort_deputy(c(
+      "Provider-native tools can't move to another Chat: {.val {native}}",
+      "i" = "Remove them with {.code $set_tools()} before replacing the Chat."
+    ))
+  }
+
+  chat$set_system_prompt(old$get_system_prompt())
+  chat$set_turns(portable_turns(old$get_turns()))
+  chat$set_tools(tools)
+  private$.chat <- chat
+  rewired <- tryCatch(
+    {
+      private$rewire_chat_runtime()
+      NULL
+    },
+    error = function(error) error
+  )
+  if (!is.null(rewired)) {
+    private$.chat <- old
+    try(private$rewire_chat_runtime(), silent = TRUE)
+    rlang::cnd_signal(rewired)
+  }
+  clear_chat_tool_callbacks(old)
+  old$set_tools(list())
+  # Fallbacks start again from the new primary Chat.
+  private$.fallback_position <- 0L
+  invisible(agent)
+}
+
+# Reasoning content carries a signature or encrypted state that only the
+# provider which produced it accepts, so history moving to another Chat keeps
+# every other content type.
+portable_turns <- function(turns) {
+  lapply(turns, function(turn) {
+    if (!inherits(turn, "ellmer::AssistantTurn")) {
+      return(turn)
+    }
+    keep <- Filter(
+      function(content) !inherits(content, "ellmer::ContentThinking"),
+      turn@contents
+    )
+    if (length(keep) == length(turn@contents)) {
+      return(turn)
+    }
+    turn@contents <- keep
+    turn
+  })
+}
+
+# ellmer resets a cancelled controller when a stream starts. A governed stream
+# starts lazily, so reset once the run is accepted, before a host such as
+# shinychat reads the controller for the new run.
+reset_stream_controller <- function(controller) {
+  if (
+    inherits(controller, "ellmer_stream_controller") &&
+      isTRUE(controller$cancelled)
+  ) {
+    controller$reset()
+  }
+  invisible(controller)
+}
+
 register_tool_observer <- function(agent, phase, callback) {
   check_conversation_lease(agent, NULL)
   private <- agent$.__enclos_env__$private
