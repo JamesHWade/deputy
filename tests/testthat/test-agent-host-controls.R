@@ -55,6 +55,34 @@ test_that("set_chat() moves the prompt, history and tools to the new Chat", {
   expect_identical(second$get_model(), "gpt-4o-mini")
 })
 
+test_that("set_chat() drops an assistant turn that held only reasoning", {
+  old <- ellmer::chat_openai(
+    model = "gpt-4o-mini",
+    credentials = function() "unused"
+  )
+  old$set_turns(list(
+    ellmer::UserTurn(list(ellmer::ContentText("First"))),
+    ellmer::AssistantTurn(list(ellmer::ContentThinking("stopped thinking"))),
+    ellmer::UserTurn(list(ellmer::ContentText("Second"))),
+    ellmer::AssistantTurn(list(
+      ellmer::ContentThinking("reasoning"),
+      ellmer::ContentText("Answer")
+    ))
+  ))
+  agent <- Agent$new(old)
+
+  agent$set_chat(ellmer::chat_anthropic(
+    model = "claude-sonnet-4-5",
+    credentials = function() "unused"
+  ))
+
+  turns <- agent$get_turns()
+  expect_length(turns, 3L)
+  expect_s3_class(turns[[1]], "ellmer::UserTurn")
+  expect_s3_class(turns[[2]], "ellmer::UserTurn")
+  expect_identical(turns[[3]]@contents[[1]]@text, "Answer")
+})
+
 test_that("runs after set_chat() use the new Chat under the same governance", {
   withr::local_options(ellmer_max_tries = 1)
   first <- local_runtime_server(list(runtime_reply("first answer")))

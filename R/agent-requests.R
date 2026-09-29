@@ -397,9 +397,11 @@ replace_agent_chat <- function(agent, chat) {
 
 # Reasoning content carries a signature or encrypted state that only the
 # provider which produced it accepts, so history moving to another Chat keeps
-# every other content type.
+# every other content type. An assistant turn that held only reasoning (a
+# response stopped while thinking) is dropped: providers reject empty
+# assistant messages, and they accept consecutive user messages.
 portable_turns <- function(turns) {
-  lapply(turns, function(turn) {
+  turns <- lapply(turns, function(turn) {
     if (!inherits(turn, "ellmer::AssistantTurn")) {
       return(turn)
     }
@@ -410,9 +412,13 @@ portable_turns <- function(turns) {
     if (length(keep) == length(turn@contents)) {
       return(turn)
     }
+    if (length(keep) == 0L) {
+      return(NULL)
+    }
     turn@contents <- keep
     turn
   })
+  Filter(Negate(is.null), turns)
 }
 
 # ellmer resets a cancelled controller when a stream starts. A governed stream
