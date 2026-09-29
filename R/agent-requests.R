@@ -309,6 +309,22 @@ try_chat_fallback <- function(agent, condition) {
   TRUE
 }
 
+# An Agent marks the Chat it wraps, so set_chat() can't take over a Chat that
+# still backs another Agent: rewiring it would bind that Agent's calls to the
+# wrong permissions, hooks and tools. The weak reference frees the Chat once
+# its Agent is gone.
+mark_chat_owner <- function(chat, agent) {
+  attr(chat, "deputy_agent_owner") <- if (!is.null(agent)) {
+    rlang::new_weakref(agent)
+  }
+  invisible(chat)
+}
+
+chat_owner <- function(chat) {
+  ref <- attr(chat, "deputy_agent_owner", exact = TRUE)
+  if (rlang::is_weakref(ref)) rlang::wref_key(ref)
+}
+
 # Agent$set_chat(): a host-selected replacement, moved between runs the way
 # try_chat_fallback() moves a failed request. The new Chat receives the prompt,
 # the history and this Agent's own adapted tools; the old Chat keeps no Deputy
@@ -332,6 +348,10 @@ replace_agent_chat <- function(agent, chat) {
   old <- private$.chat
   if (identical(chat, old)) {
     return(invisible(agent))
+  }
+  owner <- chat_owner(chat)
+  if (!is.null(owner) && !identical(owner, agent)) {
+    abort_deputy("This Chat already belongs to another Agent")
   }
   if (length(chat$get_turns()) || length(chat$get_tools())) {
     abort_deputy("The new Chat must have no conversation turns or tools")
@@ -368,6 +388,8 @@ replace_agent_chat <- function(agent, chat) {
   }
   clear_chat_tool_callbacks(old)
   old$set_tools(list())
+  mark_chat_owner(old, NULL)
+  mark_chat_owner(chat, agent)
   # Fallbacks start again from the new primary Chat.
   private$.fallback_position <- 0L
   invisible(agent)

@@ -182,6 +182,7 @@ Agent <- R6::R6Class(
         cli_abort("{.arg permissions} must be a Permissions object")
       }
       private$.chat <- chat
+      mark_chat_owner(chat, self)
       private$.permissions <- permissions
       private$.trusted_results <- normalize_trusted_results(trusted_results)
       private$.usage_limits <- normalize_usage_limits(usage_limits)

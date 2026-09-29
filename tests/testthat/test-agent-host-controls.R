@@ -47,6 +47,12 @@ test_that("set_chat() moves the prompt, history and tools to the new Chat", {
   expect_length(old$get_tools(), 0L)
   expect_identical(agent$get_model(), "claude-sonnet-4-5")
   expect_identical(agent$set_chat(new), agent)
+
+  # The replaced Chat is free to back another Agent once it's cleared.
+  old$set_turns(list())
+  second <- Agent$new(create_mock_chat())
+  expect_no_error(second$set_chat(old))
+  expect_identical(second$get_model(), "gpt-4o-mini")
 })
 
 test_that("runs after set_chat() use the new Chat under the same governance", {
@@ -109,6 +115,11 @@ test_that("set_chat() refuses Chats and states it can't take over", {
     agent$set_chat(Agent$new(create_mock_chat())),
     "not an Agent"
   )
+  # An empty Chat that still backs another Agent can't be taken over.
+  other_chat <- create_mock_chat()
+  other <- Agent$new(other_chat)
+  expect_error(agent$set_chat(other_chat), "belongs to another Agent")
+  expect_identical(other$get_turns(), list())
 
   private <- agent$.__enclos_env__$private
   private$run_active <- TRUE
