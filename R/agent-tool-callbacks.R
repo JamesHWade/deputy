@@ -131,6 +131,20 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         tool_input,
         permission_context
       )
+      # Keep the directory the policy checked this write against, so
+      # `execute_tool()` can check the path again just before writing. A call
+      # that only a PermissionRequest hook allows keeps none.
+      if (
+        S7::S7_inherits(perm_result, PermissionResultAllow) ||
+          S7::S7_inherits(perm_result, PermissionResultPending)
+      ) {
+        private$tool_call_records[[record$record_index]]$write_root <-
+          permission_enforced_write_root(
+            self$permissions,
+            tool_name,
+            permission_context
+          )
+      }
 
       if (S7::S7_inherits(perm_result, PermissionResultPending)) {
         if (!is.null(nested_context)) {

@@ -364,69 +364,64 @@ is_absolute_path <- function(path) {
     grepl("^(/|[A-Za-z]:[/\\\\]|\\\\\\\\)", path)
 }
 
-#' Check a path, then run a file operation on it
+#' Check a path again, then run a file operation on it
 #'
-#' Validates the path immediately before running `operation`, which narrows
-#' (but doesn't remove) the window in which the filesystem can change between
-#' the check and the use. Prefer this to checking a path separately.
+#' Checks that `path` is inside `allowed_dir` immediately before running
+#' `operation`, with the containment test the permission policy uses
+#' (`is_path_within_permission_root()`), so both checks agree. The permission
+#' check and the write are separate steps and a symbolic link can change
+#' between them. Checking again narrows that window; R can't open a file
+#' without following links, so it doesn't close it.
 #'
-#' @param path Path to validate
-#' @param allowed_dir Directory the path must be within (NULL to skip check)
-#' @param operation Function to perform if validation passes. Receives the
-#'   normalized path as its first argument.
+#' `allowed_dir` is the directory as the policy resolved it when it was
+#' created, such as `Permissions@file_write`. It is not resolved again: only
+#' `path` is, so replacing the directory itself with a link to somewhere else
+#' doesn't move the boundary.
+#'
+#' @param path Path the operation will use
+#' @param allowed_dir Resolved absolute directory the path must be within, as
+#'   `canonical_permission_root()` returns it
+#' @param operation Function run with `path` if the check passes
 #' @param ... Additional arguments passed to operation
-#' @return Result of `operation`. Errors if the path is empty, contains `..`
-#'   or a leading `~`, can't be normalized, or is outside `allowed_dir`.
+#' @return Result of `operation`. Signals `deputy_unsafe_path` if the path is
+#'   empty, contains a `..` segment or a leading `~`, or doesn't resolve
+#'   inside `allowed_dir`.
 #' @noRd
 validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
-  # Validate path format
-
-  if (is.null(path) || !is.character(path) || nchar(path) == 0) {
-    cli_abort(c(
-      "Invalid path",
-      "x" = "Path must be a non-empty string"
-    ))
+  if (!is_nonempty_string(path)) {
+    abort_deputy(
+      c("Invalid path", "x" = "Path must be a non-empty string"),
+      class = "unsafe_path"
+    )
   }
 
-  # Check for path traversal patterns
   if (has_path_traversal(path)) {
-    cli_abort(c(
-      "Path traversal detected",
-      "x" = "Path contains potentially dangerous patterns (.. or ~)",
-      "i" = "Use absolute paths within the allowed directory"
-    ))
+    abort_deputy(
+      c(
+        "Path traversal detected",
+        "x" = "Path contains potentially dangerous patterns (.. or ~)",
+        "i" = "Use absolute paths within the allowed directory"
+      ),
+      class = "unsafe_path"
+    )
   }
 
-  # Expand and normalize the path
-  normalized <- expand_and_normalize(path)
-  if (is.na(normalized)) {
-    cli_abort(c(
-      "Path normalization failed",
-      "x" = "Could not normalize path: {.path {path}}"
-    ))
-  }
-
-  # If allowed_dir is specified, validate containment
-  if (!is.null(allowed_dir)) {
-    # Re-resolve symlinks RIGHT BEFORE the check (minimize TOCTOU window)
-    if (file.exists(normalized)) {
-      resolved <- resolve_symlinks(normalized)
-      if (!is.na(resolved)) {
-        normalized <- resolved
-      }
-    }
-
-    if (!is_path_within(normalized, allowed_dir)) {
-      cli_abort(c(
+  if (
+    !is_nonempty_string(allowed_dir) ||
+      !is_path_within_permission_root(path, allowed_dir)
+  ) {
+    abort_deputy(
+      c(
         "Path outside allowed directory",
         "x" = "Path {.path {path}} is not within {.path {allowed_dir}}",
         "i" = "File operations are restricted to the allowed directory"
-      ))
-    }
+      ),
+      class = "unsafe_path"
+    )
   }
 
   # Perform the operation immediately after validation
-  operation(normalized, ...)
+  operation(path, ...)
 }
 
 #' Write a file after checking its path
@@ -436,31 +431,26 @@ validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
 #'
 #' @param path Path to write to
 #' @param content Content to write
-#' @param allowed_dir Directory the path must be within (NULL to skip check)
+#' @param allowed_dir Resolved absolute directory the path must be within
 #' @param append Whether to append to existing file
 #' @return `NULL`, invisibly. Errors if the path check or the write fails.
 #' @noRd
-secure_write_file <- function(
-  path,
-  content,
-  allowed_dir = NULL,
-  append = FALSE
-) {
+secure_write_file <- function(path, content, allowed_dir, append = FALSE) {
   validate_path_at_operation(
     path = path,
     allowed_dir = allowed_dir,
-    operation = function(normalized_path) {
+    operation = function(path) {
       # Create directory if needed
-      dir <- dirname(normalized_path)
+      dir <- dirname(path)
       if (!dir.exists(dir)) {
         dir.create(dir, recursive = TRUE)
       }
 
       # Perform the write immediately after validation
       if (append) {
-        cat(content, file = normalized_path, append = TRUE)
+        cat(content, file = path, append = TRUE)
       } else {
-        writeLines(content, normalized_path)
+        writeLines(content, path)
       }
       invisible(NULL)
     }
@@ -472,22 +462,22 @@ secure_write_file <- function(
 #' Checks the path with `validate_path_at_operation()` just before reading.
 #'
 #' @param path Path to read from
-#' @param allowed_dir Directory the path must be within (NULL to skip check)
+#' @param allowed_dir Resolved absolute directory the path must be within
 #' @return The file contents as one string, with lines joined by `"\n"`.
 #'   Errors if the file doesn't exist.
 #' @noRd
-secure_read_file <- function(path, allowed_dir = NULL) {
+secure_read_file <- function(path, allowed_dir) {
   validate_path_at_operation(
     path = path,
     allowed_dir = allowed_dir,
-    operation = function(normalized_path) {
-      if (!file.exists(normalized_path)) {
+    operation = function(path) {
+      if (!file.exists(path)) {
         cli_abort(c(
           "File not found",
-          "x" = "File does not exist: {.path {normalized_path}}"
+          "x" = "File does not exist: {.path {path}}"
         ))
       }
-      paste(readLines(normalized_path, warn = FALSE), collapse = "\n")
+      paste(readLines(path, warn = FALSE), collapse = "\n")
     }
   )
 }
