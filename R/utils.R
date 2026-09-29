@@ -423,31 +423,26 @@ validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
 #'
 #' @param path Path to write to
 #' @param content Content to write
-#' @param allowed_dir Directory the path must be within (NULL to skip check)
+#' @param allowed_dir Existing absolute directory the path must be within
 #' @param append Whether to append to existing file
 #' @return `NULL`, invisibly. Errors if the path check or the write fails.
 #' @noRd
-secure_write_file <- function(
-  path,
-  content,
-  allowed_dir = NULL,
-  append = FALSE
-) {
+secure_write_file <- function(path, content, allowed_dir, append = FALSE) {
   validate_path_at_operation(
     path = path,
     allowed_dir = allowed_dir,
-    operation = function(normalized_path) {
+    operation = function(path) {
       # Create directory if needed
-      dir <- dirname(normalized_path)
+      dir <- dirname(path)
       if (!dir.exists(dir)) {
         dir.create(dir, recursive = TRUE)
       }
 
       # Perform the write immediately after validation
       if (append) {
-        cat(content, file = normalized_path, append = TRUE)
+        cat(content, file = path, append = TRUE)
       } else {
-        writeLines(content, normalized_path)
+        writeLines(content, path)
       }
       invisible(NULL)
     }
@@ -459,22 +454,22 @@ secure_write_file <- function(
 #' Checks the path with `validate_path_at_operation()` just before reading.
 #'
 #' @param path Path to read from
-#' @param allowed_dir Directory the path must be within (NULL to skip check)
+#' @param allowed_dir Existing absolute directory the path must be within
 #' @return The file contents as one string, with lines joined by `"\n"`.
 #'   Errors if the file doesn't exist.
 #' @noRd
-secure_read_file <- function(path, allowed_dir = NULL) {
+secure_read_file <- function(path, allowed_dir) {
   validate_path_at_operation(
     path = path,
     allowed_dir = allowed_dir,
-    operation = function(normalized_path) {
-      if (!file.exists(normalized_path)) {
+    operation = function(path) {
+      if (!file.exists(path)) {
         cli_abort(c(
           "File not found",
-          "x" = "File does not exist: {.path {normalized_path}}"
+          "x" = "File does not exist: {.path {path}}"
         ))
       }
-      paste(readLines(normalized_path, warn = FALSE), collapse = "\n")
+      paste(readLines(path, warn = FALSE), collapse = "\n")
     }
   )
 }
