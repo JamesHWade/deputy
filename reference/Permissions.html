@@ -21,7 +21,7 @@ can do anything your R session can."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9001</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -124,7 +124,10 @@ R process can, including credential files such as <code>~/.Renviron</code>. Use
 <dt id="arg-file-write">file_write<a class="anchor" aria-label="anchor" href="#arg-file-write"></a></dt>
 <dd><p><code>TRUE</code>, <code>FALSE</code>, or an existing absolute directory. A
 directory allows writes only inside it and is resolved when the policy is
-created. Defaults to the current working directory.</p></dd>
+created. The path is checked when the model asks to write and again just
+before writing, so a symbolic link swapped in between is refused. The
+second check narrows the window for such a swap but can't remove it.
+Defaults to the current working directory.</p></dd>
 
 
 <dt id="arg-bash">bash<a class="anchor" aria-label="anchor" href="#arg-bash"></a></dt>

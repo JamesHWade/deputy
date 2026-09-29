@@ -47,8 +47,11 @@ Permissions(
 - file_write:
 
   `TRUE`, `FALSE`, or an existing absolute directory. A directory allows
-  writes only inside it and is resolved when the policy is created.
-  Defaults to the current working directory.
+  writes only inside it and is resolved when the policy is created. The
+  path is checked when the model asks to write and again just before
+  writing, so a symbolic link swapped in between is refused. The second
+  check narrows the window for such a swap but can't remove it. Defaults
+  to the current working directory.
 
 - bash:
 
