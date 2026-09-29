@@ -21,7 +21,10 @@ Permissions(
 \arguments{
 \item{mode}{One of \code{"standard"}, \code{"plan"}, \code{"readonly"}, or \code{"full"}.}
 
-\item{file_read}{Allow file reading. \code{TRUE} or \code{FALSE}.}
+\item{file_read}{Allow file reading. \code{TRUE} or \code{FALSE}. Reads aren't
+limited to a directory: with \code{TRUE}, the file tools can read any file the
+R process can, including credential files such as \verb{~/.Renviron}. Use
+\code{can_use_tool} to refuse particular paths.}
 
 \item{file_write}{\code{TRUE}, \code{FALSE}, or an existing absolute directory. A
 directory allows writes only inside it and is resolved when the policy is

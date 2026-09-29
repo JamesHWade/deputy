@@ -327,9 +327,12 @@ is_path_within <- function(path, dir) {
 
 #' Check for path traversal patterns
 #'
-#' Flags `..` anywhere in the path and a leading `~`, which could reach
-#' outside a directory. Absolute paths are not flagged; `is_path_within()`
-#' checks those.
+#' Flags a `..` path segment and a leading `~`, which could reach outside a
+#' directory. Dots inside a name, as in `notes..v2.md` or `..hidden`, are not
+#' flagged. A segment of two or more dots followed only by dots or spaces is
+#' flagged too, because Windows trims trailing dots and spaces from names.
+#' Absolute paths are not flagged; the directory containment check handles
+#' them.
 #'
 #' @param path Path to check
 #' @return `TRUE` if the path contains a traversal pattern or isn't a
@@ -340,8 +343,8 @@ has_path_traversal <- function(path) {
     return(TRUE) # Invalid input, treat as suspicious
   }
   # Check for traversal patterns that could escape directories
-  # Note: Absolute paths are allowed and checked by is_path_within()
-  grepl("\\.\\.", path) || # Parent directory references (../escape.txt)
+  # Note: Absolute paths are allowed and checked for containment separately
+  grepl("(^|[/\\\\])\\.\\.[. ]*([/\\\\]|$)", path) || # ../escape.txt
     grepl("^~", path) # Home directory expansion (~user/escape.txt)
 }
 

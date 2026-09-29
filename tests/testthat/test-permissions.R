@@ -114,6 +114,27 @@ test_that("permission check blocks path traversal", {
   expect_true(grepl("traversal", result$reason, ignore.case = TRUE))
 })
 
+test_that("path-scoped writes allow names that contain two dots", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  temp_dir <- normalizePath(temp_dir, mustWork = TRUE)
+
+  perms <- permissions_standard(working_dir = temp_dir)
+  context <- list(working_dir = temp_dir)
+  check <- function(path) {
+    permissions_check(perms, "write_file", list(path = path), context)
+  }
+
+  expect_s7_class(check("notes..v2.md"), PermissionResultAllow)
+  expect_s7_class(
+    check(file.path(temp_dir, "drafts", "notes..v2.md")),
+    PermissionResultAllow
+  )
+
+  escaped <- check("drafts/../../escape.txt")
+  expect_s7_class(escaped, PermissionResultDeny)
+  expect_match(escaped$reason, "traversal")
+})
+
 test_that("path-scoped writes reject dangling symlinks outside the root", {
   skip_on_os("windows")
   sandbox <- withr::local_tempdir(pattern = "deputy-dangling-link-")
