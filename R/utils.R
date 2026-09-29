@@ -373,8 +373,14 @@ is_absolute_path <- function(path) {
 #' between them. Checking again narrows that window; R can't open a file
 #' without following links, so it doesn't close it.
 #'
+#' `allowed_dir` is the directory as the policy resolved it when it was
+#' created, such as `Permissions@file_write`. It is not resolved again: only
+#' `path` is, so replacing the directory itself with a link to somewhere else
+#' doesn't move the boundary.
+#'
 #' @param path Path the operation will use
-#' @param allowed_dir Existing absolute directory the path must be within
+#' @param allowed_dir Resolved absolute directory the path must be within, as
+#'   `canonical_permission_root()` returns it
 #' @param operation Function run with `path` if the check passes
 #' @param ... Additional arguments passed to operation
 #' @return Result of `operation`. Signals `deputy_unsafe_path` if the path is
@@ -400,8 +406,10 @@ validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
     )
   }
 
-  root <- canonical_permission_root(allowed_dir)
-  if (is.na(root) || !is_path_within_permission_root(path, root)) {
+  if (
+    !is_nonempty_string(allowed_dir) ||
+      !is_path_within_permission_root(path, allowed_dir)
+  ) {
     abort_deputy(
       c(
         "Path outside allowed directory",
@@ -423,7 +431,7 @@ validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
 #'
 #' @param path Path to write to
 #' @param content Content to write
-#' @param allowed_dir Existing absolute directory the path must be within
+#' @param allowed_dir Resolved absolute directory the path must be within
 #' @param append Whether to append to existing file
 #' @return `NULL`, invisibly. Errors if the path check or the write fails.
 #' @noRd
@@ -454,7 +462,7 @@ secure_write_file <- function(path, content, allowed_dir, append = FALSE) {
 #' Checks the path with `validate_path_at_operation()` just before reading.
 #'
 #' @param path Path to read from
-#' @param allowed_dir Existing absolute directory the path must be within
+#' @param allowed_dir Resolved absolute directory the path must be within
 #' @return The file contents as one string, with lines joined by `"\n"`.
 #'   Errors if the file doesn't exist.
 #' @noRd
