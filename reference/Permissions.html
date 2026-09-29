@@ -115,7 +115,10 @@ can do anything your R session can.</p>
 
 
 <dt id="arg-file-read">file_read<a class="anchor" aria-label="anchor" href="#arg-file-read"></a></dt>
-<dd><p>Allow file reading. <code>TRUE</code> or <code>FALSE</code>.</p></dd>
+<dd><p>Allow file reading. <code>TRUE</code> or <code>FALSE</code>. Reads aren't
+limited to a directory: with <code>TRUE</code>, the file tools can read any file the
+R process can, including credential files such as <code>~/.Renviron</code>. Use
+<code>can_use_tool</code> to refuse particular paths.</p></dd>
 
 
 <dt id="arg-file-write">file_write<a class="anchor" aria-label="anchor" href="#arg-file-write"></a></dt>

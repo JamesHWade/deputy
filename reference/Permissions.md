@@ -39,7 +39,10 @@ Permissions(
 
 - file_read:
 
-  Allow file reading. `TRUE` or `FALSE`.
+  Allow file reading. `TRUE` or `FALSE`. Reads aren't limited to a
+  directory: with `TRUE`, the file tools can read any file the R process
+  can, including credential files such as `~/.Renviron`. Use
+  `can_use_tool` to refuse particular paths.
 
 - file_write:
 

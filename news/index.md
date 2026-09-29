@@ -2,6 +2,11 @@
 
 ## deputy (development version)
 
+- File writes restricted to a directory no longer refuse names that
+  merely contain two dots, such as `notes..v2.md`. Only a `..` path
+  segment counts as path traversal
+  ([\#219](https://github.com/JamesHWade/deputy/issues/219)).
+
 - Native tool names no longer grant native permission treatment to other
   tools ([\#216](https://github.com/JamesHWade/deputy/issues/216)). A
   host, skill or package tool named `read_file`, `ask_user`, `web_fetch`

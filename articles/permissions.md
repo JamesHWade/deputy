@@ -56,7 +56,7 @@ policy <- Permissions(
 
 | Argument | Controls | Default |
 |----|----|----|
-| `file_read` | the built-in file reading tools | `TRUE` |
+| `file_read` | the built-in file reading tools, for any file the R process can read | `TRUE` |
 | `file_write` | `write_file`, `edit_file` and `multi_edit`: `TRUE`, `FALSE`, or a directory to confine them to | the current directory |
 | `bash` | `run_bash` | `FALSE` |
 | `r_code` | `run_r_code` | `FALSE` |
@@ -242,6 +242,12 @@ a timeout, but that process can read and write anything your user
 account can. For model-written code that should only touch part of the
 system, use an OS sandbox such as mcp-repl; see [Running R
 code](https://jameshwade.github.io/deputy/articles/code-execution.md).
+
+Reading works the same way. `file_read = TRUE` lets the file tools read
+any file your user account can, including credential files such as
+`~/.Renviron` or `~/.ssh/`. A `file_write` directory doesn’t limit
+reads. To keep the model away from particular files, refuse their paths
+in `can_use_tool`, or run the agent as a user that can’t read them.
 
 To make sure the results you show a user come from one trusted tool
 rather than from model text, see [Trusted

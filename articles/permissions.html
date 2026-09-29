@@ -193,7 +193,8 @@ with you. <code><a href="../reference/permissions_full.html">permissions_full()<
 <tbody>
 <tr class="odd">
 <td><code>file_read</code></td>
-<td>the built-in file reading tools</td>
+<td>the built-in file reading tools, for any file the R process can
+read</td>
 <td><code>TRUE</code></td>
 </tr>
 <tr class="even">
@@ -477,6 +478,13 @@ limit what a tool does once it runs. <code>run_r_code</code> gets a
 separate process and a timeout, but that process can read and write
 anything your user account can. For model-written code that should only
 touch part of the system, use an OS sandbox such as mcp-repl; see <a href="code-execution.html">Running R code</a>.</p>
+<p>Reading works the same way. <code>file_read = TRUE</code> lets the
+file tools read any file your user account can, including credential
+files such as <code>~/.Renviron</code> or <code>~/.ssh/</code>. A
+<code>file_write</code> directory doesn’t limit reads. To keep the model
+away from particular files, refuse their paths in
+<code>can_use_tool</code>, or run the agent as a user that can’t read
+them.</p>
 <p>To make sure the results you show a user come from one trusted tool
 rather than from model text, see <a href="trusted-mini-agents.html">Trusted mini-agents</a>.</p>
 </div>
