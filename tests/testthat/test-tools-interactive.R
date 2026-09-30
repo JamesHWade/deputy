@@ -585,3 +585,122 @@ test_that("tool_ask_user handles multiple questions", {
   # Verify questions are echoed back
   expect_equal(length(result$questions), 2)
 })
+
+test_that("AskUserDeferred is a read-only value with default instructions", {
+  deferred <- AskUserDeferred()
+
+  expect_true(S7::S7_inherits(deferred, AskUserDeferred))
+  expect_match(deferred@instructions, "next message", fixed = TRUE)
+  expect_identical(deferred@extra, list())
+  expect_error(deferred@instructions <- "x", "read-only")
+  expect_error(AskUserDeferred(instructions = NA_character_), "instructions")
+  expect_error(AskUserDeferred(extra = list(1)), "named list")
+})
+
+test_that("a deferred handler returns the questions without answers", {
+  seen <- NULL
+  tool <- tools_interactive(
+    callback = function(questions, context) {
+      seen <<- questions
+      AskUserDeferred(instructions = "Wait for the reply.")
+    }
+  )[[1]]
+
+  result <- tool(interaction_test_questions())
+
+  expect_identical(seen, interaction_test_questions())
+  expect_identical(result$status, "deferred")
+  expect_identical(result$instructions, "Wait for the reply.")
+  expect_identical(result$questions, interaction_test_questions())
+  expect_null(result$answers)
+})
+
+test_that("a deferred handler can attach a host display", {
+  display <- list(display = list(title = "Questions for you"))
+  tool <- tools_interactive(
+    callback = function(questions, context) AskUserDeferred(extra = display)
+  )[[1]]
+
+  result <- tool(interaction_test_questions())
+
+  expect_true(S7::S7_inherits(result, ellmer::ContentToolResult))
+  expect_identical(result@extra, display)
+  expect_identical(result@value$status, "deferred")
+})
+
+test_that("a promise handler resolves to structured answers", {
+  tool <- tools_interactive(
+    callback = function(questions, context) {
+      promises::promise_resolve(
+        stats::setNames(list("YAML"), questions[[1]]$question)
+      )
+    }
+  )[[1]]
+
+  result <- NULL
+  promises::then(tool(interaction_test_questions()), function(value) {
+    result <<- value
+  })
+  while (is.null(result)) {
+    later::run_now(0.01)
+  }
+
+  expect_identical(result$answers[["Which format?"]], "YAML")
+  expect_identical(result$questions, interaction_test_questions())
+})
+
+test_that("a rejected promise handler becomes a tool rejection", {
+  tool <- tools_interactive(
+    callback = function(questions, context) {
+      promises::promise_reject(simpleError("dialog closed"))
+    }
+  )[[1]]
+
+  failure <- NULL
+  promises::catch(tool(interaction_test_questions()), function(e) {
+    failure <<- e
+  })
+  while (is.null(failure)) {
+    later::run_now(0.01)
+  }
+
+  expect_s3_class(failure, "ellmer_tool_reject")
+  expect_match(
+    conditionMessage(failure),
+    "Failed to get user input: dialog closed"
+  )
+})
+
+test_that("delegated handlers cannot defer answers to a later turn", {
+  tool <- new_ask_user_tool(
+    callback = function(questions, context) AskUserDeferred(),
+    allow_deferred = FALSE
+  )
+
+  expect_error(
+    tool(interaction_test_questions()),
+    class = "deputy_human_input_unavailable"
+  )
+})
+
+test_that("delegated ask_user results serialize after a promise resolves", {
+  answers <- list(
+    questions = interaction_test_questions(),
+    answers = list(`Which format?` = "JSON")
+  )
+  expect_match(
+    delegated_ask_user_json(answers),
+    "\"Which format?\":\"JSON\"",
+    fixed = TRUE
+  )
+
+  json <- NULL
+  promises::then(
+    delegated_ask_user_json(promises::promise_resolve(answers)),
+    function(value) json <<- value
+  )
+  while (is.null(json)) {
+    later::run_now(0.01)
+  }
+  expect_match(json, "\"Which format?\":\"JSON\"", fixed = TRUE)
+})

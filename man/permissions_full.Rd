@@ -7,11 +7,15 @@
 permissions_full()
 }
 \value{
-A \link{Permissions} object
+A \link{Permissions} object.
 }
 \description{
-Creates a permission policy that allows all operations.
-\strong{Use with caution!} This bypasses all permission checks.
+Creates a \code{"full"} policy, which allows every tool call: writes anywhere
+your R session can write, R and shell code, web access and package
+installation. Capability flags and tool annotations are not checked,
+though PreToolUse hooks still run and can deny a call. Use it only
+with a model and task you trust, ideally inside a container or other OS
+sandbox.
 }
 \examples{
 perms <- permissions_full()

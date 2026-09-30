@@ -72,15 +72,15 @@ read_provider_tool_call_id <- function(reader, source, object) {
   NULL
 }
 
-#' Resolve symlinks in a path (follows symlink chains)
+#' Resolve a chain of symlinks
 #'
-#' Recursively resolves symlinks to get the final target path.
-#' Handles symlink chains up to a maximum depth to prevent infinite loops.
+#' Follows symlinks until it reaches a path that isn't one, giving up after
+#' `max_depth` links so that circular links can't loop forever.
 #'
 #' @param path Path to resolve
-#' @param max_depth Maximum recursion depth (default 20)
-#' @return Resolved path, or `NA_character_` if path doesn't exist or resolution
-#'   fails. Callers should check for NA before using the result.
+#' @param max_depth Maximum number of links to follow (default 20)
+#' @return The final path, or `NA_character_` if a path doesn't exist, can't
+#'   be read or the chain is too long. Check for `NA` before using the result.
 #' @noRd
 resolve_symlinks <- function(path, max_depth = 20) {
   if (max_depth <= 0) {
@@ -127,11 +127,12 @@ resolve_symlinks <- function(path, max_depth = 20) {
 
 #' Expand home directory and normalize a path
 #'
-#' Expands ~ and ~user patterns, then normalizes the path.
-#' This prevents bypass attempts using home directory references.
+#' Expands `~` and `~user`, then normalizes the path with forward slashes, so
+#' paths written in different ways compare equal.
 #'
 #' @param path Path to expand
-#' @return Expanded and normalized path
+#' @return The normalized path, or `NA_character_` if `path` is empty or can't
+#'   be normalized
 #' @noRd
 expand_and_normalize <- function(path) {
   if (is.null(path) || !is.character(path) || nchar(path) == 0) {
@@ -269,22 +270,19 @@ resolve_path_components <- function(path, max_depth = 40L) {
   }
 }
 
-#' Check if a path is within a directory (secure)
+#' Check whether a path is inside a directory
 #'
-#' This function handles both existing and non-existing paths correctly.
-#' It resolves symlinks, expands home directory references, and normalizes
-#' paths before comparison.
+#' Works for paths that don't exist yet. Resolves symlinks (including a
+#' dangling final link), expands `~` and normalizes both paths before
+#' comparing them. Any path containing `..` is rejected.
 #'
-#' **Security Note:** This function is subject to TOCTOU (time-of-check-time-of-use)
-#' race conditions. The filesystem state may change between the check and actual
-#' file operations. For critical security:
-#' 1. Use `validate_path_at_operation()` which performs check immediately before I/O
-#' 2. Call this function as close to the file operation as possible
-#' 3. Consider sandboxed execution environments for high-security scenarios
+#' The answer can go stale if the filesystem changes before the file is used
+#' (a time-of-check to time-of-use race), so call this right before the file
+#' operation, or use `validate_path_at_operation()`. It is not a sandbox.
 #'
 #' @param path Path to check
 #' @param dir Directory to check against
-#' @return Logical indicating if path is within dir
+#' @return `TRUE` if `path` is `dir` or inside it, otherwise `FALSE`
 #' @noRd
 is_path_within <- function(path, dir) {
   # Early validation
@@ -327,29 +325,34 @@ is_path_within <- function(path, dir) {
   startsWith(path_with_sep, dir) || identical(path, sub("/$", "", dir))
 }
 
-#' Check for path traversal attempts
+#' Check for path traversal patterns
 #'
-#' Detects patterns that might be used to escape from a restricted directory.
-#' Note: This does NOT block absolute paths - those are handled by is_path_within().
+#' Flags a `..` path segment and a leading `~`, which could reach outside a
+#' directory. Dots inside a name, as in `notes..v2.md` or `..hidden`, are not
+#' flagged. A segment of two or more dots followed only by dots or spaces is
+#' flagged too, because Windows trims trailing dots and spaces from names.
+#' Absolute paths are not flagged; the directory containment check handles
+#' them.
 #'
 #' @param path Path to check
-#' @return Logical indicating if path contains traversal patterns
+#' @return `TRUE` if the path contains a traversal pattern or isn't a
+#'   character value
 #' @noRd
 has_path_traversal <- function(path) {
   if (is.null(path) || !is.character(path)) {
     return(TRUE) # Invalid input, treat as suspicious
   }
   # Check for traversal patterns that could escape directories
-  # Note: Absolute paths are allowed and checked by is_path_within()
-  grepl("\\.\\.", path) || # Parent directory references (../escape.txt)
+  # Note: Absolute paths are allowed and checked for containment separately
+  grepl("(^|[/\\\\])\\.\\.[. ]*([/\\\\]|$)", path) || # ../escape.txt
     grepl("^~", path) # Home directory expansion (~user/escape.txt)
 }
 
 #' Check whether a path is absolute
 #'
-#' Recognizes POSIX, Windows drive-letter, and Windows UNC paths. This helper
-#' deliberately does not expand or normalize the path; callers that accept
-#' untrusted input should reject traversal syntax before resolving it.
+#' Recognizes POSIX, Windows drive-letter and Windows UNC paths. It doesn't
+#' expand or normalize the path, so check untrusted input for traversal
+#' patterns before resolving it.
 #'
 #' @param path Path to inspect
 #' @return A length-one logical
@@ -361,129 +364,120 @@ is_absolute_path <- function(path) {
     grepl("^(/|[A-Za-z]:[/\\\\]|\\\\\\\\)", path)
 }
 
-#' Validate path and perform operation atomically (TOCTOU mitigation)
+#' Check a path again, then run a file operation on it
 #'
-#' This function reduces the TOCTOU window by performing the path validation
-#' immediately before the file operation. It should be used instead of
-#' separating the check from the operation.
+#' Checks that `path` is inside `allowed_dir` immediately before running
+#' `operation`, with the containment test the permission policy uses
+#' (`is_path_within_permission_root()`), so both checks agree. The permission
+#' check and the write are separate steps and a symbolic link can change
+#' between them. Checking again narrows that window; R can't open a file
+#' without following links, so it doesn't close it.
 #'
-#' @param path Path to validate
-#' @param allowed_dir Directory the path must be within (NULL to skip check)
-#' @param operation Function to perform if validation passes. Receives the
-#'   normalized path as its first argument.
+#' `allowed_dir` is the directory as the policy resolved it when it was
+#' created, such as `Permissions@file_write`. It is not resolved again: only
+#' `path` is, so replacing the directory itself with a link to somewhere else
+#' doesn't move the boundary.
+#'
+#' @param path Path the operation will use
+#' @param allowed_dir Resolved absolute directory the path must be within, as
+#'   `canonical_permission_root()` returns it
+#' @param operation Function run with `path` if the check passes
 #' @param ... Additional arguments passed to operation
-#' @return Result of operation, or throws error if validation fails
+#' @return Result of `operation`. Signals `deputy_unsafe_path` if the path is
+#'   empty, contains a `..` segment or a leading `~`, or doesn't resolve
+#'   inside `allowed_dir`.
 #' @noRd
 validate_path_at_operation <- function(path, allowed_dir, operation, ...) {
-  # Validate path format
-
-  if (is.null(path) || !is.character(path) || nchar(path) == 0) {
-    cli_abort(c(
-      "Invalid path",
-      "x" = "Path must be a non-empty string"
-    ))
+  if (!is_nonempty_string(path)) {
+    abort_deputy(
+      c("Invalid path", "x" = "Path must be a non-empty string"),
+      class = "unsafe_path"
+    )
   }
 
-  # Check for path traversal patterns
   if (has_path_traversal(path)) {
-    cli_abort(c(
-      "Path traversal detected",
-      "x" = "Path contains potentially dangerous patterns (.. or ~)",
-      "i" = "Use absolute paths within the allowed directory"
-    ))
+    abort_deputy(
+      c(
+        "Path traversal detected",
+        "x" = "Path contains potentially dangerous patterns (.. or ~)",
+        "i" = "Use absolute paths within the allowed directory"
+      ),
+      class = "unsafe_path"
+    )
   }
 
-  # Expand and normalize the path
-  normalized <- expand_and_normalize(path)
-  if (is.na(normalized)) {
-    cli_abort(c(
-      "Path normalization failed",
-      "x" = "Could not normalize path: {.path {path}}"
-    ))
-  }
-
-  # If allowed_dir is specified, validate containment
-  if (!is.null(allowed_dir)) {
-    # Re-resolve symlinks RIGHT BEFORE the check (minimize TOCTOU window)
-    if (file.exists(normalized)) {
-      resolved <- resolve_symlinks(normalized)
-      if (!is.na(resolved)) {
-        normalized <- resolved
-      }
-    }
-
-    if (!is_path_within(normalized, allowed_dir)) {
-      cli_abort(c(
+  if (
+    !is_nonempty_string(allowed_dir) ||
+      !is_path_within_permission_root(path, allowed_dir)
+  ) {
+    abort_deputy(
+      c(
         "Path outside allowed directory",
         "x" = "Path {.path {path}} is not within {.path {allowed_dir}}",
         "i" = "File operations are restricted to the allowed directory"
-      ))
-    }
+      ),
+      class = "unsafe_path"
+    )
   }
 
   # Perform the operation immediately after validation
-  operation(normalized, ...)
+  operation(path, ...)
 }
 
-#' Secure file write with atomic path validation
+#' Write a file after checking its path
 #'
-#' Writes content to a file with path validation performed immediately
-#' before the write operation to minimize TOCTOU window.
+#' Checks the path with `validate_path_at_operation()` just before writing,
+#' and creates the parent directory if needed.
 #'
 #' @param path Path to write to
 #' @param content Content to write
-#' @param allowed_dir Directory the path must be within (NULL to skip check)
+#' @param allowed_dir Resolved absolute directory the path must be within
 #' @param append Whether to append to existing file
-#' @return Invisible NULL on success, throws error on failure
+#' @return `NULL`, invisibly. Errors if the path check or the write fails.
 #' @noRd
-secure_write_file <- function(
-  path,
-  content,
-  allowed_dir = NULL,
-  append = FALSE
-) {
+secure_write_file <- function(path, content, allowed_dir, append = FALSE) {
   validate_path_at_operation(
     path = path,
     allowed_dir = allowed_dir,
-    operation = function(normalized_path) {
+    operation = function(path) {
       # Create directory if needed
-      dir <- dirname(normalized_path)
+      dir <- dirname(path)
       if (!dir.exists(dir)) {
         dir.create(dir, recursive = TRUE)
       }
 
       # Perform the write immediately after validation
       if (append) {
-        cat(content, file = normalized_path, append = TRUE)
+        cat(content, file = path, append = TRUE)
       } else {
-        writeLines(content, normalized_path)
+        writeLines(content, path)
       }
       invisible(NULL)
     }
   )
 }
 
-#' Secure file read with atomic path validation
+#' Read a file after checking its path
 #'
-#' Reads content from a file with path validation performed immediately
-#' before the read operation to minimize TOCTOU window.
+#' Checks the path with `validate_path_at_operation()` just before reading.
 #'
 #' @param path Path to read from
-#' @param allowed_dir Directory the path must be within (NULL to skip check)
-#' @return File contents as character vector
+#' @param allowed_dir Resolved absolute directory the path must be within
+#' @return The file contents as one string, with lines joined by `"\n"`.
+#'   Errors if the file doesn't exist.
 #' @noRd
-secure_read_file <- function(path, allowed_dir = NULL) {
+secure_read_file <- function(path, allowed_dir) {
   validate_path_at_operation(
     path = path,
     allowed_dir = allowed_dir,
-    operation = function(normalized_path) {
-      if (!file.exists(normalized_path)) {
+    operation = function(path) {
+      if (!file.exists(path)) {
         cli_abort(c(
           "File not found",
-          "x" = "File does not exist: {.path {normalized_path}}"
+          "x" = "File does not exist: {.path {path}}"
         ))
       }
-      paste(readLines(normalized_path, warn = FALSE), collapse = "\n")
+      paste(readLines(path, warn = FALSE), collapse = "\n")
     }
   )
 }
@@ -491,7 +485,7 @@ secure_read_file <- function(path, allowed_dir = NULL) {
 #' Format cost as dollars
 #'
 #' @param cost Numeric cost value
-#' @return Formatted string
+#' @return A string such as `"$0.0123"`, or `"unknown"` for `NULL` or `NA`
 #' @noRd
 format_cost <- function(cost) {
   if (is.null(cost) || is.na(cost)) {
@@ -500,7 +494,9 @@ format_cost <- function(cost) {
   sprintf("$%.4f", cost)
 }
 
-#' Get tool annotation value safely
+#' Get a tool annotation value
+#'
+#' Warns, and returns `default`, if the annotations can't be read.
 #'
 #' @param tool A tool definition
 #' @param annotation Name of the annotation
@@ -545,7 +541,9 @@ truncate_string <- function(x, max_length = 100, suffix = "...") {
   paste0(substr(x, 1, max_length - nchar(suffix)), suffix)
 }
 
-#' Validate that an object is an ellmer Chat
+#' Check that an object is an ellmer Chat
+#'
+#' Errors with class `deputy_error` if it isn't.
 #'
 #' @param x Object to validate
 #' @param arg_name Name of the argument (for error messages)
@@ -562,6 +560,9 @@ validate_chat <- function(x, arg_name = "chat") {
 }
 
 #' Parse Markdown frontmatter
+#'
+#' Reads the YAML block between `---` lines at the top of a Markdown file.
+#' Warns and returns empty `meta` if the YAML can't be parsed.
 #'
 #' @param path Path to a Markdown file
 #' @return List with `meta` (list) and `body` (character)

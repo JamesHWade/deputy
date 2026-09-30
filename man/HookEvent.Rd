@@ -2,200 +2,134 @@
 % Please edit documentation in R/hooks.R
 \name{HookEvent}
 \alias{HookEvent}
-\title{Hook events supported by deputy}
+\title{Hook events}
 \usage{
 HookEvent
 }
 \description{
-Hook events are fired at specific points during agent execution. Each event
-type has a specific callback signature and context structure.
+\code{HookEvent} lists the events you can attach a hook to with \code{\link[=HookMatcher]{HookMatcher()}}.
+
+When several hooks match an event, they run in the order they were added.
+The first callback that returns a non-\code{NULL} value decides the outcome, and
+the remaining hooks for that event don't run. If a PreToolUse callback
+errors or times out, the tool call is denied. Errors in other callbacks are
+reported and the run continues.
 }
-\section{Event Types}{
+\section{Events}{
 
 
-\strong{PreToolUse} - Before a tool is executed (can deny)
-
-Callback signature: \verb{function(tool_name, tool_input, context)}
+Each entry shows the event with its callback's arguments, then when it
+fires.
 \itemize{
-\item \code{tool_name}: Name of the tool being called (character)
-\item \code{tool_input}: Named list of arguments passed to the tool
-\item \code{context}: Common correlation fields plus \code{tool_call_id} and
-\code{tool_annotations} (if available)
-\item Return: \code{\link[=HookResultPreToolUse]{HookResultPreToolUse()}} to allow/deny
+\item \code{PreToolUse(tool_name, tool_input, context)}: before a tool runs, once
+the permission policy has allowed it.
+\item \code{PostToolUse(tool_name, tool_result, tool_error, context)}: after a tool
+call finishes, whether or not it failed.
+\item \code{PostToolUseFailure(tool_name, tool_result, tool_error, context)}: after
+\code{PostToolUse}, when the tool failed.
+\item \code{PermissionRequest(tool_name, tool_input, permission_result, context)}:
+when the permission policy denies a call.
+\item \code{SessionStart(context)}: at the start of each run.
+\item \code{UserPromptSubmit(prompt, context)}: at the start of each run, after
+\code{SessionStart}.
+\item \code{Stop(reason, context)}: at the end of each run.
+\item \code{SessionEnd(reason, context)}: at the end of each run, after \code{Stop}.
+\item \code{SubagentStart(agent_name, task, context)}: when a subagent starts a
+delegated task.
+\item \code{SubagentStop(agent_name, task, result, context)}: when a subagent
+finishes.
+\item \code{PreCompact(turns_to_compact, turns_to_keep, context)}: before older
+turns are summarised.
+\item \code{PostCompact(result, context)}: after compaction.
+\item \code{Notification(message, context)}: when the agent reports something, such
+as a denied call.
+\item \code{ConfigChange(key, old_value, new_value, context)}: when
+\code{set_permission_mode()} changes the mode.
 }
 
-\strong{PostToolUse} - After a tool completes
+\code{tool_input} is the named list of tool arguments. After a successful call
+\code{tool_error} is \code{NULL}; after a failure \code{tool_result} is \code{NULL} and
+\code{tool_error} holds the error message. \code{reason} is the stop reason, such as
+\code{"complete"}, \code{"request_limit"}, \code{"cost_limit"}, \code{"tool_loop"},
+\code{"hook_requested_stop"} or \code{"provider_error"}. \code{result} is the subagent's
+result for \code{SubagentStop} and the \link{DeputyCompaction} for \code{PostCompact}. For
+\code{ConfigChange}, \code{key} is \code{"permission_mode"}.
 
-Callback signature: \verb{function(tool_name, tool_result, tool_error, context)}
+Four events use the callback's return value:
 \itemize{
-\item \code{tool_name}: Name of the tool that was called (character)
-\item \code{tool_result}: Result returned by the tool (or NULL on error)
-\item \code{tool_error}: Error message if tool failed (or NULL on success)
-\item \code{context}: Common correlation fields plus \code{tool_call_id}
-\item Return: \code{\link[=HookResultPostToolUse]{HookResultPostToolUse()}} to continue/stop
+\item \code{PreToolUse}: return \code{\link[=HookResultPreToolUse]{HookResultPreToolUse()}} to allow or deny the call,
+or to stop the run.
+\item \code{PostToolUse}: return \code{\link[=HookResultPostToolUse]{HookResultPostToolUse()}} to stop the run or to
+change what the \code{tool_end} event shows.
+\item \code{PermissionRequest}: return \code{\link[=PermissionResultAllow]{PermissionResultAllow()}} to allow the call
+anyway, or \code{\link[=PermissionResultDeny]{PermissionResultDeny()}} to change the reason.
+\item \code{PreCompact}: return \code{\link[=HookResultPreCompact]{HookResultPreCompact()}} to cancel compaction or to
+supply your own summary.
 }
 
-\strong{PostToolUseFailure} - After a tool reports an error
+Other events ignore the return value. Returning \code{NULL} means "no decision".
+}
 
-Callback signature: \verb{function(tool_name, tool_result, tool_error, context)}
+\section{Context}{
+
+
+\code{context} is a named list. Every event includes:
 \itemize{
-\item Same arguments as PostToolUse, fired only when \code{tool_error} is not NULL
+\item \code{working_dir}: the agent's working directory.
+\item \code{agent_id}, \code{agent_name}, \code{session_id}: the agent's identifiers.
+\item \code{run_id}: the current run, when one is active.
+\item \code{run_context}: the run's \code{run_context} list.
+\item \code{parent_agent_id}, \code{parent_run_id}, \code{delegation_id}: set in subagent runs.
 }
 
-\strong{Stop} - When the agent stops
-
-Callback signature: \verb{function(reason, context)}
+Some events add fields:
 \itemize{
-\item \code{reason}: Why the agent stopped (for example \code{"complete"},
-\code{"request_limit"}, \code{"cost_limit"}, \code{"cost_unavailable"}, \code{"tool_loop"},
-or \code{"provider_error"})
-\item \code{context}: Common correlation fields plus \code{usage} and \code{cost}; native
-\code{run()} also includes \code{total_turns}
-\item Return: NULL (informational only)
-}
-
-\strong{SubagentStop} - When a sub-agent completes (LeadAgent only)
-
-Callback signature: \verb{function(agent_name, task, result, context)}
-\itemize{
-\item \code{agent_name}: Name of the sub-agent that completed (character)
-\item \code{task}: The task that was delegated (character)
-\item \code{result}: Result returned by the sub-agent
-\item \code{context}: Common correlation fields plus parent/child Agent and run IDs
-\item Return: NULL (informational only)
-}
-
-\strong{SubagentStart} - When a delegated sub-agent starts (LeadAgent only)
-
-Callback signature: \verb{function(agent_name, task, context)}
-\itemize{
-\item \code{agent_name}: Name of the sub-agent that started
-\item \code{task}: The delegated task
-\item \code{context}: Common correlation fields plus parent/child Agent IDs
-}
-
-\strong{PermissionRequest} - When permission policy denies a tool call
-
-Callback signature: \verb{function(tool_name, tool_input, permission_result, context)}
-\itemize{
-\item Return: \code{\link[=PermissionResultAllow]{PermissionResultAllow()}} to override the denial, or
-\code{\link[=PermissionResultDeny]{PermissionResultDeny()}} to replace the denial reason
-}
-
-\strong{ConfigChange} - When runtime configuration changes
-
-Callback signature: \verb{function(key, old_value, new_value, context)}
-
-\strong{UserPromptSubmit} - When a user prompt is submitted
-
-Callback signature: \verb{function(prompt, context)}
-\itemize{
-\item \code{prompt}: The user's prompt text (character)
-\item \code{context}: Common correlation fields
-\item Return: NULL (informational only)
-}
-
-\strong{Notification} - Informational runtime notice
-
-Callback signature: \verb{function(message, context)}
-\itemize{
-\item \code{message}: The notification text (character)
-\item \code{context}: Common correlation fields plus \code{level}, \code{code}, and any
-event-specific metadata
-\item Return: NULL (informational only)
-}
-
-\strong{PreCompact} - Before conversation compaction
-
-Hook signature: \verb{function(turns_to_compact, turns_to_keep, context)}
-\itemize{
-\item \code{turns_to_compact}: List of turns that will be compacted into a summary
-\item \code{turns_to_keep}: List of recent turns that will be preserved
-\item \code{context}: Common correlation fields plus \code{total_turns} and \code{compact_count}
-\item Return: \code{\link[=HookResultPreCompact]{HookResultPreCompact()}} to allow/cancel or provide custom summary
-}
-
-\strong{PostCompact} - After conversation compaction
-
-Hook signature: \verb{function(result, context)}
-\itemize{
-\item \code{result}: The \code{DeputyCompaction} outcome, including method and usage
-\item \code{context}: Common correlation fields plus \code{compact_count} and \code{automatic}
-\item Return: NULL (informational only)
-}
-
-\strong{SessionStart} - When an agent session begins
-
-Callback signature: \verb{function(context)}
-\itemize{
-\item \code{context}: Common correlation fields plus \code{permissions}, \code{provider}, and
-\code{tools_count}
-\item Return: NULL (informational only)
-}
-
-\strong{SessionEnd} - When an agent session ends
-
-Callback signature: \verb{function(reason, context)}
-\itemize{
-\item \code{reason}: Why the agent stopped (for example \code{"complete"},
-\code{"request_limit"}, \code{"cost_unavailable"}, \code{"tool_loop"}, or
-\code{"hook_requested_stop"})
-\item \code{context}: Common correlation fields plus \code{usage} and \code{cost}; native
-\code{run()} also includes \code{total_turns}
-\item Return: NULL (informational only)
-}
-}
-
-\section{Context Structure}{
-
-
-The context parameter is always a named list. Common fields:
-\itemize{
-\item \code{working_dir}: The agent's current working directory
-\item \code{run_context}: Immutable canonical product context for the active run
-\item \code{agent_id}: Stable identifier for the Agent instance
-\item \code{agent_name}: Optional human-readable Agent name
-\item \code{parent_agent_id}: Parent Agent identifier for delegated runs
-\item \code{parent_run_id}: Parent run identifier for delegated runs
-\item \code{delegation_id}: Delegation identifier for delegated runs and tools
-\item \code{tool_annotations}: (PreToolUse only) Tool annotations from ellmer if available
-\item \code{tool_call_id}: Canonical tool lifecycle identifier
-\item \code{usage}: Run-scoped \link{AgentUsage} for tool and terminal lifecycle hooks
-\item \code{usage_limits}: Active \link{UsageLimits} for tool lifecycle hooks
-\item \code{run_id}: Identifier for the active run
-\item \code{total_turns}: (native Stop, PreCompact, native SessionEnd) Conversation turns
-\item \code{cost}: (Stop, SessionEnd) List with \code{input}, \code{output}, \code{cached}, and \code{total}
-\item \code{compact_count}: (PreCompact only) Number of turns being compacted
-\item \code{automatic}: (PostCompact only) Whether the run kernel triggered compaction
-\item \code{level}: (Notification only) Informational severity such as \code{"info"} or \code{"warning"}
-\item \code{code}: (Notification only) Stable notification code when available
-\item \code{permissions}: (SessionStart only) The agent's permissions configuration
-\item \code{provider}: (SessionStart only) List with \code{name} and \code{model}
-\item \code{tools_count}: (SessionStart only) Number of registered tools
+\item \code{tool_call_id}, \code{permission_mode}, \code{usage}, \code{usage_limits} (tool events):
+the call's ID, the permission mode, the run's \link{AgentUsage} so far and its
+\link{UsageLimits}.
+\item \code{tool_annotations}, \code{tool_arguments}, \code{tool_metadata} (PreToolUse,
+PermissionRequest): the tool's annotations, declared arguments and
+\code{\link[=tool_metadata]{tool_metadata()}}, when available.
+\item \code{usage}, \code{cost} (Stop, SessionEnd): the run's \link{AgentUsage} and the
+conversation's cost, as returned by \code{agent$cost()}.
+\item \code{total_turns}, \code{compact_count} (PreCompact, PostCompact): the number of
+turns in the conversation and the number being summarised.
+\item \code{automatic} (PostCompact): \code{TRUE} when compaction ran automatically
+during a run rather than through \code{compact()}.
+\item \code{child_agent_id}, \code{child_run_id}, \code{status} (SubagentStart, SubagentStop):
+the subagent's identifiers and status.
+\item \code{level}, \code{code} (Notification): a severity such as \code{"info"} or
+\code{"warning"}, and a notification code when there is one.
+\item \code{permissions}, \code{provider}, \code{tools_count} (SessionStart): the agent's
+\link{Permissions}, a list with the provider \code{name} and \code{model}, and the
+number of registered tools.
 }
 }
 
 \examples{
 \dontrun{
-# PreToolUse callback example
+# Log each tool call. Returning NULL leaves the decision to other hooks.
 agent$add_hook(HookMatcher(
   event = "PreToolUse",
   callback = function(tool_name, tool_input, context) {
     message("Tool: ", tool_name, " in ", context$working_dir)
-    HookResultPreToolUse(permission = "allow")
+    NULL
   }
 ))
 
-# PostToolUse callback example
+# Stop the run when a tool fails
 agent$add_hook(HookMatcher(
   event = "PostToolUse",
   callback = function(tool_name, tool_result, tool_error, context) {
     if (!is.null(tool_error)) {
-      warning("Tool failed: ", tool_error)
+      return(HookResultPostToolUse(continue = FALSE))
     }
-    HookResultPostToolUse()
+    NULL
   }
 ))
 }
 
+}
+\seealso{
+\code{vignette("hooks")}
 }

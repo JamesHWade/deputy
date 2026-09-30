@@ -2,7 +2,7 @@
 % Please edit documentation in R/context-fork.R
 \name{ContextFork}
 \alias{ContextFork}
-\title{Describe a host-selected conversation fork}
+\title{Capture conversation turns for a fork}
 \usage{
 ContextFork(
   owner_id = NULL,
@@ -18,37 +18,41 @@ ContextFork(
 )
 }
 \arguments{
-\item{owner_id}{Host owner identifier.}
+\item{owner_id}{ID of the user or account that owns the conversation.}
 
-\item{conversation_id}{Host conversation identifier.}
+\item{conversation_id}{ID of the source conversation.}
 
-\item{branch_id}{Host-selected branch identifier.}
+\item{branch_id}{ID of the branch the turns come from.}
 
-\item{revision}{Exact host revision identifier.}
+\item{revision}{Revision of the conversation the turns come from.}
 
-\item{fork_point}{Host fork point token or non-negative turn number.}
+\item{fork_point}{Where the fork starts: a turn number (0 or more) or a
+string of your own.}
 
-\item{view}{Either "transcript" for the complete selected transcript or
-"context" for the current model context. The latter never falls back to
-the transcript automatically.}
+\item{view}{\code{"transcript"} if \code{turns} come from the full conversation (as
+from \verb{$get_turns()}), \code{"context"} if they come from the current model
+context (as from \verb{$get_context_turns()}). It is only recorded; you choose
+the turns.}
 
-\item{turns}{A bounded list of native public ellmer turns, or public records
-produced by \code{ellmer::contents_record()} for those turns.}
+\item{turns}{A list of ellmer user and assistant turns, or records of them
+from \code{ellmer::contents_record()}.}
 
-\item{max_bytes}{Maximum serialized bytes of the inert public projection.}
+\item{max_bytes}{Maximum size of the copied turns, in bytes. Defaults to
+64 KiB.}
 
-\item{max_turns}{Maximum number of selected turns.}
+\item{max_turns}{Maximum number of turns. Defaults to 256.}
 
-\item{schema_version}{Portable value schema version, currently 1L.}
+\item{schema_version}{Format version; must be \code{1L}.}
 }
 \value{
-A read-only ContextFork S7 value with no Chat or executable object.
+A \code{ContextFork} object. It is read-only; read its fields with \code{$}.
 }
 \description{
-ContextFork() is a read-only request to seed a fresh standalone Agent with
-selected public ellmer turns. The host supplies the owner, conversation,
-branch, revision and fork point and remains responsible for authenticating
-those identifiers. Turns are projected through the public ellmer record
-contract; tool bindings, hidden thinking and provider-private fields are
-omitted, and incomplete tool evidence becomes inert text.
+Records turns from one of your conversations, and where they came from, so
+\code{\link[=fork_agent]{fork_agent()}} can start a new agent from them. Deputy doesn't check the
+owner, conversation, branch or revision; your \code{authorize} function in
+\code{\link[=fork_agent]{fork_agent()}} confirms them. The copy keeps text, tool calls and results,
+but not tool functions, hidden thinking or provider-specific data. A tool
+call without its result, or a result without its call, becomes plain text,
+and provider file uploads are replaced by a note.
 }

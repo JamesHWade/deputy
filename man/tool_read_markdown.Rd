@@ -2,7 +2,7 @@
 % Please edit documentation in R/tools-documents.R
 \name{tool_read_markdown}
 \alias{tool_read_markdown}
-\title{Convert a file to markdown using MarkItDown}
+\title{Convert a file to Markdown using MarkItDown}
 \format{
 A tool definition created with \code{ellmer::tool()}.
 }
@@ -10,24 +10,19 @@ A tool definition created with \code{ellmer::tool()}.
 tool_read_markdown(path)
 }
 \arguments{
-\item{path}{Path to the file to convert (tool argument, not R function argument)}
+\item{path}{Path to the file to convert.}
 }
 \value{
-When called directly, a character string containing the converted
-markdown.
+The Markdown text as one string.
 }
 \description{
-Converts a local file to markdown text using Python
-\href{https://github.com/microsoft/markitdown}{MarkItDown} via \code{reticulate}.
-This is useful for rich formats (e.g. DOCX, PPTX, PDF, HTML) when you want
-a markdown representation instead of raw file text.
+A tool that converts a local document, such as DOCX, PPTX, PDF or HTML, to
+Markdown with the Python library
+\href{https://github.com/microsoft/markitdown}{MarkItDown}.
 }
 \details{
-Requires:
-\itemize{
-\item R package \code{reticulate}
-\item Python module \code{markitdown} (e.g., \verb{pip install 'markitdown[all]'})
-}
+Needs the reticulate package and the Python module \code{markitdown}
+(\verb{pip install 'markitdown[all]'}).
 }
 \examples{
 \dontrun{

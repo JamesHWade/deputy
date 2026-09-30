@@ -96,6 +96,10 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         r_session_tool_record_context(record),
         keep.null = FALSE
       )
+      # Native tool names keep their native permission treatment only for
+      # Deputy's own tools. Hooks share this context, including
+      # hook_limit_file_writes().
+      context$.deputy_native_tool <- isTRUE(extracted$native_tool)
 
       # Deputy's session-local result reader is not part of the configured tool
       # surface. Its private marker exempts only the allowlist gate; ordinary
@@ -127,6 +131,20 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         tool_input,
         permission_context
       )
+      # Keep the directory the policy checked this write against, so
+      # `execute_tool()` can check the path again just before writing. A call
+      # that only a PermissionRequest hook allows keeps none.
+      if (
+        S7::S7_inherits(perm_result, PermissionResultAllow) ||
+          S7::S7_inherits(perm_result, PermissionResultPending)
+      ) {
+        private$tool_call_records[[record$record_index]]$write_root <-
+          permission_enforced_write_root(
+            self$permissions,
+            tool_name,
+            permission_context
+          )
+      }
 
       if (S7::S7_inherits(perm_result, PermissionResultPending)) {
         if (!is.null(nested_context)) {
@@ -534,6 +552,8 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         tool_arguments = tool_arguments,
         tool_metadata = metadata,
         internal_tool = internal_tool,
+        native_tool = !is.null(registered_tool) &&
+          is_native_tool(registered_tool),
         provider_tool_call_id = provider_tool_call_id,
         tool_identity_error = tool_identity_error
       )

@@ -2,56 +2,58 @@
 % Please edit documentation in R/tools-bundles.R
 \name{tools_web}
 \alias{tools_web}
-\title{Web tools}
+\title{Get web tools}
 \usage{
 tools_web(chat = NULL, use_native = TRUE)
 }
 \arguments{
-\item{chat}{Optional ellmer Chat object. If provided, returns provider-specific
-tools when available for better quality results.}
+\item{chat}{Optional ellmer Chat, used to pick the provider's own tools.}
 
-\item{use_native}{Logical. If \code{TRUE} (default), use native provider tools when
-available. Set to \code{FALSE} to always use universal tools.}
+\item{use_native}{If \code{FALSE}, always return the default tools.}
 }
 \value{
-A list of tool definitions
+A list of tools.
 }
 \description{
-Returns a list of tools for web operations. When a \code{chat} object is provided,
-automatically selects the best tools for that provider:
+Returns a \code{web_search} and a \code{web_fetch} tool. By default these are
+\link{tool_web_search} (DuckDuckGo) and \link{tool_web_fetch}, which work with any
+provider. If you pass \code{chat}, the provider's own tools are used where
+available:
 \itemize{
-\item \strong{Claude (Anthropic)}: Uses native \code{claude_tool_web_search()} and
-\code{claude_tool_web_fetch()} for higher quality results (requires admin
-enablement and incurs extra cost)
-\item \strong{Google (Gemini/Vertex)}: Uses native \code{google_tool_web_search()} and
-\code{google_tool_web_fetch()}
-\item \strong{OpenAI}: Uses native \code{openai_tool_web_search()}
-\item \strong{Other providers}: Falls back to universal tools using httr2 and DuckDuckGo
+\item Anthropic: \code{claude_tool_web_search()} and \code{claude_tool_web_fetch()}.
+These cost extra and may need to be enabled by your organization's admin.
+\item Google Gemini and Vertex: \code{google_tool_web_search()} and
+\code{google_tool_web_fetch()}.
+\item OpenAI: \code{openai_tool_web_search()}, plus \link{tool_web_fetch}.
+\item Other providers: the default tools.
 }
 
-Without a \code{chat} argument, returns universal tools that work with any provider.
+Provider tools run on the provider's servers, so the agent checks them once,
+at registration, not on each call. It accepts them only if its permissions
+set \code{web = TRUE}, list the tool names in \code{tool_allowlist}, and have no
+\code{can_use_tool} callback.
 }
 \examples{
 \dontrun{
-# Universal tools (work with any provider)
+# Default tools, for any provider
 agent <- Agent$new(
-  chat = ellmer::chat_ollama(),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_web(),
   permissions = Permissions(web = TRUE)
 )
 
-# Provider-specific tools (auto-detected)
-chat <- ellmer::chat_claude()
+# Anthropic's own web tools
+chat <- ellmer::chat("anthropic/claude-sonnet-5")
 agent <- Agent$new(
   chat = chat,
-  tools = tools_web(chat),  # Uses Claude's native web tools
+  tools = tools_web(chat),
   permissions = Permissions(
     web = TRUE,
     tool_allowlist = c("web_search", "web_fetch")
   )
 )
 
-# Force universal tools even with Claude
+# Default tools, even with Anthropic
 agent <- Agent$new(
   chat = chat,
   tools = tools_web(chat, use_native = FALSE),

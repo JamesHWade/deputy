@@ -1,105 +1,103 @@
-#' Connect an Agent to a sandboxed MCP Console workbench
+#' Connect an agent to a sandboxed MCP Console session
 #'
 #' @description
-#' Creates a [McpConnection] to one explicitly selected
-#' [MCP Console](https://github.com/t-kalinowski/mcp-console) server. The
-#' server keeps R, Python and DuckDB SQL state for one conversation. Each
-#' connection starts its own server, owned by exactly one Agent. Register its
-#' `$tools()` on that Agent so that `send` goes through the Agent's normal
-#' permissions, hooks, limits and events.
+#' Starts an [MCP Console](https://github.com/t-kalinowski/mcp-console) server
+#' for one agent and connects to it. MCP Console runs R, Python and DuckDB SQL
+#' in an OS sandbox and keeps their state for the conversation. Each connection
+#' starts its own server. Register `connection$tools()` on the agent so that
+#' the `send` tool goes through its permissions, hooks and limits.
 #'
-#' @param agent Agent that owns the connection. Its working directory is the
-#'   Console workspace: the server's launch directory, sandbox workspace root,
-#'   project-configuration location and recording location.
-#' @param command Path to a qualified `mcp-console` executable. Defaults to the
-#'   `DEPUTY_MCP_CONSOLE_BIN` environment variable. Deputy never installs or
-#'   discovers the executable.
-#' @param args Additional launch arguments for `mcp-console serve`. Only
+#' @param agent The agent that owns the connection. Its working directory
+#'   becomes the Console workspace, where the server starts, the sandbox's
+#'   workspace is rooted, and MCP Console reads its project configuration and
+#'   writes recordings.
+#' @param command Path to an `mcp-console` executable, version 0.0.4. Defaults
+#'   to the `DEPUTY_MCP_CONSOLE_BIN` environment variable. Deputy doesn't
+#'   install the executable or search for it.
+#' @param args Extra arguments for `mcp-console serve`. Only
 #'   `--writable-root PATH` and the overrides `-c extends=:workspace`,
 #'   `-c extends=:read-only` and `-c sandbox.network=restricted` are accepted.
-#'   `--no-sandbox`, filesystem, proxy, target and other overrides are refused.
+#'   Anything else, including `--no-sandbox`, is an error.
 #' @param env Optional named character vector of environment variables for the
-#'   server. mcptools passes the server only a fixed set of inherited
-#'   variables (such as `HOME`, `PATH` and the `R_LIBS` family), so resolver
-#'   settings such as `UV_CACHE_DIR` or `XDG_CACHE_HOME` must be given here.
-#'   Without them, dependency preparation writes to caches under `HOME`.
-#' @param dependencies `"deny"` (default) or `"allow"`. Dependency preparation
-#'   runs outside the Console sandbox with the server's permissions. With
-#'   `"deny"`, Deputy refuses a server that offers it, and refuses any call
-#'   that declares `requirements`. See Details.
-#' @param project_config Set to `TRUE` to launch even though
-#'   `.agents/console/config.yaml` exists in the workspace. That file is
-#'   trusted launcher input that can widen the sandbox. Deputy refuses to start
-#'   when it exists unless the host has reviewed it and opts in.
+#'   server. The server inherits only a few variables (such as `HOME`, `PATH`
+#'   and the `R_LIBS` family), so set others here, for example `UV_CACHE_DIR`
+#'   or `XDG_CACHE_HOME`. Without them, dependency installs write to caches
+#'   under `HOME`.
+#' @param dependencies `"deny"` (the default) or `"allow"`. MCP Console can
+#'   install packages that code needs, and it does so outside its sandbox,
+#'   with the server's permissions. With `"deny"`, the connection errors if the
+#'   server offers this, and calls that declare `requirements` are refused.
+#'   See Details.
+#' @param project_config Set to `TRUE` to start even though the workspace
+#'   contains `.agents/console/config.yaml`. That file can widen the sandbox,
+#'   so by default the connection refuses to start when it exists. Review the
+#'   file before you opt in.
 #' @param timeout Maximum seconds for one MCP request.
-#' @param startup_timeout Maximum seconds for client and server startup.
-#' @return A [McpConnection]. The host must close it when the conversation ends.
+#' @param startup_timeout Maximum seconds for the client and server to start.
+#' @return A [McpConnection]. Call its `$close()` method when the conversation
+#'   ends.
 #'
 #' @details
-#' ## Qualification
+#' ## Supported versions
 #'
-#' This adapter is qualified for MCP Console 0.0.4 with mcptools 1.0.2 or
-#' 1.0.3. Before launch, Deputy runs `command --version` and refuses other
-#' versions. After launch it checks the `send` tool contract, and the security
-#' sentence that the server derives from its effective sandbox policy. Only the
-#' native sandbox with restricted networking is accepted (the default policy or
-#' the `:workspace` or `:read-only` profiles). An unsandboxed, unrestricted,
-#' proxied, external, remote or container boundary closes the connection.
-#' mcptools does not expose the server's `serverInfo`, so the version check
-#' relies on the executable.
+#' Requires MCP Console 0.0.4 and mcptools 1.0.2 or 1.0.3. The connection
+#' checks the version with `command --version` before starting the server.
+#' After starting, it checks the arguments of `send` and the sandbox
+#' description MCP Console adds to it, and closes the connection unless the
+#' server uses its native sandbox with restricted networking (the default
+#' policy, or the `:workspace` or `:read-only` profile).
 #'
-#' ## Governance
+#' ## Permissions
 #'
-#' `send` submits code with shell-class capability. In `"standard"` mode the
-#' Agent's policy needs `bash = TRUE`. The server supplies no MCP annotations,
-#' so the conservative defaults also require `web = TRUE`. `"readonly"` and
-#' `"plan"` modes always deny `send`. A call that declares `requirements` also
-#' needs `install_packages = TRUE`, and the connection must allow dependencies.
+#' `send` runs code, so it is treated like a shell tool: in `"standard"` mode
+#' the agent's permissions need `bash = TRUE`. The server declares no tool
+#' annotations, so the cautious defaults also require `web = TRUE`.
+#' `"readonly"` and `"plan"` modes always deny `send`. A call that declares
+#' `requirements` also needs `install_packages = TRUE` and a connection created
+#' with `dependencies = "allow"`.
 #'
-#' With dependency preparation enabled, the server can also resolve packages
-#' automatically, outside the sandbox, when evaluated code calls `library()`
-#' or imports a missing Python module. Deputy cannot gate those per call; they
-#' are part of the host's `dependencies = "allow"` decision. MCP Console offers
-#' preparation when `ir`, `uv` or a recent reticulate is available to it. The
-#' server-launch environment, not Deputy, decides where resolvers write.
+#' With `dependencies = "allow"`, the server can also install packages on its
+#' own, outside the sandbox, when code calls `library()` for a missing package
+#' or imports a missing Python module. These installs can't be checked call by
+#' call. MCP Console offers dependency installs when `ir`, `uv` or a recent
+#' reticulate is available to it. The server's environment decides where they
+#' are written.
 #'
-#' ## Response window
+#' ## Long-running calls
 #'
-#' The qualified mcptools releases wait about 4 seconds for a stdio reply.
-#' Deputy forwards `timeout_ms` capped at 2500 ms (also when omitted). Longer
-#' work keeps running: the call returns `[running; poll with an empty send]`,
-#' and a later `send` with no code retrieves the output. The tool description
-#' tells the model this. Upstream gives explicit dependency preparation,
-#' restart, and standard input sent to a stopped worker no deadline. If one
-#' outlasts the window, the connection closes with a `deputy_mcp_desynchronized`
-#' error and the server session is lost. For that reason restart is a host
-#' control, [mcp_console_control()], and the model-facing `send` refuses it.
+#' mcptools waits about 4 seconds for a reply, so each `send` waits at most
+#' 2.5 seconds: `timeout_ms` is capped at 2500, also when omitted. Longer work
+#' keeps running: the call returns `[running; poll with an empty send]`, and a
+#' later `send` with no code collects the output. The tool description tells
+#' the model this. Installs requested with `requirements`, restarts, and input
+#' sent to a stopped worker have no time limit in MCP Console. If one takes
+#' longer than the reply window, the connection closes with a
+#' `deputy_mcp_desynchronized` error and the session is lost. That is why only
+#' you can restart the session, with [mcp_console_control()]; the model's
+#' `send` refuses it.
 #'
-#' ## Lifecycle and recordings
+#' ## Closing and recordings
 #'
-#' `$close()` closes the server's input, which asks MCP Console to shut down
-#' and retire its worker, then stops the process. `$cancel()`, an Agent
-#' interrupt during an active call, and a desynchronized reply stop the server
-#' without that shutdown request. The private sandbox runner then retires the
-#' worker when it observes its parent exit. Descendants that escape the
-#' runner's supervision are outside Deputy's control.
+#' `$close()` asks MCP Console to shut down cleanly, then stops the process.
+#' `$cancel()`, interrupting the agent during a call, and a lost reply stop the
+#' server without asking; MCP Console's sandbox runner then stops its worker.
+#' Processes that escape the runner are outside Deputy's control.
 #'
 #' MCP Console records every call, result and plot, without redaction, under
-#' `.agents/console/sessions/<run-id>/` in its working directory. Version 0.0.4
-#' has no setting for that location or its retention. Deputy therefore uses the
-#' Agent's working directory, reports the path in
-#' `$status()$execution$recordings`, and leaves retention to the host.
+#' `.agents/console/sessions/<run-id>/` in the workspace. Version 0.0.4 can't
+#' change that location or how long recordings are kept. The path is reported
+#' in `$status()$execution$recordings`; deleting old recordings is up to you.
 #'
 #' @export
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   permissions = Permissions(bash = TRUE, web = TRUE)
 #' )
 #' console <- mcp_console_connection(agent, command = "/path/to/mcp-console")
 #' agent$register_tools(console$tools())
-#' # In a Shiny host: session$onSessionEnded(function() console$close())
+#' # In a Shiny app: session$onSessionEnded(function() console$close())
 #' console$close()
 #' }
 mcp_console_connection <- function(
@@ -209,21 +207,20 @@ mcp_console_connection <- function(
 
 #' Interrupt or restart an MCP Console session
 #'
-#' Sends MCP Console's `send(control = ...)` through the same connection.
-#' `"interrupt"` requests SIGINT for the active evaluation or dependency
-#' resolver and keeps in-memory state. Interruption is cooperative, so check
-#' the returned output: it can still end in `[running; poll with an empty send]`.
-#' `"restart"` replaces the worker and discards R, Python and DuckDB state.
+#' `"interrupt"` sends SIGINT to the running code or dependency install and
+#' keeps the session's state. The code may not stop, so check the returned
+#' output: it can still end in `[running; poll with an empty send]`.
+#' `"restart"` replaces the worker and discards all R, Python and DuckDB state.
 #'
-#' Restart has no upstream deadline. If the replacement is not ready within
-#' the client's response window (about 4 seconds), Deputy closes the connection
-#' and reports a `deputy_mcp_console_restart` error. The server and its worker
-#' are then stopped; create a new connection to continue.
+#' If a restart takes longer than about 4 seconds, the connection closes with a
+#' `deputy_mcp_console_restart` error and the server stops. Create a new
+#' connection to continue.
 #'
 #' @param connection A connection created by [mcp_console_connection()].
 #' @param action `"interrupt"` or `"restart"`.
-#' @return A promise for the upstream result. This is a direct host operation,
-#'   not an Agent run. A connection with an active request rejects overlap.
+#' @return A promise for MCP Console's reply. The call goes straight to the
+#'   server, not through the agent, and errors if the connection is already
+#'   handling a request.
 #' @export
 mcp_console_control <- function(
   connection,

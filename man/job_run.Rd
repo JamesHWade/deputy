@@ -2,29 +2,44 @@
 % Please edit documentation in R/agent-job.R
 \name{job_run}
 \alias{job_run}
-\title{Consume one durable Agent job}
+\title{Run a background job}
 \usage{
 job_run(path, bind, authorize, decision = NULL, tool_input = NULL)
 }
 \arguments{
-\item{path}{Committed directory returned by \code{\link[=job_create]{job_create()}}.}
+\item{path}{Job directory returned by \code{\link[=job_create]{job_create()}}.}
 
-\item{bind}{Function receiving an \link{AgentJob} and returning an Agent or a
-list with fields agent and cleanup.}
+\item{bind}{Function that takes the \link{AgentJob} and returns the rebuilt
+\link{Agent}, or \code{list(agent = , cleanup = )} where \code{cleanup} is a function
+that \code{job_run()} calls when it is done with the agent.}
 
-\item{authorize}{Function receiving an \link{AgentJob} and returning the exact
-identity receipt with job_id, owner_id, definition_revision, and
-context_revision.}
+\item{authorize}{Function that takes the \link{AgentJob} and returns a list of
+your app's current \code{job_id}, \code{owner_id}, \code{definition_revision} and
+\code{context_revision} for it; the job runs only if they match the saved
+values. Look them up rather than copying them from the job, and signal an
+error to refuse.}
 
-\item{decision}{Approval decision, approve or deny, for a pending job.}
+\item{decision}{\code{"approve"} or \code{"deny"}, to resume a job waiting for
+approval.}
 
-\item{tool_input}{Optional edited raw input for a pending approval.}
+\item{tool_input}{Optional edited tool arguments (a named list) to approve
+with.}
 }
 \value{
-A read-only \link{AgentJob} inspection value.
+The updated \link{AgentJob}.
 }
 \description{
-The host controls authorization, Agent reconstruction, and resource
-cleanup. The execution lock is held from the durable running transition
-through runtime detachment and terminal persistence.
+Runs a queued job, or resumes one waiting for approval, in the current R
+process and returns when the run ends. It calls \code{authorize} first; a
+refusal errors and leaves the job untouched. It then calls \code{bind}; if that
+fails, or the rebuilt agent doesn't match the setup saved by
+\code{\link[=job_create]{job_create()}}, the job fails. A running job is locked, so a second
+\code{job_run()} on it errors.
+}
+\details{
+A finished job is returned unchanged, and so is a job waiting for approval
+unless you pass \code{decision}. If a previous \code{job_run()} stopped partway, for
+example because its process was killed, the job is marked \code{"indeterminate"}
+and not run again: a tool may already have had effects, so check what
+happened before creating new work.
 }

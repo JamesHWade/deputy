@@ -1,8 +1,8 @@
 ---
-title: "Tools and Tool Bundles"
+title: "Tools"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Tools and Tool Bundles}
+  %\VignetteIndexEntry{Tools}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -15,127 +15,85 @@ knitr::opts_chunk$set(
 )
 ```
 
-Tools let a model call R functions: read a file, fetch a page, or run a
-calculation. Choose built-in tools or register functions with `ellmer::tool()`.
-Permissions determine which calls can run.
+A tool is an R function the model can ask to call. Deputy ships tools for
+files, data, the web and code, and any R function becomes a tool once you
+describe it with `ellmer::tool()`. Registering a tool only makes it available:
+the agent's [permissions](permissions.html) decide whether each call runs.
 
-## Reusable Skill Configuration
+## Built-in tools
 
-A `Skill` bundles instructions, tools, and declared requirements in a read-only
-S7 value. Construct it with `Skill(...)` or `skill_create(...)`, and inspect
-requirements with `skill_check_requirements(skill)`. `Skill()` defaults to
-version `"0.0.0"`; `skill_create()` retains its `"1.0.0"` default.
-
-```{r skill-values, eval = TRUE}
-library(deputy)
-concise <- skill_create(
-  "concise",
-  prompt = "Answer in one short paragraph.",
-  requires = list(packages = "base")
-)
-skill_check_requirements(concise)$ok
-fields <- S7::props(concise)
-fields$prompt <- "Answer in one sentence."
-shorter <- do.call(Skill, fields)
-shorter$prompt
-concise$prompt
-```
-
-Read properties with `$`, `@`, or `S7::prop()`. Configuration is frozen,
-including the declared requirements and initially NULL fields. Tools keep their
-original closures, clients, and caller-owned state when a Skill is constructed,
-revised, or loaded into an Agent.
-
-`agent$load_skill(skill)` checks package and provider requirements, registers
-tools under the Agent's existing permissions, and appends the prompt. Its
-`agent$skills()` getter returns a list of read-only Skill values. Checking
-requirements does not install packages or execute tools. `skill_load(path)`
-remains the explicit file-loading entry point and can source tool files declared
-by the skill. AgentDefinition YAML attaches approved skills through a host
-registry; it does not source those files.
-
-## Built-in Tools
-
-deputy includes the following tools out of the box:
-
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `tool_read_file` | Read a file's contents | read-only |
-| `tool_read_markdown` | Convert a supported document to markdown | read-only |
-| `tool_write_file` | Write or append to a file | destructive |
-| `tool_edit_file` | Apply one targeted file edit | destructive |
-| `tool_multi_edit` | Apply multiple file edits | destructive |
-| `tool_list_files` | List files in a directory | read-only |
+| Tool | What it does | Effects |
+|---|---|---|
+| `tool_read_file` | Read a text file, or pages of a PDF | read-only |
+| `tool_read_markdown` | Convert a PDF, Word, PowerPoint or HTML file to Markdown (needs the Python `markitdown` module) | read-only |
+| `tool_list_files` | List a directory | read-only |
 | `tool_glob_files` | Find files by glob pattern | read-only |
 | `tool_grep_files` | Search file contents | read-only |
-| `tool_run_r_code` | Execute trusted R code as the current user | destructive, open-world |
-| `tool_run_bash` | Execute trusted shell code as the current user | destructive, open-world |
-| `tool_read_csv` | Read and summarise a CSV | read-only |
-| `tool_web_fetch` | Fetch a web page | read-only, open-world |
-| `tool_web_search` | Search the web | read-only, open-world |
-| `tool_ask_user` | Ask structured questions | read-only |
+| `tool_read_csv` | Read a CSV file and summarise it | read-only |
+| `tool_write_file` | Write or append to a file | destructive |
+| `tool_edit_file` | Replace text in a file | destructive |
+| `tool_multi_edit` | Make several replacements in one file | destructive |
+| `tool_run_r_code` | Run R code in a new R process | destructive, open world |
+| `tool_run_bash` | Run a shell command | destructive, open world |
+| `tool_web_fetch` | Fetch a web page as text | read-only, open world |
+| `tool_web_search` | Search the web with DuckDuckGo | read-only, open world |
+| `tool_ask_user` | Ask the person running the agent a question | read-only |
 
-Each tool carries **annotations** that the permission system uses to decide
-whether the agent is allowed to use it. See `vignette("permissions")` for
-details.
+`run_r_code` and `run_bash` are trusted-code tools: the code runs with your
+user account's access to files and the network. The default permissions deny
+both. [Running R code](code-execution.html) covers when to enable them and
+how to sandbox model-written code instead.
 
-## Tool Bundles
+## Bundles and presets
 
-Bundles group related tools together:
+Bundles group related tools:
 
-```{r, eval = FALSE}
+```{r}
 library(deputy)
 
-tools_file()  # read_file, read_markdown, write_file, list_files
-tools_code()  # run_r_code, run_bash
-tools_data()  # read_csv, read_file, read_markdown
-tools_web()   # universal web_fetch and web_search
-tools_all()   # everything
+tools_file() # read_file, read_markdown, write_file, list_files
+tools_data() # read_csv, read_file, read_markdown
+tools_code() # run_r_code, run_bash
+tools_web() # web_fetch, web_search
+tools_all() # every built-in tool except ask_user
 ```
 
-Registration is not authorization: `tools_code()` makes the two trusted-code
-tools available to the model, while the Agent's `Permissions` still decides
-whether either call may run. `permissions_standard()` denies both.
+Combine them with `c()`:
 
-Combine bundles by concatenating:
-
-```{r, eval = FALSE}
-tools <- c(tools_file(), tools_code())
-agent <- Agent$new(chat = ellmer::chat_openai(model = "gpt-5.6-luna"), tools = tools)
+```{r}
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = c(tools_file(), tools_web()),
+  permissions = Permissions(web = TRUE)
+)
 ```
 
-## Tool Presets
+Presets are named combinations for common jobs:
 
-Presets are named collections with opinionated defaults:
-
-```{r, eval = FALSE}
-tools_preset("minimal")
-tools_preset("standard")
-tools_preset("dev")
-tools_preset("data")
-tools_preset("full")
-```
-
-| Preset | Included capabilities |
+| Preset | Tools |
 |---|---|
-| `minimal` | file and document reads |
-| `standard` | reads plus native file writes; no code execution |
-| `data` | data reads plus trusted R execution |
-| `dev` | native files plus trusted R and shell execution |
-| `full` | every built-in tool |
+| `tools_preset("minimal")` | `read_file`, `read_markdown`, `list_files` |
+| `tools_preset("standard")` | `minimal` plus `write_file` |
+| `tools_preset("data")` | `minimal` plus `read_csv` and `run_r_code` |
+| `tools_preset("dev")` | `standard` plus `run_r_code` and `run_bash` |
+| `tools_preset("full")` | `tools_all()` |
 
-## Create a tool from an R function
+The `data` and `dev` presets include trusted-code tools, so they only do
+something useful with permissions that allow code (`r_code = TRUE`,
+`bash = TRUE`).
 
-A tool wraps an R function with a name, a description, and argument types that
-the model can use. Start with a function you can call directly. This example
-wraps `toupper()`; a package function or your own function works the same way.
+## Turn an R function into a tool
+
+A tool needs a function, a name, a description the model reads, and the types
+of its arguments. This one wraps `toupper()`:
 
 ```{r custom-tool, eval = TRUE}
 library(deputy)
+
 uppercase <- ellmer::tool(
   base::toupper,
   name = "uppercase",
-  description = "Uppercase local text.",
+  description = "Convert text to upper case.",
   arguments = list(x = ellmer::type_string()),
   annotations = ellmer::tool_annotations(
     read_only_hint = TRUE,
@@ -147,65 +105,63 @@ uppercase <- ellmer::tool(
 uppercase("hello")
 ```
 
-Register the tool when constructing the agent:
+Pass it to the agent like any other tool:
 
-```{r custom-agent, eval = FALSE}
+```{r custom-agent}
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  tools = list(uppercase),
-  permissions = Permissions(file_write = FALSE)
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = list(uppercase)
 )
-result <- agent$run_sync("Use uppercase to convert 'hello' to capitals.")
-result$response
+agent$run_sync("Use the uppercase tool to shout 'hello'.")$response
 ```
 
-The annotations describe the function's effects. Here the tool changes no
-files, uses no network, and returns the same answer for the same input. Deputy
-uses these declarations when checking permissions; it does not inspect the
-function body to verify them.
+The annotations tell Deputy what the function does. Permissions are decided
+from them:
 
-| Annotation | Meaning when `TRUE` |
+| Annotation | `TRUE` means |
 |---|---|
-| `read_only_hint` | Does not change state |
-| `destructive_hint` | May delete or overwrite data |
-| `open_world_hint` | Accesses external systems |
-| `idempotent_hint` | Repeated calls have the same effect |
+| `read_only_hint` | the tool changes nothing |
+| `destructive_hint` | the tool may delete or overwrite data |
+| `open_world_hint` | the tool reaches outside the machine, for example the network |
+| `idempotent_hint` | calling it twice has the same effect as calling it once |
 
-### Replace or inspect registered tools
+Deputy takes annotations at their word; it doesn't inspect the function to
+check them. When you leave one out, Deputy assumes the risky answer: the tool
+might destroy data, might reach the network, and isn't safe to retry. A tool
+that might reach the network then needs a policy with `web = TRUE`, and one
+that might destroy data needs a policy that allows file writes or shell
+commands. So declare all four.
+In `"readonly"` mode a custom tool must also be listed in the policy's
+`tool_allowlist`.
 
-Use `agent$register_tool(tool)` to add a tool to an existing agent, or
-`agent$register_tool(tool, replace = TRUE)` to replace a tool with the same name.
+## Add, replace and inspect tools
 
-Existing names are errors unless `replace = TRUE` is explicit. Repeated names
-inside one batch always fail, including with replacement enabled. List names
-do not rename a tool. `set_tools()` replaces the whole user registry. Both
-methods and construction validate and adapt the complete batch before changing
-the backend registry; a malformed later tool leaves earlier tools untouched.
-Skills use `load_skill(..., allow_conflicts = TRUE)` for explicit replacement.
+Add tools to an existing agent with `$register_tool()` or `$register_tools()`.
+Registering a name that already exists is an error unless you pass
+`replace = TRUE`. `$set_tools()` replaces all tools at once. Deputy checks the
+whole batch before changing anything, so one bad tool leaves the agent's tools
+as they were.
 
-Missing annotations stay absent on the source object. For custom tools,
-permissions assume possible modification, destruction, and external access,
-and no idempotence. An explicit read-only annotation makes an omitted
-destructive annotation irrelevant. A local read tool therefore needs at least
-`read_only_hint = TRUE` and `open_world_hint = FALSE` under standard permissions.
-Readonly mode additionally requires an explicit allowlist entry for custom
-tools. Annotations do not grant authority or verify a service's trustworthiness.
-See `PermissionMode` for callback and mode behavior.
+```{r}
+agent$register_tool(tool_list_files)
+agent$register_tool(uppercase, replace = TRUE)
+```
 
-Inspect the supplied fields and defaults without executing the tool:
+`tool_metadata()` shows where a tool came from, which annotations it declares
+and which defaults Deputy will assume, without running it:
 
 ```{r tool-metadata, eval = TRUE}
 tool_metadata(uppercase)
 ```
 
-## Web Tools
+## Web tools
 
-deputy provides web tools that are **provider-aware**. Pass the chat to
-`tools_web()` to select provider-native web tools when available. Calling it
-without a chat returns Deputy's universal web tools:
+`tools_web()` returns Deputy's own `web_fetch` and `web_search`, which work with
+any provider. Pass it your chat to use the provider's built-in web tools
+instead, where there are any (Anthropic, Google, and OpenAI search):
 
-```{r, eval = FALSE}
-chat <- ellmer::chat_anthropic()
+```{r}
+chat <- ellmer::chat("anthropic/claude-sonnet-5")
 agent <- Agent$new(
   chat = chat,
   tools = tools_web(chat),
@@ -216,310 +172,49 @@ agent <- Agent$new(
 )
 ```
 
-Provider-native tools execute outside R, so Deputy authorizes known native web
-search and fetch tools before registering them. The policy must grant web
-access and explicitly allow the tool; static denylists are also enforced at
-registration. A custom `can_use_tool` callback rejects provider-native tools
-because Deputy cannot supply request arguments or run context after provider
-execution begins. Other provider-native tool types are rejected. Use the
-universal function tools when authorization must inspect each request. If
-`set_permission_mode()` later narrows away web access, Deputy removes registered
-provider-native web tools before the new policy becomes active.
+Provider tools run on the provider's servers, so Deputy can't check each call.
+It checks them once, when they're registered: the policy must allow web access
+and list them in `tool_allowlist`. A policy with a `can_use_tool` callback
+can't use them at all, because the callback would never see their arguments.
+Use `tools_web(chat, use_native = FALSE)` when you need per-call checks.
 
-For providers without native support, deputy falls back to `tool_web_fetch`
-(fetches a URL and extracts text) and `tool_web_search` (searches via
-DuckDuckGo).
+## Skills
 
-## MCP Integration
+A skill packages instructions, tools and the packages they need, so you can
+give the same abilities to several agents. Create one in code:
 
-deputy can load tools from
-[Model Context Protocol](https://modelcontextprotocol.io/) servers via
-the [mcptools](https://github.com/posit-dev/mcptools) package:
-
-```{r, eval = FALSE}
-# Load tools from selected configured servers
-agent <- Agent$new(
-  chat = ellmer::chat_anthropic(),
-  tools = c(tools_file(), tools_mcp(servers = "github"))
+```{r skill-values, eval = TRUE}
+concise <- skill_create(
+  "concise",
+  prompt = "Answer in one short paragraph.",
+  requires = list(packages = "base")
 )
+skill_check_requirements(concise)$ok
 ```
 
-`tools_mcp()` returns an empty list with a warning when `mcptools` is not
-installed or no tools are available. MCP servers are configured in
-`~/.config/mcptools/config.json`; see the mcptools documentation for setup.
+`agent$load_skill(concise)` appends the prompt to the agent's system prompt and
+registers the skill's tools under the agent's current permissions. Missing
+packages produce a warning, and a tool name that clashes with an existing tool
+is an error unless you pass `allow_conflicts = TRUE`. `agent$skills()` lists
+what's loaded.
 
-### Server metadata and reconnection
+Skills can also live in a directory with a `SKILL.md` prompt and a
+`SKILL.yaml` that lists tools and requirements. Deputy ships two:
+`data_analysis`, with exploratory analysis tools, and `debate`, a prompt for
+weighing opposing arguments.
 
-For service tools, `tools_mcp(config, servers = "evidence")` selects an exact
-configured server name before connecting. The bridge, qualified for mcptools
-1.0.2 and 1.0.3,
-retains annotations from the server and records `source$type = "mcp"`, its
-server name, and tool name. It reports missing metadata rather than inventing
-safe effects. Other mcptools versions fail explicitly pending qualification.
-The caller must trust the configured service; metadata does not establish trust.
-
-Pass these objects to `Agent$new(tools = ...)`, `register_tools()`, or an
-explicit tool registry used by `agent_definition_read()`. The same metadata
-survives YAML selection, Agent wrapping, cloning, and delegation. Permission
-callbacks receive it as `context$tool_metadata`, alongside the supplied
-`context$tool_annotations`. A service called `read_file` still uses its service
-annotations and capabilities; its name does not confer native file access.
-Local file checkpointing excludes MCP calls, so rewinding files never treats a
-remote service write as a change to the local workspace.
-
-Reconnecting a server invalidates tools from its old connection. Reload and
-replace explicitly with `agent$load_mcp(config, servers = "evidence", replace = TRUE)`.
-This refresh removes obsolete tools from the selected servers, including when
-discovery succeeds with an empty tool set. Unrelated tools remain registered.
-A load failure records a failed attempt in `mcp_status()`. Tools that still
-have working connections remain registered. If mcptools already closed an
-old connection, its invalidated handles are removed even when discovery or
-registration fails. Malformed metadata never silently becomes an unannotated
-executable.
-
-### Connections owned by a conversation
-
-Use `McpConnection` when a host needs independent connections, asynchronous
-calls, or resource and prompt access. Create the Agent first, then allow exact
-items from one configured server:
-
-```{r, eval = FALSE}
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  permissions = Permissions(web = TRUE)
-)
-connection <- McpConnection$new(
-  config = "~/.config/mcptools/config.json",
-  server = "evidence",
-  agent = agent,
-  tools = "inspect_evidence",
-  resources = "evidence://report/current",
-  prompts = "summarize"
-)
-agent$register_tools(c(connection$tools(), connection$capability_tools()))
+```{r}
+agent$load_skill(system.file("skills", "data_analysis", package = "deputy"))
 ```
 
-When one Agent uses multiple connections, choose distinct capability prefixes,
-such as `first$capability_tools(prefix = "papers")` and
-`second$capability_tools(prefix = "notes")`. These produce names such as
-`papers_read_resource` and `notes_read_resource` without changing the allowlists.
-Connections with no allowed tools can use resource-only or prompt-only servers;
-they do not request a tool catalogue during initialization.
+Loading a skill directory sources the R files its tools are defined in, so
+load only skills you trust. `skills_list()` lists the skills in a directory.
 
-The allowlists are fixed. `$discover("resources")` returns a promise for one
-catalogue page; its result may include a cursor for the next page. Discovery
-does not fetch resource contents, retrieve prompts, register tools or expand
-the Agent's permissions. Resource and prompt tools still require the Agent's
-web capability. The host can use `$get_prompt(name, arguments)` for prompts
-that require arguments; retrieving a prompt never inserts it into a Chat.
+## More tools
 
-Each connection has its own mcptools registry. Two conversations can therefore
-use the same configured server name without replacing each other's connection.
-Tools carry the connection ID into permission callbacks and hooks. They reject
-registration with a different Agent, session or run context. The host assigns
-those identities and remains responsible for authentication.
-
-Calls return promises and permit one active request per connection. Overlapping
-requests fail with a busy error; other connections and the host event loop can
-continue. Construction waits for startup. Call `$close()` when the conversation
-ends, for example from a Shiny session's end callback. `$cancel()` terminates
-the connection and discards its server session state. A timeout does the same;
-old tool handles never start a replacement connection implicitly.
-
-A stdio server must answer each request within mcptools' response window of
-about 4 seconds. If it does not, or a reply does not match its request, the
-call fails with a `deputy_mcp_desynchronized` error and the connection closes.
-Its session state is lost, and a late reply can never become the answer to a
-later call. Create a new connection to continue.
-
-This is a temporary adapter checked against an explicit list of qualified
-mcptools releases (currently 1.0.2 and 1.0.3). It uses upstream
-transport, authentication, tool conversion and shutdown with a small internal
-request bridge. Public replacements are requested in
-[mcptools #129](https://github.com/posit-dev/mcptools/issues/129),
-[#130](https://github.com/posit-dev/mcptools/issues/130), and
-[#109](https://github.com/posit-dev/mcptools/issues/109).
-
-### Sandboxed R with mcp-repl
-
-Use `tools_mcp_repl()` when model-generated R needs an OS sandbox rather than
-the current user's authority:
-
-```{r, eval = FALSE}
-repl_tools <- tools_mcp_repl(
-  config = "~/.config/mcptools/config.json",
-  server = "r",
-  sandbox = "workspace-write"
-)
-
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  tools = repl_tools,
-  permissions = Permissions(web = FALSE)
-)
-```
-
-The helper isolates the named server from the rest of the MCP configuration
-and checks its exact final `--sandbox` argument. Missing policies and modes that
-do not establish a Deputy-verifiable boundary are errors. mcp-repl then owns
-OS-specific confinement, including fail-closed startup on unsupported hosts.
-See `vignette("permissions")` for the complete trust model.
-
-For a persistent session owned by a particular Agent, use
-`mcp_repl_connection()`:
-
-```{r, eval = FALSE}
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  permissions = Permissions(web = FALSE)
-)
-connection <- mcp_repl_connection(
-  config = "~/.config/mcptools/config.json",
-  agent = agent,
-  server = "r",
-  sandbox = "workspace-write"
-)
-agent$register_tools(connection$tools())
-```
-
-Each connection starts a separate upstream REPL, even when its configured
-server name matches another conversation's. Registering its tools with an
-unrelated Agent fails. The connection ID and selected sandbox appear in tool
-metadata for permission callbacks and hooks. The host must call
-`connection$close()` when the conversation ends.
-
-After mcp-repl returns a busy-interpreter response, the host can request an
-interrupt with `mcp_repl_control(connection, "interrupt")`. To discard interpreter
-state and request a fresh session, use `mcp_repl_control(connection, "reset")`.
-Both return promises for the upstream result; inspect that result before
-assuming the control succeeded. An interpreter can restart inside the same
-MCP connection, so the connection ID alone does not prove its state survived.
-
-An active client request cannot accept an overlapping control request.
-`connection$cancel()` or interruption of the owning Agent terminates that
-connection and discards its state. mcp-repl's `timeout_ms` can instead return
-control while interpreter work continues; the client's `timeout` closes the
-connection when the MCP request itself takes too long. Deputy forwards
-`timeout_ms` capped at 3000 ms, and 3000 ms when it is omitted, to stay inside
-mcptools' stdio response window. Longer cells return mcp-repl's busy status;
-the model retrieves their output with a later call whose `input` is empty.
-
-Plots retain ellmer image content. Oversized transcripts retain mcp-repl's
-bounded previews and artifact references, and ordinary Deputy result offloading
-still applies when configured. These paths are upstream-owned session artifacts;
-the host must preserve anything it needs durably before closing the session.
-Deputy does not create another spill store or automatically read every linked
-artifact.
-
-The tested producer combination is mcptools 1.0.2 with mcp-repl 0.3.0 on macOS;
-mcptools 1.0.3 has identical client sources and is also qualified.
-The executable name does not establish its version. Install the qualified
-runtime explicitly; unsupported host sandboxing remains an upstream startup
-error. Put the sandbox mode in `--sandbox`; a `--config sandbox_mode=...`
-override is rejected so it cannot change the policy Deputy checked.
-
-### R, Python and SQL with MCP Console
-
-[MCP Console](https://github.com/t-kalinowski/mcp-console) grew out of
-mcp-repl. One `send` tool runs R, Python and DuckDB SQL cells in a single
-sandboxed worker, so a data frame created in R can be queried in SQL and read
-from Python in the same conversation. `mcp_console_connection()` starts one
-server per conversation, owned by one Agent:
-
-```{r, eval = FALSE}
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  permissions = Permissions(bash = TRUE, web = TRUE)
-)
-console <- mcp_console_connection(
-  agent,
-  command = Sys.getenv("DEPUTY_MCP_CONSOLE_BIN"),
-  dependencies = "allow"
-)
-agent$register_tools(console$tools())
-# ...
-console$close()
-```
-
-Install a qualified executable yourself (MCP Console 0.0.4, for example with
-`uv tool install mcp-console==0.0.4`) and pass its path. Deputy checks its
-`--version` before launch and refuses other versions.
-
-MCP Console enforces a native sandbox by default: code can read host files,
-cannot reach the network directly, and writes only to private temporary
-storage and paths the host allows. Deputy keeps it that way. It refuses
-`--no-sandbox` and any `-c` override that could widen the filesystem, add a
-proxy or select a remote or container target. It admits only
-`--writable-root PATH`, `-c extends=:workspace` (writes in the Agent's
-working directory), `-c extends=:read-only` and
-`-c sandbox.network=restricted`. A project file,
-`.agents/console/config.yaml`, can change the policy, so Deputy will not start
-when one exists unless you review it and pass `project_config = TRUE`. After
-launch, Deputy checks the sandbox description the server reports and closes
-the connection unless it shows the native sandbox with restricted networking.
-
-`send` runs code, so the Agent governs it like a shell command. Standard mode
-needs `bash = TRUE`, and `web = TRUE` because the server supplies no
-annotations. Readonly and plan modes deny it.
-
-Dependency preparation is different. It runs outside the sandbox, with the
-server's permissions, and can download and build packages. MCP Console does it
-for explicit `requirements` and also automatically when code calls `library()`
-or imports a missing Python module. Deputy cannot switch off the automatic
-path, so `dependencies = "deny"`, the default, refuses a server that offers
-preparation. With `dependencies = "allow"`, a call that declares
-`requirements` also needs `install_packages = TRUE`. Resolvers write to their
-usual caches under `HOME` (R packages, uv environments and DuckDB extensions).
-mcptools passes the server only a few inherited variables, so set cache
-locations such as `UV_CACHE_DIR` or `XDG_CACHE_HOME` through `env`.
-
-Each call waits at most 2500 ms, to stay inside mcptools' stdio response
-window. Longer work keeps running and returns
-`[running; poll with an empty send]`; the model then calls `send` with no code
-to collect the output. Use `mcp_console_control(console, "interrupt")` to
-interrupt a running cell and keep state. Restart is a host control:
-`mcp_console_control(console, "restart")` discards R, Python and SQL state.
-Upstream gives restart no deadline, so if the new worker is not ready within
-the window, Deputy closes the connection and reports it; start a new
-connection then. `console$close()` asks the server to shut down and stops it.
-
-MCP Console records every call, its output and plots, without redaction, under
-`.agents/console/sessions/` in the Agent's working directory. Version 0.0.4
-cannot move or expire these recordings, so `console$status()$execution`
-reports the path and retention is up to you.
-
-## Human-in-the-Loop
-
-The `tool_ask_user` tool lets an agent ask the user a question during
-execution. This is useful for confirmations, clarifications, or collecting
-input:
-
-```{r, eval = FALSE}
-agent_id <- "agent-analysis"
-session_id <- "session-analysis"
-
-agent <- Agent$new(
-  chat = ellmer::chat_openai(model = "gpt-5.6-luna"),
-  tools = c(
-    tools_file(),
-    tools_interactive(
-      callback = function(questions, context) {
-        # Route a modal to this Agent's host session and collect its answers.
-        collect_answers(questions, route = context$session_id)
-      },
-      context = list(agent_id = agent_id, session_id = session_id)
-    )
-  ),
-  agent_id = agent_id,
-  session_id = session_id
-)
-```
-
-`tools_interactive()` creates a fresh `tool_ask_user` instance. Its handler and
-routing context belong to that tool, so concurrent Agents cannot overwrite one
-another. The context may also be a zero-argument function when routing values
-must be resolved for each request. Omit the callback in an interactive console
-to use `readline()`.
-
-`set_ask_user_callback()` remains a process-wide compatibility fallback for
-single-Agent scripts. Do not use it to route Shiny or other concurrent hosts.
+- [Running R code](code-execution.html): trusted R execution, persistent R
+  sessions, and sandboxed interpreters through mcp-repl and MCP Console.
+- [MCP servers](mcp.html): tools, resources and prompts from Model Context
+  Protocol servers.
+- [Human input and approvals](approvals.html): `tools_interactive()` lets the
+  model ask a person questions.

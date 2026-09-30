@@ -2,22 +2,25 @@
 % Please edit documentation in R/tools-bundles.R
 \name{tools_all}
 \alias{tools_all}
-\title{All built-in tools}
+\title{Get all built-in tools}
 \usage{
 tools_all()
 }
 \value{
-A list of all tool definitions
+A list of tools.
 }
 \description{
-Returns all built-in tools. Use with \code{\link[=permissions_full]{permissions_full()}} if you want
-to allow all operations.
+Returns every built-in tool except \code{ask_user}, which you can add with
+\code{\link[=tools_interactive]{tools_interactive()}}. That includes \code{run_r_code} and \code{run_bash}, which run
+with your user account's access and are not sandboxed. The default
+permissions deny them and the web tools; \code{\link[=permissions_full]{permissions_full()}} allows
+everything.
 }
 \examples{
 \dontrun{
-# Allow all tools with full permissions
+# Allow every tool
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_all(),
   permissions = permissions_full()
 )

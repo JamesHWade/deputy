@@ -451,4 +451,11 @@ test_that("usage reported before microcompaction is not reused afterwards", {
   expect_identical(agent$microcompact(keep_last = 1L)$cleared, 1L)
   # The old count described the result before it was cleared.
   expect_lt(estimate_context(agent, list("Q2"))$tokens, 10000)
+
+  # A saved session keeps that: the restored usage is not reused either.
+  path <- withr::local_tempfile(fileext = ".rds")
+  suppressMessages(agent$save_session(path))
+  restored <- Agent$new(chat = create_mock_chat(list("done")))
+  suppressMessages(restored$load_session(path))
+  expect_lt(estimate_context(restored, list("Q2"))$tokens, 10000)
 })

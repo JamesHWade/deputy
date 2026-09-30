@@ -76,6 +76,17 @@ permission_is_allowlist_exempt <- function(tool_name, context) {
     )
 }
 
+# An agent's own delegation tool: a LeadAgent's delegate_to_agent, or a
+# delegation_tool() or graph route tool that calls a retained agent. Each is
+# identified by Deputy's private marker rather than by its name, which any
+# registered tool could use.
+permission_is_own_delegation <- function(tool_name, context) {
+  marker <- context$.deputy_internal_tool
+  identical(marker, deputy_composition_tool_marker) ||
+    (identical(marker, deputy_delegation_tool_marker) &&
+      identical(normalize_native_tool_id(tool_name), "delegate_to_agent"))
+}
+
 permission_check_tool_gating <- function(
   permissions,
   tool_name,
@@ -173,13 +184,54 @@ permission_check_tool_specific <- function(
   tool_input,
   context
 ) {
-  tool_id <- normalize_native_tool_id(tool_name)
   if (is_mcp_tool_context(context)) {
     return(
       permission_check_mcp_console(permissions, tool_input, context) %||%
         permission_check_annotation_capabilities(permissions, context)
     )
   }
+  result <- permission_check_named_capability(
+    permissions,
+    tool_name,
+    tool_input,
+    context
+  )
+  # A tool that only shares a native name keeps the name's restrictions but
+  # not its grant: it must also pass the conservative annotation checks.
+  if (
+    permission_trusts_native_name(context) ||
+      !S7::S7_inherits(result, PermissionResultAllow)
+  ) {
+    return(result)
+  }
+  permission_check_annotation_capabilities(permissions, context)
+}
+
+# The directory a write tool's path was checked against. This mirrors
+# `permission_check_named_capability()`: a standard-mode policy with a
+# directory grant checks the path of every non-MCP tool with a native write
+# name. NULL when no directory check applied, as in full mode.
+permission_enforced_write_root <- function(permissions, tool_name, context) {
+  if (
+    permissions@mode %in%
+      c("full", "readonly", "plan") ||
+      !is.character(permissions@file_write) ||
+      is_mcp_tool_context(context) ||
+      !normalize_native_tool_id(tool_name) %in%
+        c("write_file", "edit_file", "multi_edit")
+  ) {
+    return(NULL)
+  }
+  permissions@file_write
+}
+
+permission_check_named_capability <- function(
+  permissions,
+  tool_name,
+  tool_input,
+  context
+) {
+  tool_id <- normalize_native_tool_id(tool_name)
 
   # File read tools
   if (is_permission_file_read_tool(tool_name)) {
@@ -406,10 +458,7 @@ permission_check_plan_mode <- function(
     ))
   }
 
-  if (
-    is_mcp_tool_context(context) ||
-      !is_permission_native_capability_tool(tool_name)
-  ) {
+  if (!permission_is_native_capability(tool_name, context)) {
     annotations <- effective_tool_annotations(annotations)
   }
 
@@ -430,6 +479,12 @@ permission_check_plan_mode <- function(
         tool_name
       )
     ))
+  }
+
+  # Every tool call a subagent or retained agent makes is also checked against
+  # this policy, so delegating can't widen what runs.
+  if (permission_is_own_delegation(tool_name, context)) {
+    return(PermissionResultAllow())
   }
 
   if (!isTRUE(annotations$read_only_hint)) {

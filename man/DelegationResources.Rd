@@ -2,24 +2,24 @@
 % Please edit documentation in R/delegation-binding.R
 \name{DelegationResources}
 \alias{DelegationResources}
-\title{Return resources owned by one delegation}
+\title{Return tools from a resource factory}
 \usage{
 DelegationResources(tools = list(), cleanup)
 }
 \arguments{
-\item{tools}{List of ellmer function tools constructed for the supplied child.}
+\item{tools}{List of ellmer tools built for this subagent.}
 
-\item{cleanup}{Zero-argument synchronous function releasing all constructed
-resources. Deputy calls it once after settlement, cancellation, or subsequent
-setup failure, including rejected tools. It must not resume or approve work.
-Cleanup errors are retained separately in \code{list_subagents()$cleanup_error}.
-Cancellation is cooperative; borrowed resources are never closed by Deputy.}
+\item{cleanup}{A function with no arguments that releases what the factory
+created. Deputy calls it once when the delegation ends, including after a
+failure during setup such as a rejected tool. Errors are recorded in the
+\code{cleanup_error} column of \verb{$list_subagents()}.}
 }
 \value{
-A read-only runtime \code{DelegationResources} value, not a portable receipt.
+A \code{DelegationResources} object.
 }
 \description{
-Return resources owned by one delegation
+The value returned by a \link{DelegationPolicy} \code{resources} function: the tools
+built for one subagent and a function that releases them.
 }
 \seealso{
 \link{DelegationPolicy}

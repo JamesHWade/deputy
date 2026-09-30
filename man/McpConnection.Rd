@@ -2,40 +2,34 @@
 % Please edit documentation in R/mcp-connection.R
 \name{McpConnection}
 \alias{McpConnection}
-\title{Own an isolated MCP client connection}
+\title{MCP server connection}
 \description{
-A host-owned connection to one configured server. A separate R worker keeps
-mcptools' connection registry independent of other connections. mcptools owns
-transport and authentication; the selected server owns execution.
-
-This temporary adapter is qualified for mcptools 1.0.2 and 1.0.3 and uses
-their internal request and shutdown functions. Public replacements are tracked upstream in
-issues 129 and 130. Other versions fail explicitly.
+A connection to one MCP server, owned by one agent. Use it instead of
+\code{\link[=tools_mcp]{tools_mcp()}} when you need a fixed list of allowed tools, resources and
+prompts, a request timeout, or control over when the server stops. Each
+connection runs its own mcptools client in a separate R process. Requires
+mcptools 1.0.2 or 1.0.3.
 }
 \details{
-Construct an Agent first, then bind a connection to it. Tool, resource URI and
-prompt allowlists are fixed at construction. Discovery never expands them.
-Register the tools returned by \verb{$tools()} to apply the Agent's normal
-permissions, hooks and budgets. Direct host methods use the connection's
-allowlists but do not constitute an Agent run.
+Create the \link{Agent} first, then the connection. The allowlists are fixed when
+the connection is created; \verb{$discover()} never adds to them. Register
+\verb{$tools()} on the agent so that calls go through its permissions, hooks and
+limits. The other methods call the server directly, outside any agent run.
 
-Calls return promises, with at most one active call per connection. A concurrent
-call fails with a busy error; unrelated connections and the host event loop remain
-available. The host must call \verb{$close()} when its conversation ends.
-\verb{$cancel()} terminates the connection and its process tree, discarding server
-session state. It does not promise a state-preserving interpreter interrupt.
-Timeouts also close the connection; old tools cannot reconnect implicitly.
+Methods that contact the server return promises. A connection handles one
+request at a time; a second request made meanwhile errors, but other
+connections are not blocked. Call \verb{$close()} when the conversation ends.
+\verb{$cancel()}, and any request that times out, stop the connection and
+discard the server's session state; its tools then stop working.
 
-The qualified mcptools releases wait about 4 seconds for a stdio reply and
-do not match replies to requests. If a server does not answer in that
-window, or a reply does not match its request, the call fails with a
-\code{deputy_mcp_desynchronized} error and the connection closes, because a late
-reply would otherwise answer the next request. The server's session state is
-lost; create a new connection to continue.
+mcptools waits about 4 seconds for a stdio server's reply and doesn't match
+replies to requests, so a late or mismatched reply fails the call with a
+\code{deputy_mcp_desynchronized} error and closes the connection. Create a new
+connection to continue.
 
-Owner identifiers and run context prevent accidental cross-Agent reuse; the
-host remains responsible for authentication and assigning those identifiers.
-Connections and executable tools are not portable saved-session state.
+The connection is tied to the agent's ID, session and run context: its tools
+can't be registered on another agent and stop working if the agent's session
+changes. Connections are not saved with the agent's session.
 }
 \section{Methods}{
 \subsection{Public methods}{
@@ -55,7 +49,7 @@ Connections and executable tools are not portable saved-session state.
 \if{html}{\out{<a id="method-McpConnection-initialize"></a>}}
 \if{latex}{\out{\hypertarget{method-McpConnection-initialize}{}}}
 \subsection{\code{McpConnection$new()}}{
-  Connect and discover tools from one exact server entry.
+  Start the server and connect to it.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{McpConnection$new(
@@ -74,13 +68,17 @@ Connections and executable tools are not portable saved-session state.
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{config}}{Path to an mcptools JSON configuration.}
-      \item{\code{server}}{Exact configured server name.}
-      \item{\code{agent}}{Agent whose identity, session and run context own this connection.}
-      \item{\code{tools}}{Exact tool names the host allows. Empty by default.}
-      \item{\code{resources}}{Exact resource URIs the host allows. Empty by default.}
-      \item{\code{prompts}}{Exact prompt names the host allows. Empty by default.}
-      \item{\code{timeout}}{Maximum seconds for each request.}
-      \item{\code{startup_timeout}}{Maximum seconds for client and server startup.}
+      \item{\code{server}}{Name of the server in \code{config}.}
+      \item{\code{agent}}{The agent that owns the connection. The server starts in its
+working directory.}
+      \item{\code{tools}}{Names of the server tools to allow. None by default. The
+connection fails if the server doesn't offer all of them.}
+      \item{\code{resources}}{Resource URIs to allow. None by default.}
+      \item{\code{prompts}}{Prompt names to allow. None by default.}
+      \item{\code{timeout}}{Maximum seconds for each request. A request that takes
+longer closes the connection.}
+      \item{\code{startup_timeout}}{Maximum seconds for the client and server to
+start.}
     }
     \if{html}{\out{</div>}}
   }
@@ -90,14 +88,16 @@ Connections and executable tools are not portable saved-session state.
 \if{html}{\out{<a id="method-McpConnection-status"></a>}}
 \if{latex}{\out{\hypertarget{method-McpConnection-status}{}}}
 \subsection{\code{McpConnection$status()}}{
-  Inspect local connection state and fixed host allowances.
+  Report the connection's state and allowlists.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{McpConnection$status()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A list. This is local process state, not a remote health probe.
+    A list with the connection's ID, server, owner, \code{state}, the
+\code{reason} it closed, its allowlists and version details. It doesn't
+contact the server.
   }
 }
 
@@ -105,7 +105,8 @@ Connections and executable tools are not portable saved-session state.
 \if{html}{\out{<a id="method-McpConnection-discover"></a>}}
 \if{latex}{\out{\hypertarget{method-McpConnection-discover}{}}}
 \subsection{\code{McpConnection$discover()}}{
-  Inspect one catalogue page without registering or authorizing items.
+  List one page of what the server offers. Listing an item
+doesn't allow it.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{McpConnection$discover(
@@ -118,12 +119,13 @@ Connections and executable tools are not portable saved-session state.
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{kind}}{One of \code{"tools"}, \code{"resources"}, \code{"resource_templates"}, \code{"prompts"}.}
-      \item{\code{cursor}}{Opaque cursor returned by a previous page, or NULL.}
+      \item{\code{cursor}}{Cursor from a previous page, or \code{NULL} for the first page.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A promise for one server result with connection provenance.
+    A promise for a list with \code{source} (the server and connection)
+and the server's \code{result}.
   }
 }
 
@@ -131,7 +133,7 @@ Connections and executable tools are not portable saved-session state.
 \if{html}{\out{<a id="method-McpConnection-read_resource"></a>}}
 \if{latex}{\out{\hypertarget{method-McpConnection-read_resource}{}}}
 \subsection{\code{McpConnection$read_resource()}}{
-  Read one explicitly allowed resource URI.
+  Read an allowed resource.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{McpConnection$read_resource(uri)}
@@ -140,12 +142,12 @@ Connections and executable tools are not portable saved-session state.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{uri}}{Exact allowed resource URI. Returned links are never fetched automatically.}
+      \item{\code{uri}}{An allowed resource URI. Links in the result are not followed.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A promise for the upstream resource result and connection provenance.
+    A promise for a list with \code{source} and the server's \code{result}.
   }
 }
 
@@ -153,7 +155,8 @@ Connections and executable tools are not portable saved-session state.
 \if{html}{\out{<a id="method-McpConnection-get_prompt"></a>}}
 \if{latex}{\out{\hypertarget{method-McpConnection-get_prompt}{}}}
 \subsection{\code{McpConnection$get_prompt()}}{
-  Retrieve one explicitly allowed prompt without changing any Chat.
+  Get an allowed prompt. The prompt is not added to any
+conversation.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{McpConnection$get_prompt(name, arguments = list())}
@@ -162,13 +165,13 @@ Connections and executable tools are not portable saved-session state.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{name}}{Exact allowed prompt name.}
-      \item{\code{arguments}}{Named list of prompt argument strings.}
+      \item{\code{name}}{An allowed prompt name.}
+      \item{\code{arguments}}{Named list of strings to fill in the prompt.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A promise for the upstream prompt result and connection provenance.
+    A promise for a list with \code{source} and the server's \code{result}.
   }
 }
 
@@ -176,14 +179,15 @@ Connections and executable tools are not portable saved-session state.
 \if{html}{\out{<a id="method-McpConnection-tools"></a>}}
 \if{latex}{\out{\hypertarget{method-McpConnection-tools}{}}}
 \subsection{\code{McpConnection$tools()}}{
-  Build allowed tool handles for explicit Agent registration.
+  Create tools for the allowed server tools, to register on
+the owning agent.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{McpConnection$tools()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A named list of ellmer tools, bound to this connection and owner.
+    A named list of ellmer tools.
   }
 }
 
@@ -191,7 +195,10 @@ Connections and executable tools are not portable saved-session state.
 \if{html}{\out{<a id="method-McpConnection-capability_tools"></a>}}
 \if{latex}{\out{\hypertarget{method-McpConnection-capability_tools}{}}}
 \subsection{\code{McpConnection$capability_tools()}}{
-  Build resource and prompt tools restricted to the fixed host allowlists.
+  Create \verb{<prefix>_read_resource} and \verb{<prefix>_get_prompt}
+tools that let the model read allowed resources and get allowed
+prompts. Each is created only if its allowlist isn't empty. Prompts
+that need arguments can't be fetched this way.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{McpConnection$capability_tools(prefix = "mcp")}
@@ -200,14 +207,14 @@ Connections and executable tools are not portable saved-session state.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{prefix}}{Tool name prefix. Use distinct prefixes when registering
-capability tools from multiple connections. Must contain 1 to 50
-letters, digits, underscores or hyphens.}
+      \item{\code{prefix}}{Prefix for the tool names: 1 to 50 letters, digits,
+underscores or hyphens. Use a different prefix for each connection on
+the same agent.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A named list of ellmer tools for explicit Agent registration.
+    A named list of ellmer tools, possibly empty.
   }
 }
 
@@ -215,14 +222,15 @@ letters, digits, underscores or hyphens.}
 \if{html}{\out{<a id="method-McpConnection-cancel"></a>}}
 \if{latex}{\out{\hypertarget{method-McpConnection-cancel}{}}}
 \subsection{\code{McpConnection$cancel()}}{
-  End the connection and discard its server session state.
+  Stop the connection at once and discard the server's
+session state.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{McpConnection$cancel()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisibly, NULL. Repeated calls are harmless.
+    \code{NULL}, invisibly. Safe to call more than once.
   }
 }
 
@@ -230,14 +238,15 @@ letters, digits, underscores or hyphens.}
 \if{html}{\out{<a id="method-McpConnection-close"></a>}}
 \if{latex}{\out{\hypertarget{method-McpConnection-close}{}}}
 \subsection{\code{McpConnection$close()}}{
-  Close transport when idle, then terminate the client process tree.
+  Close the connection. If no request is running, the server
+is first asked to shut down; then its processes are stopped.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{McpConnection$close()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisibly, NULL. Closing an active call rejects its promise.
+    \code{NULL}, invisibly. A request still running is rejected.
   }
 }
 

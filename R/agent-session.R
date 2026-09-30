@@ -273,9 +273,11 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       private$.compaction_summary <- session$compaction_summary
       private$.compacted_turns <- restored_compacted_turns
       private$.cleared_tool_results <- restored_cleared
-      # A compacted snapshot does not record which retained turns predate
-      # its latest compaction, so none of their usage is reused.
-      private$.usage_stale_turns <- if (is.null(session$compaction_summary)) {
+      # A compacted or microcompacted snapshot does not record which retained
+      # turns predate the rewrite, so none of their usage is reused.
+      private$.usage_stale_turns <- if (
+        is.null(session$compaction_summary) && !length(restored_cleared)
+      ) {
         0L
       } else {
         length(private$.chat$get_turns())

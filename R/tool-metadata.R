@@ -1,16 +1,16 @@
-#' Inspect a tool's origin and annotation coverage
+#' Inspect a tool's origin and annotations
 #'
-#' Returns metadata for the executable source of an ellmer tool, including
-#' tools wrapped by an Agent or copied into a delegated Agent. This does not
-#' call the tool, connect a server, or authorize execution.
+#' Reports where a tool comes from and which annotations it declares. It works
+#' on tools as you created them and on the wrapped copies an agent or subagent
+#' holds. The tool is not called.
 #'
-#' @param tool An ellmer function tool or supported provider-native tool.
-#' @return A list with `name`, `source`, supplied `annotations`,
-#'   `missing_annotations`, and `effective_annotations`. Source types are
-#'   `"function"`, `"package"` (with package name), `"provider"`, or `"mcp"`
-#'   (with exact server and tool names). Unknown origins are not guessed from
-#'   tool names. Effective annotations describe the conservative defaults;
-#'   permission modes, capabilities, lists, and callbacks still decide access.
+#' @param tool An ellmer tool, or a provider's built-in tool.
+#' @return A list with `name`, `source`, `annotations` (as declared),
+#'   `missing_annotations`, and `effective_annotations` (the declared values,
+#'   with cautious defaults filling the gaps). `source$type` is `"function"`,
+#'   `"package"` (with `package`), `"provider"`, or `"mcp"` (with `server` and
+#'   `tool`). Whether a call is allowed still depends on the agent's
+#'   permissions.
 #' @seealso [PermissionMode], [tools_mcp], [Agent]
 #' @export
 #' @examples
@@ -44,4 +44,33 @@ tool_metadata <- function(tool) {
 
 is_mcp_tool_context <- function(context) {
   identical(context$tool_metadata$source$type, "mcp")
+}
+
+# Deputy's own tools carry this private marker. Permission policy gives native
+# names (read_file, run_bash, ask_user, ...) their native treatment only for
+# marked tools, never for a host, skill, package or MCP tool that shares a
+# name. The marker is an attribute, so tool_metadata() and approval
+# fingerprints are unchanged.
+deputy_native_tool_marker <- new.env(parent = emptyenv())
+
+mark_native_tool <- function(tool) {
+  attr(tool, "deputy_native_tool") <- deputy_native_tool_marker
+  tool
+}
+
+is_native_tool <- function(tool) {
+  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  identical(
+    attr(source, "deputy_native_tool", exact = TRUE),
+    deputy_native_tool_marker
+  )
+}
+
+# The Agent runtime records whether each requested tool is Deputy's own in
+# .deputy_native_tool. A context without that flag comes from a direct policy
+# query (including one built from the public tool_metadata()), job records
+# saved before the flag existed, or provider-native registration, and keeps
+# name-based classification.
+permission_trusts_native_name <- function(context) {
+  !is_mcp_tool_context(context) && !isFALSE(context$.deputy_native_tool)
 }

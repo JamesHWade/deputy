@@ -365,20 +365,18 @@ test_that("tool_read_file returns tool_reject for missing file", {
 })
 
 test_that("tool_write_file handles write errors gracefully", {
-  # Skip on Windows - absolute Unix paths behave differently
-  skip_on_os("windows")
+  # Nobody can write below a regular file, not even root.
+  parent <- withr::local_tempfile()
+  writeLines("x", parent)
 
-  # Try to write to a directory that doesn't exist
-  result <- tryCatch(
-    tool_write_file("/nonexistent/deep/path/file.txt", "content"),
-    ellmer_tool_reject = function(e) e,
-    error = function(e) e
-  )
+  result <- suppressWarnings(tryCatch(
+    tool_write_file(file.path(parent, "file.txt"), "content"),
+    ellmer_tool_reject = function(e) e
+  ))
 
-  # Should be some kind of error
-  expect_true(
-    inherits(result, "error") || inherits(result, "ellmer_tool_reject")
-  )
+  expect_s3_class(result, "ellmer_tool_reject")
+  expect_match(conditionMessage(result), "Error writing file")
+  expect_equal(readLines(parent), "x")
 })
 
 test_that("tool_list_files returns tool_reject for nonexistent directory", {
@@ -457,14 +455,40 @@ test_that("tool_run_bash rejects subprocess timeouts readably", {
 })
 
 test_that("tool_run_bash handles command not found", {
-  result <- tryCatch(
+  skip_on_os("windows")
+  error <- tryCatch(
     tool_run_bash("nonexistent_command_xyz123"),
-    ellmer_tool_reject = function(e) e$message,
-    error = function(e) e$message
+    ellmer_tool_reject = identity
   )
 
-  # Should indicate failure somehow
-  expect_true(is.character(result))
+  expect_s3_class(error, "ellmer_tool_reject")
+  expect_match(conditionMessage(error), "exited with status 127")
+  expect_match(conditionMessage(error), "nonexistent_command_xyz123")
+})
+
+test_that("tool_run_bash reports a failed command with its status and output", {
+  skip_on_os("windows")
+  error <- tryCatch(
+    run_bash_impl("echo partial; echo broken >&2; exit 3"),
+    ellmer_tool_reject = identity
+  )
+
+  expect_s3_class(error, "ellmer_tool_reject")
+  expect_match(conditionMessage(error), "exited with status 3")
+  expect_match(conditionMessage(error), "partial")
+  expect_match(conditionMessage(error), "[stderr]\nbroken", fixed = TRUE)
+  expect_error(run_bash_impl("false"), "status 1 (no output)", fixed = TRUE)
+})
+
+test_that("tool_run_bash keeps stderr from a successful command", {
+  skip_on_os("windows")
+  result <- run_bash_impl("echo done; echo note >&2")
+
+  expect_identical(result, "done\n[stderr]\nnote")
+  expect_identical(
+    run_bash_impl("true"),
+    "Command executed successfully (no output)"
+  )
 })
 
 test_that("tool_run_r_code requires callr for process isolation", {
@@ -551,6 +575,96 @@ test_that("tools_preset returns correct tools for full", {
 
 test_that("tool schemas require non-default structured inputs", {
   expect_true(tool_multi_edit@arguments@properties$edits@required)
+})
+
+edit_test_file <- function(text, env = parent.frame()) {
+  path <- withr::local_tempfile(fileext = ".txt", .local_envir = env)
+  writeBin(charToRaw(text), path)
+  path
+}
+
+edit_test_bytes <- function(path) {
+  rawToChar(readBin(path, "raw", n = file.size(path)))
+}
+
+test_that("edit_file keeps CRLF line endings and matches LF edits", {
+  path <- edit_test_file("alpha\r\nbeta\r\ngamma\r\n")
+
+  tool_edit_file(path, "alpha\nbeta", "one\ntwo")
+
+  expect_identical(edit_test_bytes(path), "one\r\ntwo\r\ngamma\r\n")
+})
+
+test_that("edit_file keeps whether the file ends with a newline", {
+  without <- edit_test_file("alpha\nbeta")
+  with <- edit_test_file("alpha\nbeta\n")
+
+  tool_edit_file(without, "beta", "gamma")
+  tool_edit_file(with, "beta", "gamma")
+
+  expect_identical(edit_test_bytes(without), "alpha\ngamma")
+  expect_identical(edit_test_bytes(with), "alpha\ngamma\n")
+})
+
+test_that("multi_edit keeps CRLF line endings and the final newline state", {
+  path <- edit_test_file("alpha\r\nbeta")
+
+  tool_multi_edit(
+    path,
+    list(
+      list(old_text = "alpha", new_text = "one\r\ntwo"),
+      list(old_text = "beta", new_text = "three")
+    )
+  )
+
+  expect_identical(edit_test_bytes(path), "one\r\ntwo\r\nthree")
+})
+
+test_that("edit tools leave mixed line endings outside the edit unchanged", {
+  path <- edit_test_file("alpha\r\nbeta\ngamma\r\n")
+
+  tool_edit_file(path, "beta", "delta")
+
+  expect_identical(edit_test_bytes(path), "alpha\r\ndelta\ngamma\r\n")
+})
+
+test_that("edit_file matches LF edits across CRLF lines in a mixed file", {
+  path <- edit_test_file("alpha\r\nbeta\ngamma\r\n")
+
+  # The replacement's new line takes the edited line's CRLF ending.
+  tool_edit_file(path, "alpha\nbeta", "one\ntwo")
+
+  expect_identical(edit_test_bytes(path), "one\r\ntwo\ngamma\r\n")
+})
+
+test_that("edit_file handles edits that start at a CRLF line break", {
+  path <- edit_test_file("alpha\r\nbeta\r\n")
+
+  tool_edit_file(path, "\nbeta", "\ngamma")
+
+  expect_identical(edit_test_bytes(path), "alpha\r\ngamma\r\n")
+})
+
+test_that("edit_file replaces every CRLF-file match with replace_all", {
+  path <- edit_test_file("x = 1\r\nx = 2\r\n")
+
+  result <- tool_edit_file(path, "x", "y", replace_all = TRUE)
+
+  expect_match(result, "2 replacements", fixed = TRUE)
+  expect_identical(edit_test_bytes(path), "y = 1\r\ny = 2\r\n")
+})
+
+test_that("edit_file keeps non-UTF-8 bytes outside the edit", {
+  path <- withr::local_tempfile(fileext = ".txt")
+  latin1 <- c(charToRaw("caf"), as.raw(0xe9), charToRaw("\nold\n"))
+  writeBin(latin1, path)
+
+  tool_edit_file(path, "old", "new")
+
+  expect_identical(
+    readBin(path, "raw", n = 100L),
+    c(charToRaw("caf"), as.raw(0xe9), charToRaw("\nnew\n"))
+  )
 })
 
 test_that("tools_preset returns correct tools for data", {

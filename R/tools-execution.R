@@ -57,30 +57,27 @@ run_r_code_impl <- function(code, timeout = 30, working_dir = getwd()) {
 #' Execute R code
 #'
 #' @description
-#' A tool that executes R code and returns the result. It runs in a separate
-#' process for fault isolation and timeout enforcement (requires callr).
+#' A tool that runs model-written R code and returns its printed output and
+#' value. Each call starts a fresh R process, so nothing carries over between
+#' calls; for a persistent session, use [RSession]. Calls time out after 30
+#' seconds.
 #'
-#' @details
-#' This tool intentionally uses R's code evaluation capabilities to execute
-#' arbitrary R code provided by the LLM. This is a core feature for agentic
-#' workflows where the agent needs to perform data analysis or other R tasks.
-#'
-#' The execution boundary is explicit:
-#' - Code runs in a separate callr subprocess, not an OS security sandbox
-#' - A timeout prevents runaway execution
-#' - The Permissions system can disable this tool entirely
+#' The code runs with your user account's access to files and the network. The
+#' separate process protects your R session from crashes; it is not a sandbox.
+#' The default permissions deny this tool; allow it with `r_code = TRUE` in
+#' [Permissions()]. For an OS sandbox, use [tools_mcp_repl()].
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character string containing captured output
-#'   and the returned value.
+#' @return The captured output and the printed value as one string.
 #'
-#' @param code R code to execute (tool argument)
+#' @param code R code to run.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
-#'   tools = list(tool_run_r_code)
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   tools = list(tool_run_r_code),
+#'   permissions = Permissions(r_code = TRUE)
 #' )
 #' }
 #'
@@ -109,25 +106,48 @@ attr(tool_run_r_code, "deputy_workspace_runner") <-
     run_r_code_impl(arguments$code, working_dir = working_dir)
   }
 
+# A non-zero exit is a failed step: the model sees the status and both streams.
+bash_result <- function(output, errors, status) {
+  text <- paste(
+    c(output, if (length(errors)) c("[stderr]", errors)),
+    collapse = "\n"
+  )
+  if (!identical(status, 0L)) {
+    ellmer::tool_reject(paste0(
+      "Command exited with status ",
+      status,
+      if (nzchar(text)) paste0(":\n", text) else " (no output)"
+    ))
+  }
+  if (!nzchar(text)) "Command executed successfully (no output)" else text
+}
+
 run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
   # Use callr for reliable timeout enforcement if available
   if (rlang::is_installed("callr")) {
-    tryCatch(
-      {
-        result <- callr::r(
-          function(cmd) {
-            system(cmd, intern = TRUE)
-          },
-          args = list(cmd = command),
-          timeout = timeout,
-          wd = working_dir
-        )
-        if (length(result) == 0) {
-          "Command executed successfully (no output)"
-        } else {
-          paste(result, collapse = "\n")
-        }
-      },
+    # The shell inherits the child's stderr, so this file captures its errors.
+    stderr_file <- tempfile("deputy-bash-", fileext = ".txt")
+    on.exit(unlink(stderr_file), add = TRUE)
+    result <- tryCatch(
+      callr::r(
+        function(cmd) {
+          # system(intern = TRUE) errors on status 127 (command not found);
+          # the shell has already written its message to stderr.
+          output <- tryCatch(
+            suppressWarnings(system(cmd, intern = TRUE)),
+            error = function(e) structure(character(), status = 127L)
+          )
+          status <- attr(output, "status")
+          list(
+            output = as.character(output),
+            status = if (is.null(status)) 0L else as.integer(status)
+          )
+        },
+        args = list(cmd = command),
+        timeout = timeout,
+        wd = working_dir,
+        stderr = stderr_file
+      ),
       error = function(e) {
         if (inherits(e, "callr_timeout_error")) {
           ellmer::tool_reject(sprintf(
@@ -141,6 +161,12 @@ run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
         ))
       }
     )
+    errors <- if (file.exists(stderr_file)) {
+      readLines(stderr_file, warn = FALSE)
+    } else {
+      character()
+    }
+    bash_result(result$output, errors, result$status)
   } else {
     # Keep the host process directory unchanged in the fallback path.
     command <- paste("cd", shQuote(working_dir), "&&", command)
@@ -166,21 +192,24 @@ run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
 #' Execute bash commands
 #'
 #' @description
-#' A tool that executes bash/shell commands and returns the output.
-#' **Use with caution!** This can execute arbitrary system commands.
+#' A tool that runs a shell command and returns its output. The model can run
+#' any command your user account can, and nothing is sandboxed. Commands time
+#' out after 30 seconds. The default permissions deny this tool; allow it with
+#' `bash = TRUE` in [Permissions()].
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character string containing command output
-#'   or a success message.
+#' @return The command's output as one string, with standard error after a
+#'   `[stderr]` line. A command that exits with a non-zero status is reported
+#'   to the model as a failed tool call, with its status and output.
 #'
-#' @param command The bash command to execute (tool argument)
+#' @param command The shell command to run.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = list(tool_run_bash),
-#'   permissions = permissions_full()  # Required for bash
+#'   permissions = Permissions(bash = TRUE)
 #' )
 #' }
 #'
@@ -205,3 +234,7 @@ attr(tool_run_bash, "deputy_workspace_runner") <-
   function(arguments, working_dir) {
     run_bash_impl(arguments$command, working_dir = working_dir)
   }
+
+# Deputy's own tools; see mark_native_tool().
+tool_run_r_code <- mark_native_tool(tool_run_r_code)
+tool_run_bash <- mark_native_tool(tool_run_bash)

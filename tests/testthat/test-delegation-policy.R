@@ -383,3 +383,258 @@ test_that("delegated S7 policies preserve ceilings after serialization", {
   expect_snapshot(error = TRUE, child$permissions <- permissions_full())
   expect_snapshot(error = TRUE, child$set_permission_mode("full"))
 })
+
+test_that("read-only and plan policies allow the lead's delegate_to_agent", {
+  annotations <- list(
+    read_only_hint = FALSE,
+    open_world_hint = FALSE,
+    idempotent_hint = FALSE,
+    destructive_hint = FALSE
+  )
+  plain <- list(tool_annotations = annotations)
+  lead <- c(plain, list(.deputy_internal_tool = deputy_delegation_tool_marker))
+  input <- list(agent_name = "reviewer", task = "Review it")
+  for (policy in list(
+    permissions_readonly(),
+    permissions_plan(),
+    Permissions(mode = "plan", web = FALSE, file_write = FALSE)
+  )) {
+    decision <- permissions_check(policy, "delegate_to_agent", input, lead)
+    expect_s7_class(decision, PermissionResultAllow)
+    # Another tool with the same name gains nothing from it.
+    decision <- permissions_check(policy, "delegate_to_agent", input, plain)
+    expect_s7_class(decision, PermissionResultDeny)
+  }
+  mcp <- c(plain, list(tool_metadata = list(source = list(type = "mcp"))))
+  expect_s7_class(
+    permissions_check(permissions_readonly(), "delegate_to_agent", input, mcp),
+    PermissionResultDeny
+  )
+
+  # A callback can still deny the delegation.
+  vetoed <- Permissions(
+    mode = "readonly",
+    file_write = FALSE,
+    can_use_tool = function(...) PermissionResultDeny("No delegation")
+  )
+  expect_identical(
+    permissions_check(vetoed, "delegate_to_agent", input, lead)$reason,
+    "No delegation"
+  )
+})
+
+test_that("read-only and plan agents deny a custom delegate_to_agent tool", {
+  for (mode in c("readonly", "plan")) {
+    calls <- 0L
+    impostor <- ellmer::tool(
+      function(agent_name, task) {
+        calls <<- calls + 1L
+        "done"
+      },
+      name = "delegate_to_agent",
+      description = "Not a lead's delegation tool.",
+      arguments = list(
+        agent_name = ellmer::type_string(),
+        task = ellmer::type_string()
+      ),
+      annotations = ellmer::tool_annotations(
+        read_only_hint = FALSE,
+        destructive_hint = FALSE,
+        open_world_hint = FALSE
+      )
+    )
+    server <- local_runtime_server(list(
+      runtime_reply(
+        tool = "delegate_to_agent",
+        arguments = list(agent_name = "reviewer", task = "Review it")
+      ),
+      runtime_reply("Stopped.")
+    ))
+    agent <- Agent$new(
+      ellmer::chat_openai_compatible(
+        base_url = server$url,
+        credentials = function() "fixture",
+        model = "gpt-4o-mini",
+        echo = "none"
+      ),
+      tools = list(impostor),
+      permissions = Permissions(mode = mode, file_write = FALSE)
+    )
+
+    result <- suppressWarnings(agent$run_sync("Delegate the review"))
+
+    expect_identical(result$stop_reason, "complete", info = mode)
+    expect_identical(calls, 0L, info = mode)
+    denied <- Filter(
+      function(event) {
+        identical(event$type, "permission") &&
+          identical(event$data$decision, "deny")
+      },
+      result$events
+    )
+    expect_length(denied, 1L)
+  }
+})
+
+test_that("a read-only lead delegates to a read-only subagent", {
+  for (mode in c("readonly", "plan")) {
+    server <- local_runtime_server(list(
+      runtime_reply(
+        tool = "delegate_to_agent",
+        arguments = list(agent_name = "reviewer", task = "Review it")
+      ),
+      runtime_reply("Looks fine."),
+      runtime_reply("The reviewer found no problems.")
+    ))
+    lead <- LeadAgent$new(
+      ellmer::chat_openai_compatible(
+        base_url = server$url,
+        credentials = function() "fixture",
+        model = "gpt-4o-mini",
+        echo = "none"
+      ),
+      sub_agents = list(agent_definition("reviewer", "Reviews", "Review.")),
+      permissions = Permissions(mode = mode, file_write = FALSE)
+    )
+
+    result <- lead$run_sync("Delegate the review")
+
+    expect_identical(result$stop_reason, "complete", info = mode)
+    runs <- lead$list_subagents()
+    expect_identical(runs$status, "completed", info = mode)
+    expect_length(server$requests(), 3L)
+  }
+})
+
+test_that("read-only and plan policies allow tools that call retained agents", {
+  annotations <- list(
+    read_only_hint = FALSE,
+    open_world_hint = FALSE,
+    idempotent_hint = FALSE,
+    destructive_hint = FALSE
+  )
+  plain <- list(tool_annotations = annotations)
+  own <- c(plain, list(.deputy_internal_tool = deputy_composition_tool_marker))
+  lead <- c(plain, list(.deputy_internal_tool = deputy_delegation_tool_marker))
+  input <- list(task = "Review it")
+  for (policy in list(permissions_readonly(), permissions_plan())) {
+    decision <- permissions_check(policy, "ask_reviewer", input, own)
+    expect_s7_class(decision, PermissionResultAllow)
+    # A plain tool gains nothing from the name, and the lead's marker only
+    # covers delegate_to_agent.
+    decision <- permissions_check(policy, "ask_reviewer", input, plain)
+    expect_s7_class(decision, PermissionResultDeny)
+    decision <- permissions_check(policy, "ask_reviewer", input, lead)
+    expect_s7_class(decision, PermissionResultDeny)
+  }
+
+  # The deny list and the callback still apply.
+  denied <- Permissions(
+    mode = "readonly",
+    file_write = FALSE,
+    tool_denylist = "ask_reviewer"
+  )
+  expect_s7_class(
+    permissions_check(denied, "ask_reviewer", input, own),
+    PermissionResultDeny
+  )
+  vetoed <- Permissions(
+    mode = "plan",
+    file_write = FALSE,
+    can_use_tool = function(...) PermissionResultDeny("No delegation")
+  )
+  expect_identical(
+    permissions_check(vetoed, "ask_reviewer", input, own)$reason,
+    "No delegation"
+  )
+})
+
+test_that("read-only and plan owners call retained agents held to their mode", {
+  for (mode in c("readonly", "plan")) {
+    writes <- 0L
+    impostor_calls <- 0L
+    write_note <- ellmer::tool(
+      function() {
+        writes <<- writes + 1L
+        "written"
+      },
+      name = "write_note",
+      description = "Write a note.",
+      arguments = list()
+    )
+    # Annotated like a delegation tool, but not one.
+    impostor <- ellmer::tool(
+      function(task) {
+        impostor_calls <<- impostor_calls + 1L
+        "done"
+      },
+      name = "ask_editor",
+      description = "Not a delegation tool.",
+      arguments = list(task = ellmer::type_string()),
+      annotations = ellmer::tool_annotations(
+        read_only_hint = FALSE,
+        destructive_hint = FALSE,
+        open_world_hint = FALSE,
+        idempotent_hint = FALSE
+      )
+    )
+    ask_reviewer <- runtime_reply(
+      tool = "ask_reviewer",
+      arguments = list(task = "Review it")
+    )
+    ask_reviewer$body <- gsub(
+      "call_fixture",
+      "call_review",
+      ask_reviewer$body,
+      fixed = TRUE
+    )
+    owner_server <- local_runtime_server(list(
+      runtime_reply(tool = "ask_editor", arguments = list(task = "Edit it")),
+      ask_reviewer,
+      runtime_reply("The reviewer couldn't write.")
+    ))
+    reviewer_server <- local_runtime_server(list(
+      runtime_reply(tool = "write_note"),
+      runtime_reply("Writing was denied.")
+    ))
+    owner <- Agent$new(
+      runtime_chat(owner_server),
+      tools = list(impostor),
+      permissions = Permissions(mode = mode, file_write = FALSE)
+    )
+    # The retained agent's own policy allows everything; the owner's doesn't.
+    reviewer <- Agent$new(
+      runtime_chat(reviewer_server),
+      tools = list(write_note),
+      permissions = permissions_full()
+    )
+    handle <- owner$retain_agent(reviewer, UsageLimits(max_requests = 4))
+    owner$register_tool(delegation_tool(
+      owner,
+      handle,
+      name = "ask_reviewer",
+      description = "Ask the reviewer.",
+      usage_limits = UsageLimits(max_requests = 2)
+    ))
+
+    result <- suppressWarnings(owner$run_sync("Get an edit and a review"))
+
+    expect_identical(result$stop_reason, "complete", info = mode)
+    expect_identical(impostor_calls, 0L, info = mode)
+    expect_identical(writes, 0L, info = mode)
+    expect_length(reviewer_server$requests(), 2L)
+    expect_match(
+      jsonlite::toJSON(reviewer_server$requests()[[2L]]$body),
+      "readonly mode|Plan mode",
+      info = mode
+    )
+    denied <- Filter(
+      function(event) {
+        identical(event$type, "permission") &&
+          identical(event$data$decision, "deny")
+      },
+      result$events
+    )
+    expect_length(denied, 1L)
+  }
+})

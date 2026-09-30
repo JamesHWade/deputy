@@ -7,22 +7,23 @@
 skill_load(path, check_requirements = TRUE)
 }
 \arguments{
-\item{path}{Path to the skill directory}
+\item{path}{Path to the skill directory or Markdown file.}
 
-\item{check_requirements}{If TRUE (default), verify requirements are met}
+\item{check_requirements}{If \code{TRUE} (the default), warn when required
+packages are missing.}
 }
 \value{
-A \link{Skill} object
+A \link{Skill}.
 }
 \description{
-Loads a skill from a directory containing \code{SKILL.yaml} (metadata) and/or
-\code{SKILL.md} (system prompt extension). You can also pass a direct path to
-a \code{SKILL.md} file.
+Loads a skill from a directory containing \code{SKILL.yaml} (metadata and tools),
+\code{SKILL.md} (prompt text) or both, or from a single Markdown file. Loading a
+skill with tools runs its R files, so only load skills you trust.
 }
 \details{
-The skill directory should contain one of:
-
-\strong{SKILL.yaml} (required):
+\code{SKILL.yaml} needs a \code{name}. Each entry under \code{tools} names an R file in the
+skill directory and the object in it created with \code{ellmer::tool()}; entries
+that can't be loaded are skipped with a warning.
 
 \if{html}{\out{<div class="sourceCode yaml">}}\preformatted{name: my_skill
 version: "1.0.0"
@@ -36,9 +37,8 @@ tools:
     function: tool_my_tool
 }\if{html}{\out{</div>}}
 
-\strong{SKILL.md} (optional, or standalone file):
-Markdown content that will be appended to the agent's system prompt
-when this skill is loaded. Frontmatter is supported:
+The body of \code{SKILL.md} is added to the agent's system prompt. Its optional
+YAML front matter overrides fields from \code{SKILL.yaml}:
 
 \if{html}{\out{<div class="sourceCode yaml">}}\preformatted{---
 name: my_skill
@@ -48,8 +48,8 @@ requires:
 ---
 }\if{html}{\out{</div>}}
 
-\strong{tools.R} (optional):
-R file containing tool definitions referenced in SKILL.yaml.
+A skill without a name is named after its directory or file. Reading YAML
+needs the yaml package.
 }
 \examples{
 \dontrun{

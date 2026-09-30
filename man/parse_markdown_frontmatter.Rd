@@ -13,6 +13,7 @@ parse_markdown_frontmatter(path)
 List with \code{meta} (list) and \code{body} (character)
 }
 \description{
-Parse Markdown frontmatter
+Reads the YAML block between \verb{---} lines at the top of a Markdown file.
+Warns and returns empty \code{meta} if the YAML can't be parsed.
 }
 \keyword{internal}

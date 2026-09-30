@@ -2,10 +2,11 @@
 % Please edit documentation in R/hooks.R
 \name{HookRegistry}
 \alias{HookRegistry}
-\title{HookRegistry R6 Class}
+\title{Hook registry}
 \description{
-Manages a collection of hooks for an agent. Handles registration,
-matching, and execution of hooks.
+Holds an agent's hooks, finds the ones that match an event, and runs them.
+Each agent has its own registry in \code{agent$hooks}; add hooks with
+\code{agent$add_hook()}.
 }
 \keyword{internal}
 \section{Methods}{
@@ -26,7 +27,7 @@ matching, and execution of hooks.
 \if{html}{\out{<a id="method-HookRegistry-initialize"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-initialize}{}}}
 \subsection{\code{HookRegistry$new()}}{
-  Create a new HookRegistry.
+  Create an empty registry.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{HookRegistry$new()}
@@ -47,12 +48,12 @@ matching, and execution of hooks.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{hook}}{A \link{HookMatcher} object}
+      \item{\code{hook}}{A \link{HookMatcher}.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self for chaining
+    The registry, invisibly.
   }
 }
 
@@ -60,7 +61,7 @@ matching, and execution of hooks.
 \if{html}{\out{<a id="method-HookRegistry-get_hooks"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-get_hooks}{}}}
 \subsection{\code{HookRegistry$get_hooks()}}{
-  Get all hooks for a specific event.
+  Get the hooks that match an event.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{HookRegistry$get_hooks(event, tool_name = NULL)}
@@ -69,13 +70,13 @@ matching, and execution of hooks.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{event}}{The event type}
-      \item{\code{tool_name}}{Optional tool name for filtering}
+      \item{\code{event}}{A \link{HookEvent}.}
+      \item{\code{tool_name}}{Optional tool name to match against hook patterns.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    List of matching HookMatcher objects
+    A list of \link{HookMatcher} objects.
   }
 }
 
@@ -83,14 +84,12 @@ matching, and execution of hooks.
 \if{html}{\out{<a id="method-HookRegistry-fire"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-fire}{}}}
 \subsection{\code{HookRegistry$fire()}}{
-  Fire hooks for an event and return the first non-NULL result.
+  Run the matching hooks in the order they were added and return the
+first non-\code{NULL} result. Later hooks don't run.
 
-Hook errors are handled as follows:
-\itemize{
-\item \strong{PreToolUse}: Errors result in denial (fail-safe security behavior)
-\item \strong{Other events}: Errors are logged prominently and stored in the
-\code{last_errors} field, but execution continues to prevent cascade failures
-}
+A failing callback is recorded in \code{last_errors()}. For PreToolUse the
+failure denies the tool call; for other events it is reported and the
+next hook runs.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{HookRegistry$fire(event, tool_name = NULL, ...)}
@@ -99,14 +98,15 @@ Hook errors are handled as follows:
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{event}}{The event type}
-      \item{\code{tool_name}}{Optional tool name for filtering (also passed to callback)}
-      \item{\code{...}}{Arguments to pass to the callback}
+      \item{\code{event}}{A \link{HookEvent}.}
+      \item{\code{tool_name}}{Optional tool name, matched against hook patterns and
+passed to the callback.}
+      \item{\code{...}}{Other arguments for the callback.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    The first non-NULL hook result, or NULL
+    The first non-\code{NULL} result, or \code{NULL}.
   }
 }
 
@@ -114,17 +114,17 @@ Hook errors are handled as follows:
 \if{html}{\out{<a id="method-HookRegistry-last_errors"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-last_errors}{}}}
 \subsection{\code{HookRegistry$last_errors()}}{
-  Get errors from recent hook executions.
-
-Useful for programmatic checking of hook health, especially for
-audit/logging hooks where failures are logged but not fatal.
+  Get the errors raised by hook callbacks since the registry was created
+or last cleared. Use it to check logging hooks, whose failures don't
+stop the run.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{HookRegistry$last_errors()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    List of error records, each containing event, tool_name, error, timestamp
+    A list of records with \code{event}, \code{tool_name}, \code{error} and
+\code{timestamp}.
   }
 }
 
@@ -132,7 +132,7 @@ audit/logging hooks where failures are logged but not fatal.
 \if{html}{\out{<a id="method-HookRegistry-clear_errors"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-clear_errors}{}}}
 \subsection{\code{HookRegistry$clear_errors()}}{
-  Clear the error history.
+  Clear the recorded errors.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{HookRegistry$clear_errors()}
@@ -151,7 +151,7 @@ audit/logging hooks where failures are logged but not fatal.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Integer count
+    An integer.
   }
 }
 

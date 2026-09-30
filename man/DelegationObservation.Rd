@@ -2,7 +2,7 @@
 % Please edit documentation in R/delegation-observation.R
 \name{DelegationObservation}
 \alias{DelegationObservation}
-\title{Bound the child activity observation buffer}
+\title{Set limits for the subagent event buffer}
 \usage{
 DelegationObservation(
   max_events = 256L,
@@ -11,20 +11,22 @@ DelegationObservation(
 )
 }
 \arguments{
-\item{max_events}{Maximum retained events, default 256.}
+\item{max_events}{Maximum number of events kept. Defaults to 256.}
 
-\item{max_bytes}{Maximum serialized bytes across retained envelopes, default
-1 MiB. The buffer evicts oldest envelopes until both limits hold.}
+\item{max_bytes}{Maximum total size of the kept events, in bytes. Defaults
+to 1 MiB.}
 
-\item{max_event_bytes}{Maximum bytes in one event, default 64 KiB. Oversized
-or nonportable content becomes an explicit omission envelope; hosts recover
-completed public content from an authorized snapshot.}
+\item{max_event_bytes}{Maximum size of one event, in bytes: between 2048 and
+\code{max_bytes}, 64 KiB by default. Larger content is replaced by a marker;
+get it from a \link{DelegationSubscription} snapshot instead.}
 }
 \value{
-Read-only observation limits for \link{Agent}.
+A \code{DelegationObservation} object for the \code{delegation_observation}
+argument of \link{Agent} or \link{LeadAgent}.
 }
 \description{
-One in-memory ring belongs to each Agent. Subscribers hold only cursors;
-they cannot block execution or accumulate private queues. Retained transcript
-storage is separate from this transient buffer.
+Each agent keeps recent subagent events in an in-memory buffer that
+\verb{$observe_subagents()} readers poll. When it is full, the oldest events are
+dropped: a slow reader never holds up a run, but sees a gap. Subagent
+transcripts are kept separately and don't count toward these limits.
 }

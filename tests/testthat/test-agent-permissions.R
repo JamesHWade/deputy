@@ -500,3 +500,119 @@ test_that("Agents require an S7 policy and cannot replace their authority ceilin
     PermissionResultDeny
   )
 })
+
+test_that("the directory a write is checked against follows the policy", {
+  root <- withr::local_tempdir(pattern = "deputy-write-root-")
+  scoped <- Permissions(file_write = root)
+  mcp <- list(tool_metadata = list(source = list(type = "mcp")))
+
+  expect_identical(
+    permission_enforced_write_root(scoped, "write_file", list()),
+    scoped$file_write
+  )
+  expect_identical(
+    permission_enforced_write_root(scoped, "Multi-Edit", list()),
+    scoped$file_write
+  )
+  expect_null(permission_enforced_write_root(scoped, "read_file", list()))
+  expect_null(permission_enforced_write_root(scoped, "write_file", mcp))
+  expect_null(permission_enforced_write_root(
+    Permissions(file_write = TRUE),
+    "write_file",
+    list()
+  ))
+  expect_null(permission_enforced_write_root(
+    Permissions(mode = "full", file_write = root),
+    "write_file",
+    list()
+  ))
+})
+
+test_that("a directory-scoped write is checked again when it runs", {
+  skip_on_os("windows")
+  sandbox <- withr::local_tempdir(pattern = "deputy-write-recheck-")
+  root <- normalizePath(file.path(sandbox, "root"), mustWork = FALSE)
+  outside <- file.path(sandbox, "outside")
+  dir.create(file.path(root, "notes"), recursive = TRUE)
+  dir.create(outside)
+  root <- normalizePath(root, mustWork = TRUE)
+
+  run_write <- function(swap) {
+    server <- local_runtime_server(list(
+      runtime_reply(
+        tool = "write_file",
+        arguments = list(path = "notes/out.txt", content = "secret")
+      ),
+      runtime_reply("done")
+    ))
+    agent <- Agent$new(
+      runtime_chat(server),
+      tools = list(tool_write_file),
+      permissions = permissions_standard(root),
+      working_dir = root
+    )
+    # PreToolUse runs after the permission check and before the tool, where
+    # a concurrent change could replace the checked directory with a link.
+    agent$add_hook(HookMatcher(
+      "PreToolUse",
+      function(tool_name, tool_input, context) {
+        if (swap) {
+          unlink(file.path(root, "notes"), recursive = TRUE)
+          file.symlink(outside, file.path(root, "notes"))
+        }
+        NULL
+      }
+    ))
+    if (swap) {
+      expect_warning(agent$run_sync("Write the note."), "Failed to evaluate")
+    } else {
+      agent$run_sync("Write the note.")
+    }
+    runtime_events(agent, "tool_end")[[1]]
+  }
+
+  written <- run_write(swap = FALSE)
+  expect_null(written$tool_error)
+  expect_identical(readLines(file.path(root, "notes", "out.txt")), "secret")
+
+  unlink(file.path(root, "notes", "out.txt"))
+  rejected <- run_write(swap = TRUE)
+  expect_false(file.exists(file.path(outside, "out.txt")))
+  expect_match(
+    conditionMessage(rejected$tool_error),
+    "no longer resolves inside the allowed directory"
+  )
+})
+
+test_that("a write allowed by a PermissionRequest hook is not checked again", {
+  sandbox <- withr::local_tempdir(pattern = "deputy-write-override-")
+  root <- file.path(sandbox, "root")
+  outside <- file.path(sandbox, "outside")
+  dir.create(root)
+  dir.create(outside)
+  target <- file.path(normalizePath(outside, mustWork = TRUE), "approved.txt")
+
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "write_file",
+      arguments = list(path = target, content = "approved")
+    ),
+    runtime_reply("done")
+  ))
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = list(tool_write_file),
+    permissions = permissions_standard(root),
+    working_dir = root
+  )
+  agent$add_hook(HookMatcher(
+    "PermissionRequest",
+    function(tool_name, tool_input, permission_result, context) {
+      PermissionResultAllow()
+    }
+  ))
+  agent$run_sync("Write outside the root with approval.")
+
+  expect_null(runtime_events(agent, "tool_end")[[1]]$tool_error)
+  expect_identical(readLines(target), "approved")
+})
