@@ -24,6 +24,7 @@ its answer. See \code{vignette("multi-agent")}.
 \subsection{Public methods}{
   \itemize{
     \item \href{#method-LeadAgent-initialize}{\code{LeadAgent$new()}}
+    \item \href{#method-LeadAgent-set_delegation_sources}{\code{LeadAgent$set_delegation_sources()}}
     \item \href{#method-LeadAgent-register_sub_agent}{\code{LeadAgent$register_sub_agent()}}
     \item \href{#method-LeadAgent-available_sub_agents}{\code{LeadAgent$available_sub_agents()}}
     \item \href{#method-LeadAgent-parallel_delegate}{\code{LeadAgent$parallel_delegate()}}
@@ -208,6 +209,46 @@ results are recorded in the lead's run and passed to its \code{on_result}.}
   }
   \subsection{Returns}{
     A new \code{LeadAgent} object
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-set_delegation_sources"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-set_delegation_sources}{}}}
+\subsection{\code{LeadAgent$set_delegation_sources()}}{
+  Replace the sources a subagent can be given as evidence, for example
+when a drawing is revised or a document is added during a conversation.
+The new list replaces the old one completely. Each delegation uses the
+sources as they were when it started, so a delegation already running is
+not affected.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$set_delegation_sources(
+  sources = list(),
+  scope = NULL,
+  clear_records = FALSE
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{sources}}{Unnamed list of source records, as for \code{new()}'s
+\code{delegation_sources}.}
+      \item{\code{scope}}{A new \code{delegation_scope} (\code{owner_id} and \code{conversation_id}),
+or \code{NULL} to keep the current one. The scope can change only when no
+run or delegation is in progress and no retained agent is held. Earlier
+subagent records and activity belong to the old conversation, so the
+change is refused while they exist unless \code{clear_records = TRUE}.}
+      \item{\code{clear_records}}{If \code{TRUE}, discard earlier subagent records and
+activity when the scope changes, instead of refusing the change. Use
+it when moving the lead to another conversation. Subscriptions from
+\verb{$observe_subagents()} made before the change stop working.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The lead, invisibly.
   }
 }
 
