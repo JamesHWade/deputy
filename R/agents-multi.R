@@ -211,27 +211,29 @@ LeadAgent <- R6::R6Class(
           "i" = "Use {.code replace = TRUE} to replace it."
         ))
       }
+      current_prompt <- private$.chat$get_system_prompt()
       private$.sub_agent_defs[[name]] <- definition
+      # The registry and the lead's routing prompt change together or not at
+      # all. Only the generated routing section is replaced, so compaction
+      # summaries, skills, and hook-provided context remain intact.
       tryCatch(
-        private$check_trusted_tools(private$.chat$get_tools()),
+        {
+          private$check_trusted_tools(private$.chat$get_tools())
+          private$.chat$set_system_prompt(private$replace_lead_prompt(
+            current_prompt,
+            private$.sub_agent_defs
+          ))
+        },
         error = function(error) {
           if (is.null(previous)) {
             private$.sub_agent_defs[[name]] <- NULL
           } else {
             private$.sub_agent_defs[[name]] <- previous
           }
+          try(private$.chat$set_system_prompt(current_prompt), silent = TRUE)
           rlang::cnd_signal(error)
         }
       )
-
-      # Replace only the generated routing section so compaction summaries,
-      # skills, and hook-provided context remain intact.
-      current_prompt <- private$.chat$get_system_prompt()
-      new_prompt <- private$replace_lead_prompt(
-        current_prompt,
-        private$.sub_agent_defs
-      )
-      private$.chat$set_system_prompt(new_prompt)
 
       if (is.null(previous)) {
         cli_alert_info("Registered sub-agent: {.val {name}}")

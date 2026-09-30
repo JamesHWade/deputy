@@ -373,6 +373,10 @@ replace_agent_chat <- function(agent, chat) {
   # If moving fails, the destination is returned empty, with its own prompt,
   # so the caller can retry with it.
   destination_prompt <- chat$get_system_prompt()
+  # The old Chat is untouched until the move succeeds; only the observer
+  # removers and reader state are rebound, so keep them to restore.
+  removers <- private$.tool_observer_removers
+  reader_registered <- private$.tool_result_reader_registered
   moved <- tryCatch(
     {
       chat$set_system_prompt(old$get_system_prompt())
@@ -386,7 +390,10 @@ replace_agent_chat <- function(agent, chat) {
   )
   if (!is.null(moved)) {
     private$.chat <- old
-    try(private$rewire_chat_runtime(), silent = TRUE)
+    private$.tool_observer_removers <- removers
+    private$.tool_result_reader_registered <- reader_registered
+    # Tool callbacks on the destination are cleared on success too (see
+    # set_chat()); here they may be Deputy's own, half installed.
     try(clear_chat_tool_callbacks(chat), silent = TRUE)
     try(chat$set_tools(list()), silent = TRUE)
     try(chat$set_turns(list()), silent = TRUE)

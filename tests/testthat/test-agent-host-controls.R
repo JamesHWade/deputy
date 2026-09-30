@@ -324,3 +324,55 @@ test_that("a refused run leaves the controller of the active run alone", {
   expect_true(controller$cancelled)
   private$run_active <- FALSE
 })
+
+test_that("a failed Agent$new() doesn't claim its Chat", {
+  chat <- create_mock_chat()
+  expect_error(Agent$new(chat, context_policy = "not a policy"))
+  agent <- Agent$new(create_mock_chat())
+  expect_no_error(agent$set_chat(chat))
+})
+
+test_that("a failed set_chat() keeps the old Chat's own tool callbacks", {
+  old <- ellmer::chat_openai(model = "gpt-4o-mini", credentials = function() {
+    "unused"
+  })
+  agent <- Agent$new(old)
+  seen <- 0L
+  old$on_tool_result(function(result) seen <<- seen + 1L)
+  count <- old$.__enclos_env__$private$callback_on_tool_result$count()
+  new <- create_mock_chat()
+  new$set_tools <- function(new_tools) stop("tools refused")
+
+  expect_error(agent$set_chat(new), "tools refused")
+  expect_identical(
+    old$.__enclos_env__$private$callback_on_tool_result$count(),
+    count
+  )
+})
+
+test_that("register_sub_agent() rolls back when the prompt can't be updated", {
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(agent_definition(
+      name = "research",
+      description = "Finds sources.",
+      prompt = "Find sources."
+    ))
+  )
+  prompt <- lead$get_system_prompt()
+  lead$.__enclos_env__$private$.chat$set_system_prompt <- function(prompt) {
+    stop("prompt refused")
+  }
+  updated <- agent_definition(
+    name = "research",
+    description = "Finds and checks sources.",
+    prompt = "Find and check sources."
+  )
+
+  expect_error(
+    lead$register_sub_agent(updated, replace = TRUE),
+    "prompt refused"
+  )
+  expect_identical(lead$sub_agent_defs[[1]]$description, "Finds sources.")
+  expect_identical(lead$get_system_prompt(), prompt)
+})
