@@ -100,6 +100,12 @@ Shiny.
 A saved conversation keeps the code, output and plots, but not the worker's
 variables. After a restart the model has to recreate them.
 
+The worker loads packages from your session's `.libPaths()`. To give it a
+library of its own, for example one the model installs packages into, name
+the directories in order with `libpath`:
+`RSession$new(agent, libpath = c(my_lib, .libPaths()))`. Your own session's
+search path doesn't change.
+
 Static plots from base graphics, ggplot2, grid and patchwork are captured.
 htmlwidgets and other interactive output are reported as unsupported.
 

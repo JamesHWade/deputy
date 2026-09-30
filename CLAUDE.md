@@ -660,7 +660,8 @@ The worker and the one-shot `run_r_code`/`run_bash` tools start from an
 allow-listed environment (`R/subprocess-env.R`, #224; hygiene, not isolation:
 same-account code can still read `/proc/<pid>/environ`): host variables
 outside the base set are unset and `.Renviron` isn't reread unless named in
-`env`; `env = "inherit"` opts out.
+`env`; `env = "inherit"` opts out. `RSession$new(libpath = )` sets the
+worker's library order, default the host's `.libPaths()` at each start.
 See `dev/conversation-r-runtime.md` for host lifecycle and recovery contracts.
 `evaluate`, `grDevices` and `htmltools` support capture and escaped displays;
 shinychat remains optional. This is not an OS security sandbox.

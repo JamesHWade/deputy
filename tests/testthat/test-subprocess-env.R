@@ -168,3 +168,23 @@ test_that("an RSession worker gets only the variables its host allows", {
     class = "deputy_r_session"
   )
 })
+
+test_that("an RSession worker searches the libraries its host names, in order", {
+  skip_on_cran()
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    working_dir = withr::local_tempdir()
+  )
+  lib <- withr::local_tempdir()
+  session <- RSession$new(agent, libpath = c(lib, .libPaths()))
+  withr::defer(session$close())
+  expect_match(
+    r_session_text(r_session_await(session$run("cat(.libPaths()[[1]])"))),
+    normalizePath(lib, winslash = "/"),
+    fixed = TRUE
+  )
+  expect_error(
+    RSession$new(agent, libpath = NA_character_),
+    class = "deputy_r_session"
+  )
+})

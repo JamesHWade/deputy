@@ -89,7 +89,8 @@ doesn't limit what the R code can do.
   plot_width = 1000L,
   plot_height = 650L,
   tools = character(),
-  env = NULL
+  env = NULL,
+  libpath = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -111,6 +112,9 @@ as \verb{tools$<name>(...)}. None by default.}
 read, such as \code{c("HTTPS_PROXY", "NO_PROXY")} behind a proxy.
 \code{"inherit"} passes your whole environment, including every key it
 holds.}
+      \item{\code{libpath}}{The library directories the R process loads packages
+from, searched in order. \code{NULL} uses your session's \code{.libPaths()} each
+time a process starts.}
     }
     \if{html}{\out{</div>}}
   }

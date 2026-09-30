@@ -74,6 +74,9 @@ RSession <- R6::R6Class(
     #'   read, such as `c("HTTPS_PROXY", "NO_PROXY")` behind a proxy.
     #'   `"inherit"` passes your whole environment, including every key it
     #'   holds.
+    #' @param libpath The library directories the R process loads packages
+    #'   from, searched in order. `NULL` uses your session's `.libPaths()` each
+    #'   time a process starts.
     initialize = function(
       agent,
       timeout = 30,
@@ -83,7 +86,8 @@ RSession <- R6::R6Class(
       plot_width = 1000L,
       plot_height = 650L,
       tools = character(),
-      env = NULL
+      env = NULL,
+      libpath = NULL
     ) {
       private$owner <- r_session_owner(agent)
       private$agent <- agent
@@ -138,6 +142,18 @@ RSession <- R6::R6Class(
         )
       }
       env <- check_subprocess_env(env, class = "r_session")
+      if (
+        !is.null(libpath) &&
+          (!is.character(libpath) ||
+            !length(libpath) ||
+            anyNA(libpath) ||
+            !all(nzchar(libpath)))
+      ) {
+        abort_deputy(
+          "{.arg libpath} must be {.code NULL} or library directories.",
+          class = "r_session"
+        )
+      }
       private$settings <- list(
         timeout = timeout,
         startup_timeout = startup_timeout,
@@ -145,7 +161,8 @@ RSession <- R6::R6Class(
         max_output_bytes = max_output_bytes,
         plot_width = plot_width,
         plot_height = plot_height,
-        env = env
+        env = env,
+        libpath = unname(libpath)
       )
       private$id <- new_deputy_id("r_session_")
       private$resource <- new.env(parent = emptyenv())
@@ -650,7 +667,7 @@ RSession <- R6::R6Class(
           if (fresh) {
             worker <- callr::r_session$new(
               options = callr::r_session_options(
-                libpath = .libPaths(),
+                libpath = private$settings$libpath %||% .libPaths(),
                 user_profile = FALSE,
                 system_profile = FALSE,
                 env = subprocess_env(private$settings$env),

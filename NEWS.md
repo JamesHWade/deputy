@@ -21,6 +21,10 @@
   environment of the R process through the operating system, and any file
   that user can read (#224).
 
+* `RSession$new()` gains `libpath`, the library directories the R process
+  loads packages from, in order, so a host can give its worker a library of
+  its own ahead of the site library while keeping it off its own search path.
+
 * New `Agent$set_chat()` replaces the Chat an agent sends requests to, so a
   host can continue a conversation with a model from another provider. The
   conversation, system prompt and tools move to the new Chat, reasoning
