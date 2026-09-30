@@ -61,7 +61,7 @@ would exceed the checkpoint size limits is refused.
 
   The agent's
   [ContextPolicy](https://jameshwade.github.io/deputy/reference/ContextPolicy.md).
-  Read-only.
+  Read-only; use `$set_context_policy()` to replace it.
 
 - `working_dir`:
 
@@ -164,6 +164,10 @@ would exceed the checkpoint size limits is refused.
 - [`Agent$get_model_object()`](#method-Agent-get_model_object)
 
 - [`Agent$set_model()`](#method-Agent-set_model)
+
+- [`Agent$set_chat()`](#method-Agent-set_chat)
+
+- [`Agent$set_context_policy()`](#method-Agent-set_context_policy)
 
 - [`Agent$register_tool()`](#method-Agent-register_tool)
 
@@ -1283,7 +1287,8 @@ permissions, hooks and usage limits applied.
 
 - `controller`:
 
-  Optional ellmer stream controller.
+  Optional ellmer stream controller. As in ellmer, a cancelled
+  controller is reset when the new run starts.
 
 - `run_context`:
 
@@ -1337,7 +1342,8 @@ usage limits and compaction applied.
 
 - `controller`:
 
-  Optional ellmer stream controller.
+  Optional ellmer stream controller. As in ellmer, a cancelled
+  controller is reset when the new run starts.
 
 - `run_context`:
 
@@ -1703,6 +1709,68 @@ Change the model.
 - `model`:
 
   Model name.
+
+#### Returns
+
+The agent, invisibly.
+
+------------------------------------------------------------------------
+
+### `Agent$set_chat()`
+
+Replace the Chat the agent sends requests to, for example to continue a
+conversation with a model from another provider. The conversation,
+system prompt and tools move to the new Chat, and the agent's
+permissions, hooks, tool observers and usage limits keep applying.
+Reasoning content
+([ellmer::ContentThinking](https://ellmer.tidyverse.org/reference/Content.html))
+is dropped from the history, because each provider accepts only its own.
+Subagents created after the change use the new Chat.
+
+To change the model within one provider, use `$set_model()`. The
+replaced Chat is left with no tools or tool callbacks. Callbacks you
+registered directly on it are not moved; register them with
+`$on_tool_request()` and `$on_tool_result()` instead. An agent whose
+Chat another agent also uses can't replace it.
+
+#### Usage
+
+    Agent$set_chat(chat)
+
+#### Arguments
+
+- `chat`:
+
+  An ellmer Chat with no turns or tools, not used by another agent. Its
+  system prompt is replaced by the agent's. Provider-native tools can't
+  move between Chats: remove them with `$set_tools()` first.
+
+#### Returns
+
+The agent, invisibly.
+
+------------------------------------------------------------------------
+
+### `Agent$set_context_policy()`
+
+Replace the
+[ContextPolicy](https://jameshwade.github.io/deputy/reference/ContextPolicy.md),
+for example to compact at a different size after switching to a model
+with a larger or smaller context window. The new policy applies from the
+next run.
+
+#### Usage
+
+    Agent$set_context_policy(context_policy)
+
+#### Arguments
+
+- `context_policy`:
+
+  A
+  [ContextPolicy](https://jameshwade.github.io/deputy/reference/ContextPolicy.md).
+  It must use the same `offload_dir` as the current policy, because
+  large tool results that were already saved are read back from there.
 
 #### Returns
 

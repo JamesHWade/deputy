@@ -164,6 +164,8 @@ its answer. See <code><a href="../articles/multi-agent.html">vignette("multi-age
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="run_sync"><a href="Agent.html#method-run_sync"><code>Agent$run_sync()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="save_session"><a href="Agent.html#method-save_session"><code>Agent$save_session()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="session_id"><a href="Agent.html#method-session_id"><code>Agent$session_id()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_chat"><a href="Agent.html#method-set_chat"><code>Agent$set_chat()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_context_policy"><a href="Agent.html#method-set_context_policy"><code>Agent$set_context_policy()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_model"><a href="Agent.html#method-set_model"><code>Agent$set_model()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_permission_mode"><a href="Agent.html#method-set_permission_mode"><code>Agent$set_permission_mode()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_system_prompt"><a href="Agent.html#method-set_system_prompt"><code>Agent$set_system_prompt()</code></a></span></li>
@@ -321,13 +323,19 @@ results are recorded in the lead's run and passed to its <code>on_result</code>.
 
 <p></p><hr><a id="method-LeadAgent-register_sub_agent"></a><div class="section">
 <h3 id="leadagent-register-sub-agent-"><code>LeadAgent$register_sub_agent()</code><a class="anchor" aria-label="anchor" href="#leadagent-register-sub-agent-"></a></h3>
-<p>Add a subagent definition. Errors if its name is already registered.</p><div class="section">
+<p>Add a subagent definition, or replace one with the same name, for
+example to give a subagent a different set of tools. Delegations that
+are already running keep the definition they started with.</p><div class="section">
 <h4 id="usage-1">Usage<a class="anchor" aria-label="anchor" href="#usage-1"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">register_sub_agent</span><span class="op">(</span><span class="va">definition</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">register_sub_agent</span><span class="op">(</span><span class="va">definition</span>, replace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-1">Arguments<a class="anchor" aria-label="anchor" href="#arguments-1"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>definition</code></dt>
 <dd><p>An <code><a href="agent_definition.html">agent_definition()</a></code> object</p></dd>
+
+      <dt><code>replace</code></dt>
+<dd><p>If <code>TRUE</code>, replace a registered definition with the same
+name. If <code>FALSE</code> (the default), a name clash is an error.</p></dd>
 
 
 </dl><p></p></div>

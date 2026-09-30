@@ -102,6 +102,8 @@ Inherited methods
 - [`Agent$run_sync()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-run_sync)
 - [`Agent$save_session()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-save_session)
 - [`Agent$session_id()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-session_id)
+- [`Agent$set_chat()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_chat)
+- [`Agent$set_context_policy()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_context_policy)
 - [`Agent$set_model()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_model)
 - [`Agent$set_permission_mode()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_permission_mode)
 - [`Agent$set_system_prompt()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_system_prompt)
@@ -303,11 +305,13 @@ A new `LeadAgent` object
 
 ### `LeadAgent$register_sub_agent()`
 
-Add a subagent definition. Errors if its name is already registered.
+Add a subagent definition, or replace one with the same name, for
+example to give a subagent a different set of tools. Delegations that
+are already running keep the definition they started with.
 
 #### Usage
 
-    LeadAgent$register_sub_agent(definition)
+    LeadAgent$register_sub_agent(definition, replace = FALSE)
 
 #### Arguments
 
@@ -316,6 +320,11 @@ Add a subagent definition. Errors if its name is already registered.
   An
   [`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
   object
+
+- `replace`:
+
+  If `TRUE`, replace a registered definition with the same name. If
+  `FALSE` (the default), a name clash is an error.
 
 #### Returns
 

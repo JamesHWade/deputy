@@ -2,6 +2,26 @@
 
 ## deputy (development version)
 
+- New `Agent$set_chat()` replaces the Chat an agent sends requests to,
+  so a host can continue a conversation with a model from another
+  provider. The conversation, system prompt and tools move to the new
+  Chat, reasoning content is dropped from the history, and the agent’s
+  permissions, hooks, tool observers and usage limits keep applying.
+
+- New `Agent$set_context_policy()` replaces the `ContextPolicy` between
+  runs, for example to compact at a different size after changing model.
+  The policy must keep the same `offload_dir`.
+
+- `LeadAgent$register_sub_agent()` gains `replace`. With
+  `replace = TRUE` it replaces a registered definition with the same
+  name and updates the lead’s prompt; delegations already running keep
+  the definition they started with.
+
+- `$stream()` and `$stream_async()` reset a cancelled stream controller
+  when a new run starts, as ellmer does. A host such as shinychat that
+  reuses its controller no longer sees the previous run’s cancellation
+  when the next run starts.
+
 - A write restricted to a `file_write` directory is checked again just
   before `write_file`, `edit_file` or `multi_edit` runs. If a file or
   symbolic link in the path changed after the permission check so that
