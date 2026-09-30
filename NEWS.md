@@ -1,5 +1,13 @@
 # deputy (development version)
 
+* `ContextPolicy()` gains `estimator`. With the default `"auto"`, automatic
+  compaction now runs when the provider cannot count tokens: it adds a
+  conservative estimate of later content to the usage reported for the latest
+  response. Previously such providers, including gateways whose
+  token-counting route returns HTTP 404, never compacted. `"provider"` keeps
+  the old behaviour. A token-counting endpoint that returns HTTP 404, 405 or
+  501 is asked only once per provider class and base URL (#213).
+
 * New `LeadAgent$set_delegation_sources()` replaces the sources a subagent can
   be given as evidence, so sources that change during a conversation (a
   drawing revised, a document added) can be offered. The scope can change

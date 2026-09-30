@@ -257,6 +257,7 @@ Agent <- R6::R6Class(
         private$.context_policy,
         private$.session_id
       )
+      private$reset_frame_snapshots()
 
       reg.finalizer(self, finalize_owned_conversations, onexit = TRUE)
       # Marked only once construction succeeded, so a failed Agent$new() never
@@ -1202,6 +1203,8 @@ Agent <- R6::R6Class(
       private$.compaction_summary <- NULL
       private$.compacted_turns <- list()
       private$.cleared_tool_results <- list()
+      private$.usage_stale_turns <- 0L
+      private$reset_frame_snapshots()
       invisible(self)
     },
 
@@ -1318,6 +1321,7 @@ Agent <- R6::R6Class(
     set_model = function(model) {
       check_conversation_lease(self, NULL)
       private$.chat$set_model(model)
+      private$mark_usage_stale()
       invisible(self)
     },
 
@@ -2035,6 +2039,8 @@ Agent <- R6::R6Class(
       if (cleared > 0L) {
         private$.chat$set_turns(turns)
         private$.cleared_tool_results <- originals
+        # Reported usage counted the results just cleared.
+        private$.usage_stale_turns <- length(turns)
       }
       list(cleared = cleared)
     },
@@ -2710,6 +2716,12 @@ Agent <- R6::R6Class(
       .last_compaction = NULL,
       .compaction_summary = NULL,
       .compacted_turns = list(),
+      # Leading context turns whose reported usage describes a different
+      # context (before compaction), which local estimates must not reuse.
+      .usage_stale_turns = 0L,
+      # The prompt-and-tools size before each estimated request, with the turn
+      # count then, so estimates can add later growth to reported usage.
+      .frame_snapshots = list(),
       # Original tool results cleared from model context by microcompact(),
       # keyed by tool call ID, so the conversation view keeps them.
       .cleared_tool_results = list(),

@@ -103,6 +103,7 @@ prepare_delegation_manifest <- function(lead, definition, prepared, child) {
     "max_tokens",
     "compact_to",
     "fallback",
+    "estimator",
     "max_tool_result_bytes",
     "max_tool_result_image_bytes",
     "max_tool_result_images"

@@ -16,6 +16,16 @@ NULL
 #'
 #' @param max_tokens Estimated context size, in tokens, that triggers
 #'   compaction. `NULL` turns automatic compaction off.
+#' @param estimator How to measure the context when the provider can't count
+#'   tokens (some gateways answer the counting request with HTTP 404).
+#'   `"auto"` (the default) asks the provider first and otherwise estimates:
+#'   the usage the provider reported for its latest response, plus an
+#'   estimate of what was added since, including a longer system prompt or
+#'   new tools. Without reported usage, everything is estimated. Estimates
+#'   assume three bytes of text per token, a fixed amount per image and per
+#'   document page, so they run high for typical text. `"provider"` uses only
+#'   the provider's count, so automatic compaction doesn't run when the
+#'   provider can't count.
 #' @param compact_to After compaction, the recent turns that are kept take up
 #'   about this fraction of `max_tokens`. Must be between 0 and 1.
 #' @param fallback What to do if the model can't write the summary. `"error"`
@@ -50,6 +60,12 @@ NULL
 #' saved sessions. If summarising fails or is cancelled, the conversation is
 #' left as it was. [Agent]`$last_compaction()` describes the latest compaction,
 #' including every summary attempt.
+#'
+#' The `"compaction_start"` run event records `estimate_source`,
+#' `"provider"` or `"estimate"`. Usage reported before a compaction or a
+#' `$microcompact()`, or saved in a session, isn't reused until the provider
+#' reports usage for the smaller context. A token-counting request that fails
+#' with HTTP 404, 405 or 501 isn't repeated for the same provider and base URL.
 #'
 #' The policy is read-only: read fields with `$`, and create a new policy to
 #' change one (the example shows how). The Chats in `summary_fallback_chats`
@@ -93,7 +109,8 @@ ContextPolicy <- S7::new_class(
     summary_fallback_chats = readonly_property(
       "summary_fallback_chats",
       S7::class_list
-    )
+    ),
+    estimator = readonly_property("estimator", S7::class_character)
   ),
   constructor = function(
     max_tokens = 32000L,
@@ -103,9 +120,11 @@ ContextPolicy <- S7::new_class(
     offload_dir = NULL,
     summary_fallback_chats = list(),
     max_tool_result_image_bytes = 2 * 1024 * 1024,
-    max_tool_result_images = 4L
+    max_tool_result_images = 4L,
+    estimator = c("auto", "provider")
   ) {
     fallback <- match.arg(fallback)
+    estimator <- match.arg(estimator)
     summary_fallback_chats <- normalize_fallback_chats(
       summary_fallback_chats,
       primary = NULL,
@@ -167,7 +186,8 @@ ContextPolicy <- S7::new_class(
       offload_dir = offload_dir,
       max_tool_result_image_bytes = max_tool_result_image_bytes,
       max_tool_result_images = max_tool_result_images,
-      summary_fallback_chats = summary_fallback_chats
+      summary_fallback_chats = summary_fallback_chats,
+      estimator = estimator
     )
     freeze_value(value)
   }
@@ -226,6 +246,7 @@ S7::method(print, ContextPolicy) <- function(x, ...) {
     cli::cli_div(theme = list(div = list("margin-left" = 2)))
     cli::cli_text("compact at: {x$max_tokens %||% 'disabled'} tokens")
     cli::cli_text("compact to: {format(x$compact_to * 100)}%")
+    cli::cli_text("estimator: {x$estimator}")
     cli::cli_text("fallback: {x$fallback}")
     cli::cli_text("summary fallback Chats: {length(x$summary_fallback_chats)}")
     cli::cli_text(

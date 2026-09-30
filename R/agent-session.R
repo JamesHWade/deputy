@@ -273,6 +273,10 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       private$.compaction_summary <- session$compaction_summary
       private$.compacted_turns <- restored_compacted_turns
       private$.cleared_tool_results <- restored_cleared
+      # Saved usage describes the saving Agent's prompt, tools and any later
+      # rewrite, none of which a load restores, so none of it is reused.
+      private$.usage_stale_turns <- length(private$.chat$get_turns())
+      private$reset_frame_snapshots()
     }
   )
 }

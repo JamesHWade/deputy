@@ -473,6 +473,98 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       as.numeric(sum(count))
     },
 
+    # The context size for automatic compaction, with its source: the
+    # provider's count, or (for the "auto" estimator) a local estimate. A
+    # subset of `turns` is estimated by characters: reported usage covers
+    # the turns it omits.
+    context_estimate = function(messages, turns = NULL, local = FALSE) {
+      policy <- private$.context_policy
+      count <- if (
+        !isTRUE(local) &&
+          (is.null(turns) || !ellmer_token_count_unsupported(private$.chat))
+      ) {
+        private$context_token_count(messages, turns = turns)
+      }
+      estimate_locally <- is.null(count) && identical(policy$estimator, "auto")
+      if (is.null(count) && !estimate_locally) {
+        return(NULL)
+      }
+      # A subset needs no frame record.
+      if (!is.null(count) && !is.null(turns)) {
+        return(list(tokens = count, source = "provider"))
+      }
+      tools <- tryCatch(private$.chat$get_tools(), error = function(e) list())
+      system_prompt <- private$.chat$get_system_prompt()
+      current <- turns %||% private$.chat$get_turns()
+      tokens <- if (estimate_locally) {
+        local_context_estimate(
+          system_prompt = system_prompt,
+          tools = tools,
+          turns = current,
+          messages = messages,
+          use_usage = is.null(turns),
+          usage_after = private$.usage_stale_turns,
+          frame_snapshots = private$.frame_snapshots
+        )
+      }
+      if (is.null(turns)) {
+        # The frame the upcoming request carries, recorded whether the
+        # provider counted or not; a later local estimate compares the
+        # current frame with it (see frame_growth()).
+        snapshots <- c(
+          private$.frame_snapshots,
+          list(list(
+            turns = length(current),
+            frame = estimate_frame_tokens(system_prompt, tools)
+          ))
+        )
+        # Keep the oldest record (the baseline for installed turns) and
+        # merge the next two when there are too many. The merged record
+        # covers both ranges with the smaller frame, so growth measured
+        # against it can only be over-estimated.
+        while (length(snapshots) > 8L) {
+          merged <- list(
+            turns = snapshots[[2L]]$turns,
+            frame = min(snapshots[[2L]]$frame, snapshots[[3L]]$frame)
+          )
+          snapshots <- c(snapshots[1L], list(merged), snapshots[-(1:3)])
+        }
+        private$.frame_snapshots <- snapshots
+      }
+      if (!is.null(count)) {
+        return(list(tokens = count, source = "provider"))
+      }
+      list(tokens = as.numeric(tokens), source = "estimate")
+    },
+
+    # Usage reported by another model or provider counts tokens differently,
+    # so none of it is reused after the model or Chat changes.
+    mark_usage_stale = function() {
+      private$.usage_stale_turns <- length(private$.chat$get_turns())
+      private$reset_frame_snapshots()
+      invisible(NULL)
+    },
+
+    # Forget frame records when turns are installed wholesale (creation,
+    # replacement, load, compaction), keeping the frame as it is now as the
+    # baseline for them: their reported usage was produced elsewhere, so the
+    # nearest known frame is the current one, and growth from here counts.
+    reset_frame_snapshots = function() {
+      frame <- tryCatch(
+        estimate_frame_tokens(
+          private$.chat$get_system_prompt(),
+          private$.chat$get_tools()
+        ),
+        error = function(error) NULL
+      )
+      private$.frame_snapshots <- if (is.null(frame)) {
+        list()
+      } else {
+        list(list(turns = 0L, frame = frame))
+      }
+      invisible(NULL)
+    },
+
     is_human_turn = function(turn) {
       if (!inherits(turn, "ellmer::UserTurn")) {
         return(FALSE)
@@ -499,7 +591,11 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       ))
     },
 
-    compaction_keep_last = function(messages, target_tokens) {
+    compaction_keep_last = function(
+      messages,
+      target_tokens,
+      estimate = FALSE
+    ) {
       turns <- private$.chat$get_turns()
       if (length(turns) == 0L) {
         return(0L)
@@ -528,7 +624,13 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         if (length(kept) < minimum_keep) {
           next
         }
-        count <- private$context_token_count(messages, turns = kept)
+        count <- if (estimate) {
+          # The full estimate was already local; asking the provider again
+          # for each candidate would repeat a failing request.
+          private$context_estimate(messages, turns = kept, local = TRUE)$tokens
+        } else {
+          private$context_token_count(messages, turns = kept)
+        }
         if (!is.null(count) && count <= target_tokens) {
           return(as.integer(length(kept)))
         }
@@ -756,6 +858,9 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       )
       private$.compacted_turns <- compacted_turns
       private$.compaction_summary <- summary
+      # Retained turns report usage for the context before compaction.
+      private$.usage_stale_turns <- length(plan$turns_to_keep)
+      private$reset_frame_snapshots()
       if (!is.null(private$.compaction_artifacts)) {
         private$.compaction_artifacts$installed <- TRUE
       }
@@ -898,28 +1003,10 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       if (is_error) {
         return(paste(header, paste(diagnostic, collapse = "\n")))
       }
-      text <- if (
-        is.list(content@value) &&
-          is.null(names(content@value)) &&
-          length(content@value) > 0L &&
-          all(vapply(
-            content@value,
-            inherits,
-            logical(1),
-            what = "ellmer::Content"
-          ))
-      ) {
-        paste(value, collapse = "\n")
-      } else if (is.character(value) && is.null(names(value))) {
-        paste(value, collapse = "\n")
-      } else {
-        as.character(jsonlite::toJSON(
-          project_content(value, for_json = TRUE),
-          auto_unbox = TRUE,
-          digits = NA,
-          null = "null"
-        ))
-      }
+      text <- public_tool_value_text(
+        value,
+        native = is_native_content_list(content@value)
+      )
       paste(format(content, show = "header"), text, sep = "\n")
     },
 

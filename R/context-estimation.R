@@ -89,15 +89,22 @@ is_ellmer_token_count <- function(chat) {
 }
 
 # ellmer dispatches token counting on the provider's S7 class; its base method
-# reports every provider without a specialised method as unsupported. Methods
-# are registered when a package loads, so an observation is kept only while
-# the same namespaces and ellmer Chat method remain.
+# reports every provider without a specialised method as unsupported, and some
+# compatible endpoints (such as API gateways) lack the counting route that
+# their class calls. Observations are keyed by class and base URL, so one
+# endpoint cannot disable counting for another of the same class. Methods are
+# registered when a package loads, so an observation is kept only while the
+# same namespaces and ellmer Chat method remain.
 ellmer_token_count_provider <- function(chat) {
   provider <- tryCatch(chat$get_provider(), error = function(e) NULL)
   if (is.null(provider)) {
     return(NULL)
   }
-  paste(class(provider), collapse = "/")
+  base_url <- tryCatch(provider@base_url, error = function(e) NULL)
+  if (!is.character(base_url) || length(base_url) != 1L || is.na(base_url)) {
+    base_url <- ""
+  }
+  paste0(paste(class(provider), collapse = "/"), " ", base_url)
 }
 
 ellmer_token_count_current <- function(observed) {
@@ -117,15 +124,32 @@ ellmer_token_count_unsupported <- function(chat) {
     ellmer_token_count_current(observed)
 }
 
+# ellmer's "not implemented" error, or an HTTP status meaning the endpoint has
+# no counting route. Other failures (rate limits, outages) may be transient.
+token_count_unavailable_error <- function(error) {
+  if (inherits(error, "not_implemented")) {
+    return(grepl(
+      "doesn't support token counting",
+      conditionMessage(error),
+      fixed = TRUE
+    ))
+  }
+  if (!inherits(error, "httr2_http")) {
+    return(FALSE)
+  }
+  status <- error$status
+  if (!is.numeric(status) || length(status) != 1L) {
+    status <- suppressWarnings(as.numeric(sub(
+      "^httr2_http_",
+      "",
+      grep("^httr2_http_[0-9]+$", class(error), value = TRUE)[1L]
+    )))
+  }
+  length(status) == 1L && !is.na(status) && status %in% c(404, 405, 501)
+}
+
 ellmer_token_count_observe <- function(chat, error) {
-  if (
-    !inherits(error, "not_implemented") ||
-      !grepl(
-        "doesn't support token counting",
-        conditionMessage(error),
-        fixed = TRUE
-      )
-  ) {
+  if (!token_count_unavailable_error(error)) {
     return(invisible(NULL))
   }
   provider <- ellmer_token_count_provider(chat)
@@ -143,4 +167,360 @@ ellmer_token_count_observe <- function(chat, error) {
   observed$unsupported <- union(observed$unsupported, provider)
   ellmer_observations$token_count <- observed
   invisible(NULL)
+}
+
+# Local context estimates ---------------------------------------------------
+
+# Deliberately conservative: typical English text and JSON average about four
+# characters per token, and one image costs at most about 1,600 tokens on
+# common providers. Text is measured in UTF-8 bytes, not characters: ASCII is
+# one byte per character, while CJK text and emoji take three or four bytes
+# for what can be a whole token each, so a per-character ratio would badly
+# under-count them. Over-estimating compacts slightly early; under-estimating
+# can overflow the model's context.
+context_estimate_bytes_per_token <- 3
+context_estimate_image_tokens <- 1600
+# A large image costs more: about one token per 750 pixels on providers that
+# price by size, before any downscaling they apply.
+context_estimate_image_pixels_per_token <- 750
+# Each message and each tool call or result also carries role and framing
+# tokens that its content does not show.
+context_estimate_turn_tokens <- 8
+context_estimate_tool_call_tokens <- 10
+# A document page: providers send its extracted text and, for PDFs, often an
+# image of the page as well.
+context_estimate_page_tokens <- 3000
+
+estimate_text_tokens <- function(text) {
+  text <- as.character(text)
+  if (!length(text)) {
+    return(0)
+  }
+  text <- enc2utf8(text)
+  bytes <- sum(nchar(text, type = "bytes"))
+  max(
+    ceiling(bytes / context_estimate_bytes_per_token),
+    text_piece_tokens(text)
+  )
+}
+
+# Byte counts alone under-count dense ASCII: base64, hashes, digits and
+# minified data tokenize at one to two characters per token. Split text where
+# tokenizers usually split it (a word, a single digit, a run of punctuation)
+# and charge each piece at least one token, and one per three bytes beyond.
+# Words are rarely longer than 20 bytes; a longer piece with many distinct
+# characters is more likely an encoded payload in one case, charged at one
+# token per 1.5 bytes. Long runs of a few repeated characters stay cheap.
+# Outside ASCII, every character counts as a token: Greek, Cyrillic, Hebrew
+# and Arabic take two bytes each but can tokenize at about one per character.
+context_estimate_piece_pattern <-
+  "[A-Z]?[a-z]+|[A-Z]+|[0-9]|[\\x21-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\x7e]+"
+context_estimate_word_bytes <- 20
+context_estimate_dense_bytes_per_token <- 1.5
+context_estimate_dense_distinct <- 8
+
+text_piece_tokens <- function(text) {
+  pieces <- regmatches(
+    text,
+    gregexpr(context_estimate_piece_pattern, text, perl = TRUE, useBytes = TRUE)
+  )
+  sum(vapply(
+    pieces,
+    function(piece) {
+      lengths <- nchar(piece, type = "bytes")
+      tokens <- pmax(1, ceiling(lengths / context_estimate_bytes_per_token))
+      for (i in which(lengths > context_estimate_word_bytes)) {
+        distinct <- length(unique(charToRaw(piece[[i]])))
+        if (distinct >= context_estimate_dense_distinct) {
+          tokens[[i]] <- ceiling(
+            lengths[[i]] / context_estimate_dense_bytes_per_token
+          )
+        }
+      }
+      sum(tokens)
+    },
+    numeric(1)
+  )) +
+    non_ascii_characters(text)
+}
+
+# UTF-8 lead bytes, one per character outside ASCII.
+non_ascii_characters <- function(text) {
+  sum(vapply(
+    text,
+    function(value) sum(charToRaw(value) >= as.raw(0xc0)),
+    numeric(1),
+    USE.NAMES = FALSE
+  ))
+}
+
+# Tokens for model-facing content: turns, content objects, strings or lists.
+# Tool requests count their JSON arguments; tool results their public text or
+# JSON value, the same projection compaction summarizes.
+estimate_content_tokens <- function(content) {
+  if (is.null(content)) {
+    return(0)
+  }
+  if (is.character(content)) {
+    return(estimate_text_tokens(content))
+  }
+  if (inherits(content, "ellmer::Turn")) {
+    return(
+      context_estimate_turn_tokens + estimate_content_tokens(content@contents)
+    )
+  }
+  if (inherits(content, "ellmer::ContentImage")) {
+    return(estimate_image_tokens(content))
+  }
+  if (inherits(content, "ellmer::ContentPDF")) {
+    return(estimate_document_tokens(content@data, "application/pdf"))
+  }
+  if (inherits(content, "ellmer::ContentDocument")) {
+    return(estimate_document_tokens(content@data, content@mime_type))
+  }
+  if (inherits(content, "ellmer::ContentToolRequest")) {
+    return(
+      context_estimate_tool_call_tokens +
+        estimate_text_tokens(c(
+          content@id,
+          content@name,
+          public_json_text(content@arguments)
+        ))
+    )
+  }
+  if (inherits(content, "ellmer::ContentToolResult")) {
+    return(
+      context_estimate_tool_call_tokens + estimate_tool_result_tokens(content)
+    )
+  }
+  if (inherits(content, "ellmer::Content")) {
+    return(estimate_text_tokens(public_content_text(content)))
+  }
+  if (is.list(content)) {
+    return(sum(vapply(content, estimate_content_tokens, numeric(1))))
+  }
+  estimate_text_tokens(tryCatch(
+    public_json_text(content),
+    error = function(error) paste(format(content), collapse = "\n")
+  ))
+}
+
+estimate_tool_result_tokens <- function(content) {
+  if (!is.null(content@error)) {
+    error <- content@error
+    return(estimate_text_tokens(
+      if (inherits(error, "condition")) conditionMessage(error) else error
+    ))
+  }
+  value <- content@value
+  if (inherits(value, "ellmer::Content") || is_native_content_list(value)) {
+    return(estimate_content_tokens(value))
+  }
+  estimate_text_tokens(public_tool_value_text(project_tool_content(value)))
+}
+
+# An inline PNG or JPEG counts by its size when its header gives one; any
+# other image, or one given by URL, counts the fixed allowance.
+estimate_image_tokens <- function(content) {
+  size <- if (inherits(content, "ellmer::ContentImageInline")) {
+    tryCatch(
+      image_dimensions(jsonlite::base64_dec(paste(
+        content@data,
+        collapse = ""
+      ))),
+      error = function(error) NULL
+    )
+  }
+  if (is.null(size)) {
+    return(context_estimate_image_tokens)
+  }
+  max(
+    context_estimate_image_tokens,
+    ceiling(prod(size) / context_estimate_image_pixels_per_token)
+  )
+}
+
+# Width and height from a PNG or JPEG header, or NULL.
+image_dimensions <- function(bytes) {
+  read_be <- function(at, n) {
+    sum(as.integer(bytes[at + seq_len(n) - 1L]) * 256^((n - 1L):0))
+  }
+  png <- as.raw(c(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))
+  if (length(bytes) >= 24L && identical(bytes[1:8], png)) {
+    return(c(read_be(17L, 4L), read_be(21L, 4L)))
+  }
+  if (length(bytes) < 4L || !identical(bytes[1:2], as.raw(c(0xff, 0xd8)))) {
+    return(NULL)
+  }
+  # JPEG: walk the segments to a start-of-frame marker.
+  at <- 3L
+  while (at + 8L <= length(bytes)) {
+    if (bytes[at] != as.raw(0xff)) {
+      return(NULL)
+    }
+    marker <- as.integer(bytes[at + 1L])
+    if (marker %in% c(0xc0:0xc3, 0xc5:0xc7, 0xc9:0xcb, 0xcd:0xcf)) {
+      return(c(read_be(at + 7L, 2L), read_be(at + 5L, 2L)))
+    }
+    at <- at + 2L + read_be(at + 2L, 2L)
+  }
+  NULL
+}
+
+# An inline document is sent whole, so it costs far more than its short
+# display text. A PDF counts per page (page objects in its body, or its size
+# at ~50 KB a page when they are compressed out of sight); any other document
+# at least counts its payload as text.
+estimate_document_tokens <- function(data, mime_type = "") {
+  payload <- tryCatch(
+    jsonlite::base64_dec(paste(data, collapse = "")),
+    error = function(error) NULL
+  )
+  bytes <- if (is.null(payload)) {
+    ceiling(sum(nchar(data, type = "bytes")) * 3 / 4)
+  } else {
+    length(payload)
+  }
+  by_payload <- ceiling(bytes / context_estimate_bytes_per_token)
+  text <- if (!is.null(payload) && !any(payload == as.raw(0))) {
+    rawToChar(payload)
+  }
+  if (!is.null(text) && validUTF8(text)) {
+    by_payload <- max(by_payload, estimate_text_tokens(text))
+  }
+  if (!identical(mime_type, "application/pdf")) {
+    return(max(context_estimate_page_tokens, by_payload))
+  }
+  pages <- if (is.null(payload)) {
+    0L
+  } else {
+    length(grepRaw("/Type[[:space:]]*/Page[^s]", payload, all = TRUE))
+  }
+  if (pages == 0L) {
+    pages <- max(1, ceiling(bytes / 50000))
+  }
+  pages * context_estimate_page_tokens
+}
+
+# Tool definitions are sent with every request; count their names,
+# descriptions and argument schema text.
+estimate_tool_tokens <- function(tools) {
+  schema_text <- function(value) {
+    if (is.character(value)) {
+      return(value)
+    }
+    if (S7::S7_inherits(value)) {
+      value <- S7::props(value)
+    }
+    if (is.list(value)) {
+      return(c(
+        names(value),
+        unlist(lapply(value, schema_text), use.names = FALSE)
+      ))
+    }
+    character()
+  }
+  sum(vapply(
+    tools,
+    function(tool) {
+      # A provider-native tool has no argument schema; its JSON is what the
+      # provider receives.
+      schema <- if (inherits(tool, "ellmer::ToolBuiltIn")) {
+        schema_text(tool@json)
+      } else {
+        schema_text(tool@arguments)
+      }
+      context_estimate_tool_call_tokens +
+        estimate_text_tokens(c(tool@name, tool@description, schema))
+    },
+    numeric(1)
+  ))
+}
+
+# The index and size of the latest completed response's reported context:
+# its input (which covers the system prompt, tools and earlier turns), cached
+# input and output, which is now part of the context. `after` excludes turns
+# whose usage describes a different context, such as one before compaction.
+reported_context_usage <- function(turns, after = 0L) {
+  for (index in rev(seq_along(turns))) {
+    if (index <= after) {
+      break
+    }
+    turn <- turns[[index]]
+    if (
+      !inherits(turn, "ellmer::AssistantTurn") ||
+        inherits(turn, "ellmer::AssistantPartialTurn")
+    ) {
+      next
+    }
+    tokens <- suppressWarnings(as.numeric(turn@tokens))
+    if (length(tokens) < 1L || !is.finite(tokens[[1L]])) {
+      next
+    }
+    output <- if (length(tokens) >= 2L && is.finite(tokens[[2L]])) {
+      tokens[[2L]]
+    } else {
+      estimate_content_tokens(turn)
+    }
+    cached <- if (length(tokens) >= 3L && is.finite(tokens[[3L]])) {
+      tokens[[3L]]
+    } else {
+      0
+    }
+    return(list(index = index, tokens = tokens[[1L]] + cached + output))
+  }
+  NULL
+}
+
+# A local estimate of the complete context. With `use_usage`, the latest
+# trustworthy reported usage replaces the estimate of everything it covered.
+local_context_estimate <- function(
+  system_prompt,
+  tools,
+  turns,
+  messages,
+  use_usage = TRUE,
+  usage_after = 0L,
+  frame_snapshots = list()
+) {
+  pending <- estimate_content_tokens(messages)
+  frame <- estimate_frame_tokens(system_prompt, tools)
+  usage <- if (use_usage) reported_context_usage(turns, usage_after)
+  if (!is.null(usage)) {
+    later <- if (usage$index < length(turns)) {
+      turns[(usage$index + 1L):length(turns)]
+    } else {
+      list()
+    }
+    return(
+      usage$tokens +
+        frame_growth(frame, frame_snapshots, usage$index) +
+        estimate_content_tokens(later) +
+        pending
+    )
+  }
+  frame + estimate_content_tokens(turns) + pending
+}
+
+# The system prompt and tool definitions every request carries.
+estimate_frame_tokens <- function(system_prompt, tools) {
+  estimate_text_tokens(system_prompt %||% character()) +
+    estimate_tool_tokens(tools)
+}
+
+# How much the prompt and tools have grown since the request that produced
+# the usage anchored at `index`. Reported usage covers the prompt and tools
+# of that request; `$set_system_prompt()`, `$set_tools()` and friends can
+# enlarge them afterwards. `snapshots` records the frame before each
+# estimated request (with the turn count then), so the frame the anchor's
+# request carried is the latest snapshot taken before that turn. Turns
+# installed wholesale have a baseline at turn 0 (the frame when they were
+# installed); without any record, the anchor is trusted as it is. Shrinkage
+# is not subtracted: over-estimating only compacts early.
+frame_growth <- function(frame, snapshots, index) {
+  before <- Filter(function(snapshot) snapshot$turns < index, snapshots)
+  if (!length(before)) {
+    return(0)
+  }
+  max(0, frame - before[[length(before)]]$frame)
 }

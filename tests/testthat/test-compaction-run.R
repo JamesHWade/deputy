@@ -11,12 +11,15 @@ test_that("summary recovery is isolated, accounted, and preserves task fallback"
   chat$set_system_prompt("Host policy remains authoritative.")
   callback_calls <- 0L
   chat$on_request_start(function(turns) callback_calls <<- callback_calls + 1L)
+  # The task fallback Chat cannot count tokens. Estimating locally would
+  # check its tiny threshold again before the fallback request.
   agent <- Agent$new(
     chat,
     fallback_chats = list(runtime_chat(task)),
     context_policy = ContextPolicy(
       max_tokens = 50,
-      summary_fallback_chats = list(runtime_chat(summary))
+      summary_fallback_chats = list(runtime_chat(summary)),
+      estimator = "provider"
     )
   )
   hooks <- compaction_hook_log(agent)
