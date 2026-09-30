@@ -10,7 +10,7 @@ in
 ## Usage
 
 ``` r
-tools_preset(name)
+tools_preset(name, env = NULL)
 ```
 
 ## Arguments
@@ -34,6 +34,13 @@ tools_preset(name)
 
   - `"full"`: everything in
     [`tools_all()`](https://jameshwade.github.io/deputy/reference/tools_all.md).
+
+- env:
+
+  The names of other environment variables the code may read, such as
+  `c("HTTPS_PROXY", "NO_PROXY")` behind a proxy. Proxy settings match in
+  either case, so `"HTTPS_PROXY"` passes `https_proxy` too. `"inherit"`
+  passes your whole environment, including every key it holds.
 
 ## Value
 

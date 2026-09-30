@@ -21,6 +21,28 @@
   doesn’t match now lists the sources available (and a stale revision
   names the current one) instead of “Requested evidence is unavailable.”
 
+- `RSession`, `tool_run_r_code` and `tool_run_bash` no longer pass the
+  host’s environment variables to the process that runs model-written
+  code, and R there no longer reads `~/.Renviron` or a project
+  `.Renviron`. The process gets the variables that locate programs,
+  libraries, locales and temporary files. Name others, such as proxy
+  settings, with the new `env` argument to `RSession$new()`,
+  [`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md),
+  [`tools_preset()`](https://jameshwade.github.io/deputy/reference/tools_preset.md)
+  and
+  [`tools_all()`](https://jameshwade.github.io/deputy/reference/tools_all.md),
+  or the command-line app’s `--code-env`; `env = "inherit"` passes
+  everything, as before. This keeps credentials out of what the code is
+  given, not out of its reach: code running as the same user can still
+  read the starting environment of the R process through the operating
+  system, and any file that user can read
+  ([\#224](https://github.com/JamesHWade/deputy/issues/224)).
+
+- `RSession$new()` gains `libpath`, the library directories the R
+  process loads packages from, in order, so a host can give its worker a
+  library of its own ahead of the site library while keeping it off its
+  own search path.
+
 - New `Agent$set_chat()` replaces the Chat an agent sends requests to,
   so a host can continue a conversation with a model from another
   provider. The conversation, system prompt and tools move to the new

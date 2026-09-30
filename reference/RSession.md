@@ -12,6 +12,16 @@ allow it with `r_code = TRUE` in
 `$run()` runs code directly, without permission checks. See
 [`vignette("code-execution")`](https://jameshwade.github.io/deputy/articles/code-execution.md).
 
+The process doesn't inherit your environment variables, and R there
+doesn't read `.Renviron`. It gets the variables that locate programs,
+libraries, locales and temporary files, such as `PATH`, `HOME`, `LANG`
+and `TMPDIR`, plus the ones you name in `env`. This keeps keys out of
+what the code is given, not out of its reach: code running as your user
+account can still read your R session's starting environment through the
+operating system, and any file your account can read, `.Renviron`
+included. To keep keys from the code, run it under an account that can't
+read them, or in a sandbox.
+
 ## Working directory and resets
 
 Each call starts in the agent's working directory;
@@ -80,7 +90,9 @@ Create a session. The R process starts on the first call.
       max_output_bytes = 8 * 1024 * 1024,
       plot_width = 1000L,
       plot_height = 650L,
-      tools = character()
+      tools = character(),
+      env = NULL,
+      libpath = NULL
     )
 
 #### Arguments
@@ -115,6 +127,19 @@ Create a session. The R process starts on the first call.
 
   Names of tools registered on `agent` that R code may call as
   `tools$<name>(...)`. None by default.
+
+- `env`:
+
+  The names of other environment variables the R code may read, such as
+  `c("HTTPS_PROXY", "NO_PROXY")` behind a proxy. `"inherit"` passes your
+  whole environment, including every key it holds.
+
+- `libpath`:
+
+  The library directories the R process loads packages from, searched in
+  order. `NULL` uses your session's
+  [`.libPaths()`](https://rdrr.io/r/base/libPaths.html) each time a
+  process starts.
 
 ------------------------------------------------------------------------
 

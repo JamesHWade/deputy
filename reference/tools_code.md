@@ -9,11 +9,30 @@ denies both tools; allow them with `r_code = TRUE` and `bash = TRUE` in
 For an OS sandbox, use
 [`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md).
 
+The processes don't inherit your environment variables, and R there
+doesn't read `.Renviron`. They get the variables that locate programs,
+libraries, locales and temporary files, such as `PATH`, `HOME`, `LANG`
+and `TMPDIR`, plus the ones you name in `env`. This keeps keys out of
+what the code is given, not out of its reach: code running as your user
+account can still read your R session's starting environment through the
+operating system, and any file your account can read, `.Renviron`
+included. To keep keys from the code, run it under an account that can't
+read them, or in a sandbox.
+
 ## Usage
 
 ``` r
-tools_code()
+tools_code(env = NULL)
 ```
+
+## Arguments
+
+- env:
+
+  The names of other environment variables the code may read, such as
+  `c("HTTPS_PROXY", "NO_PROXY")` behind a proxy. Proxy settings match in
+  either case, so `"HTTPS_PROXY"` passes `https_proxy` too. `"inherit"`
+  passes your whole environment, including every key it holds.
 
 ## Value
 

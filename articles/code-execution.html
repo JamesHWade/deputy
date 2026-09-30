@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9002</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -144,6 +144,25 @@ code can still read, write and send anything your account can. Use them
 when you trust the model, the prompt and every input the agent reads,
 for example your own analysis on your own data. Otherwise use a
 sandbox.</p>
+<p>The trusted-code tools don’t pass on your environment variables, and
+R there doesn’t read <code>.Renviron</code>. The code sees the variables
+that locate programs, libraries, locales and temporary files, such as
+<code>PATH</code>, <code>HOME</code>, <code>LANG</code> and
+<code>TMPDIR</code>, but API keys in your environment aren’t handed to
+it. Name any others it needs with <code>env</code>, for example
+<code>RSession$new(agent, env = c("HTTPS_PROXY", "NO_PROXY"))</code>,
+<code>tools_code(env = "HTTPS_PROXY")</code> or
+<code>tools_preset("dev", env = ...)</code>. Proxy settings match in
+either case. <code>env = "inherit"</code> passes everything, keys
+included.</p>
+<p>This keeps keys out of what the code is given, not out of its reach.
+Code running as your account can still read your R session’s starting
+environment through the operating system, and any file your account can
+read, <code>.Renviron</code> included. The site
+<code>Renviron.site</code> still applies, and so does a project
+<code>.Rprofile</code> for <code>tool_run_r_code</code>. To keep keys
+from the code, run the agent under an account that can’t read them, or
+use a sandbox.</p>
 <div class="section level2">
 <h2 id="one-off-r-code">One-off R code<a class="anchor" aria-label="anchor" href="#one-off-r-code"></a>
 </h2>
@@ -191,6 +210,12 @@ ends, for example from <code>session$onSessionEnded()</code> in
 Shiny.</p>
 <p>A saved conversation keeps the code, output and plots, but not the
 worker’s variables. After a restart the model has to recreate them.</p>
+<p>The worker loads packages from your session’s
+<code><a href="https://rdrr.io/r/base/libPaths.html" class="external-link">.libPaths()</a></code>. To give it a library of its own, for example
+one the model installs packages into, name the directories in order with
+<code>libpath</code>:
+<code>RSession$new(agent, libpath = c(my_lib, .libPaths()))</code>. Your
+own session’s search path doesn’t change.</p>
 <p>Static plots from base graphics, ggplot2, grid and patchwork are
 captured. htmlwidgets and other interactive output are reported as
 unsupported.</p>

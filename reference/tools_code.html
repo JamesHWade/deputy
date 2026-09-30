@@ -3,11 +3,29 @@
 user account's access. Each call runs in a separate process, which is not a
 sandbox. permissions_standard() denies both tools; allow them with
 r_code = TRUE and bash = TRUE in Permissions(). For an OS sandbox, use
-tools_mcp_repl()."><meta property="og:description" content="Returns run_r_code and run_bash. Both run model-written code with your
+tools_mcp_repl().
+The processes don't inherit your environment variables, and R there
+doesn't read .Renviron. They get the variables that locate programs,
+libraries, locales and temporary files, such as PATH, HOME, LANG and
+TMPDIR, plus the ones you name in env.
+This keeps keys out of what the code is given, not out of its reach: code
+running as your user account can still read your R session's starting
+environment through the operating system, and any file your account can
+read, .Renviron included. To keep keys from the code, run it under an
+account that can't read them, or in a sandbox."><meta property="og:description" content="Returns run_r_code and run_bash. Both run model-written code with your
 user account's access. Each call runs in a separate process, which is not a
 sandbox. permissions_standard() denies both tools; allow them with
 r_code = TRUE and bash = TRUE in Permissions(). For an OS sandbox, use
-tools_mcp_repl()."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
+tools_mcp_repl().
+The processes don't inherit your environment variables, and R there
+doesn't read .Renviron. They get the variables that locate programs,
+libraries, locales and temporary files, such as PATH, HOME, LANG and
+TMPDIR, plus the ones you name in env.
+This keeps keys out of what the code is given, not out of its reach: code
+running as your user account can still read your R session's starting
+environment through the operating system, and any file your account can
+read, .Renviron included. To keep keys from the code, run it under an
+account that can't read them, or in a sandbox."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -15,7 +33,7 @@ tools_mcp_repl()."><meta property="og:image" content="https://jameshwade.github.
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9002</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -78,13 +96,34 @@ user account's access. Each call runs in a separate process, which is not a
 sandbox. <code><a href="permissions_standard.html">permissions_standard()</a></code> denies both tools; allow them with
 <code>r_code = TRUE</code> and <code>bash = TRUE</code> in <code><a href="Permissions.html">Permissions()</a></code>. For an OS sandbox, use
 <code><a href="tools_mcp_repl.html">tools_mcp_repl()</a></code>.</p>
+<p>The processes don't inherit your environment variables, and R there
+doesn't read <code>.Renviron</code>. They get the variables that locate programs,
+libraries, locales and temporary files, such as <code>PATH</code>, <code>HOME</code>, <code>LANG</code> and
+<code>TMPDIR</code>, plus the ones you name in <code>env</code>.
+This keeps keys out of what the code is given, not out of its reach: code
+running as your user account can still read your R session's starting
+environment through the operating system, and any file your account can
+read, <code>.Renviron</code> included. To keep keys from the code, run it under an
+account that can't read them, or in a sandbox.</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tools_code</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tools_code</span><span class="op">(</span>env <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
+    <div class="section level2">
+    <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
+
+
+<dl><dt id="arg-env">env<a class="anchor" aria-label="anchor" href="#arg-env"></a></dt>
+<dd><p>The names of other environment variables the code may read,
+such as <code>c("HTTPS_PROXY", "NO_PROXY")</code> behind a proxy. Proxy settings
+match in either case, so <code>"HTTPS_PROXY"</code> passes <code>https_proxy</code> too.
+<code>"inherit"</code> passes your whole environment, including every key it
+holds.</p></dd>
+
+</dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A list of tools.</p>

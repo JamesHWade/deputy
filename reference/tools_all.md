@@ -11,8 +11,17 @@ allows everything.
 ## Usage
 
 ``` r
-tools_all()
+tools_all(env = NULL)
 ```
+
+## Arguments
+
+- env:
+
+  The names of other environment variables the code may read, such as
+  `c("HTTPS_PROXY", "NO_PROXY")` behind a proxy. Proxy settings match in
+  either case, so `"HTTPS_PROXY"` passes `https_proxy` too. `"inherit"`
+  passes your whole environment, including every key it holds.
 
 ## Value
 

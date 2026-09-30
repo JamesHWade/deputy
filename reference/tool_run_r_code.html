@@ -6,14 +6,32 @@ seconds.
 The code runs with your user account's access to files and the network. The
 separate process protects your R session from crashes; it is not a sandbox.
 The default permissions deny this tool; allow it with r_code = TRUE in
-Permissions(). For an OS sandbox, use tools_mcp_repl()."><meta property="og:description" content="A tool that runs model-written R code and returns its printed output and
+Permissions(). For an OS sandbox, use tools_mcp_repl().
+The process doesn't inherit your environment variables, and R there doesn't
+read .Renviron; a project .Rprofile still runs. It gets the variables
+that locate programs, libraries, locales and temporary files. To pass
+others, use tools_code() with env.
+This keeps keys out of what the code is given, not out of its reach: code
+running as your user account can still read your R session's starting
+environment through the operating system, and any file your account can
+read, .Renviron included. To keep keys from the code, run it under an
+account that can't read them, or in a sandbox."><meta property="og:description" content="A tool that runs model-written R code and returns its printed output and
 value. Each call starts a fresh R process, so nothing carries over between
 calls; for a persistent session, use RSession. Calls time out after 30
 seconds.
 The code runs with your user account's access to files and the network. The
 separate process protects your R session from crashes; it is not a sandbox.
 The default permissions deny this tool; allow it with r_code = TRUE in
-Permissions(). For an OS sandbox, use tools_mcp_repl()."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
+Permissions(). For an OS sandbox, use tools_mcp_repl().
+The process doesn't inherit your environment variables, and R there doesn't
+read .Renviron; a project .Rprofile still runs. It gets the variables
+that locate programs, libraries, locales and temporary files. To pass
+others, use tools_code() with env.
+This keeps keys out of what the code is given, not out of its reach: code
+running as your user account can still read your R session's starting
+environment through the operating system, and any file your account can
+read, .Renviron included. To keep keys from the code, run it under an
+account that can't read them, or in a sandbox."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -21,7 +39,7 @@ Permissions(). For an OS sandbox, use tools_mcp_repl()."><meta property="og:imag
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9002</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -87,6 +105,15 @@ seconds.</p>
 separate process protects your R session from crashes; it is not a sandbox.
 The default permissions deny this tool; allow it with <code>r_code = TRUE</code> in
 <code><a href="Permissions.html">Permissions()</a></code>. For an OS sandbox, use <code><a href="tools_mcp_repl.html">tools_mcp_repl()</a></code>.</p>
+<p>The process doesn't inherit your environment variables, and R there doesn't
+read <code>.Renviron</code>; a project <code>.Rprofile</code> still runs. It gets the variables
+that locate programs, libraries, locales and temporary files. To pass
+others, use <code><a href="tools_code.html">tools_code()</a></code> with <code>env</code>.
+This keeps keys out of what the code is given, not out of its reach: code
+running as your user account can still read your R session's starting
+environment through the operating system, and any file your account can
+read, <code>.Renviron</code> included. To keep keys from the code, run it under an
+account that can't read them, or in a sandbox.</p>
     </div>
 
     <div class="section level2">

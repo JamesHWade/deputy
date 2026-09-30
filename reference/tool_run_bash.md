@@ -6,6 +6,16 @@ Commands time out after 30 seconds. The default permissions deny this
 tool; allow it with `bash = TRUE` in
 [`Permissions()`](https://jameshwade.github.io/deputy/reference/Permissions.md).
 
+The command doesn't inherit your environment variables. It gets the
+variables that locate programs, libraries, locales and temporary files.
+To pass others, use
+[`tools_code()`](https://jameshwade.github.io/deputy/reference/tools_code.md)
+with `env`. This keeps keys out of what the code is given, not out of
+its reach: code running as your user account can still read your R
+session's starting environment through the operating system, and any
+file your account can read, `.Renviron` included. To keep keys from the
+code, run it under an account that can't read them, or in a sandbox.
+
 ## Usage
 
 ``` r

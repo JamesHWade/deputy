@@ -18,6 +18,24 @@ still read, write and send anything your account can. Use them when you
 trust the model, the prompt and every input the agent reads, for example
 your own analysis on your own data. Otherwise use a sandbox.
 
+The trusted-code tools don’t pass on your environment variables, and R
+there doesn’t read `.Renviron`. The code sees the variables that locate
+programs, libraries, locales and temporary files, such as `PATH`,
+`HOME`, `LANG` and `TMPDIR`, but API keys in your environment aren’t
+handed to it. Name any others it needs with `env`, for example
+`RSession$new(agent, env = c("HTTPS_PROXY", "NO_PROXY"))`,
+`tools_code(env = "HTTPS_PROXY")` or `tools_preset("dev", env = ...)`.
+Proxy settings match in either case. `env = "inherit"` passes
+everything, keys included.
+
+This keeps keys out of what the code is given, not out of its reach.
+Code running as your account can still read your R session’s starting
+environment through the operating system, and any file your account can
+read, `.Renviron` included. The site `Renviron.site` still applies, and
+so does a project `.Rprofile` for `tool_run_r_code`. To keep keys from
+the code, run the agent under an account that can’t read them, or use a
+sandbox.
+
 ## One-off R code
 
 `tool_run_r_code` runs each snippet in a fresh R process started with
@@ -71,6 +89,13 @@ Call `$close()` when the conversation ends, for example from
 
 A saved conversation keeps the code, output and plots, but not the
 worker’s variables. After a restart the model has to recreate them.
+
+The worker loads packages from your session’s
+[`.libPaths()`](https://rdrr.io/r/base/libPaths.html). To give it a
+library of its own, for example one the model installs packages into,
+name the directories in order with `libpath`:
+`RSession$new(agent, libpath = c(my_lib, .libPaths()))`. Your own
+session’s search path doesn’t change.
 
 Static plots from base graphics, ggplot2, grid and patchwork are
 captured. htmlwidgets and other interactive output are reported as
