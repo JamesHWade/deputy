@@ -180,6 +180,13 @@ ellmer_token_count_observe <- function(chat, error) {
 # can overflow the model's context.
 context_estimate_bytes_per_token <- 3
 context_estimate_image_tokens <- 1600
+# A large image costs more: about one token per 750 pixels on providers that
+# price by size, before any downscaling they apply.
+context_estimate_image_pixels_per_token <- 750
+# Each message and each tool call or result also carries role and framing
+# tokens that its content does not show.
+context_estimate_turn_tokens <- 8
+context_estimate_tool_call_tokens <- 10
 # A document page: providers send its extracted text and, for PDFs, often an
 # image of the page as well.
 context_estimate_page_tokens <- 3000
@@ -204,10 +211,12 @@ estimate_content_tokens <- function(content) {
     return(estimate_text_tokens(content))
   }
   if (inherits(content, "ellmer::Turn")) {
-    return(estimate_content_tokens(content@contents))
+    return(
+      context_estimate_turn_tokens + estimate_content_tokens(content@contents)
+    )
   }
   if (inherits(content, "ellmer::ContentImage")) {
-    return(context_estimate_image_tokens)
+    return(estimate_image_tokens(content))
   }
   if (inherits(content, "ellmer::ContentPDF")) {
     return(estimate_document_tokens(content@data, "application/pdf"))
@@ -216,26 +225,19 @@ estimate_content_tokens <- function(content) {
     return(estimate_document_tokens(content@data, content@mime_type))
   }
   if (inherits(content, "ellmer::ContentToolRequest")) {
-    return(estimate_text_tokens(c(
-      content@id,
-      content@name,
-      public_json_text(content@arguments)
-    )))
+    return(
+      context_estimate_tool_call_tokens +
+        estimate_text_tokens(c(
+          content@id,
+          content@name,
+          public_json_text(content@arguments)
+        ))
+    )
   }
   if (inherits(content, "ellmer::ContentToolResult")) {
-    if (!is.null(content@error)) {
-      error <- content@error
-      return(estimate_text_tokens(
-        if (inherits(error, "condition")) conditionMessage(error) else error
-      ))
-    }
-    value <- content@value
-    if (inherits(value, "ellmer::Content") || is_native_content_list(value)) {
-      return(estimate_content_tokens(value))
-    }
-    return(estimate_text_tokens(public_tool_value_text(
-      project_tool_content(value)
-    )))
+    return(
+      context_estimate_tool_call_tokens + estimate_tool_result_tokens(content)
+    )
   }
   if (inherits(content, "ellmer::Content")) {
     return(estimate_text_tokens(public_content_text(content)))
@@ -247,6 +249,68 @@ estimate_content_tokens <- function(content) {
     public_json_text(content),
     error = function(error) paste(format(content), collapse = "\n")
   ))
+}
+
+estimate_tool_result_tokens <- function(content) {
+  if (!is.null(content@error)) {
+    error <- content@error
+    return(estimate_text_tokens(
+      if (inherits(error, "condition")) conditionMessage(error) else error
+    ))
+  }
+  value <- content@value
+  if (inherits(value, "ellmer::Content") || is_native_content_list(value)) {
+    return(estimate_content_tokens(value))
+  }
+  estimate_text_tokens(public_tool_value_text(project_tool_content(value)))
+}
+
+# An inline PNG or JPEG counts by its size when its header gives one; any
+# other image, or one given by URL, counts the fixed allowance.
+estimate_image_tokens <- function(content) {
+  size <- if (inherits(content, "ellmer::ContentImageInline")) {
+    tryCatch(
+      image_dimensions(jsonlite::base64_dec(paste(
+        content@data,
+        collapse = ""
+      ))),
+      error = function(error) NULL
+    )
+  }
+  if (is.null(size)) {
+    return(context_estimate_image_tokens)
+  }
+  max(
+    context_estimate_image_tokens,
+    ceiling(prod(size) / context_estimate_image_pixels_per_token)
+  )
+}
+
+# Width and height from a PNG or JPEG header, or NULL.
+image_dimensions <- function(bytes) {
+  read_be <- function(at, n) {
+    sum(as.integer(bytes[at + seq_len(n) - 1L]) * 256^((n - 1L):0))
+  }
+  png <- as.raw(c(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))
+  if (length(bytes) >= 24L && identical(bytes[1:8], png)) {
+    return(c(read_be(17L, 4L), read_be(21L, 4L)))
+  }
+  if (length(bytes) < 4L || !identical(bytes[1:2], as.raw(c(0xff, 0xd8)))) {
+    return(NULL)
+  }
+  # JPEG: walk the segments to a start-of-frame marker.
+  at <- 3L
+  while (at + 8L <= length(bytes)) {
+    if (bytes[at] != as.raw(0xff)) {
+      return(NULL)
+    }
+    marker <- as.integer(bytes[at + 1L])
+    if (marker %in% c(0xc0:0xc3, 0xc5:0xc7, 0xc9:0xcb, 0xcd:0xcf)) {
+      return(c(read_be(at + 7L, 2L), read_be(at + 5L, 2L)))
+    }
+    at <- at + 2L + read_be(at + 2L, 2L)
+  }
+  NULL
 }
 
 # An inline document is sent whole, so it costs far more than its short
@@ -299,11 +363,15 @@ estimate_tool_tokens <- function(tools) {
   sum(vapply(
     tools,
     function(tool) {
-      estimate_text_tokens(c(
-        tool@name,
-        tool@description,
+      # A provider-native tool has no argument schema; its JSON is what the
+      # provider receives.
+      schema <- if (inherits(tool, "ellmer::ToolBuiltIn")) {
+        schema_text(tool@json)
+      } else {
         schema_text(tool@arguments)
-      ))
+      }
+      context_estimate_tool_call_tokens +
+        estimate_text_tokens(c(tool@name, tool@description, schema))
     },
     numeric(1)
   ))

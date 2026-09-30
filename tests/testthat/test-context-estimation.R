@@ -291,7 +291,7 @@ test_that("local estimates count tool arguments, results and images", {
   native <- ellmer::ContentToolResult(list(image, image), request = request)
   expect_identical(
     estimate_content_tokens(native),
-    2 * context_estimate_image_tokens
+    2 * context_estimate_image_tokens + context_estimate_tool_call_tokens
   )
   expect_identical(estimate_content_tokens(list("abc", "def")), 2)
 })
@@ -458,4 +458,59 @@ test_that("usage reported before microcompaction is not reused afterwards", {
   restored <- Agent$new(chat = create_mock_chat(list("done")))
   suppressMessages(restored$load_session(path))
   expect_lt(estimate_context(restored, list("Q2"))$tokens, 10000)
+})
+
+test_that("provider-native tools are estimated from their JSON", {
+  tool <- ellmer::openai_tool_web_search()
+  expect_gt(estimate_tool_tokens(list(tool)), 0)
+})
+
+test_that("large inline images count by their size", {
+  png_path <- withr::local_tempfile(fileext = ".png")
+  grDevices::png(png_path, width = 2000, height = 1500)
+  graphics::plot(1)
+  grDevices::dev.off()
+  jpeg_path <- withr::local_tempfile(fileext = ".jpg")
+  grDevices::jpeg(jpeg_path, width = 3000, height = 2000)
+  graphics::plot(1)
+  grDevices::dev.off()
+
+  expect_identical(
+    estimate_image_tokens(ellmer::content_image_file(
+      png_path,
+      resize = "none"
+    )),
+    4000
+  )
+  expect_identical(
+    estimate_image_tokens(ellmer::content_image_file(
+      jpeg_path,
+      resize = "none"
+    )),
+    8000
+  )
+  expect_identical(
+    estimate_image_tokens(ellmer::content_image_url(
+      "https://example.org/a.png"
+    )),
+    context_estimate_image_tokens
+  )
+})
+
+test_that("each turn and tool call carries a framing allowance", {
+  request <- ellmer::ContentToolRequest(
+    id = "a",
+    name = "t",
+    arguments = list()
+  )
+  result <- ellmer::ContentToolResult(value = "", request = request)
+  expect_gte(
+    estimate_content_tokens(ellmer::UserTurn(list())),
+    context_estimate_turn_tokens
+  )
+  expect_gte(
+    estimate_content_tokens(request),
+    context_estimate_tool_call_tokens
+  )
+  expect_gte(estimate_content_tokens(result), context_estimate_tool_call_tokens)
 })
