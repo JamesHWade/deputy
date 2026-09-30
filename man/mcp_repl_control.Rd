@@ -2,7 +2,7 @@
 % Please edit documentation in R/mcp-repl.R
 \name{mcp_repl_control}
 \alias{mcp_repl_control}
-\title{Request an upstream REPL interrupt or reset}
+\title{Interrupt or reset an mcp-repl session}
 \usage{
 mcp_repl_control(connection, action = c("interrupt", "reset"))
 }
@@ -12,12 +12,13 @@ mcp_repl_control(connection, action = c("interrupt", "reset"))
 \item{action}{\code{"interrupt"} or \code{"reset"}.}
 }
 \value{
-A promise for the upstream ellmer-compatible result. This is a direct
-host operation, not an Agent run. Busy client connections reject overlap.
+A promise for mcp-repl's reply. The call goes straight to the
+server, not through the agent, and errors if the connection is already
+handling a request.
 }
 \description{
-Sends mcp-repl's documented Ctrl-C or Ctrl-D input through the same connection.
-Interrupt is best effort; reset requests a fresh interpreter and discards its
-state. The returned upstream result describes what happened. Neither action
-is treated as proof of success merely because a request was sent.
+Sends Ctrl-C (\code{"interrupt"}) or Ctrl-D (\code{"reset"}) to the R session behind a
+\code{\link[=mcp_repl_connection]{mcp_repl_connection()}}. An interrupt may not stop the code. A reset starts
+a fresh interpreter and discards its variables. Check the returned result to
+see what happened.
 }

@@ -2,16 +2,16 @@
 % Please edit documentation in R/agent-result.R
 \name{result_n_turns}
 \alias{result_n_turns}
-\title{Count conversation turns}
+\title{Count the turns in a result}
 \usage{
 result_n_turns(result)
 }
 \arguments{
-\item{result}{An \link{AgentResult} S7 value.}
+\item{result}{An \link{AgentResult}.}
 }
 \value{
-Integer count of turns.
+The number of turns in \code{result$turns}.
 }
 \description{
-Count conversation turns
+Count the turns in a result
 }

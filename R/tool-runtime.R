@@ -13,6 +13,12 @@ native_file_tool_names <- c(
 )
 
 deputy_tool_result_reader_marker <- new.env(parent = emptyenv())
+# Marks a LeadAgent's own delegate_to_agent tool. Read-only and plan modes
+# admit only the tool carrying it, never another tool with the same name.
+deputy_delegation_tool_marker <- new.env(parent = emptyenv())
+# Marks delegation_tool() and graph route tools, which call retained agents.
+# Read-only and plan modes admit them by this marker; hosts choose the names.
+deputy_composition_tool_marker <- new.env(parent = emptyenv())
 
 clear_chat_tool_callbacks <- function(chat, source = NULL) {
   private <- tryCatch(chat$.__enclos_env__$private, error = function(e) NULL)

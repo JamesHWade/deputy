@@ -4,42 +4,43 @@
 # handling. All errors inherit from DeputyError and include structured
 # context for debugging. Errors use cli formatting for nice output.
 
-#' Deputy Error Classes
+#' Deputy error classes
 #'
 #' @description
-#' Structured error types for programmatic error handling in deputy.
-#' All deputy errors inherit from `deputy_error` and include contextual
-#' information for debugging. Errors use cli formatting for readable output.
+#' Errors signalled by deputy have class `deputy_error` plus more specific
+#' classes, so you can catch them by class with `tryCatch()`. Many carry extra
+#' fields, such as `tool_name` or `limit`. Errors from ellmer or the provider,
+#' such as HTTP errors, are passed through unchanged.
 #'
-#' @section Error Hierarchy:
+#' @section Error classes:
 #'
-#' - **deputy_error** - Base class for all deputy errors
-#'   - **deputy_permission** - Permission-related failures
-#'     - `deputy_permission_denied` - Tool/action not allowed by permissions
-#'   - **deputy_tool** - Tool execution failures
-#'     - `deputy_tool_execution` - Tool failed during execution
-#'   - **deputy_budget** - Resource limit violations
-#'     - `deputy_budget_exceeded` - Cost limit exceeded
-#'     - `deputy_cost_unavailable` - Cost limit could not be measured
-#'     - `deputy_request_limit` - Maximum model requests exceeded
-#'   - **deputy_provider** - LLM provider failures
-#'   - **deputy_session** - Session management failures
-#'     - `deputy_session_load` - Failed to load session
-#'     - `deputy_session_save` - Failed to save session
-#'   - **deputy_hook** - Hook execution failures
-#'   - **deputy_human_input_unavailable** - No interactive or bound handler
-#'     is available for an `ask_user` request
+#' - `deputy_error`: every deputy error.
+#'   - `deputy_permission_denied` (also `deputy_permission`): an action
+#'     wasn't allowed.
+#'   - `deputy_tool_execution` (also `deputy_tool`): a tool failed.
+#'   - `deputy_budget`: a usage limit was reached. Only signalled when
+#'     [UsageLimits()] has `on_exceed = "error"`.
+#'     - `deputy_request_limit`: `max_requests` was reached.
+#'     - `deputy_cost_unavailable`: `max_cost_usd` is set but a response's cost
+#'       is unknown.
+#'     - `deputy_budget_exceeded`: a tool-call, token or cost limit was
+#'       reached. The error's `budget_type`, `actual` and `limit` fields say
+#'       which.
+#'   - `deputy_session_load`, `deputy_session_save` (also `deputy_session`):
+#'     loading or saving a session file failed.
+#'   - `deputy_human_input_unavailable`: an `ask_user` request couldn't reach
+#'     a person, for example in a non-interactive session with no handler.
+#'
+#' Other deputy errors, such as `deputy_run_active` (the agent is already
+#' running), also inherit from `deputy_error`.
 #'
 #' @section Usage:
-#'
-#' Errors can be caught using `tryCatch()` with class-based matching:
 #'
 #' ```r
 #' tryCatch(
 #'   agent$run_sync("task"),
-#'   deputy_budget_exceeded = function(e) {
-#'     message("Budget exceeded: ", conditionMessage(e))
-#'     message("Current cost: $", e$current_cost)
+#'   deputy_budget = function(e) {
+#'     message("Usage limit reached: ", conditionMessage(e))
 #'   },
 #'   deputy_error = function(e) {
 #'     message("Deputy error: ", conditionMessage(e))
@@ -51,12 +52,11 @@
 #' @aliases DeputyError
 NULL
 
-#' Abort with a structured deputy error
+#' Signal a Deputy error
 #'
 #' @description
-#' Creates and signals a structured deputy error using cli formatting.
-#' All deputy errors include a message, optional context, and inherit
-#' from the `deputy_error` condition class.
+#' Signals an error of class `deputy_error`, plus `deputy_<class>` for each
+#' extra class, with the message formatted by cli.
 #'
 #' @param message The error message (supports cli formatting)
 #' @param class Additional classes to add (will be prefixed with "deputy_")
@@ -70,7 +70,7 @@ NULL
 #' # Signal an error
 #' abort_deputy("Something went wrong", class = "custom")
 #'
-#' # Catch deputy errors
+#' # Catch Deputy errors
 #' tryCatch(
 #'   abort_deputy("test"),
 #'   deputy_error = function(e) message("Caught: ", conditionMessage(e))
@@ -95,10 +95,10 @@ abort_deputy <- function(message, class = NULL, ..., .envir = parent.frame()) {
   )
 }
 
-#' Abort with a permission denied error
+#' Signal a permission denied error
 #'
 #' @description
-#' Signals that an operation was denied by the permission system.
+#' Signals that an action was not allowed.
 #'
 #' @param message The error message (supports cli formatting)
 #' @param tool_name Name of the tool that was denied (optional)
@@ -110,7 +110,7 @@ abort_deputy <- function(message, class = NULL, ..., .envir = parent.frame()) {
 #' @examples
 #' \dontrun{
 #' abort_permission_denied(
-#'   "Write operations not allowed in {.val {mode}} mode",
+#'   "Write operations not allowed in {.val readonly} mode",
 #'   tool_name = "write_file",
 #'   permission_mode = "readonly"
 #' )
@@ -136,10 +136,10 @@ abort_permission_denied <- function(
   )
 }
 
-#' Abort with a tool execution error
+#' Signal a tool execution error
 #'
 #' @description
-#' Signals that a tool failed during execution.
+#' Signals that a tool failed while running.
 #'
 #' @param message The error message (supports cli formatting)
 #' @param tool_name Name of the tool that failed
@@ -177,14 +177,14 @@ abort_tool_execution <- function(
   )
 }
 
-#' Abort with a budget exceeded error
+#' Signal a budget exceeded error
 #'
 #' @description
-#' Signals that the agent exceeded its cost budget.
+#' Signals that a run reached a tool-call, token or cost limit.
 #'
 #' @param message The error message (supports cli formatting)
-#' @param current_cost The current accumulated cost
-#' @param max_cost The maximum allowed cost
+#' @param current_cost The run's cost, for cost limits
+#' @param max_cost The cost limit, for cost limits
 #' @param ... Additional context fields
 #' @param .envir Environment for cli interpolation
 #'
@@ -230,10 +230,10 @@ abort_cost_unavailable <- function(
   )
 }
 
-#' Abort with a request limit error
+#' Signal a request limit error
 #'
 #' @description
-#' Signals that the agent exceeded its maximum model request limit.
+#' Signals that a run reached its model request limit.
 #'
 #' @param message The error message (supports cli formatting)
 #' @param current_requests The number of model requests made
@@ -268,10 +268,10 @@ abort_request_limit <- function(
   )
 }
 
-#' Abort with a provider error
+#' Signal a provider error
 #'
 #' @description
-#' Signals that the LLM provider encountered an error.
+#' Signals that the LLM provider returned an error.
 #'
 #' @param message The error message (supports cli formatting)
 #' @param provider_name Name of the provider (e.g., "openai", "anthropic")
@@ -285,7 +285,7 @@ abort_request_limit <- function(
 #' abort_provider(
 #'   c("API error from {.val {provider_name}}", "x" = "Rate limit exceeded"),
 #'   provider_name = "openai",
-#'   model = "gpt-4o"
+#'   model = "gpt-6-luna"
 #' )
 #' }
 #'
@@ -309,7 +309,7 @@ abort_provider <- function(
   )
 }
 
-#' Abort with a session load error
+#' Signal a session load error
 #'
 #' @description
 #' Signals that loading a session file failed.
@@ -346,7 +346,7 @@ abort_session_load <- function(
   )
 }
 
-#' Abort with a session save error
+#' Signal a session save error
 #'
 #' @description
 #' Signals that saving a session file failed.
@@ -383,10 +383,10 @@ abort_session_save <- function(
   )
 }
 
-#' Abort with a hook error
+#' Signal a hook error
 #'
 #' @description
-#' Signals that a hook callback failed during execution.
+#' Signals that a hook callback failed.
 #'
 #' @param message The error message (supports cli formatting)
 #' @param hook_event The hook event type (e.g., "PreToolUse", "PostToolUse")
@@ -420,25 +420,28 @@ abort_hook <- function(
   )
 }
 
-#' Check if an object is a deputy error
+#' Check whether a condition is a Deputy error
 #'
 #' @description
-#' Tests whether an object is a deputy error condition.
+#' Tests whether `x` is an error signalled by Deputy, optionally of a specific
+#' class. See [deputy-errors] for the classes.
 #'
-#' @param x Object to test
-#' @param class Optional specific error class to check for (without "deputy_" prefix)
+#' @param x Object to test.
+#' @param class Optional error class to check for, without the `"deputy_"`
+#'   prefix, such as `"budget"`.
 #'
-#' @return Logical indicating if `x` is a deputy error (of the specified class)
+#' @return `TRUE` if `x` has class `deputy_error` (and `deputy_<class>` when
+#'   `class` is given), otherwise `FALSE`.
 #'
 #' @examples
 #' \dontrun{
-#' tryCatch(
-#'   abort_deputy("test"),
-#'   error = function(e) {
-#'     is_deputy_error(e)
-#'     # TRUE
-#'   }
+#' result <- tryCatch(
+#'   agent$run_sync("Summarise the logs"),
+#'   error = function(e) e
 #' )
+#' if (is_deputy_error(result, "budget")) {
+#'   message("A usage limit stopped the run.")
+#' }
 #' }
 #'
 #' @export

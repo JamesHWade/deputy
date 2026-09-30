@@ -10,16 +10,18 @@ A tool definition created with \code{ellmer::tool()}.
 tool_multi_edit(path, edits)
 }
 \arguments{
-\item{path}{Path to the file to edit (tool argument)}
+\item{path}{Path to the file to edit.}
 
-\item{edits}{List or JSON string of edit operations (tool argument)}
+\item{edits}{A list of edits, or a JSON array. Each edit has \code{old_text},
+\code{new_text} and, optionally, \code{replace_all}.}
 }
 \value{
-When called directly, a character status message describing the
-edits and total replacement count.
+A status message with the number of edits and replacements.
 }
 \description{
-Apply a sequence of exact-match text replacements to a file.
+A tool that applies several exact-text replacements to one file, in order.
+Each edit follows the rules of \link{tool_edit_file}. If any edit fails, the file
+is left unchanged.
 }
 \examples{
 path <- tempfile(fileext = ".txt")

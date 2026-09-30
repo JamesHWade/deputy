@@ -191,6 +191,7 @@ child_chat_fixture <- function(curated = FALSE) {
       )
       on.exit(server$stop(), add = TRUE)
       saveRDS(port, file.path(directory, "port.rds"))
+      file.create(file.path(directory, "ready"))
       repeat {
         httpuv::service(50)
       }
@@ -198,7 +199,7 @@ child_chat_fixture <- function(curated = FALSE) {
     args = list(directory = directory, curated = curated)
   )
   deadline <- Sys.time() + 15
-  while (!file.exists(file.path(directory, "port.rds"))) {
+  while (!file.exists(file.path(directory, "ready"))) {
     if (!process$is_alive() || Sys.time() > deadline) {
       cli::cli_abort("Local demo transport did not start")
     }

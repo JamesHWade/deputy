@@ -3,54 +3,49 @@
 \name{deputy-errors}
 \alias{deputy-errors}
 \alias{DeputyError}
-\title{Deputy Error Classes}
+\title{Deputy error classes}
 \description{
-Structured error types for programmatic error handling in deputy.
-All deputy errors inherit from \code{deputy_error} and include contextual
-information for debugging. Errors use cli formatting for readable output.
+Errors signalled by deputy have class \code{deputy_error} plus more specific
+classes, so you can catch them by class with \code{tryCatch()}. Many carry extra
+fields, such as \code{tool_name} or \code{limit}. Errors from ellmer or the provider,
+such as HTTP errors, are passed through unchanged.
 }
-\section{Error Hierarchy}{
+\section{Error classes}{
 
 \itemize{
-\item \strong{deputy_error} - Base class for all deputy errors
+\item \code{deputy_error}: every deputy error.
 \itemize{
-\item \strong{deputy_permission} - Permission-related failures
+\item \code{deputy_permission_denied} (also \code{deputy_permission}): an action
+wasn't allowed.
+\item \code{deputy_tool_execution} (also \code{deputy_tool}): a tool failed.
+\item \code{deputy_budget}: a usage limit was reached. Only signalled when
+\code{\link[=UsageLimits]{UsageLimits()}} has \code{on_exceed = "error"}.
 \itemize{
-\item \code{deputy_permission_denied} - Tool/action not allowed by permissions
+\item \code{deputy_request_limit}: \code{max_requests} was reached.
+\item \code{deputy_cost_unavailable}: \code{max_cost_usd} is set but a response's cost
+is unknown.
+\item \code{deputy_budget_exceeded}: a tool-call, token or cost limit was
+reached. The error's \code{budget_type}, \code{actual} and \code{limit} fields say
+which.
 }
-\item \strong{deputy_tool} - Tool execution failures
-\itemize{
-\item \code{deputy_tool_execution} - Tool failed during execution
-}
-\item \strong{deputy_budget} - Resource limit violations
-\itemize{
-\item \code{deputy_budget_exceeded} - Cost limit exceeded
-\item \code{deputy_cost_unavailable} - Cost limit could not be measured
-\item \code{deputy_request_limit} - Maximum model requests exceeded
-}
-\item \strong{deputy_provider} - LLM provider failures
-\item \strong{deputy_session} - Session management failures
-\itemize{
-\item \code{deputy_session_load} - Failed to load session
-\item \code{deputy_session_save} - Failed to save session
-}
-\item \strong{deputy_hook} - Hook execution failures
-\item \strong{deputy_human_input_unavailable} - No interactive or bound handler
-is available for an \code{ask_user} request
+\item \code{deputy_session_load}, \code{deputy_session_save} (also \code{deputy_session}):
+loading or saving a session file failed.
+\item \code{deputy_human_input_unavailable}: an \code{ask_user} request couldn't reach
+a person, for example in a non-interactive session with no handler.
 }
 }
+
+Other deputy errors, such as \code{deputy_run_active} (the agent is already
+running), also inherit from \code{deputy_error}.
 }
 
 \section{Usage}{
 
 
-Errors can be caught using \code{tryCatch()} with class-based matching:
-
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{tryCatch(
   agent$run_sync("task"),
-  deputy_budget_exceeded = function(e) \{
-    message("Budget exceeded: ", conditionMessage(e))
-    message("Current cost: $", e$current_cost)
+  deputy_budget = function(e) \{
+    message("Usage limit reached: ", conditionMessage(e))
   \},
   deputy_error = function(e) \{
     message("Deputy error: ", conditionMessage(e))

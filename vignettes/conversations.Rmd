@@ -1,0 +1,166 @@
+---
+title: "Conversations and context"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Conversations and context}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+An agent keeps its conversation between runs, like an ellmer chat, so a
+follow-up task can build on the last one. Long conversations eventually outgrow
+the model's context window, and big tool results fill it faster. This article
+covers what the agent remembers, how Deputy keeps the context small, and how to
+save a conversation and pick it up later.
+
+## Two views of the conversation
+
+Deputy keeps two lists of turns:
+
+- `agent$get_turns()` is the whole conversation, every message and tool call.
+  This is what you show a user or store.
+- `agent$get_context_turns()` is what the model receives on its next request.
+  After compaction it is shorter: older turns are replaced by a summary.
+
+Until the first compaction the two are the same. Code that measures the
+model's context should use `get_context_turns()`. `set_turns()` replaces the
+conversation with the turns you give it and discards any summary.
+
+## Compaction
+
+Every agent has a `ContextPolicy`. By default, before a request whose estimated
+size exceeds 32,000 tokens, Deputy asks the model to summarise the older turns,
+adds the summary to the system prompt, and keeps only the recent turns in the
+model's context. The check runs at the start of each run and between rounds of
+tool calls, after all pending tool results are in.
+
+```{r}
+library(deputy)
+
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = tools_file(),
+  context_policy = ContextPolicy(max_tokens = 64000)
+)
+```
+
+`ContextPolicy(max_tokens = NULL)` turns automatic compaction off. The summary
+request is an ordinary model request: it counts against the run's limits and
+can be interrupted with the run. Because the summary lives in the system
+prompt, replacing the prompt with `set_system_prompt()` after a compaction
+drops the summary, unless your new prompt includes it.
+
+If the summary request fails, the run stops by default and the context is left
+as it was. `fallback = "text"` instead falls back to a
+truncated copy of the old turns and emits a `Notification` with code
+`"compact_fallback"`. To send summaries to a second provider when the first is
+down, list it in `summary_fallback_chats`:
+
+```{r}
+policy <- ContextPolicy(
+  max_tokens = 64000,
+  summary_fallback_chats = list(ellmer::chat("anthropic/claude-sonnet-5"))
+)
+```
+
+Summary fallbacks never take over the task itself, and they receive only the
+turns to summarise, without tools. [Fallbacks, tracing and
+evaluation](runtime-integration.html) covers fallbacks for the task.
+
+### Watch or control compaction
+
+`agent$last_compaction()` reports the most recent compaction: how the summary
+was made (`"llm"`, `"text"`, `"hook"` or `"custom"`), how many turns were
+replaced, what it cost, and each attempt.
+
+Two hook events surround it. A `PreCompact` hook can cancel the compaction or
+supply its own summary with `HookResultPreCompact()`; a `PostCompact` hook sees
+the result:
+
+```{r}
+agent$add_hook(HookMatcher(
+  event = "PostCompact",
+  callback = function(result, context) {
+    cli::cli_inform("Summarised {result$turns_compacted} turns ({result$method}).")
+    NULL
+  }
+))
+```
+
+To compact on demand, call `agent$compact()`. It runs straight away, outside
+any run. `keep_last` sets how many recent turns to keep, and `summary` lets you
+write the summary yourself.
+
+### Clear old tool results
+
+Tool results are often the bulk of a long conversation, and old ones are rarely
+needed word for word. `agent$microcompact()` replaces every tool result before
+the last few turns (two by default) with a short marker, without a model
+request:
+
+```{r}
+agent$microcompact(keep_last = 6, keep_tools = "read_csv")
+```
+
+`keep_tools` names tools whose results are never cleared. Like compaction, this
+only changes the model's context: `get_turns()` and saved conversations keep
+the original results.
+
+## Large tool results
+
+A single tool result can be bigger than is sensible to send to the model. When
+one exceeds 64 KiB, Deputy saves it to disk and gives the model a preview and a
+`deputy://tool-result/...` reference instead. Deputy also gives the model a
+`deputy_read_tool_result` tool, so it can read the stored result a chunk at a
+time if it needs more.
+
+Your code gets the full value back with `resolve_tool_result()`:
+
+```{r}
+value <- agent$resolve_tool_result("deputy://tool-result/...")
+```
+
+`ContextPolicy()` sets the size limit (`max_tool_result_bytes`), limits on
+images returned by tools, and where results are stored (`offload_dir`). By
+default they go in Deputy's user cache directory.
+
+## Save and restore a conversation
+
+`save_session()` writes the conversation to an RDS file, and `load_session()`
+restores it into an agent:
+
+```{r}
+agent$save_session("review.rds")
+
+later <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = tools_file(),
+  permissions = permissions_readonly()
+)
+later$load_session("review.rds")
+later$run_sync("Pick up where we left off.")
+```
+
+The file holds both views of the conversation, the system prompt and any
+compaction summary, copies of stored tool results, the run context, and file
+checkpoint history if checkpointing is on. It holds no tools, permissions or
+hooks: the receiving agent's own configuration applies, so loading a
+conversation never grants an agent more than it was created with.
+
+A saved conversation is a snapshot, not a database. Where you keep it, who may
+load it, and how you handle branches are up to your application.
+
+## In a Shiny app
+
+shinychat's conversation history works with compaction. It stores and
+restores the whole conversation (`get_turns()`), while the model keeps
+receiving the compacted context. See [Shiny chat](example-shiny-chat.html) for
+an app that tells users when older messages have been summarised.

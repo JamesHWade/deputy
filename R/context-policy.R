@@ -6,84 +6,57 @@ NULL
 #' Configure automatic context management
 #'
 #' @description
-#' Defines when an [Agent] compacts its conversation and when large tool
-#' results are replaced with durable references. The default policy compacts
-#' before a request would exceed 32,000 estimated tokens and offloads tool
-#' results larger than 64 KiB.
+#' Sets when an [Agent] compacts its conversation and when large tool results
+#' are moved out of the model context. By default, the agent compacts before a
+#' request would exceed about 32,000 tokens and saves tool results larger than
+#' 64 KiB to disk, leaving a short preview and a `deputy://tool-result/...`
+#' reference in the context. The model can read the rest with the
+#' `deputy_read_tool_result` tool, and you can with
+#' [Agent]`$resolve_tool_result()`.
 #'
-#' @param max_tokens Estimated complete-context token threshold that triggers
-#'   compaction. Use `NULL` to disable automatic compaction.
-#' @param compact_to Fraction of `max_tokens` that the retained recent context
-#'   should occupy after compaction.
-#' @param fallback What to do when LLM summary generation fails. `"error"` fails
-#'   closed; `"text"` uses a deterministic truncated-text summary. Summary
-#'   generation uses an isolated clone of the active Chat and does not select
-#'   from the Agent's task `fallback_chats`.
-#' @param max_tool_result_bytes Serialized size above which a tool result is
-#'   stored outside the model context. For native content lists, this bounds
-#'   aggregate non-image public properties. Structured explicit results also use
-#'   a conservative bound before JSON expansion. Use `NULL` to disable this bound.
-#'   Compaction applies this limit to the public evidence in explicit
-#'   `ellmer::ContentToolResult` payloads too, retaining a preview and recoverable
-#'   reference. Large tool-request arguments use the same bound and retain a
-#'   recoverable argument record. Content objects and error conditions use their public text.
-#'   A conservative rendered-size bound also covers compact sequences and shared
-#'   strings before JSON expansion. Generated summaries retain up to eight direct
-#'   recovery references; larger sets use one durable, chunk-readable catalog.
-#'   Catalogs preserve earlier entries across compactions and session restores,
-#'   including existing references when new result offloading is disabled.
-#'   Superseded internal catalogs are reclaimed after replacement, except those
-#'   referenced by retained turns or the installed prompt of a live Agent sharing
-#'   that session directory in the current R process, including independent Agents
-#'   and clones.
-#'   Earlier saved sessions keep their own catalog snapshots. Original result
-#'   artifacts are retained. New evidence artifacts from aborted compactions
-#'   are removed unless another compaction or tool caller has claimed them.
-#' @param max_tool_result_image_bytes Maximum aggregate serialized public image
-#'   payload bytes retained per native tool result (2 MiB by default). Inline
-#'   image bytes are encoded; remote images count their URL metadata, not remote
-#'   downloads. `NULL` disables this byte bound. Excess content remains in a
-#'   recoverable result artifact and the original display metadata is preserved.
-#' @param max_tool_result_images Maximum images retained per native tool result
-#'   (four by default). Use zero to offload all images, or `NULL` for no count
-#'   bound. Image limits are independent of the non-image `max_tool_result_bytes`
-#'   limit. Model token limits and automatic compaction continue to apply.
-#'   Display metadata is host-facing evidence and is not sent to the model.
-#' @param offload_dir Directory for durable result envelopes. Relative paths
-#'   are anchored to the current working directory when the policy is created.
-#'   `NULL` uses the Deputy user cache, partitioned by Agent session.
-#' @param summary_fallback_chats Ordered, explicitly configured ellmer Chats
-#'   authorized to receive summary prompts during automatic compaction. Each
-#'   template must have no turns or tools. Transient transport failures may
-#'   advance to the next template after ellmer's retries. These destinations
-#'   are separate from the Agent's task `fallback_chats`; choosing a summary
-#'   destination does not change the task Chat. Manual `$compact()` uses only
-#'   its active Chat and `fallback` policy. Templates are cloned at construction.
+#' @param max_tokens Estimated context size, in tokens, that triggers
+#'   compaction. `NULL` turns automatic compaction off.
+#' @param compact_to After compaction, the recent turns that are kept take up
+#'   about this fraction of `max_tokens`. Must be between 0 and 1.
+#' @param fallback What to do if the model can't write the summary. `"error"`
+#'   (the default) stops with an error and leaves the conversation unchanged.
+#'   `"text"` uses a plain summary built from the start of each turn instead.
+#' @param max_tool_result_bytes Size, in bytes, above which a tool result is
+#'   saved to disk and replaced in the model context by a preview and a
+#'   reference. Compaction applies the same limit to tool results and tool
+#'   call arguments in the turns it summarises. `NULL` turns this off.
+#' @param max_tool_result_image_bytes Maximum total size of the images kept in
+#'   one tool result's model context, 2 MiB by default. Inline images count
+#'   their encoded size; images given by URL count only the URL. Images over
+#'   the limit stay in the saved result. `NULL` removes the limit.
+#' @param max_tool_result_images Maximum number of images kept in one tool
+#'   result's model context, 4 by default. `0` moves all images out; `NULL`
+#'   removes the limit. Image limits are separate from
+#'   `max_tool_result_bytes`.
+#' @param offload_dir Directory for saved tool results; each session gets its
+#'   own subdirectory. A relative path is resolved against the R working
+#'   directory when the policy is created. `NULL` uses Deputy's user cache
+#'   directory.
+#' @param summary_fallback_chats A list of ellmer Chats to try, in order, if
+#'   the agent's own Chat fails to write the summary during automatic
+#'   compaction with a transient error. Each must have no turns or tools.
+#'   They are only used for summaries and don't change the agent's Chat;
+#'   manual `$compact()` doesn't use them.
 #' @details
-#' Automatic compaction is an asynchronous run phase. `SessionStart` and
-#' `UserPromptSubmit` precede `PreCompact`; `PostCompact` follows an accepted
-#' replacement. `Stop` and `SessionEnd` include summary failures and usage.
-#' Between tool rounds, context is checked at ellmer's next request boundary
-#' after all tool results settle. Summary dispatches, including failures, share
-#' the run's request/token/cost budget. Unknown costs remain unknown.
+#' Automatic compaction runs at the start of a run and between rounds of tool
+#' calls. Summary requests count toward the run's [UsageLimits]. The summary is
+#' appended to the system prompt and the model context keeps only the recent
+#' turns; the removed turns stay available from [Agent]`$get_turns()` and in
+#' saved sessions. If summarising fails or is cancelled, the conversation is
+#' left as it was. [Agent]`$last_compaction()` describes the latest compaction,
+#' including every summary attempt.
 #'
-#' Summary Chats have no tools, history, system prompt, or inherited callbacks.
-#' Cancellation or unrecoverable failure leaves the active context unchanged.
-#' An accepted summary remains installed when the budget prevents task dispatch.
-#' `$last_compaction()` includes `run_id` and summary `attempts` with destination,
-#' usage, and original condition. Summaries are internal context, not task output.
-#' This policy does not archive removed turns or restore runtime permissions
-#' from a summary.
-#'
-#' This is a read-only S7 value. Use `$` or `S7::prop()` to read properties,
-#' and construct a new policy to change configuration. `S7::props()` returns
-#' a plain property list, but nested Chats retain reference semantics. The
-#' constructor and an Agent's policy getter clone templates; changing a caller's
-#' Chat or a returned policy's Chat does not change the Agent's destinations.
-#' Summary dispatch clears tools, history, prompts, and callbacks on its clone.
-#' Policies containing Chats are runtime configuration, not portable credentials
-#' or session state. Session restore keeps the receiving Agent's policy.
-#' @return A read-only `ContextPolicy` S7 object.
+#' The policy is read-only: read fields with `$`, and create a new policy to
+#' change one (the example shows how). The Chats in `summary_fallback_chats`
+#' are copied, so later changes to your Chat objects don't affect the policy.
+#' Saved sessions don't include the policy; `$load_session()` keeps the
+#' loading agent's policy.
+#' @return A `ContextPolicy` object.
 #' @examples
 #' policy <- ContextPolicy(max_tokens = 16000, fallback = "text")
 #' policy$max_tokens
@@ -262,31 +235,30 @@ S7::method(print, ContextPolicy) <- function(x, ...) {
   invisible(x)
 }
 
-#' Record a conversation compaction outcome
+#' Create a compaction result
 #'
 #' @description
-#' [Agent]`$compact()` and `$last_compaction()` return this read-only S7 value.
-#' `$` and `S7::prop()` read its properties. `S7::props()` returns a plain list
-#' for explicit reporting; nested usage must also be projected for JSON.
-#' Original provider conditions in `attempts` retain their identity and any
-#' reference semantics. Reporting code should select safe evidence fields
-#' rather than serialize arbitrary conditions or provider objects.
+#' Describes one compaction. [Agent]`$compact()` and `$last_compaction()`
+#' return it; you rarely need to create one yourself. It is read-only; read
+#' fields with `$`. `attempts` holds the original error conditions, so pick
+#' out the fields you need rather than saving or logging it whole.
 #'
-#' @param method Outcome: `"none"`, `"cancelled"`, `"custom"`, `"hook"`,
-#'   `"llm"`, or `"text"`.
-#' @param automatic Whether the run triggered compaction automatically.
-#' @param turns_compacted Number of turns removed from the active context.
-#' @param turns_kept Number of retained turns.
-#' @param estimated_tokens Estimated context size before compaction, or `NULL`
-#'   when unavailable.
-#' @param usage An [AgentUsage] value for summary generation, including failed
-#'   attempts. Unknown provider costs remain unknown.
-#' @param summary Installed summary text, or `NULL` when no replacement occurred.
-#' @param attempts List of summary attempt records containing `fallback_index`,
-#'   `provider`, `model`, `usage`, and the original `condition` (or `NULL`).
-#' @param run_id Governed run identifier, or `NULL` for manual compaction.
-#' @prop compacted_at Construction time as a `POSIXct` value. Read-only.
-#' @return A read-only `DeputyCompaction` S7 object.
+#' @param method How the summary was made: `"llm"` (by the model), `"text"`
+#'   (the plain fallback), `"custom"` (passed to `$compact()`) or `"hook"`
+#'   (from a `PreCompact` hook). `"none"` means there was nothing to compact
+#'   and `"cancelled"` means a hook cancelled it.
+#' @param automatic Whether a run compacted automatically.
+#' @param turns_compacted Number of turns removed from the model context.
+#' @param turns_kept Number of turns kept.
+#' @param estimated_tokens Estimated context size before compaction, or `NULL`.
+#' @param usage [AgentUsage] of the summary requests, including failed ones.
+#' @param summary The summary text, or `NULL` if nothing was replaced.
+#' @param attempts List of summary attempts, each with `fallback_index`,
+#'   `provider`, `model`, `usage` and the error `condition` (or `NULL`).
+#' @param run_id ID of the run that compacted, or `NULL` for a manual
+#'   compaction.
+#' @prop compacted_at When the result was created, as a `POSIXct` value.
+#' @return A `DeputyCompaction` object.
 #' @examples
 #' outcome <- DeputyCompaction("custom", FALSE, 4, 2, summary = "Earlier work")
 #' outcome$turns_compacted

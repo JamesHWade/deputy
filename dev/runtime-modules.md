@@ -64,18 +64,32 @@ The factories are not alternate runtimes or provider adapters.
 
 ## Size exception
 
-`R/agent.R` remains above 1,000 lines (2,337 immediately after extraction).
-It intentionally keeps the complete public class interface and its roxygen
-method documentation together, including the constructor and immutable fields.
-Streaming, sessions, compaction, and tool lifecycle implementations live in
-cohesive internal modules. Splitting that public interface across source files
-would make its contract harder to discover and document. This is the explicit
-exception allowed by #72, not a target to satisfy with arbitrary fragments.
+`R/agent.R` remains above 1,000 lines (2,337 immediately after extraction,
+3,428 on 2026-09-28). It intentionally keeps the complete public class
+interface and its roxygen method documentation together, including the
+constructor and immutable fields. Streaming, sessions, compaction, and tool
+lifecycle implementations live in cohesive internal modules. Splitting that
+public interface across source files would make its contract harder to discover
+and document. This is the explicit exception allowed by #72, not a target to
+satisfy with arbitrary fragments.
 
 The other files listed in #72 are below 1,000 lines. Tests now separate hook
 registry behavior, hook result values, built-in hook policies, AgentDefinitions,
 and delegated permission/budget policy. Whole test cases move along those
 boundaries and continue to use shared helper files.
+
+These files have since grown past 1,000 lines and have no agreed exception
+(line counts on 2026-09-28):
+
+| Source | Lines |
+| --- | --- |
+| `R/agent-job.R` | 2,405 |
+| `R/subagent-chat.R` | 1,296 |
+| `R/agent-context.R` | 1,131 |
+| `R/delegation-inspection.R` | 1,020 |
+
+Split each along its responsibility boundaries, or record an exception here
+with the reason, as for `R/agent.R`. Count with `wc -l R/*.R | sort -n`.
 
 `R/delegation-inspection.R` owns compact outcomes, authorized disclosure and
 settled public-content replay. It reuses ContextPolicy artifacts and ellmer

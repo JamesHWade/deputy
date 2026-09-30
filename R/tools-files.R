@@ -1,42 +1,78 @@
 # Native filesystem tools for deputy agents
 
-# Count fixed-string matches in text.
-count_fixed_matches <- function(text, pattern) {
-  matches <- gregexpr(pattern, text, fixed = TRUE)[[1]]
-  if (length(matches) == 1 && identical(matches[[1]], -1L)) {
-    return(0L)
-  }
-  length(matches)
-}
-
-# Apply a fixed-string replacement with safety checks for edit tools.
-replace_fixed_text <- function(text, old_text, new_text, replace_all = FALSE) {
+# Edit tools replace exact text in a file's bytes and leave every other byte,
+# line ending and the final newline unchanged. Matching uses a view in which
+# each CRLF reads as LF, as readLines() and read_file present lines, and each
+# match is mapped back to the original bytes. Bytes are compared directly, so
+# files in any encoding keep their content.
+replace_fixed_bytes <- function(
+  bytes,
+  old_text,
+  new_text,
+  replace_all = FALSE
+) {
   if (!nzchar(old_text)) {
     cli_abort("{.arg old_text} must not be empty.")
   }
-
-  occurrences <- count_fixed_matches(text, old_text)
-  if (occurrences == 0L) {
+  lf <- as.raw(10L)
+  cr <- as.raw(13L)
+  n <- length(bytes)
+  # CR bytes that begin a CRLF pair are hidden from the matching view.
+  pair_cr <- bytes == cr & c(bytes[-1L] == lf, FALSE)
+  keep <- which(!pair_cr)
+  view <- rawToChar(bytes[keep])
+  pattern <- charToRaw(lf_newlines(old_text))
+  starts <- gregexpr(rawToChar(pattern), view, fixed = TRUE, useBytes = TRUE)[[
+    1L
+  ]]
+  if (identical(starts[[1L]], -1L)) {
     cli_abort("{.arg old_text} was not found in the file.")
   }
-
-  if (!isTRUE(replace_all) && occurrences > 1L) {
+  if (!isTRUE(replace_all) && length(starts) > 1L) {
     cli_abort(c(
-      "{.arg old_text} matched {occurrences} locations.",
+      "{.arg old_text} matched {length(starts)} locations.",
       "i" = "Set {.code replace_all = TRUE} to replace all of them."
     ))
   }
-
-  updated <- if (isTRUE(replace_all)) {
-    gsub(old_text, new_text, text, fixed = TRUE)
-  } else {
-    sub(old_text, new_text, text, fixed = TRUE)
+  if (!isTRUE(replace_all)) {
+    starts <- starts[1L]
   }
 
-  list(
-    text = updated,
-    replacements = if (isTRUE(replace_all)) occurrences else 1L
-  )
+  newlines <- which(bytes == lf)
+  ends_crlf <- function(i) i > 1L & pair_cr[pmax(i - 1L, 1L)]
+  pieces <- list()
+  cursor <- 1L
+  for (s in starts) {
+    from <- keep[[s]]
+    to <- keep[[s + length(pattern) - 1L]]
+    if (bytes[[from]] == lf && from > 1L && pair_cr[[from - 1L]]) {
+      from <- from - 1L
+    }
+    # New lines take the ending of the line being edited.
+    following <- newlines[newlines >= from][1L]
+    crlf <- if (is.na(following)) {
+      length(newlines) > 0L && all(ends_crlf(newlines))
+    } else {
+      ends_crlf(following)
+    }
+    replacement <- lf_newlines(new_text)
+    if (crlf) {
+      replacement <- gsub("\n", "\r\n", replacement, fixed = TRUE)
+    }
+    if (from > cursor) {
+      pieces[[length(pieces) + 1L]] <- bytes[cursor:(from - 1L)]
+    }
+    pieces[[length(pieces) + 1L]] <- charToRaw(replacement)
+    cursor <- to + 1L
+  }
+  if (cursor <= n) {
+    pieces[[length(pieces) + 1L]] <- bytes[cursor:n]
+  }
+  list(bytes = do.call(c, pieces), replacements = length(starts))
+}
+
+lf_newlines <- function(text) {
+  gsub("\r\n", "\n", enc2utf8(text), fixed = TRUE)
 }
 
 # Parse multi-edit operations from a list or JSON string.
@@ -129,20 +165,21 @@ glob_relative_paths <- function(path = ".", pattern = "*", recursive = TRUE) {
 #' Read file contents
 #'
 #' @description
-#' A tool that reads the contents of a file and returns it as a string.
+#' A tool that reads a file and returns its contents as text. Reading PDFs
+#' needs the pdftools package (or the Python module pypdf through reticulate).
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character string with the file contents, or
-#'   a structured list when selected PDF pages are requested.
+#' @return The file contents as one string. When `pages` is given, a list with
+#'   the page count and the text of each selected page.
 #'
-#' @param path Path to the file to read (tool argument, not R function argument)
-#' @param pages Optional PDF page selection. Accepts comma-separated pages and
-#'   ranges (e.g. `"1,3-5"`). Only supported for PDF files.
+#' @param path Path to the file to read.
+#' @param pages Optional PDF page selection, such as `"1,3-5"`. Only valid for
+#'   PDF files.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = list(tool_read_file)
 #' )
 #' }
@@ -221,20 +258,21 @@ tool_read_file <- ellmer::tool(
 #' Write content to a file
 #'
 #' @description
-#' A tool that writes content to a file, creating it if it doesn't exist.
+#' A tool that writes text to a file, creating the file and any missing parent
+#' directories.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character status message describing the
-#'   write.
+#' @return A status message with the number of characters written.
 #'
-#' @param path Path to the file to write (tool argument)
-#' @param content Content to write to the file (tool argument)
-#' @param append If TRUE, append to existing file (tool argument)
+#' @param path Path to the file to write.
+#' @param content Text to write.
+#' @param append If `TRUE`, add to the end of the file instead of overwriting
+#'   it.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = list(tool_write_file)
 #' )
 #' }
@@ -282,17 +320,17 @@ tool_write_file <- ellmer::tool(
 #' Edit file contents by replacing text
 #'
 #' @description
-#' Replace a specific text span in an existing file.
+#' A tool that replaces exact text in an existing file. Unless `replace_all` is
+#' `TRUE`, `old_text` must appear exactly once. Line endings and the rest of
+#' the file are left as they were.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character status message describing the
-#'   edit and replacement count.
+#' @return A status message with the number of replacements.
 #'
-#' @param path Path to the file to edit (tool argument)
-#' @param old_text Existing text to replace (tool argument)
-#' @param new_text Replacement text (tool argument)
-#' @param replace_all If TRUE, replace all matches instead of requiring a
-#'   unique match (tool argument)
+#' @param path Path to the file to edit.
+#' @param old_text Text to replace.
+#' @param new_text Replacement text.
+#' @param replace_all If `TRUE`, replace every occurrence of `old_text`.
 #'
 #' @examples
 #' path <- tempfile(fileext = ".txt")
@@ -309,14 +347,13 @@ tool_edit_file <- ellmer::tool(
 
     tryCatch(
       {
-        original <- paste(readLines(path, warn = FALSE), collapse = "\n")
-        updated <- replace_fixed_text(
-          original,
+        updated <- replace_fixed_bytes(
+          readBin(path, "raw", n = file.size(path)),
           old_text = old_text,
           new_text = new_text,
           replace_all = replace_all
         )
-        writeLines(updated$text, path)
+        writeBin(updated$bytes, path)
 
         paste(
           "Successfully edited",
@@ -353,14 +390,16 @@ tool_edit_file <- ellmer::tool(
 #' Apply multiple text edits to a file
 #'
 #' @description
-#' Apply a sequence of exact-match text replacements to a file.
+#' A tool that applies several exact-text replacements to one file, in order.
+#' Each edit follows the rules of [tool_edit_file]. If any edit fails, the file
+#' is left unchanged.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character status message describing the
-#'   edits and total replacement count.
+#' @return A status message with the number of edits and replacements.
 #'
-#' @param path Path to the file to edit (tool argument)
-#' @param edits List or JSON string of edit operations (tool argument)
+#' @param path Path to the file to edit.
+#' @param edits A list of edits, or a JSON array. Each edit has `old_text`,
+#'   `new_text` and, optionally, `replace_all`.
 #'
 #' @examples
 #' path <- tempfile(fileext = ".txt")
@@ -381,21 +420,21 @@ tool_multi_edit <- ellmer::tool(
     tryCatch(
       {
         operations <- parse_multi_edits(edits)
-        text <- paste(readLines(path, warn = FALSE), collapse = "\n")
+        bytes <- readBin(path, "raw", n = file.size(path))
         total_replacements <- 0L
 
         for (edit in operations) {
-          result <- replace_fixed_text(
-            text,
+          result <- replace_fixed_bytes(
+            bytes,
             old_text = edit$old_text,
             new_text = edit$new_text,
             replace_all = edit$replace_all
           )
-          text <- result$text
+          bytes <- result$bytes
           total_replacements <- total_replacements + result$replacements
         }
 
-        writeLines(text, path)
+        writeBin(bytes, path)
 
         paste(
           "Successfully applied",
@@ -432,21 +471,20 @@ tool_multi_edit <- ellmer::tool(
 #' List files in a directory
 #'
 #' @description
-#' A tool that lists files and directories within a specified path.
+#' A tool that lists the files and directories in a directory, with sizes.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character summary of the matching files and
-#'   directories.
+#' @return A text listing of names and sizes.
 #'
-#' @param path Directory path to list (tool argument)
-#' @param pattern Optional regex pattern to filter files (tool argument)
-#' @param recursive If TRUE, list files recursively (tool argument)
-#' @param full_names If TRUE, return full paths (tool argument)
+#' @param path Directory to list. Defaults to the working directory.
+#' @param pattern Optional regular expression to filter file names.
+#' @param recursive If `TRUE`, include subdirectories.
+#' @param full_names If `TRUE`, show full paths.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = list(tool_list_files)
 #' )
 #' }
@@ -539,15 +577,16 @@ tool_list_files <- ellmer::tool(
 #' Find files using a glob pattern
 #'
 #' @description
-#' Search for files under a directory using shell-style glob matching.
+#' A tool that finds files and directories matching a glob pattern such as
+#' `"*.R"` or `"R/*.R"`. `*` and `?` don't match `/`; `**` matches across
+#' directories.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character summary of paths matching the
-#'   glob pattern.
+#' @return A text listing of matching paths, relative to `path`.
 #'
-#' @param pattern Glob pattern to match (tool argument)
-#' @param path Base directory to search (tool argument)
-#' @param recursive If TRUE, search subdirectories recursively (tool argument)
+#' @param pattern Glob pattern to match.
+#' @param path Directory to search. Defaults to the working directory.
+#' @param recursive If `TRUE` (the default), search subdirectories.
 #'
 #' @examples
 #' directory <- tempfile()
@@ -608,16 +647,18 @@ tool_glob_files <- ellmer::tool(
 #' Search file contents with grep-like matching
 #'
 #' @description
-#' Search text files under a directory and return matching lines.
+#' A tool that searches the lines of files under a directory with a
+#' Perl-compatible regular expression.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character summary of matching file lines.
+#' @return Matching lines formatted as `file:line: text`.
 #'
-#' @param pattern Regex pattern to search for (tool argument)
-#' @param path Base directory to search (tool argument)
-#' @param recursive If TRUE, search subdirectories recursively (tool argument)
-#' @param ignore_case If TRUE, ignore case when matching (tool argument)
-#' @param max_matches Maximum matching lines to return (tool argument)
+#' @param pattern Regular expression to search for.
+#' @param path Directory to search. Defaults to the working directory.
+#' @param recursive If `TRUE` (the default), search subdirectories.
+#' @param ignore_case If `TRUE`, ignore case.
+#' @param max_matches Maximum number of matching lines to return. Defaults to
+#'   100.
 #'
 #' @examples
 #' directory <- tempfile()
@@ -742,21 +783,20 @@ tool_grep_files <- ellmer::tool(
 #' Read a CSV file
 #'
 #' @description
-#' A tool that reads a CSV file and returns a summary of its structure
-#' along with the first few rows.
+#' A tool that reads a CSV file and summarises it: row and column counts,
+#' column types and the first few rows.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
-#' @return When called directly, a character summary of the CSV structure and
-#'   preview rows.
+#' @return The summary as one string.
 #'
-#' @param path Path to the CSV file to read (tool argument)
-#' @param n_max Maximum number of rows to read (tool argument)
-#' @param show_head Number of rows to show in preview (tool argument)
+#' @param path Path to the CSV file.
+#' @param n_max Maximum number of rows to read. Defaults to 1000.
+#' @param show_head Number of rows to show. Defaults to 10.
 #'
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = list(tool_read_csv)
 #' )
 #' }
@@ -819,3 +859,13 @@ tool_read_csv <- ellmer::tool(
     destructive_hint = FALSE
   )
 )
+
+# Deputy's own tools; see mark_native_tool().
+tool_read_file <- mark_native_tool(tool_read_file)
+tool_write_file <- mark_native_tool(tool_write_file)
+tool_edit_file <- mark_native_tool(tool_edit_file)
+tool_multi_edit <- mark_native_tool(tool_multi_edit)
+tool_list_files <- mark_native_tool(tool_list_files)
+tool_glob_files <- mark_native_tool(tool_glob_files)
+tool_grep_files <- mark_native_tool(tool_grep_files)
+tool_read_csv <- mark_native_tool(tool_read_csv)

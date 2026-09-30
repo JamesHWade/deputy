@@ -123,30 +123,32 @@ validate_mcp_repl_sandbox_server <- function(server, sandbox) {
   configured
 }
 
-#' Load an R REPL with an enforced OS sandbox
+#' Load sandboxed R tools from mcp-repl
 #'
 #' @description
-#' Loads one explicitly configured [mcp-repl](https://github.com/posit-dev/mcp-repl)
-#' server after verifying that its command requests the exact sandbox policy.
-#' Deputy refuses missing, inherited, external, and unrestricted policies.
+#' Loads the tools of one [mcp-repl](https://github.com/posit-dev/mcp-repl)
+#' server, which runs R inside an OS sandbox. Use it when model-written code
+#' must not have your full user access; [tool_run_r_code] and [tool_run_bash]
+#' can reach your files and network.
 #'
-#' This is the supported path for model-generated code that requires an OS
-#' security boundary. Deputy's built-in [tool_run_r_code] and [tool_run_bash]
-#' are trusted-code tools; their subprocesses provide fault isolation, not
-#' filesystem or network confinement.
+#' The server's configuration entry must run the mcp-repl executable over stdio
+#' with `--sandbox` set to `sandbox`. A missing flag, a different mode, or a
+#' mode that doesn't guarantee a sandbox (`inherit`, `inherit-codex`,
+#' `external-sandbox`, `danger-full-access`) is an error. For a connection
+#' owned by one agent that you can interrupt, reset and close, use
+#' [mcp_repl_connection()].
 #'
 #' @param config Path to an mcptools JSON configuration. Defaults to
 #'   `~/.config/mcptools/config.json`.
-#' @param server Exact MCP server name. Defaults to `"r"`, the name used by
-#'   mcp-repl's installation examples.
-#' @param sandbox Required mcp-repl policy. `"workspace-write"` confines writes
-#'   to configured roots and `"read-only"` denies workspace writes. mcp-repl
-#'   also controls network access according to its server configuration.
+#' @param server Name of the server in `config`. Defaults to `"r"`, the name
+#'   mcp-repl's installation examples use.
+#' @param sandbox The sandbox mode the server must use. `"workspace-write"`
+#'   limits writes to the configured workspace roots; `"read-only"` blocks
+#'   workspace writes. Network access follows the server's own configuration.
 #'
-#' @return A list of ellmer-compatible tools from the selected mcp-repl server.
-#'   The `repl` tool forwards `timeout_ms` capped at 3000 ms, as described in
-#'   [mcp_repl_connection()]; longer work returns a busy result and a later
-#'   call with empty `input` retrieves its output.
+#' @return A list of tools from the server. The `repl` tool waits at most
+#'   3 seconds per call (see [mcp_repl_connection()]); longer work returns a
+#'   busy result, and a later call with empty `input` collects its output.
 #' @export
 #'
 #' @examples
@@ -157,7 +159,7 @@ validate_mcp_repl_sandbox_server <- function(server, sandbox) {
 #'   sandbox = "workspace-write"
 #' )
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = repl_tools,
 #'   permissions = Permissions(web = FALSE)
 #' )
@@ -228,29 +230,20 @@ tools_mcp_repl <- function(
 #' Get tools from MCP servers
 #'
 #' @description
-#' Fetches ellmer-compatible tools from configured MCP servers using the
-#' mcptools package for use with deputy agents.
+#' Starts the servers in an mcptools configuration file and returns their
+#' tools, ready to register on an [Agent]. MCP (Model Context Protocol) servers
+#' give agents tools for services such as GitHub, Slack or Google Drive.
 #'
-#' MCP (Model Context Protocol) allows agents to access tools from external services
-#' like GitHub, Slack, Google Drive, and more. Tools are discovered dynamically
-#' from running MCP servers.
+#' @param config Path to an MCP configuration file. Defaults to mcptools'
+#'   default location, `~/.config/mcptools/config.json`.
+#' @param servers Names of the servers to load, matched exactly. Servers not
+#'   named are not started. `NULL` (the default) loads every configured server.
 #'
-#' @param config Path to MCP configuration file. If NULL (default), uses the
-#'   mcptools default location (`~/.config/mcptools/config.json`).
-#' @param servers Optional character vector of server names to load tools from.
-#'   If NULL (default), loads tools from all configured servers. Filtering is
-#'   performed on exact configuration names before connecting servers.
-#'
-#' @return A list of tool definitions compatible with `Agent$register_tools()`.
-#'   [tool_metadata()] reports exact MCP origin, supplied annotations, and gaps.
-#'   The metadata bridge is qualified for mcptools 1.0.2 and 1.0.3; other versions fail
-#'   explicitly rather than silently losing annotations. Reconnecting a server
-#'   invalidates tools loaded from its previous connection. Reload and explicitly
-#'   replace those tools on the Agent. Load failures warn and return an empty list.
-#'   Returns an empty list if mcptools is not installed or no tools are available.
+#' @return A list of tools. If mcptools isn't installed or loading fails,
+#'   `tools_mcp()` warns and returns an empty list.
 #'
 #' @details
-#' The MCP configuration file follows the Claude Desktop format:
+#' The configuration file uses the Claude Desktop format:
 #' ```json
 #' {
 #'   "mcpServers": {
@@ -263,20 +256,33 @@ tools_mcp_repl <- function(
 #' }
 #' ```
 #'
+#' Deputy supports mcptools 1.0.2 and 1.0.3; other versions give a warning and
+#' no tools. Annotations a server leaves out get cautious defaults, so MCP
+#' tools usually need `web = TRUE` in [Permissions()]. [tool_metadata()] shows
+#' what a tool declares.
+#'
+#' Loading a server again restarts it and breaks the tools from the earlier
+#' load; register the new ones with `replace = TRUE`. A stdio server that takes
+#' more than about 4 seconds to answer a call is stopped, and the call fails.
+#' [McpConnection] gives you a fixed tool allowlist, timeouts and control over
+#' shutdown.
+#'
 #' @seealso
-#' [mcptools package](https://posit-dev.github.io/mcptools/) for configuration
+#' The [mcptools package](https://posit-dev.github.io/mcptools/) for
+#' configuration, and `vignette("mcp")`.
 #'
 #' @export
 #'
 #' @examples
 #' \dontrun{
-#' # Get all MCP tools from default config
+#' # Get all MCP tools from the default config
 #' mcp_tools <- tools_mcp()
 #'
-#' # Create agent with MCP tools
+#' # Create an agent with MCP tools
 #' agent <- Agent$new(
-#'   chat = ellmer::chat_anthropic(),
-#'   tools = c(tools_file(), mcp_tools)
+#'   chat = ellmer::chat("anthropic/claude-sonnet-5"),
+#'   tools = c(tools_file(), mcp_tools),
+#'   permissions = Permissions(web = TRUE)
 #' )
 #'
 #' # Use custom config file

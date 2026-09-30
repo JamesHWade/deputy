@@ -1,41 +1,41 @@
 #' Review a pending tool call in Shiny
 #'
 #' @description
-#' A Shiny module for human review of the inputs to a tool call suspended by a
-#' durable approval (see `approval_dir` in [Agent] and
-#' [PermissionResultPending]). The call stays blocked until the reviewer acts.
-#' The module shows each argument with its declared type, description, and
-#' proposed value, using [tool_input_review()]. The reviewer can edit simple
-#' fields, then approve or deny.
+#' A Shiny module for reviewing the inputs of a tool call that is waiting for
+#' approval (see `approval_dir` in [Agent] and [PermissionResultPending]). The
+#' call stays paused until the reviewer acts. The module shows each argument
+#' with its declared type, description and proposed value, using
+#' [tool_input_review()]. The reviewer can edit simple fields, then approve or
+#' deny.
 #'
 #' A field is editable when its declared type is enum, string, number,
-#' integer, or boolean and its editor can show the proposed value exactly.
-#' Anything else, including a proposed value that does not fit its type (a
+#' integer or boolean and its editor can show the proposed value exactly.
+#' Anything else, including a proposed value that doesn't fit its type (a
 #' boolean `"yes"`, a number `"abc"`), is shown read-only as proposed; deny the
 #' call if it is wrong. An absent optional field stays absent unless the
-#' reviewer picks a value, or ticks "Provide a value" for text and numbers. Approval with
-#' edits resumes with the edited input, which the tool must validate. Approval
-#' without edits resumes with the original input. Clearing a number removes
-#' the field. Deny executes nothing. Each pending approval is submitted at
-#' most once.
+#' reviewer picks a value, or ticks "Provide a value" for text and numbers.
+#' Clearing a number removes the field. Approving with edits resumes with the
+#' edited input, which the tool must validate; approving without edits
+#' resumes with the original input. Denying runs nothing. Each approval is
+#' submitted at most once.
 #'
 #' This is the input review step of Will Landau and Sam Parmar's
 #' [trusted mini-agent](https://trustedminiagents.dev/definition.html) pattern:
 #' a person checks the model-generated inputs before a trusted tool runs.
 #'
-#' The server registers a `Stop` hook on `agent`, so the review refreshes when
-#' a run suspends. Call it once per Agent, while no run is active.
+#' The server adds a `Stop` hook to `agent` so the review refreshes when a run
+#' pauses. Call it once per agent, while no run is active.
 #'
 #' @param id Shiny module ID.
 #' @param agent An [Agent] configured with `approval_dir`.
 #' @param decide Optional function `(path, decision, tool_input)` that carries
-#'   out the decision. The default calls `agent$resume_approval()`
-#'   synchronously, which runs the model continuation in this R process.
-#'   Supply your own function to run it elsewhere and return a promise, for
-#'   example from `mirai` or `promises::future_promise()`. The module waits for
-#'   a returned promise: on success it records the result and refreshes; on
-#'   failure it records the error and allows a retry while the approval is
-#'   still pending. The result is available from `outcome()`.
+#'   out the decision. The default calls `agent$resume_approval()`, which runs
+#'   the rest of the agent's run in this R process and blocks the app until it
+#'   finishes. To run it elsewhere, supply your own function that returns a
+#'   promise, for example from `mirai` or `promises::future_promise()`. The
+#'   module waits for the promise: on success it records the result and
+#'   refreshes; on failure it records the error and allows a retry while the
+#'   approval is still pending. The result is available from `outcome()`.
 #' @param session Shiny session.
 #' @return `approval_review_ui()` returns a UI tag list.
 #'   `approval_review_server()` returns a list of reactives: `pending()` (the
@@ -52,7 +52,7 @@
 #'     approval_dir <- tempfile("approvals-")
 #'     dir.create(approval_dir)
 #'     agent <- Agent$new(
-#'       ellmer::chat("openai/gpt-5.6-luna"),
+#'       ellmer::chat("openai/gpt-6-luna"),
 #'       approval_dir = approval_dir
 #'     )
 #'     approval_review_server("review", agent)

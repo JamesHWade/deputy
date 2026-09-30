@@ -98,6 +98,7 @@ forecast_fixture <- function() {
       )
       on.exit(server$stop(), add = TRUE)
       saveRDS(port, file.path(directory, "port.rds"))
+      file.create(file.path(directory, "ready"))
       repeat {
         httpuv::service(50)
       }
@@ -105,7 +106,7 @@ forecast_fixture <- function() {
     args = list(directory = directory)
   )
   deadline <- Sys.time() + 10
-  while (!file.exists(file.path(directory, "port.rds"))) {
+  while (!file.exists(file.path(directory, "ready"))) {
     if (!process$is_alive() || Sys.time() > deadline) {
       process$kill()
       cli::cli_abort("The local forecast fixture did not start.")

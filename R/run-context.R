@@ -6,23 +6,15 @@ run_context_abort <- function(
   path = NULL,
   key = NULL
 ) {
-  classes <- unique(c(
-    class,
-    "deputy_run_context_error",
-    "deputy_error",
-    "error",
-    "condition"
-  ))
-  condition <- structure(
-    list(
-      message = message,
-      call = NULL,
-      path = path,
-      key = key
-    ),
-    class = classes
+  # Messages are assembled text, so interpolate them rather than use them as
+  # cli templates.
+  abort_deputy(
+    "{message}",
+    class = unique(c(sub("^deputy_", "", class), "run_context_error")),
+    path = path,
+    key = key,
+    call = NULL
   )
-  stop(condition)
 }
 
 run_context_max_depth <- 32L

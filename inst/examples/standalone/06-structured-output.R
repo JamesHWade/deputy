@@ -1,7 +1,7 @@
 # Run with Rscript after installing deputy and setting OPENAI_API_KEY.
 library(deputy)
 chat <- ellmer::chat_openai(
-  model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-5.6-luna")
+  model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-6-luna")
 )
 
 agent <- Agent$new(

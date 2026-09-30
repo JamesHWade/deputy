@@ -2,7 +2,7 @@
 % Please edit documentation in R/skill.R
 \name{Skill}
 \alias{Skill}
-\title{Declarative Skill Configuration}
+\title{Reusable instructions and tools}
 \usage{
 Skill(
   name,
@@ -15,49 +15,40 @@ Skill(
 )
 }
 \arguments{
-\item{name}{Non-empty skill name, retained as supplied.}
+\item{name}{Skill name.}
 
-\item{version}{Non-empty version string. Defaults to \code{"0.0.0"};
-\code{\link[=skill_create]{skill_create()}} retains its \code{"1.0.0"} default.}
+\item{version}{Version string. Defaults to \code{"0.0.0"} (\code{\link[=skill_create]{skill_create()}}
+defaults to \code{"1.0.0"}).}
 
 \item{description}{Optional description.}
 
-\item{prompt}{Optional system prompt extension.}
+\item{prompt}{Optional text to add to the system prompt.}
 
 \item{tools}{List of tools created with \code{ellmer::tool()}.}
 
-\item{requires}{List with optional \code{packages} and \code{providers} entries.
-Each entry contains strings, or is NULL or an empty sequence.
-Other declarative metadata is retained but not evaluated.}
+\item{requires}{List with optional \code{packages} and \code{providers} entries, each
+a character vector. Other entries are kept but not checked. It must hold
+only plain data, not functions or environments.}
 
-\item{path}{Optional path to the skill directory. Construction does not
-inspect or load this path.}
+\item{path}{Optional path to the skill directory. It is recorded, not read.}
 }
 \value{
-A read-only \code{Skill} S7 value.
+A read-only \code{Skill} S7 object.
 }
 \description{
-A read-only S7 value bundling a prompt extension, original ellmer tools,
-and declared package and provider requirements. Load a Skill into an
-\link{Agent} with \code{agent$load_skill(skill)}.
+A skill bundles extra system prompt text, tools, and the packages and
+providers it needs, so you can add them to an \link{Agent} in one step with
+\code{agent$load_skill(skill)}.
 }
 \details{
-Construct skills with \code{Skill(...)}, \code{\link[=skill_create]{skill_create()}}, or \code{\link[=skill_load]{skill_load()}}.
-Read properties with \code{$}, \code{@}, or \code{S7::prop()}. To revise configuration,
-edit \code{S7::props(skill)} and pass that list to \code{do.call(Skill, fields)}.
-Individual and bulk property replacement are rejected, including initially
-NULL fields. Requirements are declarative package/provider sequences.
+Create skills with \code{Skill()}, \code{\link[=skill_create]{skill_create()}}, or \code{\link[=skill_load]{skill_load()}}. Skills
+are read-only: read fields with \code{$}, and to change one, edit
+\code{S7::props(skill)} and pass the list back to \code{Skill()} with \code{do.call()}, as
+in the example.
 
-Executable tools are composed without cloning. Their closures, clients,
-services, and caller-owned environments retain their original semantics;
-read-only Skill configuration does not freeze state inside those tools.
-Neither construction nor \code{\link[=skill_check_requirements]{skill_check_requirements()}} executes tool code.
-\code{\link[=skill_load]{skill_load()}} remains the explicit boundary that can source declared tools.
-
-RDS can preserve the value and serializable R object graphs after Deputy
-loads in the receiving process. It is not a portable transport for live
-services or connections. AgentDefinition YAML uses explicit host registries
-to attach skills; it does not embed executable Skill objects.
+Tools are stored as given, not copied, so any state they hold is shared
+with the originals. Creating a skill or checking its requirements never runs
+tool code; \code{\link[=skill_load]{skill_load()}} runs the R files a skill's tools come from.
 }
 \examples{
 concise <- Skill("concise", prompt = "Answer in one short paragraph.")

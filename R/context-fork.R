@@ -445,29 +445,33 @@ context_fork_projection <- function(omissions) {
   )
 }
 
-#' Describe a host-selected conversation fork
+#' Capture conversation turns for a fork
 #'
-#' ContextFork() is a read-only request to seed a fresh standalone Agent with
-#' selected public ellmer turns. The host supplies the owner, conversation,
-#' branch, revision and fork point and remains responsible for authenticating
-#' those identifiers. Turns are projected through the public ellmer record
-#' contract; tool bindings, hidden thinking and provider-private fields are
-#' omitted, and incomplete tool evidence becomes inert text.
+#' Records turns from one of your conversations, and where they came from, so
+#' [fork_agent()] can start a new agent from them. Deputy doesn't check the
+#' owner, conversation, branch or revision; your `authorize` function in
+#' [fork_agent()] confirms them. The copy keeps text, tool calls and results,
+#' but not tool functions, hidden thinking or provider-specific data. A tool
+#' call without its result, or a result without its call, becomes plain text,
+#' and provider file uploads are replaced by a note.
 #'
-#' @param owner_id Host owner identifier.
-#' @param conversation_id Host conversation identifier.
-#' @param branch_id Host-selected branch identifier.
-#' @param revision Exact host revision identifier.
-#' @param fork_point Host fork point token or non-negative turn number.
-#' @param view Either "transcript" for the complete selected transcript or
-#'   "context" for the current model context. The latter never falls back to
-#'   the transcript automatically.
-#' @param turns A bounded list of native public ellmer turns, or public records
-#'   produced by `ellmer::contents_record()` for those turns.
-#' @param max_bytes Maximum serialized bytes of the inert public projection.
-#' @param max_turns Maximum number of selected turns.
-#' @param schema_version Portable value schema version, currently 1L.
-#' @return A read-only ContextFork S7 value with no Chat or executable object.
+#' @param owner_id ID of the user or account that owns the conversation.
+#' @param conversation_id ID of the source conversation.
+#' @param branch_id ID of the branch the turns come from.
+#' @param revision Revision of the conversation the turns come from.
+#' @param fork_point Where the fork starts: a turn number (0 or more) or a
+#'   string of your own.
+#' @param view `"transcript"` if `turns` come from the full conversation (as
+#'   from `$get_turns()`), `"context"` if they come from the current model
+#'   context (as from `$get_context_turns()`). It is only recorded; you choose
+#'   the turns.
+#' @param turns A list of ellmer user and assistant turns, or records of them
+#'   from `ellmer::contents_record()`.
+#' @param max_bytes Maximum size of the copied turns, in bytes. Defaults to
+#'   64 KiB.
+#' @param max_turns Maximum number of turns. Defaults to 256.
+#' @param schema_version Format version; must be `1L`.
+#' @return A `ContextFork` object. It is read-only; read its fields with `$`.
 #' @export
 ContextFork <- S7::new_class(
   "ContextFork",
@@ -755,21 +759,29 @@ context_fork_reauthorize <- function(entry) {
   invisible(receipt)
 }
 
-#' Retain a host-authorized context fork for explicit continuation
+#' Start a retained agent from a conversation fork
 #'
-#' The child must be a standalone Agent with an independent empty Chat. Its own
-#' tools, prompt and resources remain host-configured; the fork only seeds inert
-#' selected history and uses the ordinary retained-conversation governance.
+#' Gives `agent` the turns in `fork` as its history and makes `parent` its
+#' owner, as `parent$retain_agent()` does; continue it with
+#' `parent$continue_agent()`. `agent` must be a standalone `Agent` with an
+#' empty chat of its own and no `approval_dir` or fallback chats. It keeps its
+#' own tools, system prompt and permissions: the fork brings only the
+#' conversation. See `vignette("retained-agents")`.
 #'
-#' @param parent Owning Agent.
-#' @param agent Standalone empty child Agent.
-#' @param fork A host-selected ContextFork.
-#' @param authorize Function receiving the portable fork snapshot and returning
-#'   the exact current `owner_id`, `conversation_id`, `branch_id`, and `revision`
-#'   record.
-#' @param usage_limits Cumulative UsageLimits ceiling for the retained handle.
-#' @param max_runs Maximum explicit continuations, default 32.
-#' @return An owner-local retained conversation handle.
+#' @param parent The `Agent` that will own the new conversation.
+#' @param agent A new `Agent` whose agent and session IDs differ from
+#'   `parent`'s.
+#' @param fork A [ContextFork].
+#' @param authorize A function that receives the fork as a plain list and
+#'   checks that its source may be used. To allow it, return a list with
+#'   exactly the fork's `owner_id`, `conversation_id`, `branch_id` and
+#'   `revision`; return `NULL` or `FALSE`, or throw an error, to deny it. It
+#'   is called again before every continuation.
+#' @param usage_limits [UsageLimits] for all runs of the retained agent
+#'   combined.
+#' @param max_runs Maximum number of continuations. Defaults to 32.
+#' @return A handle for `parent`'s `$continue_agent()`, `$cancel_agent()` and
+#'   `$release_agent()`. It only works with `parent`.
 #' @export
 fork_agent <- function(
   parent,

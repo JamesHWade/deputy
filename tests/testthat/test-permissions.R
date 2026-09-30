@@ -114,6 +114,27 @@ test_that("permission check blocks path traversal", {
   expect_true(grepl("traversal", result$reason, ignore.case = TRUE))
 })
 
+test_that("path-scoped writes allow names that contain two dots", {
+  withr::local_tempdir(pattern = "deputy-test") -> temp_dir
+  temp_dir <- normalizePath(temp_dir, mustWork = TRUE)
+
+  perms <- permissions_standard(working_dir = temp_dir)
+  context <- list(working_dir = temp_dir)
+  check <- function(path) {
+    permissions_check(perms, "write_file", list(path = path), context)
+  }
+
+  expect_s7_class(check("notes..v2.md"), PermissionResultAllow)
+  expect_s7_class(
+    check(file.path(temp_dir, "drafts", "notes..v2.md")),
+    PermissionResultAllow
+  )
+
+  escaped <- check("drafts/../../escape.txt")
+  expect_s7_class(escaped, PermissionResultDeny)
+  expect_match(escaped$reason, "traversal")
+})
+
 test_that("path-scoped writes reject dangling symlinks outside the root", {
   skip_on_os("windows")
   sandbox <- withr::local_tempdir(pattern = "deputy-dangling-link-")
@@ -295,16 +316,9 @@ test_that("readonly still enforces capability fields before annotations", {
     list(),
     read_only_web
   )
-  delegation <- permissions_check(
-    permissions,
-    "delegate_to_agent",
-    list(),
-    list(tool_annotations = list(read_only_hint = FALSE))
-  )
 
   expect_s7_class(web, PermissionResultDeny)
   expect_s7_class(unknown_web, PermissionResultDeny)
-  expect_s7_class(delegation, PermissionResultDeny)
   expect_s7_class(
     permissions_check(
       permissions,
@@ -374,11 +388,98 @@ test_that("custom permission callback is called", {
       PermissionResultAllow()
     }
   )
-  context <- list(working_dir = getwd())
+  context <- list(
+    working_dir = getwd(),
+    tool_annotations = list(read_only_hint = TRUE, open_world_hint = FALSE)
+  )
 
   result <- permissions_check(perms, "custom_tool", list(), context)
   expect_true(callback_called)
   expect_s7_class(result, PermissionResultAllow)
+})
+
+test_that("a permission callback can't allow what the policy denies", {
+  calls <- character()
+  allow_all <- function(tool_name, tool_input, context) {
+    calls <<- c(calls, tool_name)
+    PermissionResultAllow()
+  }
+  context <- list(working_dir = getwd())
+
+  standard <- Permissions(r_code = FALSE, can_use_tool = allow_all)
+  expect_s7_class(
+    permissions_check(standard, "run_r_code", list(code = "1"), context),
+    PermissionResultDeny
+  )
+  expect_s7_class(
+    permissions_check(
+      standard,
+      "write_file",
+      list(path = "/elsewhere/a.txt"),
+      context
+    ),
+    PermissionResultDeny
+  )
+  pause_all <- Permissions(
+    r_code = FALSE,
+    can_use_tool = function(...) PermissionResultPending("Review")
+  )
+  expect_s7_class(
+    permissions_check(pause_all, "run_r_code", list(code = "1"), context),
+    PermissionResultDeny
+  )
+  # Denied calls never reach the callback.
+  expect_identical(calls, character())
+
+  allowed <- permissions_check(
+    standard,
+    "read_file",
+    list(path = "a.txt"),
+    context
+  )
+  expect_s7_class(allowed, PermissionResultAllow)
+  expect_identical(calls, "read_file")
+})
+
+test_that("a permission callback refines every mode", {
+  deny_bash <- function(tool_name, tool_input, context) {
+    if (identical(tool_name, "run_bash")) {
+      return(PermissionResultDeny("No shell commands"))
+    }
+    PermissionResultAllow()
+  }
+  full <- Permissions(mode = "full", can_use_tool = deny_bash)
+  denied <- permissions_check(full, "run_bash", list(command = "ls"))
+  expect_s7_class(denied, PermissionResultDeny)
+  expect_identical(denied$reason, "No shell commands")
+  expect_s7_class(
+    permissions_check(full, "run_r_code", list(code = "1")),
+    PermissionResultAllow
+  )
+
+  read_only <- list(
+    tool_annotations = list(read_only_hint = TRUE, open_world_hint = FALSE)
+  )
+  plan <- Permissions(
+    mode = "plan",
+    file_write = FALSE,
+    can_use_tool = function(tool_name, ...) {
+      PermissionResultDeny(paste("Not now:", tool_name))
+    }
+  )
+  expect_identical(
+    permissions_check(plan, "lookup", list(), read_only)$reason,
+    "Not now: lookup"
+  )
+
+  pending <- Permissions(
+    mode = "full",
+    can_use_tool = function(...) PermissionResultPending("Review")
+  )
+  expect_s7_class(
+    permissions_check(pending, "run_bash", list(command = "ls")),
+    PermissionResultPending
+  )
 })
 
 test_that("PermissionResultAllow has correct structure", {

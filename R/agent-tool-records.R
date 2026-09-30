@@ -159,6 +159,19 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       records[[index]]$tool_call_id
     },
 
+    # The directory the policy checked this call's write against, if any.
+    execution_write_root = function(tool_call_id) {
+      if (!is_nonempty_string(tool_call_id)) {
+        return(NULL)
+      }
+      for (record in private$tool_call_records) {
+        if (identical(record$tool_call_id, tool_call_id)) {
+          return(record$write_root)
+        }
+      }
+      NULL
+    },
+
     claim_original_tool_result = function(tool_call_id, fallback) {
       if (
         !is_nonempty_string(tool_call_id) ||

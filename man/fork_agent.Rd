@@ -2,30 +2,38 @@
 % Please edit documentation in R/context-fork.R
 \name{fork_agent}
 \alias{fork_agent}
-\title{Retain a host-authorized context fork for explicit continuation}
+\title{Start a retained agent from a conversation fork}
 \usage{
 fork_agent(parent, agent, fork, authorize, usage_limits, max_runs = 32L)
 }
 \arguments{
-\item{parent}{Owning Agent.}
+\item{parent}{The \code{Agent} that will own the new conversation.}
 
-\item{agent}{Standalone empty child Agent.}
+\item{agent}{A new \code{Agent} whose agent and session IDs differ from
+\code{parent}'s.}
 
-\item{fork}{A host-selected ContextFork.}
+\item{fork}{A \link{ContextFork}.}
 
-\item{authorize}{Function receiving the portable fork snapshot and returning
-the exact current \code{owner_id}, \code{conversation_id}, \code{branch_id}, and \code{revision}
-record.}
+\item{authorize}{A function that receives the fork as a plain list and
+checks that its source may be used. To allow it, return a list with
+exactly the fork's \code{owner_id}, \code{conversation_id}, \code{branch_id} and
+\code{revision}; return \code{NULL} or \code{FALSE}, or throw an error, to deny it. It
+is called again before every continuation.}
 
-\item{usage_limits}{Cumulative UsageLimits ceiling for the retained handle.}
+\item{usage_limits}{\link{UsageLimits} for all runs of the retained agent
+combined.}
 
-\item{max_runs}{Maximum explicit continuations, default 32.}
+\item{max_runs}{Maximum number of continuations. Defaults to 32.}
 }
 \value{
-An owner-local retained conversation handle.
+A handle for \code{parent}'s \verb{$continue_agent()}, \verb{$cancel_agent()} and
+\verb{$release_agent()}. It only works with \code{parent}.
 }
 \description{
-The child must be a standalone Agent with an independent empty Chat. Its own
-tools, prompt and resources remain host-configured; the fork only seeds inert
-selected history and uses the ordinary retained-conversation governance.
+Gives \code{agent} the turns in \code{fork} as its history and makes \code{parent} its
+owner, as \code{parent$retain_agent()} does; continue it with
+\code{parent$continue_agent()}. \code{agent} must be a standalone \code{Agent} with an
+empty chat of its own and no \code{approval_dir} or fallback chats. It keeps its
+own tools, system prompt and permissions: the fork brings only the
+conversation. See \code{vignette("retained-agents")}.
 }

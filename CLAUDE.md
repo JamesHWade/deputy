@@ -24,14 +24,25 @@ Key capabilities:
 deputy/
 ├── R/                      # Source code (R6 classes and functions)
 │   ├── agent.R             # Public Agent API and runtime wiring
+│   ├── agent-context.R     # Context estimation and compaction
+│   ├── agent-session.R     # Session payload construction and restoration
+│   ├── agent-tool-callbacks.R # Permission/hook callbacks and tool content extraction
+│   ├── agent-tool-records.R # Tool call records and delegation correlation
+│   ├── agent-tracing.R     # OpenTelemetry governance trace adapter
 │   ├── agent-stream.R      # Shared governed stream and finalization
 │   ├── agent-approval.R     # Durable pending-tool suspension and governed resume
 │   ├── agent-job.R          # Host-scheduled durable jobs and recovery states
 │   ├── agent-job-runtime.R  # Job manifests, graph snapshots and checkpoints
 │   ├── approval-record.R    # S7 approval inspection and portable control records
 │   ├── approval-store.R     # Locked immutable approval revisions
+│   ├── approval-review.R    # Shiny module for reviewing a pending tool call
 │   ├── agent-requests.R    # Public ellmer callbacks and explicit fallback
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
+│   ├── owned-conversations.R # Retained specialist handles, leases and release
+│   ├── chat-composition.R  # adopt_chat() and delegation_tool() composition
+│   ├── delegation-graph.R  # Atomic host-curated graph setup and release
+│   ├── delegation-tree-budget.R # Graph lifetime budgets and structural admission
+│   ├── delegation-tree-runtime.R # Recursive ancestry, hooks and subtree cancellation
 │   ├── delegation-input.R # Immutable briefs and scoped source preparation
 │   ├── delegation-manifest.R # Initial receipts and context inspection
 │   ├── context-fork.R       # Authorized host-selected native history snapshots
@@ -43,6 +54,10 @@ deputy/
 │   ├── subagent-chat.R    # Optional authorized child activity and transcript UI
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
 │   ├── compaction-run.R    # Governed asynchronous summary attempts and recovery
+│   ├── context-policy.R    # S7 ContextPolicy and DeputyCompaction values
+│   ├── context-estimation.R # Token estimates around unpaired tool results
+│   ├── run-context.R       # Immutable run-context validation and merging
+│   ├── structured-run.R    # Structured requests and finite corrections
 │   ├── agent-definition.R # S7 AgentDefinition values and routing normalization
 │   ├── agent-definition-files.R # Portable YAML AgentDefinitions
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
@@ -50,29 +65,44 @@ deputy/
 │   ├── stall-detection.R   # Canonical repeated-tool progress signal
 │   ├── permissions.R       # S7 permission configuration and public evaluation
 │   ├── permission-evaluation.R # Internal tool gating and capability evaluation
+│   ├── permission-policy.R # Permission modes, capability intersections and path policy
 │   ├── hooks.R             # HookRegistry for lifecycle events
+│   ├── hook-validation.R   # HookMatcher configuration validation
 │   ├── callback-result.R   # S7 hook and permission decisions
 │   ├── trusted-results.R   # TrustedResults policy and no-bypass registry check
 │   ├── tool-input-review.R # Typed per-field tables for input review
 │   ├── skill.R             # S7 Skill values and requirement inspection
 │   ├── skills.R            # Explicit Skill file and tool loading
 │   ├── tools-files.R       # Native filesystem tools
+│   ├── file-checkpoints.R  # File checkpoint journal operations
+│   ├── file-checkpoint-paths.R # Checkpoint path and byte operations
+│   ├── file-checkpoint-validation.R # Checkpoint state validation
 │   ├── tools-documents.R   # Document conversion
+│   ├── tools-web.R         # web_fetch and web_search tools
 │   ├── r-session.R        # Conversation-scoped trusted R worker owner
 │   ├── r-session-worker.R # Ordered evaluate output and plot capture
 │   ├── r-session-tools.R  # Bounded data bridge to selected host tools
 │   ├── tool-invocation.R  # Governed nested tool admission and invocation
 │   ├── r-session-result.R # Native ellmer content and portable display evidence
 │   ├── tool-rich-results.R # Independent native text and image context bounds
+│   ├── tool-runtime.R      # Runtime tool wrapping, native markers and result offloading
+│   ├── tool-request-validation.R # Provider tool request validation
 │   ├── tools-execution.R   # Trusted one-shot R and shell tools
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
 │   ├── tools-mcp.R         # MCP discovery and sandboxed mcp-repl boundary
+│   ├── mcp-connection.R    # Host-owned MCP connection and immutable admission lists
+│   ├── mcp-worker.R        # Qualified mcptools worker boundary and owner validation
+│   ├── mcp-repl.R          # Sandboxed mcp-repl connection and control input
 │   ├── mcp-console.R       # Sandboxed MCP Console workbench connection
 │   ├── tool-registration.R # Batch validation and annotation defaults
 │   ├── tool-metadata.R     # Origin and annotation coverage inspection
 │   ├── mcp-metadata.R      # Qualified mcptools descriptor bridge
+│   ├── cli.R               # Runtime for the deputy command-line app
 │   ├── errors.R            # Custom error hierarchy
+│   ├── ids.R               # Runtime correlation identifiers
+│   ├── value-properties.R  # Read-only S7 property helper
+│   ├── deputy-package.R    # Package documentation and imports
 │   └── utils.R             # Internal utilities
 ├── tests/testthat/         # Unit tests (testthat edition 3)
 ├── inst/skills/            # Built-in skills with YAML metadata
@@ -321,8 +351,13 @@ tryCatch(
 ```
 
 Available constructors: `abort_deputy()`, `abort_permission_denied()`, `abort_tool_execution()`,
-`abort_budget_exceeded()`, `abort_turn_limit()`, `abort_provider()`, `abort_session_load()`,
-`abort_session_save()`, `abort_hook()`. Test membership with `is_deputy_error(x, class)`.
+`abort_budget_exceeded()`, `abort_request_limit()`, `abort_cost_unavailable()`, `abort_provider()`,
+`abort_session_load()`, `abort_session_save()`, `abort_hook()`. Test membership with
+`is_deputy_error(x, class)`.
+
+Argument validation still uses `cli_abort()` directly in many places, so those errors
+do not inherit from `deputy_error` and a `deputy_error = ` handler does not catch them.
+Use an `error = ` handler when a host needs to catch both.
 
 ### Testing Pattern
 
@@ -341,6 +376,25 @@ test_that("descriptive test name", {
   expect_equal(result$stop_reason, "end_turn")
 })
 ```
+
+### Writing user documentation
+
+README, vignettes, roxygen and example READMEs are for R users. Say what a
+function does and when to use it, then the caveats a user needs (security,
+cost, lost state), then stop. Keep internal design out of them: no ADR or issue
+references, no test files, no "previously" (that belongs in NEWS.md), and none
+of the internal vocabulary used in this file and `dev/` ("governed",
+"host-owned", "authority ceiling", "fail closed", "admission", "settlement",
+"canonical", "qualified"). Use the `CONTEXT.md` terms, such as "subagent".
+Examples use `ellmer::chat("openai/gpt-6-luna")` and
+`ellmer::chat("anthropic/claude-sonnet-5")`. The pkgdown navbar menu is built
+from the `articles:` sections in `_pkgdown.yml`, so a new article only needs to
+be listed there.
+
+The site's look is `template:` in `_pkgdown.yml` (light colours) and
+`pkgdown/extra.scss` (dark colours, layout, and `@font-face` rules for the
+IBM Plex files in `pkgdown/assets/fonts/`). Define colours as `--deputy-*`
+variables there rather than literals in rules, so both themes stay in step.
 
 ## Architecture
 
@@ -460,6 +514,15 @@ Permissions configured at construction are an immutable authority ceiling.
 `Agent$set_permission_mode()` may keep or narrow a policy but cannot widen it;
 delegated agents are bounded by the same rule and by their lead's restrictions.
 
+`can_use_tool` runs in every mode, after gating and mode/capability checks,
+and only for calls those allow: it can deny or suspend, never widen.
+PermissionRequest hooks are the explicit override for denied calls. Readonly
+and plan modes admit an agent's own delegation tools (a LeadAgent's
+`delegate_to_agent`, `delegation_tool()` and graph routes) because every child
+tool call is rechecked against the caller's current policy, and in a graph
+every ancestor's. Each is identified by a private marker, not its name. See
+ADR-0031.
+
 ### AgentDefinition Routing
 
 `agent_definition()` canonicalizes names to lowercase routing keys. A
@@ -471,7 +534,8 @@ delegated agents are bounded by the same rule and by their lead's restrictions.
 provide versioned Deputy YAML files, conventionally in `.deputy/agents/`.
 Tools and skills resolve through explicit host registries; file loading never
 sources R code, loads skills, or connects services. See ADR-0006 and the
-Multi-Agent vignette for the format and authoring examples.
+Subagents article (`vignettes/multi-agent.Rmd`) for the format and authoring
+examples.
 
 ### Durable approvals
 
@@ -500,8 +564,9 @@ match. Delegated job scheduling and host conversation adapters remain separate.
 OS locks and immutable revision commits prevent concurrent consumption and
 replay after process interruption; they do not promise exactly-once effects or
 power-loss durability. Indeterminate records require host reconciliation and
-cannot resume. See ADR-0016 and the Permissions vignette for ownership and
-limits. File storage uses the `filelock` package.
+cannot resume. See ADR-0016 and the approvals article
+(`vignettes/approvals.Rmd`) for ownership and limits. File storage uses the
+`filelock` package.
 
 ### Host-scheduled durable jobs
 
@@ -574,7 +639,10 @@ review module. `inst/examples/trusted-results/` is the three-area app.
 
 Concurrent and hosted Agents bind their own handler with
 `tools_interactive(callback, context)`. The context carries stable routing
-values and may be resolved lazily. `set_ask_user_callback()` is only a legacy
+values and may be resolved lazily. Hosts that cannot block return a promise
+for the answers, or `AskUserDeferred()` so the model ends its turn and the
+answers arrive as the next user message; delegated children reject deferral.
+`set_ask_user_callback()` is only a legacy
 process-wide fallback for single-Agent scripts; do not use it for Shiny or
 other concurrent hosts.
 
@@ -604,10 +672,10 @@ backlog stages.
 
 ### Tool Presets
 
-- `tools_preset("minimal")` - read_file, list_files
+- `tools_preset("minimal")` - read_file, read_markdown, list_files
 - `tools_preset("standard")` - + write_file; no code execution
 - `tools_preset("dev")` - + trusted run_r_code and run_bash
-- `tools_preset("data")` - read_file, list_files, read_csv, run_r_code
+- `tools_preset("data")` - read_file, read_markdown, list_files, read_csv, run_r_code
 - `tools_preset("full")` - all built-in tools
 
 Registration uses ellmer tool definitions for local functions, package exports,
@@ -621,7 +689,9 @@ delegation. MCP uses qualified mcptools releases (1.0.2, 1.0.3; an exact list,
 not a minimum) for transport/schema/invocation and a narrow read-only descriptor
 bridge because those releases drop annotations. Exact
 server selection happens before connection. Reconnecting invalidates old
-tool handles. MCP names never acquire native file or approval-tool privileges.
+tool handles. MCP names never acquire native file or approval-tool privileges;
+nor do host, skill or package tools. Only tools marked by `mark_native_tool()`
+(Deputy's own) get native-name grants; name restrictions apply to all (#216).
 `mcp_console_connection()` adapts MCP Console 0.0.4 through the same
 `McpConnection`: an explicit, version-checked executable, sandbox-widening
 arguments and unreviewed project config refused, `send` governed as
@@ -643,7 +713,7 @@ the AgentDefinition supplies the child's executable registry.
 
 | File | Purpose |
 |------|---------|
-| `R/agent.R` | Main Agent class with run/run_sync/run_shiny |
+| `R/agent.R` | Main Agent class with run/run_sync/run_async/chat/stream |
 | `R/permissions.R` | Permission system and tool annotations |
 | `R/hooks.R` | HookRegistry and event system |
 | `R/tools-files.R`, `R/tools-documents.R`, `R/tools-execution.R` | Built-in tools by capability |
@@ -661,6 +731,10 @@ the AgentDefinition supplies the child's executable registry.
 - `coro` - Coroutines for streaming
 - `digest` - Hashing
 - `jsonlite` - Runtime JSON serialization, including atomic tool evidence
+- `promises` (>= 1.5.0) and `later` - `run_async()`, `chat_async()` and polling of
+  R session, MCP and job workers without blocking the host
+- `processx` - MCP Console dependency preparation
+- `filelock` - Locks for approval and job revision stores
 - `Rapp` (>= 0.4.0) - CLI framework
 - `callr` - Fault isolation and timeouts for explicitly trusted R code
 - `evaluate` - Ordered R output, conditions, and graphics capture
@@ -674,7 +748,6 @@ the AgentDefinition supplies the child's executable registry.
 - `knitr` - Vignettes
 
 **Shiny Integration** (in Suggests):
-- `promises` - Async support for `run_shiny()`
 - `shiny` - Shiny framework
 - `shinychat` - Chat UI component
 - `commonmark` and `xml2` - optional child chat Markdown rendering and inert HTML projection

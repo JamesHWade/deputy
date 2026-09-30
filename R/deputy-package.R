@@ -12,21 +12,20 @@
 NULL
 
 # Package-level documentation
-#' @section Main Functions:
-#' * [Agent] - The main class for creating agents
-#' * [LeadAgent] - Coordinate specialized delegated agents
-#' * [tools_preset()] - Choose a set of built-in tools
-#' * [UsageLimits()] - Set request, tool, token, and cost limits
-#' * [permissions_standard()] - Standard permission policy
-#' * [permissions_plan()] - Planning permission policy
-#' * [permissions_readonly()] - Read-only permission policy
+#' @section Main functions:
+#' * [Agent]: runs a task with an ellmer Chat, tools, permissions and limits.
+#' * [LeadAgent]: an agent that delegates tasks to subagents.
+#' * [tools_preset()]: picks a set of built-in tools.
+#' * [UsageLimits()]: caps requests, tool calls, tokens and cost.
+#' * [permissions_standard()], [permissions_plan()] and
+#'   [permissions_readonly()]: ready-made permission policies.
 #'
-#' @section Getting Started:
+#' @section Getting started:
 #' ```r
 #' library(deputy)
 #'
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-5.6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6-luna"),
 #'   tools = tools_preset("minimal"),
 #'   permissions = permissions_readonly(),
 #'   usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),

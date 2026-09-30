@@ -2,29 +2,25 @@
 % Please edit documentation in R/tools-bundles.R
 \name{tools_data}
 \alias{tools_data}
-\title{Data reading tools}
+\title{Get the data reading tools}
 \usage{
 tools_data()
 }
 \value{
-A list of tool definitions
+A list of tools.
 }
 \description{
-Returns a list of tools for reading data files:
-\itemize{
-\item \code{read_csv} - Read CSV files with summary
-\item \code{read_file} - Read any file as text
-}
+Returns \code{read_csv}, \code{read_file} and \code{read_markdown}.
 }
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_data()
 )
 }
 
 }
 \seealso{
-\link{tool_read_csv}, \link{tool_read_file}
+\link{tool_read_csv}, \link{tool_read_file}, \link{tool_read_markdown}
 }

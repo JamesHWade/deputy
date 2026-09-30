@@ -9,43 +9,46 @@ tools_preset(name)
 \arguments{
 \item{name}{The preset name. One of:
 \itemize{
-\item \code{"minimal"} - Read-only tools for safe exploration
-(\code{read_file}, \code{read_markdown}, \code{list_files})
-\item \code{"standard"} - File-oriented toolset for ordinary work
-(\code{read_file}, \code{read_markdown}, \code{write_file}, \code{list_files})
-\item \code{"dev"} - Full development with shell access
-(\code{read_file}, \code{read_markdown}, \code{write_file}, \code{list_files}, \code{run_r_code}, \code{run_bash})
-\item \code{"data"} - Data analysis focused tools
-(\code{read_file}, \code{read_markdown}, \code{list_files}, \code{read_csv}, \code{run_r_code})
-\item \code{"full"} - All available tools (requires appropriate permissions)
+\item \code{"minimal"}: read-only tools
+(\code{read_file}, \code{read_markdown}, \code{list_files}).
+\item \code{"standard"}: file tools
+(\code{read_file}, \code{read_markdown}, \code{write_file}, \code{list_files}).
+\item \code{"dev"}: file tools plus code execution (\code{read_file}, \code{read_markdown},
+\code{write_file}, \code{list_files}, \code{run_r_code}, \code{run_bash}).
+\item \code{"data"}: data analysis
+(\code{read_file}, \code{read_markdown}, \code{list_files}, \code{read_csv}, \code{run_r_code}).
+\item \code{"full"}: everything in \code{\link[=tools_all]{tools_all()}}.
 }}
 }
 \value{
-A list of tool definitions
+A list of tools.
 }
 \description{
-Returns a pre-configured collection of tools for common use cases.
-Presets simplify agent setup by providing curated toolsets.
+Returns a ready-made set of tools for a common kind of task. The \code{"dev"},
+\code{"data"} and \code{"full"} presets include code execution tools, which run with
+your user account's access. The default permissions deny them; allow them
+with \code{r_code = TRUE} (and \code{bash = TRUE} for \code{run_bash}) in \code{\link[=Permissions]{Permissions()}}.
 }
 \examples{
 \dontrun{
-# Minimal preset for read-only operations
+# Read-only exploration
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_preset("minimal"),
   permissions = permissions_readonly()
 )
 
-# Standard preset for typical development
+# Reading and writing files
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
+  chat = ellmer::chat("openai/gpt-6-luna"),
   tools = tools_preset("standard")
 )
 
-# Data analysis preset
+# Data analysis with R code
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-5.6-luna"),
-  tools = tools_preset("data")
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = tools_preset("data"),
+  permissions = Permissions(r_code = TRUE)
 )
 }
 

@@ -776,6 +776,24 @@ test_that("a subscription on a cleared stream fails instead of crossing into the
   expect_length(fresh$snapshot()$children, 0L)
 })
 
+test_that("any scope change starts a new stream, even with nothing retained", {
+  state <- new.env(parent = emptyenv())
+  lead <- input_test_lead(
+    state,
+    delegation_disclosure = DelegationDisclosure(
+      authorize = function(requester, scope) identical(requester, "owner")
+    )
+  )
+  old <- lead$observe_subagents("owner")
+  lead$set_delegation_sources(
+    list(),
+    scope = list(owner_id = "owner-a", conversation_id = "conversation-b")
+  )
+  resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
+  expect_error(old$poll(), "foreign child observation cursor")
+  expect_error(old$snapshot(), "foreign child observation cursor")
+})
+
 test_that("refusals bound the ids they name", {
   state <- new.env(parent = emptyenv())
   long <- strrep("x", 5000)

@@ -68,6 +68,27 @@ test_that("has_path_traversal allows safe paths", {
   expect_false(has_path_traversal("/Users/test/file.txt"))
 })
 
+test_that("has_path_traversal matches .. only as a whole path segment", {
+  # Dots inside a name are not parent references
+  expect_false(has_path_traversal("notes..v2.md"))
+  expect_false(has_path_traversal("subdir/notes..v2.md"))
+  expect_false(has_path_traversal("..hidden"))
+  expect_false(has_path_traversal("a..b/c..d/file.txt"))
+  expect_false(has_path_traversal("file.."))
+
+  # A .. segment is flagged with either separator and in any position
+  expect_true(has_path_traversal(".."))
+  expect_true(has_path_traversal("foo/.."))
+  expect_true(has_path_traversal("foo\\..\\bar"))
+  expect_true(has_path_traversal("..\\escape.txt"))
+  expect_true(has_path_traversal("/tmp/allowed/../escape.txt"))
+
+  # Windows trims trailing dots and spaces, so these are flagged too
+  expect_true(has_path_traversal(".../escape.txt"))
+  expect_true(has_path_traversal("foo/.. /escape.txt"))
+  expect_true(has_path_traversal("foo/..."))
+})
+
 test_that("truncate_string works correctly", {
   # Short strings unchanged
   expect_equal(truncate_string("hello", 10), "hello")
@@ -218,7 +239,7 @@ test_that("validate_path_at_operation performs validation and operation atomical
   # Operation should succeed for valid path
   result <- validate_path_at_operation(
     path = test_file,
-    allowed_dir = temp_dir,
+    allowed_dir = canonical_permission_root(temp_dir),
     operation = function(normalized_path) {
       paste(readLines(normalized_path), collapse = "\n")
     }
@@ -233,7 +254,7 @@ test_that("validate_path_at_operation rejects path traversal", {
   expect_error(
     validate_path_at_operation(
       path = file.path(temp_dir, "..", "escape.txt"),
-      allowed_dir = temp_dir,
+      allowed_dir = canonical_permission_root(temp_dir),
       operation = function(p) p
     ),
     "Path traversal detected"
@@ -243,7 +264,7 @@ test_that("validate_path_at_operation rejects path traversal", {
   expect_error(
     validate_path_at_operation(
       path = "~/escape.txt",
-      allowed_dir = temp_dir,
+      allowed_dir = canonical_permission_root(temp_dir),
       operation = function(p) p
     ),
     "Path traversal detected"
@@ -256,7 +277,7 @@ test_that("validate_path_at_operation rejects paths outside allowed directory", 
   expect_error(
     validate_path_at_operation(
       path = "/etc/passwd",
-      allowed_dir = temp_dir,
+      allowed_dir = canonical_permission_root(temp_dir),
       operation = function(p) p
     ),
     "Path outside allowed directory"
@@ -270,7 +291,7 @@ test_that("validate_path_at_operation rejects invalid paths", {
   expect_error(
     validate_path_at_operation(
       path = NULL,
-      allowed_dir = temp_dir,
+      allowed_dir = canonical_permission_root(temp_dir),
       operation = function(p) p
     ),
     "Invalid path"
@@ -280,7 +301,7 @@ test_that("validate_path_at_operation rejects invalid paths", {
   expect_error(
     validate_path_at_operation(
       path = "",
-      allowed_dir = temp_dir,
+      allowed_dir = canonical_permission_root(temp_dir),
       operation = function(p) p
     ),
     "Invalid path"
@@ -296,7 +317,11 @@ test_that("secure_write_file writes content safely", {
   test_file <- file.path(temp_dir, "output.txt")
 
   # Write should succeed for valid path
-  secure_write_file(test_file, "test content", allowed_dir = temp_dir)
+  secure_write_file(
+    test_file,
+    "test content",
+    allowed_dir = canonical_permission_root(temp_dir)
+  )
   expect_true(file.exists(test_file))
   expect_equal(readLines(test_file), "test content")
 })
@@ -309,7 +334,11 @@ test_that("secure_write_file creates parent directories", {
 
   nested_file <- file.path(temp_dir, "sub", "dir", "file.txt")
 
-  secure_write_file(nested_file, "nested", allowed_dir = temp_dir)
+  secure_write_file(
+    nested_file,
+    "nested",
+    allowed_dir = canonical_permission_root(temp_dir)
+  )
   expect_true(file.exists(nested_file))
   expect_equal(readLines(nested_file), "nested")
 })
@@ -318,7 +347,11 @@ test_that("secure_write_file rejects path outside allowed directory", {
   withr::local_tempdir(pattern = "deputy-test") -> temp_dir
 
   expect_error(
-    secure_write_file("/tmp/evil.txt", "content", allowed_dir = temp_dir),
+    secure_write_file(
+      "/tmp/evil.txt",
+      "content",
+      allowed_dir = canonical_permission_root(temp_dir)
+    ),
     "Path outside allowed directory"
   )
 })
@@ -329,7 +362,10 @@ test_that("secure_read_file reads content safely", {
   test_file <- file.path(temp_dir, "test.txt")
   writeLines(c("line 1", "line 2"), test_file)
 
-  result <- secure_read_file(test_file, allowed_dir = temp_dir)
+  result <- secure_read_file(
+    test_file,
+    allowed_dir = canonical_permission_root(temp_dir)
+  )
   expect_equal(result, "line 1\nline 2")
 })
 
@@ -337,7 +373,10 @@ test_that("secure_read_file rejects path outside allowed directory", {
   withr::local_tempdir(pattern = "deputy-test") -> temp_dir
 
   expect_error(
-    secure_read_file("/etc/passwd", allowed_dir = temp_dir),
+    secure_read_file(
+      "/etc/passwd",
+      allowed_dir = canonical_permission_root(temp_dir)
+    ),
     "Path outside allowed directory"
   )
 })
@@ -351,7 +390,35 @@ test_that("secure_read_file errors on non-existent file", {
   nonexistent <- file.path(temp_dir, "nonexistent.txt")
 
   expect_error(
-    secure_read_file(nonexistent, allowed_dir = temp_dir),
+    secure_read_file(
+      nonexistent,
+      allowed_dir = canonical_permission_root(temp_dir)
+    ),
     "File not found"
   )
+})
+
+test_that("validate_path_at_operation keeps the directory the policy resolved", {
+  skip_on_os("windows")
+  parent <- withr::local_tempdir(pattern = "deputy-test")
+  allowed <- file.path(parent, "allowed")
+  outside <- file.path(parent, "outside")
+  dir.create(allowed)
+  dir.create(outside)
+  root <- Permissions(file_write = allowed)@file_write
+
+  # The allowed directory is replaced by a link to another directory.
+  file.rename(allowed, file.path(parent, "moved"))
+  file.symlink(outside, allowed)
+  ran <- FALSE
+  expect_error(
+    validate_path_at_operation(
+      path = file.path(allowed, "file.txt"),
+      allowed_dir = root,
+      operation = function(p) ran <<- TRUE
+    ),
+    class = "deputy_unsafe_path"
+  )
+  expect_false(ran)
+  expect_false(file.exists(file.path(outside, "file.txt")))
 })
