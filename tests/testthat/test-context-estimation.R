@@ -543,3 +543,48 @@ test_that("usage saved in a session is not reused after loading", {
     estimate_tool_tokens(list(big))
   )
 })
+
+test_that("usage from before a model change is not reused", {
+  chat <- create_mock_chat(list("done"))
+  chat$set_model <- function(model) invisible(NULL)
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    reported_turn("A1", input = 60000, output = 10)
+  ))
+  agent <- Agent$new(chat = chat)
+  expect_gte(estimate_context(agent, list("Q2"))$tokens, 60000)
+
+  agent$set_model("another-model")
+  expect_lt(estimate_context(agent, list("Q2"))$tokens, 1000)
+})
+
+test_that("a provider count still records the frame for later estimates", {
+  counting <- TRUE
+  chat <- create_mock_chat(list("done"))
+  chat$token_count <- function(..., include = c("new", "complete")) {
+    if (counting) 90 else NULL
+  }
+  big <- ellmer::tool(
+    function(x) x,
+    strrep("A long tool description. ", 4000),
+    arguments = list(x = ellmer::type_string()),
+    name = "big_tool",
+    annotations = ellmer::tool_annotations(read_only_hint = TRUE)
+  )
+  agent <- Agent$new(chat = chat, tools = list(big))
+  agent$set_tools(list())
+  chat$set_turns(list(create_mock_user_turn("Q1")))
+  # The provider counts this request, made with no tools.
+  expect_identical(estimate_context(agent, list("Q1"))$source, "provider")
+  # Its response reports usage for that small frame.
+  chat$set_turns(c(
+    chat$get_turns(),
+    list(reported_turn("A1", input = 100, output = 10))
+  ))
+
+  agent$register_tool(big)
+  counting <- FALSE
+  estimate <- estimate_context(agent, list("Q2"))
+  expect_identical(estimate$source, "estimate")
+  expect_gte(estimate$tokens, estimate_tool_tokens(list(big)))
+})

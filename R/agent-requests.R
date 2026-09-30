@@ -299,6 +299,7 @@ try_chat_fallback <- function(agent, condition) {
   private$current_usage_baseline <- agent_usage_snapshot(replacement)
   state$fallback_index <- selected
   private$.fallback_position <- selected
+  private$mark_usage_stale()
   install_request_callbacks(agent)
   private$record_run_event(private$agent_event(
     "fallback",
@@ -441,6 +442,7 @@ replace_agent_chat <- function(agent, chat) {
   mark_chat_owner(chat, agent)
   # Fallbacks start again from the new primary Chat.
   private$.fallback_position <- 0L
+  private$mark_usage_stale()
   # The Agent now runs on the new Chat, so failing to clear the old one is
   # reported rather than presented as a failed swap.
   cleared <- tryCatch(

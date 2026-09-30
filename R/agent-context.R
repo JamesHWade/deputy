@@ -484,27 +484,32 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       ) {
         private$context_token_count(messages, turns = turns)
       }
-      if (!is.null(count)) {
-        return(list(tokens = count, source = "provider"))
-      }
-      if (!identical(policy$estimator, "auto")) {
+      estimate_locally <- is.null(count) && identical(policy$estimator, "auto")
+      if (is.null(count) && !estimate_locally) {
         return(NULL)
+      }
+      # A subset needs no frame record.
+      if (!is.null(count) && !is.null(turns)) {
+        return(list(tokens = count, source = "provider"))
       }
       tools <- tryCatch(private$.chat$get_tools(), error = function(e) list())
       system_prompt <- private$.chat$get_system_prompt()
       current <- turns %||% private$.chat$get_turns()
-      tokens <- local_context_estimate(
-        system_prompt = system_prompt,
-        tools = tools,
-        turns = current,
-        messages = messages,
-        use_usage = is.null(turns),
-        usage_after = private$.usage_stale_turns,
-        frame_snapshots = private$.frame_snapshots
-      )
+      tokens <- if (estimate_locally) {
+        local_context_estimate(
+          system_prompt = system_prompt,
+          tools = tools,
+          turns = current,
+          messages = messages,
+          use_usage = is.null(turns),
+          usage_after = private$.usage_stale_turns,
+          frame_snapshots = private$.frame_snapshots
+        )
+      }
       if (is.null(turns)) {
-        # The frame the upcoming request carries; a later estimate compares
-        # the current frame with it (see frame_growth()).
+        # The frame the upcoming request carries, recorded whether the
+        # provider counted or not; a later local estimate compares the
+        # current frame with it (see frame_growth()).
         snapshots <- c(
           private$.frame_snapshots,
           list(list(
@@ -519,7 +524,18 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         }
         private$.frame_snapshots <- snapshots
       }
+      if (!is.null(count)) {
+        return(list(tokens = count, source = "provider"))
+      }
       list(tokens = as.numeric(tokens), source = "estimate")
+    },
+
+    # Usage reported by another model or provider counts tokens differently,
+    # so none of it is reused after the model or Chat changes.
+    mark_usage_stale = function() {
+      private$.usage_stale_turns <- length(private$.chat$get_turns())
+      private$reset_frame_snapshots()
+      invisible(NULL)
     },
 
     # Forget frame records when turns are installed wholesale (creation,

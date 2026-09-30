@@ -1321,6 +1321,7 @@ Agent <- R6::R6Class(
     set_model = function(model) {
       check_conversation_lease(self, NULL)
       private$.chat$set_model(model)
+      private$mark_usage_stale()
       invisible(self)
     },
 
