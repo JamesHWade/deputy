@@ -1325,8 +1325,10 @@ Agent <- R6::R6Class(
     #' To change the model within one provider, use `$set_model()`. The
     #' replaced Chat is left with no tools or tool callbacks. Callbacks you
     #' registered directly on it are not moved; register them with
-    #' `$on_tool_request()` and `$on_tool_result()` instead.
-    #' @param chat An ellmer Chat with no turns or tools. Its system prompt is
+    #' `$on_tool_request()` and `$on_tool_result()` instead. An agent whose
+    #' Chat another agent also uses can't replace it.
+    #' @param chat An ellmer Chat with no turns or tools, not used by another
+    #'   agent. Its system prompt is
     #'   replaced by the agent's. Provider-native tools can't move between
     #'   Chats: remove them with `$set_tools()` first.
     #' @return The agent, invisibly.

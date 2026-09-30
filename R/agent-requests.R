@@ -313,16 +313,35 @@ try_chat_fallback <- function(agent, condition) {
 # still backs another Agent: rewiring it would bind that Agent's calls to the
 # wrong permissions, hooks and tools. The weak reference frees the Chat once
 # its Agent is gone.
+# Every live Agent built on a Chat, held by weak reference: Agents may share a
+# Chat, and set_chat() must not move one away from under another.
+chat_owners <- function(chat) {
+  refs <- attr(chat, "deputy_agent_owners", exact = TRUE)
+  owners <- lapply(refs, function(ref) {
+    if (rlang::is_weakref(ref)) rlang::wref_key(ref)
+  })
+  Filter(Negate(is.null), owners)
+}
+
 mark_chat_owner <- function(chat, agent) {
-  attr(chat, "deputy_agent_owner") <- if (!is.null(agent)) {
-    rlang::new_weakref(agent)
+  owners <- chat_owners(chat)
+  if (!any(vapply(owners, identical, logical(1), agent))) {
+    owners <- c(owners, list(agent))
+  }
+  attr(chat, "deputy_agent_owners") <- lapply(owners, rlang::new_weakref)
+  invisible(chat)
+}
+
+unmark_chat_owner <- function(chat, agent) {
+  owners <- Filter(function(owner) !identical(owner, agent), chat_owners(chat))
+  attr(chat, "deputy_agent_owners") <- if (length(owners)) {
+    lapply(owners, rlang::new_weakref)
   }
   invisible(chat)
 }
 
-chat_owner <- function(chat) {
-  ref <- attr(chat, "deputy_agent_owner", exact = TRUE)
-  if (rlang::is_weakref(ref)) rlang::wref_key(ref)
+other_chat_owners <- function(chat, agent) {
+  Filter(function(owner) !identical(owner, agent), chat_owners(chat))
 }
 
 # Agent$set_chat(): a host-selected replacement, moved between runs the way
@@ -349,8 +368,15 @@ replace_agent_chat <- function(agent, chat) {
   if (identical(chat, old)) {
     return(invisible(agent))
   }
-  owner <- chat_owner(chat)
-  if (!is.null(owner) && !identical(owner, agent)) {
+  # Another Agent built on the same Chat would lose its tools and callbacks
+  # when this one moves away.
+  if (length(other_chat_owners(old, agent))) {
+    abort_deputy(c(
+      "This Agent's Chat is shared with another Agent",
+      "i" = "Give each Agent its own Chat before replacing one."
+    ))
+  }
+  if (length(other_chat_owners(chat, agent))) {
     abort_deputy("This Chat already belongs to another Agent")
   }
   if (length(chat$get_turns()) || length(chat$get_tools())) {
@@ -400,12 +426,29 @@ replace_agent_chat <- function(agent, chat) {
     try(chat$set_system_prompt(destination_prompt), silent = TRUE)
     rlang::cnd_signal(moved)
   }
-  clear_chat_tool_callbacks(old)
-  old$set_tools(list())
-  mark_chat_owner(old, NULL)
+  unmark_chat_owner(old, agent)
   mark_chat_owner(chat, agent)
   # Fallbacks start again from the new primary Chat.
   private$.fallback_position <- 0L
+  # The Agent now runs on the new Chat, so failing to clear the old one is
+  # reported rather than presented as a failed swap.
+  cleared <- tryCatch(
+    {
+      clear_chat_tool_callbacks(old)
+      old$set_tools(list())
+      NULL
+    },
+    error = function(error) error
+  )
+  if (!is.null(cleared)) {
+    cli::cli_warn(
+      c(
+        "The Agent now uses the new Chat, but the old Chat couldn't be cleared.",
+        "i" = "Don't reuse the old Chat; its tools may still be bound to this Agent."
+      ),
+      parent = cleared
+    )
+  }
   invisible(agent)
 }
 

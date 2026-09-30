@@ -376,3 +376,27 @@ test_that("register_sub_agent() rolls back when the prompt can't be updated", {
   expect_identical(lead$sub_agent_defs[[1]]$description, "Finds sources.")
   expect_identical(lead$get_system_prompt(), prompt)
 })
+
+test_that("set_chat() refuses to move either Agent off a shared Chat", {
+  chat <- create_mock_chat()
+  first <- Agent$new(chat)
+  second <- Agent$new(chat)
+
+  expect_error(first$set_chat(create_mock_chat()), "shared with another Agent")
+  expect_error(second$set_chat(create_mock_chat()), "shared with another Agent")
+  expect_error(
+    Agent$new(create_mock_chat())$set_chat(chat),
+    "already belongs to another Agent"
+  )
+})
+
+test_that("a swap that can't clear the old Chat warns and keeps the new Chat", {
+  old <- create_mock_chat()
+  agent <- Agent$new(old)
+  old$set_tools <- function(tools) stop("cleanup refused")
+  new <- create_mock_chat()
+
+  expect_warning(agent$set_chat(new), "couldn't be cleared")
+  expect_identical(agent$.__enclos_env__$private$.chat, new)
+  expect_length(chat_owners(old), 0)
+})

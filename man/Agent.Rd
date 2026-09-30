@@ -1470,7 +1470,8 @@ after the change use the new Chat.
 To change the model within one provider, use \verb{$set_model()}. The
 replaced Chat is left with no tools or tool callbacks. Callbacks you
 registered directly on it are not moved; register them with
-\verb{$on_tool_request()} and \verb{$on_tool_result()} instead.
+\verb{$on_tool_request()} and \verb{$on_tool_result()} instead. An agent whose
+Chat another agent also uses can't replace it.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_chat(chat)}
@@ -1479,7 +1480,8 @@ registered directly on it are not moved; register them with
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{chat}}{An ellmer Chat with no turns or tools. Its system prompt is
+      \item{\code{chat}}{An ellmer Chat with no turns or tools, not used by another
+agent. Its system prompt is
 replaced by the agent's. Provider-native tools can't move between
 Chats: remove them with \verb{$set_tools()} first.}
     }
