@@ -88,9 +88,11 @@ test_that("run_r_code can't read host variables or .Renviron by default", {
   )
   expect_true(is_native_tool(allowed))
 
+  # callr reads R_ENVIRON_USER before a project .Renviron, and a parallel
+  # testthat worker, itself a callr child, has one set.
   inherited <- tools_code(env = "inherit")[[1]]
   expect_match(
-    inherited(code),
+    withr::with_envvar(c(R_ENVIRON_USER = NA), inherited(code)),
     "host-secret renviron-secret TRUE",
     fixed = TRUE
   )
