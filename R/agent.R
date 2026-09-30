@@ -181,6 +181,8 @@ Agent <- R6::R6Class(
       if (!S7::S7_inherits(permissions, Permissions)) {
         cli_abort("{.arg permissions} must be a Permissions object")
       }
+      # Set only when $initialize() is called again on an existing Agent.
+      previous_chat <- private$.chat
       private$.chat <- chat
       private$.permissions <- permissions
       private$.trusted_results <- normalize_trusted_results(trusted_results)
@@ -253,6 +255,9 @@ Agent <- R6::R6Class(
       reg.finalizer(self, finalize_owned_conversations, onexit = TRUE)
       # Marked only once construction succeeded, so a failed Agent$new() never
       # claims the Chat.
+      if (!is.null(previous_chat) && !identical(previous_chat, chat)) {
+        unmark_chat_owner(previous_chat, self)
+      }
       mark_chat_owner(chat, self)
       invisible(self)
     },

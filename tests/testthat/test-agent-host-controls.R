@@ -400,3 +400,13 @@ test_that("a swap that can't clear the old Chat warns and keeps the new Chat", {
   expect_identical(agent$.__enclos_env__$private$.chat, new)
   expect_length(chat_owners(old), 0)
 })
+
+test_that("reinitializing an Agent releases its previous Chat", {
+  chat <- create_mock_chat()
+  first <- Agent$new(chat)
+  second <- Agent$new(chat)
+  second$initialize(create_mock_chat())
+
+  expect_identical(chat_owners(chat), list(first))
+  expect_no_error(first$set_chat(create_mock_chat()))
+})

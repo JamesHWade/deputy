@@ -288,6 +288,8 @@ try_chat_fallback <- function(agent, condition) {
   # directory. The replacement never imports executable tools from a template.
   replacement$set_tools(lapply(private$.chat$get_tools(), private$adapt_tool))
   remove_request_callbacks(private$.chat)
+  unmark_chat_owner(private$.chat, agent)
+  mark_chat_owner(replacement, agent)
   private$.chat <- replacement
   replacement$on_tool_request(private$handle_tool_request)
   replacement$on_tool_result(private$handle_tool_result)
