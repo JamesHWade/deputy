@@ -477,10 +477,11 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
     # provider's count, or (for the "auto" estimator) a local estimate. A
     # subset of `turns` is estimated by characters: reported usage covers
     # the turns it omits.
-    context_estimate = function(messages, turns = NULL) {
+    context_estimate = function(messages, turns = NULL, local = FALSE) {
       policy <- private$.context_policy
       count <- if (
-        is.null(turns) || !ellmer_token_count_unsupported(private$.chat)
+        !isTRUE(local) &&
+          (is.null(turns) || !ellmer_token_count_unsupported(private$.chat))
       ) {
         private$context_token_count(messages, turns = turns)
       }
@@ -517,10 +518,16 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
             frame = estimate_frame_tokens(system_prompt, tools)
           ))
         )
-        # Keep the oldest record (the baseline for installed turns) and the
-        # latest few.
-        if (length(snapshots) > 8L) {
-          snapshots <- c(snapshots[1L], utils::tail(snapshots, 7L))
+        # Keep the oldest record (the baseline for installed turns) and
+        # merge the next two when there are too many. The merged record
+        # covers both ranges with the smaller frame, so growth measured
+        # against it can only be over-estimated.
+        while (length(snapshots) > 8L) {
+          merged <- list(
+            turns = snapshots[[2L]]$turns,
+            frame = min(snapshots[[2L]]$frame, snapshots[[3L]]$frame)
+          )
+          snapshots <- c(snapshots[1L], list(merged), snapshots[-(1:3)])
         }
         private$.frame_snapshots <- snapshots
       }
@@ -618,7 +625,9 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           next
         }
         count <- if (estimate) {
-          private$context_estimate(messages, turns = kept)$tokens
+          # The full estimate was already local; asking the provider again
+          # for each candidate would repeat a failing request.
+          private$context_estimate(messages, turns = kept, local = TRUE)$tokens
         } else {
           private$context_token_count(messages, turns = kept)
         }

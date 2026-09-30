@@ -207,22 +207,34 @@ estimate_text_tokens <- function(text) {
 # Byte counts alone under-count dense ASCII: base64, hashes, digits and
 # minified data tokenize at one to two characters per token. Split text where
 # tokenizers usually split it (a word, a single digit, a run of punctuation)
-# and charge each piece at least one token, and one per four bytes beyond.
+# and charge each piece at least one token, and one per three bytes beyond.
+# Words are rarely longer than 20 bytes; a longer piece with many distinct
+# characters is more likely an encoded payload in one case, charged at one
+# token per 1.5 bytes. Long runs of a few repeated characters stay cheap.
 context_estimate_piece_pattern <- "[A-Z]?[a-z]+|[A-Z]+|[0-9]|[^A-Za-z0-9\\s]+"
+context_estimate_word_bytes <- 20
+context_estimate_dense_bytes_per_token <- 1.5
+context_estimate_dense_distinct <- 8
 
 text_piece_tokens <- function(text) {
-  pieces <- gregexpr(
-    context_estimate_piece_pattern,
+  pieces <- regmatches(
     text,
-    perl = TRUE,
-    useBytes = TRUE
+    gregexpr(context_estimate_piece_pattern, text, perl = TRUE, useBytes = TRUE)
   )
   sum(vapply(
     pieces,
-    function(match) {
-      lengths <- attr(match, "match.length")
-      lengths <- lengths[lengths > 0]
-      sum(pmax(1, ceiling(lengths / 4)))
+    function(piece) {
+      lengths <- nchar(piece, type = "bytes")
+      tokens <- pmax(1, ceiling(lengths / context_estimate_bytes_per_token))
+      for (i in which(lengths > context_estimate_word_bytes)) {
+        distinct <- length(unique(charToRaw(piece[[i]])))
+        if (distinct >= context_estimate_dense_distinct) {
+          tokens[[i]] <- ceiling(
+            lengths[[i]] / context_estimate_dense_bytes_per_token
+          )
+        }
+      }
+      sum(tokens)
     },
     numeric(1)
   ))
@@ -356,6 +368,12 @@ estimate_document_tokens <- function(data, mime_type = "") {
     length(payload)
   }
   by_payload <- ceiling(bytes / context_estimate_bytes_per_token)
+  text <- if (!is.null(payload) && !any(payload == as.raw(0))) {
+    rawToChar(payload)
+  }
+  if (!is.null(text) && validUTF8(text)) {
+    by_payload <- max(by_payload, estimate_text_tokens(text))
+  }
   if (!identical(mime_type, "application/pdf")) {
     return(max(context_estimate_page_tokens, by_payload))
   }

@@ -608,3 +608,56 @@ test_that("dense ASCII is estimated at under two characters per token", {
     ceiling(nchar(prose) / context_estimate_bytes_per_token)
   )
 })
+
+test_that("long single-case runs are estimated as dense data", {
+  set.seed(2)
+  base32 <- paste(sample(c(LETTERS, 2:7), 60000, replace = TRUE), collapse = "")
+  upper <- paste(sample(LETTERS, 60000, replace = TRUE), collapse = "")
+  expect_gt(estimate_text_tokens(upper), 32000)
+  expect_gt(estimate_text_tokens(base32), 32000)
+  expect_equal(
+    estimate_text_tokens("Donaudampfschiff"),
+    ceiling(nchar("Donaudampfschiff") / 3)
+  )
+})
+
+test_that("a local full estimate selects kept turns without provider counts", {
+  counted <- 0L
+  local_mocked_bindings(chat_token_count = function(chat, messages) {
+    counted <<- counted + 1L
+    NULL
+  })
+  chat <- create_mock_chat(list("done"))
+  turns <- list()
+  for (i in 1:10) {
+    turns <- c(
+      turns,
+      list(create_mock_user_turn(strrep("q", 3000))),
+      list(reported_turn(paste0("A", i), input = 1000 * i, output = 50))
+    )
+  }
+  chat$set_turns(turns)
+  agent <- Agent$new(
+    chat = chat,
+    context_policy = ContextPolicy(max_tokens = 5000, fallback = "text")
+  )
+  suppressWarnings(agent$run_sync("next"))
+  expect_s7_class(agent$last_compaction(), DeputyCompaction)
+  expect_lte(counted, 3L)
+})
+
+test_that("merged frame records never under-count growth", {
+  chat <- create_mock_chat()
+  chat$set_turns(rep(list(create_mock_user_turn("Q")), 9))
+  agent <- Agent$new(chat = chat)
+  private <- agent$.__enclos_env__$private
+  private$.frame_snapshots <- lapply(1:8, function(i) {
+    list(turns = i, frame = if (i == 3L) 10 else 1000)
+  })
+  estimate_context(agent, list("Q"))
+  snapshots <- private$.frame_snapshots
+  expect_length(snapshots, 8L)
+  # The small frame at turn 3 survives, now covering turns 2 and 3.
+  expect_equal(snapshots[[2]], list(turns = 2L, frame = 10))
+  expect_equal(frame_growth(500, snapshots, 3L), 490)
+})
