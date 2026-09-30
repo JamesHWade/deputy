@@ -353,6 +353,7 @@ DelegationSubscription <- R6::R6Class(
     #'   `cursor`.
     snapshot = function(transcript = FALSE) {
       private$authorize()
+      private$check_stream()
       if (
         !is.logical(transcript) || length(transcript) != 1L || is.na(transcript)
       ) {
@@ -393,6 +394,7 @@ DelegationSubscription <- R6::R6Class(
     #' `redact` errors, the cursor doesn't move.
     poll = function() {
       private$authorize()
+      private$check_stream()
       lead <- private$lead
       buffer <- lead$.__enclos_env__$private$.delegation_buffer
       cursor <- observation_cursor(buffer)
@@ -456,6 +458,16 @@ DelegationSubscription <- R6::R6Class(
         private$requester,
         inspection_scope(private$lead)
       )
+    },
+    # A lead that moved to another conversation started a new stream
+    # (`set_delegation_sources(clear_records = TRUE)`); a subscription on the
+    # old one fails rather than reading, or skipping, the new stream's events.
+    check_stream = function() {
+      validate_observation_cursor(
+        private$position,
+        private$lead$.__enclos_env__$private$.delegation_buffer
+      )
+      invisible(NULL)
     }
   )
 )

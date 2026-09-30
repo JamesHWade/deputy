@@ -185,6 +185,95 @@ LeadAgent <- R6::R6Class(
     },
 
     #' @description
+    #' Replace the sources a subagent can be given as evidence, for example
+    #' when a drawing is revised or a document is added during a conversation.
+    #' The new list replaces the old one completely. Each delegation uses the
+    #' sources as they were when it started, so a delegation already running is
+    #' not affected.
+    #'
+    #' @param sources Unnamed list of source records, as for `new()`'s
+    #'   `delegation_sources`.
+    #' @param scope A new `delegation_scope` (`owner_id` and `conversation_id`),
+    #'   or `NULL` to keep the current one. The scope can change only when no
+    #'   run or delegation is in progress and no retained agent is held. Earlier
+    #'   subagent records and activity belong to the old conversation, so the
+    #'   change is refused while they exist unless `clear_records = TRUE`.
+    #' @param clear_records If `TRUE`, discard earlier subagent records and
+    #'   activity when the scope changes, instead of refusing the change. Use
+    #'   it when moving the lead to another conversation. Subscriptions from
+    #'   `$observe_subagents()` made before the change stop working.
+    #' @return The lead, invisibly.
+    set_delegation_sources = function(
+      sources = list(),
+      scope = NULL,
+      clear_records = FALSE
+    ) {
+      current <- private$delegation_scope
+      if (is.null(current)) {
+        current <- list()
+      }
+      normalized <- normalize_delegation_sources(
+        sources,
+        if (is.null(scope)) current else scope
+      )
+      new_scope <- normalize_run_context(normalized$scope, "delegation_scope")
+      if (!identical(new_scope, current)) {
+        # A child launched through the delegate tool outside a lead run is
+        # active without `run_active`; clearing its record would break its
+        # settlement.
+        if (isTRUE(private$run_active) || length(private$active_subagents)) {
+          delegation_input_abort(
+            "invalid",
+            "The delegation scope cannot change while a delegation is running."
+          )
+        }
+        # A retained specialist keeps its history from this scope, and
+        # continuing it would publish that history under the new one. It is
+        # released explicitly, never here.
+        if (length(private$owned_conversations)) {
+          delegation_input_abort(
+            "invalid",
+            paste(
+              "The delegation scope cannot change while retained agents from",
+              "the current scope are held; release them first."
+            )
+          )
+        }
+        # Retained runs and observation events carry no scope of their own:
+        # inspection and observation authorize against the lead's current
+        # scope, so moving it would disclose them to the new conversation.
+        # A host that moves the lead to another conversation passes
+        # `clear_records = TRUE`: the records stay behind with the old scope
+        # rather than moving with the lead.
+        buffer <- private$.delegation_buffer
+        retained <- length(private$subagent_runs) ||
+          (!is.null(buffer) && length(buffer$events))
+        if (retained && !isTRUE(clear_records)) {
+          delegation_input_abort(
+            "invalid",
+            paste(
+              "The delegation scope cannot change while delegation records",
+              "from the current scope are retained; pass",
+              "`clear_records = TRUE` to discard them."
+            )
+          )
+        }
+        if (retained) {
+          private$subagent_runs <- list()
+        }
+        # A new stream on every scope change, even an empty one: a
+        # subscription from the old scope must fail its cursor check rather
+        # than read the new scope's events.
+        if (!is.null(buffer)) {
+          private$.delegation_buffer <- new_delegation_buffer(buffer$policy)
+        }
+      }
+      private$delegation_sources <- normalized$sources
+      private$delegation_scope <- new_scope
+      invisible(self)
+    },
+
+    #' @description
     #' Add a subagent definition, or replace one with the same name, for
     #' example to give a subagent a different set of tools. Delegations that
     #' are already running keep the definition they started with.
