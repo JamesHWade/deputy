@@ -1,15 +1,13 @@
 # deputy (development version)
 
-* `LeadAgent$set_delegation_sources()` replaces the host-owned source snapshot
-  after construction, so a host whose sources change during a conversation
-  (a drawing revised, a document added) can offer them as evidence. The scope
-  can change only between runs, and only once the retained delegation records
-  and observation events from the current scope are gone: inspection and
-  observation authorize against the lead's current scope, so a host moving the
-  lead to another conversation passes `clear_records = TRUE` to discard them.
-  An evidence reference that does not resolve now names the sources available
-  in scope (and a stale revision names the current one) instead of "Requested
-  evidence is unavailable."
+* New `LeadAgent$set_delegation_sources()` replaces the sources a subagent can
+  be given as evidence, so sources that change during a conversation (a
+  drawing revised, a document added) can be offered. The scope can change
+  only between runs; earlier subagent records belong to the old conversation,
+  so the change is refused while they exist unless `clear_records = TRUE`
+  discards them. An evidence reference that doesn't match now lists the
+  sources available (and a stale revision names the current one) instead of
+  "Requested evidence is unavailable."
 
 * New `Agent$set_chat()` replaces the Chat an agent sends requests to, so a
   host can continue a conversation with a model from another provider. The

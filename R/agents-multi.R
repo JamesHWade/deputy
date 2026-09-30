@@ -185,28 +185,24 @@ LeadAgent <- R6::R6Class(
     },
 
     #' @description
-    #' Replace the host-owned delegation source snapshot.
-    #'
-    #' A host whose sources change during a conversation (a drawing revised, a
-    #' document added) replaces the whole snapshot here; there is no partial
-    #' update. Each delegation resolves its evidence against the snapshot
-    #' current when it is admitted, so a replacement never changes a
-    #' delegation already running.
+    #' Replace the sources a subagent can be given as evidence, for example
+    #' when a drawing is revised or a document is added during a conversation.
+    #' The new list replaces the old one completely. Each delegation uses the
+    #' sources as they were when it started, so a delegation already running is
+    #' not affected.
     #'
     #' @param sources Unnamed list of source records, as for `new()`'s
     #'   `delegation_sources`.
-    #' @param scope Optional new `delegation_scope` (`owner_id` and
-    #'   `conversation_id`). `NULL` keeps the current scope. A scope can change
-    #'   only while no run or delegation is active and no retained agent is
-    #'   held, and, unless `clear_records = TRUE`, while no delegation record
-    #'   or observation event from the current scope is retained, since
-    #'   inspection and observation authorize against the lead's current scope.
-    #' @param clear_records When the scope changes, discard the retained
-    #'   delegation records and observation events from the current scope
-    #'   instead of refusing the change. A host that moves the lead to another
-    #'   conversation passes `TRUE`; observers of the old stream then fail
-    #'   their cursor check.
-    #' @return Invisible self
+    #' @param scope A new `delegation_scope` (`owner_id` and `conversation_id`),
+    #'   or `NULL` to keep the current one. The scope can change only when no
+    #'   run or delegation is in progress and no retained agent is held. Earlier
+    #'   subagent records and activity belong to the old conversation, so the
+    #'   change is refused while they exist unless `clear_records = TRUE`.
+    #' @param clear_records If `TRUE`, discard earlier subagent records and
+    #'   activity when the scope changes, instead of refusing the change. Use
+    #'   it when moving the lead to another conversation. Subscriptions from
+    #'   `$observe_subagents()` made before the change stop working.
+    #' @return The lead, invisibly.
     set_delegation_sources = function(
       sources = list(),
       scope = NULL,

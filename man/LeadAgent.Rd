@@ -216,13 +216,11 @@ results are recorded in the lead's run and passed to its \code{on_result}.}
 \if{html}{\out{<a id="method-LeadAgent-set_delegation_sources"></a>}}
 \if{latex}{\out{\hypertarget{method-LeadAgent-set_delegation_sources}{}}}
 \subsection{\code{LeadAgent$set_delegation_sources()}}{
-  Replace the host-owned delegation source snapshot.
-
-A host whose sources change during a conversation (a drawing revised, a
-document added) replaces the whole snapshot here; there is no partial
-update. Each delegation resolves its evidence against the snapshot
-current when it is admitted, so a replacement never changes a
-delegation already running.
+  Replace the sources a subagent can be given as evidence, for example
+when a drawing is revised or a document is added during a conversation.
+The new list replaces the old one completely. Each delegation uses the
+sources as they were when it started, so a delegation already running is
+not affected.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{LeadAgent$set_delegation_sources(
@@ -237,22 +235,20 @@ delegation already running.
     \describe{
       \item{\code{sources}}{Unnamed list of source records, as for \code{new()}'s
 \code{delegation_sources}.}
-      \item{\code{scope}}{Optional new \code{delegation_scope} (\code{owner_id} and
-\code{conversation_id}). \code{NULL} keeps the current scope. A scope can change
-only while no run or delegation is active and no retained agent is
-held, and, unless \code{clear_records = TRUE}, while no delegation record
-or observation event from the current scope is retained, since
-inspection and observation authorize against the lead's current scope.}
-      \item{\code{clear_records}}{When the scope changes, discard the retained
-delegation records and observation events from the current scope
-instead of refusing the change. A host that moves the lead to another
-conversation passes \code{TRUE}; observers of the old stream then fail
-their cursor check.}
+      \item{\code{scope}}{A new \code{delegation_scope} (\code{owner_id} and \code{conversation_id}),
+or \code{NULL} to keep the current one. The scope can change only when no
+run or delegation is in progress and no retained agent is held. Earlier
+subagent records and activity belong to the old conversation, so the
+change is refused while they exist unless \code{clear_records = TRUE}.}
+      \item{\code{clear_records}}{If \code{TRUE}, discard earlier subagent records and
+activity when the scope changes, instead of refusing the change. Use
+it when moving the lead to another conversation. Subscriptions from
+\verb{$observe_subagents()} made before the change stop working.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    Invisible self
+    The lead, invisibly.
   }
 }
 
