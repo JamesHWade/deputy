@@ -39,6 +39,22 @@ tools_file <- function() {
 #' `r_code = TRUE` and `bash = TRUE` in [Permissions()]. For an OS sandbox, use
 #' [tools_mcp_repl()].
 #'
+#' The processes don't inherit your environment variables, and R there
+#' doesn't read `.Renviron`. They get the variables that locate programs,
+#' libraries, locales and temporary files, such as `PATH`, `HOME`, `LANG` and
+#' `TMPDIR`, plus the ones you name in `env`.
+#' This keeps keys out of what the code is given, not out of its reach: code
+#' running as your user account can still read your R session's starting
+#' environment through the operating system, and any file your account can
+#' read, `.Renviron` included. To keep keys from the code, run it under an
+#' account that can't read them, or in a sandbox.
+#'
+#' @param env The names of other environment variables the code may read,
+#'   such as `c("HTTPS_PROXY", "NO_PROXY")` behind a proxy. Proxy settings
+#'   match in either case, so `"HTTPS_PROXY"` passes `https_proxy` too.
+#'   `"inherit"` passes your whole environment, including every key it
+#'   holds.
+#'
 #' @return A list of tools.
 #'
 #' @examples
@@ -52,10 +68,14 @@ tools_file <- function() {
 #'
 #' @seealso [tool_run_r_code], [tool_run_bash]
 #' @export
-tools_code <- function() {
+tools_code <- function(env = NULL) {
+  if (is.null(env)) {
+    return(list(tool_run_r_code, tool_run_bash))
+  }
+  env <- check_subprocess_env(env)
   list(
-    tool_run_r_code,
-    tool_run_bash
+    new_tool_run_r_code(env),
+    new_tool_run_bash(env)
   )
 }
 
@@ -216,6 +236,7 @@ get_provider_name <- function(chat) {
 #' permissions deny them and the web tools; [permissions_full()] allows
 #' everything.
 #'
+#' @inheritParams tools_code
 #' @return A list of tools.
 #'
 #' @examples
@@ -229,7 +250,8 @@ get_provider_name <- function(chat) {
 #' }
 #'
 #' @export
-tools_all <- function() {
+tools_all <- function(env = NULL) {
+  code <- tools_code(env)
   list(
     tool_read_file,
     tool_read_markdown,
@@ -239,8 +261,8 @@ tools_all <- function() {
     tool_list_files,
     tool_glob_files,
     tool_grep_files,
-    tool_run_r_code,
-    tool_run_bash,
+    code[[1]],
+    code[[2]],
     tool_read_csv,
     tool_web_fetch,
     tool_web_search
@@ -268,6 +290,7 @@ ToolPresets <- c("minimal", "standard", "dev", "data", "full")
 #'   * `"data"`: data analysis
 #'     (`read_file`, `read_markdown`, `list_files`, `read_csv`, `run_r_code`).
 #'   * `"full"`: everything in [tools_all()].
+#' @inheritParams tools_code
 #'
 #' @return A list of tools.
 #'
@@ -296,13 +319,17 @@ ToolPresets <- c("minimal", "standard", "dev", "data", "full")
 #'
 #' @seealso [tools_file()], [tools_code()], [tools_data()], [tools_all()]
 #' @export
-tools_preset <- function(name) {
+tools_preset <- function(name, env = NULL) {
   if (!name %in% ToolPresets) {
     cli_abort(c(
       "Unknown tool preset: {.val {name}}",
       "i" = "Available presets: {.val {ToolPresets}}"
     ))
   }
+  # The code tools, started with `env` (see tools_code()).
+  code <- tools_code(env)
+  run_r_code <- code[[1]]
+  run_bash <- code[[2]]
 
   switch(
     name,
@@ -322,16 +349,16 @@ tools_preset <- function(name) {
       tool_read_markdown,
       tool_write_file,
       tool_list_files,
-      tool_run_r_code,
-      tool_run_bash
+      run_r_code,
+      run_bash
     ),
     data = list(
       tool_read_file,
       tool_read_markdown,
       tool_list_files,
       tool_read_csv,
-      tool_run_r_code
+      run_r_code
     ),
-    full = tools_all()
+    full = tools_all(env)
   )
 }

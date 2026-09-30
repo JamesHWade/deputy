@@ -13,6 +13,16 @@ The process runs with your user account's access to files and the network;
 it is not an OS sandbox. The default permissions deny the tool; allow it
 with \code{r_code = TRUE} in \code{\link[=Permissions]{Permissions()}}. \verb{$run()} runs code directly,
 without permission checks. See \code{vignette("code-execution")}.
+
+The process doesn't inherit your environment variables, and R there doesn't
+read \code{.Renviron}. It gets the variables that locate programs, libraries,
+locales and temporary files, such as \code{PATH}, \code{HOME}, \code{LANG} and \code{TMPDIR},
+plus the ones you name in \code{env}.
+This keeps keys out of what the code is given, not out of its reach: code
+running as your user account can still read your R session's starting
+environment through the operating system, and any file your account can
+read, \code{.Renviron} included. To keep keys from the code, run it under an
+account that can't read them, or in a sandbox.
 }
 \section{Working directory and resets}{
 
@@ -78,7 +88,9 @@ doesn't limit what the R code can do.
   max_output_bytes = 8 * 1024 * 1024,
   plot_width = 1000L,
   plot_height = 650L,
-  tools = character()
+  tools = character(),
+  env = NULL,
+  libpath = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -96,6 +108,13 @@ limits captured output, not memory use.}
       \item{\code{plot_width, plot_height}}{PNG plot size in pixels, at most 4096.}
       \item{\code{tools}}{Names of tools registered on \code{agent} that R code may call
 as \verb{tools$<name>(...)}. None by default.}
+      \item{\code{env}}{The names of other environment variables the R code may
+read, such as \code{c("HTTPS_PROXY", "NO_PROXY")} behind a proxy.
+\code{"inherit"} passes your whole environment, including every key it
+holds.}
+      \item{\code{libpath}}{The library directories the R process loads packages
+from, searched in order. \code{NULL} uses your session's \code{.libPaths()} each
+time a process starts.}
     }
     \if{html}{\out{</div>}}
   }

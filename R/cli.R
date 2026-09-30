@@ -69,6 +69,8 @@ cli_normalize_config <- function(config) {
     "task"
   )
   config[nullable] <- lapply(config[nullable], cli_null_if_na)
+  # Added after the other options, so a config without it still works.
+  config$code_env <- cli_code_env(config$code_env)
 
   if (
     !is.character(config$dir) ||
@@ -158,8 +160,20 @@ cli_create_chat <- function(provider, model) {
   )
 }
 
-cli_get_tools <- function(preset, include_ask = TRUE) {
-  tools <- tools_preset(preset)
+# `--code-env`: the variables the code tools may read, or "inherit".
+cli_code_env <- function(value) {
+  if (is.null(value) || (length(value) == 1L && is.na(value))) {
+    return(NULL)
+  }
+  names <- cli_split_csv_values(value)
+  if (!length(names)) {
+    return(NULL)
+  }
+  check_subprocess_env(names, arg = "--code-env", class = "cli_config_error")
+}
+
+cli_get_tools <- function(preset, include_ask = TRUE, env = NULL) {
+  tools <- tools_preset(preset, env = env)
   if (include_ask) {
     c(tools, list(tool_ask_user))
   } else {
@@ -624,7 +638,11 @@ deputy_cli_main <- function(config) {
 
   agent <- Agent$new(
     chat = chat,
-    tools = cli_get_tools(config$tools, include_ask = !config$no_ask),
+    tools = cli_get_tools(
+      config$tools,
+      include_ask = !config$no_ask,
+      env = config$code_env
+    ),
     system_prompt = cli_get_system_prompt(
       config$system_prompt,
       config$system_prompt_file

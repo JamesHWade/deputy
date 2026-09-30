@@ -4,7 +4,14 @@
 \alias{tools_code}
 \title{Get the code execution tools}
 \usage{
-tools_code()
+tools_code(env = NULL)
+}
+\arguments{
+\item{env}{The names of other environment variables the code may read,
+such as \code{c("HTTPS_PROXY", "NO_PROXY")} behind a proxy. Proxy settings
+match in either case, so \code{"HTTPS_PROXY"} passes \code{https_proxy} too.
+\code{"inherit"} passes your whole environment, including every key it
+holds.}
 }
 \value{
 A list of tools.
@@ -15,6 +22,16 @@ user account's access. Each call runs in a separate process, which is not a
 sandbox. \code{\link[=permissions_standard]{permissions_standard()}} denies both tools; allow them with
 \code{r_code = TRUE} and \code{bash = TRUE} in \code{\link[=Permissions]{Permissions()}}. For an OS sandbox, use
 \code{\link[=tools_mcp_repl]{tools_mcp_repl()}}.
+
+The processes don't inherit your environment variables, and R there
+doesn't read \code{.Renviron}. They get the variables that locate programs,
+libraries, locales and temporary files, such as \code{PATH}, \code{HOME}, \code{LANG} and
+\code{TMPDIR}, plus the ones you name in \code{env}.
+This keeps keys out of what the code is given, not out of its reach: code
+running as your user account can still read your R session's starting
+environment through the operating system, and any file your account can
+read, \code{.Renviron} included. To keep keys from the code, run it under an
+account that can't read them, or in a sandbox.
 }
 \examples{
 \dontrun{

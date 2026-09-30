@@ -152,3 +152,4 @@
     Condition
       Error in `compaction_automatic()`:
       ! `automatic` must be TRUE or FALSE
+

@@ -88,6 +88,7 @@ deputy/
 │   ├── tool-runtime.R      # Runtime tool wrapping, native markers and result offloading
 │   ├── tool-request-validation.R # Provider tool request validation
 │   ├── tools-execution.R   # Trusted one-shot R and shell tools
+│   ├── subprocess-env.R    # Allow-listed environment for model-code subprocesses
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
 │   ├── tools-mcp.R         # MCP discovery and sandboxed mcp-repl boundary
@@ -658,6 +659,12 @@ Cancellation discards live variables; saved turns preserve code, output and
 plots, not resumable R state. Native image/text bounds preserve display extras.
 Native artifact digests use content types and public properties, excluding
 mutable S7 class environments; legacy value digests remain supported.
+The worker and the one-shot `run_r_code`/`run_bash` tools start from an
+allow-listed environment (`R/subprocess-env.R`, #224; hygiene, not isolation:
+same-account code can still read `/proc/<pid>/environ`): host variables
+outside the base set are unset and `.Renviron` isn't reread unless named in
+`env`; `env = "inherit"` opts out. `RSession$new(libpath = )` sets the
+worker's library order, default the host's `.libPaths()` at each start.
 See `dev/conversation-r-runtime.md` for host lifecycle and recovery contracts.
 `evaluate`, `grDevices` and `htmltools` support capture and escaped displays;
 shinychat remains optional. This is not an OS security sandbox.

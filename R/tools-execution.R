@@ -1,6 +1,11 @@
 # Trusted one-shot R and shell tools.
 
-run_r_code_impl <- function(code, timeout = 30, working_dir = getwd()) {
+run_r_code_impl <- function(
+  code,
+  timeout = 30,
+  working_dir = getwd(),
+  env = NULL
+) {
   rlang::check_installed("callr", reason = "to execute R code in a subprocess")
 
   result <- tryCatch(
@@ -23,7 +28,8 @@ run_r_code_impl <- function(code, timeout = 30, working_dir = getwd()) {
       },
       args = list(code_string = code),
       timeout = timeout,
-      wd = working_dir
+      wd = working_dir,
+      env = subprocess_env(env)
     ),
     error = function(e) {
       if (inherits(e, "callr_timeout_error")) {
@@ -54,6 +60,34 @@ run_r_code_impl <- function(code, timeout = 30, working_dir = getwd()) {
   paste(parts, collapse = "\n")
 }
 
+new_tool_run_r_code <- function(env = NULL) {
+  tool <- ellmer::tool(
+    fun = function(code) {
+      run_r_code_impl(code, env = env)
+    },
+    name = "run_r_code",
+    description = paste(
+      "Execute R code in a separate process and return the output and result.",
+      "Process isolation is not an OS security sandbox."
+    ),
+    arguments = list(
+      code = ellmer::type_string("R code to execute")
+      # Note: process isolation and timeout are internal, not exposed to the LLM
+    ),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = FALSE,
+      destructive_hint = TRUE,
+      open_world_hint = TRUE
+    )
+  )
+  attr(tool, "deputy_workspace_runner") <-
+    function(arguments, working_dir) {
+      run_r_code_impl(arguments$code, working_dir = working_dir, env = env)
+    }
+  # Deputy's own tool; see mark_native_tool().
+  mark_native_tool(tool)
+}
+
 #' Execute R code
 #'
 #' @description
@@ -66,6 +100,16 @@ run_r_code_impl <- function(code, timeout = 30, working_dir = getwd()) {
 #' separate process protects your R session from crashes; it is not a sandbox.
 #' The default permissions deny this tool; allow it with `r_code = TRUE` in
 #' [Permissions()]. For an OS sandbox, use [tools_mcp_repl()].
+#'
+#' The process doesn't inherit your environment variables, and R there doesn't
+#' read `.Renviron`; a project `.Rprofile` still runs. It gets the variables
+#' that locate programs, libraries, locales and temporary files. To pass
+#' others, use [tools_code()] with `env`.
+#' This keeps keys out of what the code is given, not out of its reach: code
+#' running as your user account can still read your R session's starting
+#' environment through the operating system, and any file your account can
+#' read, `.Renviron` included. To keep keys from the code, run it under an
+#' account that can't read them, or in a sandbox.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
 #' @return The captured output and the printed value as one string.
@@ -82,29 +126,7 @@ run_r_code_impl <- function(code, timeout = 30, working_dir = getwd()) {
 #' }
 #'
 #' @export
-tool_run_r_code <- ellmer::tool(
-  fun = function(code) {
-    run_r_code_impl(code)
-  },
-  name = "run_r_code",
-  description = paste(
-    "Execute R code in a separate process and return the output and result.",
-    "Process isolation is not an OS security sandbox."
-  ),
-  arguments = list(
-    code = ellmer::type_string("R code to execute")
-    # Note: process isolation and timeout are internal, not exposed to the LLM
-  ),
-  annotations = ellmer::tool_annotations(
-    read_only_hint = FALSE,
-    destructive_hint = TRUE,
-    open_world_hint = TRUE
-  )
-)
-attr(tool_run_r_code, "deputy_workspace_runner") <-
-  function(arguments, working_dir) {
-    run_r_code_impl(arguments$code, working_dir = working_dir)
-  }
+tool_run_r_code <- new_tool_run_r_code()
 
 # A non-zero exit is a failed step: the model sees the status and both streams.
 bash_result <- function(output, errors, status) {
@@ -122,7 +144,12 @@ bash_result <- function(output, errors, status) {
   if (!nzchar(text)) "Command executed successfully (no output)" else text
 }
 
-run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
+run_bash_impl <- function(
+  command,
+  timeout = 30,
+  working_dir = getwd(),
+  env = NULL
+) {
   # Use callr for reliable timeout enforcement if available
   if (rlang::is_installed("callr")) {
     # The shell inherits the child's stderr, so this file captures its errors.
@@ -146,7 +173,8 @@ run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
         args = list(cmd = command),
         timeout = timeout,
         wd = working_dir,
-        stderr = stderr_file
+        stderr = stderr_file,
+        env = subprocess_env(env)
       ),
       error = function(e) {
         if (inherits(e, "callr_timeout_error")) {
@@ -189,6 +217,31 @@ run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
   }
 }
 
+new_tool_run_bash <- function(env = NULL) {
+  tool <- ellmer::tool(
+    fun = function(command) {
+      run_bash_impl(command, env = env)
+    },
+    name = "run_bash",
+    description = "Execute a bash/shell command and return the output. Use with caution - this can execute arbitrary system commands.",
+    arguments = list(
+      command = ellmer::type_string("The bash command to execute")
+      # Note: timeout is an internal parameter, not exposed to LLM
+    ),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = FALSE,
+      destructive_hint = TRUE,
+      open_world_hint = TRUE
+    )
+  )
+  attr(tool, "deputy_workspace_runner") <-
+    function(arguments, working_dir) {
+      run_bash_impl(arguments$command, working_dir = working_dir, env = env)
+    }
+  # Deputy's own tool; see mark_native_tool().
+  mark_native_tool(tool)
+}
+
 #' Execute bash commands
 #'
 #' @description
@@ -196,6 +249,15 @@ run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
 #' any command your user account can, and nothing is sandboxed. Commands time
 #' out after 30 seconds. The default permissions deny this tool; allow it with
 #' `bash = TRUE` in [Permissions()].
+#'
+#' The command doesn't inherit your environment variables. It gets the
+#' variables that locate programs, libraries, locales and temporary files. To
+#' pass others, use [tools_code()] with `env`.
+#' This keeps keys out of what the code is given, not out of its reach: code
+#' running as your user account can still read your R session's starting
+#' environment through the operating system, and any file your account can
+#' read, `.Renviron` included. To keep keys from the code, run it under an
+#' account that can't read them, or in a sandbox.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
 #' @return The command's output as one string, with standard error after a
@@ -214,27 +276,4 @@ run_bash_impl <- function(command, timeout = 30, working_dir = getwd()) {
 #' }
 #'
 #' @export
-tool_run_bash <- ellmer::tool(
-  fun = function(command) {
-    run_bash_impl(command)
-  },
-  name = "run_bash",
-  description = "Execute a bash/shell command and return the output. Use with caution - this can execute arbitrary system commands.",
-  arguments = list(
-    command = ellmer::type_string("The bash command to execute")
-    # Note: timeout is an internal parameter, not exposed to LLM
-  ),
-  annotations = ellmer::tool_annotations(
-    read_only_hint = FALSE,
-    destructive_hint = TRUE,
-    open_world_hint = TRUE
-  )
-)
-attr(tool_run_bash, "deputy_workspace_runner") <-
-  function(arguments, working_dir) {
-    run_bash_impl(arguments$command, working_dir = working_dir)
-  }
-
-# Deputy's own tools; see mark_native_tool().
-tool_run_r_code <- mark_native_tool(tool_run_r_code)
-tool_run_bash <- mark_native_tool(tool_run_bash)
+tool_run_bash <- new_tool_run_bash()
