@@ -169,6 +169,26 @@ test_that("set_chat() refuses Chats and states it can't take over", {
   expect_error(native$set_chat(create_mock_chat()), "Provider-native tools")
 })
 
+test_that("a failed set_chat() leaves both Chats as they were", {
+  agent <- Agent$new(
+    create_mock_chat(list("old")),
+    tools = list(host_controls_tool()),
+    system_prompt = "Be brief."
+  )
+  agent$set_turns(list(create_mock_user_turn("earlier")))
+  new <- create_mock_chat(list("new"))
+  new$set_system_prompt("Destination prompt.")
+  new$set_tools <- function(new_tools) stop("tools refused")
+
+  expect_error(agent$set_chat(new), "tools refused")
+
+  expect_identical(new$get_system_prompt(), "Destination prompt.")
+  expect_length(new$get_turns(), 0L)
+  expect_identical(agent$get_system_prompt(), "Be brief.")
+  expect_length(agent$get_turns(), 1L)
+  expect_named(agent$get_tools(), "lookup")
+})
+
 test_that("set_chat() rewires tool observers and leaves the old Chat inert", {
   old <- ellmer::chat_openai(
     model = "gpt-4o-mini",

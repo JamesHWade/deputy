@@ -370,21 +370,28 @@ replace_agent_chat <- function(agent, chat) {
     ))
   }
 
-  chat$set_system_prompt(old$get_system_prompt())
-  chat$set_turns(portable_turns(old$get_turns()))
-  chat$set_tools(tools)
-  private$.chat <- chat
-  rewired <- tryCatch(
+  # If moving fails, the destination is returned empty, with its own prompt,
+  # so the caller can retry with it.
+  destination_prompt <- chat$get_system_prompt()
+  moved <- tryCatch(
     {
+      chat$set_system_prompt(old$get_system_prompt())
+      chat$set_turns(portable_turns(old$get_turns()))
+      chat$set_tools(tools)
+      private$.chat <- chat
       private$rewire_chat_runtime()
       NULL
     },
     error = function(error) error
   )
-  if (!is.null(rewired)) {
+  if (!is.null(moved)) {
     private$.chat <- old
     try(private$rewire_chat_runtime(), silent = TRUE)
-    rlang::cnd_signal(rewired)
+    try(clear_chat_tool_callbacks(chat), silent = TRUE)
+    try(chat$set_tools(list()), silent = TRUE)
+    try(chat$set_turns(list()), silent = TRUE)
+    try(chat$set_system_prompt(destination_prompt), silent = TRUE)
+    rlang::cnd_signal(moved)
   }
   clear_chat_tool_callbacks(old)
   old$set_tools(list())
