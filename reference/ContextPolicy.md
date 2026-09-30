@@ -21,7 +21,8 @@ ContextPolicy(
   offload_dir = NULL,
   summary_fallback_chats = list(),
   max_tool_result_image_bytes = 2 * 1024 * 1024,
-  max_tool_result_images = 4L
+  max_tool_result_images = 4L,
+  estimator = c("auto", "provider")
 )
 ```
 
@@ -79,6 +80,19 @@ ContextPolicy(
   default. `0` moves all images out; `NULL` removes the limit. Image
   limits are separate from `max_tool_result_bytes`.
 
+- estimator:
+
+  How to measure the context when the provider can't count tokens (some
+  gateways answer the counting request with HTTP 404). `"auto"` (the
+  default) asks the provider first and otherwise estimates: the usage
+  the provider reported for its latest response, plus an estimate of
+  what was added since, including a longer system prompt or new tools.
+  Without reported usage, everything is estimated. Estimates assume
+  three bytes of text per token, a fixed amount per image and per
+  document page, so they run high for typical text. `"provider"` uses
+  only the provider's count, so automatic compaction doesn't run when
+  the provider can't count.
+
 ## Value
 
 A `ContextPolicy` object.
@@ -95,6 +109,13 @@ and in saved sessions. If summarising fails or is cancelled, the
 conversation is left as it was.
 [Agent](https://jameshwade.github.io/deputy/reference/Agent.md)`$last_compaction()`
 describes the latest compaction, including every summary attempt.
+
+The `"compaction_start"` run event records `estimate_source`,
+`"provider"` or `"estimate"`. Usage reported before a compaction or a
+`$microcompact()`, or saved in a session, isn't reused until the
+provider reports usage for the smaller context. A token-counting request
+that fails with HTTP 404, 405 or 501 isn't repeated for the same
+provider and base URL.
 
 The policy is read-only: read fields with `$`, and create a new policy
 to change one (the example shows how). The Chats in
@@ -114,6 +135,7 @@ do.call(ContextPolicy, settings)
 #> <ContextPolicy>
 #>   compact at: 24000 tokens
 #>   compact to: 50%
+#>   estimator: auto
 #>   fallback: text
 #>   summary fallback Chats: 0
 #>   offload above: 65536 bytes

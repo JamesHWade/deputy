@@ -40,6 +40,11 @@ agent <- Agent$new(
 )
 ```
 
+Some providers and gateways can’t count tokens. Deputy then estimates
+the size from the usage the provider reported for its latest response
+plus what was added since; `ContextPolicy(estimator = "provider")`
+instead turns automatic compaction off for those providers.
+
 `ContextPolicy(max_tokens = NULL)` turns automatic compaction off. The
 summary request is an ordinary model request: it counts against the
 run’s limits and can be interrupted with the run. Because the summary

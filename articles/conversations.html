@@ -138,6 +138,11 @@ after all pending tool results are in.</p>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  context_policy <span class="op">=</span> <span class="fu"><a href="../reference/ContextPolicy.html">ContextPolicy</a></span><span class="op">(</span>max_tokens <span class="op">=</span> <span class="fl">64000</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>Some providers and gateways can’t count tokens. Deputy then estimates
+the size from the usage the provider reported for its latest response
+plus what was added since;
+<code>ContextPolicy(estimator = "provider")</code> instead turns
+automatic compaction off for those providers.</p>
 <p><code>ContextPolicy(max_tokens = NULL)</code> turns automatic
 compaction off. The summary request is an ordinary model request: it
 counts against the run’s limits and can be interrupted with the run.
