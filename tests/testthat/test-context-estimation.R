@@ -514,3 +514,32 @@ test_that("each turn and tool call carries a framing allowance", {
   )
   expect_gte(estimate_content_tokens(result), context_estimate_tool_call_tokens)
 })
+
+test_that("usage saved in a session is not reused after loading", {
+  chat <- create_mock_chat(list("done"))
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    reported_turn("A1", input = 100, output = 10)
+  ))
+  agent <- Agent$new(chat = chat)
+  path <- withr::local_tempfile(fileext = ".rds")
+  suppressMessages(agent$save_session(path))
+
+  # The receiving Agent's tools are larger than those the saved usage counted.
+  big <- ellmer::tool(
+    function(x) x,
+    strrep("A long tool description. ", 4000),
+    arguments = list(x = ellmer::type_string()),
+    name = "big_tool",
+    annotations = ellmer::tool_annotations(read_only_hint = TRUE)
+  )
+  restored <- Agent$new(
+    chat = create_mock_chat(list("done")),
+    tools = list(big)
+  )
+  suppressMessages(restored$load_session(path))
+  expect_gte(
+    estimate_context(restored, list("Q2"))$tokens,
+    estimate_tool_tokens(list(big))
+  )
+})
