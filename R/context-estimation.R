@@ -196,8 +196,36 @@ estimate_text_tokens <- function(text) {
   if (!length(text)) {
     return(0)
   }
-  bytes <- nchar(enc2utf8(text), type = "bytes")
-  ceiling(sum(bytes) / context_estimate_bytes_per_token)
+  text <- enc2utf8(text)
+  bytes <- sum(nchar(text, type = "bytes"))
+  max(
+    ceiling(bytes / context_estimate_bytes_per_token),
+    text_piece_tokens(text)
+  )
+}
+
+# Byte counts alone under-count dense ASCII: base64, hashes, digits and
+# minified data tokenize at one to two characters per token. Split text where
+# tokenizers usually split it (a word, a single digit, a run of punctuation)
+# and charge each piece at least one token, and one per four bytes beyond.
+context_estimate_piece_pattern <- "[A-Z]?[a-z]+|[A-Z]+|[0-9]|[^A-Za-z0-9\\s]+"
+
+text_piece_tokens <- function(text) {
+  pieces <- gregexpr(
+    context_estimate_piece_pattern,
+    text,
+    perl = TRUE,
+    useBytes = TRUE
+  )
+  sum(vapply(
+    pieces,
+    function(match) {
+      lengths <- attr(match, "match.length")
+      lengths <- lengths[lengths > 0]
+      sum(pmax(1, ceiling(lengths / 4)))
+    },
+    numeric(1)
+  ))
 }
 
 # Tokens for model-facing content: turns, content objects, strings or lists.

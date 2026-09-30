@@ -588,3 +588,23 @@ test_that("a provider count still records the frame for later estimates", {
   expect_identical(estimate$source, "estimate")
   expect_gte(estimate$tokens, estimate_tool_tokens(list(big)))
 })
+
+test_that("dense ASCII is estimated at under two characters per token", {
+  set.seed(1)
+  base64 <- paste(
+    sample(c(LETTERS, letters, 0:9, "+", "/"), 60000, replace = TRUE),
+    collapse = ""
+  )
+  hex <- paste(
+    sample(c(0:9, letters[1:6]), 6400, replace = TRUE),
+    collapse = ""
+  )
+  prose <- strrep("The quick brown fox jumps over the lazy dog. ", 100)
+
+  expect_gt(estimate_text_tokens(base64), 32000)
+  expect_gt(estimate_text_tokens(hex), 3200)
+  expect_equal(
+    estimate_text_tokens(prose),
+    ceiling(nchar(prose) / context_estimate_bytes_per_token)
+  )
+})
