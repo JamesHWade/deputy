@@ -4,7 +4,14 @@
 \alias{tools_all}
 \title{Get all built-in tools}
 \usage{
-tools_all()
+tools_all(env = NULL)
+}
+\arguments{
+\item{env}{The names of other environment variables the code may read,
+such as \code{c("HTTPS_PROXY", "NO_PROXY")} behind a proxy. Proxy settings
+match in either case, so \code{"HTTPS_PROXY"} passes \code{https_proxy} too.
+\code{"inherit"} passes your whole environment, including every key it
+holds.}
 }
 \value{
 A list of tools.

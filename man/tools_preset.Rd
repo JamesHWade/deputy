@@ -4,7 +4,7 @@
 \alias{tools_preset}
 \title{Get a tool preset by name}
 \usage{
-tools_preset(name)
+tools_preset(name, env = NULL)
 }
 \arguments{
 \item{name}{The preset name. One of:
@@ -19,6 +19,12 @@ tools_preset(name)
 (\code{read_file}, \code{read_markdown}, \code{list_files}, \code{read_csv}, \code{run_r_code}).
 \item \code{"full"}: everything in \code{\link[=tools_all]{tools_all()}}.
 }}
+
+\item{env}{The names of other environment variables the code may read,
+such as \code{c("HTTPS_PROXY", "NO_PROXY")} behind a proxy. Proxy settings
+match in either case, so \code{"HTTPS_PROXY"} passes \code{https_proxy} too.
+\code{"inherit"} passes your whole environment, including every key it
+holds.}
 }
 \value{
 A list of tools.

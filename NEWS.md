@@ -9,6 +9,18 @@
   sources available (and a stale revision names the current one) instead of
   "Requested evidence is unavailable."
 
+* `RSession`, `tool_run_r_code` and `tool_run_bash` no longer pass the host's
+  environment variables to the process that runs model-written code, and R
+  there no longer reads `~/.Renviron` or a project `.Renviron`. The process
+  gets the variables that locate programs, libraries, locales and temporary
+  files. Name others, such as proxy settings, with the new `env` argument to
+  `RSession$new()`, `tools_code()`, `tools_preset()` and `tools_all()`, or
+  the command-line app's `--code-env`; `env = "inherit"` passes everything,
+  as before. This keeps credentials out of what the code is given, not out of
+  its reach: code running as the same user can still read the starting
+  environment of the R process through the operating system, and any file
+  that user can read (#224).
+
 * New `Agent$set_chat()` replaces the Chat an agent sends requests to, so a
   host can continue a conversation with a model from another provider. The
   conversation, system prompt and tools move to the new Chat, reasoning

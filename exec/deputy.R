@@ -58,6 +58,9 @@ mcp_config <- NA_character_
 #| description: "MCP server name to load; repeat for multiple servers"
 mcp_server <- c()
 
+#| description: "Environment variables code tools may read, comma-separated (such as HTTPS_PROXY), or 'inherit' for all"
+code_env <- NA_character_
+
 #| description: "Working directory for file operations"
 #| short: 'd'
 dir <- "."
@@ -96,6 +99,7 @@ deputy:::deputy_cli_main(list(
   mcp = mcp,
   mcp_config = mcp_config,
   mcp_server = mcp_server,
+  code_env = code_env,
   dir = dir,
   verbose = verbose,
   no_color = no_color,

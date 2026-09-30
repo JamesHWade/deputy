@@ -35,6 +35,7 @@ test_that("the package executable exposes the Rapp command surface", {
   expect_true(grepl("-d, --dir <DIR>", help, fixed = TRUE))
   expect_true(grepl("-n, --max-requests <MAX-REQUESTS>", help, fixed = TRUE))
   expect_true(grepl("--mcp-server <MCP-SERVER>", help, fixed = TRUE))
+  expect_true(grepl("--code-env <CODE-ENV>", help, fixed = TRUE))
   expect_true(grepl("<TASK>  Task to run", help, fixed = TRUE))
   expect_false(grepl("-x, --task", help, fixed = TRUE))
   expect_false(grepl("--permission-mode", help, fixed = TRUE))
@@ -88,6 +89,8 @@ test_that("Rapp parses CLI options before entering the package runtime", {
       "alpha",
       "--mcp-server",
       "beta",
+      "--code-env",
+      "HTTPS_PROXY, NO_PROXY",
       "-d",
       working_dir,
       "-v",
@@ -113,6 +116,7 @@ test_that("Rapp parses CLI options before entering the package runtime", {
   expect_true(captured$mcp)
   expect_equal(captured$mcp_config, ".mcp.json")
   expect_equal(captured$mcp_server, c("alpha", "beta"))
+  expect_equal(captured$code_env, "HTTPS_PROXY, NO_PROXY")
   expect_equal(captured$dir, working_dir)
   expect_true(captured$verbose)
   expect_true(captured$no_color)

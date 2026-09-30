@@ -26,6 +26,28 @@ not ask Agent permission. This is process isolation with the local account's
 access, not an OS security sandbox. Hosts needing untrusted multi-user execution
 must provide a suitable external isolation boundary.
 
+The worker starts from an allow-listed environment rather than the host's
+(#224): system variables that locate programs, libraries, locales and
+temporary files, plus the names the host passes as `RSession$new(env = )`
+(proxy names match in either case). Every other host variable is unset for
+the child, and its user environ file is the null device, so it doesn't
+reread `~/.Renviron` or a project `.Renviron`, and no child can leave
+settings there for the next. `env = "inherit"` restores the inherited
+environment. `tools_code(env = )`, `tools_preset(env = )`, `tools_all(env = )`
+and the CLI's `--code-env` do the same for the one-shot `run_r_code` and
+`run_bash` tools.
+
+This is hygiene, not isolation. The child runs as the host's user, so it can
+read the host's starting environment from `/proc/<pid>/environ` (unsetting a
+variable in the host does not clear it there) and any file the account can
+read, `.Renviron` included. callr copies the site `Renviron.site` into the
+child, and the one-shot tools keep callr's default of running a project
+`.Rprofile`. For the one-shot tools callr applies the child's environment to
+the host process for the length of the call, so the host's own variables are
+unset until the call returns. Keeping credentials from model-written code
+needs a separate account or the sandboxed MCP workers, which still start with
+the host's environment.
+
 ## Compose selected tools from R
 
 A host can select tools that R code may request through Deputy:

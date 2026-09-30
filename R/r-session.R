@@ -11,6 +11,16 @@
 #' with `r_code = TRUE` in [Permissions()]. `$run()` runs code directly,
 #' without permission checks. See `vignette("code-execution")`.
 #'
+#' The process doesn't inherit your environment variables, and R there doesn't
+#' read `.Renviron`. It gets the variables that locate programs, libraries,
+#' locales and temporary files, such as `PATH`, `HOME`, `LANG` and `TMPDIR`,
+#' plus the ones you name in `env`.
+#' This keeps keys out of what the code is given, not out of its reach: code
+#' running as your user account can still read your R session's starting
+#' environment through the operating system, and any file your account can
+#' read, `.Renviron` included. To keep keys from the code, run it under an
+#' account that can't read them, or in a sandbox.
+#'
 #' @section Working directory and resets:
 #' Each call starts in the agent's working directory; `setwd()` lasts until
 #' the next call. `$cancel()` and timeouts kill the R process and discard its
@@ -60,6 +70,10 @@ RSession <- R6::R6Class(
     #' @param max_output_bytes Maximum bytes of output kept per call. This
     #'   limits captured output, not memory use.
     #' @param plot_width,plot_height PNG plot size in pixels, at most 4096.
+    #' @param env The names of other environment variables the R code may
+    #'   read, such as `c("HTTPS_PROXY", "NO_PROXY")` behind a proxy.
+    #'   `"inherit"` passes your whole environment, including every key it
+    #'   holds.
     initialize = function(
       agent,
       timeout = 30,
@@ -68,7 +82,8 @@ RSession <- R6::R6Class(
       max_output_bytes = 8 * 1024 * 1024,
       plot_width = 1000L,
       plot_height = 650L,
-      tools = character()
+      tools = character(),
+      env = NULL
     ) {
       private$owner <- r_session_owner(agent)
       private$agent <- agent
@@ -122,13 +137,15 @@ RSession <- R6::R6Class(
           class = "r_session"
         )
       }
+      env <- check_subprocess_env(env, class = "r_session")
       private$settings <- list(
         timeout = timeout,
         startup_timeout = startup_timeout,
         queue_limit = queue_limit,
         max_output_bytes = max_output_bytes,
         plot_width = plot_width,
-        plot_height = plot_height
+        plot_height = plot_height,
+        env = env
       )
       private$id <- new_deputy_id("r_session_")
       private$resource <- new.env(parent = emptyenv())
@@ -636,6 +653,7 @@ RSession <- R6::R6Class(
                 libpath = .libPaths(),
                 user_profile = FALSE,
                 system_profile = FALSE,
+                env = subprocess_env(private$settings$env),
                 # Let processx finalize its own native resources. Calling
                 # callr$close() from an R finalizer can re-enter pipe cleanup.
                 extra = list(cleanup_tree = TRUE)
