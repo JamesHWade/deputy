@@ -211,7 +211,10 @@ estimate_text_tokens <- function(text) {
 # Words are rarely longer than 20 bytes; a longer piece with many distinct
 # characters is more likely an encoded payload in one case, charged at one
 # token per 1.5 bytes. Long runs of a few repeated characters stay cheap.
-context_estimate_piece_pattern <- "[A-Z]?[a-z]+|[A-Z]+|[0-9]|[^A-Za-z0-9\\s]+"
+# Outside ASCII, every character counts as a token: Greek, Cyrillic, Hebrew
+# and Arabic take two bytes each but can tokenize at about one per character.
+context_estimate_piece_pattern <-
+  "[A-Z]?[a-z]+|[A-Z]+|[0-9]|[\\x21-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\x7e]+"
 context_estimate_word_bytes <- 20
 context_estimate_dense_bytes_per_token <- 1.5
 context_estimate_dense_distinct <- 8
@@ -237,6 +240,17 @@ text_piece_tokens <- function(text) {
       sum(tokens)
     },
     numeric(1)
+  )) +
+    non_ascii_characters(text)
+}
+
+# UTF-8 lead bytes, one per character outside ASCII.
+non_ascii_characters <- function(text) {
+  sum(vapply(
+    text,
+    function(value) sum(charToRaw(value) >= as.raw(0xc0)),
+    numeric(1),
+    USE.NAMES = FALSE
   ))
 }
 

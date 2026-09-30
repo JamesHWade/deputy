@@ -661,3 +661,11 @@ test_that("merged frame records never under-count growth", {
   expect_equal(snapshots[[2]], list(turns = 2L, frame = 10))
   expect_equal(frame_growth(500, snapshots, 3L), 490)
 })
+
+test_that("two-byte scripts count a token per character", {
+  cyrillic <- strrep("Привет ", 8000)
+  greek <- strrep("αβγδ", 5000)
+  expect_gte(estimate_text_tokens(cyrillic), 40000)
+  expect_gte(estimate_text_tokens(greek), 20000)
+  expect_equal(estimate_text_tokens(strrep("中", 300)), 300)
+})
