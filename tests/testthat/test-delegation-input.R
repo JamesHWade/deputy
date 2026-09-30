@@ -545,7 +545,11 @@ test_that("stateless receipts retain the effective lead context policy", {
   chat <- runtime_chat(server)
   rlang::env_binding_unlock(chat, "token_count")
   chat$token_count <- function(...) 40
-  policy <- ContextPolicy(max_tokens = 50, max_tool_result_bytes = 2048)
+  policy <- ContextPolicy(
+    max_tokens = 50,
+    max_tool_result_bytes = 2048,
+    estimator = "provider"
+  )
   lead <- LeadAgent$new(
     chat,
     sub_agents = list(agent_definition("a", "A", "ROLE")),
@@ -559,6 +563,7 @@ test_that("stateless receipts retain the effective lead context policy", {
     manifest$policies$context_policy$max_tool_result_bytes,
     2048L
   )
+  expect_identical(manifest$policies$context_policy$estimator, "provider")
   expect_length(server$requests(), 1L)
 })
 
