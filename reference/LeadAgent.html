@@ -97,6 +97,7 @@ its answer. See <code><a href="../articles/multi-agent.html">vignette("multi-age
 <div class="section">
 <h3 id="public-methods">Public methods<a class="anchor" aria-label="anchor" href="#public-methods"></a></h3>
 <p></p><ul><li><p><a href="#method-LeadAgent-initialize"><code>LeadAgent$new()</code></a></p></li>
+<li><p><a href="#method-LeadAgent-set_delegation_sources"><code>LeadAgent$set_delegation_sources()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-register_sub_agent"><code>LeadAgent$register_sub_agent()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-available_sub_agents"><code>LeadAgent$available_sub_agents()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-parallel_delegate"><code>LeadAgent$parallel_delegate()</code></a></p></li>
@@ -321,21 +322,37 @@ results are recorded in the lead's run and passed to its <code>on_result</code>.
 
 </div>
 
-<p></p><hr><a id="method-LeadAgent-register_sub_agent"></a><div class="section">
-<h3 id="leadagent-register-sub-agent-"><code>LeadAgent$register_sub_agent()</code><a class="anchor" aria-label="anchor" href="#leadagent-register-sub-agent-"></a></h3>
-<p>Add a subagent definition, or replace one with the same name, for
-example to give a subagent a different set of tools. Delegations that
-are already running keep the definition they started with.</p><div class="section">
+<p></p><hr><a id="method-LeadAgent-set_delegation_sources"></a><div class="section">
+<h3 id="leadagent-set-delegation-sources-"><code>LeadAgent$set_delegation_sources()</code><a class="anchor" aria-label="anchor" href="#leadagent-set-delegation-sources-"></a></h3>
+<p>Replace the sources a subagent can be given as evidence, for example
+when a drawing is revised or a document is added during a conversation.
+The new list replaces the old one completely. Each delegation uses the
+sources as they were when it started, so a delegation already running is
+not affected.</p><div class="section">
 <h4 id="usage-1">Usage<a class="anchor" aria-label="anchor" href="#usage-1"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">register_sub_agent</span><span class="op">(</span><span class="va">definition</span>, replace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">set_delegation_sources</span><span class="op">(</span></span>
+<span>  sources <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  scope <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  clear_records <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-1">Arguments<a class="anchor" aria-label="anchor" href="#arguments-1"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>definition</code></dt>
-<dd><p>An <code><a href="agent_definition.html">agent_definition()</a></code> object</p></dd>
+<p></p><div class="arguments"><dl><dt><code>sources</code></dt>
+<dd><p>Unnamed list of source records, as for <code>new()</code>'s
+<code>delegation_sources</code>.</p></dd>
 
-      <dt><code>replace</code></dt>
-<dd><p>If <code>TRUE</code>, replace a registered definition with the same
-name. If <code>FALSE</code> (the default), a name clash is an error.</p></dd>
+      <dt><code>scope</code></dt>
+<dd><p>A new <code>delegation_scope</code> (<code>owner_id</code> and <code>conversation_id</code>),
+or <code>NULL</code> to keep the current one. The scope can change only when no
+run or delegation is in progress and no retained agent is held. Earlier
+subagent records and activity belong to the old conversation, so the
+change is refused while they exist unless <code>clear_records = TRUE</code>.</p></dd>
+
+      <dt><code>clear_records</code></dt>
+<dd><p>If <code>TRUE</code>, discard earlier subagent records and
+activity when the scope changes, instead of refusing the change. Use
+it when moving the lead to another conversation. Subscriptions from
+<code>$observe_subagents()</code> made before the change stop working.</p></dd>
 
 
 </dl><p></p></div>
@@ -346,13 +363,38 @@ name. If <code>FALSE</code> (the default), a name clash is an error.</p></dd>
 
 </div>
 
+<p></p><hr><a id="method-LeadAgent-register_sub_agent"></a><div class="section">
+<h3 id="leadagent-register-sub-agent-"><code>LeadAgent$register_sub_agent()</code><a class="anchor" aria-label="anchor" href="#leadagent-register-sub-agent-"></a></h3>
+<p>Add a subagent definition, or replace one with the same name, for
+example to give a subagent a different set of tools. Delegations that
+are already running keep the definition they started with.</p><div class="section">
+<h4 id="usage-2">Usage<a class="anchor" aria-label="anchor" href="#usage-2"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">register_sub_agent</span><span class="op">(</span><span class="va">definition</span>, replace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-2">Arguments<a class="anchor" aria-label="anchor" href="#arguments-2"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>definition</code></dt>
+<dd><p>An <code><a href="agent_definition.html">agent_definition()</a></code> object</p></dd>
+
+      <dt><code>replace</code></dt>
+<dd><p>If <code>TRUE</code>, replace a registered definition with the same
+name. If <code>FALSE</code> (the default), a name clash is an error.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-2">Returns<a class="anchor" aria-label="anchor" href="#returns-2"></a></h4>
+<p>The lead, invisibly.</p>
+</div>
+
+</div>
+
 <p></p><hr><a id="method-LeadAgent-available_sub_agents"></a><div class="section">
 <h3 id="leadagent-available-sub-agents-"><code>LeadAgent$available_sub_agents()</code><a class="anchor" aria-label="anchor" href="#leadagent-available-sub-agents-"></a></h3>
 <p>List the names of the registered subagent definitions.</p><div class="section">
-<h4 id="usage-2">Usage<a class="anchor" aria-label="anchor" href="#usage-2"></a></h4>
+<h4 id="usage-3">Usage<a class="anchor" aria-label="anchor" href="#usage-3"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">available_sub_agents</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-2">Returns<a class="anchor" aria-label="anchor" href="#returns-2"></a></h4>
+<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
 <p>A character vector.</p>
 </div>
 
@@ -364,7 +406,7 @@ name. If <code>FALSE</code> (the default), a name clash is an error.</p></dd>
 <p>Each named definition gets a fresh conversation, no tools and at most
 one model request, so definitions with tools, skills or <code>mcp_servers</code>
 are rejected. The lead's conversation is not changed.</p><div class="section">
-<h4 id="usage-3">Usage<a class="anchor" aria-label="anchor" href="#usage-3"></a></h4>
+<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">parallel_delegate</span><span class="op">(</span></span>
 <span>  <span class="va">tasks</span>,</span>
 <span>  max_active <span class="op">=</span> <span class="fl">2L</span>,</span>
@@ -373,7 +415,7 @@ are rejected. The lead's conversation is not changed.</p><div class="section">
 <span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-2">Arguments<a class="anchor" aria-label="anchor" href="#arguments-2"></a></h4>
+<h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>tasks</code></dt>
 <dd><p>A named character vector, or a named list of strings and
 <a href="DelegationInput.html">DelegationInput</a> objects. Each name selects a different registered
@@ -398,7 +440,7 @@ batch.</p></dd>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
 <p>A list with <code>mode</code>, <code>results</code> (<a href="AgentResult.html">AgentResult</a> objects, <code>NULL</code>
 where none was returned), <code>outcomes</code> (<a href="DelegationOutcome.html">DelegationOutcome</a> objects),
 <code>errors</code>, <code>status</code>, and <code>run</code>, an <a href="AgentResult.html">AgentResult</a> for the whole batch
@@ -412,7 +454,7 @@ other results.</p>
 <p></p><hr><a id="method-LeadAgent-parallel_delegate_async"></a><div class="section">
 <h3 id="leadagent-parallel-delegate-async-"><code>LeadAgent$parallel_delegate_async()</code><a class="anchor" aria-label="anchor" href="#leadagent-parallel-delegate-async-"></a></h3>
 <p>Version of <code>$parallel_delegate()</code> that doesn't block R.</p><div class="section">
-<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">parallel_delegate_async</span><span class="op">(</span></span>
 <span>  <span class="va">tasks</span>,</span>
 <span>  max_active <span class="op">=</span> <span class="fl">2L</span>,</span>
@@ -421,7 +463,7 @@ other results.</p>
 <span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
+<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>tasks, max_active, mode, usage_limits, run_context</code></dt>
 <dd><p>See
 <code>$parallel_delegate()</code>.</p></dd>
@@ -429,7 +471,7 @@ other results.</p>
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
+<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
 <p>A promise that resolves to the same list as
 <code>$parallel_delegate()</code>. Calling <code>$interrupt()</code> cancels tasks that
 haven't started and asks running subagents to stop.</p>
@@ -440,17 +482,17 @@ haven't started and asks running subagents to stop.</p>
 <p></p><hr><a id="method-LeadAgent-interrupt"></a><div class="section">
 <h3 id="leadagent-interrupt-"><code>LeadAgent$interrupt()</code><a class="anchor" aria-label="anchor" href="#leadagent-interrupt-"></a></h3>
 <p>Ask the lead and its running subagents to stop.</p><div class="section">
-<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
+<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">interrupt</span><span class="op">(</span>reason <span class="op">=</span> <span class="st">"interrupted"</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
+<h4 id="arguments-5">Arguments<a class="anchor" aria-label="anchor" href="#arguments-5"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>reason</code></dt>
 <dd><p>Reason recorded on the stopped runs.</p></dd>
 
 
 </dl><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
+<h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
 <p>Invisibly, whether the lead or a subagent was running.</p>
 </div>
 
@@ -459,7 +501,7 @@ haven't started and asks running subagents to stop.</p>
 <p></p><hr><a id="method-LeadAgent-print"></a><div class="section">
 <h3 id="leadagent-print-"><code>LeadAgent$print()</code><a class="anchor" aria-label="anchor" href="#leadagent-print-"></a></h3>
 <p>Print the lead and the names of its subagent definitions.</p><div class="section">
-<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
+<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -468,10 +510,10 @@ haven't started and asks running subagents to stop.</p>
 <p></p><hr><a id="method-LeadAgent-clone"></a><div class="section">
 <h3 id="leadagent-clone-"><code>LeadAgent$clone()</code><a class="anchor" aria-label="anchor" href="#leadagent-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
+<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">LeadAgent</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-5">Arguments<a class="anchor" aria-label="anchor" href="#arguments-5"></a></h4>
+<h4 id="arguments-6">Arguments<a class="anchor" aria-label="anchor" href="#arguments-6"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

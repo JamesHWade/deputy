@@ -26,6 +26,8 @@ its answer. See
 
 - [`LeadAgent$new()`](#method-LeadAgent-initialize)
 
+- [`LeadAgent$set_delegation_sources()`](#method-LeadAgent-set_delegation_sources)
+
 - [`LeadAgent$register_sub_agent()`](#method-LeadAgent-register_sub_agent)
 
 - [`LeadAgent$available_sub_agents()`](#method-LeadAgent-available_sub_agents)
@@ -300,6 +302,49 @@ Create a new LeadAgent.
 #### Returns
 
 A new `LeadAgent` object
+
+------------------------------------------------------------------------
+
+### `LeadAgent$set_delegation_sources()`
+
+Replace the sources a subagent can be given as evidence, for example
+when a drawing is revised or a document is added during a conversation.
+The new list replaces the old one completely. Each delegation uses the
+sources as they were when it started, so a delegation already running is
+not affected.
+
+#### Usage
+
+    LeadAgent$set_delegation_sources(
+      sources = list(),
+      scope = NULL,
+      clear_records = FALSE
+    )
+
+#### Arguments
+
+- `sources`:
+
+  Unnamed list of source records, as for `new()`'s `delegation_sources`.
+
+- `scope`:
+
+  A new `delegation_scope` (`owner_id` and `conversation_id`), or `NULL`
+  to keep the current one. The scope can change only when no run or
+  delegation is in progress and no retained agent is held. Earlier
+  subagent records and activity belong to the old conversation, so the
+  change is refused while they exist unless `clear_records = TRUE`.
+
+- `clear_records`:
+
+  If `TRUE`, discard earlier subagent records and activity when the
+  scope changes, instead of refusing the change. Use it when moving the
+  lead to another conversation. Subscriptions from
+  `$observe_subagents()` made before the change stop working.
+
+#### Returns
+
+The lead, invisibly.
 
 ------------------------------------------------------------------------
 

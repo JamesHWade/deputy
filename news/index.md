@@ -2,6 +2,15 @@
 
 ## deputy (development version)
 
+- New `LeadAgent$set_delegation_sources()` replaces the sources a
+  subagent can be given as evidence, so sources that change during a
+  conversation (a drawing revised, a document added) can be offered. The
+  scope can change only between runs; earlier subagent records belong to
+  the old conversation, so the change is refused while they exist unless
+  `clear_records = TRUE` discards them. An evidence reference that
+  doesn’t match now lists the sources available (and a stale revision
+  names the current one) instead of “Requested evidence is unavailable.”
+
 - New `Agent$set_chat()` replaces the Chat an agent sends requests to,
   so a host can continue a conversation with a model from another
   provider. The conversation, system prompt and tools move to the new
