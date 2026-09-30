@@ -288,6 +288,8 @@ try_chat_fallback <- function(agent, condition) {
   # directory. The replacement never imports executable tools from a template.
   replacement$set_tools(lapply(private$.chat$get_tools(), private$adapt_tool))
   remove_request_callbacks(private$.chat)
+  unmark_chat_owner(private$.chat, agent)
+  mark_chat_owner(replacement, agent)
   private$.chat <- replacement
   replacement$on_tool_request(private$handle_tool_request)
   replacement$on_tool_result(private$handle_tool_result)
@@ -307,6 +309,219 @@ try_chat_fallback <- function(agent, condition) {
     usage = usage
   ))
   TRUE
+}
+
+# An Agent marks the Chat it wraps, so set_chat() can't take over a Chat that
+# still backs another Agent: rewiring it would bind that Agent's calls to the
+# wrong permissions, hooks and tools. The weak reference frees the Chat once
+# its Agent is gone.
+# Every live Agent built on a Chat, held by weak reference: Agents may share a
+# Chat, and set_chat() must not move one away from under another.
+chat_owners <- function(chat) {
+  refs <- attr(chat, "deputy_agent_owners", exact = TRUE)
+  owners <- lapply(refs, function(ref) {
+    if (rlang::is_weakref(ref)) rlang::wref_key(ref)
+  })
+  Filter(Negate(is.null), owners)
+}
+
+mark_chat_owner <- function(chat, agent) {
+  owners <- chat_owners(chat)
+  if (!any(vapply(owners, identical, logical(1), agent))) {
+    owners <- c(owners, list(agent))
+  }
+  attr(chat, "deputy_agent_owners") <- lapply(owners, rlang::new_weakref)
+  invisible(chat)
+}
+
+unmark_chat_owner <- function(chat, agent) {
+  owners <- Filter(function(owner) !identical(owner, agent), chat_owners(chat))
+  attr(chat, "deputy_agent_owners") <- if (length(owners)) {
+    lapply(owners, rlang::new_weakref)
+  }
+  invisible(chat)
+}
+
+other_chat_owners <- function(chat, agent) {
+  Filter(function(owner) !identical(owner, agent), chat_owners(chat))
+}
+
+# Agent$set_chat(): a host-selected replacement, moved between runs the way
+# try_chat_fallback() moves a failed request. The new Chat receives the prompt,
+# the history and this Agent's own adapted tools; the old Chat keeps no Deputy
+# callbacks, observers or tools that could run outside the Agent.
+replace_agent_chat <- function(agent, chat) {
+  private <- agent$.__enclos_env__$private
+  if (isTRUE(private$run_active)) {
+    conversation_abort("Wait for the active run before replacing the Chat.")
+  }
+  if (!is.null(private$.pending_approval_path)) {
+    approval_abort(
+      "This Agent has a pending approval; resume or deny it before replacing the Chat."
+    )
+  }
+  check_conversation_lease(agent, NULL)
+  validate_chat(chat)
+  if (inherits(chat, "Agent")) {
+    abort_deputy("{.arg chat} must be an ellmer Chat, not an Agent")
+  }
+  check_incoming_conversation(chat)
+  old <- private$.chat
+  if (identical(chat, old)) {
+    return(invisible(agent))
+  }
+  # Another Agent built on the same Chat would lose its tools and callbacks
+  # when this one moves away.
+  if (length(other_chat_owners(old, agent))) {
+    abort_deputy(c(
+      "This Agent's Chat is shared with another Agent",
+      "i" = "Give each Agent its own Chat before replacing one."
+    ))
+  }
+  if (length(other_chat_owners(chat, agent))) {
+    abort_deputy("This Chat already belongs to another Agent")
+  }
+  if (length(chat$get_turns()) || length(chat$get_tools())) {
+    abort_deputy("The new Chat must have no conversation turns or tools")
+  }
+  tools <- old$get_tools()
+  native <- names(tools)[vapply(
+    tools,
+    inherits,
+    logical(1),
+    what = "ellmer::ToolBuiltIn"
+  )]
+  if (length(native)) {
+    abort_deputy(c(
+      "Provider-native tools can't move to another Chat: {.val {native}}",
+      "i" = "Remove them with {.code $set_tools()} before replacing the Chat."
+    ))
+  }
+
+  # If moving fails, the destination is returned empty, with its own prompt,
+  # so the caller can retry with it.
+  destination_prompt <- chat$get_system_prompt()
+  moved_turns <- portable_turns(old$get_turns())
+  kept <- attr(moved_turns, "kept")
+  attr(moved_turns, "kept") <- NULL
+  # The old Chat is untouched until the move succeeds; only the observer
+  # removers and reader state are rebound, so keep them to restore.
+  removers <- private$.tool_observer_removers
+  reader_registered <- private$.tool_result_reader_registered
+  moved <- tryCatch(
+    {
+      chat$set_system_prompt(old$get_system_prompt())
+      chat$set_turns(moved_turns)
+      chat$set_tools(tools)
+      private$.chat <- chat
+      private$rewire_chat_runtime()
+      NULL
+    },
+    error = function(error) error
+  )
+  if (!is.null(moved)) {
+    private$.chat <- old
+    private$.tool_observer_removers <- removers
+    private$.tool_result_reader_registered <- reader_registered
+    # Tool callbacks on the destination are cleared on success too (see
+    # set_chat()); here they may be Deputy's own, half installed.
+    try(clear_chat_tool_callbacks(chat), silent = TRUE)
+    try(chat$set_tools(list()), silent = TRUE)
+    try(chat$set_turns(list()), silent = TRUE)
+    try(chat$set_system_prompt(destination_prompt), silent = TRUE)
+    rlang::cnd_signal(moved)
+  }
+  # Microcompacted results are keyed by position; dropped turns shift them.
+  private$.cleared_tool_results <- remap_cleared_tool_results(
+    private$.cleared_tool_results,
+    kept,
+    offset = length(private$.compacted_turns)
+  )
+  unmark_chat_owner(old, agent)
+  mark_chat_owner(chat, agent)
+  # Fallbacks start again from the new primary Chat.
+  private$.fallback_position <- 0L
+  # The Agent now runs on the new Chat, so failing to clear the old one is
+  # reported rather than presented as a failed swap.
+  cleared <- tryCatch(
+    {
+      clear_chat_tool_callbacks(old)
+      old$set_tools(list())
+      NULL
+    },
+    error = function(error) error
+  )
+  if (!is.null(cleared)) {
+    cli::cli_warn(
+      c(
+        "The Agent now uses the new Chat, but the old Chat couldn't be cleared.",
+        "i" = "Don't reuse the old Chat; its tools may still be bound to this Agent."
+      ),
+      parent = cleared
+    )
+  }
+  invisible(agent)
+}
+
+# Reasoning content carries a signature or encrypted state that only the
+# provider which produced it accepts, so history moving to another Chat keeps
+# every other content type. An assistant turn that held only reasoning (a
+# response stopped while thinking) is dropped: providers reject empty
+# assistant messages, and they accept consecutive user messages.
+# The result records the original positions of the turns it keeps as the
+# "kept" attribute.
+portable_turns <- function(turns) {
+  turns <- lapply(turns, function(turn) {
+    if (!inherits(turn, "ellmer::AssistantTurn")) {
+      return(turn)
+    }
+    keep <- Filter(
+      function(content) !inherits(content, "ellmer::ContentThinking"),
+      turn@contents
+    )
+    if (length(keep) == length(turn@contents)) {
+      return(turn)
+    }
+    if (length(keep) == 0L) {
+      return(NULL)
+    }
+    turn@contents <- keep
+    turn
+  })
+  kept <- which(!vapply(turns, is.null, logical(1)))
+  structure(turns[kept], kept = kept)
+}
+
+# Microcompacted tool results are keyed "turn:content" by position in the
+# complete conversation: the compacted prefix (`offset` turns), then the
+# context. Moves the context keys to where the kept turns now sit.
+remap_cleared_tool_results <- function(originals, kept, offset) {
+  if (length(originals) == 0L) {
+    return(originals)
+  }
+  parts <- strsplit(names(originals), ":", fixed = TRUE)
+  turn <- as.integer(vapply(parts, `[[`, character(1), 1L))
+  content <- vapply(parts, `[[`, character(1), 2L)
+  context <- turn > offset
+  moved <- match(turn[context] - offset, kept)
+  turn[context] <- offset + moved
+  keep <- !is.na(turn)
+  originals <- originals[keep]
+  names(originals) <- cleared_result_key(turn[keep], content[keep])
+  originals
+}
+
+# ellmer resets a cancelled controller when a stream starts. A governed stream
+# starts lazily, so reset once the run is accepted, before a host such as
+# shinychat reads the controller for the new run.
+reset_stream_controller <- function(controller) {
+  if (
+    inherits(controller, "ellmer_stream_controller") &&
+      isTRUE(controller$cancelled)
+  ) {
+    controller$reset()
+  }
+  invisible(controller)
 }
 
 register_tool_observer <- function(agent, phase, callback) {

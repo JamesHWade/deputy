@@ -185,41 +185,61 @@ LeadAgent <- R6::R6Class(
     },
 
     #' @description
-    #' Add a subagent definition. Errors if its name is already registered.
+    #' Add a subagent definition, or replace one with the same name, for
+    #' example to give a subagent a different set of tools. Delegations that
+    #' are already running keep the definition they started with.
     #'
     #' @param definition An [agent_definition()] object
+    #' @param replace If `TRUE`, replace a registered definition with the same
+    #'   name. If `FALSE` (the default), a name clash is an error.
     #' @return The lead, invisibly.
-    register_sub_agent = function(definition) {
+    register_sub_agent = function(definition, replace = FALSE) {
       check_conversation_lease(self, NULL)
       if (!S7::S7_inherits(definition, AgentDefinition)) {
         cli_abort("{.arg definition} must be an AgentDefinition object")
       }
+      if (!rlang::is_bool(replace)) {
+        cli_abort("{.arg replace} must be TRUE or FALSE")
+      }
 
       definition <- copy_agent_definition(definition)
-      if (definition$name %in% names(private$.sub_agent_defs)) {
-        cli_abort(
-          "AgentDefinition {.val {definition$name}} is already registered"
-        )
+      name <- definition$name
+      previous <- private$.sub_agent_defs[[name]]
+      if (!is.null(previous) && !replace) {
+        cli_abort(c(
+          "AgentDefinition {.val {name}} is already registered",
+          "i" = "Use {.code replace = TRUE} to replace it."
+        ))
       }
-      private$.sub_agent_defs[[definition$name]] <- definition
+      current_prompt <- private$.chat$get_system_prompt()
+      private$.sub_agent_defs[[name]] <- definition
+      # The registry and the lead's routing prompt change together or not at
+      # all. Only the generated routing section is replaced, so compaction
+      # summaries, skills, and hook-provided context remain intact.
       tryCatch(
-        private$check_trusted_tools(private$.chat$get_tools()),
+        {
+          private$check_trusted_tools(private$.chat$get_tools())
+          private$.chat$set_system_prompt(private$replace_lead_prompt(
+            current_prompt,
+            private$.sub_agent_defs
+          ))
+        },
         error = function(error) {
-          private$.sub_agent_defs[[definition$name]] <- NULL
+          if (is.null(previous)) {
+            private$.sub_agent_defs[[name]] <- NULL
+          } else {
+            private$.sub_agent_defs[[name]] <- previous
+          }
+          try(private$.chat$set_system_prompt(current_prompt), silent = TRUE)
           rlang::cnd_signal(error)
         }
       )
 
-      # Replace only the generated routing section so compaction summaries,
-      # skills, and hook-provided context remain intact.
-      current_prompt <- private$.chat$get_system_prompt()
-      new_prompt <- private$replace_lead_prompt(
-        current_prompt,
-        private$.sub_agent_defs
-      )
-      private$.chat$set_system_prompt(new_prompt)
-
-      cli_alert_info("Registered sub-agent: {.val {definition$name}}")
+      if (is.null(previous)) {
+        cli_alert_info("Registered sub-agent: {.val {name}}")
+      } else {
+        cli_alert_info("Replaced sub-agent: {.val {name}}")
+      }
       invisible(self)
     },
 

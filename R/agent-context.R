@@ -1129,3 +1129,30 @@ restore_cleared_tool_results <- function(
   }
   turns
 }
+
+# Agent$set_context_policy(): thresholds and bounds may change between runs.
+# The offload directory may not, because saved tool results and compaction
+# records are read back from where they were written.
+replace_context_policy <- function(agent, policy) {
+  private <- agent$.__enclos_env__$private
+  if (isTRUE(private$run_active)) {
+    conversation_abort(
+      "Wait for the active run before changing the context policy."
+    )
+  }
+  check_conversation_lease(agent, NULL)
+  policy <- normalize_context_policy(policy)
+  if (
+    !identical(
+      tool_result_offload_dir(policy, private$.session_id),
+      tool_result_offload_dir(private$.context_policy, private$.session_id)
+    )
+  ) {
+    abort_deputy(c(
+      "The new context policy must keep the same {.arg offload_dir}.",
+      "i" = "Saved tool results stay where they were written."
+    ))
+  }
+  private$.context_policy <- policy
+  invisible(agent)
+}

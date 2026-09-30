@@ -83,7 +83,8 @@ agent$add_hook(HookMatcher(
 
     \item{\code{usage_limits}}{The \link{UsageLimits} applied to each run. Read-only.}
 
-    \item{\code{context_policy}}{The agent's \link{ContextPolicy}. Read-only.}
+    \item{\code{context_policy}}{The agent's \link{ContextPolicy}. Read-only; use
+\verb{$set_context_policy()} to replace it.}
 
     \item{\code{working_dir}}{The directory file tools work in. Read-only.}
 
@@ -139,6 +140,8 @@ hooks with \verb{$add_hook()}.}
     \item \href{#method-Agent-get_model}{\code{Agent$get_model()}}
     \item \href{#method-Agent-get_model_object}{\code{Agent$get_model_object()}}
     \item \href{#method-Agent-set_model}{\code{Agent$set_model()}}
+    \item \href{#method-Agent-set_chat}{\code{Agent$set_chat()}}
+    \item \href{#method-Agent-set_context_policy}{\code{Agent$set_context_policy()}}
     \item \href{#method-Agent-register_tool}{\code{Agent$register_tool()}}
     \item \href{#method-Agent-register_tools}{\code{Agent$register_tools()}}
     \item \href{#method-Agent-on_tool_request}{\code{Agent$on_tool_request()}}
@@ -1025,7 +1028,8 @@ permissions, hooks and usage limits applied.
       \item{\code{...}}{Message content, as for ellmer.}
       \item{\code{stream}}{\code{"text"} yields text chunks; \code{"content"} yields ellmer
 content objects, including tool requests and results.}
-      \item{\code{controller}}{Optional ellmer stream controller.}
+      \item{\code{controller}}{Optional ellmer stream controller. As in ellmer, a
+cancelled controller is reset when the new run starts.}
       \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
 this run.}
       \item{\code{type}}{Optional ellmer type for structured streaming, passed to
@@ -1067,7 +1071,8 @@ usage limits and compaction applied.
 parallel; \code{"sequential"} runs them one at a time.}
       \item{\code{stream}}{\code{"text"} yields text chunks; \code{"content"} yields ellmer
 content objects, including tool requests and results.}
-      \item{\code{controller}}{Optional ellmer stream controller.}
+      \item{\code{controller}}{Optional ellmer stream controller. As in ellmer, a
+cancelled controller is reset when the new run starts.}
       \item{\code{run_context}}{Named list merged into the agent's \code{run_context} for
 this run.}
       \item{\code{type}}{Optional ellmer type for structured streaming, passed to
@@ -1442,6 +1447,69 @@ the whole context too.}
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{model}}{Model name.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The agent, invisibly.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-set_chat"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-set_chat}{}}}
+\subsection{\code{Agent$set_chat()}}{
+  Replace the Chat the agent sends requests to, for example to continue a
+conversation with a model from another provider. The conversation,
+system prompt and tools move to the new Chat, and the agent's
+permissions, hooks, tool observers and usage limits keep applying.
+Reasoning content (\link[ellmer:ContentThinking]{ellmer::ContentThinking}) is dropped from the
+history, because each provider accepts only its own. Subagents created
+after the change use the new Chat.
+
+To change the model within one provider, use \verb{$set_model()}. The
+replaced Chat is left with no tools or tool callbacks. Callbacks you
+registered directly on it are not moved; register them with
+\verb{$on_tool_request()} and \verb{$on_tool_result()} instead. An agent whose
+Chat another agent also uses can't replace it.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$set_chat(chat)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{chat}}{An ellmer Chat with no turns or tools, not used by another
+agent. Its system prompt is
+replaced by the agent's. Provider-native tools can't move between
+Chats: remove them with \verb{$set_tools()} first.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The agent, invisibly.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-set_context_policy"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-set_context_policy}{}}}
+\subsection{\code{Agent$set_context_policy()}}{
+  Replace the \link{ContextPolicy}, for example to compact at a different size
+after switching to a model with a larger or smaller context window. The
+new policy applies from the next run.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$set_context_policy(context_policy)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{context_policy}}{A \link{ContextPolicy}. It must use the same
+\code{offload_dir} as the current policy, because large tool results that
+were already saved are read back from there.}
     }
     \if{html}{\out{</div>}}
   }

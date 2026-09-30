@@ -29,6 +29,12 @@ test_that("ellmer exhausts its own HTTP retries before ordered Chat fallback", {
   expect_length(runtime_events(agent, "request_start"), 2L)
   expect_identical(agent$get_model(), "backup")
   expect_length(backup$get_turns(), 0L)
+  # The Agent's Chat ownership moves with the fallback.
+  expect_length(chat_owners(primary), 0L)
+  expect_identical(
+    chat_owners(agent$.__enclos_env__$private$.chat),
+    list(agent)
+  )
 })
 
 test_that("fallback honors ordering, terminal failures, and request limits", {
