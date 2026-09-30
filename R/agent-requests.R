@@ -401,6 +401,9 @@ replace_agent_chat <- function(agent, chat) {
   # If moving fails, the destination is returned empty, with its own prompt,
   # so the caller can retry with it.
   destination_prompt <- chat$get_system_prompt()
+  moved_turns <- portable_turns(old$get_turns())
+  kept <- attr(moved_turns, "kept")
+  attr(moved_turns, "kept") <- NULL
   # The old Chat is untouched until the move succeeds; only the observer
   # removers and reader state are rebound, so keep them to restore.
   removers <- private$.tool_observer_removers
@@ -408,7 +411,7 @@ replace_agent_chat <- function(agent, chat) {
   moved <- tryCatch(
     {
       chat$set_system_prompt(old$get_system_prompt())
-      chat$set_turns(portable_turns(old$get_turns()))
+      chat$set_turns(moved_turns)
       chat$set_tools(tools)
       private$.chat <- chat
       private$rewire_chat_runtime()
@@ -428,6 +431,12 @@ replace_agent_chat <- function(agent, chat) {
     try(chat$set_system_prompt(destination_prompt), silent = TRUE)
     rlang::cnd_signal(moved)
   }
+  # Microcompacted results are keyed by position; dropped turns shift them.
+  private$.cleared_tool_results <- remap_cleared_tool_results(
+    private$.cleared_tool_results,
+    kept,
+    offset = length(private$.compacted_turns)
+  )
   unmark_chat_owner(old, agent)
   mark_chat_owner(chat, agent)
   # Fallbacks start again from the new primary Chat.
@@ -459,6 +468,8 @@ replace_agent_chat <- function(agent, chat) {
 # every other content type. An assistant turn that held only reasoning (a
 # response stopped while thinking) is dropped: providers reject empty
 # assistant messages, and they accept consecutive user messages.
+# The result records the original positions of the turns it keeps as the
+# "kept" attribute.
 portable_turns <- function(turns) {
   turns <- lapply(turns, function(turn) {
     if (!inherits(turn, "ellmer::AssistantTurn")) {
@@ -477,7 +488,27 @@ portable_turns <- function(turns) {
     turn@contents <- keep
     turn
   })
-  Filter(Negate(is.null), turns)
+  kept <- which(!vapply(turns, is.null, logical(1)))
+  structure(turns[kept], kept = kept)
+}
+
+# Microcompacted tool results are keyed "turn:content" by position in the
+# complete conversation: the compacted prefix (`offset` turns), then the
+# context. Moves the context keys to where the kept turns now sit.
+remap_cleared_tool_results <- function(originals, kept, offset) {
+  if (length(originals) == 0L) {
+    return(originals)
+  }
+  parts <- strsplit(names(originals), ":", fixed = TRUE)
+  turn <- as.integer(vapply(parts, `[[`, character(1), 1L))
+  content <- vapply(parts, `[[`, character(1), 2L)
+  context <- turn > offset
+  moved <- match(turn[context] - offset, kept)
+  turn[context] <- offset + moved
+  keep <- !is.na(turn)
+  originals <- originals[keep]
+  names(originals) <- cleared_result_key(turn[keep], content[keep])
+  originals
 }
 
 # ellmer resets a cancelled controller when a stream starts. A governed stream

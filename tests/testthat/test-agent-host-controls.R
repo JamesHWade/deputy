@@ -410,3 +410,53 @@ test_that("reinitializing an Agent releases its previous Chat", {
   expect_identical(chat_owners(chat), list(first))
   expect_no_error(first$set_chat(create_mock_chat()))
 })
+
+test_that("set_chat() keeps microcompacted results after dropping a turn", {
+  old <- ellmer::chat_openai(
+    model = "gpt-4o-mini",
+    credentials = function() "unused"
+  )
+  request <- ellmer::ContentToolRequest(id = "a", name = "search")
+  old$set_turns(list(
+    ellmer::UserTurn(list(ellmer::ContentText("First"))),
+    ellmer::AssistantTurn(list(ellmer::ContentThinking("stopped thinking"))),
+    ellmer::UserTurn(list(ellmer::ContentText("Second"))),
+    ellmer::AssistantTurn(list(request)),
+    ellmer::UserTurn(list(
+      ellmer::ContentToolResult(value = "long result", request = request)
+    )),
+    ellmer::AssistantTurn(list(ellmer::ContentText("A1"))),
+    ellmer::UserTurn(list(ellmer::ContentText("Third"))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("A2")))
+  ))
+  agent <- Agent$new(old)
+  expect_identical(
+    agent$microcompact(keep_last = 2L, marker = "[cleared]")$cleared,
+    1L
+  )
+
+  agent$set_chat(ellmer::chat_openai(
+    model = "gpt-4o-mini",
+    credentials = function() "unused"
+  ))
+
+  turns <- agent$get_turns()
+  expect_length(turns, 7L)
+  expect_identical(turns[[4]]@contents[[1]]@value, "long result")
+  expect_identical(
+    agent$get_context_turns()[[4]]@contents[[1]]@value,
+    "[cleared]"
+  )
+})
+
+test_that("a failed reinitialization leaves the Agent owning its Chat", {
+  agent <- Agent$new(create_mock_chat())
+  chat <- create_mock_chat()
+  expect_error(agent$initialize(chat, context_policy = "not a policy"))
+
+  expect_identical(chat_owners(chat), list(agent))
+  expect_error(
+    Agent$new(create_mock_chat())$set_chat(chat),
+    "already belongs to another Agent"
+  )
+})
