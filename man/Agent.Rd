@@ -1707,7 +1707,8 @@ same as \verb{$get_turns()}.
 \if{html}{\out{<a id="method-Agent-last_turn"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-last_turn}{}}}
 \subsection{\code{Agent$last_turn()}}{
-  Get the last turn in the conversation with a given role.
+  Get the last turn in the conversation with a given role. Subagent tool
+calls shown in it are included, as \verb{$get_turns()} includes them.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$last_turn(role = c("assistant", "user", "system"))}
