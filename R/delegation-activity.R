@@ -134,6 +134,15 @@ activity_enable <- function(agent, requester, interval = 0.1) {
 
 activity_disable <- function(agent) {
   private <- agent$.__enclos_env__$private
+  # Cards still running when the presenter stops would stay running in saved
+  # history, since no later poll will settle them.
+  for (entry in activity_open_entries(agent)) {
+    activity_settle(
+      agent,
+      entry,
+      "Not shown: subagent activity stopped before this call returned."
+    )
+  }
   private$.activity <- NULL
   invisible(agent)
 }
@@ -437,9 +446,10 @@ activity_emit <- function(agent, state, anchor_turn, content) {
   invisible(NULL)
 }
 
-# Requests of one delegation already shown without a result.
-activity_open_requests <- function(agent, key) {
-  prefix <- paste0("deputy_activity_", key, "_")
+# Shown requests without a result, as overlay entries; `key` limits them to
+# one delegation.
+activity_open_entries <- function(agent, key = NULL) {
+  prefix <- paste0("deputy_activity_", if (!is.null(key)) paste0(key, "_"))
   requests <- list()
   answered <- character()
   for (entry in agent$.__enclos_env__$private$.activity_overlay) {
@@ -450,10 +460,31 @@ activity_open_requests <- function(agent, key) {
     if (inherits(entry$content, "ellmer::ContentToolResult")) {
       answered <- c(answered, marker$activity_id)
     } else {
-      requests[[marker$activity_id]] <- entry$content
+      requests[[marker$activity_id]] <- entry
     }
   }
   requests[setdiff(names(requests), answered)]
+}
+
+# Give a shown request a result that says why it has none of its own.
+activity_settle <- function(agent, entry, text, state = NULL) {
+  marker <- entry$content@extra$deputy_activity
+  result <- ellmer::ContentToolResult(
+    value = text,
+    request = entry$content,
+    extra = list(
+      display = list(label = marker$label),
+      deputy_activity = marker
+    )
+  )
+  if (is.null(state)) {
+    private <- agent$.__enclos_env__$private
+    private$.activity_overlay[[length(private$.activity_overlay) + 1L]] <-
+      list(turn = entry$turn, content = result)
+  } else {
+    activity_emit(agent, state, entry$turn, result)
+  }
+  invisible(NULL)
 }
 
 # One marker card standing in for calls that aren't shown.
@@ -569,23 +600,15 @@ activity_refresh <- function(
     if (is.null(view)) {
       # Calls shown before the record grew too large get a result, so no card
       # stays running in saved history.
-      for (request in activity_open_requests(agent, entry$key)) {
-        marker <- request@extra$deputy_activity
-        activity_emit(
+      for (open in activity_open_entries(agent, entry$key)) {
+        activity_settle(
           agent,
-          state,
-          entry$anchor_turn,
-          ellmer::ContentToolResult(
-            value = paste(
-              "Not shown: the subagent's record grew past the size the viewer",
-              "may see."
-            ),
-            request = request,
-            extra = list(
-              display = list(label = marker$label),
-              deputy_activity = marker
-            )
-          )
+          open,
+          paste(
+            "Not shown: the subagent's record grew past the size the viewer",
+            "may see."
+          ),
+          state = state
         )
       }
       activity_note(
