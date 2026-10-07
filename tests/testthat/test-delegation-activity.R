@@ -289,6 +289,31 @@ test_that("set_turns keeps shown activity out of the model context", {
   expect_identical(agent$get_turns(), list())
 })
 
+test_that("last_turn() includes the activity shown in it", {
+  chat <- ellmer::chat_openai(credentials = function() "x", echo = "none")
+  agent <- Agent$new(chat)
+  marker <- list(
+    format = "deputy_subagent_activity",
+    version = 1L,
+    activity_id = "deputy_activity_abc_1",
+    label = "sales"
+  )
+  shown <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("Go"))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Done."), shown))
+  )
+  agent$set_turns(turns)
+  expect_identical(agent$last_turn(), turns[[2L]])
+  expect_identical(agent$last_turn("user"), turns[[1L]])
+  expect_length(agent$get_context_turns()[[2L]]@contents, 1L)
+})
+
 test_that("moving to another Chat keeps shown activity on its own turn", {
   marker <- list(
     format = "deputy_subagent_activity",

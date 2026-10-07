@@ -28,7 +28,7 @@ into an earlier message.
   `ContentToolRequest` and `ContentToolResult` pair, marked with a versioned
   `deputy_activity` record in `extra`, appended to the lead's assistant turn
   that holds the depth-one delegation call. `get_turns()` merges these pairs
-  into the transcript; the wrapped Chat, `get_context_turns()`, provider
+  into the transcript, and `last_turn()` into the turn it returns; the wrapped Chat, `get_context_turns()`, provider
   requests, usage counts and compaction never contain them. `set_turns()` and
   context forks separate marked contents again, so a restored shinychat
   conversation or a copied history cannot hand them to a model; a fork given
