@@ -65,12 +65,17 @@ back from storage Deputy doesn't control.
   which authorizes again every time.
 - **Bounded, with omissions counted.** `max_bytes` (16 MiB by default) bounds
   a conversation's whole record, scope and bookkeeping included, so a saved
-  record is always readable. Children are kept in order; one that doesn't fit
-  is kept without its transcript (`retention$transcript = "omitted"`) or left
-  out, newest first if the whole record is still too large, and the record
-  counts both. A save that fails (for example, a requester the disclosure
-  refuses) keeps the last good record for that conversation, since shinychat
-  rebuilds `values` from scratch on every save.
+  record is always readable; a scope alone over the bound saves no record.
+  Children are also kept within what the lead's disclosure `max_bytes` lets
+  `delegation_history()` replay (each view, and its transcript again as
+  replayed turns). Children are kept in order; one that doesn't fit is kept
+  without its transcript (`retention$transcript = "omitted"`) or left out,
+  newest first if the whole record is still too large, and the record counts
+  both. A record saved under a larger disclosure bound than the lead now has
+  is restored without transcripts rather than refused. A save that fails (for
+  example, a requester the disclosure refuses) keeps the last good record for
+  that conversation, since shinychat rebuilds `values` from scratch on every
+  save.
 - **Saved children are redacted again on every save.** Children carried from
   an earlier save pass through the current `redact` before they are written
   back, so a stricter policy also cleans what is stored. Children are matched

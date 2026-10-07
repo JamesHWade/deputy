@@ -109,6 +109,20 @@ new_activity_presenter <- function(requester, interval) {
   state
 }
 
+# A replaced conversation starts the presenter afresh: cards waiting to be
+# streamed, labels and counts belong to the conversation they were shown in.
+activity_reset <- function(state) {
+  if (is.null(state)) {
+    return(invisible(NULL))
+  }
+  state$queue <- list()
+  state$delegations <- list()
+  state$run_id <- NULL
+  state$calls <- 0L
+  state$limited <- FALSE
+  invisible(NULL)
+}
+
 activity_enable <- function(agent, requester, interval = 0.1) {
   if (!is.function(requester)) {
     cli::cli_abort("{.arg requester} must be a function returning the viewer.")
@@ -423,6 +437,25 @@ activity_emit <- function(agent, state, anchor_turn, content) {
   invisible(NULL)
 }
 
+# Requests of one delegation already shown without a result.
+activity_open_requests <- function(agent, key) {
+  prefix <- paste0("deputy_activity_", key, "_")
+  requests <- list()
+  answered <- character()
+  for (entry in agent$.__enclos_env__$private$.activity_overlay) {
+    marker <- activity_marker(entry$content)
+    if (is.null(marker) || !startsWith(marker$activity_id, prefix)) {
+      next
+    }
+    if (inherits(entry$content, "ellmer::ContentToolResult")) {
+      answered <- c(answered, marker$activity_id)
+    } else {
+      requests[[marker$activity_id]] <- entry$content
+    }
+  }
+  requests[setdiff(names(requests), answered)]
+}
+
 # One marker card standing in for calls that aren't shown.
 activity_note <- function(agent, state, entry, runtime, anchor, kind, text) {
   id <- paste0("deputy_activity_", entry$key, "_", kind)
@@ -534,6 +567,27 @@ activity_refresh <- function(
     }
     view <- activity_view(agent, record, requester)
     if (is.null(view)) {
+      # Calls shown before the record grew too large get a result, so no card
+      # stays running in saved history.
+      for (request in activity_open_requests(agent, entry$key)) {
+        marker <- request@extra$deputy_activity
+        activity_emit(
+          agent,
+          state,
+          entry$anchor_turn,
+          ellmer::ContentToolResult(
+            value = paste(
+              "Not shown: the subagent's record grew past the size the viewer",
+              "may see."
+            ),
+            request = request,
+            extra = list(
+              display = list(label = marker$label),
+              deputy_activity = marker
+            )
+          )
+        )
+      }
       activity_note(
         agent,
         state,

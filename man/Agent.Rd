@@ -1916,7 +1916,8 @@ you load into, not from the file. The saved \code{run_context} is merged into
 the agent's, and loading fails if they disagree on an ID field. Saved
 tool results and compaction summaries are restored under this agent's
 session ID. Files saved by early development versions of Deputy can't be
-loaded. Loading errors while a run is active.
+loaded. Loading errors while a run is active. Subagent tool calls shown
+by \code{\link[=subagent_chat_activity]{subagent_chat_activity()}} for the previous conversation are dropped.
   }
   \subsection{Returns}{
     The agent, invisibly.

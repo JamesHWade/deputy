@@ -143,7 +143,8 @@ inspection_bound <- function(x, disclosure) {
   }
   if (length(serialize(payload(x), NULL, version = 3)) > disclosure$max_bytes) {
     cli::cli_abort(
-      "Delegation disclosure exceeds max_bytes; narrow the selection."
+      "Delegation disclosure exceeds max_bytes; narrow the selection.",
+      class = "deputy_disclosure_bound"
     )
   }
   x
