@@ -83,7 +83,11 @@ into an earlier message.
 - **The public entry point is the optional Shiny adapter.**
   `subagent_chat_activity(chat, lead, requester)` checks that `chat` is the
   `chat_server()` result whose client is `lead`, enables the presenter and
-  disables it when the session ends.
+  disables it when the session ends. A lead has one presenter: enabling a
+  second before the first stops is an error, since it would show the same
+  calls again under new keys and leave the first one's cards running. Each
+  `stop()` stops only its own presenter, and one enabled again during a reply
+  still streams the "Not shown" results the stopped one left queued.
 
 Tool-call correlation also stopped assuming provider IDs are unique within a
 run: a finished call no longer claims a later call with the same ID, which

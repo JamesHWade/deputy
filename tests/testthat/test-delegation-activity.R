@@ -916,6 +916,44 @@ test_that("stopping the presenter settles the cards it left running", {
   )
 })
 
+test_that("a lead shows activity through one presenter at a time", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  private$subagent_runs[[id]]$turns <- private$subagent_runs[[id]]$turns[-3L]
+  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  first <- activity_enable(root, function() "viewer")
+  activity_poll(root)
+  shown <- activity_take(root)
+  expect_length(shown, 1L)
+  # A second presenter would show the call again and leave this card running.
+  expect_error(activity_enable(root, function() "viewer"), "already shown")
+  expect_identical(private$.activity, first)
+  # Stopped and shown again during the same reply: the new presenter streams
+  # the result the stopped one settled.
+  activity_disable(root, first)
+  second <- activity_enable(root, function() "viewer")
+  live <- activity_take(root)
+  expect_length(live, 1L)
+  expect_s3_class(live[[1L]], "ellmer::ContentToolResult")
+  expect_identical(live[[1L]]@request@id, shown[[1L]]@id)
+  # Stopping the first presenter again leaves the second running.
+  activity_disable(root, first)
+  expect_identical(private$.activity, second)
+  activity_disable(root, second)
+  expect_null(private$.activity)
+})
+
 test_that("cards shown before access was lost get a result at the end", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
@@ -1156,9 +1194,16 @@ test_that("subagent_chat_activity() binds to the chat's own client", {
       )
       control <- subagent_chat_activity(chat, lead, function() "viewer")
       expect_false(is.null(lead$.__enclos_env__$private$.activity))
+      expect_error(
+        subagent_chat_activity(chat, lead, function() "viewer"),
+        "already shown"
+      )
       control$stop()
       expect_null(lead$.__enclos_env__$private$.activity)
       subagent_chat_activity(chat, lead, function() "viewer")
+      # The first `stop()` doesn't stop the presenter that replaced it.
+      control$stop()
+      expect_false(is.null(lead$.__enclos_env__$private$.activity))
     },
     {
       session$flushReact()
