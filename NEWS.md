@@ -1,5 +1,16 @@
 # deputy (development version)
 
+* Subagent tool results keep the card they showed in shinychat. Inspection,
+  `$observe_subagents()`, `$export_subagents()` and `delegation_history()`
+  used to drop everything stored with a tool result, so a Commons table, plot
+  or "Ran a trusted calculation" card, and its provenance tag, disappeared
+  from the child panel and from saved history. They now keep the result's
+  `display` fields and Commons' `commons_tag`, within fixed sizes; other
+  stored data is still left out and named in the record. `delegation_history()`
+  checks a saved card before showing it, and `subagent_chat_server()` removes
+  scripts, event handlers, forms and external resources from a card's HTML
+  (#238).
+
 * Tools with an `ellmer::type_ignore()` argument can be registered on an
   agent. Registration used to fail with "Names of `arguments` must match
   formals of `fun`", which stopped `adopt_chat()` from adopting a Commons chat

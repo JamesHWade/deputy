@@ -566,7 +566,8 @@ delegation_outcome <- function(record, compact = FALSE) {
 }
 
 # Preserve released ellmer Content records; omit provider-private payloads,
-# hidden thinking, executable tool definitions and arbitrary display extras.
+# hidden thinking and executable tool definitions. A tool result's `extra`
+# keeps only its approved display and provenance projection.
 inspection_record_turn <- function(turn) {
   turn <- portable_session_turns(list(turn))[[1L]]
   if ("json" %in% S7::prop_names(turn)) {
@@ -578,7 +579,14 @@ inspection_record_turn <- function(turn) {
     }
     if (inherits(content, "ellmer::Content")) {
       if ("extra" %in% S7::prop_names(content)) {
-        content@extra <- list()
+        display <- if (inherits(content, "ellmer::ContentToolResult")) {
+          tool_display_projection(content)
+        }
+        content@extra <- if (is.null(display)) {
+          list()
+        } else {
+          list(deputy_display = display)
+        }
       }
       if (inherits(content, "ellmer::ContentToolRequest")) {
         content@tool <- NULL
@@ -653,6 +661,15 @@ inspection_record_content <- function(content) {
     approval_json_inputs(content@arguments)
   }
   record <- ellmer::contents_record(content)
+  if (inherits(content, "ellmer::ContentToolResult")) {
+    # The approved projection travels beside the ellmer props, so `extra`
+    # itself stays empty and nothing else in it can be recorded.
+    display <- tool_display_validate(record$props$extra$deputy_display)
+    record$props$extra <- list()
+    if (!is.null(display)) {
+      record$deputy_display <- display
+    }
+  }
   for (field in names(record$props)) {
     value <- S7::prop(content, field)
     if (inherits(value, "S7_object")) {
@@ -850,6 +867,12 @@ inspection_replay <- function(record, sanitize = FALSE) {
     for (field in names(props)) {
       S7::prop(out, field) <- props[[field]]
     }
+    if (identical(x$class, "ellmer::ContentToolResult")) {
+      display <- tool_display_validate(x$deputy_display)
+      if (!is.null(display)) {
+        S7::prop(out, "extra") <- tool_display_extra(display)
+      }
+    }
     out
   }
   replay(record)
@@ -967,7 +990,10 @@ lead_inspect_subagents <- function(
 #' Turns a snapshot from `$export_subagents()` back into ellmer turns for
 #' display, for example in [subagent_chat_server()]. Replaying never runs
 #' tools, calls a model or restores a chat. Access is checked again with
-#' `disclosure`; the IDs and scope stored in `history` grant nothing.
+#' `disclosure`; the IDs and scope stored in `history` grant nothing. Tool
+#' results get back the card they showed, after a check that the saved card
+#' holds only the fields and sizes an export can contain; a snapshot that
+#' fails the check is an error.
 #' @param history A snapshot from `$export_subagents()`.
 #' @param requester Who is asking, passed to `disclosure`. Authenticate it
 #'   first.

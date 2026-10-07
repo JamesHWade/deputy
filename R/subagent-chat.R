@@ -53,8 +53,10 @@ subagent_chat_lineage <- function(runtime, compact = FALSE) {
 #'
 #' A read-only Shiny module to place next to your main chat. Cards list the
 #' agent's subagents; selecting one shows its conversation, with tool calls
-#' and attachments, and streams its current output. The panel has no input box
-#' and can't start, resume or approve work. It needs shiny, bslib, commonmark,
+#' and attachments, and streams its current output. A tool's card looks as it
+#' did in the subagent's own chat, with scripts, event handlers, forms and
+#' external resources removed from its HTML. The panel has no input box and
+#' can't start, resume or approve work. It needs shiny, bslib, commonmark,
 #' xml2 and shinychat (>= 0.5.0).
 #' @param id Shiny module ID.
 #' @param height Height of the conversation view. Defaults to `"420px"`.
@@ -1267,6 +1269,11 @@ subagent_chat_safe_content <- function(content) {
   if (inherits(content, "ellmer::ContentText")) {
     content@text <- subagent_chat_markdown(content@text)
   } else if (inherits(content, "ellmer::ContentToolResult")) {
+    # A retained display renders as the tool's card would, with its raw HTML
+    # fields rebuilt inert first.
+    if (is.list(content@extra$display)) {
+      content@extra$display <- subagent_safe_display(content@extra$display)
+    }
     value <- content@value
     if (
       inherits(value, "ellmer::ContentText") ||

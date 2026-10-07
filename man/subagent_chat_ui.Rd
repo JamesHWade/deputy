@@ -54,7 +54,9 @@ least 100; defaults to 250.}
 \description{
 A read-only Shiny module to place next to your main chat. Cards list the
 agent's subagents; selecting one shows its conversation, with tool calls
-and attachments, and streams its current output. The panel has no input box
-and can't start, resume or approve work. It needs shiny, bslib, commonmark,
+and attachments, and streams its current output. A tool's card looks as it
+did in the subagent's own chat, with scripts, event handlers, forms and
+external resources removed from its HTML. The panel has no input box and
+can't start, resume or approve work. It needs shiny, bslib, commonmark,
 xml2 and shinychat (>= 0.5.0).
 }

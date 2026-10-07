@@ -25,6 +25,7 @@ same disclosure policy and must appear in the authorized redacted child view.
 Native ellmer contents_record/contents_replay supply the portable history
 contract. Replay uses a closed set of public content constructors and no tools.
 Provider JSON, hidden thinking, tool closures and arbitrary UI extras are omitted.
+ADR-0032 keeps an approved, bounded projection of tool display and provenance.
 Saved history is observational and settled; replay cannot resume a child. Hosts
 supply current authorization and trusted scope independently of saved metadata.
 Snapshots are bounded; exceeding the host byte ceiling fails explicitly.

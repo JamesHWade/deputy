@@ -19,6 +19,7 @@ Roxygen: list(markdown = TRUE)
 Suggests:
     bslib,
     commonmark,
+    commons,
     httr2,
     ggplot2,
     htmlwidgets,
@@ -134,7 +135,9 @@ Collate:
     'stall-detection.R'
     'structured-run.R'
     'subagent-chat.R'
+    'subagent-display.R'
     'subprocess-env.R'
+    'tool-display-evidence.R'
     'tool-input-review.R'
     'tool-invocation.R'
     'tool-metadata.R'

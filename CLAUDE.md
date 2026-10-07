@@ -52,6 +52,8 @@ deputy/
 │   ├── delegation-observation.R # Bounded child events and independent cursors
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── subagent-chat.R    # Optional authorized child activity and transcript UI
+│   ├── subagent-display.R # Inert HTML for tool displays shown by the Shiny adapter
+│   ├── tool-display-evidence.R # Approved, bounded tool display/provenance projection
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
 │   ├── compaction-run.R    # Governed asynchronous summary attempts and recovery
 │   ├── context-policy.R    # S7 ContextPolicy and DeputyCompaction values
@@ -487,6 +489,11 @@ and `export_subagents()` preserve provenance without granting authority or
 verifying model claims. Settled records remain authoritative during stop hooks.
 `delegation_history()` replays allowlisted public ellmer records as read-only
 history, never active execution. See ADR-0020 and `R/delegation-inspection.R`.
+Tool results keep a versioned `deputy_display` projection beside their ellmer
+props: shinychat display fields and Commons' `commons_tag`, bounded, with
+omissions named; replay validates it before rebuilding `extra` (ADR-0032,
+`R/tool-display-evidence.R`). The Shiny adapter rebuilds display HTML inert in
+`R/subagent-display.R`; core records keep the tool's own HTML.
 
 ### Child observation
 
