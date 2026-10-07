@@ -601,6 +601,35 @@ test_that("a grandchild names its parent only when its view reports one", {
   fixture$root$release_agent_graph()
 })
 
+test_that("a card's tool name is bounded like the rest of it", {
+  long <- strrep("n", 100000)
+  rename <- function(x) {
+    if (!is.list(x)) {
+      return(x)
+    }
+    if (identical(x[["class"]], "ellmer::ContentToolRequest")) {
+      x$props$name <- long
+    }
+    lapply(x, rename)
+  }
+  fixture <- recursive_activity_fixture(
+    redact = function(view, requester) {
+      view$transcript <- rename(view$transcript)
+      view
+    }
+  )
+  items <- activity_items(activity_collect(fixture$root, "compose"))
+  requests <- Filter(
+    function(item) inherits(item, "ellmer::ContentToolRequest"),
+    items
+  )
+  expect_gt(length(requests), 0L)
+  for (request in requests) {
+    expect_lte(nchar(request@name, type = "bytes"), 256L)
+  }
+  fixture$root$release_agent_graph()
+})
+
 test_that("a descendant's new cards read its ancestors' views again", {
   hidden <- new.env(parent = emptyenv())
   hidden$analyst <- FALSE
