@@ -64,7 +64,8 @@ into an earlier message.
   aren't shown.
 - **Nothing is left running in saved history.** A call whose delegation
   settles without a result, or that is still open when the lead's reply ends,
-  gets a "Not completed" result card. Each reply shows at most 256 calls; a
+  gets a "Not completed" result card; one still open when the presenter stops
+  (its `stop()` or the Shiny session ending) gets a "Not shown" result. Each reply shows at most 256 calls; a
   marker card replaces the rest.
 - **Display HTML is inert before it is stored.** Cards go through the adapter
   allowlist of ADR-0032 before they enter the transcript, because shinychat
