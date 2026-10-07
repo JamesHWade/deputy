@@ -381,11 +381,11 @@ context_fork_turn_records <- function(turns, max_bytes, max_turns) {
       "{.arg turns} may contain only UserTurn or AssistantTurn values."
     )
   })
-  context_fork_input_bound(native, max_bytes)
   # Subagent tool calls shown in a conversation were never model context, so a
-  # fork never copies them; their markers don't survive the projection below.
+  # fork never copies them, and they don't count toward its size bound.
   activity <- activity_split(native)
   native <- activity$turns
+  context_fork_input_bound(native, max_bytes)
   # Establish the existing inert public projection before looking at tool
   # rounds or converting incomplete evidence to text. This removes hidden
   # thinking, private extras and executable bindings before any custom fork
