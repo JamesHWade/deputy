@@ -311,14 +311,15 @@ subagent_display_css_declarations <- function(
 }
 
 # `url(#id)` references point at prefixed ids; any other reference is dropped.
+# CSS reads `url` in any case, so the match does too.
 subagent_display_css_refs <- function(value, ids, prefix) {
-  pattern <- "url\\((\\s*['\"]?)#([A-Za-z][A-Za-z0-9_-]*)"
-  refs <- regmatches(value, gregexpr(pattern, value))[[1L]]
-  referenced <- sub("^url\\(\\s*['\"]?#", "", refs)
+  pattern <- "(?i)url\\((\\s*['\"]?)#([A-Za-z][A-Za-z0-9_-]*)"
+  refs <- regmatches(value, gregexpr(pattern, value, perl = TRUE))[[1L]]
+  referenced <- sub("(?i)^url\\(\\s*['\"]?#", "", refs, perl = TRUE)
   if (!all(referenced %in% ids)) {
     return(NULL)
   }
-  gsub(pattern, paste0("url(\\1#", prefix, "\\2"), value)
+  gsub(pattern, paste0("url(\\1#", prefix, "\\2"), value, perl = TRUE)
 }
 
 # Longer style sheets are dropped rather than scanned; gt's are a few KB.

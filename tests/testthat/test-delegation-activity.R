@@ -672,6 +672,46 @@ test_that("calls shown before a view grows too large still get a result", {
   expect_length(activity_take(root), 0L)
 })
 
+test_that("stopping the presenter settles the cards it left running", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  private$subagent_runs[[id]]$turns <- private$subagent_runs[[id]]$turns[-3L]
+  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  activity_enable(root, function() "viewer")
+  activity_poll(root)
+  shown <- activity_take(root)
+  expect_length(shown, 1L)
+  activity_disable(root)
+  cards <- activity_items(unlist(lapply(
+    root$get_turns(),
+    function(turn) turn@contents
+  )))
+  expect_length(cards, 2L)
+  expect_s3_class(cards[[2L]], "ellmer::ContentToolResult")
+  expect_identical(cards[[2L]]@request@id, shown[[1L]]@id)
+  expect_match(cards[[2L]]@value, "activity stopped before this call returned")
+  # Stopping again adds nothing.
+  activity_disable(root)
+  expect_length(
+    activity_items(unlist(lapply(
+      root$get_turns(),
+      function(turn) turn@contents
+    ))),
+    2L
+  )
+})
+
 test_that("replacing the conversation restarts activity labels", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "First")),
