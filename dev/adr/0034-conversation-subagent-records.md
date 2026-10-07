@@ -101,11 +101,15 @@ back from storage Deputy doesn't control.
   an earlier save pass through the current `redact` before they are written
   back, so a stricter policy also cleans what is stored. Every save needs a
   requester the disclosure authorizes for the conversation's own scope, the
-  one `delegation_history()` reads the record with, and, when the lead has
-  live records in the conversation, for the lead's live scope as well (so a
-  reopened conversation whose new lead has none saves on the first alone);
-  otherwise the save keeps the last good record without showing anything to
-  the redactor. Children saved under
+  one `delegation_history()` reads the record with; otherwise the save keeps
+  the last good record without showing anything to the redactor. Live
+  records are read only for a requester the lead's live scope allows as
+  well, asked before the lead's records are looked up. A requester it
+  refuses saves the record's children again, with the children the last
+  save left out still pending and counted, whether or not the lead has live
+  children in the conversation, so the outcome doesn't tell that requester
+  whether there are any (a reopened conversation whose new lead has none
+  saves the same way). Children saved under
   another scope (a lead moved since with `set_delegation_sources(scope = )`)
   are not carried, redacted or counted: the save replaces them with the
   current scope's live children. Children are matched

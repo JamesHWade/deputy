@@ -55,8 +55,10 @@ Records are saved through the chat's history callbacks each time shinychat
 saves the conversation, as one JSON text, so any history store can hold
 them. A subagent still running at that point is saved the next time. Access
 is checked with the lead's \link{DelegationDisclosure} when records are saved
-and every time they are read. When reading them back, \code{authorize} gets a
-\code{scope} holding the lead's \code{delegation_scope} and the conversation's ID as
+and every time they are read. A save adds the lead's subagents only when
+\code{requester} may also inspect them on the lead; otherwise it keeps the ones
+saved before. When reading them back, \code{authorize} gets a \code{scope} holding
+the lead's \code{delegation_scope} and the conversation's ID as
 \code{chat_conversation_id}; records saved under another scope are not read.
 Large results that subagents saved to disk are kept as references, which
 may no longer resolve. Needs shiny and shinychat (>= 0.5.0) with history
