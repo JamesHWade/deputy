@@ -626,6 +626,126 @@ test_that("a view over the disclosure bound shows one note instead", {
   expect_match(items[[2L]]@value, "over the size the viewer may see")
 })
 
+test_that("calls shown before a view grows too large still get a result", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  record <- private$subagent_runs[[id]]
+  # The first poll sees the call running.
+  private$subagent_runs[[id]]$turns <- record$turns[-3L]
+  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  activity_enable(root, function() "viewer")
+  activity_poll(root)
+  shown <- activity_take(root)
+  expect_length(shown, 1L)
+  expect_s3_class(shown[[1L]], "ellmer::ContentToolRequest")
+  # Then the record grows past what the viewer may see.
+  private$subagent_runs[[id]] <- record
+  private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    max_bytes = 2048
+  )
+  activity_poll(root, final = TRUE)
+  items <- activity_take(root)
+  results <- Filter(function(x) inherits(x, "ellmer::ContentToolResult"), items)
+  expect_length(results, 2L)
+  expect_identical(results[[1L]]@request@id, shown[[1L]]@id)
+  expect_match(results[[1L]]@value, "grew past the size the viewer may see")
+  expect_match(results[[2L]]@request@id, "_oversized$")
+  activity_poll(root, closing = TRUE)
+  expect_length(activity_take(root), 0L)
+})
+
+test_that("replacing the conversation restarts activity labels", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "First")),
+    runtime_reply("First answer."),
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Second")),
+    runtime_reply("Second answer.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist(
+    "sales",
+    "60",
+    responses = list(
+      runtime_reply(tool = "call_measure"),
+      runtime_reply("first"),
+      runtime_reply(tool = "call_measure"),
+      runtime_reply("second")
+    )
+  )
+  activity_retain(root, sales$agent, "ask_sales")
+  activity_enable(root, function() "viewer", 0.05)
+  label <- function(items) {
+    unique(vapply(
+      items,
+      function(content) content@extra$deputy_activity$label,
+      character(1)
+    ))
+  }
+  expect_identical(
+    label(activity_items(activity_collect(root, "One"))),
+    "sales"
+  )
+  root$set_turns(list())
+  expect_identical(
+    label(activity_items(activity_collect(root, "Two"))),
+    "sales"
+  )
+})
+
+test_that("loading a session drops activity shown for another conversation", {
+  chat <- ellmer::chat_openai(model = "test", credentials = function() "x")
+  saved <- Agent$new(chat$clone())
+  saved$set_turns(list(
+    ellmer::UserTurn(list(ellmer::ContentText("Hi"))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Hello.")))
+  ))
+  path <- withr::local_tempfile(fileext = ".rds")
+  suppressMessages(saved$save_session(path))
+  agent <- Agent$new(chat)
+  card <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(
+      deputy_activity = list(
+        format = "deputy_subagent_activity",
+        version = 1L,
+        activity_id = "deputy_activity_abc_1",
+        label = "sales"
+      )
+    )
+  )
+  turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("Go"))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Done."), card))
+  )
+  agent$set_turns(turns)
+  # A load that fails leaves the conversation and its cards.
+  broken <- withr::local_tempfile(fileext = ".rds")
+  saveRDS(list(schema_version = 3L), broken)
+  expect_error(agent$load_session(broken), class = "deputy_error")
+  expect_identical(agent$get_turns(), turns)
+  suppressMessages(agent$load_session(path))
+  shown <- unlist(lapply(agent$get_turns(), function(turn) turn@contents))
+  expect_length(shown, 2L)
+  expect_false(any(vapply(shown, is_activity_content, logical(1))))
+})
+
 test_that("shown activity doesn't count toward a fork's size bound", {
   request <- ellmer::ContentToolRequest("call_1", "ask_sales", list())
   marker <- list(
