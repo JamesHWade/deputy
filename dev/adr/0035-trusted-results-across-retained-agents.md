@@ -66,6 +66,13 @@ producer's own label, not proof.
   and pinned sources must still be the admitted ones and the registry must
   still pass; the retained configuration check already refuses changed tools.
   `execute_tool()` refuses a designated tool that is not the pinned producer.
+  A graph member's route runs its target under the policy that admitted the
+  route, the caller's (as it runs) combined with the target's, so the
+  caller's own result types are captured wherever its routes lead; that call
+  delivers to the root once and then to each own callback along the chain,
+  and the target's installed policy is restored when the call settles. The
+  policy is checked after the busy check, since a target is under a route's
+  policy while busy.
 - **One delivery to the root.** The combined policy's `on_result` records the
   event in the root's run and calls the root's `on_result`, then the retained
   agent's own callback. Each callback runs even when the other fails, and the

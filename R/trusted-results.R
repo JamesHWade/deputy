@@ -705,18 +705,35 @@ trusted_combine <- function(owner, root_policy, own, tools) {
     receipt <- receipt || own@model_receipt
     own_callback <- own@on_result
   }
+  forward <- trusted_forward(
+    owner,
+    root_policy@on_result,
+    if (is.function(own_callback)) list(own_callback) else list()
+  )
+  do.call(
+    TrustedResults,
+    c(
+      values,
+      list(on_result = forward, exempt_tools = exempt, model_receipt = receipt)
+    )
+  )
+}
+
+# Delivery for a policy installed below the root: the root records the event
+# once and its callback runs, then each own callback of the agents whose
+# policies were combined. Each runs even when another fails; the first failure
+# still fails the delivery. The own callbacks stay on the function, so a
+# route's run can combine them with its caller's.
+trusted_forward <- function(owner, root_callback, callbacks) {
   root_ref <- rlang::new_weakref(owner)
-  root_callback <- root_policy@on_result
   forward <- function(event) {
     root <- rlang::wref_key(root_ref)
     if (is.null(root)) {
       cli_abort("The agent that retained this one is no longer available.")
     }
     root$.__enclos_env__$private$record_run_event(event)
-    # Each policy's host gets the publication even when the other's delivery
-    # fails; the first failure still fails the delivery.
     failure <- NULL
-    for (callback in list(root_callback, own_callback)) {
+    for (callback in c(list(root_callback), callbacks)) {
       if (!is.function(callback)) {
         next
       }
@@ -734,12 +751,28 @@ trusted_combine <- function(owner, root_policy, own, tools) {
     }
     invisible(NULL)
   }
-  do.call(
-    TrustedResults,
-    c(
-      values,
-      list(on_result = forward, exempt_tools = exempt, model_receipt = receipt)
-    )
+  attr(forward, "deputy_trusted_callbacks") <- callbacks
+  forward
+}
+
+# The policy a graph route's target runs under for one call: the one that
+# admitted the route, its caller's combined with its own, so the caller's
+# result types are published from the target too. Delivery reaches the root
+# once, then each own callback along the chain of routes, once each.
+trusted_routed_policy <- function(owner, caller, target) {
+  callbacks <- list()
+  for (callback in c(
+    attr(caller@on_result, "deputy_trusted_callbacks", exact = TRUE),
+    attr(target@on_result, "deputy_trusted_callbacks", exact = TRUE)
+  )) {
+    if (!any(vapply(callbacks, identical, logical(1), callback))) {
+      callbacks[[length(callbacks) + 1L]] <- callback
+    }
+  }
+  root_policy <- owner$.__enclos_env__$private$.trusted_results
+  trusted_policy_copy(
+    trusted_route_policy(caller, target),
+    trusted_forward(owner, root_policy@on_result, callbacks)
   )
 }
 

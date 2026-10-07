@@ -51,6 +51,12 @@ into an earlier message.
   earliest card still waiting; then a call whose result an identical card has
   shown takes a waiting card if one is left, since a redaction that hides one
   of two identical calls far more often hides the earlier, finished one. A
+  call no card matches as shown keeps its card by provider ID and tool alone
+  when no other request in the delegation's record or in the view has them,
+  so a redactor that shows a call's arguments or result differently from one
+  view to the next doesn't give it a second card; the card then follows the
+  call as shown (a provider ID reused within the delegation still needs the
+  arguments to match). The record is read only for this count, never shown. A
   shown call that the view no longer includes is closed with a note when the
   delegation settles. shinychat pairs request and result by
   that ID, so concurrent children, repeated specialist names and provider

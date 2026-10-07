@@ -222,10 +222,11 @@ continue_conversation <- function(
   # This must precede busy/run-slot checks and lifecycle admission so a denied
   # or stale source cannot consume a run slot or leave a sticky reservation.
   context_fork_reauthorize(entry)
-  trusted_recheck_conversation(entry)
   if (entry$busy || isTRUE(cp$run_active)) {
     conversation_abort("The conversation is busy.")
   }
+  # After the busy check: a route's call runs under its own policy while busy.
+  trusted_recheck_conversation(entry)
   if (length(entry$ids) >= entry$max_runs) {
     conversation_abort("The conversation has reached max_runs; release it.")
   }
@@ -264,6 +265,21 @@ continue_conversation <- function(
       run_context = caller_private$effective_run_context()
     )
   tree_admission <- NULL
+  # A graph member's route runs its target under the policy that admitted the
+  # route, the member's combined with the target's, so the member's own
+  # result types are published wherever its routes lead.
+  routed <- NULL
+  if (
+    !identical(caller, owner) &&
+      !is.null(entry$trusted) &&
+      !is.null(caller_private$.trusted_results)
+  ) {
+    routed <- trusted_routed_policy(
+      owner,
+      caller_private$.trusted_results,
+      entry$trusted$policy
+    )
+  }
   if (!is.null(tree)) {
     if (!handle %in% tree$handles) {
       conversation_abort("This handle is not part of the configured graph.")
@@ -303,6 +319,8 @@ continue_conversation <- function(
       cp$.delegation_binding <- old$binding
       cp$.hooks <- old$hooks
       cp$.delegation_ancestors <- old$ancestors
+      cp$.trusted_results <- old$trusted_results
+      cp$.trusted_sources <- old$trusted_sources
     }
     entry$busy <- FALSE
     entry$configuration <- conversation_configuration(child)
@@ -339,8 +357,15 @@ continue_conversation <- function(
     observe = cp$.delegation_observe,
     binding = cp$.delegation_binding,
     hooks = cp$.hooks,
-    ancestors = cp$.delegation_ancestors
+    ancestors = cp$.delegation_ancestors,
+    trusted_results = cp$.trusted_results,
+    trusted_sources = cp$.trusted_sources
   )
+  if (!is.null(routed)) {
+    cp$.trusted_results <- routed
+    cp$.trusted_sources <- trusted_policy_sources(routed)
+    cp$check_trusted_tools(child$get_tools())
+  }
   cp$current_run_id <- NULL
   cp$last_run_usage <- AgentUsage()
   cp$.last_run_result <- NULL

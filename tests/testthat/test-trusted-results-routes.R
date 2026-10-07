@@ -843,6 +843,83 @@ test_that("a route reaches only what its caller's policy allows", {
   root$release_agent_graph()
 })
 
+test_that("a member's route runs its target under the member's result types", {
+  deliveries <- routes_deliveries()
+  own <- list()
+  measure <- routes_measure_tool(60)
+  audit <- ellmer::tool(
+    function() "audited",
+    name = "run_audit",
+    description = "Run the audit.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_analyst", arguments = list(task = "Audit?")),
+    runtime_reply("Root: audited.")
+  ))
+  analyst_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_auditor", arguments = list(task = "Run it.")),
+    runtime_reply("Analyst: the auditor ran it.")
+  ))
+  auditor_server <- local_runtime_server(list(
+    runtime_reply(tool = "run_audit"),
+    runtime_reply("Auditor: done.")
+  ))
+  root <- routes_root(runtime_chat(root_server), measure, deliveries)
+  # The analyst's own policy makes run_audit the producer of "audit"; the
+  # auditor holds that tool and has no policy of its own.
+  analyst <- Agent$new(
+    runtime_chat(analyst_server),
+    tools = list(routes_read_tool()),
+    agent_name = "analyst",
+    trusted_results = TrustedResults(
+      audit = audit,
+      on_result = function(event) own[[length(own) + 1L]] <<- event
+    )
+  )
+  auditor <- Agent$new(
+    runtime_chat(auditor_server),
+    tools = list(audit),
+    agent_name = "auditor"
+  )
+  route <- function(target) {
+    list(
+      target = target,
+      description = paste("Ask", target),
+      usage_limits = UsageLimits(max_requests = 4)
+    )
+  }
+  root$retain_agent_graph(
+    agents = list(analyst = analyst, auditor = auditor),
+    routes = list(
+      root = list(ask_analyst = route("analyst")),
+      analyst = list(ask_auditor = route("auditor"))
+    ),
+    usage_limits = UsageLimits(max_requests = 12),
+    max_depth = 2L,
+    max_delegations = 4L,
+    max_concurrency = 2L
+  )
+  admitted <- auditor$.__enclos_env__$private$.trusted_results
+  result <- root$run_sync("Audit?")
+  # Reached through the analyst, the auditor publishes the analyst's type:
+  # once to the root, once to the analyst's own host.
+  expect_length(deliveries$events, 1L)
+  event <- deliveries$events[[1L]]
+  expect_identical(event$result_type, "audit")
+  expect_identical(event$agent_id, auditor$agent_id)
+  expect_identical(event$parent_agent_id, analyst$agent_id)
+  expect_length(own, 1L)
+  expect_identical(own[[1L]]$result_id, event$result_id)
+  expect_length(result_trusted_results(result, "audit"), 1L)
+  # The auditor's admitted policy is back once the call settles.
+  expect_identical(auditor$.__enclos_env__$private$.trusted_results, admitted)
+  root$release_agent_graph()
+})
+
 test_that("Commons specialists qualify only when constrained", {
   skip_if_not_installed("commons")
   sales <- data.frame(region = c("north", "south"), revenue = c(25, 35))

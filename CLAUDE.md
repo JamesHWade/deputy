@@ -706,7 +706,9 @@ until release. `release_agent()` removes the owner's routes to the handle. `chec
 Deputy routes owned by the registering agent to handles its policy root
 retained under the policy (graph members reach the root through a weak
 `.trusted_root`). Delivery forwards straight to the root once; continuation
-rechecks the installed policy and `execute_tool()` the pinned producer. See
+rechecks the installed policy and `execute_tool()` the pinned producer. A
+member's route runs its target under the caller's combined policy for that
+call (`trusted_routed_policy()`). See
 ADR-0035 and `tests/testthat/test-trusted-results-routes.R`.
 
 ### Human Input

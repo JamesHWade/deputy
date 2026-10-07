@@ -326,14 +326,15 @@ subagent_history_view_id <- function(view) {
   }
 }
 
-# One settled child, with its transcript when the disclosure bound allows it.
+# One settled child, with its transcript when the disclosure bound allows it
+# and the redactor leaves it.
 subagent_history_child <- function(lead, requester, id) {
   view <- tryCatch(
     lead_inspect_subagents(lead, requester, id, TRUE, settled_only = TRUE),
     error = function(error) NULL
   )
   if (length(view)) {
-    return(list(view = view[[1L]], transcript = TRUE))
+    return(subagent_history_transcript_kept(view[[1L]]))
   }
   # A child whose outcome alone is over the disclosure bound is left out.
   view <- tryCatch(
@@ -353,6 +354,18 @@ subagent_history_without_transcript <- function(view) {
   view$transcript <- NULL
   view$retention$transcript <- "omitted"
   view
+}
+
+# A redacted view as saved: a transcript the redactor removed is marked and
+# counted as omitted, like one the save leaves out.
+subagent_history_transcript_kept <- function(view) {
+  if (is.null(view$transcript)) {
+    return(list(
+      view = subagent_history_without_transcript(view),
+      transcript = FALSE
+    ))
+  }
+  list(view = view, transcript = TRUE)
 }
 
 # A child's key in saved records: a digest of its delegation ID, so children
@@ -440,11 +453,9 @@ subagent_history_record <- function(state, conversation_id) {
         cli::cli_abort("Disclosure redaction must return a list.")
       }
       inspection_portable(view)
-      children[[keys[[index]]]] <- list(
-        view = view,
-        transcript = !is.null(view$transcript),
-        carried = TRUE
-      )
+      child <- subagent_history_transcript_kept(view)
+      child$carried <- TRUE
+      children[[keys[[index]]]] <- child
     }
   }
   omitted <- list(
@@ -949,9 +960,10 @@ subagent_history_panel_child <- function(conversation, live, id) {
 #'     saved).
 #'   * `status()`: the open conversation's ID, how many subagents its saved
 #'     record holds, how many were still running, saved without their
-#'     conversation or left out at the last save (including subagents left
-#'     out earlier that can't be found again, such as an earlier session's or
-#'     those released since), and any problem saving or reading it.
+#'     conversation (too large, or removed by the disclosure's `redact`) or
+#'     left out at the last save (including subagents left out earlier that
+#'     can't be found again, such as an earlier session's or those released
+#'     since), and any problem saving or reading it.
 #' @seealso [subagent_chat_activity()] to show subagent tool calls in the
 #'   chat itself.
 #' @export
