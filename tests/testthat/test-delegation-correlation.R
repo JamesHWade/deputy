@@ -467,3 +467,65 @@ test_that("denied delegation requests do not leave stale correlation", {
     0L
   )
 })
+
+test_that("a provider ID reused by a later call starts a new record", {
+  read_tool <- function(name) {
+    ellmer::tool(
+      function() paste(name, "read"),
+      name = name,
+      description = "Read a fixture value.",
+      annotations = ellmer::tool_annotations(
+        read_only_hint = TRUE,
+        open_world_hint = FALSE
+      )
+    )
+  }
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "first_tool"),
+    runtime_reply(tool = "second_tool"),
+    runtime_reply("done")
+  ))
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = list(read_tool("first_tool"), read_tool("second_tool"))
+  )
+  result <- agent$run_sync("Read both.")
+  names <- function(events) {
+    vapply(events, function(event) event$tool_name, character(1))
+  }
+  expect_identical(
+    names(result_tool_calls(result)),
+    c("first_tool", "second_tool")
+  )
+  expect_identical(
+    names(result_tool_results(result)),
+    c("first_tool", "second_tool")
+  )
+
+  # A delegation after another call with the same provider ID still runs.
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "first_tool"),
+    runtime_reply(tool = "ask_child", arguments = list(task = "Go")),
+    runtime_reply("root done")
+  ))
+  child_server <- local_runtime_server(list(runtime_reply("child done")))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    tools = list(read_tool("first_tool"))
+  )
+  handle <- root$retain_agent(
+    Agent$new(runtime_chat(child_server)),
+    UsageLimits(max_requests = 2)
+  )
+  root$register_tool(delegation_tool(
+    root,
+    handle,
+    "ask_child",
+    "Ask the child.",
+    UsageLimits(max_requests = 2)
+  ))
+  result <- root$run_sync("Read, then ask.")
+  expect_length(child_server$requests(), 1L)
+  expect_identical(root$list_subagents()$status, "completed")
+  expect_null(result_tool_results(result)[[2L]]$tool_error)
+})

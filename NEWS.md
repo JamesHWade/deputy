@@ -1,5 +1,12 @@
 # deputy (development version)
 
+* A tool call whose provider ID repeats an earlier call's in the same run, as
+  with providers that number calls per response, now gets its own
+  `"tool_start"` event, and a delegation tool called that way runs. Before, the
+  later call was matched to the finished one: its start event was dropped and
+  a delegation failed with "Delegation tools require their owner's active
+  governed run" (#238).
+
 * Subagent tool results keep the card they showed in shinychat. Inspection,
   `$observe_subagents()`, `$export_subagents()` and `delegation_history()`
   used to drop everything stored with a tool result, so a Commons table, plot
