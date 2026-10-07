@@ -272,24 +272,27 @@ test_that("each display field stays inside its own box", {
   display <- list(
     html = paste0(
       "<div style=\"position:absolute;inset:0;width:100vw;height:100vh;",
-      "z-index:2147483647\">cover</div>"
+      "z-index:2147483647\">cover</div>",
+      "<div style=\"height:100000000px\">tall</div>"
     ),
     title = "<span style=\"position:relative;top:-500px\">Ran</span>"
   )
   safe <- subagent_safe_display(display)
+  # The body scrolls within a bounded height; header fields are clipped.
   expect_match(
     safe$html,
     paste0(
       "^<div class=\"deputy-display\" style=\"position:relative;",
-      "overflow:auto;contain:paint;isolation:isolate\"><div style=.*",
-      "cover</div></div>$"
+      "overflow:auto;max-height:80vh;contain:paint;isolation:isolate\">",
+      "<div style=.*cover</div>.*tall</div></div>$"
     )
   )
   expect_match(
     safe$title,
     paste0(
       "^<span class=\"deputy-display\" style=\"display:inline-block;",
-      "position:relative;max-width:100%;contain:paint;isolation:isolate\">",
+      "position:relative;max-width:100%;max-height:4em;overflow:hidden;",
+      "vertical-align:middle;contain:paint;isolation:isolate\">",
       ".*Ran</span></span>$"
     )
   )
