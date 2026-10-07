@@ -172,13 +172,38 @@ activity_enable <- function(agent, requester, interval = 0.1) {
     cli::cli_abort("{.arg requester} must be a function returning the viewer.")
   }
   private <- agent$.__enclos_env__$private
-  private$.activity <- new_activity_presenter(requester, interval)
-  invisible(agent)
+  # One presenter per lead. A second would show the same calls again under
+  # new keys, and the first one's running cards would never be settled.
+  if (!is.null(private$.activity)) {
+    cli::cli_abort(c(
+      "Subagent activity is already shown for this lead.",
+      "i" = paste(
+        "Call {.fn stop} on the value {.fn subagent_chat_activity} returned",
+        "before showing it again."
+      )
+    ))
+  }
+  state <- new_activity_presenter(requester, interval)
+  # Results a presenter stopped during this reply settled still reach it.
+  leftover <- private$.activity_leftover
+  private$.activity_leftover <- NULL
+  if (
+    !is.null(leftover) && identical(leftover$run_id, private$current_run_id)
+  ) {
+    state$queue <- leftover$queue
+  }
+  private$.activity <- state
+  invisible(state)
 }
 
-activity_disable <- function(agent) {
+# `presenter` is the one to stop: once it has been stopped and another shown,
+# stopping it again leaves the other running.
+activity_disable <- function(agent, presenter = NULL) {
   private <- agent$.__enclos_env__$private
   state <- private$.activity
+  if (!is.null(presenter) && !identical(state, presenter)) {
+    return(invisible(agent))
+  }
   # Cards still running when the presenter stops would stay running in saved
   # history, since no later poll will settle them.
   for (entry in activity_open_entries(agent)) {
