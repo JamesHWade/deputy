@@ -324,6 +324,71 @@ test_that("tags with render hooks are never rendered", {
   expect_null(projection$display$html)
 })
 
+test_that("classed objects in a display never run their methods", {
+  ran <- new.env()
+  ran$calls <- character()
+  method <- function(generic, value) {
+    force(value)
+    function(x, ...) {
+      ran$calls <- c(ran$calls, generic)
+      value
+    }
+  }
+  local_mocked_s3_method("$", "deputy_test_object", method("$", "div"))
+  local_mocked_s3_method(
+    "names",
+    "deputy_test_object",
+    method("names", c("name", "attribs", "children"))
+  )
+  local_mocked_s3_method("length", "deputy_test_object", method("length", 1L))
+  local_mocked_s3_method("is.na", "deputy_test_object", method("is.na", FALSE))
+  classed <- function(x) {
+    class(x) <- c("deputy_test_object", class(x))
+    x
+  }
+  dependency <- htmltools::htmlDependency(
+    "measure",
+    "1.0",
+    src = c(file = tempdir())
+  )
+  result <- ellmer::ContentToolResult(
+    value = "60",
+    extra = list(
+      display = list(
+        title = classed("Measure"),
+        html = classed(htmltools::div("60")),
+        footer = htmltools::tagList(htmltools::span("ok"), classed(dependency)),
+        show_request = classed(TRUE),
+        markdown = "Plain text stays."
+      ),
+      commons_tag = classed("A")
+    )
+  )
+  projection <- tool_display_projection(result)
+  expect_identical(ran$calls, character())
+  expect_identical(projection$display, list(markdown = "Plain text stays."))
+  expect_identical(
+    projection$omitted$fields,
+    c(
+      title = "invalid",
+      html = "unsupported_object",
+      footer = "unsupported_object",
+      show_request = "invalid"
+    )
+  )
+  expect_identical(projection$omitted$provenance, "commons_tag")
+  # Plain tags, html strings and dependencies are still rendered.
+  result@extra <- list(
+    display = list(
+      title = htmltools::HTML("<b>Measure</b>"),
+      footer = htmltools::tagList(htmltools::span("ok"), dependency)
+    )
+  )
+  projection <- tool_display_projection(result)
+  expect_identical(projection$display$title, "<b>Measure</b>")
+  expect_match(projection$display$footer, "<span>ok</span>", fixed = TRUE)
+})
+
 test_that("a Commons display and tag survive retained inspection", {
   skip_if_not_installed("commons")
   skip_if_not_installed("shinychat")
