@@ -387,6 +387,76 @@ test_that("a tag tree whose text is over its field's limit isn't rendered", {
   expect_identical(rendered, 1L)
 })
 
+test_that("what rendering converts or calls is checked before rendering", {
+  omitted <- function(html) {
+    result <- ellmer::ContentToolResult(
+      value = "60",
+      extra = list(display = list(title = "Measure", html = html))
+    )
+    tool_display_projection(result)$omitted$fields[["html"]] %||% "none"
+  }
+  local({
+    rendered <- 0L
+    local_mocked_bindings(tool_display_render_tags = function(value) {
+      rendered <<- rendered + 1L
+      htmltools::renderTags(htmltools::div())
+    })
+    # Rendering writes numbers out as text, and `%in%` converts `noWS` values.
+    expect_identical(
+      omitted(htmltools::tags$div(width = 1:100000000)),
+      "oversized"
+    )
+    tag <- htmltools::div("60")
+    tag$.noWS <- 1:100000000
+    expect_identical(omitted(tag), "unsupported_object")
+    expect_identical(
+      omitted(htmltools::div(structure("60", noWS = 1:100000000))),
+      "unsupported_object"
+    )
+    expect_identical(rendered, 0L)
+  })
+  # A dependency that is a function is called when the tag renders.
+  ran <- FALSE
+  called <- htmltools::tagFunction(function() {
+    ran <<- TRUE
+    NULL
+  })
+  expect_identical(
+    omitted(htmltools::attachDependencies(htmltools::div("60"), called)),
+    "unsupported_object"
+  )
+  expect_identical(
+    omitted(htmltools::span(
+      htmltools::attachDependencies(htmltools::HTML("<b>60</b>"), called)
+    )),
+    "unsupported_object"
+  )
+  expect_false(ran)
+  # Attached dependencies, singletons and whitespace options still render.
+  dependency <- htmltools::htmlDependency(
+    "measure",
+    "1.0",
+    src = c(file = tempdir())
+  )
+  html <- htmltools::tagList(
+    htmltools::attachDependencies(htmltools::div("60"), dependency),
+    htmltools::singleton(htmltools::span("once")),
+    htmltools::div(
+      htmltools::HTML("<b>x</b>", .noWS = "outside"),
+      .noWS = "inside"
+    )
+  )
+  result <- ellmer::ContentToolResult(
+    value = "60",
+    extra = list(display = list(html = html))
+  )
+  projection <- tool_display_projection(result)
+  expect_match(projection$display$html, "<div>60</div>", fixed = TRUE)
+  expect_match(projection$display$html, "<span>once</span>", fixed = TRUE)
+  expect_match(projection$display$html, "<div><b>x</b></div>", fixed = TRUE)
+  expect_identical(projection$omitted$dependencies, "measure 1.0")
+})
+
 test_that("classed objects in a display never run their methods", {
   ran <- new.env()
   ran$calls <- character()

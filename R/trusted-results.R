@@ -353,100 +353,126 @@ check_trusted_registry <- function(
     )
   }
   for (name in names(tools)) {
-    tool <- tools[[name]]
-    if (
-      !is.null(attr(tool, "deputy_internal_tool", exact = TRUE)) &&
-        identical(name, "deputy_read_tool_result")
-    ) {
-      next
-    }
-    trusted_type <- trusted_result_type(policy, name)
-    native <- inherits(tool, "ellmer::ToolBuiltIn")
-    if (
-      !native &&
-        isTRUE(allow_delegation) &&
-        is.null(trusted_type) &&
-        isTRUE(attr(
-          trusted_tool_source(tool),
-          "deputy_delegation_tool",
-          exact = TRUE
-        )) &&
-        is.null(composition_tool_owner(tool)) &&
-        is.null(attr(tool, "deputy_graph_route_tree", exact = TRUE))
-    ) {
-      next
-    }
-    if (
-      !native &&
-        is.null(trusted_type) &&
-        is.function(admit_route) &&
-        isTRUE(admit_route(tool))
-    ) {
-      next
-    }
-    source_type <- if (native) "provider" else tool_metadata(tool)$source$type
-    bypass <- if (native) NULL else trusted_bypass_reason(tool)
-    if (!is.null(trusted_type)) {
-      if (!is.null(bypass) || !source_type %in% c("function", "package")) {
-        trusted_registry_abort(
-          "Trusted tool {.val {name}} for {.val {trusted_type}} must be a local function tool that neither executes code nor delegates.",
-          tool_name = name
-        )
-      }
-      if (isTRUE(require_source) && is.null(sources[[name]])) {
-        trusted_registry_abort(
-          "Trusted tool {.val {name}} must be declared in an AgentDefinition's tools or Skill values, not loaded from a skill directory.",
-          tool_name = name
-        )
-      }
-      if (
-        !is.null(sources[[name]]) &&
-          !identical(sources[[name]], trusted_tool_source(tool))
-      ) {
-        trusted_registry_abort(
-          if (is.null(explicit[[name]])) {
-            "Trusted tool {.val {name}} must be the same tool everywhere in the delegation tree."
-          } else {
-            "Trusted tool {.val {name}} must be the tool named in the policy."
-          },
-          tool_name = name
-        )
-      }
-      next
-    }
-    if (!is.null(bypass)) {
+    trusted_check_tool(
+      name,
+      tools[[name]],
+      type = trusted_result_type(policy, name),
+      exempt = name %in% policy@exempt_tools,
+      sources = sources,
+      explicit = explicit,
+      require_source = require_source,
+      allow_delegation = allow_delegation,
+      admit_route = admit_route
+    )
+  }
+  invisible(NULL)
+}
+
+# Check one registered tool by its name's standing in a policy: the producer of
+# result type `type`, an exempt tool, or neither (both `NULL`/`FALSE`).
+trusted_check_tool <- function(
+  name,
+  tool,
+  type = NULL,
+  exempt = FALSE,
+  sources = NULL,
+  explicit = list(),
+  require_source = FALSE,
+  allow_delegation = FALSE,
+  admit_route = NULL
+) {
+  if (
+    !is.null(attr(tool, "deputy_internal_tool", exact = TRUE)) &&
+      identical(name, "deputy_read_tool_result")
+  ) {
+    return(invisible(NULL))
+  }
+  trusted_type <- type
+  native <- inherits(tool, "ellmer::ToolBuiltIn")
+  if (
+    !native &&
+      isTRUE(allow_delegation) &&
+      is.null(trusted_type) &&
+      isTRUE(attr(
+        trusted_tool_source(tool),
+        "deputy_delegation_tool",
+        exact = TRUE
+      )) &&
+      is.null(composition_tool_owner(tool)) &&
+      is.null(attr(tool, "deputy_graph_route_tree", exact = TRUE))
+  ) {
+    return(invisible(NULL))
+  }
+  if (
+    !native &&
+      is.null(trusted_type) &&
+      is.function(admit_route) &&
+      isTRUE(admit_route(tool))
+  ) {
+    return(invisible(NULL))
+  }
+  source_type <- if (native) "provider" else tool_metadata(tool)$source$type
+  bypass <- if (native) NULL else trusted_bypass_reason(tool)
+  if (!is.null(trusted_type)) {
+    if (!is.null(bypass) || !source_type %in% c("function", "package")) {
       trusted_registry_abort(
-        "Tool {.val {name}} {bypass} and could bypass a trusted tool.",
+        "Trusted tool {.val {name}} for {.val {trusted_type}} must be a local function tool that neither executes code nor delegates.",
         tool_name = name
       )
     }
-    if (name %in% policy@exempt_tools) {
-      if (!source_type %in% c("function", "package")) {
-        trusted_registry_abort(
-          "Only local function tools can be exempted; {.val {name}} is a {source_type} tool.",
-          tool_name = name
-        )
-      }
-      next
-    }
-    effective <- if (native) {
-      tool_annotation_defaults
-    } else {
-      effective_tool_annotations(tool@annotations)
-    }
-    if (
-      !isTRUE(effective$read_only_hint) ||
-        !isFALSE(effective$destructive_hint) ||
-        !isFALSE(effective$open_world_hint)
-    ) {
+    if (isTRUE(require_source) && is.null(sources[[name]])) {
       trusted_registry_abort(
-        c(
-          "Tool {.val {name}} may write or reach the open world, so it could bypass a trusted tool.",
-          "i" = "Annotate it with {.code read_only_hint = TRUE, open_world_hint = FALSE} or list it in {.arg exempt_tools}."
-        ),
+        "Trusted tool {.val {name}} must be declared in an AgentDefinition's tools or Skill values, not loaded from a skill directory.",
         tool_name = name
       )
     }
+    if (
+      !is.null(sources[[name]]) &&
+        !identical(sources[[name]], trusted_tool_source(tool))
+    ) {
+      trusted_registry_abort(
+        if (is.null(explicit[[name]])) {
+          "Trusted tool {.val {name}} must be the same tool everywhere in the delegation tree."
+        } else {
+          "Trusted tool {.val {name}} must be the tool named in the policy."
+        },
+        tool_name = name
+      )
+    }
+    return(invisible(NULL))
+  }
+  if (!is.null(bypass)) {
+    trusted_registry_abort(
+      "Tool {.val {name}} {bypass} and could bypass a trusted tool.",
+      tool_name = name
+    )
+  }
+  if (isTRUE(exempt)) {
+    if (!source_type %in% c("function", "package")) {
+      trusted_registry_abort(
+        "Only local function tools can be exempted; {.val {name}} is a {source_type} tool.",
+        tool_name = name
+      )
+    }
+    return(invisible(NULL))
+  }
+  effective <- if (native) {
+    tool_annotation_defaults
+  } else {
+    effective_tool_annotations(tool@annotations)
+  }
+  if (
+    !isTRUE(effective$read_only_hint) ||
+      !isFALSE(effective$destructive_hint) ||
+      !isFALSE(effective$open_world_hint)
+  ) {
+    trusted_registry_abort(
+      c(
+        "Tool {.val {name}} may write or reach the open world, so it could bypass a trusted tool.",
+        "i" = "Annotate it with {.code read_only_hint = TRUE, open_world_hint = FALSE} or list it in {.arg exempt_tools}."
+      ),
+      tool_name = name
+    )
   }
   invisible(NULL)
 }
@@ -542,79 +568,235 @@ trusted_policy_root <- function(agent) {
   if (is.null(private$.trusted_results)) NULL else agent
 }
 
-# A route is admitted only when Deputy built it for `agent` and its target was
-# checked against the same root policy when it was retained. What it reaches
-# also holds to the caller's policy (or, further down a chain of routes, the
-# policy combined along it) together with the target's own, since a graph
-# member's own result types or narrower exemptions make its policy stricter
-# than the target's.
-trusted_route_admitted <- function(
-  agent,
-  tool,
-  policy = NULL,
-  seen = list(),
-  memo = NULL
-) {
+# A route's retained entry, when Deputy built the route for `agent` and its
+# target was checked against the same root policy when it was retained; NULL
+# otherwise.
+trusted_route_target <- function(agent, tool) {
   source <- trusted_tool_source(tool)
   handle <- attr(source, "deputy_composition_handle", exact = TRUE)
   if (
     !identical(composition_tool_owner(source), agent) ||
       !is_nonempty_string(handle)
   ) {
-    return(FALSE)
+    return(NULL)
   }
   root <- trusted_policy_root(agent)
   if (is.null(root)) {
-    return(FALSE)
+    return(NULL)
   }
   tree <- attr(tool, "deputy_graph_route_tree", exact = TRUE) %||%
     attr(source, "deputy_graph_route_tree", exact = TRUE)
   if (!is.null(tree)) {
     tree_root <- tryCatch(delegation_tree_root(tree), error = function(e) NULL)
     if (!identical(tree_root, root) || !handle %in% tree$handles) {
-      return(FALSE)
+      return(NULL)
     }
   } else if (!identical(root, agent)) {
-    return(FALSE)
+    return(NULL)
   }
   entry <- root$.__enclos_env__$private$owned_conversations[[handle]]
   if (is.null(entry) || is.null(entry$trusted)) {
+    return(NULL)
+  }
+  entry
+}
+
+# The `admit_route` function for checking `agent`'s registry `tools`.
+trusted_route_admission <- function(agent, tools) {
+  walk <- new.env(parent = emptyenv())
+  walk$tools <- tools
+  function(tool) trusted_route_admitted(agent, tool, walk)
+}
+
+# A route is admitted only when `trusted_route_target()` finds its target.
+# What it reaches also holds to the caller's policy together with the
+# target's own, and further down a chain of routes to every policy along it,
+# since a graph member's own result types or narrower exemptions make its
+# policy stricter than the target's. The first route admitted for a registry
+# checks everything its routes reach (`trusted_route_walk()`).
+trusted_route_admitted <- function(agent, tool, walk = NULL) {
+  if (is.null(trusted_route_target(agent, tool))) {
     return(FALSE)
   }
-  target <- entry$agent
-  seen <- c(seen, list(agent))
-  # A cycle of routes leads back to an agent whose registry is checked on
-  # its own.
-  if (any(vapply(seen, identical, logical(1), target))) {
-    return(TRUE)
+  walk <- walk %||% new.env(parent = emptyenv())
+  if (!isTRUE(walk$done)) {
+    walk$done <- TRUE
+    trusted_route_walk(agent, walk$tools %||% agent$get_tools())
   }
-  combined <- trusted_route_policy(
-    policy %||% agent$.__enclos_env__$private$.trusted_results,
-    entry$trusted$policy
-  )
-  # A target already checked under the same policy, along another chain of
-  # routes, isn't checked again: converging routes cost one check each.
-  memo <- memo %||% new.env(parent = emptyenv())
-  for (done in memo$checked) {
-    if (identical(done$target, target) && identical(done$policy, combined)) {
-      return(TRUE)
-    }
-  }
-  memo$checked[[length(memo$checked) + 1L]] <- list(
-    target = target,
-    policy = combined
-  )
-  check_trusted_registry(
-    combined,
-    target$get_tools(),
-    available = combined@results,
-    sources = trusted_policy_sources(combined),
-    require_source = TRUE,
-    admit_route = function(next_tool) {
-      trusted_route_admitted(target, next_tool, combined, seen, memo)
-    }
-  )
   TRUE
+}
+
+# Check what every chain of routes from `start` reaches, under the policy
+# combined along each chain: its result types joined, its exemptions
+# intersected. Chains reach an agent under different combined policies, and a
+# check under one doesn't imply the others: a designated producer is excused
+# from the read-only rule that holds where its name isn't designated. Each
+# tool's check depends only on its name's standing, though: designated,
+# exempt or neither. So this records, for every agent reached, the standings
+# each name reaches there over all chains, and checks each tool once for each,
+# as a chain-by-chain check would, at a cost that grows with the graph rather
+# than with the number of chains. A chain that leads back to an agent it has
+# passed is checked as any other.
+trusted_route_walk <- function(start, tools) {
+  # The agents reached, their registries, and each route between them.
+  agents <- list(start)
+  registries <- list(tools)
+  edges <- list()
+  index <- 1L
+  while (index <= length(agents)) {
+    for (tool in registries[[index]]) {
+      entry <- trusted_route_target(agents[[index]], tool)
+      if (is.null(entry)) {
+        next
+      }
+      to <- Position(function(agent) identical(agent, entry$agent), agents)
+      if (is.na(to)) {
+        agents[[length(agents) + 1L]] <- entry$agent
+        registries[[length(registries) + 1L]] <- entry$agent$get_tools()
+        to <- length(agents)
+      }
+      edges[[length(edges) + 1L]] <- list(
+        from = index,
+        to = to,
+        policy = entry$trusted$policy
+      )
+    }
+    index <- index + 1L
+  }
+
+  # One producer per result type, and one type per producer, across every
+  # policy reached.
+  policy <- start$.__enclos_env__$private$.trusted_results
+  results <- character()
+  values <- list()
+  for (each in c(list(policy), lapply(edges, `[[`, "policy"))) {
+    for (type in names(each@results)) {
+      name <- each@results[[type]]
+      value <- each@producers[[type]] %||% name
+      if (type %in% names(values) && !identical(values[[type]], value)) {
+        trusted_combine_abort(
+          "Result type {.val {type}} has a different producer behind a route.",
+          tool_name = name
+        )
+      }
+      if (name %in% results[names(results) != type]) {
+        trusted_combine_abort(
+          "Tool {.val {name}} cannot produce more than one trusted result type.",
+          tool_name = name
+        )
+      }
+      results[[type]] <- name
+      values[[type]] <- value
+    }
+  }
+  explicit <- !vapply(values, is.character, logical(1))
+  sources <- stats::setNames(values[explicit], results[names(values)[explicit]])
+
+  # The standings each name reaches at each agent: designated, exempt or
+  # neither. Along a route, a designated name stays designated and one the
+  # target's policy designates becomes so; otherwise a name stays exempt only
+  # if the target's policy exempts it too, and one already not exempt never
+  # becomes so.
+  universe <- unique(unlist(lapply(registries, names), use.names = FALSE))
+  standing <- function(policy) {
+    designated <- universe %in% unname(policy@results)
+    list(
+      designated = designated,
+      exempt = !designated & universe %in% policy@exempt_tools,
+      neither = !designated & !universe %in% policy@exempt_tools
+    )
+  }
+  none <- rep(FALSE, length(universe))
+  reached <- rep(
+    list(list(designated = none, exempt = none, neither = none)),
+    length(agents)
+  )
+  reached[[1L]] <- standing(policy)
+  initial <- reached[[1L]]
+  queue <- 1L
+  while (length(queue)) {
+    from <- queue[[1L]]
+    queue <- queue[-1L]
+    for (edge in edges) {
+      if (edge$from != from) {
+        next
+      }
+      have <- reached[[from]]
+      designates <- universe %in% unname(edge$policy@results)
+      exempts <- universe %in% edge$policy@exempt_tools
+      old <- reached[[edge$to]]
+      new <- list(
+        designated = old$designated |
+          have$designated |
+          ((have$exempt | have$neither) & designates),
+        exempt = old$exempt | (have$exempt & !designates & exempts),
+        neither = old$neither |
+          (have$exempt & !designates & !exempts) |
+          (have$neither & !designates)
+      )
+      if (!identical(new, old)) {
+        reached[[edge$to]] <- new
+        queue <- c(queue, edge$to)
+      }
+    }
+  }
+
+  for (index in seq_along(agents)) {
+    have <- reached[[index]]
+    # The start's own standings were checked with its registry.
+    if (index == 1L) {
+      have <- Map(function(now, before) now & !before, have, initial)
+      if (!any(unlist(have))) {
+        next
+      }
+    }
+    trusted_route_check_agent(
+      agents[[index]],
+      registries[[index]],
+      universe,
+      have,
+      names(results)[match(universe, results)],
+      sources
+    )
+  }
+  invisible(NULL)
+}
+
+# Check one agent's registry for the standings its tools' names reached.
+trusted_route_check_agent <- function(
+  agent,
+  tools,
+  universe,
+  standings,
+  types,
+  sources
+) {
+  admit <- function(tool) !is.null(trusted_route_target(agent, tool))
+  for (name in names(tools)) {
+    at <- match(name, universe)
+    if (standings$designated[[at]]) {
+      trusted_check_tool(
+        name,
+        tools[[name]],
+        type = types[[at]],
+        sources = sources,
+        explicit = sources,
+        require_source = TRUE
+      )
+    }
+    if (standings$exempt[[at]]) {
+      trusted_check_tool(
+        name,
+        tools[[name]],
+        exempt = TRUE,
+        admit_route = admit
+      )
+    }
+    if (standings$neither[[at]]) {
+      trusted_check_tool(name, tools[[name]], admit_route = admit)
+    }
+  }
+  invisible(NULL)
 }
 
 # The policy a route's target holds to for its caller: both policies' result

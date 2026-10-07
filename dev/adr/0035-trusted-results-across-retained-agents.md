@@ -62,10 +62,17 @@ producer's own label, not proof.
   root's can't reach a tool it declined through another member. Graph setup
   checks every route source again once all routes are installed, so a chain
   is judged whole whatever order its routes are given in, and a failure still
-  retains nothing. Within one registry check, a target already checked under
-  the same combined policy along another chain isn't checked again, so
-  converging routes cost one check per target rather than one per chain.
-  Everything
+  retains nothing. Chains reach a target under different combined policies
+  when members add result types or narrow exemptions, and a check under one
+  doesn't imply the others: a designated producer is excused from the
+  read-only rule that holds where its name isn't designated, so merging the
+  policies would admit tools a chain refuses. Each tool's check depends only
+  on its name's standing, though (designated, exempt or neither), so one
+  registry check walks every chain of routes once, records the standings each
+  name reaches at each agent, and checks each tool once per standing. The
+  checks are those of every chain, at a cost that grows with the graph rather
+  than with the number of chains, and a chain that leads back to an agent it
+  passed is checked like any other. Everything
   else that delegates (another owner's route, a released handle, a tool merely
   named `delegate_to_agent`) is still a bypass.
 - **Execution-time binding.** Before each continuation, the installed policy

@@ -35,9 +35,12 @@ the obstacle to subagent workflows.
   reason. Unknown `extra` keys and display fields are named, never copied.
   Tag objects are rendered with htmltools when they contain only tags, text and
   dependencies; dependencies are recorded by name and version, not file path.
-  A tag tree whose text (children and attribute values) is already over the
-  field's limit is dropped as oversized without being rendered, since
-  rendering copies and escapes all of it.
+  A tag tree that would render to more than the field's limit is dropped as
+  oversized without being rendered, since rendering copies and escapes all of
+  it. The size is bounded before rendering from everything rendering writes
+  out: text, tag and attribute names, and attribute values of any atomic type,
+  counted by their widest element without converting them, so a compact
+  sequence such as `1:1e8` is never expanded.
 - **Replay validates.** Saved history can come from storage the runtime does
   not control. Replay rebuilds `extra` only from a projection whose fields,
   types and sizes pass validation, and errors otherwise. A newer version is
@@ -81,7 +84,12 @@ the obstacle to subagent workflows.
   Nor does reading a value dispatch a method: tags, tag lists, dependencies
   and `html` strings must have exactly the class htmltools gives them and
   are read after `unclass()`, and a string or flag with any other class is
-  refused before `length()` or `is.na()` could call its methods. The display
+  refused before `length()` or `is.na()` could call its methods. The
+  attributes rendering reads from a node are checked too: attached
+  dependencies must be plain `html_dependency` records (a function standing
+  in for one would be called), the singleton flag a plain flag, and `noWS`
+  one of htmltools' own options, since `%in%` would convert any other value
+  in full. The display
   itself must be a plain list, or a list with exactly shinychat's
   `shinychat_tool_result_display` class; anything else, such as an
   environment carrying that class, is recorded as `invalid`.

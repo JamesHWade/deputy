@@ -3115,9 +3115,6 @@ Agent <- R6::R6Class(
 
       check_trusted_tools = function(tools) {
         policy <- private$.trusted_results
-        # One record of the targets checked, shared by all of this registry's
-        # routes.
-        memo <- new.env(parent = emptyenv())
         check_trusted_registry(
           policy,
           tools,
@@ -3128,9 +3125,7 @@ Agent <- R6::R6Class(
           },
           sources = private$.trusted_sources,
           require_source = isTRUE(private$.trusted_tree_member),
-          admit_route = function(tool) {
-            trusted_route_admitted(self, tool, memo = memo)
-          }
+          admit_route = trusted_route_admission(self, tools)
         )
         # Names a retained agent's own policy designates stay that tool here.
         for (entry in private$owned_conversations) {
