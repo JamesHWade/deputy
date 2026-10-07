@@ -729,6 +729,68 @@ test_that("a graph with a weaker member is not set up at all", {
   expect_null(analyst$.__enclos_env__$private$.conversation_owner)
 })
 
+test_that("a route reaches only what its caller's policy allows", {
+  measure <- routes_measure_tool()
+  fetch <- ellmer::tool(
+    function() "fetched",
+    name = "fetch_rates",
+    description = "Fetch exchange rates.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = TRUE
+    )
+  )
+  route <- function(target) {
+    list(
+      target = target,
+      description = paste("Ask", target),
+      usage_limits = UsageLimits(max_requests = 1)
+    )
+  }
+  graph <- function(root, routes) {
+    root$retain_agent_graph(
+      agents = list(
+        # Declines the root's exemption for `fetch_rates`.
+        strict = Agent$new(
+          routes_offline_chat(),
+          tools = list(measure),
+          trusted_results = TrustedResults(measure = measure)
+        ),
+        loose = Agent$new(routes_offline_chat(), tools = list(measure, fetch))
+      ),
+      routes = routes,
+      usage_limits = UsageLimits(max_requests = 4),
+      max_depth = 2L,
+      max_delegations = 2L,
+      max_concurrency = 1L
+    )
+  }
+  root <- routes_root(
+    routes_offline_chat(),
+    measure,
+    routes_deliveries(),
+    exempt_tools = "fetch_rates"
+  )
+  # The strict member can't reach the tool it declined through the other.
+  expect_error(
+    graph(
+      root,
+      list(
+        root = list(ask_strict = route("strict")),
+        strict = list(ask_loose = route("loose"))
+      )
+    ),
+    "fetch_rates"
+  )
+  expect_length(root$.__enclos_env__$private$owned_conversations, 0L)
+  # The root, whose policy exempts it, still reaches it.
+  expect_no_error(graph(
+    root,
+    list(root = list(ask_strict = route("strict"), ask_loose = route("loose")))
+  ))
+  root$release_agent_graph()
+})
+
 test_that("Commons specialists qualify only when constrained", {
   skip_if_not_installed("commons")
   sales <- data.frame(region = c("north", "south"), revenue = c(25, 35))
