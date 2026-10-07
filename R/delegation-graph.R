@@ -548,6 +548,13 @@ retain_agent_graph <- function(
       )
     }
   }
+  # Each route was checked against the routes installed before it. Check every
+  # source again with all of them in place, so each chain of routes is judged
+  # whole and a failure still sets up nothing.
+  for (source_name in names(routes)) {
+    source <- graph_route_source(tree, source_name)
+    graph_agent_private(source)$check_trusted_tools(source$get_tools())
+  }
 
   root_private <- graph_agent_private(owner)
   root_private$.delegation_tree <- tree

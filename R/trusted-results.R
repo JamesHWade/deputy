@@ -548,7 +548,13 @@ trusted_policy_root <- function(agent) {
 # policy combined along it) together with the target's own, since a graph
 # member's own result types or narrower exemptions make its policy stricter
 # than the target's.
-trusted_route_admitted <- function(agent, tool, policy = NULL, seen = list()) {
+trusted_route_admitted <- function(
+  agent,
+  tool,
+  policy = NULL,
+  seen = list(),
+  memo = NULL
+) {
   source <- trusted_tool_source(tool)
   handle <- attr(source, "deputy_composition_handle", exact = TRUE)
   if (
@@ -586,6 +592,18 @@ trusted_route_admitted <- function(agent, tool, policy = NULL, seen = list()) {
     policy %||% agent$.__enclos_env__$private$.trusted_results,
     entry$trusted$policy
   )
+  # A target already checked under the same policy, along another chain of
+  # routes, isn't checked again: converging routes cost one check each.
+  memo <- memo %||% new.env(parent = emptyenv())
+  for (done in memo$checked) {
+    if (identical(done$target, target) && identical(done$policy, combined)) {
+      return(TRUE)
+    }
+  }
+  memo$checked[[length(memo$checked) + 1L]] <- list(
+    target = target,
+    policy = combined
+  )
   check_trusted_registry(
     combined,
     target$get_tools(),
@@ -593,7 +611,7 @@ trusted_route_admitted <- function(agent, tool, policy = NULL, seen = list()) {
     sources = trusted_policy_sources(combined),
     require_source = TRUE,
     admit_route = function(next_tool) {
-      trusted_route_admitted(target, next_tool, combined, seen)
+      trusted_route_admitted(target, next_tool, combined, seen, memo)
     }
   )
   TRUE

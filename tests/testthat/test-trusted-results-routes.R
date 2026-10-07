@@ -843,6 +843,105 @@ test_that("a route reaches only what its caller's policy allows", {
   root$release_agent_graph()
 })
 
+test_that("a chain of routes is checked whole, whatever order it's given in", {
+  measure <- routes_measure_tool()
+  fetch <- ellmer::tool(
+    function() "fetched",
+    name = "fetch_rates",
+    description = "Fetch exchange rates.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = TRUE
+    )
+  )
+  route <- function(target) {
+    list(
+      target = target,
+      description = paste("Ask", target),
+      usage_limits = UsageLimits(max_requests = 1)
+    )
+  }
+  root <- routes_root(
+    routes_offline_chat(),
+    measure,
+    routes_deliveries(),
+    exempt_tools = "fetch_rates"
+  )
+  # `strict` declines the root's exemption; its route to `middle` is set up
+  # before `middle`'s route to `loose`, which holds the tool.
+  strict <- Agent$new(
+    routes_offline_chat(),
+    tools = list(measure),
+    trusted_results = TrustedResults(measure = measure)
+  )
+  expect_error(
+    root$retain_agent_graph(
+      agents = list(
+        strict = strict,
+        middle = Agent$new(routes_offline_chat(), tools = list(measure)),
+        loose = Agent$new(routes_offline_chat(), tools = list(measure, fetch))
+      ),
+      routes = list(
+        root = list(ask_strict = route("strict")),
+        strict = list(ask_middle = route("middle")),
+        middle = list(ask_loose = route("loose"))
+      ),
+      usage_limits = UsageLimits(max_requests = 6),
+      max_depth = 3L,
+      max_delegations = 3L,
+      max_concurrency = 1L
+    ),
+    "fetch_rates"
+  )
+  expect_length(root$.__enclos_env__$private$owned_conversations, 0L)
+  expect_null(strict$.__enclos_env__$private$.trusted_root)
+  expect_named(strict$get_tools(), "call_measure")
+})
+
+test_that("converging routes check each target once", {
+  measure <- routes_measure_tool()
+  root <- routes_root(routes_offline_chat(), measure, routes_deliveries())
+  # Five layers of three, each member routing to every member of the next:
+  # 363 chains of routes from the root, through 15 members.
+  layer <- function(n) paste0("m", n, "_", 1:3)
+  route <- function(target) {
+    list(
+      target = target,
+      description = paste("Ask", target),
+      usage_limits = UsageLimits(max_requests = 1)
+    )
+  }
+  routes_to <- function(n) stats::setNames(lapply(layer(n), route), layer(n))
+  agents <- list()
+  routes <- list(root = routes_to(1L))
+  for (n in 1:5) {
+    for (name in layer(n)) {
+      agents[[name]] <- Agent$new(routes_offline_chat(), tools = list(measure))
+      if (n < 5L) {
+        routes[[name]] <- routes_to(n + 1L)
+      }
+    }
+  }
+  root$retain_agent_graph(
+    agents = agents,
+    routes = routes,
+    usage_limits = UsageLimits(max_requests = 50),
+    max_depth = 5L,
+    max_delegations = 20L,
+    max_concurrency = 2L
+  )
+  checks <- 0L
+  check <- check_trusted_registry
+  local_mocked_bindings(check_trusted_registry = function(...) {
+    checks <<- checks + 1L
+    check(...)
+  })
+  root$.__enclos_env__$private$check_trusted_tools(root$get_tools())
+  # The root's registry and each member's once; chain by chain, 364.
+  expect_identical(checks, 16L)
+  root$release_agent_graph()
+})
+
 test_that("a member's route runs its target under the member's result types", {
   deliveries <- routes_deliveries()
   own <- list()
