@@ -783,6 +783,89 @@ test_that("a call keeps its card when redaction later hides an earlier one", {
   expect_length(activity_take(root), 0L)
 })
 
+test_that("identical reused calls keep their own cards under redaction", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  hidden <- new.env(parent = emptyenv())
+  hidden$first <- FALSE
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure(
+      redact = function(view, requester) {
+        # Hides the first call's request and result once it has finished.
+        if (isTRUE(hidden$first)) {
+          view$transcript <- view$transcript[-(2:3)]
+        }
+        view
+      }
+    )
+  )
+  values <- c("60", "61")
+  counter <- new.env()
+  counter$calls <- 0L
+  measure <- ellmer::tool(
+    function() {
+      counter$calls <- counter$calls + 1L
+      values[[counter$calls]]
+    },
+    name = "call_measure",
+    description = "Run a registered measure.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  server <- local_runtime_server(list(
+    runtime_tool_calls_reply(list(list(
+      id = "call_same",
+      name = "call_measure"
+    ))),
+    runtime_tool_calls_reply(list(list(
+      id = "call_same",
+      name = "call_measure"
+    ))),
+    runtime_reply("sales done")
+  ))
+  sales <- Agent$new(
+    runtime_chat(server),
+    tools = list(measure),
+    agent_name = "sales"
+  )
+  activity_retain(root, sales, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  record <- private$subagent_runs[[id]]
+  running <- function(turns) {
+    private$subagent_runs[[id]]$turns <- turns
+    private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  }
+  activity_enable(root, function() "viewer")
+  running(record$turns[1:2])
+  activity_poll(root)
+  first <- activity_take(root)
+  running(record$turns[1:3])
+  activity_poll(root)
+  expect_identical(activity_take(root)[[1L]]@value, "60")
+  # The second, identical call runs while the first is hidden: it gets a
+  # card of its own, and its result goes there.
+  hidden$first <- TRUE
+  running(record$turns[1:4])
+  activity_poll(root)
+  second <- activity_take(root)
+  expect_length(second, 1L)
+  expect_s3_class(second[[1L]], "ellmer::ContentToolRequest")
+  expect_false(identical(second[[1L]]@id, first[[1L]]@id))
+  private$subagent_runs[[id]] <- record
+  activity_poll(root, final = TRUE)
+  results <- activity_take(root)
+  expect_length(results, 1L)
+  expect_identical(results[[1L]]@request@id, second[[1L]]@id)
+  expect_identical(results[[1L]]@value, "61")
+})
+
 test_that("stopping the presenter settles the cards it left running", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),

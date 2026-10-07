@@ -690,6 +690,17 @@ test_that("saved records stay within what the lead's disclosure can replay", {
     c("omitted", "omitted")
   )
   expect_identical(lengths(lapply(views, function(view) view$turns)), c(0L, 0L))
+  # A bound tightened below the outcomes themselves shows those that fit.
+  shown <- integer()
+  for (bound in round(seq(scope + costs[[1L]], scope, length.out = 24))) {
+    private$.delegation_disclosure <- DelegationDisclosure(
+      authorize = function(requester, scope) identical(requester, "viewer"),
+      max_bytes = bound
+    )
+    shown <- c(shown, length(subagent_history_restored(state)))
+  }
+  expect_identical(shown, sort(shown, decreasing = TRUE))
+  expect_true(all(c(2L, 1L, 0L) %in% shown))
 })
 
 test_that("raw tool results are saved and read back", {

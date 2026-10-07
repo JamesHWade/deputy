@@ -731,16 +731,22 @@ activity_refresh <- function(
     calls <- activity_calls(view)
     # Each call keeps the number it was first shown with, matched by its
     # provider ID, tool and arguments, so a redaction that later hides an
-    # earlier call can't move a later call onto that call's card.
+    # earlier call can't move a later call onto that call's card. Identical
+    # calls are told apart by the result each card has shown.
     known <- entry$calls %||% list()
     identities <- vapply(known, function(slot) slot$identity, character(1))
     taken <- logical(length(known))
     for (call in calls) {
       call_identity <- activity_call_identity(call$request)
-      index <- which(!taken & identities == call_identity)
-      if (length(index)) {
-        index <- index[[1L]]
-      } else {
+      result_identity <- if (!is.null(call$result)) {
+        activity_call_identity(call$result)
+      }
+      index <- activity_call_slot(
+        known,
+        which(!taken & identities == call_identity),
+        result_identity
+      )
+      if (is.null(index)) {
         index <- length(known) + 1L
         known[[index]] <- list(identity = call_identity, emitted = character())
         identities <- c(identities, call_identity)
@@ -790,6 +796,7 @@ activity_refresh <- function(
         if (!is.null(content)) {
           activity_emit(agent, state, entry$anchor_turn, content)
           emitted <- c(emitted, "result")
+          known[[index]]$result <- result_identity %||% "closed"
         }
       }
       known[[index]]$emitted <- emitted
@@ -814,12 +821,30 @@ activity_refresh <- function(
   invisible(NULL)
 }
 
-# What identifies a call from one poll to the next.
-activity_call_identity <- function(request) {
-  digest::digest(
-    list(request@id, request@name, request@arguments),
-    algo = "sha256"
-  )
+# What identifies a call from one poll to the next, and the result a card
+# has shown.
+activity_call_identity <- function(content) {
+  parts <- if (inherits(content, "ellmer::ContentToolRequest")) {
+    list(content@id, content@name, content@arguments)
+  } else {
+    list(content@value, content@error)
+  }
+  digest::digest(parts, algo = "sha256")
+}
+
+# The slot among `candidates`, shown for identical calls, that this call is:
+# the one that showed this result, else one still waiting for its result.
+# NULL means a call not shown yet.
+activity_call_slot <- function(known, candidates, result) {
+  shown <- lapply(known[candidates], function(slot) slot$result)
+  if (!is.null(result)) {
+    same <- candidates[vapply(shown, identical, logical(1), result)]
+    if (length(same)) {
+      return(same[[1L]])
+    }
+  }
+  waiting <- candidates[vapply(shown, is.null, logical(1))]
+  if (length(waiting)) waiting[[1L]]
 }
 
 activity_wait <- function(slot, seconds) {

@@ -731,12 +731,21 @@ subagent_history_restored <- function(state, transcript = TRUE) {
   }
   tryCatch(replay(history), deputy_disclosure_bound = function(error) {
     # Saved under a larger bound than the lead's disclosure now allows: the
-    # outcomes are still shown, without their transcripts.
+    # outcomes are still shown, without their transcripts, as many as fit.
     history$children <- lapply(
       history$children,
       subagent_history_without_transcript
     )
-    replay(history)
+    repeat {
+      shown <- tryCatch(
+        replay(history),
+        deputy_disclosure_bound = function(error) NULL
+      )
+      if (!is.null(shown) || !length(history$children)) {
+        return(shown %||% list())
+      }
+      history$children[[length(history$children)]] <- NULL
+    }
   })
 }
 

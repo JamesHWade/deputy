@@ -81,7 +81,8 @@ back from storage Deputy doesn't control.
   empty history's own size
   (schema, scope, containers), and a record that can't fit even that saves
   nothing. A record saved under a larger disclosure bound than the lead now has
-  is restored without transcripts rather than refused. A save that fails (for
+  is restored without transcripts rather than refused, with as many outcomes
+  as the current bound holds. A save that fails (for
   example, a requester the disclosure refuses) keeps the last good record for
   that conversation, since shinychat rebuilds `values` from scratch on every
   save.
