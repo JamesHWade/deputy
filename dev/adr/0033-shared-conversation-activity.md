@@ -31,7 +31,9 @@ into an earlier message.
   into the transcript; the wrapped Chat, `get_context_turns()`, provider
   requests, usage counts and compaction never contain them. `set_turns()` and
   context forks separate marked contents again, so a restored shinychat
-  conversation or a copied history cannot hand them to a model. Replacing the
+  conversation or a copied history cannot hand them to a model; a fork given
+  portable records (`ellmer::contents_record()`) finds the marker in the
+  records, before a sanitized replay would clear it. Replacing the
   conversation (`set_turns()`, or a successful `load_session()`, which drops
   the shown cards) restarts the presenter's queue, labels and counts. Clones do
   not inherit the presenter.
@@ -69,8 +71,10 @@ into an earlier message.
 - **Nothing is left running in saved history.** A call whose delegation
   settles without a result, or that is still open when the lead's reply ends,
   gets a "Not completed" result card; one still open when the presenter stops
-  (its `stop()` or the Shiny session ending) gets a "Not shown" result. Each reply shows at most 256 calls; a
-  marker card replaces the rest.
+  (its `stop()` or the Shiny session ending), or when the reply ends and the
+  records can't be read (access withdrawn, a redactor that fails), gets a
+  "Not shown" result. Each reply shows at most 256 calls; a marker card
+  replaces the rest.
 - **Display HTML is inert before it is stored.** Cards go through the adapter
   allowlist of ADR-0032 before they enter the transcript, because shinychat
   replays stored UI without the adapter.
