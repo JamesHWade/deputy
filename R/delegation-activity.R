@@ -742,6 +742,83 @@ activity_poll <- function(
   invisible(result)
 }
 
+activity_name <- function(runtime) {
+  name <- runtime$agent_name
+  if (is_nonempty_string(name)) inspection_text(name, 64L) else "subagent"
+}
+
+# The label and lead call ID a delegation's new cards carry, from `runtime` as
+# its redacted view reports it in this refresh: its name, numbered while the
+# view still shows the name first shown; its parent's label while the view
+# still reports a parent; and the lead's call ID as the depth-one
+# delegation's view reports it. An ancestor's part comes from the ancestor's
+# view as read in this refresh, never an earlier read, so a viewer or
+# redaction that has changed since sees only what it allows now.
+activity_attribute <- function(
+  agent,
+  state,
+  records,
+  record,
+  runtime,
+  requester,
+  pass
+) {
+  id <- record$delegation_id
+  name <- activity_name(runtime)
+  entry <- state$delegations[[id]]
+  label <- if (identical(name, entry$agent_name)) entry$numbered else name
+  parent_id <- runtime$parent_delegation_id
+  if (is_nonempty_string(parent_id)) {
+    parent <- activity_attribution(
+      agent,
+      state,
+      records,
+      parent_id,
+      requester,
+      pass
+    )
+    label <- paste0(label, " (via ", parent$label %||% "a subagent", ")")
+  }
+  root <- activity_root_record(records, record)
+  root_call <- if (identical(root$delegation_id, id)) {
+    if (is_nonempty_string(runtime$tool_call_id)) runtime$tool_call_id
+  } else if (!is.null(root)) {
+    activity_attribution(
+      agent,
+      state,
+      records,
+      root$delegation_id,
+      requester,
+      pass
+    )$root_call
+  }
+  list(label = inspection_text(label, 256L), root_call = root_call)
+}
+
+# A delegation's attribution as the requester's redacted view shows it in this
+# refresh, read at most once. A parent ID comes from a redacted view, so one
+# leading back to a delegation already being worked out has no label.
+activity_attribution <- function(agent, state, records, id, requester, pass) {
+  if (!is.null(pass$done[[id]])) {
+    return(pass$done[[id]])
+  }
+  record <- records[[id]]
+  if (is.null(record) || id %in% pass$visiting) {
+    return(list())
+  }
+  pass$visiting <- c(pass$visiting, id)
+  view <- activity_view(agent, record, requester)
+  runtime <- if (!is.null(view)) view$outcome$runtime
+  attribution <- if (is.list(runtime) && !is.object(runtime)) {
+    activity_attribute(agent, state, records, record, runtime, requester, pass)
+  } else {
+    list()
+  }
+  pass$visiting <- setdiff(pass$visiting, id)
+  pass$done[[id]] <- attribution
+  attribution
+}
+
 activity_refresh <- function(
   agent,
   state,
@@ -756,6 +833,11 @@ activity_refresh <- function(
     function(record) record$delegation_id,
     character(1)
   )
+  # What each delegation's cards say of it, as the requester's redacted views
+  # show it in this refresh (`activity_attribution()`).
+  pass <- new.env(parent = emptyenv())
+  pass$done <- list()
+  pass$visiting <- character()
   for (record in records) {
     id <- record$delegation_id
     entry <- state$delegations[[id]]
@@ -783,11 +865,17 @@ activity_refresh <- function(
       )
     }
     view <- activity_view(agent, record, requester)
-    # The lead's call ID is shown as the depth-one delegation's redacted view
-    # reports it, so a redactor that removes it removes it from every card.
-    is_root <- identical(root$delegation_id, id)
-    root_call <- if (!is_root) state$delegations[[root$delegation_id]]$root_call
     if (is.null(view)) {
+      root_call <- if (!identical(root$delegation_id, id)) {
+        activity_attribution(
+          agent,
+          state,
+          records,
+          root$delegation_id,
+          requester,
+          pass
+        )$root_call
+      }
       # Calls shown before the record grew too large get a result, so no card
       # stays running in saved history.
       for (open in activity_open_entries(agent, entry$key)) {
@@ -822,38 +910,25 @@ activity_refresh <- function(
     if (!is.list(runtime) || is.object(runtime)) {
       runtime <- list()
     }
-    if (is_root) {
-      entry$root_call <- if (is_nonempty_string(runtime$tool_call_id)) {
-        runtime$tool_call_id
-      }
-      root_call <- entry$root_call
-    }
-    # The label follows each refresh's redacted view. The number that tells
-    # delegations of one name apart is drawn once, for the name first shown,
-    # and is used only while the view still shows that name.
-    name <- runtime$agent_name
-    name <- if (is_nonempty_string(name)) {
-      inspection_text(name, 64L)
-    } else {
-      "subagent"
-    }
+    # The number that tells delegations of one name apart is drawn once, for
+    # the name first shown.
     if (is.null(entry$agent_name)) {
-      entry$agent_name <- name
-      entry$numbered <- activity_label(agent, state, name)
+      entry$agent_name <- activity_name(runtime)
+      entry$numbered <- activity_label(agent, state, entry$agent_name)
       state$delegations[[id]] <- entry
     }
-    label <- if (identical(name, entry$agent_name)) entry$numbered else name
-    # Named only when the redacted view still reports the parent.
-    parent_id <- runtime$parent_delegation_id
-    if (is_nonempty_string(parent_id)) {
-      label <- paste0(
-        label,
-        " (via ",
-        state$delegations[[parent_id]]$label %||% "a subagent",
-        ")"
-      )
-    }
-    entry$label <- inspection_text(label, 256L)
+    attribution <- activity_attribute(
+      agent,
+      state,
+      records,
+      record,
+      runtime,
+      requester,
+      pass
+    )
+    pass$done[[id]] <- attribution
+    entry$label <- attribution$label
+    root_call <- attribution$root_call
     calls <- activity_calls(view)
     # Each call keeps the number it was first shown with, matched by its
     # provider ID, tool and arguments, so a redaction that later hides an
