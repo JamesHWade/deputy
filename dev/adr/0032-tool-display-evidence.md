@@ -35,6 +35,9 @@ the obstacle to subagent workflows.
   reason. Unknown `extra` keys and display fields are named, never copied.
   Tag objects are rendered with htmltools when they contain only tags, text and
   dependencies; dependencies are recorded by name and version, not file path.
+  A tag tree whose text (children and attribute values) is already over the
+  field's limit is dropped as oversized without being rendered, since
+  rendering copies and escapes all of it.
 - **Replay validates.** Saved history can come from storage the runtime does
   not control. Replay rebuilds `extra` only from a projection whose fields,
   types and sizes pass validation, and errors otherwise. A newer version is
@@ -60,8 +63,8 @@ the obstacle to subagent workflows.
   `<style>` element survives only when every rule is scoped to such an id, as
   gt's tables are; `@media` is kept at the top level only. A sheet over
   256 KiB or 1,000 rules, or an inline style over 256 KiB, is dropped unread,
-  and declarations are checked together, so rebuilding stays linear and
-  bounded. Each rebuilt field sits in its
+  and declarations, like a rule's selectors, are checked together, so
+  rebuilding stays linear and bounded. Each rebuilt field sits in its
   own box with `contain: paint` and `isolation: isolate`, so positioned,
   transformed or offset content can't paint over the host page, and with a
   bounded height (the body scrolls within 80vh, header fields are clipped to
