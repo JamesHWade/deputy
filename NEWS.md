@@ -7,7 +7,8 @@
   saved with the conversation and shown again when it is reopened, without
   running anything; the lead's model still sees only each subagent's summary.
   `$get_turns()` includes the cards, `$get_context_turns()` doesn't, and
-  `$set_turns()` separates them again (#238).
+  `$set_turns()` separates them again. `$save_session()` keeps them beside the
+  conversation and `$load_session()` brings them back (#238).
 
 * A tool call whose provider ID repeats an earlier call's in the same run, as
   with providers that number calls per response, now gets its own
