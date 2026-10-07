@@ -45,7 +45,9 @@ back from storage Deputy doesn't control.
   `$export_subagents()`-shaped history whose `scope` is the lead's
   `delegation_scope` plus `chat_conversation_id`. Agent and session IDs change
   on reload, so they are not part of it. Reading checks the scope and the
-  conversation ID exactly and authorizes the requester against that scope.
+  conversation ID exactly and authorizes the requester against that scope;
+  so does `status()`, whose counts and problems describe the record, and a
+  requester refused gets none of them.
 - **A typed encoding survives any store.** The record is saved as one JSON
   string inside a versioned envelope (`format`, `version`, `codec`,
   `conversation_id`, `data`). The codec covers exactly the portable data

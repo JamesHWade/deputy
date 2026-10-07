@@ -667,6 +667,37 @@ test_that("live subagents show to a requester who can't see saved ones", {
   )
 })
 
+test_that("status counts saved subagents only for requesters who may see them", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  lead <- history_lead(history_root_server(), history_sales_server(), counter)
+  history_session(
+    lead,
+    store,
+    function(session, chat, saver) {
+      history_submit(session, chat, store, "Revenue?")
+      expect_identical(saver$status()$saved, 1L)
+      # The requester may read live subagents, not the conversation's saved
+      # records.
+      lead$.__enclos_env__$private$.delegation_disclosure <-
+        DelegationDisclosure(
+          authorize = function(requester, scope) {
+            identical(requester, "viewer") &&
+              is.null(scope$chat_conversation_id)
+          }
+        )
+      status <- saver$status()
+      expect_identical(status$saved, 0L)
+      expect_identical(
+        status$omitted,
+        list(running = 0L, transcripts = 0L, children = 0L)
+      )
+      expect_match(status$error, "not available")
+    }
+  )
+})
+
 test_that("a redactor that removes the conversation keeps live subagents", {
   counter <- new.env()
   counter$calls <- 0L
