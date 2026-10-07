@@ -650,6 +650,23 @@ subagent_safe_display <- function(display) {
   if (!is.list(display) || is.object(display)) {
     return(NULL)
   }
+  # shinychat renders Markdown as HTML, remote images included, so a card's
+  # Markdown is shown as HTML rebuilt through the same allowlist instead.
+  markdown <- display$markdown
+  display$markdown <- NULL
+  if (
+    is.character(markdown) &&
+      length(markdown) == 1L &&
+      !is.na(markdown) &&
+      nzchar(markdown)
+  ) {
+    if (rlang::is_installed("commonmark")) {
+      display$html <- display$html %||%
+        commonmark::markdown_html(markdown, extensions = TRUE)
+    } else {
+      display$text <- display$text %||% markdown
+    }
+  }
   for (field in intersect(tool_display_html_fields, names(display))) {
     value <- display[[field]]
     safe <- if (is.character(value) && length(value) == 1L) {
