@@ -678,8 +678,9 @@ review module. `inst/examples/trusted-results/` is the three-area app.
 carry its `tool_fingerprint`. An owner with a policy admits retained agents in
 `retain_conversation()` (`trusted_admit_conversation()`): explicit producers
 required, the agent's registry checked as a tree member against the combined
-policy (own types added, exemptions intersected, receipt if either), which is
-installed until release. `check_trusted_registry(admit_route = )` accepts only
+policy (own types added, exemptions intersected, receipt if either; producers
+also checked against the root's other retained agents), which is installed
+until release. `release_agent()` removes the owner's routes to the handle. `check_trusted_registry(admit_route = )` accepts only
 Deputy routes owned by the registering agent to handles its policy root
 retained under the policy (graph members reach the root through a weak
 `.trusted_root`). Delivery forwards straight to the root once; continuation

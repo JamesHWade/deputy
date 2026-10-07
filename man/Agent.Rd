@@ -490,10 +490,12 @@ was idle.
 \subsection{\code{Agent$release_agent()}}{
   Stop retaining an agent so it can be used on its own again. This also
 discards its delegation records, so save them first with
-\verb{$export_subagents()} if you need them. Its tools and connections stay
-open. Errors while the agent is running: cancel it with \verb{$cancel_agent()}
-and wait for the task to end first. Agents in a graph are released with
-\verb{$release_agent_graph()}. Handles don't survive an R restart.
+\verb{$export_subagents()} if you need them, and removes the tools made for
+it with \code{\link[=delegation_tool]{delegation_tool()}} from this agent. Its own tools and
+connections stay open. Errors while the agent is running: cancel it with
+\verb{$cancel_agent()} and wait for the task to end first. Agents in a graph
+are released with \verb{$release_agent_graph()}. Handles don't survive an R
+restart.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$release_agent(handle)}

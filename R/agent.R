@@ -411,10 +411,12 @@ Agent <- R6::R6Class(
     #' @description
     #' Stop retaining an agent so it can be used on its own again. This also
     #' discards its delegation records, so save them first with
-    #' `$export_subagents()` if you need them. Its tools and connections stay
-    #' open. Errors while the agent is running: cancel it with `$cancel_agent()`
-    #' and wait for the task to end first. Agents in a graph are released with
-    #' `$release_agent_graph()`. Handles don't survive an R restart.
+    #' `$export_subagents()` if you need them, and removes the tools made for
+    #' it with [delegation_tool()] from this agent. Its own tools and
+    #' connections stay open. Errors while the agent is running: cancel it with
+    #' `$cancel_agent()` and wait for the task to end first. Agents in a graph
+    #' are released with `$release_agent_graph()`. Handles don't survive an R
+    #' restart.
     #' @param handle A handle from `$retain_agent()`.
     #' @return `NULL`, invisibly.
     release_agent = function(handle) release_conversation(self, handle),

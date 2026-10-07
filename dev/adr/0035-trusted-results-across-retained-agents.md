@@ -37,9 +37,13 @@ producer's own label, not proof.
 - **The combined policy weakens neither side.** A retained agent's own policy
   adds its result types (pinned to its registered producers when given by
   name); a type both name must have the same producer, and a tool may produce
-  one type. Exemptions are the intersection; a receipt applies if either asks.
-  The combined policy is installed on the retained agent until release, which
-  restores its own policy; the owner's finalizer does too.
+  one type. Both rules also hold across everything the root retains (graph
+  members included), so two specialists can't give one type different
+  producers. Exemptions are the intersection; a receipt applies if either
+  asks. The combined policy is installed on the retained agent until release,
+  which restores its own policy and removes the owner's `delegation_tool()`
+  routes to it (they could only fail, and would fail the owner's next registry
+  check); the owner's finalizer restores the policy too.
 - **Routes are admitted by provenance, not by name.** `check_trusted_registry()`
   takes an `admit_route` predicate. A tool is an admitted route only when
   Deputy's composition marker names the registering agent as owner, it carries
