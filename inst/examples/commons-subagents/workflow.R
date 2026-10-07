@@ -1,5 +1,8 @@
 # The Commons specialists and their root, as the app and its tests use them.
 
+# Base R has `%||%` only from R 4.4.0; Commons runs on R 4.1 and later.
+`%||%` <- function(x, y) if (is.null(x)) y else x
+
 commons_example_data <- function() {
   list(
     sales = data.frame(

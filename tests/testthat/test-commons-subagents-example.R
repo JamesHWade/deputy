@@ -43,6 +43,18 @@ commons_example_local <- function(
   list(example = example, fixture = fixture, workflow = workflow)
 }
 
+# Runs the event loop until `ready()` is true, failing the test after
+# `seconds` instead of hanging it.
+commons_wait <- function(ready, what, seconds = 60) {
+  deadline <- Sys.time() + seconds
+  while (!ready()) {
+    if (Sys.time() > deadline) {
+      cli::cli_abort("{what} took more than {seconds} seconds.")
+    }
+    later::run_now(0.02)
+  }
+}
+
 commons_collect <- function(agent, task) {
   stream <- agent$stream_async(task, stream = "content")
   seen <- list()
@@ -57,9 +69,7 @@ commons_collect <- function(agent, task) {
     )
     done <<- TRUE
   })()
-  while (!done) {
-    later::run_now(0.02)
-  }
+  commons_wait(function() done, "The reply")
   if (!is.null(failure)) {
     rlang::cnd_signal(failure)
   }
@@ -220,18 +230,14 @@ test_that("cancelling a slow Commons specialist stops only that work", {
       break
     }
     if (Sys.time() > deadline) {
-      fail("The operations specialist never started.")
+      cli::cli_abort("The operations specialist never started.")
     }
   }
   root$interrupt_subagent(
     rows$delegation_id[rows$agent_name == "ops"],
     "user_cancelled"
   )
-  suppressWarnings(
-    while (!done) {
-      later::run_now(0.02)
-    }
-  )
+  suppressWarnings(commons_wait(function() done, "The cancelled reply", 30))
   rows <- root$list_subagents()
   expect_identical(rows$status, "stopped")
   expect_identical(rows$stop_reason, "user_cancelled")

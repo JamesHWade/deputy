@@ -134,7 +134,7 @@ server <- function(input, output, session) {
   output$metrics <- renderText({
     invalidateLater(500L, session)
     paste(
-      length(fixture$requests()),
+      fixture$count(),
       "local model requests ·",
       effects$runs,
       "measure runs in this app"

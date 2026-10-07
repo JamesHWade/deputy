@@ -316,6 +316,9 @@ commons_local_fixture <- function(delay = 0.1, slow = 1) {
       )
       lapply(files, readRDS)
     },
+    count = function() {
+      length(list.files(directory, pattern = "^[0-9]+[.]rds$"))
+    },
     close = function() {
       if (process$is_alive()) {
         process$kill()
