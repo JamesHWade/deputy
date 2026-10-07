@@ -13,9 +13,9 @@
   tools that delegate are still refused, and every trusted result from a
   retained agent or graph member reaches the root's `on_result` once, with the
   producing agent's IDs. A retained agent's own policy applies alongside,
-  without weakening either, and two retained agents can't give one result type
-  different tools. The policy must give its trusted tools as tool objects
-  (#238).
+  without weakening either, also to the graph members it asks through its
+  routes, and two retained agents can't give one result type different tools.
+  The policy must give its trusted tools as tool objects (#238).
 
 * `$release_agent()` now also removes the owner's `delegation_tool()` tools for
   the released agent, which could only fail once it was released (#238).
