@@ -14,7 +14,9 @@ TrustedResults(
 \arguments{
 \item{...}{Named pairs \code{result_type = "tool_name"}, or \code{result_type = tool}
 with the ellmer tool itself, which then is the only tool object that may
-produce that type. Result types must be unique, start with a letter or
+produce that type. A tool given this way doesn't have to be registered
+with the agent that has the policy; an agent it retains can hold it
+instead. Result types must be unique, start with a letter or
 number, and contain only letters, numbers, dots, underscores and hyphens.
 Each tool may produce only one result type.}
 
@@ -53,7 +55,10 @@ construction, in \verb{$set_tools()} and \verb{$register_tools()}, and when load
 skills or MCP tools. The change errors, and the previous tools stay in
 place, if:
 \itemize{
-\item a trusted tool is missing, or isn't the tool object given to the policy;
+\item a trusted tool given by name is missing, or a tool registered under a
+trusted tool's name isn't the tool object given to the policy. A trusted
+tool given as the tool object may be missing here, since it can be
+registered in an agent this one retains instead;
 \item a trusted tool is not a local function tool (for example, it is an MCP or
 provider tool), runs code, or delegates to another agent;
 \item another tool runs model-supplied code or delegates (\code{run_r_code},

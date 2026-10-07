@@ -70,7 +70,8 @@ back from storage Deputy doesn't control.
   a conversation's whole record, scope and bookkeeping included, so a saved
   record is always readable; a scope alone over the bound saves no record.
   Children are also kept within what the lead's disclosure `max_bytes` lets
-  `delegation_history()` replay (each view, and its transcript again as
+  `delegation_history()` replay (each view as replay projects it, with every
+  artifact reference marked `"unresolved"`, and its transcript again as
   replayed turns). Children are kept in order; one that doesn't fit is kept
   without its transcript (`retention$transcript = "omitted"`) or left out,
   newest first if the whole record is still too large, and the record counts
