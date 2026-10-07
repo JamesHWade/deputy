@@ -483,7 +483,11 @@ subagent_history_record <- function(state, conversation_id) {
     }
     earlier <- (prior$omitted$earlier %||% 0L) + sum(!pending %in% live)
     for (index in seq_along(carried)) {
-      view <- disclosure$redact(carried[[index]], requester)
+      # Redacted as replay shows it: its references marked "unresolved".
+      view <- disclosure$redact(
+        inspection_unresolved_references(carried[[index]]),
+        requester
+      )
       if (!is.list(view)) {
         cli::cli_abort("Disclosure redaction must return a list.")
       }
