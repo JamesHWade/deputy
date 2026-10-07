@@ -40,7 +40,11 @@ the obstacle to subagent workflows.
   it. The size is bounded before rendering from everything rendering writes
   out: text, tag and attribute names, and attribute values of any atomic type,
   counted by their widest element without converting them, so a compact
-  sequence such as `1:1e8` is never expanded.
+  sequence such as `1:1e8` is never expanded. Text and attribute values count
+  as escaped (`&` as `&amp;`, `"` in an attribute as `&quot;`), and each tag
+  its markup, indentation and line breaks, so the bound holds for the rendered
+  text. The walk visits at most 4,096 nodes, attributes included, and stops at
+  the first it refuses, so a longer tag list isn't walked to its end.
 - **Replay validates.** Saved history can come from storage the runtime does
   not control. Replay rebuilds `extra` only from a projection whose fields,
   types and sizes pass validation, and errors otherwise. A newer version is
