@@ -168,6 +168,9 @@ activity_reset <- function(agent) {
   state$run_id <- NULL
   state$calls <- 0L
   state$limited <- FALSE
+  # A reply still streaming belongs to the replaced conversation: its
+  # subagents' calls aren't shown in the new one.
+  state$skip_run <- private$current_run_id
   invisible(NULL)
 }
 
@@ -415,7 +418,9 @@ activity_calls <- function(view) {
 
 # Lineage as the redacted view reports it; `anchor` is the lead's own tool
 # call, already in the conversation the viewer sees.
-activity_lineage <- function(runtime, anchor, label, activity_id, sequence) {
+# `root_call` is the lead's tool call ID as the depth-one delegation's
+# redacted view reports it, or NULL.
+activity_lineage <- function(runtime, root_call, label, activity_id, sequence) {
   text <- function(value, bytes = 256L) {
     if (is_nonempty_string(value)) inspection_text(value, bytes) else NULL
   }
@@ -437,7 +442,7 @@ activity_lineage <- function(runtime, anchor, label, activity_id, sequence) {
       },
       run_id = text(runtime$run_id),
       conversation_id = text(runtime$session_id),
-      root_tool_call_id = text(anchor$tool_call_id)
+      root_tool_call_id = text(root_call)
     )
   )
 }
@@ -585,9 +590,9 @@ activity_settle <- function(agent, entry, text, state = NULL) {
 }
 
 # One marker card standing in for calls that aren't shown.
-activity_note <- function(agent, state, entry, runtime, anchor, kind, text) {
+activity_note <- function(agent, state, entry, runtime, root_call, kind, text) {
   id <- paste0("deputy_activity_", entry$key, "_", kind)
-  marker <- activity_lineage(runtime, anchor, "subagents", id, 0L)
+  marker <- activity_lineage(runtime, root_call, "subagents", id, 0L)
   request <- ellmer::ContentToolRequest(
     id = id,
     name = "more_subagent_tool_calls",
@@ -628,6 +633,7 @@ activity_poll <- function(
   if (
     is.null(state) ||
       is.null(run_id) ||
+      identical(state$skip_run, run_id) ||
       (!is.null(presenter) && !identical(state, presenter))
   ) {
     return(invisible(NULL))
@@ -717,6 +723,10 @@ activity_refresh <- function(
       )
     }
     view <- activity_view(agent, record, requester)
+    # The lead's call ID is shown as the depth-one delegation's redacted view
+    # reports it, so a redactor that removes it removes it from every card.
+    is_root <- identical(root$delegation_id, id)
+    root_call <- if (!is_root) state$delegations[[root$delegation_id]]$root_call
     if (is.null(view)) {
       # Calls shown before the record grew too large get a result, so no card
       # stays running in saved history.
@@ -736,7 +746,7 @@ activity_refresh <- function(
         state,
         entry,
         list(),
-        root,
+        root_call,
         "oversized",
         paste(
           "More tool calls of this subagent aren't shown here: its record is",
@@ -751,6 +761,12 @@ activity_refresh <- function(
     runtime <- view$outcome$runtime
     if (!is.list(runtime) || is.object(runtime)) {
       runtime <- list()
+    }
+    if (is_root) {
+      entry$root_call <- if (is_nonempty_string(runtime$tool_call_id)) {
+        runtime$tool_call_id
+      }
+      root_call <- entry$root_call
     }
     if (is.null(entry$label)) {
       name <- runtime$agent_name
@@ -797,7 +813,13 @@ activity_refresh <- function(
       }
       emitted <- known[[index]]$emitted
       activity_id <- paste0("deputy_activity_", entry$key, "_", index)
-      marker <- activity_lineage(runtime, root, entry$label, activity_id, index)
+      marker <- activity_lineage(
+        runtime,
+        root_call,
+        entry$label,
+        activity_id,
+        index
+      )
       request <- activity_request_content(call$request, marker)
       if (!"request" %in% emitted) {
         if (state$calls >= activity_max_calls) {
@@ -807,7 +829,7 @@ activity_refresh <- function(
               state,
               entry,
               runtime,
-              root,
+              root_call,
               "limit",
               paste0(
                 "More subagent tool calls ran in this reply than the ",
