@@ -1097,11 +1097,7 @@ Agent <- R6::R6Class(
       )
       reset_stream_controller(controller)
       if (!is.null(private$.activity) && identical(stream, "content")) {
-        return(activity_stream(
-          self,
-          governed_run$stream,
-          private$.activity$interval
-        ))
+        return(activity_stream(self, governed_run$stream, private$.activity))
       }
       governed_run$stream
     },

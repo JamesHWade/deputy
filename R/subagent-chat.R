@@ -776,7 +776,8 @@ subagent_chat_server <- function(
 #' @return Invisibly, a list with `stop()`, which stops adding calls. Ending the
 #'   Shiny session also stops it. A lead shows activity in one chat at a time:
 #'   calling `subagent_chat_activity()` again for the same lead before `stop()`
-#'   is an error.
+#'   is an error. Called again after `stop()` during a reply, it shows calls
+#'   from the next reply on.
 #' @seealso [subagent_chat_ui()] for a panel with each subagent's full
 #'   conversation.
 #' @export
