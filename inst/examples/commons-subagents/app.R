@@ -9,7 +9,7 @@ source("workflow.R", local = TRUE)
 # One local model server and one history store for the whole app, so a
 # reloaded page reopens its conversation and the counts below cover every
 # session.
-fixture <- commons_local_fixture(delay = 0.2, slow = 6)
+fixture <- commons_local_fixture(delay = 0.2, slow = 1.2)
 history_dir <- file.path(tempdir(), "deputy-commons-subagents-history")
 store <- shinychat::FileConversationStore$new(history_dir)
 effects <- commons_example_effects()
@@ -59,14 +59,28 @@ ui <- page_fillable(
   )
 )
 
+# The first line of what the measure returned. Commons tells the model that a
+# table or chart is already on screen; here that card is in the conversation.
+trusted_value <- function(value) {
+  if (inherits(value, "ellmer::ContentToolResult")) {
+    value <- value@value
+  }
+  text <- paste(format(value), collapse = "\n")
+  first <- trimws(sub("\n.*", "", text))
+  if (startsWith(first, "This measure result is already visible")) {
+    return("Shown in the conversation")
+  }
+  substr(first, 1L, 80L)
+}
+
 server <- function(input, output, session) {
   requester <- "demo-user"
   user <- function() requester
-  trusted <- reactiveVal(list())
+  trusted <- commons_example_results()
   workflow <- commons_example_workflow(
     fixture,
     effects,
-    on_result = function(event) trusted(c(trusted(), list(event))),
+    on_result = trusted$on_result,
     requester = requester
   )
   root <- workflow$root
@@ -92,7 +106,7 @@ server <- function(input, output, session) {
   )
 
   output$trusted <- renderUI({
-    events <- trusted()
+    events <- trusted$results()
     if (!length(events)) {
       return(tags$p(
         class = "text-muted",
@@ -100,14 +114,10 @@ server <- function(input, output, session) {
       ))
     }
     rows <- lapply(events, function(event) {
-      value <- event$value
-      if (inherits(value, "ellmer::ContentToolResult")) {
-        value <- value@value
-      }
       tags$tr(
         tags$td(event$arguments$name %||% event$tool_name),
         tags$td(event$agent_name %||% "root"),
-        tags$td(substr(paste(format(value), collapse = " "), 1L, 80L))
+        tags$td(trusted_value(event$value))
       )
     })
     tags$table(

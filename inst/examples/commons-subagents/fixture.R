@@ -4,7 +4,12 @@
 # The reply depends only on that agent's latest task and the tool results it
 # has already received, which keeps every run of the example identical without
 # API keys or paid requests.
-commons_local_fixture <- function(delay = 0.1, slow = 4) {
+#
+# `delay` is how long every reply takes. A slow operations check takes five
+# searches of `slow` seconds each: the app waits for each reply before it can do
+# anything else, so a long check is made of short steps, as a working agent's
+# would be, and a cancellation takes effect at the next one.
+commons_local_fixture <- function(delay = 0.1, slow = 1) {
   directory <- tempfile("deputy-commons-subagents-")
   dir.create(directory, recursive = TRUE)
   process <- callr::r_bg(
@@ -102,6 +107,13 @@ commons_local_fixture <- function(delay = 0.1, slow = 4) {
           arguments = list(name = name, arguments = "{}")
         )
       }
+      search <- function(query, n) {
+        list(
+          id = paste0("call_", n),
+          name = "search_pool",
+          arguments = list(query = query)
+        )
+      }
       route <- function(name, task, n) {
         list(
           id = paste0("call_", n),
@@ -177,7 +189,11 @@ commons_local_fixture <- function(delay = 0.1, slow = 4) {
           },
           ops = if (grepl("SLOW", task, fixed = TRUE)) {
             Sys.sleep(slow)
-            list(text = "OPS: The on-time delivery rate is unchanged.")
+            if (done < 5L) {
+              list(calls = list(search("shipments", n)))
+            } else {
+              list(text = "OPS: The on-time delivery rate is unchanged.")
+            }
           } else if (done == 0L) {
             list(calls = list(measure("on_time_rate", n)))
           } else {

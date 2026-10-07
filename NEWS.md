@@ -1,5 +1,18 @@
 # deputy (development version)
 
+* A conversation saved with shinychat's history now reopens with every turn.
+  A failed tool call inside a Shiny session carries Shiny's call stacks, which
+  shinychat's file store can't read back, so the turn holding it was dropped
+  when the conversation was reopened. `$get_turns()` now returns tool errors as
+  plain conditions with their class and message; the model still sees the
+  error as it was raised (#238).
+
+* New example `commons-subagents`: a Shiny app in which a root agent asks
+  Commons specialists concurrently, one of them asks another, their tool calls
+  and trusted measures appear in one conversation, and a reopened conversation
+  shows them again without running anything. It runs against a local test
+  server, with no API keys (#238).
+
 * `TrustedResults()` accepts the trusted tool itself, as in
   `TrustedResults(forecast = get_forecast)`; only that tool object may then
   produce the result, wherever it is registered. Each `"trusted_result"` event

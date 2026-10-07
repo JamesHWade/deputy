@@ -178,6 +178,24 @@ for durable approval and the designated computation. Run
 Model commentary cannot write its authoritative host receipt. The recipe is separate from curated-chat composition (ADR-0024) and the
 recursive graph runtime (ADR-0025).
 
+`inst/examples/commons-subagents/` is the end-to-end Commons workflow for #238:
+actual `commons::commons()` chats as graph members (sales and ops from the root,
+an auditor under sales), strict `TrustedResults(measure = call_measure)` with
+Commons cut to `search_pool` + `call_measure` (one shared tool object), activity
+cards, saved subagent records and a Shiny app. `fixture.R` is a callr/httpuv
+OpenAI-compatible server keyed by model name (`commons-<role>`) with scripted
+replies, a scripted ops failure and a slow ops path for cancellation (five
+short search steps: ellmer 0.5.0 opens a stream with httr2's
+`req_perform_connection()`, which blocks R until response headers arrive, so a
+reply delayed whole would freeze the app and the cancel click with it). Run
+`devtools::test(filter = "commons-subagents-example")`; it covers concurrency,
+the grandchild, repeated names, partial failure, cancellation, reopened
+conversations with zero re-execution, failed delivery and refused Commons
+configurations. `dev/browser/commons-subagents.js` drives the running app in
+Chromium with Playwright (22 checks; see `dev/browser/README.md`); it found the
+app's `on_result` reading a reactiveVal outside a reactive context, which the
+fixture's scripted replies hid from the R tests.
+
 ## Common Commands
 
 ### Testing
@@ -452,7 +470,10 @@ latest reported usage plus characters (`R/context-estimation.R`); kept-turn
 subsets and usage reported before a compaction use characters only. Evaluation cases and the
 future history-retrieval comparison are described in `dev/compaction-evaluation.md`.
 `Agent$get_turns()` and `turns()` expose the complete selected conversation;
-`get_context_turns()` exposes the compacted model input. Accepted compaction
+`get_context_turns()` exposes the compacted model input. `get_turns()` returns
+tool errors as plain conditions (class and message): shinychat's file store
+writes turns with `serializeJSON()` and drops any it can't read back, which
+Shiny's `deep.stack.trace` calls caused (`portable_tool_errors()`). Accepted compaction
 retains removed turns as a portable in-memory prefix, without executable tool
 references. `set_turns()` replaces both views and clears the installed summary.
 Snapshot schema 3 preserves the prefix and context separately. Hosts still own

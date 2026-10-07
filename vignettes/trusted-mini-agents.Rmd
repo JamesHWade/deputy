@@ -372,7 +372,12 @@ Commons chats can be retained this way, but not as they come. Their
 get around a trusted measure; remove them. Commons doesn't mark its other
 tools as closed-world, so set `open_world_hint = FALSE` on the ones you keep
 after checking that they don't reach outside the data you gave Commons, and
-name `call_measure` as the trusted tool.
+name `call_measure` as the trusted tool. Each Commons chat makes its own
+`call_measure`, so for one producer across several specialists, take the tools
+from one Commons chat and give the same list to each with `$set_tools()`. The
+`commons-subagents` example, in
+`system.file("examples/commons-subagents", package = "deputy")`, sets this up
+for three specialists in a Shiny app.
 
 Delegated children cannot pause for durable approval, whether they come from a
 definition, a retained agent or a graph. To review a trusted tool's inputs

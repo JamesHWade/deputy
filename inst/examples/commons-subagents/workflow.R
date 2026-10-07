@@ -263,6 +263,19 @@ commons_example_workflow <- function(
   )
 }
 
+# The app's list of trusted results. The root's `on_result` runs outside any
+# reactive context, so it reads the current list with `isolate()`; reading it
+# directly would fail, and a failed delivery fails the tool call.
+commons_example_results <- function() {
+  results <- shiny::reactiveVal(list())
+  list(
+    results = results,
+    on_result = function(event) {
+      results(c(shiny::isolate(results()), list(event)))
+    }
+  )
+}
+
 commons_example_release <- function(workflow) {
   root <- workflow$root
   root$interrupt("session_ended")

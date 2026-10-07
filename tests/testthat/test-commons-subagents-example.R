@@ -28,7 +28,7 @@ commons_example_skip <- function() {
 
 # A running example: its local server, a workflow and cleanup.
 commons_example_local <- function(
-  slow = 3,
+  slow = 0.5,
   on_result = function(event) NULL,
   .local_envir = parent.frame()
 ) {
@@ -197,7 +197,7 @@ test_that("a second delegation to the same Commons specialist is numbered", {
 
 test_that("cancelling a slow Commons specialist stops only that work", {
   commons_example_skip()
-  local <- commons_example_local(slow = 3)
+  local <- commons_example_local(slow = 0.5)
   root <- local$workflow$root
   activity_enable(root, function() "demo-user", 0.02)
   stream <- root$stream_async(
@@ -284,7 +284,13 @@ test_that("a reopened conversation shows the same cards and records and runs not
     )
   }
 
-  first <- example$commons_example_workflow(fixture, effects)
+  # The app's own list of trusted results, updated as the app updates it.
+  trusted <- example$commons_example_results()
+  first <- example$commons_example_workflow(
+    fixture,
+    effects,
+    on_result = trusted$on_result
+  )
   withr::defer(example$commons_example_release(first))
   conversation <- NULL
   live <- NULL
@@ -319,6 +325,18 @@ test_that("a reopened conversation shows the same cards and records and runs not
   expect_match(paste(warnings, collapse = "\n"), "Subagent 'ops' failed")
   expect_length(live, 10L)
   expect_length(live_turns, 4L)
+  # Every measure reached the app's list once, so every call succeeded.
+  expect_length(shiny::isolate(trusted$results()), 4L)
+  shown <- Filter(
+    function(card) identical(card$class, "ellmer::ContentToolResult"),
+    live
+  )
+  expect_length(shown, 5L)
+  expect_true(all(vapply(
+    shown,
+    function(card) is.null(card$props$error),
+    logical(1)
+  )))
   runs <- effects$runs
   requests <- length(fixture$requests())
   expect_identical(runs, 4L)
