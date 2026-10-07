@@ -442,7 +442,15 @@ subagent_chat_server <- function(
             ))
             render_child()
           }
-          update <- state$reader$poll()
+          # With a conversation, only its own subagents are read: their views
+          # on each tick, and the selected child's events below. The lead-wide
+          # events are left unread, since other conversations' events could
+          # take them over the disclosure bound.
+          update <- if (is.null(conversation)) {
+            state$reader$poll()
+          } else {
+            list(events = list(), gaps = list(), cursor = NULL)
+          }
           fresh_views <- filter_views(conversation_views(
             live_views(current_lead, current_requester)
           ))
@@ -462,7 +470,8 @@ subagent_chat_server <- function(
           }
           if (!is.null(selected()) && !closed()) {
             if (is.null(state$partial_cursor)) {
-              state$partial_cursor <- update$cursor
+              state$partial_cursor <- update$cursor %||%
+                subagent_history_cursor(current_lead, current_requester)
             } else {
               # Re-read the bounded retained event suffix to reapply redaction
               # to cached streamed text as well as newly arriving text.

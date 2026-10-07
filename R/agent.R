@@ -1715,12 +1715,17 @@ Agent <- R6::R6Class(
     #' The file holds the conversation (including turns removed by compaction),
     #' the system prompt and any compaction summary, copies of large tool
     #' results, the run context, file checkpoint state (when enabled) and some
-    #' metadata, such as the time, Deputy version and provider. It doesn't hold
+    #' metadata, such as the time, Deputy version and provider. Subagent tool
+    #' calls shown by [subagent_chat_activity()] are kept beside the
+    #' conversation, never among the turns the model reads. It doesn't hold
     #' tools, permissions, hooks or the Chat itself.
     save_session = function(path) {
       tryCatch(
         {
           session <- private$build_session_payload()
+          session$activity <- activity_session_entries(
+            private$.activity_overlay
+          )
           saveRDS(session, path)
           cli_alert_success("Session saved to {.path {path}}")
           invisible(path)
@@ -1751,7 +1756,8 @@ Agent <- R6::R6Class(
     #' tool results and compaction summaries are restored under this agent's
     #' session ID. Files saved by early development versions of Deputy can't be
     #' loaded. Loading errors while a run is active. Subagent tool calls shown
-    #' by [subagent_chat_activity()] for the previous conversation are dropped.
+    #' by [subagent_chat_activity()] come back with the conversation they were
+    #' saved with; those shown for the previous conversation are dropped.
     load_session = function(path) {
       check_conversation_lease(self, NULL)
       if (isTRUE(private$run_active)) {
@@ -1783,13 +1789,15 @@ Agent <- R6::R6Class(
         }
       )
 
+      # Checked before anything is restored, against the turns being loaded.
+      overlay <- activity_session_overlay(session, path)
       private$restore_session_payload(
         session,
         source = path
       )
       # Activity shown for the previous conversation doesn't belong to this
       # one; a failed load above leaves it in place.
-      private$.activity_overlay <- list()
+      private$.activity_overlay <- overlay
       activity_reset(self)
       cli_alert_success("Session loaded from {.path {path}}")
       invisible(self)

@@ -114,7 +114,9 @@ back from storage Deputy doesn't control.
   conversation and saved children that aren't live, listing saved ones without
   transcripts and replaying a transcript only when that child is selected. It
   reads and bounds only the open conversation's live records, so other
-  conversations' children can't push its list over the disclosure bound.
+  conversations' children can't push its list over the disclosure bound, and
+  it doesn't read the lead-wide event stream, whose other conversations'
+  events could; it reads the selected child's events on their own.
   Saved children are authorized for the conversation's own scope, so a
   requester the lead's live scope refuses (after a reload changed its agent
   and session IDs, say) still sees them, with no live reader.
