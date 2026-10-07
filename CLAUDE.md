@@ -513,9 +513,9 @@ the lead's own shinychat conversation (ADR-0033, `R/delegation-activity.R`).
 Each call is an inert request/result pair marked `extra$deputy_activity`,
 appended to the lead's assistant turn holding the depth-one delegation call.
 `get_turns()` merges them; the wrapped Chat, `get_context_turns()`, usage and
-providers never see them, and `set_turns()`/context forks strip them (before a
-fork's size bound). IDs are `deputy_activity_<key>_<n>` with an opaque
-per-delegation key, never provider IDs; labels and lineage come from the
+providers never see them, and `set_turns()`, `add_turn()` and context forks
+strip them (before a fork's size bound). IDs are `deputy_activity_<key>_<n>`
+with an opaque per-delegation key, never provider IDs; labels and lineage come from the
 redacted view, and a view over `max_bytes` shows one note card. `stream_async()` merges
 cards only while a presenter is enabled, reading records through disclosure
 on the consumer side; it never runs tools. Tool-call correlation no longer

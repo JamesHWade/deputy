@@ -29,8 +29,8 @@ into an earlier message.
   `deputy_activity` record in `extra`, appended to the lead's assistant turn
   that holds the depth-one delegation call. `get_turns()` merges these pairs
   into the transcript, and `last_turn()` into the turn it returns; the wrapped Chat, `get_context_turns()`, provider
-  requests, usage counts and compaction never contain them. `set_turns()` and
-  context forks separate marked contents again, so a restored shinychat
+  requests, usage counts and compaction never contain them. `set_turns()`,
+  `add_turn()` and context forks separate marked contents again, so a restored shinychat
   conversation or a copied history cannot hand them to a model; a fork given
   portable records (`ellmer::contents_record()`) finds the marker in the
   records, before a sanitized replay would clear it. `save_session()` keeps
@@ -135,7 +135,7 @@ provider's ID comes back.
   because the saved turns contain them.
 - The lead's `get_turns()` grows by the shown cards while a presenter is in
   use. Hosts that copy that transcript into another Chat must pass it through
-  an Agent's `set_turns()` or drop marked contents; `get_context_turns()` is
+  an Agent's `set_turns()` or `add_turn()`, or drop marked contents; `get_context_turns()` is
   the model's view.
 - Activity from runs the host starts directly (`continue_agent()` outside a
   lead reply, `parallel_delegate()`) has no reply to attach to and stays in the
