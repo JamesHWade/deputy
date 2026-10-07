@@ -387,6 +387,85 @@ test_that("a tag tree whose text is over its field's limit isn't rendered", {
   expect_identical(rendered, 1L)
 })
 
+test_that("escaping and markup count toward a tag tree's limit", {
+  rendered <- 0L
+  local_mocked_bindings(tool_display_render_tags = function(value) {
+    rendered <<- rendered + 1L
+    htmltools::renderTags(value)
+  })
+  limit <- tool_display_limits[["html"]]
+  omitted <- function(html) {
+    result <- ellmer::ContentToolResult(
+      value = "60",
+      extra = list(display = list(html = html))
+    )
+    tool_display_projection(result)$omitted$fields[["html"]] %||% "none"
+  }
+  # `&` is written as `&amp;`, and `"` in an attribute as `&quot;`.
+  amps <- strrep("&", limit %/% 5 + 1)
+  expect_identical(omitted(htmltools::div(amps)), "oversized")
+  quotes <- strrep("\"", limit %/% 6 + 1)
+  expect_identical(omitted(htmltools::div(title = quotes)), "oversized")
+  # Each tag's markup and line count too.
+  tags <- htmltools::tagList(
+    strrep("x", limit - 10000),
+    lapply(1:2000, function(i) htmltools::tags$i())
+  )
+  expect_identical(omitted(tags), "oversized")
+  expect_identical(rendered, 0L)
+  # Text marked as HTML isn't escaped, and text within the limit once escaped
+  # is rendered whole.
+  expect_identical(omitted(htmltools::div(htmltools::HTML(amps))), "none")
+  expect_identical(
+    omitted(htmltools::div(strrep("&", limit %/% 5 - 100))),
+    "none"
+  )
+  expect_identical(rendered, 2L)
+})
+
+test_that("a walk stops once its node budget is spent", {
+  walked <- 0L
+  walk <- tool_display_plain_tags
+  data <- 0L
+  walk_data <- tool_display_plain_data
+  local_mocked_bindings(
+    tool_display_plain_tags = function(...) {
+      walked <<- walked + 1L
+      walk(...)
+    },
+    tool_display_plain_data = function(...) {
+      data <<- data + 1L
+      walk_data(...)
+    }
+  )
+  omitted <- function(html) {
+    result <- ellmer::ContentToolResult(
+      value = "60",
+      extra = list(display = list(html = html))
+    )
+    tool_display_projection(result)$omitted$fields[["html"]]
+  }
+  many <- structure(
+    as.list(rep("x", 20000)),
+    class = c("shiny.tag.list", "list")
+  )
+  expect_identical(omitted(many), "unsupported_object")
+  expect_lt(walked, 4200L)
+  tag <- htmltools::div("60")
+  attr(tag, "html_dependencies") <- list(structure(
+    list(name = "measure", version = "1.0", meta = as.list(1:20000)),
+    class = "html_dependency"
+  ))
+  expect_identical(omitted(tag), "unsupported_object")
+  expect_lt(data, 4200L)
+  # Attributes count as nodes.
+  attribs <- stats::setNames(as.list(rep("v", 5000)), paste0("a", 1:5000))
+  expect_identical(
+    omitted(do.call(htmltools::div, attribs)),
+    "unsupported_object"
+  )
+})
+
 test_that("what rendering converts or calls is checked before rendering", {
   omitted <- function(html) {
     result <- ellmer::ContentToolResult(
