@@ -1042,12 +1042,7 @@ delegation_history <- function(history, requester, disclosure, scope) {
     ) {
       cli::cli_abort("Only settled child history can be replayed.")
     }
-    if (!is.null(view$outcome$references)) {
-      view$outcome$references <- lapply(view$outcome$references, function(ref) {
-        ref$availability <- "unresolved"
-        ref
-      })
-    }
+    view <- inspection_unresolved_references(view)
     view <- disclosure$redact(view, requester)
     inspection_portable(view)
     if (!is.list(view)) {
@@ -1058,4 +1053,16 @@ delegation_history <- function(history, requester, disclosure, scope) {
     view
   })
   inspection_bound(views, disclosure)
+}
+
+# A saved artifact's availability may be stale, so replay marks every
+# reference "unresolved".
+inspection_unresolved_references <- function(view) {
+  if (!is.null(view$outcome$references)) {
+    view$outcome$references <- lapply(view$outcome$references, function(ref) {
+      ref$availability <- "unresolved"
+      ref
+    })
+  }
+  view
 }

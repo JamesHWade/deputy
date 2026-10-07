@@ -391,8 +391,10 @@ subagent_history_record_size <- function(record) {
 }
 
 # What a saved child costs against the lead's disclosure bound when it is
-# replayed: its view, and its transcript again as replayed turns.
+# replayed: its view as `delegation_history()` replays it, with every reference
+# marked "unresolved", and its transcript again as replayed turns.
 subagent_history_replay_size <- function(view) {
+  view <- inspection_unresolved_references(view)
   length(serialize(list(view, view$transcript), NULL, version = 3))
 }
 
