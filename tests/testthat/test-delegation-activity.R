@@ -906,6 +906,91 @@ test_that("identical reused calls keep their own cards under redaction", {
   }
 })
 
+test_that("a call the redactor shows differently keeps its card", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  # Masks requests' arguments, then results too, from a given view on.
+  masked <- new.env(parent = emptyenv())
+  masked$level <- 0L
+  mask <- function(x) {
+    if (!is.list(x)) {
+      return(x)
+    }
+    if (identical(x$class, "ellmer::ContentToolRequest")) {
+      x$props$arguments <- list(region = "[masked]")
+    }
+    if (identical(x$class, "ellmer::ContentToolResult") && masked$level > 1L) {
+      x$props$value <- "[masked]"
+    }
+    for (i in seq_along(x)) {
+      x[i] <- list(mask(x[[i]]))
+    }
+    x
+  }
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure(
+      redact = function(view, requester) {
+        if (masked$level > 0L) {
+          view$transcript <- mask(view$transcript)
+        }
+        view
+      }
+    )
+  )
+  measure <- ellmer::tool(
+    function(region) "60",
+    name = "call_measure",
+    description = "Run a registered measure.",
+    arguments = list(region = ellmer::type_string()),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "call_measure", arguments = list(region = "north")),
+    runtime_reply("sales done")
+  ))
+  sales <- Agent$new(
+    runtime_chat(server),
+    tools = list(measure),
+    agent_name = "sales"
+  )
+  activity_retain(root, sales, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  record <- private$subagent_runs[[id]]
+  running <- function(turns) {
+    private$subagent_runs[[id]]$turns <- turns
+    private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  }
+  activity_enable(root, function() "viewer")
+  running(record$turns[1:2])
+  activity_poll(root)
+  shown <- activity_take(root)
+  expect_length(shown, 1L)
+  expect_identical(shown[[1L]]@arguments, list(region = "north"))
+  # Finished, with its arguments masked: the result goes to the same card.
+  masked$level <- 1L
+  running(record$turns[1:3])
+  activity_poll(root)
+  results <- activity_take(root)
+  expect_length(results, 1L)
+  expect_s3_class(results[[1L]], "ellmer::ContentToolResult")
+  expect_identical(results[[1L]]@request@id, shown[[1L]]@id)
+  expect_identical(results[[1L]]@value, "60")
+  # Its result masked too, as the subagent settles: nothing new is shown.
+  masked$level <- 2L
+  private$subagent_runs[[id]] <- record
+  activity_poll(root, final = TRUE)
+  expect_length(activity_take(root), 0L)
+  activity_disable(root)
+})
+
 test_that("stopping the presenter settles the cards it left running", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
