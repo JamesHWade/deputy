@@ -408,6 +408,11 @@ subagent_history_record <- function(state, conversation_id) {
     prior <- state$record
     carried <- prior$history$children %||% list()
     keys <- prior$keys %||% character()
+    # Saved children are this conversation's history: only a requester who
+    # may read it there sees them, even through the redactor.
+    if (length(carried)) {
+      inspection_authorize(disclosure, requester, scope)
+    }
     # This lead finds its own running and oversized children again; another
     # lead's are gone.
     counts <- prior$omitted

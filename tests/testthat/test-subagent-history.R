@@ -868,6 +868,36 @@ test_that("children left out stay counted when another session saves", {
   expect_match(state$error, "could not be read")
 })
 
+test_that("saved children reach no one the conversation refuses", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  saved <- subagent_history_save(history_state(lead, "conv-a"), list())
+  # Reopened by a requester who may inspect the lead's live subagents but not
+  # this conversation's saved history.
+  redacted <- 0L
+  disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) {
+      identical(requester, "viewer") && is.null(scope$chat_conversation_id)
+    },
+    redact = function(view, requester) {
+      redacted <<- redacted + 1L
+      view
+    }
+  )
+  later <- history_lead(NULL, NULL, counter)
+  later$.__enclos_env__$private$.delegation_disclosure <- disclosure
+  state <- history_state(later, "conv-a")
+  subagent_history_restore(state, saved)
+  resaved <- subagent_history_save(state, list())
+  expect_identical(redacted, 0L)
+  expect_identical(
+    history_parse(resaved$deputy_subagents$data),
+    history_parse(saved$deputy_subagents$data)
+  )
+  expect_false(is.null(subagent_history_status(state)$error))
+})
+
 test_that("a save the requester may not see keeps the last good record", {
   counter <- new.env()
   counter$calls <- 0L
