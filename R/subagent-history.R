@@ -851,9 +851,18 @@ subagent_history_panel_views <- function(conversation, live) {
   live_ids <- vapply(live, subagent_history_view_id, character(1))
   restored <- Filter(
     function(view) !subagent_history_view_id(view) %in% live_ids,
-    conversation$restored(transcript = FALSE) %||% list()
+    subagent_history_panel_saved(conversation, transcript = FALSE)
   )
   c(restored, live)
+}
+
+# Saved subagents are authorized on their own: a requester the disclosure
+# refuses them still sees the live ones, with no saved ones beside them.
+subagent_history_panel_saved <- function(conversation, transcript = TRUE) {
+  tryCatch(
+    conversation$restored(transcript = transcript) %||% list(),
+    deputy_delegation_disclosure = function(error) list()
+  )
 }
 
 # The open conversation's live subagents as `$inspect_subagents()` shows
@@ -915,7 +924,7 @@ subagent_history_panel_child <- function(conversation, live, id) {
   }
   Filter(
     function(view) identical(subagent_history_view_id(view), id),
-    conversation$restored() %||% list()
+    subagent_history_panel_saved(conversation)
   )
 }
 

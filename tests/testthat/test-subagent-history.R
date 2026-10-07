@@ -633,6 +633,40 @@ test_that("saved subagents show to a requester who can't see live ones", {
   expect_identical(counter$calls, 1L)
 })
 
+test_that("live subagents show to a requester who can't see saved ones", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  lead <- history_lead(history_root_server(), history_sales_server(), counter)
+  history_session(
+    lead,
+    store,
+    function(session, chat, saver) {
+      history_submit(session, chat, store, "Revenue?")
+      expect_length(saver$restored(), 1L)
+      # The requester may read live subagents, not the conversation's
+      # saved records.
+      lead$.__enclos_env__$private$.delegation_disclosure <-
+        DelegationDisclosure(
+          authorize = function(requester, scope) {
+            identical(requester, "viewer") &&
+              is.null(scope$chat_conversation_id)
+          }
+        )
+      panel <- session$userData$panel
+      session$elapse(200)
+      views <- panel$views()
+      expect_length(views, 1L)
+      id <- views[[1L]]$outcome$runtime$delegation_id
+      session$setInputs(`panel-selected` = id)
+      session$elapse(200)
+      expect_identical(panel$selected(), id)
+      expect_no_match(panel$notice() %||% "", "unavailable")
+    },
+    panel = TRUE
+  )
+})
+
 test_that("saved records that fail their checks are not read", {
   counter <- new.env()
   counter$calls <- 0L
