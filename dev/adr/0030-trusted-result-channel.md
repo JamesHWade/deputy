@@ -57,6 +57,9 @@ the event is built.
   `tool_input_review()` turns an input and its declaration into a
   per-field table. The approval-gates recipe uses it instead of `dput()`.
 
+ADR-0035 extends the policy to retained agents and delegation graphs, with
+explicit producers and admission when an agent is retained.
+
 ## Consequences
 
 - **Delegation extends the policy to the tree.** `LeadAgent` accepts the

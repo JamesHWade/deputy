@@ -130,6 +130,8 @@ retain_conversation <- function(
     normalize_usage_limits(usage_limits),
     agent$usage_limits
   )
+  # A root with a trusted-results policy admits only agents that satisfy it.
+  trusted <- trusted_admit_conversation(owner, agent)
   previous_turns <- cp$.chat$get_turns()
   committed <- FALSE
   on.exit(
@@ -159,6 +161,8 @@ retain_conversation <- function(
   entry$authorize <- authorize
   entry$authorization <- authorization
   entry$manifest <- manifest
+  entry$trusted <- trusted
+  trusted_install_conversation(owner, agent, trusted)
   handle <- new_deputy_id("conversation_")
   if (is.environment(cp$.chat)) {
     attr(cp$.chat, "deputy_conversation_owner") <- entry$token
@@ -218,6 +222,7 @@ continue_conversation <- function(
   # This must precede busy/run-slot checks and lifecycle admission so a denied
   # or stale source cannot consume a run slot or leave a sticky reservation.
   context_fork_reauthorize(entry)
+  trusted_recheck_conversation(entry)
   if (entry$busy || isTRUE(cp$run_active)) {
     conversation_abort("The conversation is busy.")
   }
@@ -464,6 +469,7 @@ release_conversation <- function(owner, handle) {
   }
   cp$.conversation_owner <- NULL
   cp$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
+  trusted_release_conversation(entry)
   op$owned_conversations[[handle]] <- NULL
   # Release snapshots too; hosts can explicitly export them beforehand.
   op$subagent_runs[entry$ids] <- NULL
@@ -534,6 +540,7 @@ finalize_owned_conversations <- function(owner) {
     if (identical(child$.conversation_owner, entry$token)) {
       child$.conversation_owner <- NULL
       child$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
+      trusted_release_conversation(entry)
     }
     if (
       identical(attr(child$.chat, "deputy_conversation_owner"), entry$token)

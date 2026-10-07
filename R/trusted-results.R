@@ -19,12 +19,13 @@ NULL
 #' skills or MCP tools. The change errors, and the previous tools stay in
 #' place, if:
 #'
-#' * a trusted tool is missing;
+#' * a trusted tool is missing, or isn't the tool object given to the policy;
 #' * a trusted tool is not a local function tool (for example, it is an MCP or
 #'   provider tool), runs code, or delegates to another agent;
 #' * another tool runs model-supplied code or delegates (`run_r_code`,
-#'   `run_bash`, `install_package`, R session tools, delegation and graph
-#'   route tools), since it could produce any result;
+#'   `run_bash`, `install_package`, R session tools, and delegation and graph
+#'   route tools other than those described below), since it could produce
+#'   any result;
 #' * another tool isn't annotated with both `read_only_hint = TRUE` and
 #'   `open_world_hint = FALSE`, or is annotated `destructive_hint = TRUE`,
 #'   and isn't listed in `exempt_tools`. Tools without annotations, including
@@ -46,12 +47,27 @@ NULL
 #' everywhere. A subagent's trusted tool must be listed in its definition's
 #' `tools` or in [Skill] values, not loaded from a skill directory. Subagent
 #' trusted results are recorded in the lead's run and passed to its
-#' `on_result`, with the subagent's IDs. Graph routes and other tools that
-#' compose agents are still rejected.
+#' `on_result`, with the subagent's IDs.
 #'
-#' @param ... Named pairs `result_type = "tool_name"`. Result types must be
-#'   unique, start with a letter or number, and contain only letters, numbers,
-#'   dots, underscores and hyphens. Each tool may produce only one result type.
+#' An agent with a policy can also retain agents (`$retain_agent()`,
+#' [adopt_chat()], `$retain_agent_graph()`) and call them through
+#' [delegation_tool()] or graph routes. Each result type must then be given as
+#' the tool itself, so that only that tool object counts as its producer. A
+#' retained agent's tools are checked against the policy when it is retained
+#' and before each task, and must not change while it is retained; route tools
+#' are accepted only for agents that passed. Every trusted result from a
+#' retained agent or graph member reaches this agent's `on_result` once, with
+#' the producing agent's IDs. A retained agent's own policy still applies
+#' alongside: its results also reach its own `on_result`, a tool is exempt
+#' only if both policies exempt it, and a receipt is used if either asks for
+#' one. Releasing the agent restores its own policy. Delegated agents can't
+#' wait for durable approval.
+#'
+#' @param ... Named pairs `result_type = "tool_name"`, or `result_type = tool`
+#'   with the ellmer tool itself, which then is the only tool object that may
+#'   produce that type. Result types must be unique, start with a letter or
+#'   number, and contain only letters, numbers, dots, underscores and hyphens.
+#'   Each tool may produce only one result type.
 #' @param on_result Optional function called with the `"trusted_result"`
 #'   [AgentEvent] as soon as the trusted tool returns, before the model sees
 #'   any output. Use it to update a Shiny `reactiveValues()` or your own
@@ -66,6 +82,7 @@ NULL
 #'   result ID and type instead of the value, so it cannot restate the values.
 #'   Defaults to `FALSE`, which sends the model the same value your app gets.
 #' @prop results Named character vector mapping result types to tool names.
+#' @prop producers Named list of the tools given for result types, by type.
 #' @return A `TrustedResults` object. It is read-only; read fields with `$`.
 #' @seealso `vignette("trusted-mini-agents")`, [result_trusted_results()],
 #'   [approval_review_ui()], [Agent], [tool_metadata()]
@@ -82,6 +99,7 @@ TrustedResults <- S7::new_class(
   package = "deputy",
   properties = list(
     results = readonly_property("results", S7::class_character),
+    producers = readonly_property("producers", S7::class_list),
     on_result = readonly_property(
       "on_result",
       S7::new_union(NULL, S7::class_function)
@@ -107,15 +125,25 @@ TrustedResults <- S7::new_class(
         "{.fn TrustedResults} requires named {.code result_type = \"tool_name\"} pairs."
       )
     }
+    producers <- list()
     for (type in types) {
       if (!grepl("^[A-Za-z0-9][A-Za-z0-9._-]*$", type)) {
         cli_abort(
           "Result type {.val {type}} must contain only letters, numbers, dots, underscores, or hyphens."
         )
       }
-      if (!is_nonempty_string(results[[type]])) {
+      value <- results[[type]]
+      if (inherits(value, "ellmer::ToolDef")) {
+        # The tool itself names its one producer, not just the name.
+        source <- trusted_tool_source(value)
+        if (!is_nonempty_string(source@name)) {
+          cli_abort("The tool for result type {.val {type}} must have a name.")
+        }
+        producers[[type]] <- source
+        results[[type]] <- source@name
+      } else if (!is_nonempty_string(value)) {
         cli_abort(
-          "Result type {.val {type}} must name one tool with a non-empty string."
+          "Result type {.val {type}} must name one tool with a non-empty string, or be the tool itself."
         )
       }
     }
@@ -149,6 +177,7 @@ TrustedResults <- S7::new_class(
     value <- S7::new_object(
       S7::S7_object(),
       results = results,
+      producers = producers,
       on_result = on_result,
       exempt_tools = exempt_tools,
       model_receipt = model_receipt
@@ -166,7 +195,11 @@ S7::method(print, TrustedResults) <- function(x, ...) {
     cli::cli_text("{.cls TrustedResults}")
     for (type in names(x@results)) {
       cli::cli_bullets(c(
-        "*" = "{.field {type}} from {.fn {x@results[[type]]}}"
+        "*" = if (is.null(x@producers[[type]])) {
+          "{.field {type}} from {.fn {x@results[[type]]}}"
+        } else {
+          "{.field {type}} from {.fn {x@results[[type]]}} (this tool object only)"
+        }
       ))
     }
     if (length(x@exempt_tools) > 0L) {
@@ -237,10 +270,21 @@ trusted_tool_source <- function(tool) {
   attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
 }
 
+# Explicit producers by tool name.
+trusted_policy_sources <- function(policy) {
+  if (is.null(policy) || !length(policy@producers)) {
+    return(list())
+  }
+  stats::setNames(
+    policy@producers,
+    unname(policy@results[names(policy@producers)])
+  )
+}
+
 # Each designated name must refer to one executable across a delegation tree,
 # so a result type keeps exactly one producer. Returns the sources by name.
 trusted_tree_sources <- function(policy, registries) {
-  sources <- list()
+  sources <- trusted_policy_sources(policy)
   for (tools in registries) {
     for (name in intersect(names(tools), policy@results)) {
       source <- trusted_tool_source(tools[[name]])
@@ -260,19 +304,32 @@ trusted_tree_sources <- function(policy, registries) {
 # Validate a complete registry (named list of ellmer tools) against the policy.
 # `available` names the designated tools reachable elsewhere in the same tree;
 # `allow_delegation` admits only a LeadAgent's own delegate tool, whose
-# children inherit the policy; `sources` pins designated names to one tool.
+# children inherit the policy; `sources` pins designated names to one tool;
+# `admit_route` admits Deputy's own routes to agents already checked against
+# the same policy.
 check_trusted_registry <- function(
   policy,
   tools,
   available = names(tools),
   allow_delegation = FALSE,
   sources = NULL,
-  require_source = FALSE
+  require_source = FALSE,
+  admit_route = NULL
 ) {
   if (is.null(policy)) {
     return(invisible(NULL))
   }
-  missing <- setdiff(policy@results, available)
+  explicit <- trusted_policy_sources(policy)
+  for (name in intersect(names(sources), names(explicit))) {
+    if (!identical(sources[[name]], explicit[[name]])) {
+      trusted_registry_abort(
+        "Trusted tool {.val {name}} must be the tool named in the policy.",
+        tool_name = name
+      )
+    }
+  }
+  sources <- c(sources, explicit[setdiff(names(explicit), names(sources))])
+  missing <- setdiff(policy@results, c(available, names(explicit)))
   if (length(missing) > 0L) {
     trusted_registry_abort(
       "Trusted tool {.val {missing}} must remain registered.",
@@ -303,6 +360,14 @@ check_trusted_registry <- function(
     ) {
       next
     }
+    if (
+      !native &&
+        is.null(trusted_type) &&
+        is.function(admit_route) &&
+        isTRUE(admit_route(tool))
+    ) {
+      next
+    }
     source_type <- if (native) "provider" else tool_metadata(tool)$source$type
     bypass <- if (native) NULL else trusted_bypass_reason(tool)
     if (!is.null(trusted_type)) {
@@ -323,7 +388,11 @@ check_trusted_registry <- function(
           !identical(sources[[name]], trusted_tool_source(tool))
       ) {
         trusted_registry_abort(
-          "Trusted tool {.val {name}} must be the same tool everywhere in the delegation tree.",
+          if (is.null(explicit[[name]])) {
+            "Trusted tool {.val {name}} must be the same tool everywhere in the delegation tree."
+          } else {
+            "Trusted tool {.val {name}} must be the tool named in the policy."
+          },
           tool_name = name
         )
       }
@@ -393,6 +462,11 @@ trusted_invocation_id <- function(tool) {
   if (is_nonempty_string(id)) id else NULL
 }
 
+# The producer's code, schema and metadata, as approvals fingerprint tools.
+trusted_producer_fingerprint <- function(tool) {
+  tryCatch(approval_tool_fingerprint(tool), error = function(error) NULL)
+}
+
 trusted_result_receipt <- function(id, type) {
   paste0(
     "Trusted result ",
@@ -409,8 +483,10 @@ trusted_result_receipt <- function(id, type) {
 #' @param result An [AgentResult].
 #' @param type Optional result type. `NULL` returns results of every type.
 #' @return A list of `"trusted_result"` [AgentEvent]s. Each has `result_id`,
-#'   `result_type`, `tool_name`, `tool_call_id`, `arguments`, the tool's
-#'   unchanged `value`, and the run's IDs.
+#'   `result_type`, `tool_name`, `tool_fingerprint` (a SHA-256 digest of the
+#'   producing tool's code, arguments and metadata), `tool_call_id`,
+#'   `arguments`, the tool's unchanged `value`, and the IDs of the run and
+#'   agent that produced it.
 #' @seealso [TrustedResults]
 #' @export
 result_trusted_results <- S7::new_generic(
@@ -435,4 +511,260 @@ S7::method(result_trusted_results, AgentResult) <- function(
     },
     result@events
   )
+}
+
+# Trusted results across retained specialists and graph routes ----------------
+
+# The agent whose policy governs `agent`'s tree: a retained specialist or graph
+# member answers to the agent that retained it; anything else to itself.
+trusted_policy_root <- function(agent) {
+  private <- agent$.__enclos_env__$private
+  if (!is.null(private$.trusted_root)) {
+    return(rlang::wref_key(private$.trusted_root))
+  }
+  if (is.null(private$.trusted_results)) NULL else agent
+}
+
+# A route is admitted only when Deputy built it for `agent` and its target was
+# checked against the same root policy when it was retained.
+trusted_route_admitted <- function(agent, tool) {
+  source <- trusted_tool_source(tool)
+  handle <- attr(source, "deputy_composition_handle", exact = TRUE)
+  if (
+    !identical(composition_tool_owner(source), agent) ||
+      !is_nonempty_string(handle)
+  ) {
+    return(FALSE)
+  }
+  root <- trusted_policy_root(agent)
+  if (is.null(root)) {
+    return(FALSE)
+  }
+  tree <- attr(tool, "deputy_graph_route_tree", exact = TRUE) %||%
+    attr(source, "deputy_graph_route_tree", exact = TRUE)
+  if (!is.null(tree)) {
+    tree_root <- tryCatch(delegation_tree_root(tree), error = function(e) NULL)
+    if (!identical(tree_root, root) || !handle %in% tree$handles) {
+      return(FALSE)
+    }
+  } else if (!identical(root, agent)) {
+    return(FALSE)
+  }
+  entry <- root$.__enclos_env__$private$owned_conversations[[handle]]
+  !is.null(entry) && !is.null(entry$trusted)
+}
+
+trusted_values <- function(policy) {
+  values <- as.list(policy@results)
+  for (type in names(policy@producers)) {
+    values[[type]] <- policy@producers[[type]]
+  }
+  values
+}
+
+# A copy of `policy` delivering to `on_result`, keeping explicit producers.
+trusted_policy_copy <- function(
+  policy,
+  on_result,
+  exempt_tools = policy@exempt_tools,
+  model_receipt = policy@model_receipt
+) {
+  do.call(
+    TrustedResults,
+    c(
+      trusted_values(policy),
+      list(
+        on_result = on_result,
+        exempt_tools = exempt_tools,
+        model_receipt = model_receipt
+      )
+    )
+  )
+}
+
+trusted_combine_abort <- function(message, tool_name, .envir = parent.frame()) {
+  trusted_registry_abort(
+    c(
+      message,
+      "i" = "A retained agent's own policy can add to its root's, not change it."
+    ),
+    tool_name = tool_name,
+    .envir = .envir
+  )
+}
+
+# The policy a retained agent runs under: its root's and its own, neither
+# weakened. Results of both, one producer each; exemptions both allow; a
+# receipt if either asks; delivery to the root once, then to its own callback.
+trusted_combine <- function(owner, root_policy, own, tools) {
+  values <- trusted_values(root_policy)
+  exempt <- root_policy@exempt_tools
+  receipt <- root_policy@model_receipt
+  own_callback <- NULL
+  if (!is.null(own)) {
+    for (type in names(own@results)) {
+      name <- own@results[[type]]
+      producer <- own@producers[[type]] %||%
+        trusted_tool_source(tools[[name]] %||% list())
+      if (!inherits(producer, "ellmer::ToolDef")) {
+        trusted_combine_abort(
+          "Trusted tool {.val {name}} of the retained agent is not registered.",
+          tool_name = name
+        )
+      }
+      if (type %in% names(values)) {
+        if (!identical(values[[type]], producer)) {
+          trusted_combine_abort(
+            "Result type {.val {type}} has a different producer in the retained agent.",
+            tool_name = name
+          )
+        }
+        next
+      }
+      if (name %in% root_policy@results) {
+        trusted_combine_abort(
+          "Trusted tool {.val {name}} would produce two result types.",
+          tool_name = name
+        )
+      }
+      values[[type]] <- producer
+    }
+    exempt <- intersect(exempt, own@exempt_tools)
+    receipt <- receipt || own@model_receipt
+    own_callback <- own@on_result
+  }
+  root_ref <- rlang::new_weakref(owner)
+  root_callback <- root_policy@on_result
+  forward <- function(event) {
+    root <- rlang::wref_key(root_ref)
+    if (is.null(root)) {
+      cli_abort("The agent that retained this one is no longer available.")
+    }
+    root$.__enclos_env__$private$record_run_event(event)
+    if (is.function(root_callback)) {
+      root_callback(event)
+    }
+    if (is.function(own_callback)) {
+      own_callback(event)
+    }
+    invisible(NULL)
+  }
+  do.call(
+    TrustedResults,
+    c(
+      values,
+      list(on_result = forward, exempt_tools = exempt, model_receipt = receipt)
+    )
+  )
+}
+
+# Check `agent` against `owner`'s policy before `owner` retains it. Returns
+# what to install while retained and what to restore on release, or NULL when
+# `owner` has no policy.
+trusted_admit_conversation <- function(owner, agent) {
+  op <- owner$.__enclos_env__$private
+  policy <- op$.trusted_results
+  if (is.null(policy)) {
+    return(NULL)
+  }
+  implicit <- setdiff(names(policy@results), names(policy@producers))
+  if (length(implicit)) {
+    trusted_registry_abort(
+      c(
+        "Trusted results reached through retained agents need explicit producers.",
+        "i" = "Pass the tool itself, as in {.code TrustedResults({implicit[[1L]]} = tool)}."
+      ),
+      tool_name = policy@results[[implicit[[1L]]]]
+    )
+  }
+  cp <- agent$.__enclos_env__$private
+  if (isTRUE(cp$.trusted_tree_member) || !is.null(cp$.trusted_root)) {
+    trusted_registry_abort(
+      "The agent already belongs to another trusted-results tree.",
+      tool_name = names(policy@results)[[1L]]
+    )
+  }
+  tools <- agent$get_tools()
+  effective <- trusted_combine(owner, policy, cp$.trusted_results, tools)
+  sources <- trusted_policy_sources(effective)
+  withCallingHandlers(
+    check_trusted_registry(
+      effective,
+      tools,
+      available = effective@results,
+      sources = sources,
+      require_source = TRUE
+    ),
+    deputy_tool_registration = function(error) {
+      rlang::abort(
+        paste0(
+          "The retained agent",
+          if (is_nonempty_string(agent$agent_name)) {
+            paste0(" '", agent$agent_name, "'")
+          },
+          " violates the trusted-results policy."
+        ),
+        class = setdiff(class(error), c("rlang_error", "error", "condition")),
+        parent = error
+      )
+    }
+  )
+  list(
+    policy = effective,
+    sources = sources,
+    previous = list(
+      policy = cp$.trusted_results,
+      member = cp$.trusted_tree_member,
+      sources = cp$.trusted_sources,
+      root = cp$.trusted_root
+    )
+  )
+}
+
+trusted_install_conversation <- function(owner, agent, trusted) {
+  if (is.null(trusted)) {
+    return(invisible(NULL))
+  }
+  cp <- agent$.__enclos_env__$private
+  cp$.trusted_results <- trusted$policy
+  cp$.trusted_tree_member <- TRUE
+  cp$.trusted_sources <- trusted$sources
+  cp$.trusted_root <- rlang::new_weakref(owner)
+  invisible(NULL)
+}
+
+trusted_release_conversation <- function(entry) {
+  trusted <- entry$trusted
+  if (is.null(trusted)) {
+    return(invisible(NULL))
+  }
+  cp <- entry$agent$.__enclos_env__$private
+  cp$.trusted_results <- trusted$previous$policy
+  cp$.trusted_tree_member <- trusted$previous$member
+  cp$.trusted_sources <- trusted$previous$sources
+  cp$.trusted_root <- trusted$previous$root
+  entry$trusted <- NULL
+  invisible(NULL)
+}
+
+# Before each continuation: the installed policy is still the admitted one and
+# the agent's current tools still pass it.
+trusted_recheck_conversation <- function(entry) {
+  trusted <- entry$trusted
+  if (is.null(trusted)) {
+    return(invisible(NULL))
+  }
+  cp <- entry$agent$.__enclos_env__$private
+  if (
+    !identical(cp$.trusted_results, trusted$policy) ||
+      !identical(cp$.trusted_sources, trusted$sources) ||
+      !isTRUE(cp$.trusted_tree_member)
+  ) {
+    trusted_registry_abort(
+      "The retained agent's trusted-results policy changed; release it and retain it again.",
+      tool_name = names(trusted$policy@results)[[1L]]
+    )
+  }
+  cp$check_trusted_tools(entry$agent$get_tools())
+  invisible(NULL)
 }

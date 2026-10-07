@@ -12,9 +12,11 @@ TrustedResults(
 )
 }
 \arguments{
-\item{...}{Named pairs \code{result_type = "tool_name"}. Result types must be
-unique, start with a letter or number, and contain only letters, numbers,
-dots, underscores and hyphens. Each tool may produce only one result type.}
+\item{...}{Named pairs \code{result_type = "tool_name"}, or \code{result_type = tool}
+with the ellmer tool itself, which then is the only tool object that may
+produce that type. Result types must be unique, start with a letter or
+number, and contain only letters, numbers, dots, underscores and hyphens.
+Each tool may produce only one result type.}
 
 \item{on_result}{Optional function called with the \code{"trusted_result"}
 \link{AgentEvent} as soon as the trusted tool returns, before the model sees
@@ -51,12 +53,13 @@ construction, in \verb{$set_tools()} and \verb{$register_tools()}, and when load
 skills or MCP tools. The change errors, and the previous tools stay in
 place, if:
 \itemize{
-\item a trusted tool is missing;
+\item a trusted tool is missing, or isn't the tool object given to the policy;
 \item a trusted tool is not a local function tool (for example, it is an MCP or
 provider tool), runs code, or delegates to another agent;
 \item another tool runs model-supplied code or delegates (\code{run_r_code},
-\code{run_bash}, \code{install_package}, R session tools, delegation and graph
-route tools), since it could produce any result;
+\code{run_bash}, \code{install_package}, R session tools, and delegation and graph
+route tools other than those described below), since it could produce
+any result;
 \item another tool isn't annotated with both \code{read_only_hint = TRUE} and
 \code{open_world_hint = FALSE}, or is annotated \code{destructive_hint = TRUE},
 and isn't listed in \code{exempt_tools}. Tools without annotations, including
@@ -79,8 +82,21 @@ tool may live in the lead or in subagents but must be the same tool
 everywhere. A subagent's trusted tool must be listed in its definition's
 \code{tools} or in \link{Skill} values, not loaded from a skill directory. Subagent
 trusted results are recorded in the lead's run and passed to its
-\code{on_result}, with the subagent's IDs. Graph routes and other tools that
-compose agents are still rejected.
+\code{on_result}, with the subagent's IDs.
+
+An agent with a policy can also retain agents (\verb{$retain_agent()},
+\code{\link[=adopt_chat]{adopt_chat()}}, \verb{$retain_agent_graph()}) and call them through
+\code{\link[=delegation_tool]{delegation_tool()}} or graph routes. Each result type must then be given as
+the tool itself, so that only that tool object counts as its producer. A
+retained agent's tools are checked against the policy when it is retained
+and before each task, and must not change while it is retained; route tools
+are accepted only for agents that passed. Every trusted result from a
+retained agent or graph member reaches this agent's \code{on_result} once, with
+the producing agent's IDs. A retained agent's own policy still applies
+alongside: its results also reach its own \code{on_result}, a tool is exempt
+only if both policies exempt it, and a receipt is used if either asks for
+one. Releasing the agent restores its own policy. Delegated agents can't
+wait for durable approval.
 }
 \examples{
 policy <- TrustedResults(
@@ -98,5 +114,7 @@ policy$results
 
 \describe{
 \item{\code{@results}}{Named character vector mapping result types to tool names.}
+
+\item{\code{@producers}}{Named list of the tools given for result types, by type.}
 }}
 

@@ -436,6 +436,7 @@ graph_restore_after_failure <- function(
           child_private <- graph_agent_private(entry$agent)
           child_private$.conversation_owner <- NULL
           child_private$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
+          trusted_release_conversation(entry)
           attr(child_private$.chat, "deputy_conversation_owner") <- NULL
           root_private$owned_conversations[[handle]] <- NULL
         }

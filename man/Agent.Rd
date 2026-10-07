@@ -286,6 +286,10 @@ directly, and its conversation, prompt, model, tools, hooks and tool
 observers can't be changed (observers it already has keep working). An
 agent can retain up to 32 others at a time. See
 \code{vignette("retained-agents", package = "deputy")}.
+
+If this agent has a \link{TrustedResults} policy, \code{agent}'s tools must pass
+it, and its trusted results reach this agent's \code{on_result}; see
+\link{TrustedResults} for the rules.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$retain_agent(agent, usage_limits, max_runs = 32L)}
@@ -323,7 +327,9 @@ running fails. An agent waiting on its own delegate still counts toward
 Each agent keeps its own permissions, and each of its tool calls is also
 checked against the current permissions of every agent above it, so an
 agent in read-only or plan mode can use its route tools and its
-delegates are held to that mode too.
+delegates are held to that mode too. With a \link{TrustedResults} policy on
+this agent, every agent in the graph must pass it before any route is
+added, and their trusted results reach this agent's \code{on_result}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$retain_agent_graph(

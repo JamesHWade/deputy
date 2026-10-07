@@ -825,7 +825,8 @@ LeadAgent <- R6::R6Class(
           unlist(lapply(definitions, names), use.names = FALSE)
         )),
         allow_delegation = TRUE,
-        sources = sources
+        sources = sources,
+        admit_route = function(tool) trusted_route_admitted(self, tool)
       )
       for (name in names(definitions)) {
         withCallingHandlers(
@@ -871,17 +872,7 @@ LeadAgent <- R6::R6Class(
         invisible(NULL)
       }
       child_private <- child$.__enclos_env__$private
-      child_private$.trusted_results <- do.call(
-        TrustedResults,
-        c(
-          as.list(policy@results),
-          list(
-            on_result = forward,
-            exempt_tools = policy@exempt_tools,
-            model_receipt = policy@model_receipt
-          )
-        )
-      )
+      child_private$.trusted_results <- trusted_policy_copy(policy, forward)
       child_private$.trusted_tree_member <- TRUE
       child_private$.trusted_sources <- sources
       child_private$check_trusted_tools(child$get_tools())
