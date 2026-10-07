@@ -1501,6 +1501,46 @@ test_that("a reopened conversation saves without access to live subagents", {
   expect_identical(child$outcome$answer, "[withheld]")
 })
 
+test_that("a resave redacts saved references as replay marks them", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    redact = function(view, requester) {
+      if (!length(view$outcome$references)) {
+        view$outcome$references <- list(list(
+          reference = "deputy://tool-result/ref-1",
+          availability = "available",
+          locator = "/private/results/ref-1.rds"
+        ))
+      }
+      # A reference that can't be resolved loses its locator.
+      view$outcome$references <- lapply(
+        view$outcome$references,
+        function(ref) {
+          if (identical(ref$availability, "unresolved")) {
+            ref$locator <- NULL
+          }
+          ref
+        }
+      )
+      view
+    }
+  )
+  lead$.__enclos_env__$private$.delegation_disclosure <- disclosure
+  saved <- subagent_history_save(history_state(lead, "conv-a"), list())
+  later <- history_lead(NULL, NULL, counter)
+  later$.__enclos_env__$private$.delegation_disclosure <- disclosure
+  state <- history_state(later, "conv-a")
+  subagent_history_restore(state, saved)
+  resaved <- subagent_history_save(state, list())$deputy_subagents
+  child <- history_parse(resaved$data)$history$children[[1L]]
+  reference <- child$outcome$references[[1L]]
+  expect_identical(reference$availability, "unresolved")
+  expect_null(reference$locator)
+})
+
 test_that("a save without live access doesn't depend on live subagents", {
   counter <- new.env()
   counter$calls <- 0L

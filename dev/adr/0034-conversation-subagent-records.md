@@ -99,7 +99,8 @@ back from storage Deputy doesn't control.
   new conversation's first save, which has no record to keep.
 - **Saved children are redacted again on every save.** Children carried from
   an earlier save pass through the current `redact` before they are written
-  back, so a stricter policy also cleans what is stored. Every save needs a
+  back, with their references marked "unresolved" first, as replay shows
+  them, so a stricter policy also cleans what is stored. Every save needs a
   requester the disclosure authorizes for the conversation's own scope, the
   one `delegation_history()` reads the record with; otherwise the save keeps
   the last good record without showing anything to the redactor. Live

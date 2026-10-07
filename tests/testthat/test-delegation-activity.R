@@ -1410,6 +1410,53 @@ test_that("cards shown before access was lost get a result at the end", {
   expect_false(is.null(private$.activity$error))
 })
 
+test_that("a reply that fails settles the cards it showed", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  private$subagent_runs[[id]]$turns <- private$subagent_runs[[id]]$turns[-3L]
+  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  activity_enable(root, function() "viewer", 0.05)
+  # The lead's stream fails while the call is open, after its run has ended:
+  # a poll shows the call first, and the closing poll gives it a result.
+  inner <- function() {
+    promises::promise(function(resolve, reject) {
+      later::later(function() reject(simpleError("provider failed")), 0.3)
+    })
+  }
+  stream <- activity_stream(root, inner, private$.activity)
+  seen <- list()
+  failure <- NULL
+  done <- FALSE
+  coro::async(function() {
+    tryCatch(
+      for (chunk in coro::await_each(stream)) {
+        seen[[length(seen) + 1L]] <<- chunk
+      },
+      error = function(error) failure <<- error
+    )
+    done <<- TRUE
+  })()
+  while (!done) {
+    later::run_now(0.05)
+  }
+  expect_match(conditionMessage(failure), "provider failed", fixed = TRUE)
+  expect_length(seen, 2L)
+  expect_s3_class(seen[[1L]], "ellmer::ContentToolRequest")
+  expect_s3_class(seen[[2L]], "ellmer::ContentToolResult")
+  expect_identical(seen[[2L]]@request@id, seen[[1L]]@id)
+})
+
 test_that("replacing the conversation restarts activity labels", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "First")),
