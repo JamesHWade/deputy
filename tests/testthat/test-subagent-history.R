@@ -578,7 +578,7 @@ test_that("records stay within max_bytes and count what was left out", {
   full <- subagent_history_record(state, "conv-a")
   expect_identical(
     full$omitted,
-    list(running = 0L, transcripts = 0L, children = 0L)
+    list(running = 0L, transcripts = 0L, children = 0L, earlier = 0L)
   )
   view <- full$history$children[[1L]]
   without <- nchar(
@@ -802,6 +802,61 @@ test_that("saved children are redacted again with the current policy", {
   subagent_history_restore(state, list(deputy_subagents = resaved))
   expect_length(state$record$history$children, 1L)
   expect_identical(state$record$keys, record$keys)
+})
+
+test_that("children left out stay counted when another session saves", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  private <- lead$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  finished <- private$subagent_runs[[id]]$completed_at
+  counts <- function(running = 0L, children = 0L) {
+    list(running = running, transcripts = 0L, children = children)
+  }
+  # Saved while the subagent was still running.
+  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  state <- history_state(lead, "conv-a")
+  running <- subagent_history_save(state, list())
+  expect_identical(subagent_history_status(state)$omitted, counts(running = 1L))
+  # The same lead reopens it once the subagent has finished: the subagent is
+  # saved and not counted as left out.
+  private$subagent_runs[[id]]$completed_at <- finished
+  subagent_history_restore(state, running)
+  subagent_history_save(state, list())
+  expect_identical(subagent_history_status(state)$saved, 1L)
+  expect_identical(subagent_history_status(state)$omitted, counts())
+  # A later session can't find that subagent: every save still counts it.
+  later <- history_lead(NULL, NULL, counter)
+  state <- history_state(later, "conv-a")
+  subagent_history_restore(state, running)
+  expect_identical(subagent_history_status(state)$omitted, counts(running = 1L))
+  subagent_history_save(state, list())
+  expect_identical(
+    subagent_history_status(state)$omitted,
+    counts(children = 1L)
+  )
+  again <- subagent_history_save(state, list())
+  expect_identical(
+    subagent_history_status(state)$omitted,
+    counts(children = 1L)
+  )
+  third <- history_lead(NULL, NULL, counter)
+  state <- history_state(third, "conv-a")
+  subagent_history_restore(state, again)
+  subagent_history_save(state, list())
+  expect_identical(
+    subagent_history_status(state)$omitted,
+    counts(children = 1L)
+  )
+  # Counts that don't add up are not read.
+  record <- history_parse(again$deputy_subagents$data)
+  record$omitted$earlier <- 2L
+  tampered <- subagent_history_envelope(record)
+  state <- history_state(third, "conv-a")
+  subagent_history_restore(state, list(deputy_subagents = tampered))
+  expect_null(state$record)
+  expect_match(state$error, "could not be read")
 })
 
 test_that("a save the requester may not see keeps the last good record", {

@@ -29,8 +29,9 @@ conversation, as \code{\link[=delegation_history]{delegation_history()}} returns
 \code{transcript = FALSE}, without their conversations.
 \item \code{status()}: the open conversation's ID, how many subagents its saved
 record holds, how many were still running, saved without their
-conversation or left out at the last save, and any problem saving or
-reading it.
+conversation or left out at the last save (including subagents an
+earlier session left out, which a new session can't recover), and any
+problem saving or reading it.
 }
 }
 \description{

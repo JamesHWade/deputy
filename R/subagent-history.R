@@ -376,6 +376,8 @@ subagent_history_replay_size <- function(view) {
 # ones in the order they started, within `max_bytes` and within what the
 # lead's disclosure lets `restored()` replay. A child that doesn't fit keeps
 # its outcome without its transcript, or is left out; the record counts both.
+# `earlier` counts children left out that this lead can't find again: those a
+# record saved by another lead left out, and saved children dropped now.
 subagent_history_record <- function(state, conversation_id) {
   lead <- state$lead
   requester <- state$requester()
@@ -399,10 +401,21 @@ subagent_history_record <- function(state, conversation_id) {
       "x" = "Its scope alone is over the lead's disclosure {.arg max_bytes}."
     ))
   }
+  saved_by <- subagent_history_key(lead$agent_id)
   children <- list()
+  earlier <- 0L
   if (identical(state$conversation_id, conversation_id)) {
-    carried <- state$record$history$children %||% list()
-    keys <- state$record$keys %||% character()
+    prior <- state$record
+    carried <- prior$history$children %||% list()
+    keys <- prior$keys %||% character()
+    # This lead finds its own running and oversized children again; another
+    # lead's are gone.
+    counts <- prior$omitted
+    earlier <- if (identical(prior$saved_by, saved_by)) {
+      counts$earlier %||% 0L
+    } else {
+      (counts$running %||% 0L) + (counts$children %||% 0L)
+    }
     for (index in seq_along(carried)) {
       view <- disclosure$redact(carried[[index]], requester)
       if (!is.list(view)) {
@@ -411,11 +424,25 @@ subagent_history_record <- function(state, conversation_id) {
       inspection_portable(view)
       children[[keys[[index]]]] <- list(
         view = view,
-        transcript = !is.null(view$transcript)
+        transcript = !is.null(view$transcript),
+        carried = TRUE
       )
     }
   }
-  omitted <- list(running = 0L, transcripts = 0L, children = 0L)
+  omitted <- list(
+    running = 0L,
+    transcripts = 0L,
+    children = 0L,
+    earlier = earlier
+  )
+  left_out <- function(omitted, child) {
+    if (isTRUE(child$carried)) {
+      omitted$earlier <- omitted$earlier + 1L
+    } else {
+      omitted$children <- omitted$children + 1L
+    }
+    omitted
+  }
   for (record in subagent_history_records(lead, conversation_id)) {
     if (
       is.na(record$completed_at) ||
@@ -428,6 +455,7 @@ subagent_history_record <- function(state, conversation_id) {
     if (is.null(child)) {
       omitted$children <- omitted$children + 1L
     } else {
+      # A live child replaces its saved copy; this lead can find it again.
       children[[subagent_history_key(record$delegation_id)]] <- child
     }
   }
@@ -445,15 +473,19 @@ subagent_history_record <- function(state, conversation_id) {
       child$transcript <- FALSE
     }
     if (size > budget || cost > bound) {
-      omitted$children <- omitted$children + 1L
+      omitted <- left_out(omitted, child)
       next
     }
     budget <- budget - size
     bound <- bound - cost
-    kept[[key]] <- list(view = view, transcript = isTRUE(child$transcript))
+    kept[[key]] <- list(
+      view = view,
+      transcript = isTRUE(child$transcript),
+      carried = isTRUE(child$carried)
+    )
   }
   build <- function(kept) {
-    omitted$transcripts <- sum(
+    transcripts <- sum(
       !vapply(
         kept,
         function(child) child$transcript,
@@ -464,7 +496,13 @@ subagent_history_record <- function(state, conversation_id) {
       conversation_id = conversation_id,
       history = history_of(unname(lapply(kept, function(child) child$view))),
       keys = names(kept) %||% character(),
-      omitted = omitted
+      saved_by = saved_by,
+      omitted = list(
+        running = omitted$running,
+        transcripts = transcripts,
+        children = omitted$children + omitted$earlier,
+        earlier = omitted$earlier
+      )
     )
   }
   # The scope, keys and counts count too: drop the newest children until the
@@ -473,8 +511,8 @@ subagent_history_record <- function(state, conversation_id) {
   while (
     length(kept) && subagent_history_record_size(record) > state$max_bytes
   ) {
+    omitted <- left_out(omitted, kept[[length(kept)]])
     kept[[length(kept)]] <- NULL
-    omitted$children <- omitted$children + 1L
     record <- build(kept)
   }
   # A record that can't fit without children would not read back.
@@ -540,7 +578,11 @@ subagent_history_read <- function(saved, lead, conversation_id, max_bytes) {
       !is.character(record$keys) ||
       length(record$keys) != length(history$children) ||
       anyDuplicated(record$keys) ||
-      !all(grepl("^[0-9a-f]{64}$", record$keys))
+      !all(grepl("^[0-9a-f]{64}$", record$keys)) ||
+      !is.character(record$saved_by) ||
+      length(record$saved_by) != 1L ||
+      !isTRUE(grepl("^[0-9a-f]{64}$", record$saved_by)) ||
+      !subagent_history_counts(record$omitted)
   ) {
     history_codec_abort()
   }
@@ -692,13 +734,32 @@ subagent_history_status <- function(state) {
   id <- subagent_history_active_id(state)
   current <- !is.null(id) && identical(state$conversation_id, id)
   record <- if (current) state$record
+  counts <- record$omitted
   list(
     conversation_id = id,
     saved = length(record$history$children),
-    omitted = record$omitted %||%
-      list(running = 0L, transcripts = 0L, children = 0L),
+    omitted = list(
+      running = counts$running %||% 0L,
+      transcripts = counts$transcripts %||% 0L,
+      children = counts$children %||% 0L
+    ),
     error = if (current) state$error
   )
+}
+
+# A saved record's counts: whole, non-negative, and `earlier` within
+# `children`.
+subagent_history_counts <- function(counts) {
+  count <- function(value) {
+    is.integer(value) && length(value) == 1L && !is.na(value) && value >= 0L
+  }
+  is.list(counts) &&
+    all(vapply(
+      c("running", "transcripts", "children", "earlier"),
+      function(name) count(counts[[name]]),
+      logical(1)
+    )) &&
+    counts$earlier <= counts$children
 }
 
 # The subagent panel's list for the open conversation: live subagents that
@@ -785,8 +846,9 @@ subagent_history_panel_child <- function(conversation, live, id) {
 #'     `transcript = FALSE`, without their conversations.
 #'   * `status()`: the open conversation's ID, how many subagents its saved
 #'     record holds, how many were still running, saved without their
-#'     conversation or left out at the last save, and any problem saving or
-#'     reading it.
+#'     conversation or left out at the last save (including subagents an
+#'     earlier session left out, which a new session can't recover), and any
+#'     problem saving or reading it.
 #' @seealso [subagent_chat_activity()] to show subagent tool calls in the
 #'   chat itself.
 #' @export
