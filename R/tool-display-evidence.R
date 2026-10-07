@@ -81,7 +81,13 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
     if (!is.null(class) && !identical(class, tool_display_html_class)) {
       return(FALSE)
     }
-    tool_display_count(state, unclass(x))
+    # Text is escaped unless it is marked as HTML, and written on its own
+    # indented line.
+    escapes <- if (is.null(attr(x, "html", exact = TRUE))) {
+      tool_display_escapes$text
+    }
+    tool_display_count(state, unclass(x), escapes)
+    state$bytes <- state$bytes + depth + 1
     return(TRUE)
   }
   if (identical(class, "shiny.tag")) {
@@ -100,20 +106,30 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
     ) {
       return(FALSE)
     }
-    # The name is written twice, opening and closing the element.
+    # The name is written twice, as `<name>` and `</name>`, each on an
+    # indented line (the indent is two spaces a level, and a level is at
+    # least two steps of `depth`).
     tool_display_count(state, c(tag$name, tag$name))
+    state$bytes <- state$bytes + 2 * depth + 5
     attribs <- tag$attribs
     if (!is.null(attribs) && (!is.list(attribs) || is.object(attribs))) {
       return(FALSE)
     }
+    # Attributes count toward the node budget, and each is written as
+    # ` name="value"` with the value escaped, whatever its class.
+    state$nodes <- state$nodes + length(attribs)
+    if (state$nodes > 4096L) {
+      return(FALSE)
+    }
     tool_display_count(state, names(attribs))
+    state$bytes <- state$bytes + 3 * length(attribs)
     for (value in attribs) {
       html <- is.character(value) &&
         identical(oldClass(value), tool_display_html_class)
       if (!html && !is.null(value) && (!is.atomic(value) || is.object(value))) {
         return(FALSE)
       }
-      tool_display_count(state, unclass(value))
+      tool_display_count(state, unclass(value), tool_display_escapes$attribute)
     }
     return(tool_display_plain_tags(tag$children, depth + 1L, state))
   }
@@ -121,18 +137,43 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
     is.list(x) &&
       (is.null(class) || identical(class, c("shiny.tag.list", "list")))
   ) {
-    return(all(vapply(
+    return(tool_display_walk_all(
       unclass(x),
       tool_display_plain_tags,
-      logical(1),
-      depth = depth + 1L,
-      state = state
-    )))
+      depth + 1L,
+      state
+    ))
   }
   FALSE
 }
 
+# TRUE when `walk` accepts every element. It stops at the first one it
+# refuses, so a list longer than the node budget isn't walked to its end.
+tool_display_walk_all <- function(x, walk, depth, state) {
+  for (element in x) {
+    if (!walk(element, depth, state)) {
+      return(FALSE)
+    }
+  }
+  TRUE
+}
+
 tool_display_html_class <- c("html", "character")
+
+# The bytes htmltools' escaping adds for each character it replaces: text
+# escapes `&`, `<` and `>`; attribute values also quotes and line breaks.
+tool_display_escapes <- list(
+  text = c(`&` = 4, `<` = 3, `>` = 3),
+  attribute = c(
+    `&` = 4,
+    `<` = 3,
+    `>` = 3,
+    `'` = 4,
+    `"` = 5,
+    `\r` = 4,
+    `\n` = 4
+  )
+)
 
 tool_display_walk_state <- function(limit = Inf) {
   state <- new.env(parent = emptyenv())
@@ -142,24 +183,37 @@ tool_display_walk_state <- function(limit = Inf) {
   state
 }
 
-# Rendering converts each element of a value to text and joins them. This adds
-# an upper bound on those bytes without converting anything: strings are
-# measured only while the walk is within its limit, so measuring costs no more
-# than the limit allows, and other types count their widest element.
-tool_display_count <- function(state, x) {
+# Rendering converts each element of a value to text, escapes it and joins
+# them. This adds an upper bound on those bytes without converting anything:
+# strings are measured, and then scanned for the characters `escapes` names,
+# only while the walk is within its limit, so measuring costs no more than the
+# limit allows, and other types count their widest element.
+tool_display_count <- function(state, x, escapes = NULL) {
   n <- length(x)
   if (n == 0L) {
     return(invisible())
   }
-  state$bytes <- state$bytes +
-    if (is.character(x) && state$bytes + n <= state$limit) {
-      # A missing string renders as "NA", or as an attribute with no value.
-      bytes <- nchar(x, type = "bytes")
-      bytes[is.na(bytes)] <- 2L
-      sum(as.numeric(bytes)) + n
-    } else {
-      n * tool_display_text_widths[[typeof(x)]]
-    }
+  if (!is.character(x) || state$bytes + n > state$limit) {
+    state$bytes <- state$bytes + n * tool_display_text_widths[[typeof(x)]]
+    return(invisible())
+  }
+  # A missing string renders as "NA", or as an attribute with no value.
+  bytes <- nchar(x, type = "bytes")
+  missing <- is.na(bytes)
+  bytes[missing] <- 2L
+  state$bytes <- state$bytes + sum(as.numeric(bytes)) + n
+  if (is.null(escapes) || state$bytes > state$limit) {
+    return(invisible())
+  }
+  text <- x[!missing]
+  for (char in names(escapes)) {
+    left <- nchar(
+      gsub(char, "", text, fixed = TRUE, useBytes = TRUE),
+      type = "bytes"
+    )
+    state$bytes <- state$bytes +
+      escapes[[char]] * sum(as.numeric(bytes[!missing]) - left)
+  }
   invisible()
 }
 
@@ -185,14 +239,15 @@ tool_display_node_attributes <- function(x, depth, state) {
       tool_display_dependency(dependencies, depth, state) ||
       (is.list(dependencies) &&
         is.null(oldClass(dependencies)) &&
-        all(vapply(
+        tool_display_walk_all(
           dependencies,
-          function(dependency) {
+          function(dependency, depth, state) {
             is.null(dependency) ||
               tool_display_dependency(dependency, depth, state)
           },
-          logical(1)
-        ))))
+          depth,
+          state
+        )))
 }
 
 # htmltools only ever sets these.
@@ -245,13 +300,7 @@ tool_display_plain_data <- function(x, depth = 0L, state = NULL) {
   }
   is.list(x) &&
     !is.object(x) &&
-    all(vapply(
-      x,
-      tool_display_plain_data,
-      logical(1),
-      depth = depth + 1L,
-      state = state
-    ))
+    tool_display_walk_all(x, tool_display_plain_data, depth + 1L, state)
 }
 
 # One string, plain or htmltools' `html`. A string or flag with any other class
