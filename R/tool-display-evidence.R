@@ -53,45 +53,60 @@ tool_display_marker_names <- function(names, limit = 16L) {
   )
 }
 
-# Walk a tag tree without dispatching methods on application objects.
+# Walk a tag tree without dispatching methods on application objects. Every
+# object must have exactly the class htmltools gives it and is read only after
+# `unclass()`, so no `$`, `names()` or `length()` method of a subclass runs.
 tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
   state <- state %||% new.env(parent = emptyenv())
   state$nodes <- (state$nodes %||% 0L) + 1L
   if (state$nodes > 4096L || depth > 64L) {
     return(FALSE)
   }
-  if (is.null(x) || (is.character(x) && !is.object(x)) || inherits(x, "html")) {
-    return(is.null(x) || is.character(x))
-  }
-  if (inherits(x, "html_dependency")) {
+  if (is.null(x)) {
     return(TRUE)
   }
-  if (inherits(x, "shiny.tag")) {
+  class <- oldClass(x)
+  if (is.character(x)) {
+    return(is.null(class) || identical(class, tool_display_html_class))
+  }
+  if (identical(class, "html_dependency")) {
+    return(tool_display_plain_data(unclass(x), depth + 1L, state))
+  }
+  if (identical(class, "shiny.tag")) {
+    tag <- unclass(x)
     # Render hooks run arbitrary R code when the tag is rendered.
     if (
-      !all(names(x) %in% c("name", "attribs", "children", ".noWS")) ||
-        length(x$.renderHooks) ||
-        !is.character(x$name) ||
-        length(x$name) != 1L
+      !all(names(tag) %in% c("name", "attribs", "children", ".noWS")) ||
+        !is.character(tag$name) ||
+        is.object(tag$name) ||
+        length(tag$name) != 1L ||
+        !tool_display_plain_data(tag$.noWS, depth + 1L, state)
     ) {
       return(FALSE)
     }
-    attribs <- x$attribs
+    attribs <- tag$attribs
+    if (!is.null(attribs) && (!is.list(attribs) || is.object(attribs))) {
+      return(FALSE)
+    }
     plain_attribs <- all(vapply(
       attribs,
       function(value) {
         is.null(value) ||
           (is.atomic(value) && !is.object(value)) ||
-          inherits(value, "html")
+          (is.character(value) &&
+            identical(oldClass(value), tool_display_html_class))
       },
       logical(1)
     ))
     return(
       plain_attribs &&
-        tool_display_plain_tags(x$children, depth + 1L, state)
+        tool_display_plain_tags(tag$children, depth + 1L, state)
     )
   }
-  if (is.list(x) && (!is.object(x) || inherits(x, "shiny.tag.list"))) {
+  if (
+    is.list(x) &&
+      (is.null(class) || identical(class, c("shiny.tag.list", "list")))
+  ) {
     return(all(vapply(
       unclass(x),
       tool_display_plain_tags,
@@ -103,10 +118,51 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
   FALSE
 }
 
+tool_display_html_class <- c("html", "character")
+
+# Data with no class anywhere: atomic vectors and plain lists.
+tool_display_plain_data <- function(x, depth = 0L, state = NULL) {
+  state <- state %||% new.env(parent = emptyenv())
+  state$nodes <- (state$nodes %||% 0L) + 1L
+  if (state$nodes > 4096L || depth > 64L) {
+    return(FALSE)
+  }
+  if (is.null(x) || (is.atomic(x) && !is.object(x))) {
+    return(TRUE)
+  }
+  is.list(x) &&
+    !is.object(x) &&
+    all(vapply(
+      x,
+      tool_display_plain_data,
+      logical(1),
+      depth = depth + 1L,
+      state = state
+    ))
+}
+
+# One string, plain or htmltools' `html`. A string or flag with any other class
+# is never read, since `length()` and `is.na()` would call its methods.
+tool_display_string <- function(value, html = FALSE) {
+  if (!is.character(value)) {
+    return(FALSE)
+  }
+  class <- oldClass(value)
+  if (!is.null(class) && !(html && identical(class, tool_display_html_class))) {
+    return(FALSE)
+  }
+  value <- unclass(value)
+  length(value) == 1L && !is.na(value)
+}
+
+tool_display_flag <- function(value) {
+  is.logical(value) && !is.object(value) && length(value) == 1L && !is.na(value)
+}
+
 # Render one HTML-capable display field to text, recording dependencies by name
 # rather than carrying their file paths.
 tool_display_html_value <- function(value) {
-  if (is.character(value) && length(value) == 1L && !is.na(value)) {
+  if (tool_display_string(value, html = TRUE)) {
     return(list(value = enc2utf8(as.character(unclass(value)))))
   }
   if (
@@ -140,26 +196,24 @@ tool_display_html_value <- function(value) {
 
 tool_display_field <- function(field, value) {
   if (field %in% tool_display_flag_fields) {
-    if (rlang::is_bool(value)) {
+    if (tool_display_flag(value)) {
       return(list(value = value))
     }
     return(list(reason = "invalid"))
   }
   if (identical(field, "open_style")) {
     if (
-      is.character(value) &&
-        length(value) == 1L &&
-        !is.na(value) &&
+      tool_display_string(value) &&
         value %in% c("minimal", "framed")
     ) {
-      return(list(value = as.character(unclass(value))))
+      return(list(value = as.character(value)))
     }
     return(list(reason = "invalid"))
   }
   out <- if (field %in% tool_display_html_fields) {
     tool_display_html_value(value)
-  } else if (is.character(value) && length(value) == 1L && !is.na(value)) {
-    list(value = enc2utf8(as.character(unclass(value))))
+  } else if (tool_display_string(value)) {
+    list(value = enc2utf8(as.character(value)))
   } else {
     list(reason = if (is.character(value)) "invalid" else "unsupported_object")
   }
@@ -196,12 +250,10 @@ tool_display_projection <- function(content) {
       next
     }
     if (
-      is.character(value) &&
-        length(value) == 1L &&
-        !is.na(value) &&
+      tool_display_string(value) &&
         grepl(tool_display_provenance_pattern, value)
     ) {
-      provenance[[field]] <- as.character(unclass(value))
+      provenance[[field]] <- as.character(value)
     } else {
       omitted$provenance <- c(omitted$provenance, field)
     }
@@ -325,20 +377,17 @@ tool_display_validate <- function(record) {
     }
     for (field in fields) {
       value <- display[[field]]
-      valid <- if (field %in% tool_display_flag_fields) {
-        rlang::is_bool(value)
-      } else if (identical(field, "open_style")) {
-        is.character(value) &&
-          length(value) == 1L &&
-          !is.na(value) &&
-          value %in% c("minimal", "framed")
-      } else {
-        is.character(value) &&
-          length(value) == 1L &&
-          !is.na(value) &&
-          nchar(value, type = "bytes") <= tool_display_limits[[field]]
-      }
-      if (!valid || !is.null(attributes(value))) {
+      # Attributes are checked first, so no method of a classed value runs.
+      valid <- is.null(attributes(value)) &&
+        if (field %in% tool_display_flag_fields) {
+          tool_display_flag(value)
+        } else if (identical(field, "open_style")) {
+          tool_display_string(value) && value %in% c("minimal", "framed")
+        } else {
+          tool_display_string(value) &&
+            nchar(value, type = "bytes") <= tool_display_limits[[field]]
+        }
+      if (!valid) {
         tool_display_invalid()
       }
     }

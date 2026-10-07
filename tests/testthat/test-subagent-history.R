@@ -333,7 +333,10 @@ test_that("subagent records are saved with the conversation and restored read-on
     result <- history_results(view$turns)[[1L]]
     expect_identical(result@extra$display$title, "Ran a trusted calculation")
     expect_identical(result@extra$commons_tag, "A")
-    expect_length(saver$restored(transcript = FALSE)[[1L]]$turns, 0L)
+    expect_identical(view$retention$transcript, "included")
+    listed <- saver$restored(transcript = FALSE)[[1L]]
+    expect_length(listed$turns, 0L)
+    expect_identical(listed$retention$transcript, "not_requested")
     # The subagent's cards are back in the shown conversation only.
     shown <- unlist(lapply(restored_lead$get_turns(), function(t) t@contents))
     context <- unlist(lapply(
@@ -671,6 +674,12 @@ test_that("saved records stay within what the lead's disclosure can replay", {
     length(full$history$children[[1L]]$transcript)
   )
   expect_length(views[[2L]]$turns, 0L)
+  # Listed without transcripts: one left out on request, one the save omitted.
+  listed <- subagent_history_restored(state, transcript = FALSE)
+  expect_identical(
+    vapply(listed, function(view) view$retention$transcript, ""),
+    c("not_requested", "omitted")
+  )
 
   # A record saved under a larger bound still reads back, without transcripts.
   state$record <- full

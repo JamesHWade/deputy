@@ -706,7 +706,12 @@ subagent_history_restored <- function(state, transcript = TRUE) {
   }
   history <- state$record$history
   if (!transcript) {
+    # Left out on request, as inspection marks it; a transcript the save
+    # itself omitted stays marked "omitted".
     history$children <- lapply(history$children, function(view) {
+      if (!identical(view$retention$transcript, "omitted")) {
+        view$retention$transcript <- "not_requested"
+      }
       view$transcript <- NULL
       view
     })
@@ -843,7 +848,9 @@ subagent_history_panel_child <- function(conversation, live, id) {
 #' @return Invisibly, a list of functions:
 #'   * `restored(transcript = TRUE)`: the subagents saved with the open
 #'     conversation, as [delegation_history()] returns them, or `NULL`. With
-#'     `transcript = FALSE`, without their conversations.
+#'     `transcript = FALSE`, without their conversations, each marked
+#'     `retention$transcript = "not_requested"` (or `"omitted"` when it wasn't
+#'     saved).
 #'   * `status()`: the open conversation's ID, how many subagents its saved
 #'     record holds, how many were still running, saved without their
 #'     conversation or left out at the last save (including subagents an

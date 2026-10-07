@@ -56,6 +56,50 @@ is_activity_content <- function(content) {
   !is.null(activity_marker(content))
 }
 
+# A portable turn record (from `ellmer::contents_record()`) without its
+# activity contents, found by the same marker as `activity_marker()`.
+activity_strip_record <- function(record) {
+  props <- record$props
+  if (!is.list(props) || is.object(props) || !is.list(props$contents)) {
+    return(record)
+  }
+  marked <- vapply(props$contents, activity_record_marked, logical(1))
+  if (!any(marked)) {
+    return(record)
+  }
+  record$props$contents <- props$contents[!marked]
+  record
+}
+
+activity_record_marked <- function(content) {
+  props <- if (is.list(content) && !is.object(content)) content$props
+  class <- if (is.list(content)) content$class
+  if (
+    !is.list(props) ||
+      is.object(props) ||
+      !(identical(class, "ellmer::ContentToolRequest") ||
+        identical(class, "ellmer::ContentToolResult"))
+  ) {
+    return(FALSE)
+  }
+  marker <- if (is.list(props$extra)) props$extra$deputy_activity
+  if (
+    !is.list(marker) ||
+      is.object(marker) ||
+      !identical(marker$format, activity_format) ||
+      !is_nonempty_string(marker$activity_id) ||
+      !grepl(activity_id_pattern, marker$activity_id)
+  ) {
+    return(FALSE)
+  }
+  id <- if (identical(class, "ellmer::ContentToolRequest")) {
+    props$id
+  } else if (is.list(props$request)) {
+    props$request$props$id
+  }
+  identical(id, marker$activity_id)
+}
+
 # Separate activity from turns a host supplies, such as a restored shinychat
 # conversation. The model context gets the turns without it.
 activity_split <- function(turns) {
@@ -551,6 +595,18 @@ activity_poll <- function(agent, final = FALSE, closing = FALSE) {
       # A viewer who may not see the subagents sees no activity; the runs and
       # the lead's own conversation are unaffected.
       state$error <- inspection_text(conditionMessage(error), 1024L)
+      # Cards already shown still get a result when the reply ends, so none
+      # stays running in saved history.
+      if (closing) {
+        for (open in activity_open_entries(agent)) {
+          activity_settle(
+            agent,
+            open,
+            "Not shown: subagent activity could not be read when the reply ended.",
+            state = state
+          )
+        }
+      }
     }
   )
   invisible(result)
