@@ -783,6 +783,7 @@ activity_attribute <- function(
   entry <- state$delegations[[id]]
   label <- if (identical(name, entry$agent_name)) entry$numbered else name
   parent_id <- runtime$parent_delegation_id
+  parent <- NULL
   if (is_nonempty_string(parent_id)) {
     parent <- activity_attribution(
       agent,
@@ -794,18 +795,12 @@ activity_attribute <- function(
     )
     label <- paste0(label, " (via ", parent$label %||% "a subagent", ")")
   }
-  root <- activity_root_record(records, record)
-  root_call <- if (identical(root$delegation_id, id)) {
+  # The lead's call is reached only through parents the redacted views
+  # report, so a view that hides its parent hides that call too.
+  root_call <- if (is.null(record$parent_delegation_id)) {
     if (is_nonempty_string(runtime$tool_call_id)) runtime$tool_call_id
-  } else if (!is.null(root)) {
-    activity_attribution(
-      agent,
-      state,
-      records,
-      root$delegation_id,
-      requester,
-      pass
-    )$root_call
+  } else {
+    parent$root_call
   }
   list(label = inspection_text(label, 256L), root_call = root_call)
 }
@@ -881,16 +876,9 @@ activity_refresh <- function(
     }
     view <- activity_view(agent, record, requester)
     if (is.null(view)) {
-      root_call <- if (!identical(root$delegation_id, id)) {
-        activity_attribution(
-          agent,
-          state,
-          records,
-          root$delegation_id,
-          requester,
-          pass
-        )$root_call
-      }
+      # Without a view, nothing the viewer may see links the delegation to
+      # the lead's call, so its note doesn't name one.
+      root_call <- NULL
       # Calls shown before the record grew too large get a result, so no card
       # stays running in saved history.
       for (open in activity_open_entries(agent, entry$key)) {
