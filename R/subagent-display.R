@@ -628,17 +628,20 @@ subagent_display_splice <- function(nodes) {
 # Each rebuilt field sits in a box that contains its painting and stacking, so
 # positioned, transformed or offset content stays inside its own card.
 subagent_display_contain <- function(html, field) {
+  # A bounded height too, so a card can't stretch the conversation around it:
+  # the body scrolls, and header fields are clipped to a few lines.
   if (identical(field, "html")) {
     return(paste0(
       "<div class=\"deputy-display\" style=\"position:relative;overflow:auto;",
-      "contain:paint;isolation:isolate\">",
+      "max-height:80vh;contain:paint;isolation:isolate\">",
       html,
       "</div>"
     ))
   }
   paste0(
     "<span class=\"deputy-display\" style=\"display:inline-block;",
-    "position:relative;max-width:100%;contain:paint;isolation:isolate\">",
+    "position:relative;max-width:100%;max-height:4em;overflow:hidden;",
+    "vertical-align:middle;contain:paint;isolation:isolate\">",
     html,
     "</span>"
   )

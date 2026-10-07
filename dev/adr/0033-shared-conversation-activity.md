@@ -36,8 +36,9 @@ into an earlier message.
   records, before a sanitized replay would clear it. Replacing the
   conversation (`set_turns()`, or a successful `load_session()`, which drops
   the shown cards) restarts the presenter's queue, labels and counts, and drops
-  results a stopped presenter left for the reply streaming. Clones do not
-  inherit the presenter.
+  results a stopped presenter left for the reply streaming; that reply's
+  calls are no longer shown, since they belong to the replaced conversation.
+  Clones do not inherit the presenter.
 - **Identity is the delegation and the call's place in it.** An activity ID
   is `deputy_activity_<key>_<n>`, where `key` is an opaque token drawn once
   per delegation and `n` numbers the delegation's own tool requests in the
@@ -56,7 +57,8 @@ into an earlier message.
   tool-call IDs reused across conversations cannot collide, and the ID reveals
   nothing a redactor removed. The marker keeps the provider-independent
   lineage (agent, conversation, delegation, parent delegation, depth, run and
-  the root tool call) as the redacted view reports it.
+  the root tool call) as the redacted view reports it; the root tool call
+  comes from the depth-one delegation's redacted view.
 - **Attribution goes in the activity row label.** The display keeps the tool's
   own title, icon and HTML. `label` names the subagent by the name its
   redacted view gives; later delegations to the same name are numbered and a

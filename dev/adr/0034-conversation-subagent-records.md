@@ -91,15 +91,21 @@ back from storage Deputy doesn't control.
   save.
 - **Saved children are redacted again on every save.** Children carried from
   an earlier save pass through the current `redact` before they are written
-  back, so a stricter policy also cleans what is stored. They are carried only
-  for a requester the disclosure authorizes for the conversation's own scope,
-  the one `delegation_history()` reads them with; otherwise the save keeps the
-  last good record without showing them to the redactor. Children saved under
+  back, so a stricter policy also cleans what is stored. Every save needs a
+  requester the disclosure authorizes for the conversation's own scope, the
+  one `delegation_history()` reads the record with, and, when the lead has
+  live records in the conversation, for the lead's live scope as well (so a
+  reopened conversation whose new lead has none saves on the first alone);
+  otherwise the save keeps the last good record without showing anything to
+  the redactor. Children saved under
   another scope (a lead moved since with `set_delegation_sources(scope = )`)
   are not carried, redacted or counted: the save replaces them with the
   current scope's live children. Children are matched
   across saves by a SHA-256 digest of their delegation ID, kept beside the
-  views, so matching survives a redactor that removes the ID itself.
+  views, so matching survives a redactor that removes the ID itself. A live
+  child always replaces its saved copy: when it can't be saved now (running,
+  or over the disclosure bound) the copy goes and the child is counted once,
+  as pending.
 - **The panel follows the open conversation.** `subagent_chat_server(conversation
   = )` shows live children whose `host_conversation_id` is the open
   conversation and saved children that aren't live, listing saved ones without
