@@ -245,8 +245,8 @@ subagent_display_active <- function(value) {
       "image-set\\(|image\\(|cross-fade\\(|element\\(|src\\("
     ),
     plain
-  ) ||
-    grepl("\\\\", value) ||
+  ) |
+    grepl("\\\\", value) |
     grepl("url\\((?!['\"]?#)", plain, perl = TRUE)
 }
 
@@ -271,43 +271,37 @@ subagent_display_id <- function(id, prefix) {
   paste0(prefix, id)
 }
 
-# Keep declarations that only style the element in place.
+# Keep declarations that only style the element in place. Declarations are
+# checked together, so the work stays linear in the length of the style.
 subagent_display_css_declarations <- function(
   css,
   ids = character(),
   prefix = subagent_display_prefix()
 ) {
-  declarations <- strsplit(css, ";", fixed = TRUE)[[1L]]
-  kept <- character()
-  for (declaration in declarations) {
-    parts <- regmatches(
-      declaration,
-      regexpr(":", declaration, fixed = TRUE),
-      invert = TRUE
-    )[[1L]]
-    if (length(parts) != 2L) {
-      next
-    }
-    property <- tolower(trimws(parts[[1L]]))
-    value <- trimws(parts[[2L]])
-    if (
-      !grepl("^-?[a-z][a-z0-9-]*$", property) ||
-        !nzchar(value) ||
-        # Braces would open nested rules that escape the checks here.
-        grepl("[{}]", value) ||
-        subagent_display_active(value) ||
-        (identical(property, "position") &&
-          grepl("fixed|sticky", value, ignore.case = TRUE))
-    ) {
-      next
-    }
-    value <- subagent_display_css_refs(value, ids, prefix)
-    if (is.null(value)) {
-      next
-    }
-    kept <- c(kept, paste0(property, ":", value))
+  if (nchar(css, type = "chars") > subagent_display_style_limit) {
+    return("")
   }
-  paste(kept, collapse = ";")
+  declarations <- strsplit(css, ";", fixed = TRUE)[[1L]]
+  colon <- regexpr(":", declarations, fixed = TRUE)
+  property <- tolower(trimws(substr(declarations, 1L, colon - 1L)))
+  value <- trimws(substring(declarations, colon + 1L))
+  keep <- colon > 0L &
+    grepl("^-?[a-z][a-z0-9-]*$", property) &
+    nzchar(value) &
+    # Braces would open nested rules that escape the checks here.
+    !grepl("[{}]", value) &
+    !subagent_display_active(value) &
+    !(property == "position" &
+      grepl("fixed|sticky", value, ignore.case = TRUE))
+  for (index in which(keep & grepl("url\\(", value, ignore.case = TRUE))) {
+    rewritten <- subagent_display_css_refs(value[[index]], ids, prefix)
+    if (is.null(rewritten)) {
+      keep[[index]] <- FALSE
+    } else {
+      value[[index]] <- rewritten
+    }
+  }
+  paste(paste0(property[keep], ":", value[keep]), collapse = ";")
 }
 
 # `url(#id)` references point at prefixed ids; any other reference is dropped.
@@ -322,14 +316,19 @@ subagent_display_css_refs <- function(value, ids, prefix) {
   gsub(pattern, paste0("url(\\1#", prefix, "\\2"), value, perl = TRUE)
 }
 
-# Longer style sheets are dropped rather than scanned; gt's are a few KB.
+# Longer style sheets and inline styles are dropped rather than scanned, as
+# are sheets with more rules; gt's are a few KB with about 50 rules.
 subagent_display_style_limit <- 256L * 1024L
+subagent_display_style_rules <- 1000L
 
 # A rule survives only when each selector starts at an id defined in the same
 # display, which is how gt scopes its table styles. `@media` is kept at the top
 # level only, so the scan stays linear in the length of the sheet.
 subagent_display_style_element <- function(css, ids, prefix) {
-  if (nchar(css, type = "chars") > subagent_display_style_limit) {
+  if (
+    nchar(css, type = "chars") > subagent_display_style_limit ||
+      lengths(gregexpr("{", css, fixed = TRUE)) > subagent_display_style_rules
+  ) {
     return("")
   }
   css <- gsub("/\\*.*?\\*/", "", css, perl = TRUE)
@@ -403,17 +402,20 @@ subagent_display_style_element <- function(css, ids, prefix) {
     paste(rewritten, collapse = ",")
   }
   emit <- function(blocks, nested = FALSE) {
-    out <- character()
-    for (block in blocks) {
+    out <- character(length(blocks))
+    for (index in seq_along(blocks)) {
+      block <- blocks[[index]]
       if (startsWith(block$prelude, "@media")) {
         if (nested) {
           next
         }
         inner <- emit(scan_blocks(block$body), nested = TRUE)
         if (length(inner)) {
-          out <- c(
-            out,
-            paste0(block$prelude, "{", paste(inner, collapse = ""), "}")
+          out[[index]] <- paste0(
+            block$prelude,
+            "{",
+            paste(inner, collapse = ""),
+            "}"
           )
         }
         next
@@ -428,10 +430,10 @@ subagent_display_style_element <- function(css, ids, prefix) {
       }
       body <- subagent_display_css_declarations(block$body, ids, prefix)
       if (nzchar(body)) {
-        out <- c(out, paste0(selector, "{", body, "}"))
+        out[[index]] <- paste0(selector, "{", body, "}")
       }
     }
-    out
+    out[nzchar(out)]
   }
   paste(emit(scan_blocks(css)), collapse = "")
 }
@@ -533,6 +535,16 @@ subagent_display_html <- function(html) {
         }
         next
       }
+      if (identical(key, "class")) {
+        classes <- strsplit(trimws(value), "[[:space:]]+")[[1L]]
+        # shinychat sends a `suggestion` element's text as the user's message
+        # when it is clicked.
+        classes <- classes[nzchar(classes) & tolower(classes) != "suggestion"]
+        if (length(classes)) {
+          kept$class <- paste(classes, collapse = " ")
+        }
+        next
+      }
       if (identical(key, "href") && identical(name, "a")) {
         if (subagent_display_url(value, name)) {
           kept$href <- value
@@ -547,9 +559,12 @@ subagent_display_html <- function(html) {
         }
         next
       }
+      # `data-*` attributes are dropped: Bootstrap, shinychat and other
+      # libraries on the host page act on them (`data-bs-toggle`,
+      # `data-suggestion`), outside the display.
       allowed <- key %in%
         subagent_display_attributes ||
-        grepl("^(aria|data)-[a-z0-9_.-]+$", key)
+        grepl("^aria-[a-z0-9_.-]+$", key)
       if (!allowed) {
         next
       }
@@ -574,12 +589,9 @@ subagent_display_html <- function(html) {
     render,
     depth = 0L
   ))
-  html <- vapply(
-    rendered,
-    function(node) as.character(htmltools::tagList(node)),
-    character(1)
-  )
-  trimws(paste(html, collapse = ""))
+  # One render for the whole fragment: per-node renders cost more than the
+  # rebuild itself.
+  trimws(as.character(htmltools::tagList(rendered)))
 }
 
 # Unwrapped elements contribute their children in place, and neighbouring text

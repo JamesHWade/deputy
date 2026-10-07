@@ -593,7 +593,7 @@ activity_refresh <- function(
       entry <- list(
         key = activity_new_key(),
         anchor_turn = anchor_turn,
-        emitted = list()
+        calls = list()
       )
     }
     view <- activity_view(agent, record, requester)
@@ -652,10 +652,25 @@ activity_refresh <- function(
       state$delegations[[id]] <- entry
     }
     calls <- activity_calls(view)
-    for (index in seq_along(calls)) {
-      call <- calls[[index]]
-      key <- as.character(index)
-      emitted <- entry$emitted[[key]] %||% character()
+    # Each call keeps the number it was first shown with, matched by its
+    # provider ID, tool and arguments, so a redaction that later hides an
+    # earlier call can't move a later call onto that call's card.
+    known <- entry$calls %||% list()
+    identities <- vapply(known, function(slot) slot$identity, character(1))
+    taken <- logical(length(known))
+    for (call in calls) {
+      call_identity <- activity_call_identity(call$request)
+      index <- which(!taken & identities == call_identity)
+      if (length(index)) {
+        index <- index[[1L]]
+      } else {
+        index <- length(known) + 1L
+        known[[index]] <- list(identity = call_identity, emitted = character())
+        identities <- c(identities, call_identity)
+        taken <- c(taken, FALSE)
+      }
+      taken[[index]] <- TRUE
+      emitted <- known[[index]]$emitted
       activity_id <- paste0("deputy_activity_", entry$key, "_", index)
       marker <- activity_lineage(runtime, root, entry$label, activity_id, index)
       request <- activity_request_content(call$request, marker)
@@ -700,13 +715,34 @@ activity_refresh <- function(
           emitted <- c(emitted, "result")
         }
       }
-      entry$emitted[[key]] <- emitted
+      known[[index]]$emitted <- emitted
+    }
+    entry$calls <- known
+    if (settled || closing) {
+      # A call shown earlier that the view no longer includes still gets a
+      # result, so no card stays running in saved history.
+      for (open in activity_open_entries(agent, entry$key)) {
+        activity_settle(
+          agent,
+          open,
+          "Not shown: the subagent's record no longer shows this call.",
+          state = state
+        )
+      }
     }
     entry$signature <- signature
     entry$done <- settled || closing
     state$delegations[[id]] <- entry
   }
   invisible(NULL)
+}
+
+# What identifies a call from one poll to the next.
+activity_call_identity <- function(request) {
+  digest::digest(
+    list(request@id, request@name, request@arguments),
+    algo = "sha256"
+  )
 }
 
 activity_wait <- function(slot, seconds) {
