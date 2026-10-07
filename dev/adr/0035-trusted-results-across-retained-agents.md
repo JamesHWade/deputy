@@ -41,9 +41,10 @@ producer's own label, not proof.
   one type. Both rules also hold across everything the root retains (graph
   members included), so two specialists can't give one type different
   producers. A name the combined policy designates is that producer
-  everywhere: a tool of that name in the owner's registry or another retained
-  agent's must be the same object, checked when the agent is retained and
-  whenever the owner's registry changes while it is retained. Exemptions are
+  everywhere: a tool of that name in the owner's registry, a LeadAgent
+  owner's definitions or another retained agent's registry must be the same
+  object, checked when the agent is retained and whenever the owner's
+  registry or definitions change while it is retained. Exemptions are
   the intersection; a receipt applies if either
   asks. The combined policy is installed on the retained agent until release,
   which restores its own policy and removes the owner's `delegation_tool()`

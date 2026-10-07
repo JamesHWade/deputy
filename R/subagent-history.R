@@ -385,7 +385,6 @@ subagent_history_record <- function(state, conversation_id) {
   lead <- state$lead
   requester <- state$requester()
   disclosure <- lead$.__enclos_env__$private$.delegation_disclosure
-  inspection_authorize(disclosure, requester, inspection_scope(lead))
   scope <- subagent_history_scope(lead, conversation_id)
   history_of <- function(children) {
     list(
@@ -404,7 +403,15 @@ subagent_history_record <- function(state, conversation_id) {
       "x" = "Its scope alone is over the lead's disclosure {.arg max_bytes}."
     ))
   }
+  # The record is this conversation's history: only a requester who may read
+  # it there writes it, even through the redactor. Live records are read
+  # under the lead's live scope as well, so a reopened conversation whose
+  # lead has none here saves without it.
+  inspection_authorize(disclosure, requester, scope)
   records <- subagent_history_records(lead, conversation_id)
+  if (length(records)) {
+    inspection_authorize(disclosure, requester, inspection_scope(lead))
+  }
   live <- vapply(
     records,
     function(record) subagent_history_key(record$delegation_id),
@@ -423,11 +430,6 @@ subagent_history_record <- function(state, conversation_id) {
     }
     carried <- prior$history$children %||% list()
     keys <- prior$keys %||% character()
-    # Saved children are this conversation's history: only a requester who
-    # may read it there sees them, even through the redactor.
-    if (length(carried)) {
-      inspection_authorize(disclosure, requester, scope)
-    }
     # Children the last save left out are counted again below while the
     # lead still has them; the rest are gone.
     pending <- prior$pending %||% character()
@@ -460,19 +462,21 @@ subagent_history_record <- function(state, conversation_id) {
     omitted
   }
   for (record in records) {
+    key <- subagent_history_key(record$delegation_id)
+    # A live child replaces its saved copy, whether it is saved again now or
+    # left out (and counted once, as pending): this lead can find it again.
     if (
       is.na(record$completed_at) ||
         !isTRUE(record$status %in% subagent_history_settled)
     ) {
+      children[[key]] <- NULL
       omitted$running <- omitted$running + 1L
       next
     }
     child <- subagent_history_child(lead, requester, record$delegation_id)
+    children[[key]] <- child
     if (is.null(child)) {
       omitted$children <- omitted$children + 1L
-    } else {
-      # A live child replaces its saved copy; this lead can find it again.
-      children[[subagent_history_key(record$delegation_id)]] <- child
     }
   }
   budget <- state$max_bytes

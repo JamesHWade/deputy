@@ -796,15 +796,10 @@ LeadAgent <- R6::R6Class(
 
     # The whole delegation tree obeys one no-bypass rule: the lead may keep its
     # own delegate tool only because every child inherits the policy.
-    check_trusted_tools = function(tools) {
-      policy <- private$.trusted_results
-      if (is.null(policy)) {
-        return(invisible(NULL))
-      }
-      # Designated producers must be declared statically, in tools or Skill
-      # values. Skills named by path load fresh objects when each child is
-      # built, so they may add other checked tools but never a producer.
-      definitions <- lapply(private$.sub_agent_defs, function(def) {
+    # Each definition's checked registry: its tools and Skill values, less its
+    # denylist.
+    trusted_definition_tools = function() {
+      lapply(private$.sub_agent_defs, function(def) {
         skill_tools <- unlist(
           lapply(def$skills, function(skill) {
             if (S7::S7_inherits(skill, Skill)) skill$tools else list()
@@ -816,6 +811,17 @@ LeadAgent <- R6::R6Class(
           def$disallowed_tools
         ))
       })
+    },
+
+    check_trusted_tools = function(tools) {
+      policy <- private$.trusted_results
+      if (is.null(policy)) {
+        return(invisible(NULL))
+      }
+      # Designated producers must be declared statically, in tools or Skill
+      # values. Skills named by path load fresh objects when each child is
+      # built, so they may add other checked tools but never a producer.
+      definitions <- private$trusted_definition_tools()
       sources <- trusted_tree_sources(policy, c(list(tools), definitions))
       check_trusted_registry(
         policy,
@@ -851,6 +857,16 @@ LeadAgent <- R6::R6Class(
             )
           }
         )
+      }
+      # Names a retained agent's own policy designates stay that tool in the
+      # lead's registry and in every definition.
+      for (entry in private$owned_conversations) {
+        if (!is.null(entry$trusted)) {
+          trusted_check_names(
+            trusted_policy_sources(entry$trusted$policy),
+            c(list(tools), definitions)
+          )
+        }
       }
       invisible(sources)
     },
