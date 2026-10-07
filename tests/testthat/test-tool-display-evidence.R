@@ -457,6 +457,25 @@ test_that("what rendering converts or calls is checked before rendering", {
   expect_identical(projection$omitted$dependencies, "measure 1.0")
 })
 
+test_that("missing strings in a tag tree are counted, not an error", {
+  result <- ellmer::ContentToolResult(
+    value = "60",
+    extra = list(
+      display = list(
+        html = htmltools::div(
+          title = NA_character_,
+          htmltools::span(NA_character_),
+          "60"
+        )
+      )
+    )
+  )
+  projection <- tool_display_projection(result)
+  expect_match(projection$display$html, "<div title>", fixed = TRUE)
+  expect_match(projection$display$html, "<span>NA</span>", fixed = TRUE)
+  expect_null(projection$omitted$fields)
+})
+
 test_that("only the extra named display is a display", {
   result <- ellmer::ContentToolResult(
     value = "60",
