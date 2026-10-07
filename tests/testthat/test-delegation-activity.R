@@ -887,6 +887,8 @@ test_that("stopping the presenter settles the cards it left running", {
   shown <- activity_take(root)
   expect_length(shown, 1L)
   activity_disable(root)
+  # Stopping again before the reply takes them keeps those results.
+  activity_disable(root)
   # The reply still streaming gets the result too, once.
   live <- activity_take(root)
   expect_length(live, 1L)
@@ -914,6 +916,13 @@ test_that("stopping the presenter settles the cards it left running", {
     ))),
     2L
   )
+  # Nor does it reach a conversation that replaced the one it was shown in.
+  private$.activity_leftover <- list(
+    run_id = private$current_run_id,
+    queue = live
+  )
+  root$set_turns(root$get_turns())
+  expect_length(activity_take(root), 0L)
 })
 
 test_that("a lead shows activity through one presenter at a time", {
