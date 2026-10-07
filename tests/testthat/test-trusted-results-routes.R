@@ -1138,6 +1138,74 @@ test_that("a member's route runs its target under the member's result types", {
   root$release_agent_graph()
 })
 
+test_that("members sharing one callback function each get their delivery", {
+  deliveries <- routes_deliveries()
+  own <- list()
+  shared <- function(event) own[[length(own) + 1L]] <<- event
+  measure <- routes_measure_tool(60)
+  audit <- ellmer::tool(
+    function() "audited",
+    name = "run_audit",
+    description = "Run the audit.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_analyst", arguments = list(task = "Audit?")),
+    runtime_reply("Root: audited.")
+  ))
+  analyst_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_auditor", arguments = list(task = "Run it.")),
+    runtime_reply("Analyst: the auditor ran it.")
+  ))
+  auditor_server <- local_runtime_server(list(
+    runtime_reply(tool = "run_audit"),
+    runtime_reply("Auditor: done.")
+  ))
+  root <- routes_root(runtime_chat(root_server), measure, deliveries)
+  # Both members publish "audit" to their own host through one function.
+  analyst <- Agent$new(
+    runtime_chat(analyst_server),
+    tools = list(routes_read_tool()),
+    agent_name = "analyst",
+    trusted_results = TrustedResults(audit = audit, on_result = shared)
+  )
+  auditor <- Agent$new(
+    runtime_chat(auditor_server),
+    tools = list(audit),
+    agent_name = "auditor",
+    trusted_results = TrustedResults(audit = audit, on_result = shared)
+  )
+  route <- function(target) {
+    list(
+      target = target,
+      description = paste("Ask", target),
+      usage_limits = UsageLimits(max_requests = 4)
+    )
+  }
+  root$retain_agent_graph(
+    agents = list(analyst = analyst, auditor = auditor),
+    routes = list(
+      root = list(ask_analyst = route("analyst")),
+      analyst = list(ask_auditor = route("auditor"))
+    ),
+    usage_limits = UsageLimits(max_requests = 12),
+    max_depth = 2L,
+    max_delegations = 4L,
+    max_concurrency = 2L
+  )
+  root$run_sync("Audit?")
+  # Once to the root, then once to each member's own registration.
+  expect_length(deliveries$events, 1L)
+  expect_length(own, 2L)
+  for (event in own) {
+    expect_identical(event$result_id, deliveries$events[[1L]]$result_id)
+  }
+  root$release_agent_graph()
+})
+
 test_that("Commons specialists qualify only when constrained", {
   skip_if_not_installed("commons")
   sales <- data.frame(region = c("north", "south"), revenue = c(25, 35))

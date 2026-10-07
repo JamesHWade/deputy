@@ -905,10 +905,16 @@ trusted_combine <- function(owner, root_policy, own, tools) {
     receipt <- receipt || own@model_receipt
     own_callback <- own@on_result
   }
+  # Each registration has its own key, so two members using one function
+  # still get a delivery each.
   forward <- trusted_forward(
     owner,
     root_policy@on_result,
-    if (is.function(own_callback)) list(own_callback) else list()
+    if (is.function(own_callback)) {
+      list(list(key = new_deputy_id(), callback = own_callback))
+    } else {
+      list()
+    }
   )
   do.call(
     TrustedResults,
@@ -933,7 +939,10 @@ trusted_forward <- function(owner, root_callback, callbacks) {
     }
     root$.__enclos_env__$private$record_run_event(event)
     failure <- NULL
-    for (callback in c(list(root_callback), callbacks)) {
+    for (callback in c(
+      list(root_callback),
+      lapply(callbacks, `[[`, "callback")
+    )) {
       if (!is.function(callback)) {
         next
       }
@@ -958,15 +967,17 @@ trusted_forward <- function(owner, root_callback, callbacks) {
 # The policy a graph route's target runs under for one call: the one that
 # admitted the route, its caller's combined with its own, so the caller's
 # result types are published from the target too. Delivery reaches the root
-# once, then each own callback along the chain of routes, once each.
+# once, then each member's own callback along the chain of routes, once each:
+# registrations are told apart by key, so a chain passing a member twice
+# calls it once, and members sharing one function are each called.
 trusted_routed_policy <- function(owner, caller, target) {
   callbacks <- list()
-  for (callback in c(
+  for (entry in c(
     attr(caller@on_result, "deputy_trusted_callbacks", exact = TRUE),
     attr(target@on_result, "deputy_trusted_callbacks", exact = TRUE)
   )) {
-    if (!any(vapply(callbacks, identical, logical(1), callback))) {
-      callbacks[[length(callbacks) + 1L]] <- callback
+    if (!entry$key %in% vapply(callbacks, `[[`, character(1), "key")) {
+      callbacks[[length(callbacks) + 1L]] <- entry
     }
   }
   root_policy <- owner$.__enclos_env__$private$.trusted_results
