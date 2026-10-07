@@ -219,7 +219,14 @@ test_that("saved records round-trip exactly through JSON stores", {
     r0 = raw(0),
     rl = as.raw(rep(1:255, 3)),
     z = c(1 + 2i, NA, complex(real = NaN, imaginary = Inf), -0.1 + 1e300i),
-    zm = matrix(c(1i, 2i), 1L)
+    zm = matrix(c(1i, 2i), 1L),
+    p = pairlist(a = 1L, 2, b = list("x", pairlist(c = TRUE))),
+    pm = local({
+      p <- pairlist(1, "a", TRUE, NULL)
+      dim(p) <- c(2L, 2L)
+      dimnames(p) <- list(c("r1", "r2"), NULL)
+      p
+    })
   )
   expect_identical(history_parse(history_json(x)), x)
   stored <- jsonlite::toJSON(
@@ -249,7 +256,8 @@ test_that("decoding builds only portable data", {
     '{"t":"raw","v":["AA==","AA=="]}',
     '{"t":"cplx","v":[["1"]]}',
     '{"t":"cplx","v":[{"re":"1","im":"2"}]}',
-    '{"t":"cplx","v":[["x","1"]]}'
+    '{"t":"cplx","v":[["x","1"]]}',
+    '{"t":"pairlist","v":[]}'
   )
   for (text in bad) {
     expect_error(history_parse(text), "not in a readable form")
@@ -1418,6 +1426,31 @@ test_that("a save the requester may not see keeps the last good record", {
   # A conversation with nothing saved yet saves nothing.
   fresh <- history_state(lead, "conv-a", requester = "intruder")
   expect_null(subagent_history_save(fresh, list())$deputy_subagents)
+})
+
+test_that("a new conversation's failed first save reports its error", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  open <- new.env()
+  open$id <- "conv-a"
+  state <- history_state(lead, "conv-a")
+  state$chat$history$conversation_id <- function() open$id
+  subagent_history_save(state, list())
+  expect_identical(subagent_history_status(state)$saved, 1L)
+  open$id <- "conv-b"
+  state$max_bytes <- 16
+  values <- subagent_history_save(state, list(other = 1))
+  expect_null(values$deputy_subagents)
+  status <- subagent_history_status(state)
+  expect_identical(status$conversation_id, "conv-b")
+  expect_identical(status$saved, 0L)
+  expect_match(status$error, "can't be saved")
+  expect_null(subagent_history_restored(state))
+  # The next save that works clears it.
+  state$max_bytes <- 16 * 1024^2
+  expect_type(subagent_history_save(state, list())$deputy_subagents, "list")
+  expect_null(subagent_history_status(state)$error)
 })
 
 test_that("subagent_chat_history() checks its arguments", {

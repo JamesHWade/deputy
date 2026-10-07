@@ -136,6 +136,17 @@ activity_merge <- function(turns, overlay) {
   turns
 }
 
+# One turn of the complete conversation, at `position`, with the activity
+# shown in it.
+activity_merge_turn <- function(turn, position, overlay) {
+  for (entry in overlay) {
+    if (isTRUE(entry$turn == position)) {
+      turn@contents <- c(turn@contents, list(entry$content))
+    }
+  }
+  turn
+}
+
 activity_strip <- function(turns) {
   activity_split(turns)$turns
 }
