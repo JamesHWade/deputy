@@ -73,7 +73,10 @@ back from storage Deputy doesn't control.
   without its transcript (`retention$transcript = "omitted"`) or left out,
   newest first if the whole record is still too large, and the record counts
   both; a child whose outcome alone is over the disclosure bound is left out
-  and counted. Counts survive later saves: the record lists the live children
+  and counted. A transcript the redactor removes, from a live child or a
+  saved one, is marked and counted as omitted the same way, so
+  `retention$transcript` never says `"included"` without one. Counts survive
+  later saves: the record lists the live children
   it left out (running, oversized or dropped for space) by the same digest
   as its saved children. A later save counts each again from the lead's
   records while the lead still has it, and otherwise, as for another
