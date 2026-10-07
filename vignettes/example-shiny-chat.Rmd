@@ -136,6 +136,9 @@ shiny::runApp(system.file("examples", "shiny-chat", package = "deputy"))
 
 To show the tool calls a lead's subagents make in the main chat, as they
 happen, see [Subagent tool calls in the main
-chat](delegation.html#subagent-tool-calls-in-the-main-chat). For a panel of
-subagent conversations beside the chat, see [A subagent panel for
+chat](delegation.html#subagent-tool-calls-in-the-main-chat), and to keep each
+conversation's subagents with it, so they come back when it is reopened, see
+[Saving subagents with the
+conversation](delegation.html#saving-subagents-with-the-conversation). For a
+panel of subagent conversations beside the chat, see [A subagent panel for
 Shiny](delegation.html#a-subagent-panel-for-shiny).
