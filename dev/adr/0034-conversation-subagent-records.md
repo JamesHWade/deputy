@@ -110,8 +110,10 @@ back from storage Deputy doesn't control.
   or over the disclosure bound) the copy goes and the child is counted once,
   as pending.
 - **The panel follows the open conversation.** `subagent_chat_server(conversation
-  = )` shows live children whose `host_conversation_id` is the open
-  conversation and saved children that aren't live, listing saved ones without
+  = )` shows live children whose records say they ran in the open
+  conversation (by `host_conversation_id`, read before redaction, so a
+  redactor may leave it out of the views) and saved children that aren't
+  live, listing saved ones without
   transcripts and replaying a transcript only when that child is selected. It
   reads and bounds only the open conversation's live records, so other
   conversations' children can't push its list over the disclosure bound, and
