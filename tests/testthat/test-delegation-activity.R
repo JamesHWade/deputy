@@ -282,11 +282,16 @@ test_that("concurrent specialists stream attributed activity with unique IDs", {
   expect_length(ids, 2L)
   rows <- root$list_subagents()
   expect_setequal(
-    sub("_1$", "", sub("^deputy_activity_", "delegation_", ids)),
+    unique(vapply(
+      items,
+      function(content) content@extra$deputy_activity$delegation_id,
+      character(1)
+    )),
     rows$delegation_id
   )
-  # Both children reused the provider ID "call_fixture"; none of it shows.
-  expect_false(any(grepl("call_fixture", ids, fixed = TRUE)))
+  # Both children reused the provider ID "call_fixture"; none of it shows, and
+  # IDs are opaque rather than built from delegation IDs.
+  expect_false(any(grepl("call_fixture|delegation", ids)))
   labels <- vapply(
     items,
     function(content) content@extra$deputy_activity$label,
@@ -550,6 +555,107 @@ test_that("activity renders as native shinychat tool cards", {
     result$value,
     "<div class=\"measure\"><strong>60</strong></div>"
   )
+})
+
+test_that("activity shows only what the host's redaction leaves", {
+  root_server <- local_runtime_server(list(
+    runtime_tool_calls_reply(list(
+      list(id = "call_a", name = "ask_sales", arguments = list(task = "S?")),
+      list(id = "call_b", name = "ask_ops", arguments = list(task = "O?"))
+    )),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure(
+      redact = function(view, requester) {
+        view$outcome$runtime$agent_name <- "specialist"
+        view$outcome$runtime$agent_id <- NULL
+        view$outcome$runtime$run_id <- NULL
+        view$outcome$runtime$session_id <- NULL
+        view
+      }
+    )
+  )
+  sales <- activity_specialist("sales", "60")
+  ops <- activity_specialist("ops", "7")
+  activity_retain(root, sales$agent, "ask_sales")
+  activity_retain(root, ops$agent, "ask_ops")
+  activity_enable(root, function() "viewer", 0.05)
+  items <- activity_items(activity_collect(root, "Both?"))
+  expect_length(items, 4L)
+  markers <- lapply(items, function(content) content@extra$deputy_activity)
+  expect_setequal(
+    unique(vapply(markers, function(marker) marker$label, "")),
+    c("specialist", "specialist #2")
+  )
+  expect_identical(
+    unique(vapply(markers, function(marker) marker$agent_name, "")),
+    "specialist"
+  )
+  for (marker in markers) {
+    expect_null(marker$agent_id)
+    expect_null(marker$run_id)
+    expect_null(marker$conversation_id)
+  }
+  shown <- paste(deparse(items), collapse = "")
+  for (name in c("sales", "ops", sales$agent$agent_id, ops$agent$agent_id)) {
+    expect_false(grepl(name, shown, fixed = TRUE))
+  }
+})
+
+test_that("a view over the disclosure bound shows one note instead", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = DelegationDisclosure(
+      authorize = function(requester, scope) identical(requester, "viewer"),
+      max_bytes = 2048
+    )
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  activity_enable(root, function() "viewer", 0.05)
+  items <- activity_items(activity_collect(root, "Sales?"))
+  expect_length(items, 2L)
+  expect_identical(items[[1L]]@name, "more_subagent_tool_calls")
+  expect_match(items[[1L]]@id, "_oversized$")
+  expect_match(items[[2L]]@value, "over the size the viewer may see")
+})
+
+test_that("shown activity doesn't count toward a fork's size bound", {
+  request <- ellmer::ContentToolRequest("call_1", "ask_sales", list())
+  marker <- list(
+    format = "deputy_subagent_activity",
+    version = 1L,
+    activity_id = "deputy_activity_abc_1",
+    label = "sales"
+  )
+  shown <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  large <- ellmer::ContentToolResult(
+    strrep("x", 200000),
+    request = shown,
+    extra = list(deputy_activity = marker)
+  )
+  turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("Go"))),
+    ellmer::AssistantTurn(list(request, shown, large)),
+    ellmer::UserTurn(list(ellmer::ContentToolResult(
+      "done",
+      request = request
+    ))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Done.")))
+  )
+  records <- context_fork_turn_records(turns, 64 * 1024, 64L)
+  expect_true("subagent_activity" %in% records$omissions)
 })
 
 test_that("context forks never copy shown activity", {

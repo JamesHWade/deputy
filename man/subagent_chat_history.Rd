@@ -18,7 +18,7 @@ client.}
 
 \item{max_bytes}{Most bytes of records to save per conversation. Children
 that don't fit keep their outcome without their conversation, or are left
-out, and \code{status()} names them. Defaults to 16 MiB.}
+out, and \code{status()} counts them. Defaults to 16 MiB.}
 }
 \value{
 Invisibly, a list of functions:
@@ -27,8 +27,9 @@ Invisibly, a list of functions:
 conversation, as \code{\link[=delegation_history]{delegation_history()}} returns them, or \code{NULL}. With
 \code{transcript = FALSE}, without their conversations.
 \item \code{status()}: the open conversation's ID, how many subagents its saved
-record holds, which were left out or saved without their conversation,
-and any problem saving or reading it.
+record holds, how many were still running, saved without their
+conversation or left out at the last save, and any problem saving or
+reading it.
 }
 }
 \description{

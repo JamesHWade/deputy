@@ -67,6 +67,15 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
     return(TRUE)
   }
   if (inherits(x, "shiny.tag")) {
+    # Render hooks run arbitrary R code when the tag is rendered.
+    if (
+      !all(names(x) %in% c("name", "attribs", "children", ".noWS")) ||
+        length(x$.renderHooks) ||
+        !is.character(x$name) ||
+        length(x$name) != 1L
+    ) {
+      return(FALSE)
+    }
     attribs <- x$attribs
     plain_attribs <- all(vapply(
       attribs,

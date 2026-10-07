@@ -34,17 +34,19 @@ into an earlier message.
   conversation or a copied history cannot hand them to a model. Clones do not
   inherit the presenter.
 - **Identity is the delegation and the call's position in it.** An activity ID
-  is `deputy_activity_<delegation>_<n>`, where `n` counts the delegation's own
-  tool requests in order (turns before the delegation are excluded, so a
-  retained specialist's earlier history doesn't shift it). shinychat pairs
-  request and result by that ID, so concurrent children, repeated specialist
-  names and provider tool-call IDs reused across conversations cannot collide.
-  The marker keeps the provider-independent lineage: agent, conversation,
-  delegation, parent delegation, depth, run and the root tool call.
+  is `deputy_activity_<key>_<n>`, where `key` is an opaque token drawn once
+  per delegation and `n` counts the delegation's own tool requests in order
+  (turns before the delegation are excluded, so a retained specialist's
+  earlier history doesn't shift it). shinychat pairs request and result by
+  that ID, so concurrent children, repeated specialist names and provider
+  tool-call IDs reused across conversations cannot collide, and the ID reveals
+  nothing a redactor removed. The marker keeps the provider-independent
+  lineage (agent, conversation, delegation, parent delegation, depth, run and
+  the root tool call) as the redacted view reports it.
 - **Attribution goes in the activity row label.** The display keeps the tool's
-  own title, icon and HTML. `label` names the subagent; later delegations to
-  the same name are numbered and a descendant names its parent ("reviewer (via
-  analyst)").
+  own title, icon and HTML. `label` names the subagent by the name its
+  redacted view gives; later delegations to the same name are numbered and a
+  descendant names its parent ("reviewer (via analyst)").
 - **The consumer side computes it.** `Agent$stream_async(stream = "content")`
   merges activity into the lead's stream only while a presenter is enabled. It
   races the lead's next chunk with a short timer; on each tick it reads the
@@ -54,7 +56,9 @@ into an earlier message.
   result, and when the reply ends, it rereads every open delegation, so all of
   a delegation's cards precede its result. Runtime execution remains the only
   consumer of each child stream; reading never runs a tool or resumes an agent.
-  Disclosure errors leave the lead's run untouched and show no activity.
+  Disclosure errors leave the lead's run untouched and show no activity. A
+  redacted view over the disclosure's `max_bytes` is not read further: one
+  note card says its calls aren't shown.
 - **Nothing is left running in saved history.** A call whose delegation
   settles without a result, or that is still open when the lead's reply ends,
   gets a "Not completed" result card. Each reply shows at most 256 calls; a

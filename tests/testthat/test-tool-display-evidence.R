@@ -296,6 +296,34 @@ test_that("observed content keeps its display within the event bound", {
   expect_false(observation_payload_fits(payload, 65536))
 })
 
+test_that("tags with render hooks are never rendered", {
+  ran <- FALSE
+  hooked <- htmltools::tagAddRenderHook(
+    htmltools::div("60"),
+    function(tag) {
+      ran <<- TRUE
+      tag
+    }
+  )
+  result <- ellmer::ContentToolResult(
+    value = "60",
+    extra = list(display = list(title = "Measure", html = hooked))
+  )
+  projection <- tool_display_projection(result)
+  expect_false(ran)
+  expect_null(projection$display$html)
+  expect_identical(projection$display$title, "Measure")
+  expect_identical(
+    projection$omitted$fields,
+    c(html = "unsupported_object")
+  )
+  nested <- htmltools::tags$section(hooked)
+  result@extra$display$html <- nested
+  projection <- tool_display_projection(result)
+  expect_false(ran)
+  expect_null(projection$display$html)
+})
+
 test_that("a Commons display and tag survive retained inspection", {
   skip_if_not_installed("commons")
   skip_if_not_installed("shinychat")
