@@ -23,6 +23,9 @@ activity_max_calls <- 256L
 # A result value shown without a display, and a request's arguments.
 activity_value_bytes <- 262144
 activity_argument_bytes <- 16384
+# A tool name: providers allow far shorter ones, so a longer name (from a
+# provider or a redactor) is cut, and every part of a card stays bounded.
+activity_name_bytes <- 256L
 
 activity_marker <- function(content) {
   if (
@@ -541,7 +544,7 @@ activity_request_content <- function(request, marker) {
   }
   ellmer::ContentToolRequest(
     id = marker$activity_id,
-    name = request@name,
+    name = inspection_text(request@name, activity_name_bytes),
     arguments = arguments,
     extra = list(deputy_activity = marker)
   )
