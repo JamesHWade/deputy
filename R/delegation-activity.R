@@ -738,9 +738,10 @@ activity_refresh <- function(
       } else {
         "subagent"
       }
-      parent_label <- if (!is.null(record$parent_delegation_id)) {
-        state$delegations[[record$parent_delegation_id]]$label %||%
-          "a subagent"
+      # Named only when the redacted view still reports the parent.
+      parent_id <- runtime$parent_delegation_id
+      parent_label <- if (is_nonempty_string(parent_id)) {
+        state$delegations[[parent_id]]$label %||% "a subagent"
       }
       entry$label <- activity_label(
         agent,
@@ -753,28 +754,26 @@ activity_refresh <- function(
     calls <- activity_calls(view)
     # Each call keeps the number it was first shown with, matched by its
     # provider ID, tool and arguments, so a redaction that later hides an
-    # earlier call can't move a later call onto that call's card. Identical
-    # calls are told apart by the result each card has shown.
+    # earlier call can't move a later call onto that call's card.
     known <- entry$calls %||% list()
-    identities <- vapply(known, function(slot) slot$identity, character(1))
-    taken <- logical(length(known))
-    for (call in calls) {
-      call_identity <- activity_call_identity(call$request)
-      result_identity <- if (!is.null(call$result)) {
-        activity_call_identity(call$result)
-      }
-      index <- activity_call_slot(
-        known,
-        which(!taken & identities == call_identity),
-        result_identity
-      )
-      if (is.null(index)) {
+    call_ids <- vapply(
+      calls,
+      function(call) activity_call_identity(call$request),
+      character(1)
+    )
+    result_ids <- lapply(calls, function(call) {
+      if (!is.null(call$result)) activity_call_identity(call$result)
+    })
+    slots <- activity_call_slots(known, call_ids, result_ids)
+    for (position in seq_along(calls)) {
+      call <- calls[[position]]
+      call_identity <- call_ids[[position]]
+      result_identity <- result_ids[[position]]
+      index <- slots[[position]]
+      if (is.na(index)) {
         index <- length(known) + 1L
         known[[index]] <- list(identity = call_identity, emitted = character())
-        identities <- c(identities, call_identity)
-        taken <- c(taken, FALSE)
       }
-      taken[[index]] <- TRUE
       emitted <- known[[index]]$emitted
       activity_id <- paste0("deputy_activity_", entry$key, "_", index)
       marker <- activity_lineage(runtime, root, entry$label, activity_id, index)
@@ -854,19 +853,45 @@ activity_call_identity <- function(content) {
   digest::digest(parts, algo = "sha256")
 }
 
-# The slot among `candidates`, shown for identical calls, that this call is:
-# the one that showed this result, else one still waiting for its result.
-# NULL means a call not shown yet.
-activity_call_slot <- function(known, candidates, result) {
-  shown <- lapply(known[candidates], function(slot) slot$result)
-  if (!is.null(result)) {
-    same <- candidates[vapply(shown, identical, logical(1), result)]
-    if (length(same)) {
-      return(same[[1L]])
+# The shown card each call in the view is, NA for a call not shown yet.
+# Identical calls (the same provider ID, tool and arguments) are told apart by
+# what their cards show. A call still running, or one whose result no
+# identical card has shown, takes the earliest card still waiting. Then a call
+# whose result an identical card has shown takes a waiting card if one is
+# left, and otherwise that card: when one of two identical calls is hidden,
+# it is far likelier the earlier, finished one than a later one still running.
+activity_call_slots <- function(known, calls, results) {
+  identities <- vapply(known, function(slot) slot$identity, character(1))
+  shown <- lapply(known, function(slot) slot$result)
+  waiting <- vapply(shown, is.null, logical(1))
+  taken <- logical(length(known))
+  slots <- rep(NA_integer_, length(calls))
+  same <- function(position) {
+    result <- results[[position]]
+    !is.null(result) &
+      identities == calls[[position]] &
+      vapply(shown, identical, logical(1), result)
+  }
+  pick <- function(position, candidates) {
+    index <- which(candidates & !taken)[1L]
+    if (!is.na(index)) {
+      taken[[index]] <<- TRUE
+      slots[[position]] <<- index
     }
   }
-  waiting <- candidates[vapply(shown, is.null, logical(1))]
-  if (length(waiting)) waiting[[1L]]
+  repeated <- vapply(
+    seq_along(calls),
+    function(position) any(same(position)),
+    logical(1)
+  )
+  for (position in which(!repeated)) {
+    pick(position, waiting & identities == calls[[position]])
+  }
+  for (position in which(repeated)) {
+    open <- waiting & identities == calls[[position]] & !taken
+    pick(position, if (any(open)) open else same(position))
+  }
+  slots
 }
 
 activity_wait <- function(slot, seconds) {
