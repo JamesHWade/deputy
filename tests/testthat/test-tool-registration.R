@@ -238,3 +238,39 @@ test_that("child definitions can share parent tools without inheriting the regis
     c("shared", "parent_only", "delegate_to_agent") %in% names(lead$get_tools())
   ))
 })
+
+test_that("tools with ignored arguments keep their schema and defaults", {
+  scoped <- ellmer::tool(
+    function(query, source = "default") paste(query, source),
+    name = "scoped_lookup",
+    description = "Look up a value in the only source.",
+    arguments = list(
+      query = ellmer::type_string("What to look up."),
+      source = ellmer::type_ignore()
+    ),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  chat <- registration_chat()
+  chat$set_tools(list(scoped))
+  agent <- Agent$new(chat = chat)
+  expect_named(agent$get_tools(), "scoped_lookup")
+  expect_named(agent$get_tools()$scoped_lookup@arguments@properties, "query")
+  expect_named(formals(agent$get_tools()$scoped_lookup), c("query", "source"))
+  agent$register_tool(scoped, replace = TRUE)
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "scoped_lookup", arguments = list(query = "rate")),
+    runtime_reply("done")
+  ))
+  agent <- Agent$new(runtime_chat(server), tools = list(scoped))
+  result <- agent$run_sync("Look it up.")
+  expect_identical(
+    result_tool_results(result)[[1L]]$tool_result,
+    "rate default"
+  )
+  sent <- server$requests()[[1L]]$body$tools[[1L]]$`function`$parameters
+  expect_named(sent$properties, "query")
+})
