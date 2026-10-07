@@ -3,7 +3,8 @@
 * `TrustedResults()` accepts the trusted tool itself, as in
   `TrustedResults(forecast = get_forecast)`; only that tool object may then
   produce the result, wherever it is registered. Each `"trusted_result"` event
-  now also carries `tool_fingerprint`, a digest of the producing tool (#238).
+  now also carries `tool_fingerprint`, a digest of the producing tool's code,
+  argument schema and metadata, not of a call's inputs (#238).
 
 * An agent with a `TrustedResults()` policy can now retain agents
   (`$retain_agent()`, `adopt_chat()`, `$retain_agent_graph()`) and call them

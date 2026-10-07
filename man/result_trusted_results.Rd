@@ -14,7 +14,8 @@ result_trusted_results(result, type = NULL)
 \value{
 A list of \code{"trusted_result"} \link{AgentEvent}s. Each has \code{result_id},
 \code{result_type}, \code{tool_name}, \code{tool_fingerprint} (a SHA-256 digest of the
-producing tool's code, arguments and metadata), \code{tool_call_id},
+producing tool's code, argument schema and metadata: the same for every
+call, whatever its inputs), \code{tool_call_id},
 \code{arguments}, the tool's unchanged \code{value}, and the IDs of the run and
 agent that produced it.
 }

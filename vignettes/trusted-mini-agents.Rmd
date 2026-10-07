@@ -358,7 +358,9 @@ reaches the root's `on_result` exactly once, as soon as the tool returns and
 before that agent's model sees anything. The event carries the producing
 agent's `agent_id`, `session_id`, `run_id`, `delegation_id` and
 `tool_call_id`, the `parent_agent_id` that delegated to it, and a
-`tool_fingerprint` of the trusted tool. With `model_receipt = TRUE`, the
+`tool_fingerprint` identifying the trusted tool's code, argument schema and
+metadata (it is the same for every call, whatever the inputs). With
+`model_receipt = TRUE`, the
 retained agent's model gets the receipt instead of the value.
 
 A retained agent may have a policy of its own. Both apply while it is

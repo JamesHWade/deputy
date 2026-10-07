@@ -25,7 +25,8 @@ producer's own label, not proof.
   tools are unwrapped to their source. Any registry in the tree that holds the
   name must hold that object, a designated tool is checked against it again
   when it executes, and every `trusted_result` event carries the producer's
-  `tool_fingerprint` (the approval fingerprint of code, schema and metadata).
+  `tool_fingerprint` (the approval fingerprint of code, argument schema and
+  metadata, which identifies the tool, not a call's inputs).
   Name-only policies keep working for agents and LeadAgents.
 - **Admission happens when an agent is retained.** When the owner has a
   policy, `retain_conversation()` (used by `retain_agent()`, `adopt_chat()`,
@@ -39,7 +40,11 @@ producer's own label, not proof.
   name); a type both name must have the same producer, and a tool may produce
   one type. Both rules also hold across everything the root retains (graph
   members included), so two specialists can't give one type different
-  producers. Exemptions are the intersection; a receipt applies if either
+  producers. A name the combined policy designates is that producer
+  everywhere: a tool of that name in the owner's registry or another retained
+  agent's must be the same object, checked when the agent is retained and
+  whenever the owner's registry changes while it is retained. Exemptions are
+  the intersection; a receipt applies if either
   asks. The combined policy is installed on the retained agent until release,
   which restores its own policy and removes the owner's `delegation_tool()`
   routes to it (they could only fail, and would fail the owner's next registry

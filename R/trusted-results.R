@@ -301,6 +301,22 @@ trusted_tree_sources <- function(policy, registries) {
   sources
 }
 
+# A tool that shares a designated name must be that name's producer, so the
+# name refers to one executable wherever the tree reaches it.
+trusted_check_names <- function(sources, registries) {
+  for (tools in registries) {
+    for (name in intersect(names(tools), names(sources))) {
+      if (!identical(trusted_tool_source(tools[[name]]), sources[[name]])) {
+        trusted_registry_abort(
+          "Trusted tool {.val {name}} must be the same tool everywhere in the delegation tree.",
+          tool_name = name
+        )
+      }
+    }
+  }
+  invisible(NULL)
+}
+
 # Validate a complete registry (named list of ellmer tools) against the policy.
 # `available` names the designated tools reachable elsewhere in the same tree;
 # `allow_delegation` admits only a LeadAgent's own delegate tool, whose
@@ -484,7 +500,8 @@ trusted_result_receipt <- function(id, type) {
 #' @param type Optional result type. `NULL` returns results of every type.
 #' @return A list of `"trusted_result"` [AgentEvent]s. Each has `result_id`,
 #'   `result_type`, `tool_name`, `tool_fingerprint` (a SHA-256 digest of the
-#'   producing tool's code, arguments and metadata), `tool_call_id`,
+#'   producing tool's code, argument schema and metadata: the same for every
+#'   call, whatever its inputs), `tool_call_id`,
 #'   `arguments`, the tool's unchanged `value`, and the IDs of the run and
 #'   agent that produced it.
 #' @seealso [TrustedResults]
@@ -701,6 +718,25 @@ trusted_admit_conversation <- function(owner, agent) {
   effective <- trusted_combine(owner, policy, cp$.trusted_results, tools)
   trusted_check_siblings(op, effective)
   sources <- trusted_policy_sources(effective)
+  # The names this agent's combined policy designates hold for the owner and
+  # the other retained agents, and theirs hold for this agent.
+  retained <- Filter(
+    function(entry) !is.null(entry$trusted),
+    op$owned_conversations
+  )
+  trusted_check_names(
+    sources,
+    c(
+      list(owner$get_tools()),
+      lapply(retained, function(entry) entry$agent$get_tools())
+    )
+  )
+  for (entry in retained) {
+    trusted_check_names(
+      trusted_policy_sources(entry$trusted$policy),
+      list(tools)
+    )
+  }
   withCallingHandlers(
     check_trusted_registry(
       effective,
