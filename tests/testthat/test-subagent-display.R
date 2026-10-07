@@ -7,6 +7,7 @@ test_that("display HTML keeps structure and drops active content", {
     "<script>steal()</script><strong>60</strong>",
     "<img src=\"data:image/png;base64,iVBORw0KGgo=\" alt=\"plot\" onerror=\"x()\">",
     "<img src=\"javascript:alert(1)\">",
+    "<img src=\"https://t.example/p.gif\">",
     "<a href=\"javascript:alert(1)\">bad</a>",
     "<a href=\"https://example.org/doc\">doc</a>",
     "<iframe src=\"https://example.org\"></iframe>",
@@ -20,7 +21,7 @@ test_that("display HTML keeps structure and drops active content", {
     paste0(
       "<div class=\"measure\" data-row=\"1\"><strong>60</strong>",
       "<img src=\"data:image/png;base64,iVBORw0KGgo=\" alt=\"plot\"/>",
-      "<img/><a>bad</a>",
+      "<img/><img/><a>bad</a>",
       "<a href=\"https://example.org/doc\" target=\"_blank\" ",
       "rel=\"noopener noreferrer\">doc</a>",
       "<span style=\"color:red\">r</span></div>"
@@ -60,28 +61,57 @@ test_that("styles stay scoped to the display's own prefixed ids", {
     "<div id=\"chat\">spoof</div>"
   )
   safe <- subagent_display_html(html)
+  prefix <- regmatches(safe, regexpr("deputy-display-[0-9a-f]{12}-", safe))
+  expect_length(prefix, 1L)
   expect_match(
     safe,
     paste0(
-      "<style>#deputy-display-tbl td{color:red}",
-      "#deputy-display-tbl th,#deputy-display-tbl td{padding:1px}",
-      "@media (max-width:600px){#deputy-display-tbl td{font-size:10px}}",
+      "<style>#",
+      prefix,
+      "tbl td{color:red}",
+      "#",
+      prefix,
+      "tbl th,#",
+      prefix,
+      "tbl td{padding:1px}",
+      "@media (max-width:600px){#",
+      prefix,
+      "tbl td{font-size:10px}}",
       "</style>"
     ),
     fixed = TRUE
   )
-  expect_match(safe, "<div id=\"deputy-display-tbl\">", fixed = TRUE)
-  expect_match(safe, "<td id=\"deputy-display-cell\">1</td>", fixed = TRUE)
+  expect_match(safe, paste0("<div id=\"", prefix, "tbl\">"), fixed = TRUE)
   expect_match(
     safe,
-    "<div id=\"deputy-display-chat\">spoof</div>",
+    paste0("<td id=\"", prefix, "cell\">1</td>"),
+    fixed = TRUE
+  )
+  expect_match(
+    safe,
+    paste0("<div id=\"", prefix, "chat\">spoof</div>"),
     fixed = TRUE
   )
   expect_no_match(safe, "body|https://t.example|~|blue")
+  # Another display with the same ids gets its own prefix.
+  other <- subagent_display_html(html)
+  expect_false(grepl(prefix, other, fixed = TRUE))
   expect_identical(
     subagent_display_html("<style>#x td{color:red}</style><p>no id</p>"),
     "<p>no id</p>"
   )
+})
+
+test_that("nested CSS rules can't escape a declaration", {
+  nested <- paste0(
+    "<div id=\"a\" style=\"color:red;a:b{} &{position:fixed;inset:0}\">",
+    "<style>#a{a:b{} &{position:fixed;inset:0;z-index:99999} ",
+    "& ~ *{display:none}}#a td{color:blue}</style>x</div>"
+  )
+  safe <- subagent_display_html(nested)
+  expect_no_match(safe, "[{}].*position|fixed|display:none|~|&")
+  expect_match(safe, "style=\"color:red\"", fixed = TRUE)
+  expect_match(safe, "td{color:blue}", fixed = TRUE)
 })
 
 test_that("malformed and non-HTML input degrades to text or nothing", {

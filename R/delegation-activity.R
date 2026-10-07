@@ -202,40 +202,50 @@ activity_anchor_turn <- function(agent, tool_call_id) {
   fallback
 }
 
-activity_label <- function(agent, state, record, records) {
-  name <- inspection_text(record$agent_name %||% "subagent", 64L)
-  named <- c(
+# The delegation an activity ID belongs to, as an opaque key.
+activity_id_key <- function(activity_id) {
+  sub("^deputy_activity_(.+)_[^_]+$", "\\1", activity_id)
+}
+
+activity_new_key <- function() {
+  substr(gsub("-", "", new_deputy_id()), 1L, 16L)
+}
+
+# Names come from the redacted view, and repeated names are counted by
+# delegation key, so a label never shows what the host's redactor removed.
+activity_label <- function(agent, state, name, parent_label = NULL) {
+  keys <- c(
     vapply(
       agent$.__enclos_env__$private$.activity_overlay,
       function(entry) {
         marker <- activity_marker(entry$content)
-        if (identical(marker$agent_name, name)) marker$delegation_id else ""
+        if (identical(marker$agent_name, name)) {
+          activity_id_key(marker$activity_id)
+        } else {
+          ""
+        }
       },
       character(1)
     ),
     vapply(
       state$delegations,
       function(entry) {
-        if (identical(entry$agent_name, name)) entry$delegation_id else ""
+        if (identical(entry$agent_name, name)) entry$key %||% "" else ""
       },
       character(1)
     )
   )
-  ordinal <- length(unique(named[nzchar(named)])) + 1L
+  ordinal <- length(unique(keys[nzchar(keys)])) + 1L
   label <- if (ordinal > 1L) paste0(name, " #", ordinal) else name
-  parent <- if (!is.null(record$parent_delegation_id)) {
-    records[[record$parent_delegation_id]]
-  }
-  if (!is.null(parent)) {
-    parent_name <- state$delegations[[parent$delegation_id]]$label %||%
-      inspection_text(parent$agent_name %||% "subagent", 64L)
-    label <- paste0(label, " (via ", parent_name, ")")
+  if (!is.null(parent_label)) {
+    label <- paste0(label, " (via ", parent_label, ")")
   }
   inspection_text(label, 256L)
 }
 
 # Authorized, redacted view of one delegation with only its own turns, shaped
-# like an inspection view so a host's redactor treats both alike.
+# like an inspection view so a host's redactor treats both alike. NULL when the
+# redacted view is over the disclosure's size bound.
 activity_view <- function(agent, record, requester) {
   private <- agent$.__enclos_env__$private
   disclosure <- private$.delegation_disclosure
@@ -245,6 +255,16 @@ activity_view <- function(agent, record, requester) {
     cli::cli_abort("Disclosure redaction must return a list.")
   }
   inspection_portable(view)
+  fits <- tryCatch(
+    {
+      inspection_bound(view, disclosure)
+      TRUE
+    },
+    error = function(error) FALSE
+  )
+  if (!fits) {
+    return(NULL)
+  }
   view
 }
 
@@ -273,10 +293,13 @@ activity_calls <- function(view) {
   calls
 }
 
-activity_lineage <- function(record, anchor, label, activity_id, sequence) {
+# Lineage as the redacted view reports it; `anchor` is the lead's own tool
+# call, already in the conversation the viewer sees.
+activity_lineage <- function(runtime, anchor, label, activity_id, sequence) {
   text <- function(value, bytes = 256L) {
     if (is_nonempty_string(value)) inspection_text(value, bytes) else NULL
   }
+  depth <- runtime$depth
   Filter(
     Negate(is.null),
     list(
@@ -285,13 +308,15 @@ activity_lineage <- function(record, anchor, label, activity_id, sequence) {
       activity_id = activity_id,
       sequence = as.integer(sequence),
       label = label,
-      agent_name = text(record$agent_name, 64L),
-      agent_id = text(record$agent_id),
-      delegation_id = text(record$delegation_id),
-      parent_delegation_id = text(record$parent_delegation_id),
-      depth = if (is.numeric(record$depth)) as.integer(record$depth),
-      run_id = text(record$run_id),
-      conversation_id = text(record$session_id),
+      agent_name = text(runtime$agent_name, 64L),
+      agent_id = text(runtime$agent_id),
+      delegation_id = text(runtime$delegation_id),
+      parent_delegation_id = text(runtime$parent_delegation_id),
+      depth = if (is.numeric(depth) && length(depth) == 1L && !is.na(depth)) {
+        as.integer(depth)
+      },
+      run_id = text(runtime$run_id),
+      conversation_id = text(runtime$session_id),
       root_tool_call_id = text(anchor$tool_call_id)
     )
   )
@@ -357,15 +382,24 @@ activity_result_content <- function(result, request, marker) {
   )
 }
 
-activity_unfinished_content <- function(request, marker, record, closing) {
-  reason <- record$stop_reason %||% record$status %||% "stopped"
+# The reason shown is the redacted view's; `settled` comes from the record.
+activity_unfinished_content <- function(
+  request,
+  marker,
+  runtime,
+  settled,
+  closing
+) {
+  status <- if (is_nonempty_string(runtime$status)) runtime$status
+  reason <- runtime$stop_reason
+  reason <- if (is_nonempty_string(reason)) reason else status %||% "stopped"
   ellmer::ContentToolResult(
-    error = if (closing && is.na(record$completed_at)) {
+    error = if (closing && !settled) {
       "Not completed when the reply ended."
     } else {
       paste0(
         "Not completed: the subagent ",
-        if (identical(record$status, "failed")) "failed" else "stopped",
+        if (identical(status, "failed")) "failed" else "stopped",
         " (",
         inspection_text(reason, 128L),
         ") before this call returned."
@@ -389,30 +423,23 @@ activity_emit <- function(agent, state, anchor_turn, content) {
   invisible(NULL)
 }
 
-activity_limit_marker <- function(agent, state, anchor_turn, record, anchor) {
-  id <- paste0(
-    "deputy_activity_",
-    sub("^delegation_", "", record$delegation_id),
-    "_limit"
-  )
-  marker <- activity_lineage(record, anchor, "subagents", id, 0L)
+# One marker card standing in for calls that aren't shown.
+activity_note <- function(agent, state, entry, runtime, anchor, kind, text) {
+  id <- paste0("deputy_activity_", entry$key, "_", kind)
+  marker <- activity_lineage(runtime, anchor, "subagents", id, 0L)
   request <- ellmer::ContentToolRequest(
     id = id,
     name = "more_subagent_tool_calls",
     arguments = list(),
     extra = list(deputy_activity = marker)
   )
-  activity_emit(agent, state, anchor_turn, request)
+  activity_emit(agent, state, entry$anchor_turn, request)
   activity_emit(
     agent,
     state,
-    anchor_turn,
+    entry$anchor_turn,
     ellmer::ContentToolResult(
-      value = paste0(
-        "More subagent tool calls ran in this reply than the ",
-        activity_max_calls,
-        " shown here. Their full history is in the subagent records."
-      ),
+      value = text,
       request = request,
       extra = list(
         display = list(label = "subagents"),
@@ -500,28 +527,77 @@ activity_refresh <- function(
         next
       }
       entry <- list(
-        delegation_id = id,
-        agent_name = inspection_text(record$agent_name %||% "subagent", 64L),
+        key = activity_new_key(),
         anchor_turn = anchor_turn,
         emitted = list()
       )
-      entry$label <- activity_label(agent, state, record, records)
-      state$delegations[[id]] <- entry
     }
     view <- activity_view(agent, record, requester)
+    if (is.null(view)) {
+      activity_note(
+        agent,
+        state,
+        entry,
+        list(),
+        root,
+        "oversized",
+        paste(
+          "More tool calls of this subagent aren't shown here: its record is",
+          "over the size the viewer may see. Its history is in the subagent",
+          "records."
+        )
+      )
+      entry$done <- TRUE
+      state$delegations[[id]] <- entry
+      next
+    }
+    runtime <- view$outcome$runtime
+    if (!is.list(runtime) || is.object(runtime)) {
+      runtime <- list()
+    }
+    if (is.null(entry$label)) {
+      name <- runtime$agent_name
+      entry$agent_name <- if (is_nonempty_string(name)) {
+        inspection_text(name, 64L)
+      } else {
+        "subagent"
+      }
+      parent_label <- if (!is.null(record$parent_delegation_id)) {
+        state$delegations[[record$parent_delegation_id]]$label %||%
+          "a subagent"
+      }
+      entry$label <- activity_label(
+        agent,
+        state,
+        entry$agent_name,
+        parent_label
+      )
+      state$delegations[[id]] <- entry
+    }
     calls <- activity_calls(view)
-    suffix <- sub("^delegation_", "", id)
     for (index in seq_along(calls)) {
       call <- calls[[index]]
       key <- as.character(index)
       emitted <- entry$emitted[[key]] %||% character()
-      activity_id <- paste0("deputy_activity_", suffix, "_", index)
-      marker <- activity_lineage(record, root, entry$label, activity_id, index)
+      activity_id <- paste0("deputy_activity_", entry$key, "_", index)
+      marker <- activity_lineage(runtime, root, entry$label, activity_id, index)
       request <- activity_request_content(call$request, marker)
       if (!"request" %in% emitted) {
         if (state$calls >= activity_max_calls) {
           if (!isTRUE(state$limited)) {
-            activity_limit_marker(agent, state, entry$anchor_turn, record, root)
+            activity_note(
+              agent,
+              state,
+              entry,
+              runtime,
+              root,
+              "limit",
+              paste0(
+                "More subagent tool calls ran in this reply than the ",
+                activity_max_calls,
+                " shown here. Their full history is in the subagent records."
+              )
+            )
             state$limited <- TRUE
           }
           break
@@ -534,7 +610,13 @@ activity_refresh <- function(
         content <- if (!is.null(call$result)) {
           activity_result_content(call$result, request, marker)
         } else if (settled || closing) {
-          activity_unfinished_content(request, marker, record, closing)
+          activity_unfinished_content(
+            request,
+            marker,
+            runtime,
+            settled,
+            closing
+          )
         }
         if (!is.null(content)) {
           activity_emit(agent, state, entry$anchor_turn, content)
