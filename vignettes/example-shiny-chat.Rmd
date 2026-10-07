@@ -134,5 +134,8 @@ The package includes the app with the compaction notice:
 shiny::runApp(system.file("examples", "shiny-chat", package = "deputy"))
 ```
 
-For apps that show subagent conversations beside the main chat, see [Briefing
-and inspecting subagents](delegation.html#a-subagent-panel-for-shiny).
+To show the tool calls a lead's subagents make in the main chat, as they
+happen, see [Subagent tool calls in the main
+chat](delegation.html#subagent-tool-calls-in-the-main-chat). For a panel of
+subagent conversations beside the chat, see [A subagent panel for
+Shiny](delegation.html#a-subagent-panel-for-shiny).
