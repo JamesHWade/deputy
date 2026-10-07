@@ -135,6 +135,35 @@ test_that("display projection bounds sizes and refuses executable objects", {
     extra = list(display = htmltools::tags$div("not a display list"))
   ))
   expect_identical(projection$omitted$display, "invalid")
+  # shinychat's class on something other than a list, or beside another
+  # class, isn't a display either.
+  for (display in list(
+    structure(new.env(), class = "shinychat_tool_result_display"),
+    structure(
+      methods::new("externalptr"),
+      class = "shinychat_tool_result_display"
+    ),
+    structure(
+      list(title = "x"),
+      class = c("other", "shinychat_tool_result_display")
+    )
+  )) {
+    projection <- tool_display_projection(ellmer::ContentToolResult(
+      "x",
+      extra = list(display = display)
+    ))
+    expect_identical(projection$omitted$display, "invalid")
+  }
+  projection <- tool_display_projection(ellmer::ContentToolResult(
+    "x",
+    extra = list(
+      display = structure(
+        list(title = "Ran"),
+        class = "shinychat_tool_result_display"
+      )
+    )
+  ))
+  expect_identical(projection$display$title, "Ran")
 })
 
 test_that("saved display records are validated before replay", {
