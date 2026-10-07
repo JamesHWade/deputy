@@ -87,7 +87,10 @@ back from storage Deputy doesn't control.
   save.
 - **Saved children are redacted again on every save.** Children carried from
   an earlier save pass through the current `redact` before they are written
-  back, so a stricter policy also cleans what is stored. Children are matched
+  back, so a stricter policy also cleans what is stored. They are carried only
+  for a requester the disclosure authorizes for the conversation's own scope,
+  the one `delegation_history()` reads them with; otherwise the save keeps the
+  last good record without showing them to the redactor. Children are matched
   across saves by a SHA-256 digest of their delegation ID, kept beside the
   views, so matching survives a redactor that removes the ID itself.
 - **The panel follows the open conversation.** `subagent_chat_server(conversation
