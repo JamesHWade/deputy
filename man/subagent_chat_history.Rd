@@ -34,7 +34,9 @@ record holds, how many were still running, saved without their
 conversation (too large, or removed by the disclosure's \code{redact}) or
 left out at the last save (including subagents left out earlier that
 can't be found again, such as an earlier session's or those released
-since), and any problem saving or reading it.
+since), and any problem saving or reading it. A user the lead's
+\code{delegation_disclosure} doesn't let see them gets no counts, and a note
+saying so.
 }
 }
 \description{

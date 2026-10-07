@@ -82,8 +82,10 @@ producer's own label, not proof.
   A graph member's route runs its target under the policy that admitted the
   route, the caller's (as it runs) combined with the target's, so the
   caller's own result types are captured wherever its routes lead; that call
-  delivers to the root once and then to each own callback along the chain,
-  and the target's installed policy is restored when the call settles. The
+  delivers to the root once and then to each member's own callback along the
+  chain, once per member: registrations are told apart by a key drawn at
+  retention, not by function, so members sharing one function are each
+  called. The target's installed policy is restored when the call settles. The
   policy is checked after the busy check, since a target is under a route's
   policy while busy.
 - **One delivery to the root.** The combined policy's `on_result` records the
