@@ -322,6 +322,7 @@ context_fork_turn_records <- function(turns, max_bytes, max_turns) {
       "The host-selected fork exceeds max_turns."
     )
   }
+  stripped <- FALSE
   native <- lapply(turns, function(turn) {
     if (
       inherits(turn, "ellmer::SystemTurn") ||
@@ -341,6 +342,13 @@ context_fork_turn_records <- function(turns, max_bytes, max_turns) {
     # Allow a portable record to be reconstructed for a saved host value, but
     # never accept arbitrary objects or turn-like lists as native content.
     if (is.list(turn) && !is.object(turn)) {
+      # Shown subagent activity is taken out first: a sanitized replay clears
+      # the marker that identifies it, and it doesn't count toward the bound.
+      record <- activity_strip_record(turn)
+      if (!identical(record, turn)) {
+        stripped <<- TRUE
+        turn <- record
+      }
       if (!observation_payload_fits(turn, max_bytes)) {
         context_fork_abort(
           "oversized",
@@ -428,7 +436,7 @@ context_fork_turn_records <- function(turns, max_bytes, max_turns) {
     omissions = c(
       sanitized$omissions,
       if (tool_ids$replacements > 0L) "partial_tool_evidence",
-      if (length(activity$overlay)) "subagent_activity"
+      if (stripped || length(activity$overlay)) "subagent_activity"
     )
   )
 }

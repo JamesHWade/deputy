@@ -70,6 +70,29 @@ activity_retain <- function(root, specialist, tool_name) {
   handle
 }
 
+# The tool-call IDs of the requests and results in `turns`.
+activity_test_call_ids <- function(turns) {
+  contents <- unlist(lapply(turns, function(turn) turn@contents))
+  calls <- Filter(
+    function(content) {
+      inherits(content, "ellmer::ContentToolRequest") ||
+        inherits(content, "ellmer::ContentToolResult")
+    },
+    contents
+  )
+  vapply(
+    calls,
+    function(content) {
+      if (inherits(content, "ellmer::ContentToolRequest")) {
+        content@id
+      } else {
+        content@request@id
+      }
+    },
+    character(1)
+  )
+}
+
 activity_collect <- function(agent, task) {
   stream <- agent$stream_async(task, stream = "content")
   seen <- list()
@@ -800,6 +823,38 @@ test_that("stopping the presenter settles the cards it left running", {
   )
 })
 
+test_that("cards shown before access was lost get a result at the end", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  flags <- new.env()
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure(flags)
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  private$subagent_runs[[id]]$turns <- private$subagent_runs[[id]]$turns[-3L]
+  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  activity_enable(root, function() "viewer")
+  activity_poll(root)
+  shown <- activity_take(root)
+  expect_length(shown, 1L)
+  # The viewer loses access before the reply ends.
+  flags$denied <- TRUE
+  activity_poll(root, closing = TRUE)
+  settled <- activity_take(root)
+  expect_length(settled, 1L)
+  expect_s3_class(settled[[1L]], "ellmer::ContentToolResult")
+  expect_identical(settled[[1L]]@request@id, shown[[1L]]@id)
+  expect_match(settled[[1L]]@value, "could not be read", fixed = TRUE)
+  expect_false(is.null(private$.activity$error))
+})
+
 test_that("replacing the conversation restarts activity labels", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "First")),
@@ -910,6 +965,17 @@ test_that("shown activity doesn't count toward a fork's size bound", {
   )
   records <- context_fork_turn_records(turns, 64 * 1024, 64L)
   expect_true("subagent_activity" %in% records$omissions)
+  # The same turns as portable records, as a host would save them. A
+  # sanitized replay of a record clears the marker, so the cards are found in
+  # the records themselves.
+  portable <- lapply(turns, ellmer::contents_record)
+  records <- context_fork_turn_records(portable, 16 * 1024^2, 64L)
+  expect_true("subagent_activity" %in% records$omissions)
+  ids <- activity_test_call_ids(lapply(records$records, inspection_replay))
+  expect_identical(ids, c("call_1", "call_1"))
+  records <- context_fork_turn_records(portable, 64 * 1024, 64L)
+  ids <- activity_test_call_ids(lapply(records$records, inspection_replay))
+  expect_identical(ids, c("call_1", "call_1"))
 })
 
 test_that("context forks never copy shown activity", {
@@ -933,12 +999,9 @@ test_that("context forks never copy shown activity", {
   )))
   records <- context_fork_turn_records(turns, 16 * 1024^2, 64L)
   expect_true("subagent_activity" %in% records$omissions)
-  replayed <- lapply(records$records, inspection_replay)
-  expect_false(any(grepl(
-    "deputy_activity",
-    paste(deparse(replayed), collapse = ""),
-    fixed = TRUE
-  )))
+  ids <- activity_test_call_ids(lapply(records$records, inspection_replay))
+  expect_length(ids, 2L)
+  expect_false(any(startsWith(ids, "deputy_activity_")))
 })
 
 test_that("the per-reply call limit leaves a marker", {
