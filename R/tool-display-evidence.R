@@ -85,6 +85,10 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
     return(TRUE)
   }
   if (identical(class, "shiny.tag")) {
+    # An environment or function carrying the class can't be read as a tag.
+    if (!is.list(x)) {
+      return(FALSE)
+    }
     tag <- unclass(x)
     # Render hooks run arbitrary R code when the tag is rendered.
     if (
@@ -210,7 +214,7 @@ tool_display_no_ws_options <- c(
 # package directory, so those fields must be single strings, and everything in
 # it plain data. A function standing in for one is never called.
 tool_display_dependency <- function(x, depth, state) {
-  if (!identical(oldClass(x), "html_dependency")) {
+  if (!identical(oldClass(x), "html_dependency") || !is.list(x)) {
     return(FALSE)
   }
   dependency <- unclass(x)
@@ -375,7 +379,8 @@ tool_display_projection <- function(content) {
   }
 
   display <- list()
-  source <- extra$display
+  # `[[` matches the name exactly; `$` would take `display_private` for it.
+  source <- extra[["display"]]
   if (!is.null(source)) {
     # Only a plain list with exactly shinychat's class is a display; an
     # environment or pointer carrying it can't be unclassed.

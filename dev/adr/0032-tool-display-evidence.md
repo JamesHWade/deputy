@@ -89,7 +89,10 @@ the obstacle to subagent workflows.
   dependencies must be plain `html_dependency` records (a function standing
   in for one would be called), the singleton flag a plain flag, and `noWS`
   one of htmltools' own options, since `%in%` would convert any other value
-  in full. The display
+  in full. Tags and dependencies must be lists as well; an environment or
+  function carrying their class is omitted. Only the `extra` element named
+  exactly `display` is read as the display, so a key such as
+  `display_private` is named as unknown and never projected. The display
   itself must be a plain list, or a list with exactly shinychat's
   `shinychat_tool_result_display` class; anything else, such as an
   environment carrying that class, is recorded as `invalid`.

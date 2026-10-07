@@ -576,6 +576,59 @@ test_that("a grandchild names its parent only when its view reports one", {
   fixture$root$release_agent_graph()
 })
 
+test_that("a descendant's new cards read its ancestors' views again", {
+  hidden <- new.env(parent = emptyenv())
+  hidden$analyst <- FALSE
+  fixture <- recursive_activity_fixture(
+    redact = function(view, requester) {
+      runtime <- view$outcome$runtime
+      if (isTRUE(hidden$analyst) && identical(runtime$agent_name, "analyst")) {
+        view$outcome$runtime$agent_name <- NULL
+        view$outcome$runtime$tool_call_id <- NULL
+      }
+      view
+    }
+  )
+  root <- fixture$root
+  activity_disable(root)
+  root$run_sync("compose")
+  private <- root$.__enclos_env__$private
+  child <- Filter(
+    function(id) !is.null(private$subagent_runs[[id]]$parent_delegation_id),
+    names(private$subagent_runs)
+  )
+  record <- private$subagent_runs[[child]]
+  # The grandchild has asked for its measure and not yet had the result.
+  private$subagent_runs[[child]]$turns <- record$turns[1:2]
+  private$subagent_runs[[child]]$completed_at <- as.POSIXct(
+    NA_real_,
+    tz = "UTC"
+  )
+  marker <- function(item) item@extra$deputy_activity
+  activity_enable(root, function() "viewer")
+  activity_poll(root)
+  first <- Filter(
+    function(item) identical(marker(item)$agent_name, "reviewer"),
+    activity_take(root)
+  )
+  expect_length(first, 1L)
+  expect_identical(marker(first[[1L]])$label, "reviewer (via analyst)")
+  expect_true(is_nonempty_string(marker(first[[1L]])$root_tool_call_id))
+  # The host stops showing the parent's name and the lead's call to the
+  # viewer. The parent's record hasn't changed since, but the grandchild's
+  # next card shows neither.
+  hidden$analyst <- TRUE
+  private$subagent_runs[[child]] <- record
+  activity_poll(root)
+  later <- activity_take(root)
+  expect_length(later, 1L)
+  expect_identical(marker(later[[1L]])$label, "reviewer (via subagent)")
+  expect_null(marker(later[[1L]])$root_tool_call_id)
+  expect_no_match(later[[1L]]@extra$display$label %||% "", "analyst")
+  activity_disable(root)
+  root$release_agent_graph()
+})
+
 test_that("each refresh labels its cards from its own redacted view", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
