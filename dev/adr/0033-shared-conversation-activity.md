@@ -35,8 +35,9 @@ into an earlier message.
   portable records (`ellmer::contents_record()`) finds the marker in the
   records, before a sanitized replay would clear it. Replacing the
   conversation (`set_turns()`, or a successful `load_session()`, which drops
-  the shown cards) restarts the presenter's queue, labels and counts. Clones do
-  not inherit the presenter.
+  the shown cards) restarts the presenter's queue, labels and counts, and drops
+  results a stopped presenter left for the reply streaming. Clones do not
+  inherit the presenter.
 - **Identity is the delegation and the call's place in it.** An activity ID
   is `deputy_activity_<key>_<n>`, where `key` is an opaque token drawn once
   per delegation and `n` numbers the delegation's own tool requests in the

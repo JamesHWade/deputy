@@ -154,8 +154,12 @@ new_activity_presenter <- function(requester, interval) {
 }
 
 # A replaced conversation starts the presenter afresh: cards waiting to be
-# streamed, labels and counts belong to the conversation they were shown in.
-activity_reset <- function(state) {
+# streamed, labels and counts belong to the conversation they were shown in,
+# as do the results a stopped presenter left for the reply streaming now.
+activity_reset <- function(agent) {
+  private <- agent$.__enclos_env__$private
+  private$.activity_leftover <- NULL
+  state <- private$.activity
   if (is.null(state)) {
     return(invisible(NULL))
   }
