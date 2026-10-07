@@ -67,7 +67,11 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
   }
   class <- oldClass(x)
   if (is.character(x)) {
-    return(is.null(class) || identical(class, tool_display_html_class))
+    if (!is.null(class) && !identical(class, tool_display_html_class)) {
+      return(FALSE)
+    }
+    state$bytes <- (state$bytes %||% 0) + sum(nchar(x, type = "bytes"))
+    return(TRUE)
   }
   if (identical(class, "html_dependency")) {
     return(tool_display_plain_data(unclass(x), depth + 1L, state))
@@ -87,6 +91,11 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
     attribs <- tag$attribs
     if (!is.null(attribs) && (!is.list(attribs) || is.object(attribs))) {
       return(FALSE)
+    }
+    for (value in attribs) {
+      if (is.character(value)) {
+        state$bytes <- (state$bytes %||% 0) + sum(nchar(value, type = "bytes"))
+      }
     }
     plain_attribs <- all(vapply(
       attribs,
@@ -160,17 +169,22 @@ tool_display_flag <- function(value) {
 }
 
 # Render one HTML-capable display field to text, recording dependencies by name
-# rather than carrying their file paths.
-tool_display_html_value <- function(value) {
+# rather than carrying their file paths. A tag tree whose text alone is over
+# `limit` bytes is not rendered, since rendering copies and escapes all of it.
+tool_display_html_value <- function(value, limit = Inf) {
   if (tool_display_string(value, html = TRUE)) {
     return(list(value = enc2utf8(as.character(unclass(value)))))
   }
+  state <- new.env(parent = emptyenv())
   if (
     inherits(value, c("shiny.tag", "shiny.tag.list")) &&
-      tool_display_plain_tags(value)
+      tool_display_plain_tags(value, state = state)
   ) {
+    if ((state$bytes %||% 0) > limit) {
+      return(list(reason = "oversized"))
+    }
     rendered <- tryCatch(
-      htmltools::renderTags(value),
+      tool_display_render_tags(value),
       error = function(error) NULL
     )
     if (is.null(rendered)) {
@@ -194,6 +208,10 @@ tool_display_html_value <- function(value) {
   list(reason = "unsupported_object")
 }
 
+tool_display_render_tags <- function(value) {
+  htmltools::renderTags(value)
+}
+
 tool_display_field <- function(field, value) {
   if (field %in% tool_display_flag_fields) {
     if (tool_display_flag(value)) {
@@ -211,7 +229,7 @@ tool_display_field <- function(field, value) {
     return(list(reason = "invalid"))
   }
   out <- if (field %in% tool_display_html_fields) {
-    tool_display_html_value(value)
+    tool_display_html_value(value, tool_display_limits[[field]])
   } else if (tool_display_string(value)) {
     list(value = enc2utf8(as.character(value)))
   } else {

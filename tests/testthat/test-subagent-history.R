@@ -499,6 +499,70 @@ test_that("other conversations' subagents don't crowd out the open one", {
   )
 })
 
+test_that("other conversations' events don't crowd out the open one", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  root <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "One?")),
+    runtime_reply("Lead: one."),
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Two?")),
+    runtime_reply("Lead: two.")
+  ))
+  sales <- local_runtime_server(list(
+    runtime_reply(tool = "call_measure"),
+    runtime_reply("One is 60."),
+    runtime_reply(tool = "call_measure"),
+    runtime_reply("Two is 60.")
+  ))
+  lead <- history_lead(root, sales, counter)
+  history_session(
+    lead,
+    store,
+    function(session, chat, saver) {
+      history_submit(session, chat, store, "One?")
+      first <- lead$list_subagents()$delegation_id[[1L]]
+      session$setInputs(chat_history_new = 1L)
+      session$flushReact()
+      two <- history_submit(session, chat, store, "Two?")
+      panel <- session$userData$panel
+      session$elapse(200)
+      expect_length(panel$views(), 1L)
+      id <- panel$views()[[1L]]$outcome$runtime$delegation_id
+      session$setInputs(`panel-selected` = id)
+      session$elapse(200)
+      expect_identical(panel$selected(), id)
+      # A burst of events from the first conversation's subagent, more than
+      # the disclosure bound holds at once.
+      lead$.__enclos_env__$private$.delegation_disclosure <-
+        DelegationDisclosure(
+          authorize = function(requester, scope) identical(requester, "viewer"),
+          max_bytes = length(serialize(panel$views(), NULL, version = 3)) +
+            20000
+        )
+      for (i in seq_len(40L)) {
+        lead_observe_event(
+          lead,
+          first,
+          list(
+            type = "text",
+            data = list(text = strrep("x", 20000L)),
+            timestamp = Sys.time()
+          )
+        )
+      }
+      session$elapse(200)
+      views <- panel$views()
+      expect_length(views, 1L)
+      expect_identical(views[[1L]]$outcome$runtime$host_conversation_id, two)
+      # The open subagent stays selected, with no failure shown.
+      expect_identical(panel$selected(), id)
+      expect_no_match(panel$notice() %||% "", "unavailable")
+    },
+    panel = TRUE
+  )
+})
+
 test_that("the subagent panel shows saved subagents read-only", {
   counter <- new.env()
   counter$calls <- 0L

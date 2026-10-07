@@ -59,7 +59,13 @@ producer's own label, not proof.
   route reaches must also satisfy the caller's policy combined with the
   target's (result types joined, exemptions intersected), down every chain of
   routes from it, so a graph member whose own policy is stricter than the
-  root's can't reach a tool it declined through another member. Everything
+  root's can't reach a tool it declined through another member. Graph setup
+  checks every route source again once all routes are installed, so a chain
+  is judged whole whatever order its routes are given in, and a failure still
+  retains nothing. Within one registry check, a target already checked under
+  the same combined policy along another chain isn't checked again, so
+  converging routes cost one check per target rather than one per chain.
+  Everything
   else that delegates (another owner's route, a released handle, a tool merely
   named `delegate_to_agent`) is still a bypass.
 - **Execution-time binding.** Before each continuation, the installed policy

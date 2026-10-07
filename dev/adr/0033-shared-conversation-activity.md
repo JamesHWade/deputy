@@ -33,9 +33,13 @@ into an earlier message.
   context forks separate marked contents again, so a restored shinychat
   conversation or a copied history cannot hand them to a model; a fork given
   portable records (`ellmer::contents_record()`) finds the marker in the
-  records, before a sanitized replay would clear it. Replacing the
+  records, before a sanitized replay would clear it. `save_session()` keeps
+  the shown cards beside the turns (`activity`: each card with the index of
+  its turn), never among them, and `load_session()` restores them after
+  checking each is a marked card in one of the loaded assistant turns; a
+  malformed entry fails the load before anything changes. Replacing the
   conversation (`set_turns()`, or a successful `load_session()`, which drops
-  the shown cards) restarts the presenter's queue, labels and counts, and drops
+  the previous conversation's cards) restarts the presenter's queue, labels and counts, and drops
   results a stopped presenter left for the reply streaming; that reply's
   calls are no longer shown, since they belong to the replaced conversation.
   Clones do not inherit the presenter.
@@ -69,7 +73,10 @@ into an earlier message.
   own title, icon and HTML. `label` names the subagent by the name its
   redacted view gives; later delegations to the same name are numbered and a
   descendant names its parent ("reviewer (via analyst)") when its redacted
-  view still reports one.
+  view still reports one. The label is worked out again from each read's
+  redacted view, so a redactor that stops showing the name or the parent
+  stops them appearing on later cards; the number is drawn once, for the name
+  first shown, and is used only while the view still shows that name.
 - **The consumer side computes it.** `Agent$stream_async(stream = "content")`
   merges activity into the lead's stream only while a presenter is enabled. It
   races the lead's next chunk with a short timer; on each tick it reads the
