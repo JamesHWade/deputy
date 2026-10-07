@@ -191,6 +191,29 @@ test_that("inline styles are checked in one pass, and long ones dropped", {
   )
 })
 
+test_that("Markdown displays are shown as inert HTML", {
+  skip_if_not_installed("commonmark")
+  safe <- subagent_safe_display(list(
+    title = "Measure",
+    markdown = paste(
+      "**Revenue** ![pixel](https://tracker.example/p.gif)",
+      "<script>steal()</script>"
+    )
+  ))
+  expect_null(safe$markdown)
+  expect_match(safe$html, "<strong>Revenue</strong>", fixed = TRUE)
+  expect_match(safe$html, "<img alt=\"pixel\"/>", fixed = TRUE)
+  expect_no_match(safe$html, "tracker\\.example|<script")
+  # Beside HTML of its own, the Markdown isn't shown at all.
+  safe <- subagent_safe_display(list(
+    html = "<b>60</b>",
+    markdown = "![pixel](https://tracker.example/p.gif)"
+  ))
+  expect_null(safe$markdown)
+  expect_match(safe$html, "<b>60</b>", fixed = TRUE)
+  expect_no_match(safe$html, "tracker")
+})
+
 test_that("library hooks on the host page don't survive", {
   safe <- subagent_display_html(paste0(
     "<a data-bs-toggle=\"collapse\" data-bs-target=\"#host-panel\" ",
@@ -221,7 +244,7 @@ test_that("malformed and non-HTML input degrades to text or nothing", {
   )
 })
 
-test_that("only raw HTML display fields are rebuilt", {
+test_that("HTML display fields are rebuilt and text fields kept", {
   display <- list(
     title = "<b onmouseover=\"x()\">Ran</b>",
     icon = "<script>x()</script>",
@@ -239,7 +262,8 @@ test_that("only raw HTML display fields are rebuilt", {
     safe$footer,
     subagent_display_contain("<small>note</small>", "footer")
   )
-  expect_identical(safe$markdown, display$markdown)
+  # Markdown beside HTML of its own isn't shown.
+  expect_null(safe$markdown)
   expect_identical(safe$label, display$label)
   expect_false(safe$show_request)
 })

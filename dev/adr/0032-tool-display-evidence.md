@@ -63,8 +63,11 @@ the obstacle to subagent workflows.
   and declarations are checked together, so rebuilding stays linear and
   bounded. Each rebuilt field sits in its
   own box with `contain: paint` and `isolation: isolate`, so positioned,
-  transformed or offset content can't paint over the host page. `markdown`
-  and text fields are left to shinychat's inert renderers. Core records keep
+  transformed or offset content can't paint over the host page. shinychat
+  renders `markdown` as HTML, remote images included, so the adapter renders
+  it with commonmark and rebuilds the result through the same allowlist,
+  showing it as `html` (and drops it beside HTML of the card's own). Text
+  fields are left to shinychat's plain-text renderer. Core records keep
   the tool's own HTML; the adapter is the only renderer.
 - **Recording never runs code.** Tag objects are rendered only when they are
   plain, resolved tags: a render hook would run arbitrary R code while a
