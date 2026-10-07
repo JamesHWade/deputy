@@ -24,7 +24,8 @@ subagent, in milliseconds. At least 50; defaults to 100.}
 Invisibly, a list with \code{stop()}, which stops adding calls. Ending the
 Shiny session also stops it. A lead shows activity in one chat at a time:
 calling \code{subagent_chat_activity()} again for the same lead before \code{stop()}
-is an error.
+is an error. Called again after \code{stop()} during a reply, it shows calls
+from the next reply on.
 }
 \description{
 Adds the tool calls the lead's subagents make, with their results, to the

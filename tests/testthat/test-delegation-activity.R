@@ -1013,6 +1013,44 @@ test_that("a lead shows activity through one presenter at a time", {
   activity_disable(root, third)
 })
 
+test_that("a reply's stream reads only the presenter it started with", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  private$subagent_runs[[id]]$turns <- private$subagent_runs[[id]]$turns[-3L]
+  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  first <- activity_enable(root, function() "viewer")
+  activity_poll(root, presenter = first)
+  shown <- activity_take(root, first)
+  expect_length(shown, 1L)
+  # Stopped and replaced during the reply: its stream neither reads with the
+  # new presenter nor takes that presenter's cards, only the result the
+  # stopped one settled.
+  activity_disable(root, first)
+  second <- activity_enable(root, function() "viewer")
+  activity_poll(root, presenter = first)
+  expect_length(second$queue, 0L)
+  activity_poll(root, presenter = second)
+  expect_length(second$queue, 1L)
+  live <- activity_take(root, first)
+  expect_length(live, 1L)
+  expect_s3_class(live[[1L]], "ellmer::ContentToolResult")
+  expect_identical(live[[1L]]@request@id, shown[[1L]]@id)
+  expect_length(second$queue, 1L)
+  expect_length(activity_take(root, first), 0L)
+  activity_disable(root, second)
+})
+
 test_that("cards shown before access was lost get a result at the end", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),

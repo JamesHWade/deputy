@@ -91,9 +91,11 @@ into an earlier message.
   disables it when the session ends. A lead has one presenter: enabling a
   second before the first stops is an error, since it would show the same
   calls again under new keys and leave the first one's cards running. Each
-  `stop()` stops only its own presenter. The "Not shown" results a presenter
-  stopped during a reply left queued reach that reply's stream, also through
-  a presenter shown again meanwhile, and never a later reply's.
+  `stop()` stops only its own presenter. A reply's stream reads and drains
+  only the presenter it started with: once that presenter stops, the stream
+  gets the "Not shown" results it settled for that reply and reads nothing
+  more, so a presenter shown during a reply (with its own requester) shows
+  cards from the next reply on, and never in a stream it didn't start.
 
 Tool-call correlation also stopped assuming provider IDs are unique within a
 run: a finished call no longer claims a later call with the same ID, which
