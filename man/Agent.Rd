@@ -1156,7 +1156,9 @@ compaction come back as text.
 \if{latex}{\out{\hypertarget{method-Agent-add_turn}{}}}
 \subsection{\code{Agent$add_turn()}}{
   Add a user turn and an assistant turn, as ellmer's
-\verb{$add_turn()} does.
+\verb{$add_turn()} does. Subagent tool calls shown in them, as
+\verb{$get_turns()} returns them, stay in the conversation but are not sent
+to the model.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$add_turn(user, assistant, log_tokens = TRUE)}

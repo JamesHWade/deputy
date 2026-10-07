@@ -1130,14 +1130,32 @@ Agent <- R6::R6Class(
     },
 
     #' @description Add a user turn and an assistant turn, as ellmer's
-    #' `$add_turn()` does.
+    #' `$add_turn()` does. Subagent tool calls shown in them, as
+    #' `$get_turns()` returns them, stay in the conversation but are not sent
+    #' to the model.
     #' @param user User turn or content.
     #' @param assistant Assistant turn or content.
     #' @param log_tokens Passed to ellmer's `$add_turn()`.
     #' @return The agent, invisibly.
     add_turn = function(user, assistant, log_tokens = TRUE) {
       check_conversation_lease(self, NULL)
-      private$.chat$add_turn(user, assistant, log_tokens = log_tokens)
+      # Subagent activity shown in the conversation never reaches the model,
+      # as in `$set_turns()`.
+      split <- activity_split(list(user, assistant))
+      offset <- length(private$.compacted_turns) +
+        length(private$.chat$get_turns())
+      private$.chat$add_turn(
+        split$turns[[1L]],
+        split$turns[[2L]],
+        log_tokens = log_tokens
+      )
+      private$.activity_overlay <- c(
+        private$.activity_overlay,
+        lapply(split$overlay, function(entry) {
+          entry$turn <- offset + entry$turn
+          entry
+        })
+      )
       invisible(self)
     },
 
