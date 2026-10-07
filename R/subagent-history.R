@@ -801,7 +801,22 @@ subagent_history_restored <- function(state, transcript = TRUE) {
 subagent_history_status <- function(state) {
   id <- subagent_history_active_id(state)
   current <- !is.null(id) && identical(state$conversation_id, id)
-  record <- if (current) state$record
+  # The counts and any problem are about the conversation's saved subagents,
+  # so they are read only for a requester its scope allows, as `restored()`
+  # reads the record itself.
+  allowed <- !current ||
+    isTRUE(tryCatch(
+      {
+        inspection_authorize(
+          state$lead$.__enclos_env__$private$.delegation_disclosure,
+          state$requester(),
+          subagent_history_scope(state$lead, id)
+        )
+        TRUE
+      },
+      deputy_delegation_disclosure = function(error) FALSE
+    ))
+  record <- if (current && allowed) state$record
   counts <- record$omitted
   list(
     conversation_id = id,
@@ -811,7 +826,11 @@ subagent_history_status <- function(state) {
       transcripts = counts$transcripts %||% 0L,
       children = counts$children %||% 0L
     ),
-    error = if (current) state$error
+    error = if (!allowed) {
+      "This conversation's saved subagents are not available to this user."
+    } else if (current) {
+      state$error
+    }
   )
 }
 
@@ -967,7 +986,9 @@ subagent_history_panel_child <- function(conversation, lead, live, id) {
 #'     conversation (too large, or removed by the disclosure's `redact`) or
 #'     left out at the last save (including subagents left out earlier that
 #'     can't be found again, such as an earlier session's or those released
-#'     since), and any problem saving or reading it.
+#'     since), and any problem saving or reading it. A user the lead's
+#'     `delegation_disclosure` doesn't let see them gets no counts, and a note
+#'     saying so.
 #' @seealso [subagent_chat_activity()] to show subagent tool calls in the
 #'   chat itself.
 #' @export
