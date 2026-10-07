@@ -323,6 +323,63 @@ test_that("retained agents can't give one result type two producers", {
   ))
 })
 
+test_that("a name a retained agent designates is that tool across the tree", {
+  measure <- routes_measure_tool(60)
+  audit_tool <- function(value) {
+    ellmer::tool(
+      function() value,
+      name = "run_audit",
+      description = "Run the audit.",
+      annotations = ellmer::tool_annotations(
+        read_only_hint = TRUE,
+        open_world_hint = FALSE
+      )
+    )
+  }
+  audit <- audit_tool("audited")
+  plain <- audit_tool("plain")
+  auditor <- function() {
+    Agent$new(
+      routes_offline_chat(),
+      tools = list(measure, audit),
+      trusted_results = TrustedResults(audit = audit)
+    )
+  }
+  plain_agent <- function() {
+    Agent$new(routes_offline_chat(), tools = list(measure, plain))
+  }
+  root <- function() {
+    routes_root(routes_offline_chat(), measure, routes_deliveries())
+  }
+  # The owner already has another tool under the name.
+  owner <- root()
+  owner$register_tool(plain)
+  expect_error(
+    owner$retain_agent(auditor(), UsageLimits(max_requests = 4)),
+    "same tool everywhere"
+  )
+  expect_length(owner$.__enclos_env__$private$owned_conversations, 0L)
+  # Or registers one while the agent is retained.
+  owner <- root()
+  owner$retain_agent(auditor(), UsageLimits(max_requests = 4))
+  expect_error(owner$register_tool(plain), "same tool everywhere")
+  expect_false("run_audit" %in% names(owner$get_tools()))
+  # Another retained agent has one, retained before or after.
+  owner <- root()
+  owner$retain_agent(plain_agent(), UsageLimits(max_requests = 4))
+  expect_error(
+    owner$retain_agent(auditor(), UsageLimits(max_requests = 4)),
+    "same tool everywhere"
+  )
+  owner <- root()
+  owner$retain_agent(auditor(), UsageLimits(max_requests = 4))
+  expect_error(
+    owner$retain_agent(plain_agent(), UsageLimits(max_requests = 4)),
+    "same tool everywhere"
+  )
+  expect_length(owner$.__enclos_env__$private$owned_conversations, 1L)
+})
+
 test_that("releasing a retained agent removes its routes from the owner", {
   measure <- routes_measure_tool(60)
   root <- routes_root(routes_offline_chat(), measure, routes_deliveries())

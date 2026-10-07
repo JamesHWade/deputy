@@ -75,7 +75,10 @@ the obstacle to subagent workflows.
   Nor does reading a value dispatch a method: tags, tag lists, dependencies
   and `html` strings must have exactly the class htmltools gives them and
   are read after `unclass()`, and a string or flag with any other class is
-  refused before `length()` or `is.na()` could call its methods.
+  refused before `length()` or `is.na()` could call its methods. The display
+  itself must be a plain list, or a list with exactly shinychat's
+  `shinychat_tool_result_display` class; anything else, such as an
+  environment carrying that class, is recorded as `invalid`.
 
 ## Consequences
 

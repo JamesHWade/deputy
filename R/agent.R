@@ -3123,6 +3123,15 @@ Agent <- R6::R6Class(
           require_source = isTRUE(private$.trusted_tree_member),
           admit_route = function(tool) trusted_route_admitted(self, tool)
         )
+        # Names a retained agent's own policy designates stay that tool here.
+        for (entry in private$owned_conversations) {
+          if (!is.null(entry$trusted)) {
+            trusted_check_names(
+              trusted_policy_sources(entry$trusted$policy),
+              list(tools)
+            )
+          }
+        }
       },
 
       process_tool_result = function(tool_name, value, execution_id = NULL) {
