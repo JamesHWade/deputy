@@ -66,9 +66,13 @@ the obstacle to subagent workflows.
   transformed or offset content can't paint over the host page. `markdown`
   and text fields are left to shinychat's inert renderers. Core records keep
   the tool's own HTML; the adapter is the only renderer.
-- **Rendering never runs code.** Tag objects are rendered only when they are
+- **Recording never runs code.** Tag objects are rendered only when they are
   plain, resolved tags: a render hook would run arbitrary R code while a
   record is made, so a tag carrying one is omitted as `unsupported_object`.
+  Nor does reading a value dispatch a method: tags, tag lists, dependencies
+  and `html` strings must have exactly the class htmltools gives them and
+  are read after `unclass()`, and a string or flag with any other class is
+  refused before `length()` or `is.na()` could call its methods.
 
 ## Consequences
 
