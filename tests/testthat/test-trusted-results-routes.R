@@ -931,15 +931,134 @@ test_that("converging routes check each target once", {
     max_concurrency = 2L
   )
   checks <- 0L
-  check <- check_trusted_registry
-  local_mocked_bindings(check_trusted_registry = function(...) {
+  check <- trusted_route_check_agent
+  local_mocked_bindings(trusted_route_check_agent = function(...) {
     checks <<- checks + 1L
     check(...)
   })
   root$.__enclos_env__$private$check_trusted_tools(root$get_tools())
-  # The root's registry and each member's once; chain by chain, 364.
+  # Each member's registry once; chain by chain, 363.
+  expect_identical(checks, 15L)
+  root$release_agent_graph()
+})
+
+test_that("members with policies of their own don't multiply route checks", {
+  measure <- routes_measure_tool()
+  root <- routes_root(routes_offline_chat(), measure, routes_deliveries())
+  # Eight layers of two, each member adding a result type of its own and
+  # routing to both members of the next layer: 255 chains of routes, each
+  # reaching the last layer under a different combined policy.
+  layer <- function(n) paste0("m", n, "_", 1:2)
+  route <- function(target) {
+    list(
+      target = target,
+      description = paste("Ask", target),
+      usage_limits = UsageLimits(max_requests = 1)
+    )
+  }
+  routes_to <- function(n) stats::setNames(lapply(layer(n), route), layer(n))
+  agents <- list()
+  routes <- list(root = routes_to(1L))
+  for (n in 1:8) {
+    for (name in layer(n)) {
+      producer <- routes_read_tool(paste0("make_", name))
+      agents[[name]] <- Agent$new(
+        routes_offline_chat(),
+        tools = list(producer),
+        trusted_results = do.call(
+          TrustedResults,
+          stats::setNames(list(producer), paste0("made_", name))
+        )
+      )
+      if (n < 8L) {
+        routes[[name]] <- routes_to(n + 1L)
+      }
+    }
+  }
+  root$retain_agent_graph(
+    agents = agents,
+    routes = routes,
+    usage_limits = UsageLimits(max_requests = 50),
+    max_depth = 8L,
+    max_delegations = 20L,
+    max_concurrency = 2L
+  )
+  checks <- 0L
+  check <- trusted_bypass_reason
+  local_mocked_bindings(trusted_bypass_reason = function(...) {
+    checks <<- checks + 1L
+    check(...)
+  })
+  root$.__enclos_env__$private$check_trusted_tools(root$get_tools())
+  # Each member's producer once; chain by chain, 1,620 checks.
   expect_identical(checks, 16L)
   root$release_agent_graph()
+})
+
+test_that("a name designated along one chain is still checked along another", {
+  measure <- routes_measure_tool()
+  note <- ellmer::tool(
+    function() "noted",
+    name = "write_note",
+    description = "Write a note.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = FALSE,
+      open_world_hint = FALSE
+    )
+  )
+  route <- function(target) {
+    list(
+      target = target,
+      description = paste("Ask", target),
+      usage_limits = UsageLimits(max_requests = 1)
+    )
+  }
+  root <- routes_root(
+    routes_offline_chat(),
+    measure,
+    routes_deliveries(),
+    exempt_tools = "write_note"
+  )
+  # `writer` makes write_note a producer; `strict` declines the root's
+  # exemption. `notes` holds write_note, exempt by its own policy too, so it
+  # is designated on the chain through `writer` but on the chain through
+  # `strict` neither designated nor exempt.
+  agents <- list(
+    writer = Agent$new(
+      routes_offline_chat(),
+      tools = list(note),
+      trusted_results = TrustedResults(note = note)
+    ),
+    strict = Agent$new(
+      routes_offline_chat(),
+      tools = list(measure),
+      trusted_results = TrustedResults(measure = measure)
+    ),
+    notes = Agent$new(
+      routes_offline_chat(),
+      tools = list(note),
+      trusted_results = TrustedResults(
+        measure = measure,
+        exempt_tools = "write_note"
+      )
+    )
+  )
+  expect_error(
+    root$retain_agent_graph(
+      agents = agents,
+      routes = list(
+        root = list(ask_writer = route("writer"), ask_strict = route("strict")),
+        writer = list(ask_notes = route("notes")),
+        strict = list(ask_notes = route("notes"))
+      ),
+      usage_limits = UsageLimits(max_requests = 6),
+      max_depth = 2L,
+      max_delegations = 3L,
+      max_concurrency = 1L
+    ),
+    "write_note"
+  )
+  expect_length(root$.__enclos_env__$private$owned_conversations, 0L)
 })
 
 test_that("a member's route runs its target under the member's result types", {

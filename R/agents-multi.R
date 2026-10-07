@@ -832,7 +832,7 @@ LeadAgent <- R6::R6Class(
         )),
         allow_delegation = TRUE,
         sources = sources,
-        admit_route = function(tool) trusted_route_admitted(self, tool)
+        admit_route = trusted_route_admission(self, tools)
       )
       for (name in names(definitions)) {
         withCallingHandlers(
