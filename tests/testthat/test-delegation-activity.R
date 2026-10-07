@@ -628,7 +628,62 @@ test_that("a grandchild names its parent only when its view reports one", {
     expect_null(marker$parent_delegation_id)
     expect_null(marker$depth)
   }
+  # The lead's call is named only along parents the views report: the
+  # analyst's own call, and not for the reviewer, whose parent is hidden.
+  rows <- fixture$root$list_subagents()
+  by_name <- function(name) {
+    Filter(function(marker) identical(marker$agent_name, name), markers)
+  }
+  expect_identical(
+    unique(vapply(by_name("analyst"), function(m) m$root_tool_call_id, "")),
+    rows$tool_call_id[[1L]]
+  )
+  reviewer <- by_name("reviewer")
+  expect_gt(length(reviewer), 0L)
+  for (marker in reviewer) {
+    expect_null(marker$root_tool_call_id)
+  }
   fixture$root$release_agent_graph()
+})
+
+test_that("a subagent's transcript leaves out activity its own chat showed", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist("sales", "60")
+  # Before it is retained, the specialist's own chat showed a card for a
+  # subagent of its own.
+  marker <- list(
+    format = "deputy_subagent_activity",
+    version = 1L,
+    activity_id = "deputy_activity_abc_1",
+    label = "helper"
+  )
+  shown <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  sales$agent$set_turns(list(
+    ellmer::UserTurn(list(ellmer::ContentText("Earlier?"))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Earlier answer."), shown))
+  ))
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  views <- root$inspect_subagents("viewer", transcript = TRUE)
+  expect_length(views, 1L)
+  # The transcript has the calls the specialist's model saw, and no card.
+  turns <- lapply(views[[1L]]$transcript, inspection_replay)
+  expect_identical(
+    activity_test_call_ids(turns),
+    activity_test_call_ids(sales$agent$get_context_turns())
+  )
 })
 
 test_that("a card's tool name is bounded like the rest of it", {

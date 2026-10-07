@@ -70,7 +70,14 @@ into an earlier message.
   nothing a redactor removed. The marker keeps the provider-independent
   lineage (agent, conversation, delegation, parent delegation, depth, run and
   the root tool call) as the redacted view reports it; the root tool call
-  comes from the depth-one delegation's redacted view.
+  comes from the depth-one delegation's redacted view, reached only through
+  parent delegations the views report, so a view that hides its parent (or
+  is too large to read) names no root call. Where a card sits still follows
+  the delegation records: it is on the lead's turn of its depth-one
+  delegation, whatever the marker says. A child's transcript in its records
+  leaves out activity cards its own chat showed (its own subagents' calls,
+  redacted for its own viewer), so the lead reads and shows only the child's
+  own calls.
 - **Attribution goes in the activity row label.** The display keeps the tool's
   own title, icon and HTML. `label` names the subagent by the name its
   redacted view gives; later delegations to the same name are numbered and a
