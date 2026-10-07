@@ -457,6 +457,42 @@ test_that("what rendering converts or calls is checked before rendering", {
   expect_identical(projection$omitted$dependencies, "measure 1.0")
 })
 
+test_that("only the extra named display is a display", {
+  result <- ellmer::ContentToolResult(
+    value = "60",
+    extra = list(display_private = list(html = "<b>secret</b>"))
+  )
+  projection <- tool_display_projection(result)
+  expect_identical(projection$display, list())
+  expect_identical(projection$omitted$extra, "display_private")
+  expect_no_match(paste(unlist(projection), collapse = " "), "secret")
+})
+
+test_that("tags and dependencies that aren't lists are omitted", {
+  dependency <- structure(new.env(), class = "html_dependency")
+  result <- ellmer::ContentToolResult(
+    value = "60",
+    extra = list(
+      display = list(
+        title = "Measure",
+        html = structure(new.env(), class = "shiny.tag"),
+        icon = structure(function() "i", class = "shiny.tag"),
+        footer = htmltools::tagList(htmltools::span("ok"), dependency)
+      )
+    )
+  )
+  projection <- tool_display_projection(result)
+  expect_identical(projection$display, list(title = "Measure"))
+  expect_identical(
+    projection$omitted$fields,
+    c(
+      icon = "unsupported_object",
+      html = "unsupported_object",
+      footer = "unsupported_object"
+    )
+  )
+})
+
 test_that("classed objects in a display never run their methods", {
   ran <- new.env()
   ran$calls <- character()
