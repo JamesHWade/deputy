@@ -804,6 +804,11 @@ test_that("stopping the presenter settles the cards it left running", {
   shown <- activity_take(root)
   expect_length(shown, 1L)
   activity_disable(root)
+  # The reply still streaming gets the result too, once.
+  live <- activity_take(root)
+  expect_length(live, 1L)
+  expect_identical(live[[1L]]@request@id, shown[[1L]]@id)
+  expect_length(activity_take(root), 0L)
   cards <- activity_items(unlist(lapply(
     root$get_turns(),
     function(turn) turn@contents
@@ -814,6 +819,11 @@ test_that("stopping the presenter settles the cards it left running", {
   expect_match(cards[[2L]]@value, "activity stopped before this call returned")
   # Stopping again adds nothing.
   activity_disable(root)
+  expect_length(activity_take(root), 0L)
+  # What one reply left queued never reaches another.
+  private$.activity_leftover <- list(run_id = "run_other", queue = shown)
+  expect_length(activity_take(root), 0L)
+  expect_null(private$.activity_leftover)
   expect_length(
     activity_items(unlist(lapply(
       root$get_turns(),
