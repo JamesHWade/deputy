@@ -59,7 +59,8 @@
   `"tool_start"` event, and a delegation tool called that way runs. Before, the
   later call was matched to the finished one: its start event was dropped and
   a delegation failed with "Delegation tools require their owner's active
-  governed run" (#238).
+  governed run". Agents with an `approval_dir` still refuse a repeated ID
+  within one run, since their saved effects are kept by tool-call ID (#238).
 
 * Subagent tool results keep the card they showed in shinychat. Inspection,
   `$observe_subagents()`, `$export_subagents()` and `delegation_history()`
@@ -69,8 +70,8 @@
   `display` fields and Commons' `commons_tag`, within fixed sizes; other
   stored data is still left out and named in the record. `delegation_history()`
   checks a saved card before showing it, and `subagent_chat_server()` removes
-  scripts, event handlers, forms and external resources from a card's HTML and
-  keeps what is left inside the card (#238).
+  scripts, event handlers, forms, external resources and `data-*` attributes
+  from a card's HTML and keeps what is left inside the card (#238).
 
 * Tools with an `ellmer::type_ignore()` argument can be registered on an
   agent. Registration used to fail with "Names of `arguments` must match

@@ -672,6 +672,94 @@ test_that("calls shown before a view grows too large still get a result", {
   expect_length(activity_take(root), 0L)
 })
 
+test_that("a call keeps its card when redaction later hides an earlier one", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  hidden <- new.env(parent = emptyenv())
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure(
+      redact = function(view, requester) {
+        if (is.null(hidden$id)) {
+          return(view)
+        }
+        shows_hidden <- function(record) {
+          any(vapply(
+            inspection_replay(record)@contents,
+            function(content) {
+              id <- if (inherits(content, "ellmer::ContentToolResult")) {
+                content@request@id
+              } else if (inherits(content, "ellmer::ContentToolRequest")) {
+                content@id
+              }
+              identical(id, hidden$id)
+            },
+            logical(1)
+          ))
+        }
+        view$transcript <- Filter(Negate(shows_hidden), view$transcript)
+        view
+      }
+    )
+  )
+  sales <- activity_specialist(
+    "sales",
+    "60",
+    responses = list(
+      runtime_tool_calls_reply(list(list(
+        id = "call_a",
+        name = "call_measure"
+      ))),
+      runtime_tool_calls_reply(list(list(
+        id = "call_b",
+        name = "call_measure"
+      ))),
+      runtime_reply("sales result 60")
+    )
+  )
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  record <- private$subagent_runs[[id]]
+  running <- function(turns) {
+    private$subagent_runs[[id]]$turns <- turns
+    private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  }
+  activity_enable(root, function() "viewer")
+  # The first call runs.
+  running(record$turns[1:2])
+  activity_poll(root)
+  first <- activity_take(root)
+  expect_length(first, 1L)
+  # The second runs, and the host's redaction now hides the first.
+  hidden$id <- "call_a"
+  running(record$turns[1:4])
+  activity_poll(root)
+  second <- activity_take(root)
+  expect_length(second, 1L)
+  expect_s3_class(second[[1L]], "ellmer::ContentToolRequest")
+  expect_false(identical(second[[1L]]@id, first[[1L]]@id))
+  # The second call's result goes to its own card, and the first card is
+  # closed rather than left running.
+  private$subagent_runs[[id]] <- record
+  activity_poll(root, final = TRUE)
+  results <- activity_take(root)
+  expect_length(results, 2L)
+  names(results) <- vapply(results, function(result) result@request@id, "")
+  expect_setequal(names(results), c(first[[1L]]@id, second[[1L]]@id))
+  expect_identical(results[[second[[1L]]@id]]@value, "60")
+  expect_match(
+    results[[first[[1L]]@id]]@value,
+    "no longer shows this call",
+    fixed = TRUE
+  )
+  activity_poll(root, closing = TRUE)
+  expect_length(activity_take(root), 0L)
+})
+
 test_that("stopping the presenter settles the cards it left running", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),

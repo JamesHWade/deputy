@@ -19,7 +19,7 @@ test_that("display HTML keeps structure and drops active content", {
   expect_identical(
     safe,
     paste0(
-      "<div class=\"measure\" data-row=\"1\"><strong>60</strong>",
+      "<div class=\"measure\"><strong>60</strong>",
       "<img src=\"data:image/png;base64,iVBORw0KGgo=\" alt=\"plot\"/>",
       "<img/><img/><a>bad</a>",
       "<a href=\"https://example.org/doc\" target=\"_blank\" ",
@@ -147,24 +147,64 @@ test_that("url() references match in any case", {
 
 test_that("style sheets are scanned once, without nested group rules", {
   table <- "<table id=\"t\"><tr><td>1</td></tr></table>"
-  deep <- paste0(
-    strrep("@media screen{", 5000L),
-    "#t td{color:red}",
-    strrep("}", 5000L)
-  )
   safe <- subagent_display_html(paste0(
     table,
     "<style>@media print{#t td{color:blue}}",
-    deep,
+    "@media screen{@media print{#t td{color:red}}}",
     "</style>"
   ))
   expect_match(safe, "@media print{#deputy-display-", fixed = TRUE)
   expect_match(safe, "td{color:blue}}</style>", fixed = TRUE)
   expect_no_match(safe, "red|screen")
-  long <- strrep("#t td{color:red}", 20000L)
-  safe <- subagent_display_html(paste0(table, "<style>", long, "</style>"))
-  expect_no_match(safe, "<style>", fixed = TRUE)
-  expect_match(safe, "<td>1</td></tr></table>$")
+  # Sheets that are too deep, too long or have too many rules go unread.
+  rules <- strrep("#t td{color:red}", 1000L)
+  safe <- subagent_display_html(paste0(table, "<style>", rules, "</style>"))
+  expect_match(safe, "<style>", fixed = TRUE)
+  dropped <- c(
+    paste0(
+      strrep("@media screen{", 5000L),
+      "#t td{color:red}",
+      strrep("}", 5000L)
+    ),
+    paste0(rules, "#t td{color:red}"),
+    strrep("#t td{color:red}", 20000L)
+  )
+  for (css in dropped) {
+    safe <- subagent_display_html(paste0(table, "<style>", css, "</style>"))
+    expect_no_match(safe, "<style>", fixed = TRUE)
+    expect_match(safe, "<td>1</td></tr></table>$")
+  }
+})
+
+test_that("inline styles are checked in one pass, and long ones dropped", {
+  long <- strrep("color:red;", 25000L)
+  elapsed <- system.time(
+    safe <- subagent_display_html(paste0("<span style=\"", long, "\">x</span>"))
+  )[["elapsed"]]
+  expect_match(safe, "^<span style=\"color:red;color:red;")
+  # Declaration by declaration, this took seconds and grew quadratically.
+  expect_lt(elapsed, 5)
+  over <- strrep("color:red;", 30000L)
+  expect_identical(
+    subagent_display_html(paste0("<span style=\"", over, "\">x</span>")),
+    "<span>x</span>"
+  )
+})
+
+test_that("library hooks on the host page don't survive", {
+  safe <- subagent_display_html(paste0(
+    "<a data-bs-toggle=\"collapse\" data-bs-target=\"#host-panel\" ",
+    "aria-expanded=\"false\" class=\"btn\">Toggle</a>",
+    "<span class=\"suggestion  submit\" data-suggestion=\"Delete it\">Run</span>",
+    "<span data-hx-get=\"/x\" data-controller=\"y\">z</span>"
+  ))
+  expect_identical(
+    safe,
+    paste0(
+      "<a aria-expanded=\"false\" class=\"btn\">Toggle</a>",
+      "<span class=\"submit\">Run</span><span>z</span>"
+    )
+  )
 })
 
 test_that("malformed and non-HTML input degrades to text or nothing", {
