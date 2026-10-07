@@ -588,9 +588,11 @@ test_that("records stay within max_bytes and count what was left out", {
     history_json(subagent_history_without_transcript(view)),
     type = "bytes"
   )
+  # The smallest record leaves the child out and names it as pending.
   empty <- full
   empty$history$children <- list()
   empty$keys <- character()
+  empty$pending <- full$keys
   empty$omitted$children <- 1L
   base <- subagent_history_record_size(empty)
   # A bound too small for the record without children saves nothing.
@@ -611,6 +613,7 @@ test_that("records stay within max_bytes and count what was left out", {
   expect_identical(dropped$omitted$children, 1L)
   expect_length(dropped$history$children, 0L)
   expect_length(dropped$keys, 0L)
+  expect_identical(dropped$pending, full$keys)
   # Whatever the bound, the whole record fits it and reads back.
   full_size <- subagent_history_record_size(full)
   for (bound in round(seq(base, full_size + 64, length.out = 12))) {
@@ -922,6 +925,38 @@ test_that("children left out stay counted when another session saves", {
   subagent_history_restore(state, list(deputy_subagents = tampered))
   expect_null(state$record)
   expect_match(state$error, "could not be read")
+})
+
+test_that("children left out stay counted after the lead releases them", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  private <- lead$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  counts <- function(running = 0L, children = 0L) {
+    list(running = running, transcripts = 0L, children = children)
+  }
+  # Saved while the subagent was still running.
+  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  state <- history_state(lead, "conv-a")
+  subagent_history_save(state, list())
+  expect_identical(subagent_history_status(state)$omitted, counts(running = 1L))
+  # Released with its records before the next save, which can neither save
+  # it nor count it as running: it stays counted as left out.
+  lead$release_agent(names(private$owned_conversations)[[1L]])
+  expect_length(private$subagent_runs, 0L)
+  subagent_history_save(state, list())
+  expect_identical(subagent_history_status(state)$saved, 0L)
+  expect_identical(
+    subagent_history_status(state)$omitted,
+    counts(children = 1L)
+  )
+  expect_length(state$record$pending, 0L)
+  subagent_history_save(state, list())
+  expect_identical(
+    subagent_history_status(state)$omitted,
+    counts(children = 1L)
+  )
 })
 
 test_that("saved children reach no one the conversation refuses", {

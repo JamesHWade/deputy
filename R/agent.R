@@ -1226,7 +1226,7 @@ Agent <- R6::R6Class(
       )
       preserve_run_usage(self, usage)
       private$.activity_overlay <- split$overlay
-      activity_reset(private$.activity)
+      activity_reset(self)
       private$.compaction_summary <- NULL
       private$.compacted_turns <- list()
       private$.cleared_tool_results <- list()
@@ -1796,7 +1796,7 @@ Agent <- R6::R6Class(
       # Activity shown for the previous conversation doesn't belong to this
       # one; a failed load above leaves it in place.
       private$.activity_overlay <- list()
-      activity_reset(private$.activity)
+      activity_reset(self)
       cli_alert_success("Session loaded from {.path {path}}")
       invisible(self)
     },
