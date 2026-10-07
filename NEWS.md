@@ -9,7 +9,8 @@
   stored data is still left out and named in the record. `delegation_history()`
   checks a saved card before showing it, and `subagent_chat_server()` removes
   scripts, event handlers, forms, external resources and `data-*` attributes
-  from a card's HTML and keeps what is left inside the card (#238).
+  from a card's HTML and Markdown and keeps what is left inside the card
+  (#238).
 
 * Tools with an `ellmer::type_ignore()` argument can be registered on an
   agent. Registration used to fail with "Names of `arguments` must match
