@@ -684,7 +684,8 @@ subagent_chat_server <- function(
 #' conversation shows them again without running anything. The lead's model
 #' never sees them: it gets each subagent's summary, as before. `$get_turns()`
 #' on the lead includes the cards, while `$get_context_turns()` and requests
-#' to the provider don't, and `$set_turns()` separates them again.
+#' to the provider don't, and `$set_turns()` and `$add_turn()` separate them
+#' again.
 #'
 #' Only tool calls made while the lead is answering in this chat appear, and
 #' only when `requester` may see the subagents under the lead's
