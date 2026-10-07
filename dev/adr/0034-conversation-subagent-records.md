@@ -119,7 +119,8 @@ back from storage Deputy doesn't control.
   events could; it reads the selected child's events on their own.
   Saved children are authorized for the conversation's own scope, so a
   requester the lead's live scope refuses (after a reload changed its agent
-  and session IDs, say) still sees them, with no live reader.
+  and session IDs, say) still sees them, with no live reader, and a
+  requester refused the saved records still sees the live ones.
 
 ## Consequences
 
