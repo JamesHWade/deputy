@@ -178,22 +178,43 @@ activity_enable <- function(agent, requester, interval = 0.1) {
 
 activity_disable <- function(agent) {
   private <- agent$.__enclos_env__$private
+  state <- private$.activity
   # Cards still running when the presenter stops would stay running in saved
   # history, since no later poll will settle them.
   for (entry in activity_open_entries(agent)) {
     activity_settle(
       agent,
       entry,
-      "Not shown: subagent activity stopped before this call returned."
+      "Not shown: subagent activity stopped before this call returned.",
+      state = state
     )
+  }
+  # A reply still streaming takes what was queued, those results included;
+  # a later reply doesn't.
+  private$.activity_leftover <- if (
+    !is.null(state) && length(state$queue) && !is.null(private$current_run_id)
+  ) {
+    list(run_id = private$current_run_id, queue = state$queue)
   }
   private$.activity <- NULL
   invisible(agent)
 }
 
 activity_take <- function(agent) {
-  state <- agent$.__enclos_env__$private$.activity
-  if (is.null(state) || !length(state$queue)) {
+  private <- agent$.__enclos_env__$private
+  state <- private$.activity
+  if (is.null(state)) {
+    leftover <- private$.activity_leftover
+    private$.activity_leftover <- NULL
+    if (
+      !is.null(leftover) &&
+        identical(leftover$run_id, private$current_run_id)
+    ) {
+      return(leftover$queue)
+    }
+    return(list())
+  }
+  if (!length(state$queue)) {
     return(list())
   }
   queue <- state$queue

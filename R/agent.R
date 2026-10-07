@@ -2742,6 +2742,9 @@ Agent <- R6::R6Class(
       # never part of the model context (R/delegation-activity.R).
       .activity_overlay = list(),
       .activity = NULL,
+      # What the presenter had queued when it stopped, for the reply then
+      # streaming.
+      .activity_leftover = NULL,
       # Leading context turns whose reported usage describes a different
       # context (before compaction), which local estimates must not reuse.
       .usage_stale_turns = 0L,
@@ -2806,6 +2809,7 @@ Agent <- R6::R6Class(
         cloned$.__enclos_env__$private$.compaction_artifacts <- NULL
         # A clone, such as shinychat's title generator, shows no activity.
         cloned$.__enclos_env__$private$.activity <- NULL
+        cloned$.__enclos_env__$private$.activity_leftover <- NULL
         register_compaction_catalog_owner(
           private$.compaction_catalog_registry,
           cloned
