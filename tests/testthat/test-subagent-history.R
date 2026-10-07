@@ -1501,6 +1501,53 @@ test_that("a reopened conversation saves without access to live subagents", {
   expect_identical(child$outcome$answer, "[withheld]")
 })
 
+test_that("a save without live access doesn't depend on live subagents", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  private <- lead$.__enclos_env__$private
+  state <- history_state(lead, "conv-a")
+  counts <- function(children = 0L) {
+    list(running = 0L, transcripts = 0L, children = children)
+  }
+  empty <- length(serialize(
+    list(
+      schema_version = 1L,
+      settled = TRUE,
+      scope = subagent_history_scope(lead, "conv-a"),
+      children = list()
+    ),
+    NULL,
+    version = 3
+  ))
+  # The child doesn't fit the disclosure bound, so it is left out.
+  private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    max_bytes = empty + 100
+  )
+  subagent_history_save(state, list())
+  expect_identical(subagent_history_status(state)$omitted, counts(1L))
+  # A requester allowed the conversation but not the lead's live scope saves
+  # as with no subagents here, and the child left out still waits.
+  private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) {
+      identical(requester, "viewer") && !is.null(scope$chat_conversation_id)
+    },
+    max_bytes = empty + 100
+  )
+  subagent_history_save(state, list())
+  expect_null(subagent_history_status(state)$error)
+  expect_identical(subagent_history_status(state)$omitted, counts(1L))
+  quiet <- history_state(lead, "conv-b")
+  subagent_history_save(quiet, list())
+  expect_null(subagent_history_status(quiet)$error)
+  # Saved once a save may read it, and not also counted as left out.
+  private$.delegation_disclosure <- history_disclosure()
+  subagent_history_save(state, list())
+  expect_identical(subagent_history_status(state)$saved, 1L)
+  expect_identical(subagent_history_status(state)$omitted, counts())
+})
+
 test_that("a saved child its live record can't show again is counted once", {
   counter <- new.env()
   counter$calls <- 0L

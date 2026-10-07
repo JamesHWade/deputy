@@ -434,13 +434,23 @@ subagent_history_record <- function(state, conversation_id) {
     ))
   }
   # The record is this conversation's history: only a requester who may read
-  # it there writes it, even through the redactor. Live records are read
-  # under the lead's live scope as well, so a reopened conversation whose
-  # lead has none here saves without it.
+  # it there writes it, even through the redactor.
   inspection_authorize(disclosure, requester, scope)
-  records <- subagent_history_records(lead, conversation_id)
-  if (length(records)) {
-    inspection_authorize(disclosure, requester, inspection_scope(lead))
+  # Live records are read only under the lead's live scope as well, asked
+  # before they are looked up. A requester it doesn't allow saves what the
+  # record already holds, the same whether or not the lead has subagents
+  # here, as a reopened conversation whose lead has none saves without them.
+  live_allowed <- isTRUE(tryCatch(
+    {
+      inspection_authorize(disclosure, requester, inspection_scope(lead))
+      TRUE
+    },
+    deputy_delegation_disclosure = function(error) FALSE
+  ))
+  records <- if (live_allowed) {
+    subagent_history_records(lead, conversation_id)
+  } else {
+    list()
   }
   live <- vapply(
     records,
@@ -450,6 +460,7 @@ subagent_history_record <- function(state, conversation_id) {
   )
   children <- list()
   earlier <- 0L
+  waiting <- list(running = 0L, children = 0L)
   if (identical(state$conversation_id, conversation_id)) {
     prior <- state$record
     # Saved children belong to the scope they were saved under. A lead moved
@@ -463,6 +474,13 @@ subagent_history_record <- function(state, conversation_id) {
     # Children the last save left out are counted again below while the
     # lead still has them; the rest are gone.
     pending <- prior$pending %||% character()
+    if (!live_allowed) {
+      # Unread, they wait for a save that may read them, counted as before.
+      live <- pending
+      waiting$running <- prior$omitted$running %||% 0L
+      waiting$children <- (prior$omitted$children %||% 0L) -
+        (prior$omitted$earlier %||% 0L)
+    }
     earlier <- (prior$omitted$earlier %||% 0L) + sum(!pending %in% live)
     for (index in seq_along(carried)) {
       view <- disclosure$redact(carried[[index]], requester)
@@ -476,9 +494,9 @@ subagent_history_record <- function(state, conversation_id) {
     }
   }
   omitted <- list(
-    running = 0L,
+    running = waiting$running,
     transcripts = 0L,
-    children = 0L,
+    children = waiting$children,
     earlier = earlier
   )
   left_out <- function(omitted, child) {
@@ -1016,8 +1034,10 @@ subagent_history_panel_child <- function(conversation, lead, live, id) {
 #' saves the conversation, as one JSON text, so any history store can hold
 #' them. A subagent still running at that point is saved the next time. Access
 #' is checked with the lead's [DelegationDisclosure] when records are saved
-#' and every time they are read. When reading them back, `authorize` gets a
-#' `scope` holding the lead's `delegation_scope` and the conversation's ID as
+#' and every time they are read. A save adds the lead's subagents only when
+#' `requester` may also inspect them on the lead; otherwise it keeps the ones
+#' saved before. When reading them back, `authorize` gets a `scope` holding
+#' the lead's `delegation_scope` and the conversation's ID as
 #' `chat_conversation_id`; records saved under another scope are not read.
 #' Large results that subagents saved to disk are kept as references, which
 #' may no longer resolve. Needs shiny and shinychat (>= 0.5.0) with history
