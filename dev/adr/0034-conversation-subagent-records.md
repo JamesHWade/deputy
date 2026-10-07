@@ -52,11 +52,11 @@ back from storage Deputy doesn't control.
   string inside a versioned envelope (`format`, `version`, `codec`,
   `conversation_id`, `data`). The codec covers exactly the portable data
   inspection allows (NULL, logical, integer, double, complex, character, raw,
-  lists, and names/dim/dimnames), with doubles (and each part of a complex
-  number) as `%.17g` text, NA, NaN and infinities spelled out, and raw vectors
-  as base64, so a round trip is exact. Decoding builds only those types; it
-  never uses `unserialize()` or `jsonlite::unserializeJSON()`, which can load
-  namespaces or construct closures from stored text.
+  lists, pairlists, and names/dim/dimnames), with doubles (and each part of a
+  complex number) as `%.17g` text, NA, NaN and infinities spelled out, and raw
+  vectors as base64, so a round trip is exact. Decoding builds only those
+  types; it never uses `unserialize()` or `jsonlite::unserializeJSON()`, which
+  can load namespaces or construct closures from stored text.
 - **Restore validates everything and runs nothing.** The envelope, the decoded
   record, its scope and keys, every child's settled status (where the redacted
   view still reports one) and every transcript record (through
@@ -93,7 +93,8 @@ back from storage Deputy doesn't control.
   transcripts on request stay marked `"not_requested"`. A save that fails (for
   example, a requester the disclosure refuses) keeps the last good record for
   that conversation, since shinychat rebuilds `values` from scratch on every
-  save.
+  save, and `status()` reports the failure for that conversation, including a
+  new conversation's first save, which has no record to keep.
 - **Saved children are redacted again on every save.** Children carried from
   an earlier save pass through the current `redact` before they are written
   back, so a stricter policy also cleans what is stored. Every save needs a

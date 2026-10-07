@@ -78,7 +78,13 @@ history_encode <- function(x, depth = 0L) {
   values <- unname(x)
   attributes(values) <- NULL
   text <- function(value) if (is.na(value)) NULL else enc2utf8(value)
-  node <- if (is.list(x)) {
+  node <- if (is.pairlist(x)) {
+    # is.list() is also true of a pairlist; it keeps its own type.
+    list(
+      t = "pairlist",
+      v = lapply(values, history_encode, depth = depth + 1L)
+    )
+  } else if (is.list(x)) {
     list(t = "list", v = lapply(values, history_encode, depth = depth + 1L))
   } else if (is.logical(x)) {
     list(
@@ -216,6 +222,12 @@ history_decode <- function(node, depth = 0L) {
   x <- switch(
     node$t,
     list = lapply(values, history_decode, depth = depth + 1L),
+    # An empty pairlist is NULL, which is saved as "null".
+    pairlist = if (length(values)) {
+      as.pairlist(lapply(values, history_decode, depth = depth + 1L))
+    } else {
+      history_codec_abort()
+    },
     lgl = vapply(
       values,
       function(value) {
@@ -663,7 +675,15 @@ subagent_history_save <- function(state, values) {
     },
     error = function(error) {
       # A save shinychat can't complete loses the conversation, so keep the
-      # last good record for it instead.
+      # last good record for it instead. A conversation saved for the first
+      # time has none, but the error is still about it, not about the one
+      # saved before.
+      if (!identical(state$conversation_id, id)) {
+        state$conversation_id <- id
+        state$record <- NULL
+        state$envelope <- NULL
+        state$kept <- NULL
+      }
       state$error <- inspection_text(conditionMessage(error), 1024L)
       previous
     }
