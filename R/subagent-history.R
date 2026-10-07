@@ -826,6 +826,7 @@ subagent_history_restored <- function(state, transcript = TRUE) {
 subagent_history_status <- function(state) {
   id <- subagent_history_active_id(state)
   current <- !is.null(id) && identical(state$conversation_id, id)
+  scope <- if (current) subagent_history_scope(state$lead, id)
   # The counts and any problem are about the conversation's saved subagents,
   # so they are read only for a requester its scope allows, as `restored()`
   # reads the record itself.
@@ -835,13 +836,19 @@ subagent_history_status <- function(state) {
         inspection_authorize(
           state$lead$.__enclos_env__$private$.delegation_disclosure,
           state$requester(),
-          subagent_history_scope(state$lead, id)
+          scope
         )
         TRUE
       },
       deputy_delegation_disclosure = function(error) FALSE
     ))
-  record <- if (current && allowed) state$record
+  # A record saved under another scope (the lead has moved since) isn't
+  # counted: `restored()` refuses it, and the next save replaces it.
+  record <- if (
+    current && allowed && identical(state$record$history$scope, scope)
+  ) {
+    state$record
+  }
   counts <- record$omitted
   list(
     conversation_id = id,
