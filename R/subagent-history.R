@@ -835,19 +835,13 @@ subagent_history_counts <- function(counts, pending) {
 }
 
 # The subagent panel's list for the open conversation: live subagents that
-# ran in it, then saved ones that aren't live.
+# ran in it, then saved ones that aren't live. `live` comes from
+# `subagent_history_live_views()`, which picks them by their records, since a
+# redactor may leave the conversation out of the views.
 subagent_history_panel_views <- function(conversation, live) {
   if (is.null(conversation)) {
     return(live)
   }
-  id <- conversation$conversation_id()
-  live <- Filter(
-    function(view) {
-      !is.null(id) &&
-        identical(view$outcome$runtime$host_conversation_id, id)
-    },
-    live
-  )
   live_ids <- vapply(live, subagent_history_view_id, character(1))
   restored <- Filter(
     function(view) !subagent_history_view_id(view) %in% live_ids,
@@ -905,21 +899,22 @@ subagent_history_cursor <- function(lead, requester) {
   tryCatch(reader$poll()$cursor, finally = reader$close())
 }
 
-# One child for the panel to show: live if it ran in the open conversation,
-# otherwise saved with it.
-subagent_history_panel_child <- function(conversation, live, id) {
+# One child for the panel to show: live if its record says it ran in the open
+# conversation (a redactor may leave that out of the view), otherwise saved
+# with it.
+subagent_history_panel_child <- function(conversation, lead, live, id) {
   if (is.null(conversation)) {
     return(live)
   }
   open <- conversation$conversation_id()
-  live <- Filter(
-    function(view) {
-      !is.null(open) &&
-        identical(view$outcome$runtime$host_conversation_id, open)
-    },
-    live
-  )
-  if (length(live)) {
+  ran_here <- !is.null(open) &&
+    id %in%
+      vapply(
+        subagent_history_records(lead, open),
+        function(record) record$delegation_id,
+        character(1)
+      )
+  if (ran_here && length(live)) {
     return(live)
   }
   Filter(
