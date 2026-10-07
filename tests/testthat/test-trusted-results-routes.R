@@ -380,6 +380,58 @@ test_that("a name a retained agent designates is that tool across the tree", {
   expect_length(owner$.__enclos_env__$private$owned_conversations, 1L)
 })
 
+test_that("a retained agent's designated names hold in a lead's definitions", {
+  measure <- routes_measure_tool(60)
+  audit_tool <- function(value) {
+    ellmer::tool(
+      function() value,
+      name = "run_audit",
+      description = "Run the audit.",
+      annotations = ellmer::tool_annotations(
+        read_only_hint = TRUE,
+        open_world_hint = FALSE
+      )
+    )
+  }
+  audit <- audit_tool("audited")
+  plain <- audit_tool("plain")
+  auditor <- function() {
+    Agent$new(
+      routes_offline_chat(),
+      tools = list(measure, audit),
+      trusted_results = TrustedResults(audit = audit)
+    )
+  }
+  checker <- function() {
+    AgentDefinition(
+      "checker",
+      "Checks figures.",
+      "CHECKER.",
+      tools = list(plain),
+      max_requests = 2L
+    )
+  }
+  lead <- function(...) {
+    LeadAgent$new(
+      routes_offline_chat(),
+      trusted_results = TrustedResults(measure = measure),
+      ...
+    )
+  }
+  # A definition already holds another tool under the name.
+  owner <- lead(sub_agents = list(checker()))
+  expect_error(
+    owner$retain_agent(auditor(), UsageLimits(max_requests = 4)),
+    "same tool everywhere"
+  )
+  expect_length(owner$.__enclos_env__$private$owned_conversations, 0L)
+  # Or one is registered while the agent is retained.
+  owner <- lead()
+  owner$retain_agent(auditor(), UsageLimits(max_requests = 4))
+  expect_error(owner$register_sub_agent(checker()), "same tool everywhere")
+  expect_false("checker" %in% owner$available_sub_agents())
+})
+
 test_that("releasing a retained agent removes its routes from the owner", {
   measure <- routes_measure_tool(60)
   root <- routes_root(routes_offline_chat(), measure, routes_deliveries())

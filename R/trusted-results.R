@@ -779,10 +779,15 @@ trusted_admit_conversation <- function(owner, agent) {
     function(entry) !is.null(entry$trusted),
     op$owned_conversations
   )
+  # A LeadAgent's definitions are part of its tree too.
+  definitions <- if (is.function(op$trusted_definition_tools)) {
+    op$trusted_definition_tools()
+  }
   trusted_check_names(
     sources,
     c(
       list(owner$get_tools()),
+      definitions,
       lapply(retained, function(entry) entry$agent$get_tools())
     )
   )
