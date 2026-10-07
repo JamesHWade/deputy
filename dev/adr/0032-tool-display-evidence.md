@@ -51,11 +51,15 @@ the obstacle to subagent workflows.
   shinychat sees them: structure, classes, inline styles, inline SVG and
   `data:` images stay; scripts, event handlers, forms, embedded documents,
   sibling-reaching selectors, nested CSS rules and every URL the browser would
-  fetch (remote images included) go. Ids get a prefix unique to each display,
-  and a `<style>` element survives only when every rule is scoped to such an
-  id, as gt's tables are. `markdown` and text fields are left to shinychat's
-  inert renderers. Core records keep the tool's own HTML; the adapter is the
-  only renderer.
+  fetch (remote images, and quoted URLs in `image-set()` and the other image
+  functions, included) go. Ids get a prefix unique to each display, and a
+  `<style>` element survives only when every rule is scoped to such an id, as
+  gt's tables are; `@media` is kept at the top level only and a sheet over
+  256 KiB is dropped, so the scan is linear. Each rebuilt field sits in its
+  own box with `contain: paint` and `isolation: isolate`, so positioned,
+  transformed or offset content can't paint over the host page. `markdown`
+  and text fields are left to shinychat's inert renderers. Core records keep
+  the tool's own HTML; the adapter is the only renderer.
 - **Rendering never runs code.** Tag objects are rendered only when they are
   plain, resolved tags: a render hook would run arbitrary R code while a
   record is made, so a tag carrying one is omitted as `unsupported_object`.
