@@ -47,7 +47,8 @@ back from storage Deputy doesn't control.
   on reload, so they are not part of it. Reading checks the scope and the
   conversation ID exactly and authorizes the requester against that scope;
   so does `status()`, whose counts and problems describe the record, and a
-  requester refused gets none of them.
+  requester refused gets none of them. Nor does `status()` count a record
+  saved under a scope the lead has since left; the next save replaces it.
 - **A typed encoding survives any store.** The record is saved as one JSON
   string inside a versioned envelope (`format`, `version`, `codec`,
   `conversation_id`, `data`). The codec covers exactly the portable data
