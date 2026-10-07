@@ -252,7 +252,12 @@ subagent_chat_server <- function(
         live <- if (live_access(current_lead, requester())) {
           current_lead$inspect_subagents(requester(), id, transcript = TRUE)
         }
-        subagent_history_panel_child(conversation, live %||% list(), id)
+        subagent_history_panel_child(
+          conversation,
+          current_lead,
+          live %||% list(),
+          id
+        )
       } else {
         Filter(
           function(view) identical(view$outcome$runtime$delegation_id, id),

@@ -667,6 +667,45 @@ test_that("live subagents show to a requester who can't see saved ones", {
   )
 })
 
+test_that("a redactor that removes the conversation keeps live subagents", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  lead <- history_lead(history_root_server(), history_sales_server(), counter)
+  history_session(
+    lead,
+    store,
+    function(session, chat, saver) {
+      history_submit(session, chat, store, "Revenue?")
+      # The views leave out which conversation a subagent ran in, and the
+      # requester may not read the saved records, so only the live
+      # subagent can be listed.
+      lead$.__enclos_env__$private$.delegation_disclosure <-
+        DelegationDisclosure(
+          authorize = function(requester, scope) {
+            identical(requester, "viewer") &&
+              is.null(scope$chat_conversation_id)
+          },
+          redact = function(view, requester) {
+            view$outcome$runtime$host_conversation_id <- NULL
+            view
+          }
+        )
+      panel <- session$userData$panel
+      session$elapse(200)
+      views <- panel$views()
+      expect_length(views, 1L)
+      expect_null(views[[1L]]$outcome$runtime$host_conversation_id)
+      id <- views[[1L]]$outcome$runtime$delegation_id
+      session$setInputs(`panel-selected` = id)
+      session$elapse(200)
+      expect_identical(panel$selected(), id)
+      expect_no_match(panel$notice() %||% "", "missing|unavailable")
+    },
+    panel = TRUE
+  )
+})
+
 test_that("saved records that fail their checks are not read", {
   counter <- new.env()
   counter$calls <- 0L
