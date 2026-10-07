@@ -952,6 +952,18 @@ test_that("a lead shows activity through one presenter at a time", {
   expect_identical(private$.activity, second)
   activity_disable(root, second)
   expect_null(private$.activity)
+  # What a stopped presenter left for one reply never reaches the next, even
+  # through a presenter shown in between.
+  private$.activity_leftover <- list(
+    run_id = private$current_run_id,
+    queue = live
+  )
+  third <- activity_enable(root, function() "viewer")
+  run_id <- private$current_run_id
+  private$current_run_id <- "run_next"
+  expect_length(activity_take(root), 0L)
+  private$current_run_id <- run_id
+  activity_disable(root, third)
 })
 
 test_that("cards shown before access was lost get a result at the end", {
