@@ -24,8 +24,8 @@
   `display` fields and Commons' `commons_tag`, within fixed sizes; other
   stored data is still left out and named in the record. `delegation_history()`
   checks a saved card before showing it, and `subagent_chat_server()` removes
-  scripts, event handlers, forms and external resources from a card's HTML
-  (#238).
+  scripts, event handlers, forms and external resources from a card's HTML and
+  keeps what is left inside the card (#238).
 
 * Tools with an `ellmer::type_ignore()` argument can be registered on an
   agent. Registration used to fail with "Names of `arguments` must match

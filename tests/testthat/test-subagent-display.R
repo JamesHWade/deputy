@@ -114,6 +114,43 @@ test_that("nested CSS rules can't escape a declaration", {
   expect_match(safe, "td{color:blue}", fixed = TRUE)
 })
 
+test_that("image functions can't fetch a quoted URL", {
+  html <- paste0(
+    "<div id=\"t\" style=\"color:red;",
+    "background-image:image-set('https://t.example/a' 1x)\">",
+    "<span style=\"background:-webkit-image-set('https://t.example/b' 1x)\">",
+    "a</span><i style=\"list-style-image:src('https://t.example/c')\">b</i>",
+    "<style>#t td{color:blue;",
+    "background-image:image-set(\"https://t.example/d\" 1x)}</style></div>"
+  )
+  safe <- subagent_display_html(html)
+  expect_no_match(safe, "t.example|image-set|src\\(")
+  expect_match(safe, "style=\"color:red\"", fixed = TRUE)
+  expect_match(safe, "td{color:blue}", fixed = TRUE)
+})
+
+test_that("style sheets are scanned once, without nested group rules", {
+  table <- "<table id=\"t\"><tr><td>1</td></tr></table>"
+  deep <- paste0(
+    strrep("@media screen{", 5000L),
+    "#t td{color:red}",
+    strrep("}", 5000L)
+  )
+  safe <- subagent_display_html(paste0(
+    table,
+    "<style>@media print{#t td{color:blue}}",
+    deep,
+    "</style>"
+  ))
+  expect_match(safe, "@media print{#deputy-display-", fixed = TRUE)
+  expect_match(safe, "td{color:blue}}</style>", fixed = TRUE)
+  expect_no_match(safe, "red|screen")
+  long <- strrep("#t td{color:red}", 20000L)
+  safe <- subagent_display_html(paste0(table, "<style>", long, "</style>"))
+  expect_no_match(safe, "<style>", fixed = TRUE)
+  expect_match(safe, "<td>1</td></tr></table>$")
+})
+
 test_that("malformed and non-HTML input degrades to text or nothing", {
   expect_identical(subagent_display_html(""), "")
   expect_identical(subagent_display_html(NA_character_), "")
@@ -139,13 +176,43 @@ test_that("only raw HTML display fields are rebuilt", {
     show_request = FALSE
   )
   safe <- subagent_safe_display(display)
-  expect_identical(safe$title, "<b>Ran</b>")
+  expect_identical(safe$title, subagent_display_contain("<b>Ran</b>", "title"))
   expect_null(safe$icon)
-  expect_identical(safe$html, "<div>ok</div>")
-  expect_identical(safe$footer, "<small>note</small>")
+  expect_identical(safe$html, subagent_display_contain("<div>ok</div>", "html"))
+  expect_identical(
+    safe$footer,
+    subagent_display_contain("<small>note</small>", "footer")
+  )
   expect_identical(safe$markdown, display$markdown)
   expect_identical(safe$label, display$label)
   expect_false(safe$show_request)
+})
+
+test_that("each display field stays inside its own box", {
+  display <- list(
+    html = paste0(
+      "<div style=\"position:absolute;inset:0;width:100vw;height:100vh;",
+      "z-index:2147483647\">cover</div>"
+    ),
+    title = "<span style=\"position:relative;top:-500px\">Ran</span>"
+  )
+  safe <- subagent_safe_display(display)
+  expect_match(
+    safe$html,
+    paste0(
+      "^<div class=\"deputy-display\" style=\"position:relative;",
+      "overflow:auto;contain:paint;isolation:isolate\"><div style=.*",
+      "cover</div></div>$"
+    )
+  )
+  expect_match(
+    safe$title,
+    paste0(
+      "^<span class=\"deputy-display\" style=\"display:inline-block;",
+      "position:relative;max-width:100%;contain:paint;isolation:isolate\">",
+      ".*Ran</span></span>$"
+    )
+  )
 })
 
 test_that("the child panel renders retained displays inertly", {
@@ -162,7 +229,10 @@ test_that("the child panel renders retained displays inertly", {
     )
   )
   safe <- subagent_chat_safe_content(result)
-  expect_identical(safe@extra$display$html, "<div><strong>60</strong></div>")
+  expect_identical(
+    safe@extra$display$html,
+    subagent_display_contain("<div><strong>60</strong></div>", "html")
+  )
   messages <- subagent_chat_messages(list(
     ellmer::AssistantTurn(list(request)),
     ellmer::UserTurn(list(result))

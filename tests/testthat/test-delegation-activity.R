@@ -321,7 +321,7 @@ test_that("concurrent specialists stream attributed activity with unique IDs", {
   expect_identical(result[[1L]]@extra$commons_tag, "A")
   expect_identical(
     result[[1L]]@extra$display$title,
-    "Ran a trusted calculation"
+    subagent_display_contain("Ran a trusted calculation", "title")
   )
   expect_match(
     result[[1L]]@extra$display$html,
@@ -547,13 +547,19 @@ test_that("activity renders as native shinychat tool cards", {
   expect_identical(request$request_id, items[[1L]]@id)
   expect_identical(result$request_id, items[[1L]]@id)
   expect_identical(request$tool_name, "call_measure")
-  expect_identical(result$title, "Ran a trusted calculation")
+  expect_identical(
+    result$title,
+    subagent_display_contain("Ran a trusted calculation", "title")
+  )
   expect_identical(result$label, "sales")
   expect_identical(result$status, "success")
   expect_identical(result$value_type, "html")
   expect_identical(
     result$value,
-    "<div class=\"measure\"><strong>60</strong></div>"
+    subagent_display_contain(
+      "<div class=\"measure\"><strong>60</strong></div>",
+      "html"
+    )
   )
 })
 
