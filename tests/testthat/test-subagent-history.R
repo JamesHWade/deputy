@@ -978,6 +978,54 @@ test_that("saved records stay within what the lead's disclosure can replay", {
   expect_true(1L %in% listed)
 })
 
+test_that("the replay budget counts references as replay marks them", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  references <- lapply(seq_len(200), function(i) {
+    list(reference = paste0("ref-", i), availability = "missing")
+  })
+  disclosure <- function(max_bytes) {
+    DelegationDisclosure(
+      authorize = function(requester, scope) identical(requester, "viewer"),
+      redact = function(view, requester) {
+        if (!length(view$outcome$references)) {
+          view$outcome$references <- references
+        }
+        view
+      },
+      max_bytes = max_bytes
+    )
+  }
+  private <- lead$.__enclos_env__$private
+  private$.delegation_disclosure <- disclosure(16 * 1024^2)
+  full <- subagent_history_record(history_state(lead, "conv-a"), "conv-a")
+  empty <- full$history
+  empty$children <- list()
+  edge <- length(serialize(empty, NULL, version = 3)) +
+    subagent_history_replay_size(full$history$children[[1L]])
+  # Replay marks each reference "unresolved", which is longer than "missing":
+  # around the edge, a transcript the save keeps is replayed, not dropped.
+  for (bound in edge + seq(0, 700, by = 100)) {
+    private$.delegation_disclosure <- disclosure(bound)
+    state <- history_state(lead, "conv-a")
+    record <- subagent_history_record(state, "conv-a")
+    state$record <- record
+    state$conversation_id <- "conv-a"
+    kept <- vapply(
+      record$history$children,
+      function(view) !is.null(view$transcript),
+      logical(1)
+    )
+    shown <- vapply(
+      subagent_history_restored(state),
+      function(view) length(view$turns) > 0L,
+      logical(1)
+    )
+    expect_identical(unname(shown), unname(kept))
+  }
+})
+
 test_that("a tightened bound is searched, not tried one child at a time", {
   counter <- new.env()
   counter$calls <- 0L
