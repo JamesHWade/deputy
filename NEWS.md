@@ -14,7 +14,8 @@
   `"tool_start"` event, and a delegation tool called that way runs. Before, the
   later call was matched to the finished one: its start event was dropped and
   a delegation failed with "Delegation tools require their owner's active
-  governed run" (#238).
+  governed run". Agents with an `approval_dir` still refuse a repeated ID
+  within one run, since their saved effects are kept by tool-call ID (#238).
 
 * Subagent tool results keep the card they showed in shinychat. Inspection,
   `$observe_subagents()`, `$export_subagents()` and `delegation_history()`

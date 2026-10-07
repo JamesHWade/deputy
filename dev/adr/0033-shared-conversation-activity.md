@@ -35,11 +35,15 @@ into an earlier message.
   conversation (`set_turns()`, or a successful `load_session()`, which drops
   the shown cards) restarts the presenter's queue, labels and counts. Clones do
   not inherit the presenter.
-- **Identity is the delegation and the call's position in it.** An activity ID
+- **Identity is the delegation and the call's place in it.** An activity ID
   is `deputy_activity_<key>_<n>`, where `key` is an opaque token drawn once
-  per delegation and `n` counts the delegation's own tool requests in order
-  (turns before the delegation are excluded, so a retained specialist's
-  earlier history doesn't shift it). shinychat pairs request and result by
+  per delegation and `n` numbers the delegation's own tool requests in the
+  order they are first shown (turns before the delegation are excluded, so a
+  retained specialist's earlier history doesn't shift it). A call keeps its
+  number from one poll to the next by its provider ID, tool and arguments, so
+  a redaction that later hides an earlier call can't move a later call onto
+  its card; a shown call that the view no longer includes is closed with a
+  note when the delegation settles. shinychat pairs request and result by
   that ID, so concurrent children, repeated specialist names and provider
   tool-call IDs reused across conversations cannot collide, and the ID reveals
   nothing a redactor removed. The marker keeps the provider-independent
@@ -77,7 +81,10 @@ into an earlier message.
 
 Tool-call correlation also stopped assuming provider IDs are unique within a
 run: a finished call no longer claims a later call with the same ID, which
-providers that number calls per response produce.
+providers that number calls per response produce. Durable approvals keep
+refusing a reused ID within one continuation, as before: their effect receipts
+are keyed by tool-call ID across suspension and resume, where only the
+provider's ID comes back.
 
 ## Consequences
 
