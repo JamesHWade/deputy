@@ -129,6 +129,22 @@ test_that("image functions can't fetch a quoted URL", {
   expect_match(safe, "td{color:blue}", fixed = TRUE)
 })
 
+test_that("url() references match in any case", {
+  html <- paste0(
+    "<svg width=\"10\" height=\"10\"><defs><linearGradient id=\"grad\">",
+    "<stop offset=\"0\" stop-color=\"red\"/></linearGradient></defs>",
+    "<rect width=\"10\" height=\"10\" style=\"fill:URL(#grad)\"/>",
+    "<rect width=\"5\" height=\"5\" fill=\"Url(#grad)\" ",
+    "style=\"stroke:URL(#host-page)\"/></svg>"
+  )
+  safe <- subagent_display_html(html)
+  prefix <- regmatches(safe, regexpr("deputy-display-[0-9a-f]{12}-", safe))
+  expect_length(prefix, 1L)
+  expect_match(safe, paste0("fill:url(#", prefix, "grad)"), fixed = TRUE)
+  expect_match(safe, paste0("fill=\"url(#", prefix, "grad)\""), fixed = TRUE)
+  expect_no_match(safe, "host-page|URL\\(|Url\\(")
+})
+
 test_that("style sheets are scanned once, without nested group rules", {
   table <- "<table id=\"t\"><tr><td>1</td></tr></table>"
   deep <- paste0(

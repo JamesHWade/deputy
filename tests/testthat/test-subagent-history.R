@@ -37,7 +37,8 @@ history_lead <- function(
   sales,
   counter,
   scope = list(owner_id = "u1"),
-  state = NULL
+  state = NULL,
+  value = 60
 ) {
   offline <- list(url = "http://127.0.0.1:9/v1")
   lead <- Agent$new(
@@ -47,7 +48,7 @@ history_lead <- function(
   )
   specialist <- Agent$new(
     runtime_chat(sales %||% offline),
-    tools = list(history_measure_tool(60, counter)),
+    tools = list(history_measure_tool(value, counter)),
     agent_name = "sales"
   )
   handle <- lead$retain_agent(specialist, UsageLimits(max_requests = 8))
@@ -213,7 +214,12 @@ test_that("saved records round-trip exactly through JSON stores", {
     m = matrix(1:6, 2, dimnames = list(c("r1", "r2"), NULL)),
     e = character(),
     f = integer(),
-    h = c(a = 1L, b = NA)
+    h = c(a = 1L, b = NA),
+    r = as.raw(c(0, 255, 16)),
+    r0 = raw(0),
+    rl = as.raw(rep(1:255, 3)),
+    z = c(1 + 2i, NA, complex(real = NaN, imaginary = Inf), -0.1 + 1e300i),
+    zm = matrix(c(1i, 2i), 1L)
   )
   expect_identical(history_parse(history_json(x)), x)
   stored <- jsonlite::toJSON(
@@ -237,7 +243,13 @@ test_that("decoding builds only portable data", {
     '{"t":"list","v":[],"x":1}',
     '{"t":"lgl","v":["TRUE"]}',
     '{"t":"chr","v":["a"],"d":["2"]}',
-    '{"t":"null","v":[]}'
+    '{"t":"null","v":[]}',
+    '{"t":"raw","v":["!!!!"]}',
+    '{"t":"raw","v":["AAA"]}',
+    '{"t":"raw","v":["AA==","AA=="]}',
+    '{"t":"cplx","v":[["1"]]}',
+    '{"t":"cplx","v":[{"re":"1","im":"2"}]}',
+    '{"t":"cplx","v":[["x","1"]]}'
   )
   for (text in bad) {
     expect_error(history_parse(text), "not in a readable form")
@@ -669,6 +681,70 @@ test_that("saved records stay within what the lead's disclosure can replay", {
     c("omitted", "omitted")
   )
   expect_identical(lengths(lapply(views, function(view) view$turns)), c(0L, 0L))
+})
+
+test_that("raw tool results are saved and read back", {
+  counter <- new.env()
+  counter$calls <- 0L
+  bytes <- as.raw(c(137, 80, 78, 71))
+  lead <- history_lead(
+    history_root_server(),
+    history_sales_server(),
+    counter,
+    value = bytes
+  )
+  lead$conversation_id <- "conv-a"
+  lead$run_sync("Revenue?")
+  state <- history_state(lead, "conv-a")
+  record <- subagent_history_record(state, "conv-a")
+  expect_length(record$history$children, 1L)
+  read <- subagent_history_read(
+    subagent_history_envelope(record),
+    lead,
+    "conv-a",
+    state$max_bytes
+  )
+  expect_identical(read, record)
+  state$record <- read
+  state$conversation_id <- "conv-a"
+  result <- history_results(subagent_history_restored(state)[[1L]]$turns)[[1L]]
+  expect_identical(result@value, bytes)
+})
+
+test_that("a disclosure bound below the record's own size saves nothing", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  scope <- length(serialize(
+    subagent_history_scope(lead, "conv-a"),
+    NULL,
+    version = 3
+  ))
+  empty <- length(serialize(
+    list(
+      schema_version = 1L,
+      settled = TRUE,
+      scope = subagent_history_scope(lead, "conv-a"),
+      children = list()
+    ),
+    NULL,
+    version = 3
+  ))
+  lead$.__enclos_env__$private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    max_bytes = (scope + empty) %/% 2
+  )
+  state <- history_state(lead, "conv-a")
+  expect_error(subagent_history_record(state, "conv-a"), "can't be saved")
+  # Room for the record but not for this child's outcome: the child is left
+  # out and counted.
+  lead$.__enclos_env__$private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    max_bytes = empty + 64
+  )
+  record <- subagent_history_record(state, "conv-a")
+  expect_length(record$history$children, 0L)
+  expect_identical(record$omitted$children, 1L)
 })
 
 test_that("a scope larger than max_bytes saves no record", {

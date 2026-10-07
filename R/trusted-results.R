@@ -699,6 +699,7 @@ trusted_admit_conversation <- function(owner, agent) {
   }
   tools <- agent$get_tools()
   effective <- trusted_combine(owner, policy, cp$.trusted_results, tools)
+  trusted_check_siblings(op, effective)
   sources <- trusted_policy_sources(effective)
   withCallingHandlers(
     check_trusted_registry(
@@ -732,6 +733,38 @@ trusted_admit_conversation <- function(owner, agent) {
       root = cp$.trusted_root
     )
   )
+}
+
+# Result types that retained agents add keep one producer across everything
+# the root has retained, and a producer one type, as within one policy. Graph
+# members are retained by the root too, so this covers the whole tree.
+trusted_check_siblings <- function(op, effective) {
+  mine <- effective@producers
+  for (entry in op$owned_conversations) {
+    if (is.null(entry$trusted)) {
+      next
+    }
+    theirs <- entry$trusted$policy@producers
+    for (type in names(mine)) {
+      name <- effective@results[[type]]
+      for (other in names(theirs)) {
+        same_tool <- identical(mine[[type]], theirs[[other]])
+        if (identical(type, other) && !same_tool) {
+          trusted_combine_abort(
+            "Result type {.val {type}} has a different producer in another retained agent.",
+            tool_name = name
+          )
+        }
+        if (!identical(type, other) && same_tool) {
+          trusted_combine_abort(
+            "Trusted tool {.val {name}} would produce two result types.",
+            tool_name = name
+          )
+        }
+      }
+    }
+  }
+  invisible(NULL)
 }
 
 trusted_install_conversation <- function(owner, agent, trusted) {

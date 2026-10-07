@@ -49,9 +49,10 @@ back from storage Deputy doesn't control.
 - **A typed encoding survives any store.** The record is saved as one JSON
   string inside a versioned envelope (`format`, `version`, `codec`,
   `conversation_id`, `data`). The codec covers exactly the portable data
-  inspection allows (NULL, logical, integer, double, character, lists, and
-  names/dim/dimnames), with doubles as `%.17g` text and NA, NaN and infinities
-  spelled out, so a round trip is exact. Decoding builds only those types; it
+  inspection allows (NULL, logical, integer, double, complex, character, raw,
+  lists, and names/dim/dimnames), with doubles (and each part of a complex
+  number) as `%.17g` text, NA, NaN and infinities spelled out, and raw vectors
+  as base64, so a round trip is exact. Decoding builds only those types; it
   never uses `unserialize()` or `jsonlite::unserializeJSON()`, which can load
   namespaces or construct closures from stored text.
 - **Restore validates everything and runs nothing.** The envelope, the decoded
@@ -71,7 +72,10 @@ back from storage Deputy doesn't control.
   replayed turns). Children are kept in order; one that doesn't fit is kept
   without its transcript (`retention$transcript = "omitted"`) or left out,
   newest first if the whole record is still too large, and the record counts
-  both. A record saved under a larger disclosure bound than the lead now has
+  both; a child whose outcome alone is over the disclosure bound is left out
+  and counted. The disclosure budget starts from the empty history's own size
+  (schema, scope, containers), and a record that can't fit even that saves
+  nothing. A record saved under a larger disclosure bound than the lead now has
   is restored without transcripts rather than refused. A save that fails (for
   example, a requester the disclosure refuses) keeps the last good record for
   that conversation, since shinychat rebuilds `values` from scratch on every

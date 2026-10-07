@@ -471,8 +471,34 @@ release_conversation <- function(owner, handle) {
   cp$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
   trusted_release_conversation(entry)
   op$owned_conversations[[handle]] <- NULL
+  conversation_remove_routes(owner, handle)
   # Release snapshots too; hosts can explicitly export them beforehand.
   op$subagent_runs[entry$ids] <- NULL
+  invisible(NULL)
+}
+
+# Routes to a released agent can only fail, so they leave the owner's tools:
+# the model no longer sees them, and later registry checks don't trip on them.
+conversation_remove_routes <- function(owner, handle) {
+  op <- owner$.__enclos_env__$private
+  tools <- op$.chat$get_tools()
+  dead <- vapply(
+    tools,
+    function(tool) {
+      identical(
+        attr(
+          trusted_tool_source(tool),
+          "deputy_composition_handle",
+          exact = TRUE
+        ),
+        handle
+      )
+    },
+    logical(1)
+  )
+  if (any(dead)) {
+    op$.chat$set_tools(tools[!dead])
+  }
   invisible(NULL)
 }
 

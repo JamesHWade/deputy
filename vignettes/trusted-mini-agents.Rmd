@@ -364,8 +364,9 @@ retained agent's model gets the receipt instead of the value.
 A retained agent may have a policy of its own. Both apply while it is
 retained: its results reach its own `on_result` too, a tool is exempt only if
 both policies exempt it, and a receipt is used if either policy asks for one.
-The two can't name different tools for the same kind of result. Releasing the
-agent gives it back its own policy.
+The two can't name different tools for the same kind of result, and neither
+can two retained agents. Releasing the agent gives it back its own policy and
+removes the tools you made for it with `delegation_tool()`.
 
 Commons chats can be retained this way, but not as they come. Their
 `run_sql` and `run_r` tools compute anything the model asks for, so they would

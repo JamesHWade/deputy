@@ -274,6 +274,79 @@ test_that("only Deputy's own routes to admitted agents are accepted", {
   expect_identical(names(root$get_tools()), c(before, "ask_sales"))
 })
 
+test_that("retained agents can't give one result type two producers", {
+  measure <- routes_measure_tool(60)
+  audit_tool <- function(value) {
+    ellmer::tool(
+      function() value,
+      name = "run_audit",
+      description = "Run the audit.",
+      annotations = ellmer::tool_annotations(
+        read_only_hint = TRUE,
+        open_world_hint = FALSE
+      )
+    )
+  }
+  audit <- audit_tool("audited")
+  specialist <- function(tool, ...) {
+    Agent$new(
+      routes_offline_chat(),
+      tools = list(measure, tool),
+      trusted_results = TrustedResults(...)
+    )
+  }
+  root <- routes_root(routes_offline_chat(), measure, routes_deliveries())
+  root$retain_agent(
+    specialist(audit, audit = audit),
+    UsageLimits(max_requests = 4)
+  )
+  # Another specialist's own producer for the same type is refused.
+  other_audit <- audit_tool("other")
+  other <- specialist(other_audit, audit = other_audit)
+  expect_error(
+    root$retain_agent(other, UsageLimits(max_requests = 4)),
+    "different producer in another retained agent"
+  )
+  expect_null(other$.__enclos_env__$private$.trusted_root)
+  # So is the same producer under another type.
+  expect_error(
+    root$retain_agent(
+      specialist(audit, check = audit),
+      UsageLimits(max_requests = 4)
+    ),
+    "two result types"
+  )
+  # The same producer for the same type is fine.
+  expect_no_error(root$retain_agent(
+    specialist(audit, audit = audit),
+    UsageLimits(max_requests = 4)
+  ))
+})
+
+test_that("releasing a retained agent removes its routes from the owner", {
+  measure <- routes_measure_tool(60)
+  root <- routes_root(routes_offline_chat(), measure, routes_deliveries())
+  handle <- root$retain_agent(
+    Agent$new(routes_offline_chat(), tools = list(measure)),
+    UsageLimits(max_requests = 4)
+  )
+  routes_route(root, handle)
+  expect_true("ask_sales" %in% names(root$get_tools()))
+  root$release_agent(handle)
+  expect_false("ask_sales" %in% names(root$get_tools()))
+  # The owner's registry still accepts tools.
+  expect_no_error(root$register_tool(routes_read_tool()))
+  # The same holds for an owner without a policy.
+  plain <- Agent$new(routes_offline_chat())
+  handle <- plain$retain_agent(
+    Agent$new(routes_offline_chat(), tools = list(routes_measure_tool(1))),
+    UsageLimits(max_requests = 4)
+  )
+  routes_route(plain, handle)
+  plain$release_agent(handle)
+  expect_false("ask_sales" %in% names(plain$get_tools()))
+})
+
 test_that("a retained producer can't be swapped after admission", {
   measure <- routes_measure_tool()
   root <- routes_root(routes_offline_chat(), measure, routes_deliveries())
