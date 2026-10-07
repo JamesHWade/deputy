@@ -1438,6 +1438,44 @@ test_that("saved children stay with the scope they were saved under", {
   expect_null(subagent_history_status(state)$error)
 })
 
+test_that("status doesn't count a record saved under another scope", {
+  counter <- new.env()
+  counter$calls <- 0L
+  scope <- list(owner_id = "u1", conversation_id = "c1")
+  lead <- history_lead(
+    history_root_server(),
+    history_sales_server(),
+    counter,
+    scope = scope
+  )
+  lead$conversation_id <- "conv-a"
+  lead$run_sync("Revenue?")
+  saved <- subagent_history_save(history_state(lead, "conv-a"), list())
+  # This requester may see only the scope the lead moves to.
+  later <- LeadAgent$new(
+    runtime_chat(list(url = "http://127.0.0.1:9/v1")),
+    delegation_scope = scope,
+    delegation_disclosure = DelegationDisclosure(
+      authorize = function(requester, scope) {
+        identical(requester, "viewer") && identical(scope$owner_id, "u2")
+      }
+    )
+  )
+  state <- history_state(later, "conv-a")
+  subagent_history_restore(state, saved)
+  expect_length(state$record$history$children, 1L)
+  later$set_delegation_sources(
+    scope = list(owner_id = "u2", conversation_id = "c2")
+  )
+  status <- subagent_history_status(state)
+  expect_identical(status$saved, 0L)
+  expect_identical(
+    status$omitted,
+    list(running = 0L, transcripts = 0L, children = 0L)
+  )
+  expect_null(status$error)
+})
+
 test_that("a reopened conversation saves without access to live subagents", {
   counter <- new.env()
   counter$calls <- 0L
