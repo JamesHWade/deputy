@@ -1127,6 +1127,71 @@ test_that("saved children stay with the scope they were saved under", {
   expect_null(subagent_history_status(state)$error)
 })
 
+test_that("a reopened conversation saves without access to live subagents", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  saved <- subagent_history_save(history_state(lead, "conv-a"), list())
+  # A new lead whose disclosure allows the conversation's scope but not its
+  # own live one, with a stricter redactor.
+  later <- history_lead(NULL, NULL, counter)
+  later$.__enclos_env__$private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) {
+      identical(requester, "viewer") && !is.null(scope$chat_conversation_id)
+    },
+    redact = function(view, requester) {
+      view$outcome$answer <- "[withheld]"
+      view
+    }
+  )
+  state <- history_state(later, "conv-a")
+  subagent_history_restore(state, saved)
+  resaved <- subagent_history_save(state, list())$deputy_subagents
+  expect_null(subagent_history_status(state)$error)
+  child <- history_parse(resaved$data)$history$children[[1L]]
+  expect_identical(child$outcome$answer, "[withheld]")
+})
+
+test_that("a saved child its live record can't show again is counted once", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  state <- history_state(lead, "conv-a")
+  subagent_history_save(state, list())
+  expect_identical(subagent_history_status(state)$saved, 1L)
+  counts <- function(children = 0L) {
+    list(running = 0L, transcripts = 0L, children = children)
+  }
+  # The disclosure bound tightens below the child's outcome while it is
+  # still live: its saved copy goes, and it is left out once.
+  empty <- length(serialize(
+    list(
+      schema_version = 1L,
+      settled = TRUE,
+      scope = subagent_history_scope(lead, "conv-a"),
+      children = list()
+    ),
+    NULL,
+    version = 3
+  ))
+  private <- lead$.__enclos_env__$private
+  private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    max_bytes = empty + 100
+  )
+  resaved <- subagent_history_save(state, list())$deputy_subagents
+  expect_null(subagent_history_status(state)$error)
+  expect_identical(subagent_history_status(state)$saved, 0L)
+  expect_identical(subagent_history_status(state)$omitted, counts(1L))
+  subagent_history_restore(state, list(deputy_subagents = resaved))
+  expect_false(is.null(state$record))
+  # Saved again once the bound allows it, with nothing left out.
+  private$.delegation_disclosure <- history_disclosure()
+  subagent_history_save(state, list())
+  expect_identical(subagent_history_status(state)$saved, 1L)
+  expect_identical(subagent_history_status(state)$omitted, counts())
+})
+
 test_that("a save the requester may not see keeps the last good record", {
   counter <- new.env()
   counter$calls <- 0L
