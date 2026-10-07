@@ -178,6 +178,14 @@ subagent_chat_server <- function(
   conversation_views <- function(live) {
     subagent_history_panel_views(conversation, live)
   }
+  # With a conversation, only its own live subagents are read, so other
+  # conversations' subagents can't make its list too large to show.
+  live_views <- function(lead, requester) {
+    if (is.null(conversation)) {
+      return(lead$inspect_subagents(requester))
+    }
+    subagent_history_live_views(conversation, lead, requester)
+  }
   poll_interval <- context_policy_whole_number(poll_interval, "poll_interval")
   if (is.null(poll_interval) || poll_interval < 100L) {
     cli::cli_abort("poll_interval must be at least 100 milliseconds.")
@@ -262,9 +270,15 @@ subagent_chat_server <- function(
       }
       clear()
       state$rendered <- view
-      if (!is.null(state$reader)) {
-        state$partial_cursor <- previous_cursor %||%
+      if (!is.null(state$reader) && is.null(previous_cursor)) {
+        previous_cursor <- if (is.null(conversation)) {
           state$reader$snapshot()$cursor
+        } else {
+          subagent_history_cursor(value(lead), requester())
+        }
+      }
+      if (!is.null(state$reader)) {
+        state$partial_cursor <- previous_cursor
       }
       for (message in subagent_chat_messages(view$turns)) {
         shinychat::chat_append_message(
@@ -377,7 +391,7 @@ subagent_chat_server <- function(
           if (closed()) {
             detach()
             current <- filter_views(conversation_views(
-              current_lead$inspect_subagents(current_requester)
+              live_views(current_lead, current_requester)
             ))
             if (!identical(current, views())) {
               update_views(current)
@@ -392,12 +406,18 @@ subagent_chat_server <- function(
             clear()
             state$lead <- current_lead
             state$reader <- current_lead$observe_subagents(current_requester)
-            update_views(conversation_views(state$reader$snapshot()$children))
+            update_views(conversation_views(
+              if (is.null(conversation)) {
+                state$reader$snapshot()$children
+              } else {
+                live_views(current_lead, current_requester)
+              }
+            ))
             render_child()
           }
           update <- state$reader$poll()
           fresh_views <- filter_views(conversation_views(
-            current_lead$inspect_subagents(current_requester)
+            live_views(current_lead, current_requester)
           ))
           disclosure_changed <- !identical(fresh_views, views())
           if (

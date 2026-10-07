@@ -449,6 +449,56 @@ test_that("each conversation saves only its own subagents", {
   }
 })
 
+test_that("other conversations' subagents don't crowd out the open one", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  root <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "One?")),
+    runtime_reply("Lead: one."),
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Two?")),
+    runtime_reply("Lead: two.")
+  ))
+  sales <- local_runtime_server(list(
+    runtime_reply(tool = "call_measure"),
+    runtime_reply("One is 60."),
+    runtime_reply(tool = "call_measure"),
+    runtime_reply("Two is 60.")
+  ))
+  lead <- history_lead(root, sales, counter)
+  history_session(
+    lead,
+    store,
+    function(session, chat, saver) {
+      history_submit(session, chat, store, "One?")
+      # Room for one subagent's view, not for two.
+      one <- length(serialize(
+        lead$inspect_subagents("viewer"),
+        NULL,
+        version = 3
+      ))
+      lead$.__enclos_env__$private$.delegation_disclosure <-
+        DelegationDisclosure(
+          authorize = function(requester, scope) identical(requester, "viewer"),
+          max_bytes = round(one * 1.5)
+        )
+      session$setInputs(chat_history_new = 1L)
+      session$flushReact()
+      two <- history_submit(session, chat, store, "Two?")
+      expect_error(
+        lead$inspect_subagents("viewer"),
+        class = "deputy_disclosure_bound"
+      )
+      panel <- session$userData$panel
+      session$elapse(200)
+      views <- panel$views()
+      expect_length(views, 1L)
+      expect_identical(views[[1L]]$outcome$runtime$host_conversation_id, two)
+    },
+    panel = TRUE
+  )
+})
+
 test_that("the subagent panel shows saved subagents read-only", {
   counter <- new.env()
   counter$calls <- 0L
