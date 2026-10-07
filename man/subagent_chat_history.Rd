@@ -26,7 +26,9 @@ Invisibly, a list of functions:
 \itemize{
 \item \code{restored(transcript = TRUE)}: the subagents saved with the open
 conversation, as \code{\link[=delegation_history]{delegation_history()}} returns them, or \code{NULL}. With
-\code{transcript = FALSE}, without their conversations.
+\code{transcript = FALSE}, without their conversations, each marked
+\code{retention$transcript = "not_requested"} (or \code{"omitted"} when it wasn't
+saved).
 \item \code{status()}: the open conversation's ID, how many subagents its saved
 record holds, how many were still running, saved without their
 conversation or left out at the last save (including subagents an
