@@ -102,7 +102,9 @@ back from storage Deputy doesn't control.
 - **The panel follows the open conversation.** `subagent_chat_server(conversation
   = )` shows live children whose `host_conversation_id` is the open
   conversation and saved children that aren't live, listing saved ones without
-  transcripts and replaying a transcript only when that child is selected.
+  transcripts and replaying a transcript only when that child is selected. It
+  reads and bounds only the open conversation's live records, so other
+  conversations' children can't push its list over the disclosure bound.
 
 ## Consequences
 

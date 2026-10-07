@@ -45,10 +45,13 @@ into an earlier message.
   retained specialist's earlier history doesn't shift it). A call keeps its
   number from one poll to the next by its provider ID, tool and arguments, so
   a redaction that later hides an earlier call can't move a later call onto
-  its card; identical calls are told apart by the result each card has shown
-  (identical calls with identical results can't be, but their cards look the
-  same); a shown call that the view no longer includes is closed with a note
-  when the delegation settles. shinychat pairs request and result by
+  its card. Identical calls are told apart by what their cards show: a call
+  still running, or one whose result no identical card has shown, takes the
+  earliest card still waiting; then a call whose result an identical card has
+  shown takes a waiting card if one is left, since a redaction that hides one
+  of two identical calls far more often hides the earlier, finished one. A
+  shown call that the view no longer includes is closed with a note when the
+  delegation settles. shinychat pairs request and result by
   that ID, so concurrent children, repeated specialist names and provider
   tool-call IDs reused across conversations cannot collide, and the ID reveals
   nothing a redactor removed. The marker keeps the provider-independent
@@ -57,7 +60,8 @@ into an earlier message.
 - **Attribution goes in the activity row label.** The display keeps the tool's
   own title, icon and HTML. `label` names the subagent by the name its
   redacted view gives; later delegations to the same name are numbered and a
-  descendant names its parent ("reviewer (via analyst)").
+  descendant names its parent ("reviewer (via analyst)") when its redacted
+  view still reports one.
 - **The consumer side computes it.** `Agent$stream_async(stream = "content")`
   merges activity into the lead's stream only while a presenter is enabled. It
   races the lead's next chunk with a short timer; on each tick it reads the

@@ -833,6 +833,46 @@ subagent_history_panel_views <- function(conversation, live) {
   c(restored, live)
 }
 
+# The open conversation's live subagents as `$inspect_subagents()` shows
+# them, reading and bounding only the records that ran in it, so other
+# conversations' subagents can't push its list over the disclosure bound.
+subagent_history_live_views <- function(conversation, lead, requester) {
+  disclosure <- lead$.__enclos_env__$private$.delegation_disclosure
+  inspection_authorize(disclosure, requester, inspection_scope(lead))
+  id <- conversation$conversation_id()
+  if (is.null(id)) {
+    return(list())
+  }
+  ids <- vapply(
+    subagent_history_records(lead, id),
+    function(record) record$delegation_id,
+    character(1),
+    USE.NAMES = FALSE
+  )
+  records <- Filter(
+    function(record) record$delegation_id %in% ids,
+    lead_delegation_records(lead, usage = TRUE)
+  )
+  views <- lapply(records, function(record) {
+    view <- disclosure$redact(
+      lead_inspection_view(lead, record, FALSE),
+      requester
+    )
+    if (!is.list(view)) {
+      cli::cli_abort("Disclosure redaction must return a list.")
+    }
+    inspection_portable(view)
+    view
+  })
+  inspection_bound(views, disclosure)
+}
+
+# The observation cursor now, read without building any subagent's view.
+subagent_history_cursor <- function(lead, requester) {
+  reader <- lead$observe_subagents(requester)
+  tryCatch(reader$poll()$cursor, finally = reader$close())
+}
+
 # One child for the panel to show: live if it ran in the open conversation,
 # otherwise saved with it.
 subagent_history_panel_child <- function(conversation, live, id) {
