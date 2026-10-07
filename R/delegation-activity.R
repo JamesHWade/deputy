@@ -801,7 +801,30 @@ activity_refresh <- function(
     result_ids <- lapply(calls, function(call) {
       if (!is.null(call$result)) activity_call_identity(call$result)
     })
-    slots <- activity_call_slots(known, call_ids, result_ids)
+    # Its provider ID and tool alone identify a call when no other request in
+    # the record or the view has them, so a call the redactor shows
+    # differently from one view to the next keeps its card.
+    call_keys <- vapply(
+      calls,
+      function(call) activity_call_key(call$request),
+      character(1)
+    )
+    record_keys <- activity_record_keys(record)
+    unique_keys <- vapply(
+      call_keys,
+      function(key) {
+        sum(record_keys == key) == 1L && sum(call_keys == key) == 1L
+      },
+      logical(1),
+      USE.NAMES = FALSE
+    )
+    slots <- activity_call_slots(
+      known,
+      call_ids,
+      result_ids,
+      call_keys,
+      unique_keys
+    )
     for (position in seq_along(calls)) {
       call <- calls[[position]]
       call_identity <- call_ids[[position]]
@@ -809,8 +832,15 @@ activity_refresh <- function(
       index <- slots[[position]]
       if (is.na(index)) {
         index <- length(known) + 1L
-        known[[index]] <- list(identity = call_identity, emitted = character())
+        known[[index]] <- list(
+          identity = call_identity,
+          key = call_keys[[position]],
+          emitted = character()
+        )
       }
+      # The card follows the call as it's shown now, so later views match it
+      # in that form.
+      known[[index]]$identity <- call_identity
       emitted <- known[[index]]$emitted
       activity_id <- paste0("deputy_activity_", entry$key, "_", index)
       marker <- activity_lineage(
@@ -862,6 +892,8 @@ activity_refresh <- function(
           emitted <- c(emitted, "result")
           known[[index]]$result <- result_identity %||% "closed"
         }
+      } else if (!is.null(result_identity)) {
+        known[[index]]$result <- result_identity
       }
       known[[index]]$emitted <- emitted
     }
@@ -896,6 +928,25 @@ activity_call_identity <- function(content) {
   digest::digest(parts, algo = "sha256")
 }
 
+# A request's provider ID and tool, without its arguments.
+activity_call_key <- function(request) {
+  digest::digest(list(request@id, request@name), algo = "sha256")
+}
+
+# The keys of the requests in a delegation's own turns, as recorded. Used only
+# to match calls to cards, never shown.
+activity_record_keys <- function(record) {
+  keys <- character()
+  for (turn in activity_own_turns(record)) {
+    for (content in turn@contents) {
+      if (inherits(content, "ellmer::ContentToolRequest")) {
+        keys <- c(keys, activity_call_key(content))
+      }
+    }
+  }
+  keys
+}
+
 # The shown card each call in the view is, NA for a call not shown yet.
 # Identical calls (the same provider ID, tool and arguments) are told apart by
 # what their cards show. A call still running, or one whose result no
@@ -903,8 +954,22 @@ activity_call_identity <- function(content) {
 # whose result an identical card has shown takes a waiting card if one is
 # left, and otherwise that card: when one of two identical calls is hidden,
 # it is far likelier the earlier, finished one than a later one still running.
-activity_call_slots <- function(known, calls, results) {
+# Last, a call no card matches as shown, whose key is `unique` to it in the
+# record and the view, takes the earliest card with that key: it is the same
+# call, its arguments or result shown differently.
+activity_call_slots <- function(
+  known,
+  calls,
+  results,
+  keys = rep(NA_character_, length(calls)),
+  unique = logical(length(calls))
+) {
   identities <- vapply(known, function(slot) slot$identity, character(1))
+  slot_keys <- vapply(
+    known,
+    function(slot) slot$key %||% NA_character_,
+    character(1)
+  )
   shown <- lapply(known, function(slot) slot$result)
   waiting <- vapply(shown, is.null, logical(1))
   taken <- logical(length(known))
@@ -933,6 +998,9 @@ activity_call_slots <- function(known, calls, results) {
   for (position in which(repeated)) {
     open <- waiting & identities == calls[[position]] & !taken
     pick(position, if (any(open)) open else same(position))
+  }
+  for (position in which(is.na(slots) & unique)) {
+    pick(position, !is.na(slot_keys) & slot_keys == keys[[position]])
   }
   slots
 }
