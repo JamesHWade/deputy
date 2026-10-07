@@ -262,7 +262,12 @@ tool_display_projection <- function(content) {
   display <- list()
   source <- extra$display
   if (!is.null(source)) {
-    if (inherits(source, "shinychat_tool_result_display")) {
+    # Only a plain list with exactly shinychat's class is a display; an
+    # environment or pointer carrying it can't be unclassed.
+    if (
+      is.list(source) &&
+        identical(oldClass(source), "shinychat_tool_result_display")
+    ) {
       source <- unclass(source)
     }
     if (!is.list(source) || is.object(source)) {
