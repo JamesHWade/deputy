@@ -968,6 +968,50 @@ test_that("saved children are redacted again with the current policy", {
   expect_identical(state$record$keys, record$keys)
 })
 
+test_that("a transcript the redactor removes is saved as omitted", {
+  counter <- new.env()
+  counter$calls <- 0L
+  flags <- new.env()
+  flags$strip <- TRUE
+  disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    redact = function(view, requester) {
+      if (isTRUE(flags$strip)) {
+        view$transcript <- NULL
+      }
+      view
+    }
+  )
+  counts <- function(transcripts = 0L) {
+    list(running = 0L, transcripts = transcripts, children = 0L)
+  }
+  child_of <- function(saved) {
+    history_parse(saved$deputy_subagents$data)$history$children[[1L]]
+  }
+  lead <- history_settled_lead("conv-a", counter)
+  lead$.__enclos_env__$private$.delegation_disclosure <- disclosure
+  # A live child.
+  state <- history_state(lead, "conv-a")
+  child <- child_of(subagent_history_save(state, list()))
+  expect_identical(subagent_history_status(state)$omitted, counts(1L))
+  expect_null(child$transcript)
+  expect_identical(child$retention$transcript, "omitted")
+
+  # A saved child, reopened where the redactor now removes its transcript.
+  flags$strip <- FALSE
+  saved <- subagent_history_save(history_state(lead, "conv-a"), list())
+  expect_identical(child_of(saved)$retention$transcript, "included")
+  flags$strip <- TRUE
+  later <- history_lead(NULL, NULL, counter)
+  later$.__enclos_env__$private$.delegation_disclosure <- disclosure
+  state <- history_state(later, "conv-a")
+  subagent_history_restore(state, saved)
+  child <- child_of(subagent_history_save(state, list()))
+  expect_identical(subagent_history_status(state)$omitted, counts(1L))
+  expect_null(child$transcript)
+  expect_identical(child$retention$transcript, "omitted")
+})
+
 test_that("children left out stay counted when another session saves", {
   counter <- new.env()
   counter$calls <- 0L
