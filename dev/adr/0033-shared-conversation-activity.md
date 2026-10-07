@@ -31,8 +31,10 @@ into an earlier message.
   into the transcript; the wrapped Chat, `get_context_turns()`, provider
   requests, usage counts and compaction never contain them. `set_turns()` and
   context forks separate marked contents again, so a restored shinychat
-  conversation or a copied history cannot hand them to a model. Clones do not
-  inherit the presenter.
+  conversation or a copied history cannot hand them to a model. Replacing the
+  conversation (`set_turns()`, or a successful `load_session()`, which drops
+  the shown cards) restarts the presenter's queue, labels and counts. Clones do
+  not inherit the presenter.
 - **Identity is the delegation and the call's position in it.** An activity ID
   is `deputy_activity_<key>_<n>`, where `key` is an opaque token drawn once
   per delegation and `n` counts the delegation's own tool requests in order
@@ -57,8 +59,9 @@ into an earlier message.
   a delegation's cards precede its result. Runtime execution remains the only
   consumer of each child stream; reading never runs a tool or resumes an agent.
   Disclosure errors leave the lead's run untouched and show no activity. A
-  redacted view over the disclosure's `max_bytes` is not read further: one
-  note card says its calls aren't shown.
+  redacted view over the disclosure's `max_bytes` is not read further: its
+  calls already shown get a "Not shown" result and one note card says the rest
+  aren't shown.
 - **Nothing is left running in saved history.** A call whose delegation
   settles without a result, or that is still open when the lead's reply ends,
   gets a "Not completed" result card. Each reply shows at most 256 calls; a

@@ -55,7 +55,8 @@ subagent_chat_lineage <- function(runtime, compact = FALSE) {
 #' agent's subagents; selecting one shows its conversation, with tool calls
 #' and attachments, and streams its current output. A tool's card looks as it
 #' did in the subagent's own chat, with scripts, event handlers, forms and
-#' external resources removed from its HTML. The panel has no input box and
+#' external resources removed from its HTML and its content kept inside the
+#' card. The panel has no input box and
 #' can't start, resume or approve work. It needs shiny, bslib, commonmark,
 #' xml2 and shinychat (>= 0.5.0).
 #' @param id Shiny module ID.
