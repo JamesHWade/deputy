@@ -81,8 +81,9 @@ back from storage Deputy doesn't control.
   empty history's own size
   (schema, scope, containers), and a record that can't fit even that saves
   nothing. A record saved under a larger disclosure bound than the lead now has
-  is restored without transcripts rather than refused, with as many outcomes
-  as the current bound holds. A save that fails (for
+  is restored without transcripts rather than refused, with as many of its
+  oldest outcomes as the current bound holds (found by bisection, since fewer
+  children only make the history smaller). A save that fails (for
   example, a requester the disclosure refuses) keeps the last good record for
   that conversation, since shinychat rebuilds `values` from scratch on every
   save.
@@ -91,7 +92,10 @@ back from storage Deputy doesn't control.
   back, so a stricter policy also cleans what is stored. They are carried only
   for a requester the disclosure authorizes for the conversation's own scope,
   the one `delegation_history()` reads them with; otherwise the save keeps the
-  last good record without showing them to the redactor. Children are matched
+  last good record without showing them to the redactor. Children saved under
+  another scope (a lead moved since with `set_delegation_sources(scope = )`)
+  are not carried, redacted or counted: the save replaces them with the
+  current scope's live children. Children are matched
   across saves by a SHA-256 digest of their delegation ID, kept beside the
   views, so matching survives a redactor that removes the ID itself.
 - **The panel follows the open conversation.** `subagent_chat_server(conversation
@@ -110,7 +114,8 @@ back from storage Deputy doesn't control.
 - Artifacts a child offloaded to disk are kept as references
   (`availability = "unresolved"` on replay); their bytes are not copied into
   conversation storage.
-- A host that changes its `delegation_scope` shape can no longer read earlier
-  records; the next save replaces them with the live children.
+- A host that changes its `delegation_scope`, in shape or by moving the lead,
+  can no longer read earlier records; the next save replaces them with the
+  live children.
 - Each save rewrites the conversation's whole record. Hosts with many large
   displays should lower `max_bytes` or rely on the named omissions.

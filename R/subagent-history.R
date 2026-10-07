@@ -406,6 +406,12 @@ subagent_history_record <- function(state, conversation_id) {
   earlier <- 0L
   if (identical(state$conversation_id, conversation_id)) {
     prior <- state$record
+    # Saved children belong to the scope they were saved under. A lead moved
+    # to another scope since (`set_delegation_sources(scope = )`) neither
+    # carries them nor counts them, and this save replaces them.
+    if (!identical(prior$history$scope, scope)) {
+      prior <- NULL
+    }
     carried <- prior$history$children %||% list()
     keys <- prior$keys %||% character()
     # Saved children are this conversation's history: only a requester who
@@ -732,20 +738,34 @@ subagent_history_restored <- function(state, transcript = TRUE) {
   tryCatch(replay(history), deputy_disclosure_bound = function(error) {
     # Saved under a larger bound than the lead's disclosure now allows: the
     # outcomes are still shown, without their transcripts, as many as fit.
-    history$children <- lapply(
-      history$children,
-      subagent_history_without_transcript
-    )
-    repeat {
-      shown <- tryCatch(
-        replay(history),
-        deputy_disclosure_bound = function(error) NULL
-      )
-      if (!is.null(shown) || !length(history$children)) {
-        return(shown %||% list())
-      }
-      history$children[[length(history$children)]] <- NULL
+    children <- lapply(history$children, subagent_history_without_transcript)
+    first <- function(n) {
+      history$children <- children[seq_len(n)]
+      tryCatch(replay(history), deputy_disclosure_bound = function(error) {
+        NULL
+      })
     }
+    shown <- first(length(children))
+    if (!is.null(shown)) {
+      return(shown)
+    }
+    # Fewer children only make the history smaller, so the longest run of
+    # them that fits is found by bisection: `low` fits or is zero, `high`
+    # doesn't fit.
+    shown <- list()
+    low <- 0L
+    high <- length(children)
+    while (low < high) {
+      middle <- (low + high) %/% 2L
+      fits <- first(middle)
+      if (is.null(fits)) {
+        high <- middle
+      } else {
+        shown <- fits
+        low <- middle + 1L
+      }
+    }
+    shown
   })
 }
 

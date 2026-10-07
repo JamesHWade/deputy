@@ -703,6 +703,51 @@ test_that("saved records stay within what the lead's disclosure can replay", {
   expect_true(all(c(2L, 1L, 0L) %in% shown))
 })
 
+test_that("a tightened bound is searched, not tried one child at a time", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  state <- history_state(lead, "conv-a")
+  record <- subagent_history_record(state, "conv-a")
+  child <- subagent_history_without_transcript(record$history$children[[1L]])
+  record$history$children <- rep(list(child), 64L)
+  record$keys <- vapply(
+    seq_len(64L),
+    function(i) subagent_history_key(as.character(i)),
+    ""
+  )
+  state$record <- record
+  state$conversation_id <- "conv-a"
+  open <- DelegationDisclosure(
+    authorize = function(requester, scope) TRUE,
+    max_bytes = 1e9
+  )
+  sized <- function(n) {
+    history <- record$history
+    history$children <- history$children[seq_len(n)]
+    views <- delegation_history(
+      history,
+      "viewer",
+      open,
+      subagent_history_scope(lead, "conv-a")
+    )
+    max(
+      length(serialize(history, NULL, version = 3)),
+      length(serialize(views, NULL, version = 3))
+    )
+  }
+  reads <- 0L
+  lead$.__enclos_env__$private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) {
+      reads <<- reads + 1L
+      identical(requester, "viewer")
+    },
+    max_bytes = sized(10L)
+  )
+  expect_length(subagent_history_restored(state), 10L)
+  expect_lte(reads, 10L)
+})
+
 test_that("raw tool results are saved and read back", {
   counter <- new.env()
   counter$calls <- 0L
@@ -907,6 +952,48 @@ test_that("saved children reach no one the conversation refuses", {
     history_parse(saved$deputy_subagents$data)
   )
   expect_false(is.null(subagent_history_status(state)$error))
+})
+
+test_that("saved children stay with the scope they were saved under", {
+  counter <- new.env()
+  counter$calls <- 0L
+  scope <- list(owner_id = "u1", conversation_id = "c1")
+  lead <- history_lead(
+    history_root_server(),
+    history_sales_server(),
+    counter,
+    scope = scope
+  )
+  lead$conversation_id <- "conv-a"
+  lead$run_sync("Revenue?")
+  saved <- subagent_history_save(history_state(lead, "conv-a"), list())
+  redacted <- 0L
+  disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    redact = function(view, requester) {
+      redacted <<- redacted + 1L
+      view
+    }
+  )
+  # Reopened by a lead with nothing live, which then moves to another scope.
+  later <- LeadAgent$new(
+    runtime_chat(list(url = "http://127.0.0.1:9/v1")),
+    delegation_scope = scope,
+    delegation_disclosure = disclosure
+  )
+  state <- history_state(later, "conv-a")
+  subagent_history_restore(state, saved)
+  expect_length(state$record$history$children, 1L)
+  later$set_delegation_sources(
+    scope = list(owner_id = "u2", conversation_id = "c2")
+  )
+  resaved <- subagent_history_save(state, list())$deputy_subagents
+  record <- history_parse(resaved$data)
+  expect_identical(redacted, 0L)
+  expect_length(record$history$children, 0L)
+  expect_identical(record$history$scope$owner_id, "u2")
+  expect_identical(record$omitted$children, 0L)
+  expect_null(subagent_history_status(state)$error)
 })
 
 test_that("a save the requester may not see keeps the last good record", {
