@@ -95,7 +95,10 @@ into an earlier message.
   Disclosure errors leave the lead's run untouched and show no activity. A
   redacted view over the disclosure's `max_bytes` is not read further: its
   calls already shown get a "Not shown" result and one note card says the rest
-  aren't shown.
+  aren't shown. Each card is bounded on its own as well: arguments to 16 KiB,
+  a result value to 256 KiB, an error to 4 KiB, a label to 1 KiB and the tool
+  name to 256 bytes, so many delegations can't each fill a card up to
+  `max_bytes`.
 - **Nothing is left running in saved history.** A call whose delegation
   settles without a result, or that is still open when the lead's reply ends,
   gets a "Not completed" result card; one still open when the presenter stops
