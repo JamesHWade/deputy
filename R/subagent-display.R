@@ -379,27 +379,22 @@ subagent_display_style_element <- function(css, ids, prefix) {
     }
     out
   }
+  # All of a rule's selectors are checked and rewritten at once, so a rule
+  # with many selectors costs no more than their length.
   scope <- function(prelude) {
     selectors <- trimws(strsplit(prelude, ",", fixed = TRUE)[[1L]])
-    rewritten <- character()
-    for (selector in selectors) {
-      # Sibling combinators would reach elements outside the display.
-      if (grepl("[~+]", selector)) {
-        return(NULL)
-      }
-      id <- regmatches(
-        selector,
-        regexpr("^#[A-Za-z][A-Za-z0-9_-]*", selector)
-      )
-      if (!length(id) || !substring(id, 2L) %in% ids) {
-        return(NULL)
-      }
-      rewritten <- c(
-        rewritten,
-        paste0("#", prefix, substring(selector, 2L))
-      )
+    # Sibling combinators would reach elements outside the display.
+    if (any(grepl("[~+]", selectors))) {
+      return(NULL)
     }
-    paste(rewritten, collapse = ",")
+    match <- regexpr("^#[A-Za-z][A-Za-z0-9_-]*", selectors)
+    if (
+      any(match < 0L) ||
+        !all(substring(selectors, 2L, attr(match, "match.length")) %in% ids)
+    ) {
+      return(NULL)
+    }
+    paste(paste0("#", prefix, substring(selectors, 2L)), collapse = ",")
   }
   emit <- function(blocks, nested = FALSE) {
     out <- character(length(blocks))

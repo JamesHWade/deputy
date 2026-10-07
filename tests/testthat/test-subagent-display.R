@@ -191,6 +191,20 @@ test_that("inline styles are checked in one pass, and long ones dropped", {
   )
 })
 
+test_that("a rule's selectors are rewritten in one pass", {
+  selectors <- paste(rep("#t", 80000L), collapse = ",")
+  elapsed <- system.time(
+    safe <- subagent_display_html(paste0(
+      "<style>",
+      selectors,
+      "{color:red}</style><div id=\"t\">x</div>"
+    ))
+  )[["elapsed"]]
+  expect_match(safe, "{color:red}</style>", fixed = TRUE)
+  # Selector by selector, this took over 20 seconds.
+  expect_lt(elapsed, 5)
+})
+
 test_that("Markdown displays are shown as inert HTML", {
   skip_if_not_installed("commonmark")
   safe <- subagent_safe_display(list(

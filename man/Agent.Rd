@@ -1879,7 +1879,9 @@ restore.
     The file holds the conversation (including turns removed by compaction),
 the system prompt and any compaction summary, copies of large tool
 results, the run context, file checkpoint state (when enabled) and some
-metadata, such as the time, Deputy version and provider. It doesn't hold
+metadata, such as the time, Deputy version and provider. Subagent tool
+calls shown by \code{\link[=subagent_chat_activity]{subagent_chat_activity()}} are kept beside the
+conversation, never among the turns the model reads. It doesn't hold
 tools, permissions, hooks or the Chat itself.
   }
   \subsection{Returns}{
@@ -1911,7 +1913,8 @@ the agent's, and loading fails if they disagree on an ID field. Saved
 tool results and compaction summaries are restored under this agent's
 session ID. Files saved by early development versions of Deputy can't be
 loaded. Loading errors while a run is active. Subagent tool calls shown
-by \code{\link[=subagent_chat_activity]{subagent_chat_activity()}} for the previous conversation are dropped.
+by \code{\link[=subagent_chat_activity]{subagent_chat_activity()}} come back with the conversation they were
+saved with; those shown for the previous conversation are dropped.
   }
   \subsection{Returns}{
     The agent, invisibly.

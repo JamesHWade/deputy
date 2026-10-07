@@ -353,6 +353,40 @@ test_that("tags with render hooks are never rendered", {
   expect_null(projection$display$html)
 })
 
+test_that("a tag tree whose text is over its field's limit isn't rendered", {
+  rendered <- 0L
+  local_mocked_bindings(tool_display_render_tags = function(value) {
+    rendered <<- rendered + 1L
+    htmltools::renderTags(value)
+  })
+  over <- 2 * 1024^2 + 1
+  result <- ellmer::ContentToolResult(
+    value = "60",
+    extra = list(
+      display = list(
+        title = "Measure",
+        html = htmltools::div(htmltools::span(strrep("&", over)))
+      )
+    )
+  )
+  projection <- tool_display_projection(result)
+  expect_null(projection$display$html)
+  expect_identical(projection$omitted$fields, c(html = "oversized"))
+  # The title rendered; the oversized body never was.
+  expect_identical(rendered, 0L)
+  # Text in attributes counts too.
+  result@extra$display$html <- htmltools::div(title = strrep("x", over))
+  expect_identical(
+    tool_display_projection(result)$omitted$fields,
+    c(html = "oversized")
+  )
+  expect_identical(rendered, 0L)
+  result@extra$display$html <- htmltools::div("60")
+  projection <- tool_display_projection(result)
+  expect_identical(projection$display$html, "<div>60</div>")
+  expect_identical(rendered, 1L)
+})
+
 test_that("classed objects in a display never run their methods", {
   ran <- new.env()
   ran$calls <- character()

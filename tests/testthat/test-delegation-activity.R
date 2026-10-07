@@ -532,6 +532,65 @@ test_that("a grandchild names its parent only when its view reports one", {
   fixture$root$release_agent_graph()
 })
 
+test_that("each refresh labels its cards from its own redacted view", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  hidden <- new.env(parent = emptyenv())
+  hidden$name <- FALSE
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure(
+      redact = function(view, requester) {
+        if (isTRUE(hidden$name)) {
+          view$outcome$runtime$agent_name <- NULL
+        }
+        view
+      }
+    )
+  )
+  sales <- activity_specialist(
+    "sales",
+    "60",
+    responses = list(
+      runtime_reply(tool = "call_measure"),
+      runtime_reply(tool = "call_measure"),
+      runtime_reply("sales done")
+    )
+  )
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  record <- private$subagent_runs[[id]]
+  private$subagent_runs[[id]]$turns <- record$turns[1:3]
+  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  labels <- function(items) {
+    unique(vapply(
+      items,
+      function(item) item@extra$deputy_activity$label,
+      character(1)
+    ))
+  }
+  activity_enable(root, function() "viewer")
+  activity_poll(root)
+  expect_identical(labels(activity_take(root)), "sales")
+  # The host stops showing the subagent's name: its later cards don't
+  # show it either.
+  hidden$name <- TRUE
+  private$subagent_runs[[id]] <- record
+  activity_poll(root, final = TRUE)
+  later <- activity_take(root)
+  expect_length(later, 2L)
+  expect_identical(labels(later), "subagent")
+  for (item in later) {
+    expect_null(item@extra$deputy_activity$agent_name)
+    expect_no_match(item@extra$display$label %||% "", "sales")
+  }
+  activity_disable(root)
+})
+
 test_that("viewers who may not see subagents get no activity", {
   state <- new.env(parent = emptyenv())
   state$denied <- TRUE
@@ -1282,6 +1341,75 @@ test_that("loading a session drops activity shown for another conversation", {
   shown <- unlist(lapply(agent$get_turns(), function(turn) turn@contents))
   expect_length(shown, 2L)
   expect_false(any(vapply(shown, is_activity_content, logical(1))))
+})
+
+test_that("a saved session keeps the subagent activity shown in it", {
+  chat <- ellmer::chat_openai(model = "test", credentials = function() "x")
+  card <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(
+      deputy_activity = list(
+        format = "deputy_subagent_activity",
+        version = 1L,
+        activity_id = "deputy_activity_abc_1",
+        label = "sales"
+      )
+    )
+  )
+  turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("Go"))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Done."), card))
+  )
+  saved <- Agent$new(chat$clone())
+  saved$set_turns(turns)
+  path <- withr::local_tempfile(fileext = ".rds")
+  suppressMessages(saved$save_session(path))
+  # Beside the conversation, not among the turns the model reads.
+  session <- readRDS(path)
+  expect_false(any(vapply(
+    unlist(lapply(session$turns, function(turn) turn@contents)),
+    is_activity_content,
+    logical(1)
+  )))
+  agent <- Agent$new(chat$clone())
+  suppressMessages(agent$load_session(path))
+  expect_identical(agent$get_turns(), turns)
+  context <- unlist(lapply(agent$get_context_turns(), function(turn) {
+    turn@contents
+  }))
+  expect_false(any(vapply(context, is_activity_content, logical(1))))
+  # Activity that doesn't fit the turns it's saved with is refused, and
+  # nothing is loaded.
+  bad <- function(change) {
+    session <- readRDS(path)
+    session$activity <- change(session$activity)
+    file <- withr::local_tempfile(
+      fileext = ".rds",
+      .local_envir = parent.frame()
+    )
+    saveRDS(session, file)
+    file
+  }
+  other <- Agent$new(chat$clone())
+  for (file in list(
+    bad(function(entries) {
+      entries[[1L]]$turn <- 1L
+      entries
+    }),
+    bad(function(entries) {
+      entries[[1L]]$turn <- 9L
+      entries
+    }),
+    bad(function(entries) {
+      entries[[1L]]$content <- ellmer::ContentText("not a card")
+      entries
+    })
+  )) {
+    expect_error(other$load_session(file), class = "deputy_session_load")
+    expect_length(other$get_turns(), 0L)
+  }
 })
 
 test_that("shown activity doesn't count toward a fork's size bound", {

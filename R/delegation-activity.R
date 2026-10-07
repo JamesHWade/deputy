@@ -140,6 +140,57 @@ activity_strip <- function(turns) {
   activity_split(turns)$turns
 }
 
+# Shown activity as a saved session keeps it: each card with the index of the
+# turn it was shown in, beside the turns the model reads.
+activity_session_entries <- function(overlay) {
+  if (!length(overlay)) {
+    return(NULL)
+  }
+  lapply(overlay, function(entry) {
+    list(turn = as.integer(entry$turn), content = entry$content)
+  })
+}
+
+# The shown activity of a saved session, checked against the turns it is
+# loaded with: each entry a marked card in one of the conversation's
+# assistant turns.
+activity_session_overlay <- function(session, path = NULL) {
+  entries <- if (is.list(session)) session$activity
+  if (is.null(entries)) {
+    return(list())
+  }
+  turns <- if (is.list(session$turns) && is.list(session$compacted_turns)) {
+    c(session$compacted_turns, session$turns)
+  } else {
+    list()
+  }
+  valid <- function(entry) {
+    turn <- if (is.list(entry) && !is.object(entry)) entry$turn
+    is.numeric(turn) &&
+      !is.object(turn) &&
+      length(turn) == 1L &&
+      !is.na(turn) &&
+      turn >= 1 &&
+      turn <= length(turns) &&
+      turn == round(turn) &&
+      inherits(turns[[turn]], "ellmer::AssistantTurn") &&
+      is_activity_content(entry$content)
+  }
+  if (
+    !is.list(entries) ||
+      is.object(entries) ||
+      !all(vapply(entries, valid, logical(1)))
+  ) {
+    abort_session_load(
+      "Invalid session file - its subagent activity is malformed",
+      path = path
+    )
+  }
+  lapply(entries, function(entry) {
+    list(turn = as.integer(entry$turn), content = entry$content)
+  })
+}
+
 new_activity_presenter <- function(requester, interval) {
   state <- new.env(parent = emptyenv())
   state$requester <- requester
@@ -336,7 +387,7 @@ activity_new_key <- function() {
 
 # Names come from the redacted view, and repeated names are counted by
 # delegation key, so a label never shows what the host's redactor removed.
-activity_label <- function(agent, state, name, parent_label = NULL) {
+activity_label <- function(agent, state, name) {
   keys <- c(
     vapply(
       agent$.__enclos_env__$private$.activity_overlay,
@@ -359,11 +410,7 @@ activity_label <- function(agent, state, name, parent_label = NULL) {
     )
   )
   ordinal <- length(unique(keys[nzchar(keys)])) + 1L
-  label <- if (ordinal > 1L) paste0(name, " #", ordinal) else name
-  if (!is.null(parent_label)) {
-    label <- paste0(label, " (via ", parent_label, ")")
-  }
-  inspection_text(label, 256L)
+  if (ordinal > 1L) paste0(name, " #", ordinal) else name
 }
 
 # Authorized, redacted view of one delegation with only its own turns, shaped
@@ -768,26 +815,32 @@ activity_refresh <- function(
       }
       root_call <- entry$root_call
     }
-    if (is.null(entry$label)) {
-      name <- runtime$agent_name
-      entry$agent_name <- if (is_nonempty_string(name)) {
-        inspection_text(name, 64L)
-      } else {
-        "subagent"
-      }
-      # Named only when the redacted view still reports the parent.
-      parent_id <- runtime$parent_delegation_id
-      parent_label <- if (is_nonempty_string(parent_id)) {
-        state$delegations[[parent_id]]$label %||% "a subagent"
-      }
-      entry$label <- activity_label(
-        agent,
-        state,
-        entry$agent_name,
-        parent_label
-      )
+    # The label follows each refresh's redacted view. The number that tells
+    # delegations of one name apart is drawn once, for the name first shown,
+    # and is used only while the view still shows that name.
+    name <- runtime$agent_name
+    name <- if (is_nonempty_string(name)) {
+      inspection_text(name, 64L)
+    } else {
+      "subagent"
+    }
+    if (is.null(entry$agent_name)) {
+      entry$agent_name <- name
+      entry$numbered <- activity_label(agent, state, name)
       state$delegations[[id]] <- entry
     }
+    label <- if (identical(name, entry$agent_name)) entry$numbered else name
+    # Named only when the redacted view still reports the parent.
+    parent_id <- runtime$parent_delegation_id
+    if (is_nonempty_string(parent_id)) {
+      label <- paste0(
+        label,
+        " (via ",
+        state$delegations[[parent_id]]$label %||% "a subagent",
+        ")"
+      )
+    }
+    entry$label <- inspection_text(label, 256L)
     calls <- activity_calls(view)
     # Each call keeps the number it was first shown with, matched by its
     # provider ID, tool and arguments, so a redaction that later hides an
