@@ -78,7 +78,11 @@ into an earlier message.
   view still reports one. The label is worked out again from each read's
   redacted view, so a redactor that stops showing the name or the parent
   stops them appearing on later cards; the number is drawn once, for the name
-  first shown, and is used only while the view still shows that name.
+  first shown, and is used only while the view still shows that name. An
+  ancestor's part of a descendant's card (the parent's label, the lead's
+  call ID) comes from the ancestor's view as read for the same refresh, never
+  an earlier one, so a viewer or redaction that changed while the ancestor's
+  record stood still sees only what it allows now.
 - **The consumer side computes it.** `Agent$stream_async(stream = "content")`
   merges activity into the lead's stream only while a presenter is enabled. It
   races the lead's next chunk with a short timer; on each tick it reads the
