@@ -98,6 +98,15 @@ history_encode <- function(x, depth = 0L) {
     list(t = "dbl", v = lapply(values, history_encode_double))
   } else if (is.character(x)) {
     list(t = "chr", v = lapply(values, text))
+  } else if (is.raw(x)) {
+    list(t = "raw", v = list(gsub("\n", "", jsonlite::base64_enc(values))))
+  } else if (is.complex(x)) {
+    list(
+      t = "cplx",
+      v = lapply(values, function(value) {
+        list(history_encode_double(Re(value)), history_encode_double(Im(value)))
+      })
+    )
   } else {
     history_codec_abort()
   }
@@ -169,6 +178,19 @@ history_decode_text <- function(value) {
   value
 }
 
+history_decode_raw <- function(values) {
+  if (
+    length(values) != 1L ||
+      !is.character(values[[1L]]) ||
+      length(values[[1L]]) != 1L ||
+      !grepl("^[A-Za-z0-9+/]*={0,2}$", values[[1L]]) ||
+      nchar(values[[1L]]) %% 4L != 0L
+  ) {
+    history_codec_abort()
+  }
+  jsonlite::base64_dec(values[[1L]])
+}
+
 history_decode <- function(node, depth = 0L) {
   if (
     depth > 64L ||
@@ -210,6 +232,20 @@ history_decode <- function(node, depth = 0L) {
     int = vapply(values, history_decode_number, integer(1), integer = TRUE),
     dbl = vapply(values, history_decode_number, double(1), integer = FALSE),
     chr = vapply(values, history_decode_text, character(1)),
+    raw = history_decode_raw(values),
+    cplx = vapply(
+      values,
+      function(value) {
+        if (!is.list(value) || length(value) != 2L || !is.null(names(value))) {
+          history_codec_abort()
+        }
+        complex(
+          real = history_decode_number(value[[1L]], integer = FALSE),
+          imaginary = history_decode_number(value[[2L]], integer = FALSE)
+        )
+      },
+      complex(1)
+    ),
     history_codec_abort()
   )
   if (!is.null(node$n)) {
@@ -299,7 +335,11 @@ subagent_history_child <- function(lead, requester, id) {
   if (length(view)) {
     return(list(view = view[[1L]], transcript = TRUE))
   }
-  view <- lead_inspect_subagents(lead, requester, id, FALSE)
+  # A child whose outcome alone is over the disclosure bound is left out.
+  view <- tryCatch(
+    lead_inspect_subagents(lead, requester, id, FALSE),
+    deputy_disclosure_bound = function(error) NULL
+  )
   if (!length(view)) {
     return(NULL)
   }
@@ -341,6 +381,24 @@ subagent_history_record <- function(state, conversation_id) {
   requester <- state$requester()
   disclosure <- lead$.__enclos_env__$private$.delegation_disclosure
   inspection_authorize(disclosure, requester, inspection_scope(lead))
+  scope <- subagent_history_scope(lead, conversation_id)
+  history_of <- function(children) {
+    list(
+      schema_version = 1L,
+      settled = TRUE,
+      scope = scope,
+      children = children
+    )
+  }
+  # What `delegation_history()` measures besides the children.
+  bound <- disclosure$max_bytes -
+    length(serialize(history_of(list()), NULL, version = 3))
+  if (bound < 0) {
+    cli::cli_abort(c(
+      "Subagent records for this conversation can't be saved.",
+      "x" = "Its scope alone is over the lead's disclosure {.arg max_bytes}."
+    ))
+  }
   children <- list()
   if (identical(state$conversation_id, conversation_id)) {
     carried <- state$record$history$children %||% list()
@@ -367,17 +425,13 @@ subagent_history_record <- function(state, conversation_id) {
       next
     }
     child <- subagent_history_child(lead, requester, record$delegation_id)
-    if (!is.null(child)) {
+    if (is.null(child)) {
+      omitted$children <- omitted$children + 1L
+    } else {
       children[[subagent_history_key(record$delegation_id)]] <- child
     }
   }
   budget <- state$max_bytes
-  bound <- disclosure$max_bytes -
-    length(serialize(
-      subagent_history_scope(lead, conversation_id),
-      NULL,
-      version = 3
-    ))
   kept <- list()
   for (key in names(children)) {
     child <- children[[key]]
@@ -408,12 +462,7 @@ subagent_history_record <- function(state, conversation_id) {
     )
     list(
       conversation_id = conversation_id,
-      history = list(
-        schema_version = 1L,
-        settled = TRUE,
-        scope = subagent_history_scope(lead, conversation_id),
-        children = unname(lapply(kept, function(child) child$view))
-      ),
+      history = history_of(unname(lapply(kept, function(child) child$view))),
       keys = names(kept) %||% character(),
       omitted = omitted
     )
