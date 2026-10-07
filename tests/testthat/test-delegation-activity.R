@@ -626,6 +626,7 @@ test_that("activity shows only what the host's redaction leaves", {
         view$outcome$runtime$agent_id <- NULL
         view$outcome$runtime$run_id <- NULL
         view$outcome$runtime$session_id <- NULL
+        view$outcome$runtime$tool_call_id <- NULL
         view
       }
     )
@@ -650,6 +651,7 @@ test_that("activity shows only what the host's redaction leaves", {
     expect_null(marker$agent_id)
     expect_null(marker$run_id)
     expect_null(marker$conversation_id)
+    expect_null(marker$root_tool_call_id)
   }
   shown <- paste(deparse(items), collapse = "")
   for (name in c("sales", "ops", sales$agent$agent_id, ops$agent$agent_id)) {
@@ -1122,6 +1124,40 @@ test_that("replacing the conversation restarts activity labels", {
     label(activity_items(activity_collect(root, "Two"))),
     "sales"
   )
+})
+
+test_that("a conversation replaced mid-reply gets none of that reply's calls", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  activity_enable(root, function() "viewer")
+  # The host replaces the conversation while the reply is still streaming;
+  # the new one has a tool turn of its own the cards could attach to.
+  root$set_turns(list(
+    ellmer::UserTurn(list(ellmer::ContentText("Other?"))),
+    ellmer::AssistantTurn(list(
+      ellmer::ContentToolRequest("other_call", "other_tool", list())
+    ))
+  ))
+  activity_poll(root, final = TRUE)
+  activity_poll(root, closing = TRUE)
+  expect_length(activity_take(root), 0L)
+  expect_length(
+    activity_items(unlist(lapply(
+      root$get_turns(),
+      function(turn) turn@contents
+    ))),
+    0L
+  )
+  activity_disable(root)
 })
 
 test_that("loading a session drops activity shown for another conversation", {

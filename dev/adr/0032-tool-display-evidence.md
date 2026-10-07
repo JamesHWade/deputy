@@ -63,7 +63,10 @@ the obstacle to subagent workflows.
   and declarations are checked together, so rebuilding stays linear and
   bounded. Each rebuilt field sits in its
   own box with `contain: paint` and `isolation: isolate`, so positioned,
-  transformed or offset content can't paint over the host page. shinychat
+  transformed or offset content can't paint over the host page, and with a
+  bounded height (the body scrolls within 80vh, header fields are clipped to
+  4em), so an element of enormous height can't stretch the conversation
+  around the card. shinychat
   renders `markdown` as HTML, remote images included, so the adapter renders
   it with commonmark and rebuilds the result through the same allowlist,
   showing it as `html` (and drops it beside HTML of the card's own). Text
