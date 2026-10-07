@@ -17,8 +17,9 @@ client.}
 \link{DelegationDisclosure} expects it.}
 
 \item{max_bytes}{Most bytes of records to save per conversation. Children
-that don't fit keep their outcome without their conversation, or are left
-out, and \code{status()} counts them. Defaults to 16 MiB.}
+that don't fit, here or in the \code{max_bytes} of the lead's
+\code{delegation_disclosure}, keep their outcome without their conversation,
+or are left out, and \code{status()} counts them. Defaults to 16 MiB.}
 }
 \value{
 Invisibly, a list of functions:

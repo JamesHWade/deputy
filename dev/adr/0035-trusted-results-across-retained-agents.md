@@ -54,7 +54,9 @@ producer's own label, not proof.
   `execute_tool()` refuses a designated tool that is not the pinned producer.
 - **One delivery to the root.** The combined policy's `on_result` records the
   event in the root's run and calls the root's `on_result`, then the retained
-  agent's own callback. Delivery still happens in the producing agent's
+  agent's own callback. Each callback runs even when the other fails, and the
+  first failure fails the delivery. Delivery still happens in the producing
+  agent's
   wrapper, before its model, offloading or hooks see the value, so receipts
   and the fail-closed behavior of ADR-0030 are unchanged. Graph members forward
   straight to the root, never through intermediate agents, so each publication

@@ -356,8 +356,9 @@ server <- function(input, output, session) {
 ```
 
 Each conversation's subagents are saved as one piece of JSON text, up to
-`max_bytes` (16 MiB by default). A subagent that doesn't fit is saved without
-its conversation, or not at all, and `saved$status()` says how many. Your
+`max_bytes` (16 MiB by default) and within what your `delegation_disclosure`
+lets one reader see. A subagent that doesn't fit is saved without its
+conversation, or not at all, and `saved$status()` says how many. Your
 `delegation_disclosure` is checked when records are saved and whenever they are
 read back; reading back, `authorize` gets a `scope` with the lead's
 `delegation_scope` and the conversation's ID as `chat_conversation_id`. Large

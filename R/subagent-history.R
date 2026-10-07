@@ -325,11 +325,17 @@ subagent_history_record_size <- function(record) {
   nchar(history_json(record), type = "bytes")
 }
 
+# What a saved child costs against the lead's disclosure bound when it is
+# replayed: its view, and its transcript again as replayed turns.
+subagent_history_replay_size <- function(view) {
+  length(serialize(list(view, view$transcript), NULL, version = 3))
+}
+
 # Assemble the conversation's record: children saved earlier in this
 # conversation first, passed through the current redactor again, then live
-# ones in the order they started, within `max_bytes`. A child that doesn't fit
-# keeps its outcome without its transcript, or is left out; the record counts
-# both.
+# ones in the order they started, within `max_bytes` and within what the
+# lead's disclosure lets `restored()` replay. A child that doesn't fit keeps
+# its outcome without its transcript, or is left out; the record counts both.
 subagent_history_record <- function(state, conversation_id) {
   lead <- state$lead
   requester <- state$requester()
@@ -366,21 +372,30 @@ subagent_history_record <- function(state, conversation_id) {
     }
   }
   budget <- state$max_bytes
+  bound <- disclosure$max_bytes -
+    length(serialize(
+      subagent_history_scope(lead, conversation_id),
+      NULL,
+      version = 3
+    ))
   kept <- list()
   for (key in names(children)) {
     child <- children[[key]]
     view <- child$view
     size <- nchar(history_json(view), type = "bytes")
-    if (size > budget && !is.null(view$transcript)) {
+    cost <- subagent_history_replay_size(view)
+    if ((size > budget || cost > bound) && !is.null(view$transcript)) {
       view <- subagent_history_without_transcript(view)
       size <- nchar(history_json(view), type = "bytes")
+      cost <- subagent_history_replay_size(view)
       child$transcript <- FALSE
     }
-    if (size > budget) {
+    if (size > budget || cost > bound) {
       omitted$children <- omitted$children + 1L
       next
     }
     budget <- budget - size
+    bound <- bound - cost
     kept[[key]] <- list(view = view, transcript = isTRUE(child$transcript))
   }
   build <- function(kept) {
@@ -412,6 +427,13 @@ subagent_history_record <- function(state, conversation_id) {
     kept[[length(kept)]] <- NULL
     omitted$children <- omitted$children + 1L
     record <- build(kept)
+  }
+  # A record that can't fit without children would not read back.
+  if (subagent_history_record_size(record) > state$max_bytes) {
+    cli::cli_abort(c(
+      "Subagent records for this conversation can't be saved.",
+      "x" = "Its scope alone is over {.arg max_bytes}."
+    ))
   }
   record
 }
@@ -598,12 +620,23 @@ subagent_history_restored <- function(state, transcript = TRUE) {
       view
     })
   }
-  delegation_history(
-    history,
-    state$requester(),
-    state$lead$.__enclos_env__$private$.delegation_disclosure,
-    subagent_history_scope(state$lead, id)
-  )
+  replay <- function(history) {
+    delegation_history(
+      history,
+      state$requester(),
+      state$lead$.__enclos_env__$private$.delegation_disclosure,
+      subagent_history_scope(state$lead, id)
+    )
+  }
+  tryCatch(replay(history), deputy_disclosure_bound = function(error) {
+    # Saved under a larger bound than the lead's disclosure now allows: the
+    # outcomes are still shown, without their transcripts.
+    history$children <- lapply(
+      history$children,
+      subagent_history_without_transcript
+    )
+    replay(history)
+  })
 }
 
 subagent_history_status <- function(state) {
@@ -694,8 +727,9 @@ subagent_history_panel_child <- function(conversation, live, id) {
 #' @param requester A function returning the current user, as your
 #'   [DelegationDisclosure] expects it.
 #' @param max_bytes Most bytes of records to save per conversation. Children
-#'   that don't fit keep their outcome without their conversation, or are left
-#'   out, and `status()` counts them. Defaults to 16 MiB.
+#'   that don't fit, here or in the `max_bytes` of the lead's
+#'   `delegation_disclosure`, keep their outcome without their conversation,
+#'   or are left out, and `status()` counts them. Defaults to 16 MiB.
 #' @return Invisibly, a list of functions:
 #'   * `restored(transcript = TRUE)`: the subagents saved with the open
 #'     conversation, as [delegation_history()] returns them, or `NULL`. With

@@ -436,6 +436,47 @@ test_that("a failed root delivery becomes a tool error, delivered once", {
   expect_identical(nrow(root$list_subagents()), 1L)
 })
 
+test_that("a retained agent's own host gets a result the root failed to take", {
+  calls <- 0L
+  own <- list()
+  measure <- routes_measure_tool(60)
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Revenue?")),
+    runtime_reply("Lead: no number.")
+  ))
+  sales_server <- routes_sales_server()
+  root <- Agent$new(
+    runtime_chat(root_server),
+    trusted_results = TrustedResults(
+      measure = measure,
+      on_result = function(event) {
+        calls <<- calls + 1L
+        stop("store offline")
+      }
+    )
+  )
+  sales <- Agent$new(
+    runtime_chat(sales_server),
+    tools = list(measure),
+    trusted_results = TrustedResults(
+      measure = measure,
+      on_result = function(event) own[[length(own) + 1L]] <<- event
+    )
+  )
+  handle <- root$retain_agent(sales, UsageLimits(max_requests = 8))
+  routes_route(root, handle)
+  expect_warning(
+    result <- root$run_sync("Revenue?"),
+    "could not be delivered"
+  )
+  expect_identical(calls, 1L)
+  expect_length(own, 1L)
+  expect_identical(own[[1L]]$result_type, "measure")
+  # The delivery still failed, so the specialist's model got an error.
+  requests <- routes_request_text(sales_server)
+  expect_match(requests[[2L]], "could not be delivered", fixed = TRUE)
+})
+
 test_that("permissions and hooks still decide whether the producer runs", {
   deliveries <- routes_deliveries()
   counter <- new.env()

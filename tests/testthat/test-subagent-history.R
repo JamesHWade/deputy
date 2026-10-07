@@ -573,11 +573,14 @@ test_that("records stay within max_bytes and count what was left out", {
     history_json(subagent_history_without_transcript(view)),
     type = "bytes"
   )
-  state$max_bytes <- 1
-  base <- subagent_history_record_size(subagent_history_record(
-    state,
-    "conv-a"
-  ))
+  empty <- full
+  empty$history$children <- list()
+  empty$keys <- character()
+  empty$omitted$children <- 1L
+  base <- subagent_history_record_size(empty)
+  # A bound too small for the record without children saves nothing.
+  state$max_bytes <- base - 1
+  expect_error(subagent_history_record(state, "conv-a"), "can't be saved")
   # Room for the child without its transcript.
   state$max_bytes <- base + without + 256
   trimmed <- subagent_history_record(state, "conv-a")
@@ -605,6 +608,86 @@ test_that("records stay within max_bytes and count what was left out", {
       record
     )
   }
+})
+
+test_that("saved records stay within what the lead's disclosure can replay", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_lead(
+    local_runtime_server(list(
+      runtime_reply(tool = "ask_sales", arguments = list(task = "One")),
+      runtime_reply("First."),
+      runtime_reply(tool = "ask_sales", arguments = list(task = "Two")),
+      runtime_reply("Second.")
+    )),
+    local_runtime_server(list(
+      runtime_reply(tool = "call_measure"),
+      runtime_reply("one"),
+      runtime_reply(tool = "call_measure"),
+      runtime_reply("two")
+    )),
+    counter
+  )
+  lead$conversation_id <- "conv-a"
+  lead$run_sync("One")
+  lead$run_sync("Two")
+  state <- history_state(lead, "conv-a")
+  full <- subagent_history_record(state, "conv-a")
+  expect_length(full$history$children, 2L)
+  costs <- vapply(full$history$children, subagent_history_replay_size, 1)
+  private <- lead$.__enclos_env__$private
+  # Room to replay one child's transcript, not both.
+  scope <- length(serialize(
+    subagent_history_scope(lead, "conv-a"),
+    NULL,
+    version = 3
+  ))
+  private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    max_bytes = scope + costs[[1L]] + costs[[2L]] / 2
+  )
+  record <- subagent_history_record(state, "conv-a")
+  expect_length(record$history$children, 2L)
+  expect_identical(record$omitted$transcripts, 1L)
+  expect_null(record$history$children[[2L]]$transcript)
+  state$record <- record
+  state$conversation_id <- "conv-a"
+  views <- subagent_history_restored(state)
+  expect_length(views, 2L)
+  expect_length(
+    views[[1L]]$turns,
+    length(full$history$children[[1L]]$transcript)
+  )
+  expect_length(views[[2L]]$turns, 0L)
+
+  # A record saved under a larger bound still reads back, without transcripts.
+  state$record <- full
+  views <- subagent_history_restored(state)
+  expect_length(views, 2L)
+  expect_identical(
+    vapply(views, function(view) view$retention$transcript, ""),
+    c("omitted", "omitted")
+  )
+  expect_identical(lengths(lapply(views, function(view) view$turns)), c(0L, 0L))
+})
+
+test_that("a scope larger than max_bytes saves no record", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_lead(
+    history_root_server(),
+    history_sales_server(),
+    counter,
+    scope = list(owner_id = strrep("u", 4096))
+  )
+  lead$conversation_id <- "conv-a"
+  lead$run_sync("Revenue?")
+  state <- history_state(lead, "conv-a")
+  state$max_bytes <- 1024
+  values <- subagent_history_save(state, list(other = "kept"))
+  expect_null(values$deputy_subagents)
+  expect_identical(values$other, "kept")
+  expect_match(state$error, "can't be saved")
 })
 
 test_that("saved children are redacted again with the current policy", {

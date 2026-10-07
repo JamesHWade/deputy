@@ -1224,6 +1224,7 @@ Agent <- R6::R6Class(
       )
       preserve_run_usage(self, usage)
       private$.activity_overlay <- split$overlay
+      activity_reset(private$.activity)
       private$.compaction_summary <- NULL
       private$.compacted_turns <- list()
       private$.cleared_tool_results <- list()
@@ -1753,7 +1754,8 @@ Agent <- R6::R6Class(
     #' the agent's, and loading fails if they disagree on an ID field. Saved
     #' tool results and compaction summaries are restored under this agent's
     #' session ID. Files saved by early development versions of Deputy can't be
-    #' loaded. Loading errors while a run is active.
+    #' loaded. Loading errors while a run is active. Subagent tool calls shown
+    #' by [subagent_chat_activity()] for the previous conversation are dropped.
     load_session = function(path) {
       check_conversation_lease(self, NULL)
       if (isTRUE(private$run_active)) {
@@ -1789,6 +1791,10 @@ Agent <- R6::R6Class(
         session,
         source = path
       )
+      # Activity shown for the previous conversation doesn't belong to this
+      # one; a failed load above leaves it in place.
+      private$.activity_overlay <- list()
+      activity_reset(private$.activity)
       cli_alert_success("Session loaded from {.path {path}}")
       invisible(self)
     },

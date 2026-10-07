@@ -235,11 +235,15 @@ subagent_display_plain <- function(value) {
   gsub("[[:space:][:cntrl:]]", "", tolower(value))
 }
 
-# A value is active when it could run script or fetch a resource.
+# A value is active when it could run script or fetch a resource. Besides
+# `url()`, the image functions also fetch a quoted string as a URL.
 subagent_display_active <- function(value) {
   plain <- subagent_display_plain(value)
   grepl(
-    "javascript:|vbscript:|expression\\(|behavior:|-moz-binding|@import",
+    paste0(
+      "javascript:|vbscript:|expression\\(|behavior:|-moz-binding|@import|",
+      "image-set\\(|image\\(|cross-fade\\(|element\\(|src\\("
+    ),
     plain
   ) ||
     grepl("\\\\", value) ||
@@ -317,9 +321,16 @@ subagent_display_css_refs <- function(value, ids, prefix) {
   gsub(pattern, paste0("url(\\1#", prefix, "\\2"), value)
 }
 
+# Longer style sheets are dropped rather than scanned; gt's are a few KB.
+subagent_display_style_limit <- 256L * 1024L
+
 # A rule survives only when each selector starts at an id defined in the same
-# display, which is how gt scopes its table styles.
+# display, which is how gt scopes its table styles. `@media` is kept at the top
+# level only, so the scan stays linear in the length of the sheet.
 subagent_display_style_element <- function(css, ids, prefix) {
+  if (nchar(css, type = "chars") > subagent_display_style_limit) {
+    return("")
+  }
   css <- gsub("/\\*.*?\\*/", "", css, perl = TRUE)
   if (
     !length(ids) ||
@@ -390,11 +401,14 @@ subagent_display_style_element <- function(css, ids, prefix) {
     }
     paste(rewritten, collapse = ",")
   }
-  emit <- function(blocks) {
+  emit <- function(blocks, nested = FALSE) {
     out <- character()
     for (block in blocks) {
       if (startsWith(block$prelude, "@media")) {
-        inner <- emit(scan_blocks(block$body))
+        if (nested) {
+          next
+        }
+        inner <- emit(scan_blocks(block$body), nested = TRUE)
         if (length(inner)) {
           out <- c(
             out,
@@ -598,6 +612,25 @@ subagent_display_splice <- function(nodes) {
   out
 }
 
+# Each rebuilt field sits in a box that contains its painting and stacking, so
+# positioned, transformed or offset content stays inside its own card.
+subagent_display_contain <- function(html, field) {
+  if (identical(field, "html")) {
+    return(paste0(
+      "<div class=\"deputy-display\" style=\"position:relative;overflow:auto;",
+      "contain:paint;isolation:isolate\">",
+      html,
+      "</div>"
+    ))
+  }
+  paste0(
+    "<span class=\"deputy-display\" style=\"display:inline-block;",
+    "position:relative;max-width:100%;contain:paint;isolation:isolate\">",
+    html,
+    "</span>"
+  )
+}
+
 # Tool display fields that shinychat renders as raw HTML go through
 # `subagent_display_html()`; plain-text fields and flags pass through.
 subagent_safe_display <- function(display) {
@@ -611,7 +644,9 @@ subagent_safe_display <- function(display) {
     } else {
       ""
     }
-    display[[field]] <- if (nzchar(safe)) safe else NULL
+    display[[field]] <- if (nzchar(safe)) {
+      subagent_display_contain(safe, field)
+    }
   }
   display
 }
