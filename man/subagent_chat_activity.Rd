@@ -41,7 +41,8 @@ The cards are part of the conversation shinychat saves, so a restored
 conversation shows them again without running anything. The lead's model
 never sees them: it gets each subagent's summary, as before. \verb{$get_turns()}
 on the lead includes the cards, while \verb{$get_context_turns()} and requests
-to the provider don't, and \verb{$set_turns()} separates them again.
+to the provider don't, and \verb{$set_turns()} and \verb{$add_turn()} separate them
+again.
 
 Only tool calls made while the lead is answering in this chat appear, and
 only when \code{requester} may see the subagents under the lead's

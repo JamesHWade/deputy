@@ -6,9 +6,10 @@
 # holds the delegation, after its own contents. They are part of the
 # conversation `get_turns()` returns, so shinychat records and replays them with
 # its own history, but never part of the model context the wrapped Chat sends:
-# `set_turns()` separates them again. Identities come from the delegation and
-# the call's position in it, never from provider tool-call IDs, so concurrent
-# children, repeated specialist names and reused provider IDs cannot collide.
+# `set_turns()` and `add_turn()` separate them again. Identities come from the
+# delegation and the call's position in it, never from provider tool-call IDs,
+# so concurrent children, repeated specialist names and reused provider IDs
+# cannot collide.
 #
 # Activity is computed on the consumer side of the stream, from authorized and
 # redacted views of the delegation records, the same way an inspection panel
