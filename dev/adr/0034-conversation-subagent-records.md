@@ -55,19 +55,27 @@ back from storage Deputy doesn't control.
   never uses `unserialize()` or `jsonlite::unserializeJSON()`, which can load
   namespaces or construct closures from stored text.
 - **Restore validates everything and runs nothing.** The envelope, the decoded
-  record, its scope, every child's settled status and every transcript record
-  (through `inspection_replay()`) are checked before anything reads them. A
+  record, its scope and keys, every child's settled status (where the redacted
+  view still reports one) and every transcript record (through
+  `inspection_replay()`) are checked before anything reads them. A
   record that fails is dropped and reported; the next save starts from the
   conversation's live children. A record from a newer format version is saved
   back unchanged and not added to. Restored records never create delegation
   records, handles or agents; they are read through `delegation_history()`,
   which authorizes again every time.
-- **Bounded, with omissions named.** `max_bytes` (16 MiB by default) bounds a
-  conversation's record. Children are kept in order; one that doesn't fit is
-  kept without its transcript (`retention$transcript = "omitted"`) or left out,
-  and the record lists both. A save that fails (for example, a requester the
-  disclosure refuses) keeps the last good record for that conversation, since
-  shinychat rebuilds `values` from scratch on every save.
+- **Bounded, with omissions counted.** `max_bytes` (16 MiB by default) bounds
+  a conversation's whole record, scope and bookkeeping included, so a saved
+  record is always readable. Children are kept in order; one that doesn't fit
+  is kept without its transcript (`retention$transcript = "omitted"`) or left
+  out, newest first if the whole record is still too large, and the record
+  counts both. A save that fails (for example, a requester the disclosure
+  refuses) keeps the last good record for that conversation, since shinychat
+  rebuilds `values` from scratch on every save.
+- **Saved children are redacted again on every save.** Children carried from
+  an earlier save pass through the current `redact` before they are written
+  back, so a stricter policy also cleans what is stored. Children are matched
+  across saves by a SHA-256 digest of their delegation ID, kept beside the
+  views, so matching survives a redactor that removes the ID itself.
 - **The panel follows the open conversation.** `subagent_chat_server(conversation
   = )` shows live children whose `host_conversation_id` is the open
   conversation and saved children that aren't live, listing saved ones without

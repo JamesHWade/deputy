@@ -506,7 +506,11 @@ test_that("saved records that fail their checks are not read", {
       x
     })),
     text = reread(within(saved, data <- "not json")),
-    codec = reread(within(saved, codec <- "rds"))
+    codec = reread(within(saved, codec <- "rds")),
+    keys = reread(tampered(function(x) {
+      x$keys <- c(x$keys, x$keys)
+      x
+    }))
   )
   for (name in names(cases)) {
     fresh <- cases[[name]]
@@ -554,32 +558,91 @@ test_that("records from a newer format are kept unchanged", {
   )
 })
 
-test_that("records over max_bytes keep outcomes and name what was left out", {
+test_that("records stay within max_bytes and count what was left out", {
   counter <- new.env()
   counter$calls <- 0L
   lead <- history_settled_lead("conv-a", counter)
-  id <- lead$inspect_subagents("viewer")[[1L]]$outcome$runtime$delegation_id
   state <- history_state(lead, "conv-a")
   full <- subagent_history_record(state, "conv-a")
-  expect_identical(full$omitted$transcripts, character())
+  expect_identical(
+    full$omitted,
+    list(running = 0L, transcripts = 0L, children = 0L)
+  )
   view <- full$history$children[[1L]]
-  with_transcript <- nchar(history_json(view), type = "bytes")
   without <- nchar(
     history_json(subagent_history_without_transcript(view)),
     type = "bytes"
   )
-  state$max_bytes <- (with_transcript + without) / 2
+  state$max_bytes <- 1
+  base <- subagent_history_record_size(subagent_history_record(
+    state,
+    "conv-a"
+  ))
+  # Room for the child without its transcript.
+  state$max_bytes <- base + without + 256
   trimmed <- subagent_history_record(state, "conv-a")
-  expect_identical(trimmed$omitted$transcripts, id)
+  expect_identical(trimmed$omitted$transcripts, 1L)
   expect_null(trimmed$history$children[[1L]]$transcript)
   expect_identical(
     trimmed$history$children[[1L]]$retention$transcript,
     "omitted"
   )
-  state$max_bytes <- without / 2
+  # No room for the child at all.
+  state$max_bytes <- base + without / 2
   dropped <- subagent_history_record(state, "conv-a")
-  expect_identical(dropped$omitted$children, id)
+  expect_identical(dropped$omitted$children, 1L)
   expect_length(dropped$history$children, 0L)
+  expect_length(dropped$keys, 0L)
+  # Whatever the bound, the whole record fits it and reads back.
+  full_size <- subagent_history_record_size(full)
+  for (bound in round(seq(base, full_size + 64, length.out = 12))) {
+    state$max_bytes <- bound
+    record <- subagent_history_record(state, "conv-a")
+    expect_lte(subagent_history_record_size(record), bound)
+    envelope <- subagent_history_envelope(record)
+    expect_identical(
+      subagent_history_read(envelope, lead, "conv-a", bound),
+      record
+    )
+  }
+})
+
+test_that("saved children are redacted again with the current policy", {
+  counter <- new.env()
+  counter$calls <- 0L
+  flags <- new.env()
+  flags$strict <- FALSE
+  disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    redact = function(view, requester) {
+      if (isTRUE(flags$strict)) {
+        view$outcome$answer <- "[withheld]"
+        view$outcome$runtime$delegation_id <- NULL
+      }
+      view
+    }
+  )
+  lead <- history_settled_lead("conv-a", counter)
+  lead$.__enclos_env__$private$.delegation_disclosure <- disclosure
+  saved <- subagent_history_save(history_state(lead, "conv-a"), list())
+  record <- history_parse(saved$deputy_subagents$data)
+  expect_match(record$history$children[[1L]]$outcome$answer, "60")
+
+  # Reopened later under a stricter policy, with nothing live.
+  flags$strict <- TRUE
+  later <- history_lead(NULL, NULL, counter)
+  later$.__enclos_env__$private$.delegation_disclosure <- disclosure
+  state <- history_state(later, "conv-a")
+  subagent_history_restore(state, saved)
+  expect_length(state$record$history$children, 1L)
+  resaved <- subagent_history_save(state, list())$deputy_subagents
+  child <- history_parse(resaved$data)$history$children[[1L]]
+  expect_identical(child$outcome$answer, "[withheld]")
+  expect_null(child$outcome$runtime$delegation_id)
+  # Without an ID, the child still reads back and keeps its key.
+  subagent_history_restore(state, list(deputy_subagents = resaved))
+  expect_length(state$record$history$children, 1L)
+  expect_identical(state$record$keys, record$keys)
 })
 
 test_that("a save the requester may not see keeps the last good record", {

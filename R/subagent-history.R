@@ -315,51 +315,60 @@ subagent_history_without_transcript <- function(view) {
   view
 }
 
+# A child's key in saved records: a digest of its delegation ID, so children
+# can be matched across saves without storing an ID the redactor may remove.
+subagent_history_key <- function(delegation_id) {
+  digest::digest(delegation_id, algo = "sha256", serialize = FALSE)
+}
+
+subagent_history_record_size <- function(record) {
+  nchar(history_json(record), type = "bytes")
+}
+
 # Assemble the conversation's record: children saved earlier in this
-# conversation first, then live ones in the order they started, within
-# `max_bytes`. A child that doesn't fit keeps its outcome without its
-# transcript, or is left out; either way the record names it.
+# conversation first, passed through the current redactor again, then live
+# ones in the order they started, within `max_bytes`. A child that doesn't fit
+# keeps its outcome without its transcript, or is left out; the record counts
+# both.
 subagent_history_record <- function(state, conversation_id) {
   lead <- state$lead
   requester <- state$requester()
-  inspection_authorize(
-    lead$.__enclos_env__$private$.delegation_disclosure,
-    requester,
-    inspection_scope(lead)
-  )
-  carried <- if (identical(state$conversation_id, conversation_id)) {
-    state$record$history$children
-  }
+  disclosure <- lead$.__enclos_env__$private$.delegation_disclosure
+  inspection_authorize(disclosure, requester, inspection_scope(lead))
   children <- list()
-  for (view in carried %||% list()) {
-    id <- subagent_history_view_id(view)
-    if (!is.na(id)) {
-      children[[id]] <- list(
+  if (identical(state$conversation_id, conversation_id)) {
+    carried <- state$record$history$children %||% list()
+    keys <- state$record$keys %||% character()
+    for (index in seq_along(carried)) {
+      view <- disclosure$redact(carried[[index]], requester)
+      if (!is.list(view)) {
+        cli::cli_abort("Disclosure redaction must return a list.")
+      }
+      inspection_portable(view)
+      children[[keys[[index]]]] <- list(
         view = view,
         transcript = !is.null(view$transcript)
       )
     }
   }
-  omitted <- list(running = character(), transcripts = character())
+  omitted <- list(running = 0L, transcripts = 0L, children = 0L)
   for (record in subagent_history_records(lead, conversation_id)) {
-    id <- record$delegation_id
     if (
       is.na(record$completed_at) ||
         !isTRUE(record$status %in% subagent_history_settled)
     ) {
-      omitted$running <- c(omitted$running, id)
+      omitted$running <- omitted$running + 1L
       next
     }
-    child <- subagent_history_child(lead, requester, id)
+    child <- subagent_history_child(lead, requester, record$delegation_id)
     if (!is.null(child)) {
-      children[[id]] <- child
+      children[[subagent_history_key(record$delegation_id)]] <- child
     }
   }
   budget <- state$max_bytes
   kept <- list()
-  omitted$children <- character()
-  for (id in names(children)) {
-    child <- children[[id]]
+  for (key in names(children)) {
+    child <- children[[key]]
     view <- child$view
     size <- nchar(history_json(view), type = "bytes")
     if (size > budget && !is.null(view$transcript)) {
@@ -368,25 +377,43 @@ subagent_history_record <- function(state, conversation_id) {
       child$transcript <- FALSE
     }
     if (size > budget) {
-      omitted$children <- c(omitted$children, id)
+      omitted$children <- omitted$children + 1L
       next
     }
-    if (!isTRUE(child$transcript)) {
-      omitted$transcripts <- c(omitted$transcripts, id)
-    }
     budget <- budget - size
-    kept[[length(kept) + 1L]] <- view
+    kept[[key]] <- list(view = view, transcript = isTRUE(child$transcript))
   }
-  list(
-    conversation_id = conversation_id,
-    history = list(
-      schema_version = 1L,
-      settled = TRUE,
-      scope = subagent_history_scope(lead, conversation_id),
-      children = kept
-    ),
-    omitted = omitted
-  )
+  build <- function(kept) {
+    omitted$transcripts <- sum(
+      !vapply(
+        kept,
+        function(child) child$transcript,
+        logical(1)
+      )
+    )
+    list(
+      conversation_id = conversation_id,
+      history = list(
+        schema_version = 1L,
+        settled = TRUE,
+        scope = subagent_history_scope(lead, conversation_id),
+        children = unname(lapply(kept, function(child) child$view))
+      ),
+      keys = names(kept) %||% character(),
+      omitted = omitted
+    )
+  }
+  # The scope, keys and counts count too: drop the newest children until the
+  # whole record fits.
+  record <- build(kept)
+  while (
+    length(kept) && subagent_history_record_size(record) > state$max_bytes
+  ) {
+    kept[[length(kept)]] <- NULL
+    omitted$children <- omitted$children + 1L
+    record <- build(kept)
+  }
+  record
 }
 
 subagent_history_envelope <- function(record) {
@@ -438,14 +465,19 @@ subagent_history_read <- function(saved, lead, conversation_id, max_bytes) {
         history$scope,
         subagent_history_scope(lead, conversation_id)
       ) ||
-      !is.list(history$children)
+      !is.list(history$children) ||
+      !is.character(record$keys) ||
+      length(record$keys) != length(history$children) ||
+      anyDuplicated(record$keys) ||
+      !all(grepl("^[0-9a-f]{64}$", record$keys))
   ) {
     history_codec_abort()
   }
   for (view in history$children) {
+    status <- if (is.list(view)) view$outcome$runtime$status
     if (
-      is.na(subagent_history_view_id(view)) ||
-        !isTRUE(view$outcome$runtime$status %in% subagent_history_settled)
+      !is.list(view) ||
+        (!is.null(status) && !isTRUE(status %in% subagent_history_settled))
     ) {
       history_codec_abort()
     }
@@ -582,11 +614,7 @@ subagent_history_status <- function(state) {
     conversation_id = id,
     saved = length(record$history$children),
     omitted = record$omitted %||%
-      list(
-        running = character(),
-        transcripts = character(),
-        children = character()
-      ),
+      list(running = 0L, transcripts = 0L, children = 0L),
     error = if (current) state$error
   )
 }
@@ -667,14 +695,15 @@ subagent_history_panel_child <- function(conversation, live, id) {
 #'   [DelegationDisclosure] expects it.
 #' @param max_bytes Most bytes of records to save per conversation. Children
 #'   that don't fit keep their outcome without their conversation, or are left
-#'   out, and `status()` names them. Defaults to 16 MiB.
+#'   out, and `status()` counts them. Defaults to 16 MiB.
 #' @return Invisibly, a list of functions:
 #'   * `restored(transcript = TRUE)`: the subagents saved with the open
 #'     conversation, as [delegation_history()] returns them, or `NULL`. With
 #'     `transcript = FALSE`, without their conversations.
 #'   * `status()`: the open conversation's ID, how many subagents its saved
-#'     record holds, which were left out or saved without their conversation,
-#'     and any problem saving or reading it.
+#'     record holds, how many were still running, saved without their
+#'     conversation or left out at the last save, and any problem saving or
+#'     reading it.
 #' @seealso [subagent_chat_activity()] to show subagent tool calls in the
 #'   chat itself.
 #' @export
