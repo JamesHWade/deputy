@@ -94,7 +94,9 @@ file and shows how to undo what it wrote.
   conversations](https://jameshwade.github.io/deputy/articles/conversations.html)
   for conversations that outgrow the model’s context window.
 - [Shiny](https://jameshwade.github.io/deputy/articles/example-shiny-chat.html):
-  an agent works anywhere shinychat expects an ellmer chat.
+  an agent works anywhere shinychat expects an ellmer chat, and its
+  subagents’ tool calls appear in the same conversation and are saved
+  with it.
 - [Subagents](https://jameshwade.github.io/deputy/articles/multi-agent.html)
   with their own prompts, tools, permissions and budgets.
 - [Sandboxed code
