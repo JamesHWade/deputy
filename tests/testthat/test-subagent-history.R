@@ -532,6 +532,43 @@ test_that("the subagent panel shows saved subagents read-only", {
   expect_identical(counter$calls, 1L)
 })
 
+test_that("saved subagents show to a requester who can't see live ones", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  lead <- history_lead(history_root_server(), history_sales_server(), counter)
+  conversation <- NULL
+  history_session(lead, store, function(session, chat, saver) {
+    conversation <<- history_submit(session, chat, store, "Revenue?")
+  })
+  # The reopening session may read saved conversations, not live subagents.
+  restored <- history_lead(NULL, NULL, counter)
+  restored$.__enclos_env__$private$.delegation_disclosure <-
+    DelegationDisclosure(
+      authorize = function(requester, scope) {
+        identical(requester, "viewer") && !is.null(scope$chat_conversation_id)
+      }
+    )
+  history_session(
+    restored,
+    store,
+    function(session, chat, saver) {
+      panel <- session$userData$panel
+      session$setInputs(chat_history_select = list(id = conversation))
+      session$elapse(200)
+      views <- panel$views()
+      expect_length(views, 1L)
+      id <- views[[1L]]$outcome$runtime$delegation_id
+      session$setInputs(`panel-selected` = id)
+      session$elapse(200)
+      expect_identical(panel$selected(), id)
+      expect_match(panel$notice(), "sales")
+    },
+    panel = TRUE
+  )
+  expect_identical(counter$calls, 1L)
+})
+
 test_that("saved records that fail their checks are not read", {
   counter <- new.env()
   counter$calls <- 0L
@@ -745,15 +782,24 @@ test_that("saved records stay within what the lead's disclosure can replay", {
   expect_identical(lengths(lapply(views, function(view) view$turns)), c(0L, 0L))
   # A bound tightened below the outcomes themselves shows those that fit.
   shown <- integer()
+  listed <- integer()
   for (bound in round(seq(scope + costs[[1L]], scope, length.out = 24))) {
     private$.delegation_disclosure <- DelegationDisclosure(
       authorize = function(requester, scope) identical(requester, "viewer"),
       max_bytes = bound
     )
     shown <- c(shown, length(subagent_history_restored(state)))
+    # Listed without transcripts, they stay marked as left out on request.
+    views <- subagent_history_restored(state, transcript = FALSE)
+    listed <- c(listed, length(views))
+    expect_identical(
+      vapply(views, function(view) view$retention$transcript, ""),
+      rep("not_requested", length(views))
+    )
   }
   expect_identical(shown, sort(shown, decreasing = TRUE))
   expect_true(all(c(2L, 1L, 0L) %in% shown))
+  expect_true(1L %in% listed)
 })
 
 test_that("a tightened bound is searched, not tried one child at a time", {

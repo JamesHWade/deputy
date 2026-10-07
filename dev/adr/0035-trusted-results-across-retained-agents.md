@@ -54,8 +54,12 @@ producer's own label, not proof.
   Deputy's composition marker names the registering agent as owner, it carries
   the handle of a conversation that agent's policy root retained under its
   policy, and, for graph routes, the tree's root is that policy root. Graph
-  members find their policy root through a weak reference. Everything else
-  that delegates (another owner's route, a released handle, a tool merely
+  members find their policy root through a weak reference. What an admitted
+  route reaches must also satisfy the caller's policy combined with the
+  target's (result types joined, exemptions intersected), down every chain of
+  routes from it, so a graph member whose own policy is stricter than the
+  root's can't reach a tool it declined through another member. Everything
+  else that delegates (another owner's route, a released handle, a tool merely
   named `delegate_to_agent`) is still a bypass.
 - **Execution-time binding.** Before each continuation, the installed policy
   and pinned sources must still be the admitted ones and the registry must

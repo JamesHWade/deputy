@@ -186,6 +186,22 @@ subagent_chat_server <- function(
     }
     subagent_history_live_views(conversation, lead, requester)
   }
+  # Saved subagents are authorized on their own, so with a conversation a
+  # requester who may not see the lead's live subagents still sees them.
+  live_access <- function(lead, requester) {
+    is.null(conversation) ||
+      isTRUE(tryCatch(
+        {
+          inspection_authorize(
+            lead$.__enclos_env__$private$.delegation_disclosure,
+            requester,
+            inspection_scope(lead)
+          )
+          TRUE
+        },
+        deputy_delegation_disclosure = function(error) FALSE
+      ))
+  }
   poll_interval <- context_policy_whole_number(poll_interval, "poll_interval")
   if (is.null(poll_interval) || poll_interval < 100L) {
     cli::cli_abort("poll_interval must be at least 100 milliseconds.")
@@ -232,11 +248,11 @@ subagent_chat_server <- function(
       }
       saved <- value(history)
       current <- if (is.null(saved)) {
-        subagent_history_panel_child(
-          conversation,
-          value(lead)$inspect_subagents(requester(), id, transcript = TRUE),
-          id
-        )
+        current_lead <- value(lead)
+        live <- if (live_access(current_lead, requester())) {
+          current_lead$inspect_subagents(requester(), id, transcript = TRUE)
+        }
+        subagent_history_panel_child(conversation, live %||% list(), id)
       } else {
         Filter(
           function(view) identical(view$outcome$runtime$delegation_id, id),
@@ -387,6 +403,17 @@ subagent_chat_server <- function(
           }
           if (!inherits(current_lead, "Agent")) {
             cli::cli_abort("No live lead is available.")
+          }
+          if (!live_access(current_lead, current_requester)) {
+            # Only the open conversation's saved subagents, with no live
+            # reader.
+            detach()
+            current <- filter_views(conversation_views(list()))
+            if (!identical(current, views())) {
+              update_views(current)
+            }
+            render_child()
+            return()
           }
           if (closed()) {
             detach()
@@ -749,7 +776,8 @@ subagent_chat_server <- function(
 #' @return Invisibly, a list with `stop()`, which stops adding calls. Ending the
 #'   Shiny session also stops it. A lead shows activity in one chat at a time:
 #'   calling `subagent_chat_activity()` again for the same lead before `stop()`
-#'   is an error.
+#'   is an error. Called again after `stop()` during a reply, it shows calls
+#'   from the next reply on.
 #' @seealso [subagent_chat_ui()] for a panel with each subagent's full
 #'   conversation.
 #' @export

@@ -543,8 +543,12 @@ trusted_policy_root <- function(agent) {
 }
 
 # A route is admitted only when Deputy built it for `agent` and its target was
-# checked against the same root policy when it was retained.
-trusted_route_admitted <- function(agent, tool) {
+# checked against the same root policy when it was retained. What it reaches
+# also holds to the caller's policy (or, further down a chain of routes, the
+# policy combined along it) together with the target's own, since a graph
+# member's own result types or narrower exemptions make its policy stricter
+# than the target's.
+trusted_route_admitted <- function(agent, tool, policy = NULL, seen = list()) {
   source <- trusted_tool_source(tool)
   handle <- attr(source, "deputy_composition_handle", exact = TRUE)
   if (
@@ -568,7 +572,58 @@ trusted_route_admitted <- function(agent, tool) {
     return(FALSE)
   }
   entry <- root$.__enclos_env__$private$owned_conversations[[handle]]
-  !is.null(entry) && !is.null(entry$trusted)
+  if (is.null(entry) || is.null(entry$trusted)) {
+    return(FALSE)
+  }
+  target <- entry$agent
+  seen <- c(seen, list(agent))
+  # A cycle of routes leads back to an agent whose registry is checked on
+  # its own.
+  if (any(vapply(seen, identical, logical(1), target))) {
+    return(TRUE)
+  }
+  combined <- trusted_route_policy(
+    policy %||% agent$.__enclos_env__$private$.trusted_results,
+    entry$trusted$policy
+  )
+  check_trusted_registry(
+    combined,
+    target$get_tools(),
+    available = combined@results,
+    sources = trusted_policy_sources(combined),
+    require_source = TRUE,
+    admit_route = function(next_tool) {
+      trusted_route_admitted(target, next_tool, combined, seen)
+    }
+  )
+  TRUE
+}
+
+# The policy a route's target holds to for its caller: both policies' result
+# types, each with its one producer, the tools both exempt, and a receipt if
+# either asks.
+trusted_route_policy <- function(caller, target) {
+  values <- trusted_values(caller)
+  for (type in names(target@results)) {
+    value <- target@producers[[type]] %||% target@results[[type]]
+    if (type %in% names(values) && !identical(values[[type]], value)) {
+      trusted_combine_abort(
+        "Result type {.val {type}} has a different producer behind a route.",
+        tool_name = target@results[[type]]
+      )
+    }
+    values[[type]] <- value
+  }
+  do.call(
+    TrustedResults,
+    c(
+      values,
+      list(
+        exempt_tools = intersect(caller@exempt_tools, target@exempt_tools),
+        model_receipt = caller@model_receipt || target@model_receipt
+      )
+    )
+  )
 }
 
 trusted_values <- function(policy) {

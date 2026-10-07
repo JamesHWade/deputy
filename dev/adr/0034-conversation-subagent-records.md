@@ -84,7 +84,8 @@ back from storage Deputy doesn't control.
   nothing. A record saved under a larger disclosure bound than the lead now has
   is restored without transcripts rather than refused, with as many of its
   oldest outcomes as the current bound holds (found by bisection, since fewer
-  children only make the history smaller). A save that fails (for
+  children only make the history smaller); children listed without their
+  transcripts on request stay marked `"not_requested"`. A save that fails (for
   example, a requester the disclosure refuses) keeps the last good record for
   that conversation, since shinychat rebuilds `values` from scratch on every
   save.
@@ -105,6 +106,9 @@ back from storage Deputy doesn't control.
   transcripts and replaying a transcript only when that child is selected. It
   reads and bounds only the open conversation's live records, so other
   conversations' children can't push its list over the disclosure bound.
+  Saved children are authorized for the conversation's own scope, so a
+  requester the lead's live scope refuses (after a reload changed its agent
+  and session IDs, say) still sees them, with no live reader.
 
 ## Consequences
 
