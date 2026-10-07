@@ -53,12 +53,17 @@ tool_display_marker_names <- function(names, limit = 16L) {
   )
 }
 
-# Walk a tag tree without dispatching methods on application objects. Every
-# object must have exactly the class htmltools gives it and is read only after
-# `unclass()`, so no `$`, `names()` or `length()` method of a subclass runs.
+# Walk a tag tree without dispatching methods on application objects, checking
+# everything rendering reads. Every object must have exactly the class htmltools
+# gives it and is read only after `unclass()`, so no `$`, `names()` or
+# `length()` method of a subclass runs. Rendering also reads three attributes of
+# any node: its attached dependencies (calling any that are functions), its
+# singleton flag and a string's `noWS`; each must be plain data. Every value
+# rendering writes out counts toward `state$bytes` by a bound found without
+# converting it, so a compact sequence such as `1:1e8` is never expanded.
 tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
-  state <- state %||% new.env(parent = emptyenv())
-  state$nodes <- (state$nodes %||% 0L) + 1L
+  state <- state %||% tool_display_walk_state()
+  state$nodes <- state$nodes + 1L
   if (state$nodes > 4096L || depth > 64L) {
     return(FALSE)
   }
@@ -66,15 +71,18 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
     return(TRUE)
   }
   class <- oldClass(x)
+  if (identical(class, "html_dependency")) {
+    return(tool_display_dependency(x, depth, state))
+  }
+  if (!tool_display_node_attributes(x, depth, state)) {
+    return(FALSE)
+  }
   if (is.character(x)) {
     if (!is.null(class) && !identical(class, tool_display_html_class)) {
       return(FALSE)
     }
-    state$bytes <- (state$bytes %||% 0) + sum(nchar(x, type = "bytes"))
+    tool_display_count(state, unclass(x))
     return(TRUE)
-  }
-  if (identical(class, "html_dependency")) {
-    return(tool_display_plain_data(unclass(x), depth + 1L, state))
   }
   if (identical(class, "shiny.tag")) {
     tag <- unclass(x)
@@ -84,33 +92,26 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
         !is.character(tag$name) ||
         is.object(tag$name) ||
         length(tag$name) != 1L ||
-        !tool_display_plain_data(tag$.noWS, depth + 1L, state)
+        !tool_display_no_ws(tag$.noWS)
     ) {
       return(FALSE)
     }
+    # The name is written twice, opening and closing the element.
+    tool_display_count(state, c(tag$name, tag$name))
     attribs <- tag$attribs
     if (!is.null(attribs) && (!is.list(attribs) || is.object(attribs))) {
       return(FALSE)
     }
+    tool_display_count(state, names(attribs))
     for (value in attribs) {
-      if (is.character(value)) {
-        state$bytes <- (state$bytes %||% 0) + sum(nchar(value, type = "bytes"))
+      html <- is.character(value) &&
+        identical(oldClass(value), tool_display_html_class)
+      if (!html && !is.null(value) && (!is.atomic(value) || is.object(value))) {
+        return(FALSE)
       }
+      tool_display_count(state, unclass(value))
     }
-    plain_attribs <- all(vapply(
-      attribs,
-      function(value) {
-        is.null(value) ||
-          (is.atomic(value) && !is.object(value)) ||
-          (is.character(value) &&
-            identical(oldClass(value), tool_display_html_class))
-      },
-      logical(1)
-    ))
-    return(
-      plain_attribs &&
-        tool_display_plain_tags(tag$children, depth + 1L, state)
-    )
+    return(tool_display_plain_tags(tag$children, depth + 1L, state))
   }
   if (
     is.list(x) &&
@@ -129,10 +130,106 @@ tool_display_plain_tags <- function(x, depth = 0L, state = NULL) {
 
 tool_display_html_class <- c("html", "character")
 
+tool_display_walk_state <- function(limit = Inf) {
+  state <- new.env(parent = emptyenv())
+  state$nodes <- 0L
+  state$bytes <- 0
+  state$limit <- limit
+  state
+}
+
+# Rendering converts each element of a value to text and joins them. This adds
+# an upper bound on those bytes without converting anything: strings are
+# measured only while the walk is within its limit, so measuring costs no more
+# than the limit allows, and other types count their widest element.
+tool_display_count <- function(state, x) {
+  n <- length(x)
+  if (n == 0L) {
+    return(invisible())
+  }
+  state$bytes <- state$bytes +
+    if (is.character(x) && state$bytes + n <= state$limit) {
+      sum(as.numeric(nchar(x, type = "bytes"))) + n
+    } else {
+      n * tool_display_text_widths[[typeof(x)]]
+    }
+  invisible()
+}
+
+# The most bytes one element takes as text, with its separator.
+tool_display_text_widths <- c(
+  logical = 6,
+  integer = 12,
+  double = 25,
+  complex = 50,
+  raw = 3,
+  character = 1
+)
+
+# The attributes rendering reads from a node. Attached dependencies are called
+# when they are functions, `noWS` is matched with `%in%` (converting a value of
+# another type in full) and the singleton flag is tested with `isTRUE()`.
+tool_display_node_attributes <- function(x, depth, state) {
+  singleton <- attr(x, "htmltools.singleton", exact = TRUE)
+  dependencies <- attr(x, "html_dependencies", exact = TRUE)
+  (is.null(singleton) || tool_display_flag(singleton)) &&
+    tool_display_no_ws(attr(x, "noWS", exact = TRUE)) &&
+    (is.null(dependencies) ||
+      tool_display_dependency(dependencies, depth, state) ||
+      (is.list(dependencies) &&
+        is.null(oldClass(dependencies)) &&
+        all(vapply(
+          dependencies,
+          function(dependency) {
+            is.null(dependency) ||
+              tool_display_dependency(dependency, depth, state)
+          },
+          logical(1)
+        ))))
+}
+
+# htmltools only ever sets these.
+tool_display_no_ws <- function(x) {
+  is.null(x) ||
+    (is.character(x) &&
+      is.null(attributes(x)) &&
+      length(x) <= length(tool_display_no_ws_options) &&
+      all(x %in% tool_display_no_ws_options))
+}
+
+tool_display_no_ws_options <- c(
+  "before",
+  "after",
+  "after-begin",
+  "before-end",
+  "outside",
+  "inside"
+)
+
+# A dependency is recorded by name and version. Rendering also resolves its
+# package directory, so those fields must be single strings, and everything in
+# it plain data. A function standing in for one is never called.
+tool_display_dependency <- function(x, depth, state) {
+  if (!identical(oldClass(x), "html_dependency")) {
+    return(FALSE)
+  }
+  dependency <- unclass(x)
+  src <- if (is.list(dependency)) dependency$src
+  is.list(dependency) &&
+    tool_display_string(dependency$name) &&
+    tool_display_string(dependency$version) &&
+    (is.null(dependency$package) || tool_display_string(dependency$package)) &&
+    (is.null(src) ||
+      (is.list(src) &&
+        !is.object(src) &&
+        (is.null(src$file) || tool_display_string(src$file)))) &&
+    tool_display_plain_data(dependency, depth + 1L, state)
+}
+
 # Data with no class anywhere: atomic vectors and plain lists.
 tool_display_plain_data <- function(x, depth = 0L, state = NULL) {
-  state <- state %||% new.env(parent = emptyenv())
-  state$nodes <- (state$nodes %||% 0L) + 1L
+  state <- state %||% tool_display_walk_state()
+  state$nodes <- state$nodes + 1L
   if (state$nodes > 4096L || depth > 64L) {
     return(FALSE)
   }
@@ -169,18 +266,18 @@ tool_display_flag <- function(value) {
 }
 
 # Render one HTML-capable display field to text, recording dependencies by name
-# rather than carrying their file paths. A tag tree whose text alone is over
-# `limit` bytes is not rendered, since rendering copies and escapes all of it.
+# rather than carrying their file paths. A tag tree that would render to more
+# than `limit` bytes is not rendered, since rendering copies and escapes it all.
 tool_display_html_value <- function(value, limit = Inf) {
   if (tool_display_string(value, html = TRUE)) {
     return(list(value = enc2utf8(as.character(unclass(value)))))
   }
-  state <- new.env(parent = emptyenv())
+  state <- tool_display_walk_state(limit)
   if (
     inherits(value, c("shiny.tag", "shiny.tag.list")) &&
       tool_display_plain_tags(value, state = state)
   ) {
-    if ((state$bytes %||% 0) > limit) {
+    if (state$bytes > limit) {
       return(list(reason = "oversized"))
     }
     rendered <- tryCatch(

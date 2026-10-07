@@ -37,7 +37,9 @@ into an earlier message.
   the shown cards beside the turns (`activity`: each card with the index of
   its turn), never among them, and `load_session()` restores them after
   checking each is a marked card in one of the loaded assistant turns; a
-  malformed entry fails the load before anything changes. Replacing the
+  malformed entry fails the load before anything changes. `set_chat()` keeps
+  each card with its turn when moving drops an assistant turn that held only
+  reasoning. Replacing the
   conversation (`set_turns()`, or a successful `load_session()`, which drops
   the previous conversation's cards) restarts the presenter's queue, labels and counts, and drops
   results a stopped presenter left for the reply streaming; that reply's

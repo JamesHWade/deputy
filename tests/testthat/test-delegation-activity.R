@@ -289,6 +289,50 @@ test_that("set_turns keeps shown activity out of the model context", {
   expect_identical(agent$get_turns(), list())
 })
 
+test_that("moving to another Chat keeps shown activity on its own turn", {
+  marker <- list(
+    format = "deputy_subagent_activity",
+    version = 1L,
+    activity_id = "deputy_activity_abc_1",
+    label = "sales"
+  )
+  shown <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  delegation <- ellmer::ContentToolRequest("call_1", "delegate", list())
+  turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("First"))),
+    # A reply stopped while thinking, which another provider can't take.
+    ellmer::AssistantTurn(list(ellmer::ContentThinking("stopped thinking"))),
+    ellmer::UserTurn(list(ellmer::ContentText("Second"))),
+    ellmer::AssistantTurn(list(delegation, shown)),
+    ellmer::UserTurn(list(ellmer::ContentToolResult(
+      "60",
+      request = delegation
+    ))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Done.")))
+  )
+  agent <- Agent$new(ellmer::chat_openai(
+    model = "gpt-4o-mini",
+    credentials = function() "unused",
+    echo = "none"
+  ))
+  agent$set_turns(turns)
+  agent$set_chat(ellmer::chat_anthropic(
+    model = "claude-sonnet-4-5",
+    credentials = function() "unused",
+    echo = "none"
+  ))
+  moved <- agent$get_turns()
+  expect_length(moved, 5L)
+  expect_identical(moved[[3L]]@contents, list(delegation, shown))
+  expect_identical(moved[[4L]], turns[[5L]])
+  expect_identical(agent$get_context_turns()[[3L]]@contents, list(delegation))
+})
+
 test_that("concurrent specialists stream attributed activity with unique IDs", {
   fixture <- activity_concurrent_root()
   root <- fixture$root
