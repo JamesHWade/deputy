@@ -52,10 +52,16 @@ the obstacle to subagent workflows.
   `data:` images stay; scripts, event handlers, forms, embedded documents,
   sibling-reaching selectors, nested CSS rules and every URL the browser would
   fetch (remote images, and quoted URLs in `image-set()` and the other image
-  functions, included) go. Ids get a prefix unique to each display, and a
+  functions, included) go. So do the declarative hooks that libraries on the
+  host page act on: every `data-*` attribute (Bootstrap's `data-bs-toggle`
+  and `data-bs-target` would open or close host elements) and shinychat's
+  `suggestion` class (a click would send the element's text as the user's
+  message). Ids get a prefix unique to each display, and a
   `<style>` element survives only when every rule is scoped to such an id, as
-  gt's tables are; `@media` is kept at the top level only and a sheet over
-  256 KiB is dropped, so the scan is linear. Each rebuilt field sits in its
+  gt's tables are; `@media` is kept at the top level only. A sheet over
+  256 KiB or 1,000 rules, or an inline style over 256 KiB, is dropped unread,
+  and declarations are checked together, so rebuilding stays linear and
+  bounded. Each rebuilt field sits in its
   own box with `contain: paint` and `isolation: isolate`, so positioned,
   transformed or offset content can't paint over the host page. `markdown`
   and text fields are left to shinychat's inert renderers. Core records keep
