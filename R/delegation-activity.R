@@ -140,6 +140,19 @@ activity_strip <- function(turns) {
   activity_split(turns)$turns
 }
 
+# Shown activity is keyed by its turn's position in the complete conversation:
+# the compacted prefix (`offset` turns), then the context. When moving to
+# another Chat drops context turns, each card moves to where its turn now sits.
+activity_remap <- function(overlay, kept, offset) {
+  overlay <- lapply(overlay, function(entry) {
+    if (entry$turn > offset) {
+      entry$turn <- offset + match(entry$turn - offset, kept)
+    }
+    entry
+  })
+  Filter(function(entry) !is.na(entry$turn), overlay)
+}
+
 # Shown activity as a saved session keeps it: each card with the index of the
 # turn it was shown in, beside the turns the model reads.
 activity_session_entries <- function(overlay) {
