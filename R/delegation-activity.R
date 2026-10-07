@@ -184,14 +184,6 @@ activity_enable <- function(agent, requester, interval = 0.1) {
     ))
   }
   state <- new_activity_presenter(requester, interval)
-  # Results a presenter stopped during this reply settled still reach it.
-  leftover <- private$.activity_leftover
-  private$.activity_leftover <- NULL
-  if (
-    !is.null(leftover) && identical(leftover$run_id, private$current_run_id)
-  ) {
-    state$queue <- leftover$queue
-  }
   private$.activity <- state
   invisible(state)
 }
@@ -214,12 +206,18 @@ activity_disable <- function(agent, presenter = NULL) {
       state = state
     )
   }
-  # A reply still streaming takes what was queued, those results included;
-  # a later reply doesn't.
-  private$.activity_leftover <- if (
-    !is.null(state) && length(state$queue) && !is.null(private$current_run_id)
-  ) {
-    list(run_id = private$current_run_id, queue = state$queue)
+  # The reply streaming now takes what was queued, those results included,
+  # even once another presenter is shown; a later reply doesn't.
+  run_id <- private$current_run_id
+  if (!is.null(state) && length(state$queue) && !is.null(run_id)) {
+    earlier <- private$.activity_leftover
+    private$.activity_leftover <- list(
+      run_id = run_id,
+      queue = c(
+        if (identical(earlier$run_id, run_id)) earlier$queue,
+        state$queue
+      )
+    )
   }
   private$.activity <- NULL
   invisible(agent)
@@ -227,24 +225,19 @@ activity_disable <- function(agent, presenter = NULL) {
 
 activity_take <- function(agent) {
   private <- agent$.__enclos_env__$private
+  # What a presenter stopped during this reply left queued reaches this reply
+  # once, whether or not another presenter has been shown since.
+  leftover <- private$.activity_leftover
+  private$.activity_leftover <- NULL
+  if (!identical(leftover$run_id, private$current_run_id)) {
+    leftover <- NULL
+  }
   state <- private$.activity
-  if (is.null(state)) {
-    leftover <- private$.activity_leftover
-    private$.activity_leftover <- NULL
-    if (
-      !is.null(leftover) &&
-        identical(leftover$run_id, private$current_run_id)
-    ) {
-      return(leftover$queue)
-    }
-    return(list())
+  queue <- if (!is.null(state)) state$queue
+  if (!is.null(state)) {
+    state$queue <- list()
   }
-  if (!length(state$queue)) {
-    return(list())
-  }
-  queue <- state$queue
-  state$queue <- list()
-  queue
+  c(leftover$queue, queue) %||% list()
 }
 
 # The depth-one delegation a descendant belongs to: its tool call is the one
