@@ -445,3 +445,31 @@ test_that("tool errors with call stacks read back from saved chat history", {
   # The model's context keeps the error as it was raised.
   expect_identical(agent$get_context_turns()[[3L]]@contents[[1L]]@error, error)
 })
+
+test_that("plain tool errors keep their message, not classes that need more", {
+  # A message method that reads a field the plain condition doesn't keep.
+  local_mocked_s3_method(
+    "conditionMessage",
+    "deputy_test_error",
+    function(c) paste("Failed on", c$item)
+  )
+  error <- structure(
+    class = c("deputy_test_error", "shiny.custom.error", "error", "condition"),
+    list(message = "", call = NULL, item = "row 3")
+  )
+  request <- ellmer::ContentToolRequest("call_1", "read_rows", list())
+  agent <- Agent$new(
+    ellmer::chat_openai(model = "test", credentials = function() "x")
+  )
+  agent$set_turns(list(
+    ellmer::UserTurn(list(ellmer::ContentText("Rows?"))),
+    ellmer::AssistantTurn(list(request)),
+    ellmer::UserTurn(list(
+      ellmer::ContentToolResult(error = error, request = request)
+    )),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Reading failed.")))
+  ))
+  shown <- agent$get_turns()[[3L]]@contents[[1L]]@error
+  expect_identical(class(shown), c("shiny.custom.error", "error", "condition"))
+  expect_identical(conditionMessage(shown), "Failed on row 3")
+})

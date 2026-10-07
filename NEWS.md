@@ -4,8 +4,8 @@
   A failed tool call inside a Shiny session carries Shiny's call stacks, which
   shinychat's file store can't read back, so the turn holding it was dropped
   when the conversation was reopened. `$get_turns()` now returns tool errors as
-  plain conditions with their class and message; the model still sees the
-  error as it was raised (#238).
+  plain conditions with the same message; the model still sees the error as
+  it was raised (#238).
 
 * New example `commons-subagents`: a Shiny app in which a root agent asks
   Commons specialists concurrently, one of them asks another, their tool calls

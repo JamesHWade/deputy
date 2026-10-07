@@ -1196,7 +1196,7 @@ until \verb{$set_turns()} replaces the conversation. When
 \code{\link[=subagent_chat_activity]{subagent_chat_activity()}} shows subagent tool calls in this
 conversation, they are included here too, after the contents of the
 reply that delegated them; the model never sees them. A tool error is
-returned as a plain condition with its class and message, so the
+returned as a plain condition with the same message, so the
 conversation can be saved and read back by shinychat's history.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}

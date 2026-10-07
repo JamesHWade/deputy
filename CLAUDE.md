@@ -471,7 +471,8 @@ subsets and usage reported before a compaction use characters only. Evaluation c
 future history-retrieval comparison are described in `dev/compaction-evaluation.md`.
 `Agent$get_turns()` and `turns()` expose the complete selected conversation;
 `get_context_turns()` exposes the compacted model input. `get_turns()` returns
-tool errors as plain conditions (class and message): shinychat's file store
+tool errors as plain conditions (message; base, `ellmer_tool_reject` and
+`shiny.custom.error` classes only): shinychat's file store
 writes turns with `serializeJSON()` and drops any it can't read back, which
 Shiny's `deep.stack.trace` calls caused (`portable_tool_errors()`). Accepted compaction
 retains removed turns as a portable in-memory prefix, without executable tool
