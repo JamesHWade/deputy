@@ -704,7 +704,9 @@ subagent_chat_server <- function(
 #' @param interval How often to look for new calls while the lead waits on a
 #'   subagent, in milliseconds. At least 50; defaults to 100.
 #' @return Invisibly, a list with `stop()`, which stops adding calls. Ending the
-#'   Shiny session also stops it.
+#'   Shiny session also stops it. A lead shows activity in one chat at a time:
+#'   calling `subagent_chat_activity()` again for the same lead before `stop()`
+#'   is an error.
 #' @seealso [subagent_chat_ui()] for a panel with each subagent's full
 #'   conversation.
 #' @export
@@ -731,9 +733,9 @@ subagent_chat_activity <- function(chat, lead, requester, interval = 100L) {
   if (is.null(interval) || interval < 50L) {
     cli::cli_abort("{.arg interval} must be at least 50 milliseconds.")
   }
-  activity_enable(lead, requester, interval / 1000)
+  presenter <- activity_enable(lead, requester, interval / 1000)
   stop <- function() {
-    activity_disable(lead)
+    activity_disable(lead, presenter)
     invisible(NULL)
   }
   session <- shiny::getDefaultReactiveDomain()
