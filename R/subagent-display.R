@@ -5,9 +5,11 @@
 # or saved history rather than from the producing tool, so the adapter rebuilds
 # it from an allowlist first: structure, classes, inline styles, inline SVG and
 # image data stay; scripts, event handlers, embedded documents, forms, external
-# style sheets and active URLs do not. Ids are prefixed so a display can never
-# take over an element id the host page relies on, and a `<style>` element is
-# kept only when every rule is scoped to such an id, as gt tables are.
+# style sheets and every URL the browser would fetch do not; only inline data
+# images remain. Each display's ids get a prefix of its own, so a display can
+# never take over an element id the host page or another card relies on, and a
+# `<style>` element is kept only when every rule is scoped to such an id, as gt
+# tables are, and holds no nested rules.
 
 subagent_display_elements <- c(
   "a",
@@ -212,7 +214,15 @@ subagent_display_attributes <- c(
   "gradienttransform"
 )
 
-subagent_display_id_prefix <- "deputy-display-"
+# Each rebuilt display gets its own id prefix, so ids and id-scoped styles
+# from one card never reach another.
+subagent_display_prefix <- function() {
+  paste0(
+    "deputy-display-",
+    substr(gsub("-", "", new_deputy_id()), 1L, 12L),
+    "-"
+  )
+}
 
 # Rebuilt markup adds no whitespace of its own, so inline content keeps its
 # original spacing.
@@ -244,22 +254,25 @@ subagent_display_url <- function(value, element) {
         "^data:image/(png|jpe?g|gif|webp|bmp|svg\\+xml);base64,[A-Za-z0-9+/=]*$",
         plain,
         ignore.case = TRUE
-      ) ||
-        grepl("^https://", plain, ignore.case = TRUE)
+      )
     )
   }
   grepl("^(https?://|mailto:)", plain, ignore.case = TRUE)
 }
 
-subagent_display_id <- function(id) {
+subagent_display_id <- function(id, prefix) {
   if (!grepl("^[A-Za-z][A-Za-z0-9_-]{0,63}$", id)) {
     return(NULL)
   }
-  paste0(subagent_display_id_prefix, id)
+  paste0(prefix, id)
 }
 
 # Keep declarations that only style the element in place.
-subagent_display_css_declarations <- function(css, ids = character()) {
+subagent_display_css_declarations <- function(
+  css,
+  ids = character(),
+  prefix = subagent_display_prefix()
+) {
   declarations <- strsplit(css, ";", fixed = TRUE)[[1L]]
   kept <- character()
   for (declaration in declarations) {
@@ -276,13 +289,15 @@ subagent_display_css_declarations <- function(css, ids = character()) {
     if (
       !grepl("^-?[a-z][a-z0-9-]*$", property) ||
         !nzchar(value) ||
+        # Braces would open nested rules that escape the checks here.
+        grepl("[{}]", value) ||
         subagent_display_active(value) ||
         (identical(property, "position") &&
           grepl("fixed|sticky", value, ignore.case = TRUE))
     ) {
       next
     }
-    value <- subagent_display_css_refs(value, ids)
+    value <- subagent_display_css_refs(value, ids, prefix)
     if (is.null(value)) {
       next
     }
@@ -292,19 +307,19 @@ subagent_display_css_declarations <- function(css, ids = character()) {
 }
 
 # `url(#id)` references point at prefixed ids; any other reference is dropped.
-subagent_display_css_refs <- function(value, ids) {
+subagent_display_css_refs <- function(value, ids, prefix) {
   pattern <- "url\\((\\s*['\"]?)#([A-Za-z][A-Za-z0-9_-]*)"
   refs <- regmatches(value, gregexpr(pattern, value))[[1L]]
   referenced <- sub("^url\\(\\s*['\"]?#", "", refs)
   if (!all(referenced %in% ids)) {
     return(NULL)
   }
-  gsub(pattern, paste0("url(\\1#", subagent_display_id_prefix, "\\2"), value)
+  gsub(pattern, paste0("url(\\1#", prefix, "\\2"), value)
 }
 
 # A rule survives only when each selector starts at an id defined in the same
 # display, which is how gt scopes its table styles.
-subagent_display_style_element <- function(css, ids) {
+subagent_display_style_element <- function(css, ids, prefix) {
   css <- gsub("/\\*.*?\\*/", "", css, perl = TRUE)
   if (
     !length(ids) ||
@@ -370,7 +385,7 @@ subagent_display_style_element <- function(css, ids) {
       }
       rewritten <- c(
         rewritten,
-        paste0("#", subagent_display_id_prefix, substring(selector, 2L))
+        paste0("#", prefix, substring(selector, 2L))
       )
     }
     paste(rewritten, collapse = ",")
@@ -392,10 +407,11 @@ subagent_display_style_element <- function(css, ids) {
         next
       }
       selector <- scope(block$prelude)
-      if (is.null(selector)) {
+      # A rule with nested blocks is dropped whole.
+      if (is.null(selector) || grepl("[{}]", block$body)) {
         next
       }
-      body <- subagent_display_css_declarations(block$body, ids)
+      body <- subagent_display_css_declarations(block$body, ids, prefix)
       if (nzchar(body)) {
         out <- c(out, paste0(selector, "{", body, "}"))
       }
@@ -441,6 +457,7 @@ subagent_display_html <- function(html) {
     "id"
   ))
   ids <- ids[!is.na(ids) & grepl("^[A-Za-z][A-Za-z0-9_-]{0,63}$", ids)]
+  prefix <- subagent_display_prefix()
   state <- new.env(parent = emptyenv())
   state$nodes <- 0L
   render <- function(node, depth) {
@@ -460,7 +477,7 @@ subagent_display_html <- function(html) {
       return(NULL)
     }
     if (identical(name, "style")) {
-      css <- subagent_display_style_element(xml2::xml_text(node), ids)
+      css <- subagent_display_style_element(xml2::xml_text(node), ids, prefix)
       if (!nzchar(css)) {
         return(NULL)
       }
@@ -488,14 +505,14 @@ subagent_display_html <- function(html) {
         next
       }
       if (identical(key, "id")) {
-        prefixed <- if (value %in% ids) subagent_display_id(value)
+        prefixed <- if (value %in% ids) subagent_display_id(value, prefix)
         if (!is.null(prefixed)) {
           kept$id <- prefixed
         }
         next
       }
       if (identical(key, "style")) {
-        css <- subagent_display_css_declarations(value, ids)
+        css <- subagent_display_css_declarations(value, ids, prefix)
         if (nzchar(css)) {
           kept$style <- css
         }
@@ -524,7 +541,7 @@ subagent_display_html <- function(html) {
       if (key %in% subagent_display_url_attributes) {
         # Paint and clipping may reference a gradient or clip path defined in
         # the same display, never anything outside it.
-        value <- subagent_display_css_refs(value, ids)
+        value <- subagent_display_css_refs(value, ids, prefix)
         if (is.null(value) || subagent_display_active(value)) {
           next
         }
