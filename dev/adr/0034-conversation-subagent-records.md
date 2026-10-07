@@ -73,11 +73,12 @@ back from storage Deputy doesn't control.
   without its transcript (`retention$transcript = "omitted"`) or left out,
   newest first if the whole record is still too large, and the record counts
   both; a child whose outcome alone is over the disclosure bound is left out
-  and counted. Counts survive later saves: the record names the lead that
-  saved it (a digest of its agent ID), so a lead that reopens its own record
-  counts its running and oversized children again from its live records,
-  while another lead, which can't find them, keeps them counted as left out,
-  as it does saved children it drops. The disclosure budget starts from the
+  and counted. Counts survive later saves: the record lists the live children
+  it left out (running, oversized or dropped for space) by the same digest
+  as its saved children. A later save counts each again from the lead's
+  records while the lead still has it, and otherwise, as for another
+  session's lead or a child released since, keeps it counted as left out, as
+  it does saved children it drops. The disclosure budget starts from the
   empty history's own size
   (schema, scope, containers), and a record that can't fit even that saves
   nothing. A record saved under a larger disclosure bound than the lead now has
