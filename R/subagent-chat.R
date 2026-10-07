@@ -139,6 +139,10 @@ subagent_chat_ui <- function(id, height = "420px") {
 #'   button.
 #' @param poll_interval How often to check for updates, in milliseconds. At
 #'   least 100; defaults to 250.
+#' @param conversation Optional value returned by [subagent_chat_history()]
+#'   for the lead's chat. The panel then shows the subagents of the
+#'   conversation open in that chat: those that ran in it, live, and those
+#'   saved with it, read-only.
 #' @return `subagent_chat_server()` returns a list of reactives: `selected`
 #'   (the selected delegation ID), `views`, `notice` and `closed`.
 #' @export
@@ -150,13 +154,28 @@ subagent_chat_server <- function(
   disclosure = NULL,
   scope = NULL,
   on_cancel = NULL,
-  poll_interval = 250L
+  poll_interval = 250L,
+  conversation = NULL
 ) {
   subagent_chat_dependencies()
   if (
     !is.function(requester) || (!is.null(on_cancel) && !is.function(on_cancel))
   ) {
     cli::cli_abort("requester and any on_cancel callback must be functions.")
+  }
+  if (
+    !is.null(conversation) &&
+      (!is.list(conversation) ||
+        !is.function(conversation$restored) ||
+        !is.function(conversation$conversation_id))
+  ) {
+    cli::cli_abort(
+      "{.arg conversation} must be the value returned by {.fn subagent_chat_history}."
+    )
+  }
+  # The open conversation's live subagents and the saved ones not live.
+  conversation_views <- function(live) {
+    subagent_history_panel_views(conversation, live)
   }
   poll_interval <- context_policy_whole_number(poll_interval, "poll_interval")
   if (is.null(poll_interval) || poll_interval < 100L) {
@@ -204,7 +223,11 @@ subagent_chat_server <- function(
       }
       saved <- value(history)
       current <- if (is.null(saved)) {
-        value(lead)$inspect_subagents(requester(), id, transcript = TRUE)
+        subagent_history_panel_child(
+          conversation,
+          value(lead)$inspect_subagents(requester(), id, transcript = TRUE),
+          id
+        )
       } else {
         Filter(
           function(view) identical(view$outcome$runtime$delegation_id, id),
@@ -352,8 +375,8 @@ subagent_chat_server <- function(
           }
           if (closed()) {
             detach()
-            current <- filter_views(current_lead$inspect_subagents(
-              current_requester
+            current <- filter_views(conversation_views(
+              current_lead$inspect_subagents(current_requester)
             ))
             if (!identical(current, views())) {
               update_views(current)
@@ -368,12 +391,12 @@ subagent_chat_server <- function(
             clear()
             state$lead <- current_lead
             state$reader <- current_lead$observe_subagents(current_requester)
-            update_views(state$reader$snapshot()$children)
+            update_views(conversation_views(state$reader$snapshot()$children))
             render_child()
           }
           update <- state$reader$poll()
-          fresh_views <- filter_views(current_lead$inspect_subagents(
-            current_requester
+          fresh_views <- filter_views(conversation_views(
+            current_lead$inspect_subagents(current_requester)
           ))
           disclosure_changed <- !identical(fresh_views, views())
           if (

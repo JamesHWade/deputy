@@ -334,3 +334,34 @@ saves, so reopening it shows them again, and nothing runs when it does. The
 same `delegation_disclosure` decides who sees them. A second delegation to the
 same subagent is numbered ("analyst #2"), and a subagent's own subagents say
 whom they ran for ("reviewer (via analyst)").
+
+## Saving subagents with the conversation
+
+`subagent_chat_history()` saves each conversation's subagents with that
+conversation in shinychat's history: their tasks, outcomes, conversations with
+tool results and cards, usage, and which subagent ran for which. Reopening the
+conversation, after a reload or in a new session, brings them back read-only.
+Nothing runs again, no subagent resumes, and the lead's model doesn't see them.
+Pass the result to `subagent_chat_server()` as `conversation` and the panel
+shows the subagents of the conversation that is open, saved or live:
+
+```{r}
+server <- function(input, output, session) {
+  user <- function() current_user(session)
+  chat <- shinychat::chat_server("chat", lead)
+  subagent_chat_activity(chat, lead, requester = user)
+  saved <- subagent_chat_history(chat, lead, requester = user)
+  subagent_chat_server("subagents", lead, requester = user, conversation = saved)
+}
+```
+
+Each conversation's subagents are saved as one piece of JSON text, up to
+`max_bytes` (16 MiB by default). A subagent that doesn't fit is saved without
+its conversation, or not at all, and `saved$status()` lists which. Your
+`delegation_disclosure` is checked when records are saved and whenever they are
+read back; reading back, `authorize` gets a `scope` with the lead's
+`delegation_scope` and the conversation's ID as `chat_conversation_id`. Large
+results a subagent saved to disk are kept only as references, which may no
+longer resolve. Deputy learns which conversation a reply belongs to from
+`lead$conversation_id`, which shinychat sets before each reply; set it
+yourself if you start a subagent outside a reply.

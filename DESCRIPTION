@@ -137,6 +137,7 @@ Collate:
     'structured-run.R'
     'subagent-chat.R'
     'subagent-display.R'
+    'subagent-history.R'
     'subprocess-env.R'
     'tool-display-evidence.R'
     'tool-input-review.R'

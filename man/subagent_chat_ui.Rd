@@ -15,7 +15,8 @@ subagent_chat_server(
   disclosure = NULL,
   scope = NULL,
   on_cancel = NULL,
-  poll_interval = 250L
+  poll_interval = 250L,
+  conversation = NULL
 )
 }
 \arguments{
@@ -44,6 +45,11 @@ button.}
 
 \item{poll_interval}{How often to check for updates, in milliseconds. At
 least 100; defaults to 250.}
+
+\item{conversation}{Optional value returned by \code{\link[=subagent_chat_history]{subagent_chat_history()}}
+for the lead's chat. The panel then shows the subagents of the
+conversation open in that chat: those that ran in it, live, and those
+saved with it, read-only.}
 }
 \value{
 \code{subagent_chat_ui()} returns a bslib card.

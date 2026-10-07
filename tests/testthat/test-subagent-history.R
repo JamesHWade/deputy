@@ -1,0 +1,645 @@
+history_disclosure <- function(state = NULL) {
+  DelegationDisclosure(
+    authorize = function(requester, scope) {
+      identical(requester, "viewer") && !isTRUE(state$denied)
+    }
+  )
+}
+
+history_measure_tool <- function(value, counter) {
+  ellmer::tool(
+    function() {
+      counter$calls <- counter$calls + 1L
+      ellmer::ContentToolResult(
+        value = value,
+        extra = list(
+          display = list(
+            title = "Ran a trusted calculation",
+            html = paste0("<div class=\"measure\">", value, "</div>")
+          ),
+          commons_tag = "A"
+        )
+      )
+    },
+    name = "call_measure",
+    description = "Run a registered measure.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+}
+
+# A lead with one retained specialist behind `ask_sales`. Pass `NULL` servers
+# for a lead that must never call a model.
+history_lead <- function(
+  root,
+  sales,
+  counter,
+  scope = list(owner_id = "u1"),
+  state = NULL
+) {
+  offline <- list(url = "http://127.0.0.1:9/v1")
+  lead <- Agent$new(
+    runtime_chat(root %||% offline),
+    delegation_disclosure = history_disclosure(state),
+    delegation_scope = scope
+  )
+  specialist <- Agent$new(
+    runtime_chat(sales %||% offline),
+    tools = list(history_measure_tool(60, counter)),
+    agent_name = "sales"
+  )
+  handle <- lead$retain_agent(specialist, UsageLimits(max_requests = 8))
+  lead$register_tool(delegation_tool(
+    lead,
+    handle,
+    "ask_sales",
+    "Ask the sales specialist.",
+    UsageLimits(max_requests = 4)
+  ))
+  lead
+}
+
+history_root_server <- function(.local_envir = parent.frame()) {
+  local_runtime_server(
+    list(
+      runtime_reply(tool = "ask_sales", arguments = list(task = "Revenue?")),
+      runtime_reply("Lead: revenue is 60.")
+    ),
+    .local_envir = .local_envir
+  )
+}
+
+history_sales_server <- function(.local_envir = parent.frame()) {
+  local_runtime_server(
+    list(
+      runtime_reply(tool = "call_measure"),
+      runtime_reply("Total revenue is 60.")
+    ),
+    .local_envir = .local_envir
+  )
+}
+
+# shinychat's file store, keeping each record as it reads back from disk.
+HistoryTestStore <- R6::R6Class(
+  "HistoryTestStore",
+  inherit = shinychat::ConversationStore,
+  public = list(
+    inner = NULL,
+    saved = list(),
+    initialize = function(dir) {
+      self$inner <- shinychat::FileConversationStore$new(dir)
+    },
+    list = function(partition) self$inner$list(partition),
+    get = function(partition, id) self$inner$get(partition, id),
+    put = function(partition, record) {
+      self$inner$put(partition, record)
+      self$saved[[record$id]] <- self$inner$get(partition, record$id)
+      invisible(NULL)
+    },
+    delete = function(partition, id) self$inner$delete(partition, id)
+  )
+)
+
+history_wait <- function(session, done, timeout = 60) {
+  deadline <- Sys.time() + timeout
+  while (!isTRUE(done())) {
+    if (Sys.time() > deadline) {
+      cli::cli_abort("Timed out waiting for the chat.")
+    }
+    later::run_now(0.02)
+    session$flushReact()
+  }
+}
+
+history_submit <- function(session, chat, store, text) {
+  before <- shiny::isolate(chat$history$conversation_id())
+  count <- if (is.null(before)) 0L else store$saved[[before]]$response_count
+  session$setInputs(chat_user_input = text)
+  history_wait(session, function() {
+    id <- shiny::isolate(chat$history$conversation_id())
+    !is.null(id) &&
+      (store$saved[[id]]$response_count %||% 0L) > count &&
+      identical(shiny::isolate(chat$status()), "idle")
+  })
+  shiny::isolate(chat$history$conversation_id())
+}
+
+# Run `body(session, chat, saver)` in a Shiny session whose chat runs `lead`
+# with history kept in `store`.
+history_session <- function(lead, store, body, panel = FALSE) {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("bslib")
+  shiny::testServer(
+    function(input, output, session) {
+      chat <- shinychat::chat_server(
+        "chat",
+        lead,
+        history = shinychat::history_options(
+          restore_mode = "none",
+          store = store,
+          scope = "test",
+          title = NULL
+        )
+      )
+      subagent_chat_activity(chat, lead, function() "viewer")
+      saver <- subagent_chat_history(chat, lead, function() "viewer")
+      session$userData$chat <- chat
+      session$userData$saver <- saver
+      if (panel) {
+        session$userData$panel <- subagent_chat_server(
+          "panel",
+          lead,
+          function() "viewer",
+          conversation = saver,
+          poll_interval = 100L
+        )
+      }
+    },
+    {
+      session$flushReact()
+      body(session, session$userData$chat, session$userData$saver)
+    }
+  )
+}
+
+history_results <- function(turns) {
+  contents <- unlist(lapply(turns, function(turn) turn@contents))
+  Filter(function(x) inherits(x, "ellmer::ContentToolResult"), contents)
+}
+
+history_state <- function(lead, conversation_id, requester = "viewer") {
+  chat <- new.env()
+  chat$client <- lead
+  chat$history <- new.env()
+  chat$history$conversation_id <- function() conversation_id
+  state <- new.env()
+  state$chat <- chat
+  state$lead <- lead
+  state$requester <- function() requester
+  state$max_bytes <- 16 * 1024^2
+  state$conversation_id <- NULL
+  state$record <- NULL
+  state$envelope <- NULL
+  state$kept <- NULL
+  state$error <- NULL
+  state
+}
+
+# A settled delegation started while `lead` answered in `conversation_id`.
+history_settled_lead <- function(
+  conversation_id,
+  counter,
+  .local_envir = parent.frame()
+) {
+  lead <- history_lead(
+    history_root_server(.local_envir),
+    history_sales_server(.local_envir),
+    counter
+  )
+  lead$conversation_id <- conversation_id
+  lead$run_sync("Revenue?")
+  lead
+}
+
+test_that("saved records round-trip exactly through JSON stores", {
+  x <- list(
+    a = 1L,
+    b = c(1.5, NA, NaN, Inf, -Inf, 0.1, -0, 1e300, 5e-324),
+    c = c("x", NA, "é"),
+    d = list(NULL, list(), stats::setNames(list(), character()), TRUE, NA),
+    m = matrix(1:6, 2, dimnames = list(c("r1", "r2"), NULL)),
+    e = character(),
+    f = integer(),
+    h = c(a = 1L, b = NA)
+  )
+  expect_identical(history_parse(history_json(x)), x)
+  stored <- jsonlite::toJSON(
+    list(values = list(data = history_json(x), version = 1L)),
+    auto_unbox = TRUE,
+    null = "null",
+    digits = 17,
+    force = TRUE
+  )
+  back <- jsonlite::fromJSON(stored, simplifyVector = FALSE)$values
+  expect_identical(history_parse(back$data), x)
+})
+
+test_that("decoding builds only portable data", {
+  bad <- c(
+    '{"t":"closure","v":[]}',
+    '{"t":"S4","v":[]}',
+    '{"t":"chr","v":[1]}',
+    '{"t":"dbl","v":["1;system(\\"id\\")"]}',
+    '{"t":"int","v":["99999999999"]}',
+    '{"t":"list","v":[],"x":1}',
+    '{"t":"lgl","v":["TRUE"]}',
+    '{"t":"chr","v":["a"],"d":["2"]}',
+    '{"t":"null","v":[]}'
+  )
+  for (text in bad) {
+    expect_error(history_parse(text), "not in a readable form")
+  }
+  deep <- '{"t":"null"}'
+  for (i in 1:70) {
+    deep <- paste0('{"t":"list","v":[', deep, "]}")
+  }
+  expect_error(history_parse(deep), "not in a readable form")
+  expect_error(history_json(list(f = identity)), "not in a readable form")
+  expect_error(history_json(factor("a")), "not in a readable form")
+})
+
+test_that("delegations record the conversation the lead answered in", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_lead(
+    history_root_server(),
+    history_sales_server(),
+    counter
+  )
+  expect_null(lead$conversation_id)
+  expect_error(lead$conversation_id <- 1, "one non-empty string")
+  expect_error(lead$conversation_id <- c("a", "b"), "one non-empty string")
+  expect_error(lead$conversation_id <- "", "one non-empty string")
+  lead$conversation_id <- "conv-a"
+  lead$run_sync("Revenue?")
+  view <- lead$inspect_subagents("viewer")[[1L]]
+  expect_identical(view$outcome$runtime$host_conversation_id, "conv-a")
+  # The model's copy of the outcome leaves out the host's identity.
+  results <- history_results(lead$get_context_turns())
+  expect_false(any(grepl(
+    "conv-a",
+    vapply(
+      results,
+      function(result) paste(result@value, collapse = ""),
+      character(1)
+    )
+  )))
+  lead$conversation_id <- NULL
+  expect_null(lead$conversation_id)
+})
+
+test_that("subagent records are saved with the conversation and restored read-only", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  lead <- history_lead(
+    history_root_server(),
+    history_sales_server(),
+    counter
+  )
+  conversation <- NULL
+  history_session(lead, store, function(session, chat, saver) {
+    conversation <<- history_submit(session, chat, store, "Revenue?")
+    status <- saver$status()
+    expect_identical(status$conversation_id, conversation)
+    expect_identical(status$saved, 1L)
+    expect_null(status$error)
+  })
+  expect_identical(counter$calls, 1L)
+  saved <- store$saved[[conversation]]$values$deputy_subagents
+  expect_identical(saved$format, "deputy_conversation_subagents")
+  expect_identical(saved$version, 1L)
+  expect_identical(saved$conversation_id, conversation)
+  expect_type(saved$data, "character")
+
+  # A new session and a new lead that can't reach a model.
+  restored_lead <- history_lead(NULL, NULL, counter)
+  history_session(restored_lead, store, function(session, chat, saver) {
+    session$setInputs(chat_history_select = list(id = conversation))
+    session$flushReact()
+    expect_identical(saver$status()$saved, 1L)
+    views <- saver$restored()
+    expect_length(views, 1L)
+    view <- views[[1L]]
+    expect_identical(view$outcome$runtime$agent_name, "sales")
+    expect_identical(view$outcome$runtime$status, "completed")
+    expect_identical(view$outcome$runtime$host_conversation_id, conversation)
+    expect_identical(view$retention$execution, "read_only")
+    result <- history_results(view$turns)[[1L]]
+    expect_identical(result@extra$display$title, "Ran a trusted calculation")
+    expect_identical(result@extra$commons_tag, "A")
+    expect_length(saver$restored(transcript = FALSE)[[1L]]$turns, 0L)
+    # The subagent's cards are back in the shown conversation only.
+    shown <- unlist(lapply(restored_lead$get_turns(), function(t) t@contents))
+    context <- unlist(lapply(
+      restored_lead$get_context_turns(),
+      function(t) t@contents
+    ))
+    expect_true(any(vapply(shown, is_activity_content, logical(1))))
+    expect_false(any(vapply(context, is_activity_content, logical(1))))
+    # Restoring creates no live subagent and runs nothing.
+    expect_length(restored_lead$inspect_subagents("viewer"), 0L)
+  })
+  expect_identical(counter$calls, 1L)
+})
+
+test_that("a restored conversation keeps its saved subagents as it continues", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  first <- history_lead(history_root_server(), history_sales_server(), counter)
+  conversation <- NULL
+  history_session(first, store, function(session, chat, saver) {
+    conversation <<- history_submit(session, chat, store, "Revenue?")
+  })
+  second <- history_lead(history_root_server(), history_sales_server(), counter)
+  history_session(second, store, function(session, chat, saver) {
+    session$setInputs(chat_history_select = list(id = conversation))
+    session$flushReact()
+    expect_identical(
+      history_submit(session, chat, store, "Again?"),
+      conversation
+    )
+    expect_identical(saver$status()$saved, 2L)
+  })
+  third <- history_lead(NULL, NULL, counter)
+  history_session(third, store, function(session, chat, saver) {
+    session$setInputs(chat_history_select = list(id = conversation))
+    session$flushReact()
+    views <- saver$restored(transcript = FALSE)
+    ids <- vapply(
+      views,
+      function(view) view$outcome$runtime$delegation_id,
+      character(1)
+    )
+    expect_length(unique(ids), 2L)
+    expect_identical(
+      ids[[1L]],
+      first$inspect_subagents("viewer")[[1L]]$outcome$runtime$delegation_id
+    )
+  })
+  expect_identical(counter$calls, 2L)
+})
+
+test_that("each conversation saves only its own subagents", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  root <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "One?")),
+    runtime_reply("Lead: one."),
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Two?")),
+    runtime_reply("Lead: two.")
+  ))
+  sales <- local_runtime_server(list(
+    runtime_reply(tool = "call_measure"),
+    runtime_reply("One is 60."),
+    runtime_reply(tool = "call_measure"),
+    runtime_reply("Two is 60.")
+  ))
+  lead <- history_lead(root, sales, counter)
+  ids <- character()
+  history_session(
+    lead,
+    store,
+    function(session, chat, saver) {
+      ids[["one"]] <<- history_submit(session, chat, store, "One?")
+      session$setInputs(chat_history_new = 1L)
+      session$flushReact()
+      expect_null(saver$restored())
+      ids[["two"]] <<- history_submit(session, chat, store, "Two?")
+      panel <- session$userData$panel
+      session$elapse(200)
+      views <- panel$views()
+      expect_length(views, 1L)
+      expect_identical(
+        views[[1L]]$outcome$runtime$host_conversation_id,
+        ids[["two"]]
+      )
+      # Opening the first conversation shows its subagent instead.
+      session$setInputs(chat_history_select = list(id = ids[["one"]]))
+      session$elapse(200)
+      views <- panel$views()
+      expect_length(views, 1L)
+      expect_identical(
+        views[[1L]]$outcome$runtime$host_conversation_id,
+        ids[["one"]]
+      )
+    },
+    panel = TRUE
+  )
+  expect_false(identical(ids[["one"]], ids[["two"]]))
+  for (name in names(ids)) {
+    record <- history_parse(
+      store$saved[[ids[[name]]]]$values$deputy_subagents$data
+    )
+    expect_length(record$history$children, 1L)
+    expect_identical(
+      record$history$children[[1L]]$outcome$runtime$host_conversation_id,
+      ids[[name]]
+    )
+  }
+})
+
+test_that("the subagent panel shows saved subagents read-only", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  lead <- history_lead(history_root_server(), history_sales_server(), counter)
+  conversation <- NULL
+  history_session(lead, store, function(session, chat, saver) {
+    conversation <<- history_submit(session, chat, store, "Revenue?")
+  })
+  restored <- history_lead(NULL, NULL, counter)
+  history_session(
+    restored,
+    store,
+    function(session, chat, saver) {
+      panel <- session$userData$panel
+      session$elapse(200)
+      expect_length(panel$views(), 0L)
+      session$setInputs(chat_history_select = list(id = conversation))
+      session$elapse(200)
+      views <- panel$views()
+      expect_length(views, 1L)
+      id <- views[[1L]]$outcome$runtime$delegation_id
+      session$setInputs(`panel-selected` = id)
+      session$elapse(200)
+      expect_identical(panel$selected(), id)
+      expect_match(panel$notice(), "sales")
+      expect_match(panel$notice(), "completed")
+    },
+    panel = TRUE
+  )
+  expect_identical(counter$calls, 1L)
+})
+
+test_that("saved records that fail their checks are not read", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  state <- history_state(lead, "conv-a")
+  values <- subagent_history_save(state, list())
+  saved <- values$deputy_subagents
+  expect_null(state$error)
+  record <- history_parse(saved$data)
+
+  reread <- function(envelope, conversation = "conv-a", target = lead) {
+    fresh <- history_state(target, conversation)
+    subagent_history_restore(fresh, list(deputy_subagents = envelope))
+    fresh
+  }
+  expect_length(reread(saved)$record$history$children, 1L)
+
+  tampered <- function(change) {
+    copy <- record
+    copy <- change(copy)
+    envelope <- saved
+    envelope$data <- history_json(copy)
+    envelope
+  }
+  cases <- list(
+    other_conversation = reread(saved, "conv-b"),
+    running = reread(tampered(function(x) {
+      x$history$children[[1L]]$outcome$runtime$status <- "running"
+      x
+    })),
+    scope = reread(tampered(function(x) {
+      x$history$scope$owner_id <- "u2"
+      x
+    })),
+    transcript = reread(tampered(function(x) {
+      x$history$children[[1L]]$transcript[[1L]]$class <- "base::function"
+      x
+    })),
+    text = reread(within(saved, data <- "not json")),
+    codec = reread(within(saved, codec <- "rds"))
+  )
+  for (name in names(cases)) {
+    fresh <- cases[[name]]
+    if (identical(name, "other_conversation")) {
+      expect_null(fresh$record)
+      expect_match(fresh$error, "could not be read")
+      next
+    }
+    expect_null(fresh$record)
+    expect_match(fresh$error, "could not be read")
+    # The next save starts from the conversation's live subagents only.
+    expect_null(fresh$envelope)
+  }
+
+  # A lead whose delegation scope changed doesn't read them either.
+  other <- history_lead(NULL, NULL, counter, scope = list(owner_id = "u2"))
+  expect_null(reread(saved, target = other)$record)
+})
+
+test_that("records from a newer format are kept unchanged", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  state <- history_state(lead, "conv-a")
+  newer <- list(
+    format = "deputy_conversation_subagents",
+    version = 2L,
+    data = "{}"
+  )
+  subagent_history_restore(state, list(deputy_subagents = newer))
+  expect_match(state$error, "newer version")
+  expect_null(subagent_history_restored(state))
+  expect_identical(
+    subagent_history_save(state, list())$deputy_subagents,
+    newer
+  )
+  # Another conversation saves its own record, and keeps it.
+  state$chat$history$conversation_id <- function() "conv-b"
+  lead$conversation_id <- "conv-b"
+  saved <- subagent_history_save(state, list())$deputy_subagents
+  expect_identical(saved$conversation_id, "conv-b")
+  expect_identical(
+    subagent_history_save(state, list())$deputy_subagents,
+    saved
+  )
+})
+
+test_that("records over max_bytes keep outcomes and name what was left out", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  id <- lead$inspect_subagents("viewer")[[1L]]$outcome$runtime$delegation_id
+  state <- history_state(lead, "conv-a")
+  full <- subagent_history_record(state, "conv-a")
+  expect_identical(full$omitted$transcripts, character())
+  view <- full$history$children[[1L]]
+  with_transcript <- nchar(history_json(view), type = "bytes")
+  without <- nchar(
+    history_json(subagent_history_without_transcript(view)),
+    type = "bytes"
+  )
+  state$max_bytes <- (with_transcript + without) / 2
+  trimmed <- subagent_history_record(state, "conv-a")
+  expect_identical(trimmed$omitted$transcripts, id)
+  expect_null(trimmed$history$children[[1L]]$transcript)
+  expect_identical(
+    trimmed$history$children[[1L]]$retention$transcript,
+    "omitted"
+  )
+  state$max_bytes <- without / 2
+  dropped <- subagent_history_record(state, "conv-a")
+  expect_identical(dropped$omitted$children, id)
+  expect_length(dropped$history$children, 0L)
+})
+
+test_that("a save the requester may not see keeps the last good record", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  state <- history_state(lead, "conv-a")
+  saved <- subagent_history_save(state, list())$deputy_subagents
+  state$requester <- function() "intruder"
+  values <- subagent_history_save(state, list(other = 1))
+  expect_identical(values$deputy_subagents, saved)
+  expect_identical(values$other, 1)
+  expect_match(state$error, "not authorized")
+  # A conversation with nothing saved yet saves nothing.
+  fresh <- history_state(lead, "conv-a", requester = "intruder")
+  expect_null(subagent_history_save(fresh, list())$deputy_subagents)
+})
+
+test_that("subagent_chat_history() checks its arguments", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("bslib")
+  lead <- Agent$new(
+    ellmer::chat_openai(credentials = function() "x", echo = "none"),
+    delegation_disclosure = history_disclosure()
+  )
+  other <- Agent$new(
+    ellmer::chat_openai(credentials = function() "x", echo = "none")
+  )
+  shiny::testServer(
+    function(input, output, session) {
+      chat <- shinychat::chat_server("chat", lead, history = FALSE)
+      expect_error(
+        subagent_chat_history(list(), lead, function() "viewer"),
+        "chat_server"
+      )
+      expect_error(
+        subagent_chat_history(chat, other, function() "viewer"),
+        "client"
+      )
+      expect_error(subagent_chat_history(chat, lead, "viewer"), "function")
+      expect_error(
+        subagent_chat_history(chat, lead, function() "viewer", 10),
+        "at least 1024"
+      )
+      expect_error(
+        subagent_chat_server(
+          "panel",
+          lead,
+          function() "viewer",
+          conversation = list()
+        ),
+        "subagent_chat_history"
+      )
+      saver <- subagent_chat_history(chat, lead, function() "viewer")
+      expect_null(saver$restored())
+      expect_null(saver$status()$conversation_id)
+    },
+    {
+      session$flushReact()
+    }
+  )
+})

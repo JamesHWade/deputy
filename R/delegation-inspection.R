@@ -509,6 +509,7 @@ delegation_outcome <- function(record, compact = FALSE) {
     "tool_call_id",
     "conversation_handle",
     "previous_delegation_id",
+    "host_conversation_id",
     "status",
     "stop_reason"
   )
@@ -532,6 +533,8 @@ delegation_outcome <- function(record, compact = FALSE) {
   if (compact) {
     # Display labels may be shortened; opaque correlations must stay exact.
     runtime$agent_name <- inspection_text(runtime$agent_name, 512L)
+    # The host's conversation identity is not model context.
+    runtime$host_conversation_id <- NULL
     runtime <- compact_fields(runtime)
   }
   DelegationOutcome(

@@ -225,6 +225,7 @@ reference:
   - DelegationSubscription
   - subagent_chat_ui
   - subagent_chat_activity
+  - subagent_chat_history
 
 - title: Retained specialists
   desc: Keep a specialist's conversation across several delegations.
