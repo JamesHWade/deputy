@@ -560,3 +560,67 @@ runtime_chat <- function(server, model = "gpt-4o-mini", ...) {
 runtime_events <- function(agent, type) {
   Filter(function(event) identical(event$type, type), agent$last_run()$events)
 }
+
+# A streamed reply asking for several tools at once, each as
+# list(id = , name = , arguments = ). Real providers give each call its own ID
+# within a reply; different conversations may reuse them.
+runtime_tool_calls_reply <- function(calls) {
+  usage <- list(prompt_tokens = 10, completion_tokens = 5, total_tokens = 15)
+  tool_calls <- lapply(seq_along(calls), function(index) {
+    call <- calls[[index]]
+    list(
+      index = index - 1L,
+      id = call$id,
+      type = "function",
+      `function` = list(
+        name = call$name,
+        arguments = as.character(jsonlite::toJSON(
+          call$arguments %||% list(),
+          auto_unbox = TRUE
+        ))
+      )
+    )
+  })
+  chunks <- list(
+    list(
+      id = "fixture",
+      model = "gpt-4o-mini",
+      choices = list(list(
+        index = 0L,
+        delta = list(role = "assistant", tool_calls = tool_calls)
+      ))
+    ),
+    list(
+      id = "fixture",
+      model = "gpt-4o-mini",
+      choices = list(list(
+        index = 0L,
+        delta = structure(list(), names = character()),
+        finish_reason = "tool_calls"
+      )),
+      usage = usage
+    )
+  )
+  body <- paste0(
+    paste0(
+      vapply(
+        chunks,
+        function(chunk) {
+          paste0(
+            "data: ",
+            jsonlite::toJSON(chunk, auto_unbox = TRUE, null = "null"),
+            "\n\n"
+          )
+        },
+        character(1)
+      ),
+      collapse = ""
+    ),
+    "data: [DONE]\n\n"
+  )
+  list(
+    status = 200L,
+    headers = list("Content-Type" = "text/event-stream"),
+    body = body
+  )
+}

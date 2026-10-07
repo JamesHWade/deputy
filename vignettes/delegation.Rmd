@@ -305,6 +305,28 @@ instead of a live lead, pass `history`, together with `disclosure` and `scope`
 from your own records. The panel needs shinychat 0.5.0 or later, bslib,
 commonmark and xml2.
 
+## Subagent tool calls in the main chat
+
+`subagent_chat_activity()` shows the tool calls a lead's subagents make, with
+their results, in the lead's own shinychat conversation. Each call appears as a
+tool card in the reply that delegated it, labelled with the subagent's name,
+as it happens. A card looks as it did in the subagent's chat, so a Commons
+table or plot still reads "Ran a trusted calculation".
+
+```{r}
+server <- function(input, output, session) {
+  chat <- shinychat::chat_server("chat", lead)
+  subagent_chat_activity(chat, lead, requester = function() current_user(session))
+}
+```
+
+The lead's model still gets only each subagent's summary; the cards are for
+the person reading the chat. They are part of the conversation shinychat
+saves, so reopening it shows them again, and nothing runs when it does. The
+same `delegation_disclosure` decides who sees them. A second delegation to the
+same subagent is numbered ("analyst #2"), and a subagent's own subagents say
+whom they ran for ("reviewer (via analyst)").
+
 The package includes a demo that needs no API key. It runs two specialists
 against a local test server and shows tool output, a plot, a failure,
 cancellation, revoked access and replayed history:

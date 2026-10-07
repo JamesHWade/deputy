@@ -669,6 +669,79 @@ subagent_chat_server <- function(
   })
 }
 
+#' Show subagent tool calls in the main chat
+#'
+#' Adds the tool calls the lead's subagents make, with their results, to the
+#' lead's conversation in a shinychat chat, as they happen. Each call shows as
+#' a tool card in the reply that delegated it, labelled with the subagent's
+#' name; a second delegation to the same name is numbered, and a subagent's own
+#' subagents say whom they ran for. A card looks as it did in the subagent's own
+#' chat (a Commons table or plot, say), with scripts, event handlers, forms and
+#' external resources removed from its HTML.
+#'
+#' The cards are part of the conversation shinychat saves, so a restored
+#' conversation shows them again without running anything. The lead's model
+#' never sees them: it gets each subagent's summary, as before. `$get_turns()`
+#' on the lead includes the cards, while `$get_context_turns()` and requests
+#' to the provider don't, and `$set_turns()` separates them again.
+#'
+#' Only tool calls made while the lead is answering in this chat appear, and
+#' only when `requester` may see the subagents under the lead's
+#' [DelegationDisclosure]; its `redact` function applies, as for
+#' `$inspect_subagents()`. A call cut short by cancellation or a failed
+#' subagent shows as not completed. Up to 256 calls appear per reply. Showing a
+#' call never runs it again. Needs shiny, shinychat (>= 0.5.0), bslib,
+#' commonmark and xml2.
+#'
+#' @param chat The value returned by [shinychat::chat_server()] for the lead's
+#'   chat.
+#' @param lead The [Agent] or [LeadAgent] given to `chat_server()` as its
+#'   client.
+#' @param requester A function returning the current user, as your
+#'   [DelegationDisclosure] expects it. Access is checked each time new calls
+#'   are read.
+#' @param interval How often to look for new calls while the lead waits on a
+#'   subagent, in milliseconds. At least 50; defaults to 100.
+#' @return Invisibly, a list with `stop()`, which stops adding calls. Ending the
+#'   Shiny session also stops it.
+#' @seealso [subagent_chat_ui()] for a panel with each subagent's full
+#'   conversation.
+#' @export
+subagent_chat_activity <- function(chat, lead, requester, interval = 100L) {
+  subagent_chat_dependencies()
+  if (
+    !is.environment(chat) ||
+      !is.environment(chat$history) ||
+      !is.function(chat$history$on_save)
+  ) {
+    cli::cli_abort(
+      "{.arg chat} must be the value returned by {.fn shinychat::chat_server}."
+    )
+  }
+  if (!inherits(lead, "Agent") || !identical(chat$client, lead)) {
+    cli::cli_abort(
+      "{.arg lead} must be the Agent that {.arg chat} runs as its client."
+    )
+  }
+  if (!is.function(requester)) {
+    cli::cli_abort("{.arg requester} must be a function.")
+  }
+  interval <- context_policy_whole_number(interval, "interval")
+  if (is.null(interval) || interval < 50L) {
+    cli::cli_abort("{.arg interval} must be at least 50 milliseconds.")
+  }
+  activity_enable(lead, requester, interval / 1000)
+  stop <- function() {
+    activity_disable(lead)
+    invisible(NULL)
+  }
+  session <- shiny::getDefaultReactiveDomain()
+  if (!is.null(session)) {
+    session$onSessionEnded(stop)
+  }
+  invisible(list(stop = stop))
+}
+
 # Keep tool requests and results in the same assistant message so shinychat's
 # native tool cards can match them, including results carried by user turns.
 subagent_chat_messages <- function(turns) {

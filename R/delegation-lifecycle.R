@@ -74,6 +74,11 @@ lead_bind_delegation <- function(lead, id, child, manifest = NULL) {
   record$manifest <- manifest
   record$agent_id <- child$agent_id
   record$session_id <- child$session_id()
+  # A retained specialist already has history; this delegation's own turns
+  # start after it.
+  record$turns_before <- length(tryCatch(child$turns(), error = function(e) {
+    list()
+  }))
   record$run_context <- child$run_context
   record$artifact_routing <- lead_child_artifact_routing(child)
   private$subagent_runs[[id]] <- record

@@ -382,6 +382,10 @@ context_fork_turn_records <- function(turns, max_bytes, max_turns) {
     )
   })
   context_fork_input_bound(native, max_bytes)
+  # Subagent tool calls shown in a conversation were never model context, so a
+  # fork never copies them; their markers don't survive the projection below.
+  activity <- activity_split(native)
+  native <- activity$turns
   # Establish the existing inert public projection before looking at tool
   # rounds or converting incomplete evidence to text. This removes hidden
   # thinking, private extras and executable bindings before any custom fork
@@ -423,7 +427,8 @@ context_fork_turn_records <- function(turns, max_bytes, max_turns) {
     bytes = as.integer(bytes),
     omissions = c(
       sanitized$omissions,
-      if (tool_ids$replacements > 0L) "partial_tool_evidence"
+      if (tool_ids$replacements > 0L) "partial_tool_evidence",
+      if (length(activity$overlay)) "subagent_activity"
     )
   )
 }

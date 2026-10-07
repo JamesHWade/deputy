@@ -50,6 +50,7 @@ deputy/
 │   ├── delegation-inspection.R # Compact outcomes, authorized history and replay
 │   ├── delegation-lifecycle.R # Shared live records and child settlement
 │   ├── delegation-observation.R # Bounded child events and independent cursors
+│   ├── delegation-activity.R # Descendant tool cards in the lead's shown conversation
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── subagent-chat.R    # Optional authorized child activity and transcript UI
 │   ├── subagent-display.R # Inert HTML for tool displays shown by the Shiny adapter
@@ -503,6 +504,19 @@ consumer of each child stream. Every snapshot/poll reauthorizes and redacts;
 evicted or omitted events produce explicit gaps recovered from retained history.
 `interrupt_subagent()` is a separate trusted-host control. Detaching a reader
 never cancels work. See ADR-0021 and `R/delegation-observation.R`.
+
+### Descendant activity in the shared chat
+
+`subagent_chat_activity(chat, lead, requester)` shows descendant tool calls in
+the lead's own shinychat conversation (ADR-0033, `R/delegation-activity.R`).
+Each call is an inert request/result pair marked `extra$deputy_activity`,
+appended to the lead's assistant turn holding the depth-one delegation call.
+`get_turns()` merges them; the wrapped Chat, `get_context_turns()`, usage and
+providers never see them, and `set_turns()`/context forks strip them. IDs are
+`deputy_activity_<delegation>_<n>`, never provider IDs. `stream_async()` merges
+cards only while a presenter is enabled, reading records through disclosure
+on the consumer side; it never runs tools. Tool-call correlation no longer
+lets a finished call claim a later call that reuses its provider ID.
 
 ### Optional child chat panel
 

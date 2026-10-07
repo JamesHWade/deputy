@@ -1177,7 +1177,10 @@ compaction come back as text.
 does. Unlike \verb{$get_context_turns()}, this includes turns that
 compaction removed from the model context, and the original tool
 results that \verb{$microcompact()} cleared. Removed turns stay in memory
-until \verb{$set_turns()} replaces the conversation.
+until \verb{$set_turns()} replaces the conversation. When
+\code{\link[=subagent_chat_activity]{subagent_chat_activity()}} shows subagent tool calls in this
+conversation, they are included here too, after the contents of the
+reply that delegated them; the model never sees them.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_turns(include_system_prompt = FALSE)}

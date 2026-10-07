@@ -1096,6 +1096,13 @@ Agent <- R6::R6Class(
         stream_type = type
       )
       reset_stream_controller(controller)
+      if (!is.null(private$.activity) && identical(stream, "content")) {
+        return(activity_stream(
+          self,
+          governed_run$stream,
+          private$.activity$interval
+        ))
+      }
       governed_run$stream
     },
 
@@ -1142,13 +1149,16 @@ Agent <- R6::R6Class(
     #'   does. Unlike `$get_context_turns()`, this includes turns that
     #'   compaction removed from the model context, and the original tool
     #'   results that `$microcompact()` cleared. Removed turns stay in memory
-    #'   until `$set_turns()` replaces the conversation.
+    #'   until `$set_turns()` replaces the conversation. When
+    #'   [subagent_chat_activity()] shows subagent tool calls in this
+    #'   conversation, they are included here too, after the contents of the
+    #'   reply that delegated them; the model never sees them.
     #' @param include_system_prompt Include the system prompt as a turn.
     #' @return A list of ellmer turns.
     get_turns = function(include_system_prompt = FALSE) {
-      turns <- restore_cleared_tool_results(
-        c(private$.compacted_turns, private$.chat$get_turns()),
-        private$.cleared_tool_results
+      turns <- activity_merge(
+        private$transcript_turns(),
+        private$.activity_overlay
       )
       if (isTRUE(include_system_prompt)) {
         context <- self$get_context_turns(include_system_prompt = TRUE)
@@ -1189,9 +1199,11 @@ Agent <- R6::R6Class(
       previous_turns <- private$.chat$get_turns()
       prompt <- private$.chat$get_system_prompt()
       prompt_without_compaction <- private$system_prompt_without_compaction()
+      # Subagent activity shown in the conversation never reaches the model.
+      split <- activity_split(value)
       tryCatch(
         {
-          private$.chat$set_turns(value)
+          private$.chat$set_turns(split$turns)
           if (!identical(prompt, prompt_without_compaction)) {
             private$.chat$set_system_prompt(prompt_without_compaction)
           }
@@ -1203,6 +1215,7 @@ Agent <- R6::R6Class(
         }
       )
       preserve_run_usage(self, usage)
+      private$.activity_overlay <- split$overlay
       private$.compaction_summary <- NULL
       private$.compacted_turns <- list()
       private$.cleared_tool_results <- list()
@@ -1655,7 +1668,7 @@ Agent <- R6::R6Class(
       conversation_usage_snapshot(
         private$.chat,
         private$.compacted_turns,
-        tool_calls = count_tool_requests(self$get_turns())
+        tool_calls = count_tool_requests(private$transcript_turns())
       )
     },
 
@@ -2719,6 +2732,10 @@ Agent <- R6::R6Class(
       .last_compaction = NULL,
       .compaction_summary = NULL,
       .compacted_turns = list(),
+      # Subagent tool calls shown in this conversation, by transcript turn;
+      # never part of the model context (R/delegation-activity.R).
+      .activity_overlay = list(),
+      .activity = NULL,
       # Leading context turns whose reported usage describes a different
       # context (before compaction), which local estimates must not reuse.
       .usage_stale_turns = 0L,
@@ -2737,6 +2754,15 @@ Agent <- R6::R6Class(
       .tool_observer_removers = list(),
       .r6_clone = NULL,
       current_run_checkpoint_id = NULL,
+
+      # The selected conversation without subagent activity: what the model
+      # was given before compaction, with cleared tool results restored.
+      transcript_turns = function() {
+        restore_cleared_tool_results(
+          c(private$.compacted_turns, private$.chat$get_turns()),
+          private$.cleared_tool_results
+        )
+      },
 
       interrupt_run = function(reason, conversation_token = NULL) {
         check_conversation_access(self, conversation_token)
@@ -2772,6 +2798,8 @@ Agent <- R6::R6Class(
         cloned$.__enclos_env__$private$active_owned_tools <- list()
         cloned$.__enclos_env__$private$rewire_chat_runtime()
         cloned$.__enclos_env__$private$.compaction_artifacts <- NULL
+        # A clone, such as shinychat's title generator, shows no activity.
+        cloned$.__enclos_env__$private$.activity <- NULL
         register_compaction_catalog_owner(
           private$.compaction_catalog_registry,
           cloned
