@@ -300,6 +300,34 @@ portable_session_turns <- function(turns) {
   })
 }
 
+# Tool errors as plain conditions with their class and message. An error raised
+# inside Shiny carries its call stacks as attributes, and rlang errors carry a
+# backtrace; chat history stores turns as JSON and can't read those calls back,
+# so a reopened conversation would lose the whole turn.
+portable_tool_errors <- function(turns) {
+  plain <- function(content) {
+    if (
+      !inherits(content, "ellmer::ContentToolResult") ||
+        !inherits(content@error, "condition")
+    ) {
+      return(content)
+    }
+    error <- content@error
+    content@error <- structure(
+      list(message = conditionMessage(error), call = NULL),
+      class = class(error)
+    )
+    content
+  }
+  lapply(turns, function(turn) {
+    if (!inherits(turn, "ellmer::Turn")) {
+      return(turn)
+    }
+    turn@contents <- lapply(turn@contents, plain)
+    turn
+  })
+}
+
 # Saved as positions and markers plus one user turn holding the originals in
 # the same order, so the originals share the turn serializers.
 cleared_tool_results_turns <- function(originals) {
