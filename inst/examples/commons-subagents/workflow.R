@@ -46,7 +46,7 @@ commons_example_table <- function(sales) {
 commons_example_chart <- function(sales) {
   path <- tempfile(fileext = ".png")
   on.exit(unlink(path), add = TRUE)
-  grDevices::png(path, width = 480, height = 300, type = "cairo")
+  grDevices::png(path, width = 480, height = 300)
   graphics::par(mar = c(3, 4, 2, 1))
   graphics::barplot(
     sales$revenue,
