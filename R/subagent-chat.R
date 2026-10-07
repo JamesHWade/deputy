@@ -175,8 +175,12 @@ subagent_chat_server <- function(
     )
   }
   # The open conversation's live subagents and the saved ones not live.
-  conversation_views <- function(live) {
-    subagent_history_panel_views(conversation, live)
+  conversation_views <- function(lead, live) {
+    subagent_history_panel_views(
+      conversation,
+      live,
+      lead$.__enclos_env__$private$.delegation_disclosure
+    )
   }
   # With a conversation, only its own live subagents are read, so other
   # conversations' subagents can't make its list too large to show.
@@ -413,7 +417,7 @@ subagent_chat_server <- function(
             # Only the open conversation's saved subagents, with no live
             # reader.
             detach()
-            current <- filter_views(conversation_views(list()))
+            current <- filter_views(conversation_views(current_lead, list()))
             if (!identical(current, views())) {
               update_views(current)
             }
@@ -423,6 +427,7 @@ subagent_chat_server <- function(
           if (closed()) {
             detach()
             current <- filter_views(conversation_views(
+              current_lead,
               live_views(current_lead, current_requester)
             ))
             if (!identical(current, views())) {
@@ -439,6 +444,7 @@ subagent_chat_server <- function(
             state$lead <- current_lead
             state$reader <- current_lead$observe_subagents(current_requester)
             update_views(conversation_views(
+              current_lead,
               if (is.null(conversation)) {
                 state$reader$snapshot()$children
               } else {
@@ -457,6 +463,7 @@ subagent_chat_server <- function(
             list(events = list(), gaps = list(), cursor = NULL)
           }
           fresh_views <- filter_views(conversation_views(
+            current_lead,
             live_views(current_lead, current_requester)
           ))
           disclosure_changed <- !identical(fresh_views, views())

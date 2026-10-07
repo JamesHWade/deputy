@@ -116,8 +116,10 @@ history_encode <- function(x, depth = 0L) {
   } else {
     history_codec_abort()
   }
-  if (!is.null(names(x)) && is.null(dim(x))) {
-    node$n <- lapply(names(x), text)
+  # A names attribute is kept beside dimensions too. A one-dimensional
+  # array's `names()` are its dimnames, which are saved as such.
+  if ("names" %in% names(attributes(x))) {
+    node$n <- lapply(attr(x, "names", exact = TRUE), text)
   }
   if (!is.null(dim(x))) {
     node$d <- lapply(dim(x), format, scientific = FALSE)
@@ -260,12 +262,6 @@ history_decode <- function(node, depth = 0L) {
     ),
     history_codec_abort()
   )
-  if (!is.null(node$n)) {
-    if (!is.null(node$d) || !is.list(node$n) || length(node$n) != length(x)) {
-      history_codec_abort()
-    }
-    names(x) <- vapply(node$n, history_decode_text, character(1))
-  }
   if (!is.null(node$d)) {
     if (!is.list(node$d) || !length(node$d)) {
       history_codec_abort()
@@ -284,6 +280,13 @@ history_decode <- function(node, depth = 0L) {
     }
   } else if (!is.null(node$dn)) {
     history_codec_abort()
+  }
+  # After the dimensions, which would drop them.
+  if (!is.null(node$n)) {
+    if (!is.list(node$n) || length(node$n) != length(x)) {
+      history_codec_abort()
+    }
+    names(x) <- vapply(node$n, history_decode_text, character(1))
   }
   x
 }
@@ -879,7 +882,7 @@ subagent_history_counts <- function(counts, pending) {
 # ran in it, then saved ones that aren't live. `live` comes from
 # `subagent_history_live_views()`, which picks them by their records, since a
 # redactor may leave the conversation out of the views.
-subagent_history_panel_views <- function(conversation, live) {
+subagent_history_panel_views <- function(conversation, live, disclosure) {
   if (is.null(conversation)) {
     return(live)
   }
@@ -888,6 +891,32 @@ subagent_history_panel_views <- function(conversation, live) {
     function(view) !subagent_history_view_id(view) %in% live_ids,
     subagent_history_panel_saved(conversation, transcript = FALSE)
   )
+  # Each list keeps to the disclosure bound on its own. Together they keep to
+  # it too: every live subagent, and as many saved ones, oldest first, as fit
+  # beside them, found by bisection since fewer only make the list smaller.
+  fits <- function(n) {
+    tryCatch(
+      {
+        inspection_bound(c(restored[seq_len(n)], live), disclosure)
+        TRUE
+      },
+      deputy_disclosure_bound = function(error) FALSE
+    )
+  }
+  low <- 0L
+  high <- length(restored)
+  if (!fits(high)) {
+    # `low` fits (the live ones were bounded alone) and `high` doesn't.
+    while (high - low > 1L) {
+      middle <- (low + high) %/% 2L
+      if (fits(middle)) {
+        low <- middle
+      } else {
+        high <- middle
+      }
+    }
+    restored <- restored[seq_len(low)]
+  }
   c(restored, live)
 }
 

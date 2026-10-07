@@ -220,6 +220,9 @@ test_that("saved records round-trip exactly through JSON stores", {
     rl = as.raw(rep(1:255, 3)),
     z = c(1 + 2i, NA, complex(real = NaN, imaginary = Inf), -0.1 + 1e300i),
     zm = matrix(c(1i, 2i), 1L),
+    mn = structure(1:4, dim = c(2L, 2L), names = c("a", "b", "c", "d")),
+    ln = structure(list(1, "x"), dim = c(1L, 2L), names = c("p", NA)),
+    a1 = array(1:3, dimnames = list(c("a", "b", "c"))),
     p = pairlist(a = 1L, 2, b = list("x", pairlist(c = TRUE))),
     pm = local({
       p <- pairlist(1, "a", TRUE, NULL)
@@ -395,6 +398,46 @@ test_that("a restored conversation keeps its saved subagents as it continues", {
     )
   })
   expect_identical(counter$calls, 2L)
+})
+
+test_that("saved and live subagents keep to the disclosure bound together", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  first <- history_lead(history_root_server(), history_sales_server(), counter)
+  conversation <- NULL
+  history_session(first, store, function(session, chat, saver) {
+    conversation <<- history_submit(session, chat, store, "Revenue?")
+  })
+  second <- history_lead(history_root_server(), history_sales_server(), counter)
+  history_session(
+    second,
+    store,
+    function(session, chat, saver) {
+      session$setInputs(chat_history_select = list(id = conversation))
+      session$flushReact()
+      history_submit(session, chat, store, "Again?")
+      panel <- session$userData$panel
+      session$elapse(200)
+      expect_length(panel$views(), 2L)
+      # Room for the saved list or the live one, not for both.
+      live <- second$inspect_subagents("viewer")
+      disclosure <- DelegationDisclosure(
+        authorize = function(requester, scope) identical(requester, "viewer"),
+        max_bytes = round(length(serialize(live, NULL, version = 3)) * 1.5)
+      )
+      second$.__enclos_env__$private$.delegation_disclosure <- disclosure
+      session$elapse(200)
+      views <- panel$views()
+      expect_length(views, 1L)
+      expect_identical(
+        views[[1L]]$outcome$runtime$delegation_id,
+        live[[1L]]$outcome$runtime$delegation_id
+      )
+      expect_no_error(inspection_bound(views, disclosure))
+    },
+    panel = TRUE
+  )
 })
 
 test_that("each conversation saves only its own subagents", {
