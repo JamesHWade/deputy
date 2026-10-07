@@ -210,38 +210,48 @@ activity_disable <- function(agent, presenter = NULL) {
       state = state
     )
   }
-  # The reply streaming now takes what was queued, those results included,
-  # even once another presenter is shown; a later reply doesn't.
+  # The reply streaming now, if it started with this presenter, takes what
+  # was queued, those results included; a later reply doesn't. A presenter
+  # shown during a reply has no stream in it, so an earlier presenter's
+  # results for that reply are kept.
   run_id <- private$current_run_id
-  if (!is.null(state) && length(state$queue) && !is.null(run_id)) {
-    earlier <- private$.activity_leftover
+  earlier <- private$.activity_leftover
+  if (
+    !is.null(state) &&
+      length(state$queue) &&
+      !is.null(run_id) &&
+      !identical(earlier$run_id, run_id)
+  ) {
     private$.activity_leftover <- list(
       run_id = run_id,
-      queue = c(
-        if (identical(earlier$run_id, run_id)) earlier$queue,
-        state$queue
-      )
+      presenter = state,
+      queue = state$queue
     )
   }
   private$.activity <- NULL
   invisible(agent)
 }
 
-activity_take <- function(agent) {
+# `presenter` is the one the reading stream started with: a stream takes only
+# its own presenter's cards, and what that presenter left queued for this
+# reply when it stopped, never another presenter's.
+activity_take <- function(agent, presenter = NULL) {
   private <- agent$.__enclos_env__$private
-  # What a presenter stopped during this reply left queued reaches this reply
-  # once, whether or not another presenter has been shown since.
+  mine <- function(state) is.null(presenter) || identical(state, presenter)
+  queue <- list()
   leftover <- private$.activity_leftover
-  private$.activity_leftover <- NULL
-  if (!identical(leftover$run_id, private$current_run_id)) {
-    leftover <- NULL
+  if (!is.null(leftover) && mine(leftover$presenter)) {
+    private$.activity_leftover <- NULL
+    if (identical(leftover$run_id, private$current_run_id)) {
+      queue <- leftover$queue
+    }
   }
   state <- private$.activity
-  queue <- if (!is.null(state)) state$queue
-  if (!is.null(state)) {
+  if (!is.null(state) && mine(state)) {
+    queue <- c(queue, state$queue)
     state$queue <- list()
   }
-  c(leftover$queue, queue) %||% list()
+  queue
 }
 
 # The depth-one delegation a descendant belongs to: its tool call is the one
@@ -604,11 +614,22 @@ activity_note <- function(agent, state, entry, runtime, anchor, kind, text) {
 # rereads every open delegation and settles calls that won't return once their
 # delegation has settled; `closing` does so for every open call, because the
 # lead's reply is ending and a card must not stay running in saved history.
-activity_poll <- function(agent, final = FALSE, closing = FALSE) {
+# A stream polls only the presenter it started with; once that presenter is
+# stopped, or another shown, it reads nothing more.
+activity_poll <- function(
+  agent,
+  final = FALSE,
+  closing = FALSE,
+  presenter = NULL
+) {
   private <- agent$.__enclos_env__$private
   state <- private$.activity
   run_id <- private$current_run_id
-  if (is.null(state) || is.null(run_id)) {
+  if (
+    is.null(state) ||
+      is.null(run_id) ||
+      (!is.null(presenter) && !identical(state, presenter))
+  ) {
     return(invisible(NULL))
   }
   if (!identical(state$run_id, run_id)) {
@@ -941,11 +962,12 @@ activity_watch <- function(slot, value) {
 # The lead's stream with its subagents' tool calls merged in as they happen.
 # While the lead waits on a delegation, the stream checks for new calls on a
 # timer; before it yields a tool result, and when it ends, it settles them.
-activity_stream <- coro::async_generator(function(agent, inner, interval) {
+activity_stream <- coro::async_generator(function(agent, inner, presenter) {
   slot <- new.env(parent = emptyenv())
   waiting <- FALSE
+  interval <- presenter$interval
   repeat {
-    for (content in activity_take(agent)) {
+    for (content in activity_take(agent, presenter)) {
       coro::yield(content)
     }
     if (!waiting) {
@@ -959,29 +981,29 @@ activity_stream <- coro::async_generator(function(agent, inner, interval) {
     if (!isTRUE(slot$done)) {
       coro::await(activity_wait(slot, interval))
       if (!isTRUE(slot$done)) {
-        activity_poll(agent)
+        activity_poll(agent, presenter = presenter)
         next
       }
     }
     waiting <- FALSE
     if (!is.null(slot$error)) {
-      activity_poll(agent, closing = TRUE)
-      for (content in activity_take(agent)) {
+      activity_poll(agent, closing = TRUE, presenter = presenter)
+      for (content in activity_take(agent, presenter)) {
         coro::yield(content)
       }
       rlang::cnd_signal(slot$error)
     }
     value <- slot$value
     if (coro::is_exhausted(value)) {
-      activity_poll(agent, closing = TRUE)
-      for (content in activity_take(agent)) {
+      activity_poll(agent, closing = TRUE, presenter = presenter)
+      for (content in activity_take(agent, presenter)) {
         coro::yield(content)
       }
       break
     }
     if (inherits(value, "ellmer::ContentToolResult")) {
-      activity_poll(agent, final = TRUE)
-      for (content in activity_take(agent)) {
+      activity_poll(agent, final = TRUE, presenter = presenter)
+      for (content in activity_take(agent, presenter)) {
         coro::yield(content)
       }
     }
