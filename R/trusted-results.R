@@ -641,11 +641,24 @@ trusted_combine <- function(owner, root_policy, own, tools) {
       cli_abort("The agent that retained this one is no longer available.")
     }
     root$.__enclos_env__$private$record_run_event(event)
-    if (is.function(root_callback)) {
-      root_callback(event)
+    # Each policy's host gets the publication even when the other's delivery
+    # fails; the first failure still fails the delivery.
+    failure <- NULL
+    for (callback in list(root_callback, own_callback)) {
+      if (!is.function(callback)) {
+        next
+      }
+      error <- tryCatch(
+        {
+          callback(event)
+          NULL
+        },
+        error = identity
+      )
+      failure <- failure %||% error
     }
-    if (is.function(own_callback)) {
-      own_callback(event)
+    if (!is.null(failure)) {
+      rlang::cnd_signal(failure)
     }
     invisible(NULL)
   }
