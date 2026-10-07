@@ -153,7 +153,10 @@ tool_display_count <- function(state, x) {
   }
   state$bytes <- state$bytes +
     if (is.character(x) && state$bytes + n <= state$limit) {
-      sum(as.numeric(nchar(x, type = "bytes"))) + n
+      # A missing string renders as "NA", or as an attribute with no value.
+      bytes <- nchar(x, type = "bytes")
+      bytes[is.na(bytes)] <- 2L
+      sum(as.numeric(bytes)) + n
     } else {
       n * tool_display_text_widths[[typeof(x)]]
     }

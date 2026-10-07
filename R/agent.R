@@ -1472,7 +1472,8 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get the last turn in the conversation with a given role.
+    #' Get the last turn in the conversation with a given role. Subagent tool
+    #' calls shown in it are included, as `$get_turns()` includes them.
     #'
     #' @param role `"assistant"`, `"user"` or `"system"`.
     #' @return An ellmer turn, or `NULL`.
@@ -1493,11 +1494,12 @@ Agent <- R6::R6Class(
         } else {
           NA_integer_
         }
-        return(restore_cleared_tool_results(
+        turn <- restore_cleared_tool_results(
           list(current),
           private$.cleared_tool_results,
           positions = position
-        )[[1L]])
+        )[[1L]]
+        return(activity_merge_turn(turn, position, private$.activity_overlay))
       }
       turns <- Filter(
         function(turn) identical(turn@role, role),
@@ -1509,11 +1511,13 @@ Agent <- R6::R6Class(
           function(turn) turn@role,
           character(1)
         )
-        restore_cleared_tool_results(
+        position <- max(which(roles == role))
+        turn <- restore_cleared_tool_results(
           tail(turns, 1L),
           private$.cleared_tool_results,
-          positions = max(which(roles == role))
+          positions = position
         )[[1L]]
+        activity_merge_turn(turn, position, private$.activity_overlay)
       } else {
         NULL
       }
