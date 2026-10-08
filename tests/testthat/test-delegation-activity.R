@@ -982,6 +982,27 @@ test_that("a view over the disclosure bound shows one note instead", {
   expect_match(items[[2L]]@value, "over the size the viewer may see")
 })
 
+test_that("notes for oversized views count toward the reply's limit", {
+  local_mocked_bindings(activity_max_calls = 1L)
+  root <- activity_concurrent_root()$root
+  root$.__enclos_env__$private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    max_bytes = 2048
+  )
+  activity_retain(root, activity_specialist("sales", "60")$agent, "ask_sales")
+  activity_retain(root, activity_specialist("ops", "7")$agent, "ask_ops")
+  activity_enable(root, function() "viewer", 0.05)
+  items <- activity_items(activity_collect(root, "Report."))
+  ids <- vapply(
+    Filter(function(item) inherits(item, "ellmer::ContentToolRequest"), items),
+    function(item) item@id,
+    character(1)
+  )
+  expect_length(ids, 2L)
+  expect_identical(sum(endsWith(ids, "_oversized")), 1L)
+  expect_identical(sum(endsWith(ids, "_limit")), 1L)
+})
+
 test_that("calls shown before a view grows too large still get a result", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),

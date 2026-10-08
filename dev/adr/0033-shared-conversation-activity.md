@@ -120,8 +120,8 @@ into an earlier message.
   gets a "Not completed" result card; one still open when the presenter stops
   (its `stop()` or the Shiny session ending), or when the reply ends and the
   records can't be read (access withdrawn, a redactor that fails), gets a
-  "Not shown" result, which a reply still streaming also receives. Each reply shows at most 256 calls; a marker card
-  replaces the rest.
+  "Not shown" result, which a reply still streaming also receives. Each reply shows at most 256 calls, a note for an
+  oversized view counting as one; a marker card replaces the rest.
 - **Display HTML is inert before it is stored.** Cards go through the adapter
   allowlist of ADR-0032 before they enter the transcript, because shinychat
   replays stored UI without the adapter.
