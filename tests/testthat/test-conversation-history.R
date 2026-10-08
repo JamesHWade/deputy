@@ -402,3 +402,74 @@ test_that("failed context installation leaves the retained transcript unchanged"
   expect_identical(agent$get_turns(), original)
   expect_length(agent$get_context_turns(), 0L)
 })
+
+test_that("tool errors with call stacks read back from saved chat history", {
+  # Shiny records call stacks on errors raised inside a session; some of their
+  # calls hold objects that can't be written as text and read back.
+  error <- rlang::error_cnd("ellmer_tool_reject", message = "Subagent failed.")
+  attr(error, "deep.stack.trace") <- list(
+    as.call(list(as.name("handler"), new.env()))
+  )
+  request <- ellmer::ContentToolRequest("call_1", "ask_ops", list(task = "Go"))
+  turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("Rate?"))),
+    ellmer::AssistantTurn(list(request)),
+    ellmer::UserTurn(list(
+      ellmer::ContentToolResult(error = error, request = request)
+    )),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Ops failed.")))
+  )
+  # As shinychat's file store writes and reads each turn.
+  saved <- function(turns) {
+    jsonlite::serializeJSON(
+      lapply(turns, ellmer::contents_record),
+      digits = 17
+    )
+  }
+  expect_error(jsonlite::unserializeJSON(saved(turns)))
+
+  agent <- Agent$new(
+    ellmer::chat_openai(model = "test", credentials = function() "x")
+  )
+  agent$set_turns(turns)
+  restored <- lapply(
+    jsonlite::unserializeJSON(saved(agent$get_turns())),
+    ellmer::contents_replay
+  )
+  expect_length(restored, 4L)
+  shown <- restored[[3L]]@contents[[1L]]@error
+  expect_s3_class(shown, "ellmer_tool_reject")
+  expect_identical(conditionMessage(shown), "Subagent failed.")
+  expect_null(attr(shown, "deep.stack.trace"))
+  expect_identical(restored[[4L]]@text, "Ops failed.")
+  # The model's context keeps the error as it was raised.
+  expect_identical(agent$get_context_turns()[[3L]]@contents[[1L]]@error, error)
+})
+
+test_that("plain tool errors keep their message, not classes that need more", {
+  # A message method that reads a field the plain condition doesn't keep.
+  local_mocked_s3_method(
+    "conditionMessage",
+    "deputy_test_error",
+    function(c) paste("Failed on", c$item)
+  )
+  error <- structure(
+    class = c("deputy_test_error", "shiny.custom.error", "error", "condition"),
+    list(message = "", call = NULL, item = "row 3")
+  )
+  request <- ellmer::ContentToolRequest("call_1", "read_rows", list())
+  agent <- Agent$new(
+    ellmer::chat_openai(model = "test", credentials = function() "x")
+  )
+  agent$set_turns(list(
+    ellmer::UserTurn(list(ellmer::ContentText("Rows?"))),
+    ellmer::AssistantTurn(list(request)),
+    ellmer::UserTurn(list(
+      ellmer::ContentToolResult(error = error, request = request)
+    )),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Reading failed.")))
+  ))
+  shown <- agent$get_turns()[[3L]]@contents[[1L]]@error
+  expect_identical(class(shown), c("shiny.custom.error", "error", "condition"))
+  expect_identical(conditionMessage(shown), "Failed on row 3")
+})

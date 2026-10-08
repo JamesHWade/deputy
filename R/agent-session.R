@@ -310,6 +310,50 @@ portable_session_turns <- function(turns) {
   })
 }
 
+# Classes a plain tool error keeps: the base ones, whose message is the
+# `message` field; ellmer's tool rejection; and Shiny's custom errors, which
+# shinychat shows even when Shiny sanitizes error messages.
+portable_error_classes <- c(
+  "ellmer_tool_reject",
+  "shiny.custom.error",
+  "error",
+  "warning",
+  "message",
+  "condition"
+)
+
+# Tool errors as plain conditions with their message. An error raised inside
+# Shiny carries its call stacks as attributes, and rlang errors carry a
+# backtrace; chat history stores turns as JSON and can't read those calls back,
+# so a reopened conversation would lose the whole turn. Other classes go too,
+# since their message methods may read fields a plain condition doesn't have.
+portable_tool_errors <- function(turns) {
+  plain <- function(content) {
+    if (
+      !inherits(content, "ellmer::ContentToolResult") ||
+        !inherits(content@error, "condition")
+    ) {
+      return(content)
+    }
+    error <- content@error
+    content@error <- structure(
+      list(message = conditionMessage(error), call = NULL),
+      class = union(
+        intersect(class(error), portable_error_classes),
+        "condition"
+      )
+    )
+    content
+  }
+  lapply(turns, function(turn) {
+    if (!inherits(turn, "ellmer::Turn")) {
+      return(turn)
+    }
+    turn@contents <- lapply(turn@contents, plain)
+    turn
+  })
+}
+
 # Saved as positions and markers plus one user turn holding the originals in
 # the same order, so the originals share the turn serializers.
 cleared_tool_results_turns <- function(originals) {

@@ -1174,12 +1174,14 @@ Agent <- R6::R6Class(
     #'   until `$set_turns()` replaces the conversation. When
     #'   [subagent_chat_activity()] shows subagent tool calls in this
     #'   conversation, they are included here too, after the contents of the
-    #'   reply that delegated them; the model never sees them.
+    #'   reply that delegated them; the model never sees them. A tool error is
+    #'   returned as a plain condition with the same message, so the
+    #'   conversation can be saved and read back by shinychat's history.
     #' @param include_system_prompt Include the system prompt as a turn.
     #' @return A list of ellmer turns.
     get_turns = function(include_system_prompt = FALSE) {
       turns <- activity_merge(
-        private$transcript_turns(),
+        portable_tool_errors(private$transcript_turns()),
         private$.activity_overlay
       )
       if (isTRUE(include_system_prompt)) {
