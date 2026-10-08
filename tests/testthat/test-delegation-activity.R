@@ -1647,9 +1647,14 @@ test_that("a saved session keeps the subagent activity shown in it", {
       )
     )
   )
+  answer <- ellmer::ContentToolResult(
+    "60",
+    request = card,
+    extra = list(deputy_activity = card@extra$deputy_activity)
+  )
   turns <- list(
     ellmer::UserTurn(list(ellmer::ContentText("Go"))),
-    ellmer::AssistantTurn(list(ellmer::ContentText("Done."), card))
+    ellmer::AssistantTurn(list(ellmer::ContentText("Done."), card, answer))
   )
   saved <- Agent$new(chat$clone())
   saved$set_turns(turns)
@@ -1699,6 +1704,151 @@ test_that("a saved session keeps the subagent activity shown in it", {
     expect_error(other$load_session(file), class = "deputy_session_load")
     expect_length(other$get_turns(), 0L)
   }
+})
+
+test_that("a saved session gives a card still waiting a result", {
+  chat <- ellmer::chat_openai(model = "test", credentials = function() "x")
+  marker <- list(
+    format = "deputy_subagent_activity",
+    version = 1L,
+    activity_id = "deputy_activity_abc_1",
+    label = "sales"
+  )
+  card <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("Go"))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Working."), card))
+  )
+  # Saved mid-reply: the call hasn't returned yet.
+  saved <- Agent$new(chat$clone())
+  saved$set_turns(turns)
+  path <- withr::local_tempfile(fileext = ".rds")
+  suppressMessages(saved$save_session(path))
+  expect_identical(saved$get_turns(), turns)
+  agent <- Agent$new(chat$clone())
+  suppressMessages(agent$load_session(path))
+  contents <- agent$get_turns()[[2L]]@contents
+  expect_length(contents, 3L)
+  expect_s3_class(contents[[3L]], "ellmer::ContentToolResult")
+  expect_identical(contents[[3L]]@request@id, card@id)
+  expect_match(contents[[3L]]@value, "saved before this call returned")
+})
+
+test_that("a save takes the results a reply hasn't shown yet", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  root$run_sync("Sales?")
+  private <- root$.__enclos_env__$private
+  id <- names(private$subagent_runs)[[1L]]
+  turns <- private$subagent_runs[[id]]$turns
+  completed_at <- private$subagent_runs[[id]]$completed_at
+  # Shown while the call was running.
+  private$subagent_runs[[id]]$turns <- turns[-3L]
+  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
+  activity_enable(root, function() "viewer")
+  activity_poll(root)
+  shown <- activity_take(root)
+  expect_length(shown, 1L)
+  # The call returns, and the subagent finishes, before the next poll.
+  private$subagent_runs[[id]]$turns <- turns
+  private$subagent_runs[[id]]$completed_at <- completed_at
+  path <- withr::local_tempfile(fileext = ".rds")
+  suppressMessages(root$save_session(path))
+  saved <- Filter(
+    function(entry) inherits(entry$content, "ellmer::ContentToolResult"),
+    readRDS(path)$activity
+  )
+  expect_length(saved, 1L)
+  expect_identical(saved[[1L]]$content@request@id, shown[[1L]]@id)
+  expect_null(saved[[1L]]$content@error)
+  expect_no_match(
+    paste(format(saved[[1L]]$content@value), collapse = "\n"),
+    "Not completed"
+  )
+  # The reply streaming now shows the same result.
+  live <- activity_take(root)
+  expect_length(live, 1L)
+  expect_identical(live[[1L]], saved[[1L]]$content)
+})
+
+test_that("shown activity is kept across a durable approval", {
+  directory <- withr::local_tempdir()
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "effect", arguments = list(value = "b")),
+    runtime_reply("finished")
+  ))
+  tool <- ellmer::tool(
+    function(value) paste0("result_", value),
+    name = "effect",
+    description = "Record an effect.",
+    arguments = list(value = ellmer::type_string()),
+    convert = FALSE,
+    annotations = ellmer::tool_annotations(
+      read_only_hint = FALSE,
+      destructive_hint = FALSE,
+      open_world_hint = FALSE
+    )
+  )
+  make_agent <- function() {
+    Agent$new(
+      chat = runtime_chat(server),
+      tools = list(tool),
+      permissions = Permissions(can_use_tool = function(name, input, context) {
+        PermissionResultPending("Review the effect")
+      }),
+      approval_dir = directory,
+      working_dir = directory,
+      session_id = "activity_approval_session",
+      agent_id = "activity_approval_agent"
+    )
+  }
+  marker <- list(
+    format = "deputy_subagent_activity",
+    version = 1L,
+    activity_id = "deputy_activity_abc_1",
+    label = "sales"
+  )
+  card <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  answer <- ellmer::ContentToolResult(
+    "60",
+    request = card,
+    extra = list(deputy_activity = marker)
+  )
+  earlier <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("Sales?"))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("60."), card, answer))
+  )
+  agent <- make_agent()
+  agent$set_turns(earlier)
+  result <- agent$run_sync("Record it.")
+  expect_identical(result$stop_reason, "approval_pending")
+  path <- agent$pending_approval()$source$path
+  # Resumed by a new agent, as after a restart.
+  resumed <- make_agent()
+  resumed$resume_approval(path, "approve")
+  expect_identical(resumed$get_turns()[[2L]]@contents, earlier[[2L]]@contents)
+  context <- unlist(lapply(resumed$get_context_turns(), function(turn) {
+    turn@contents
+  }))
+  expect_false(any(vapply(context, is_activity_content, logical(1))))
 })
 
 test_that("shown activity doesn't count toward a fork's size bound", {

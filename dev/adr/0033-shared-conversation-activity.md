@@ -33,15 +33,21 @@ into an earlier message.
   `add_turn()` and context forks separate marked contents again, so a restored shinychat
   conversation or a copied history cannot hand them to a model; a fork given
   portable records (`ellmer::contents_record()`) finds the marker in the
-  records, before a sanitized replay would clear it. `save_session()` keeps
-  the shown cards beside the turns (`activity`: each card with the index of
-  its turn), never among them, and `load_session()` restores them after
-  checking each is a marked card in one of the loaded assistant turns; a
-  malformed entry fails the load before anything changes. `set_chat()` keeps
+  records, before a sanitized replay would clear it. The session payload
+  that `save_session()` and a durable approval's pause both write keeps the
+  shown cards beside the turns (`activity`: each card with the index of its
+  turn), never among them; the approval store keeps them as portable records
+  and its resume replays them. A save made mid-reply first polls, so a call
+  that has returned is saved with its result, and the saved copy gives a
+  card still waiting a "Not completed" result, since nothing settles it after
+  a load; the live conversation keeps waiting for the call. `load_session()`
+  and a resumed approval restore the cards after checking each is a marked
+  card in one of the restored assistant turns; a malformed entry fails the
+  restore before anything changes. `set_chat()` keeps
   each card with its turn when moving drops an assistant turn that held only
   reasoning. Replacing the
-  conversation (`set_turns()`, or a successful `load_session()`, which drops
-  the previous conversation's cards) restarts the presenter's queue, labels and counts, and drops
+  conversation (`set_turns()`, or a successful `load_session()` or approval
+  resume, which drop the previous conversation's cards) restarts the presenter's queue, labels and counts, and drops
   results a stopped presenter left for the reply streaming; that reply's
   calls are no longer shown, since they belong to the replaced conversation.
   Clones do not inherit the presenter.
