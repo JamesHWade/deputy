@@ -107,6 +107,16 @@ test_that("concurrent Commons specialists, a grandchild and a failure share one 
   )
   expect_match(paste(warnings, collapse = "\n"), "Subagent 'ops' failed")
 
+  # Both specialists were in flight together: each asked its model before
+  # the other's last request, which a sequential run never does.
+  roles <- vapply(
+    local$fixture$requests(),
+    function(request) sub("^commons-", "", request$body$model),
+    character(1)
+  )
+  expect_lt(match("ops", roles), max(which(roles == "sales")))
+  expect_lt(match("sales", roles), max(which(roles == "ops")))
+
   # Each measure ran once and reached the root once, from its own agent.
   expect_identical(workflow$effects$runs, 4L)
   events <- workflow$delivered$events
