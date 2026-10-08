@@ -24,11 +24,13 @@ or are left out, and \code{status()} counts them. Defaults to 16 MiB.}
 \value{
 Invisibly, a list of functions:
 \itemize{
-\item \code{restored(transcript = TRUE)}: the subagents saved with the open
-conversation, as \code{\link[=delegation_history]{delegation_history()}} returns them, or \code{NULL}. With
-\code{transcript = FALSE}, without their conversations, each marked
-\code{retention$transcript = "not_requested"} (or \code{"omitted"} when it wasn't
-saved).
+\item \code{restored(transcript = TRUE, delegation_id = NULL)}: the subagents
+saved with the open conversation, as \code{\link[=delegation_history]{delegation_history()}} returns
+them, or \code{NULL}. With \code{transcript = FALSE}, without their
+conversations, each marked \code{retention$transcript = "not_requested"} (or
+\code{"omitted"} when it wasn't saved). With \code{delegation_id}, only that
+saved subagent, whose conversation is kept if it fits the disclosure's
+\code{max_bytes} on its own.
 \item \code{status()}: the open conversation's ID, how many subagents its saved
 record holds, how many were still running, saved without their
 conversation (too large, or removed by the disclosure's \code{redact}) or

@@ -69,6 +69,26 @@ history_encode_double <- function(value) {
   text
 }
 
+# JSON holds only UTF-8 text. A string that isn't valid UTF-8 once converted
+# (marked "bytes", or invalid bytes under another mark) keeps its bytes and its
+# mark instead, as base64.
+history_encode_text <- function(value) {
+  if (is.na(value)) {
+    return(NULL)
+  }
+  mark <- Encoding(value)
+  if (!identical(mark, "bytes")) {
+    text <- enc2utf8(value)
+    if (validUTF8(text)) {
+      return(text)
+    }
+  }
+  list(
+    b = gsub("\n", "", jsonlite::base64_enc(charToRaw(value))),
+    e = mark
+  )
+}
+
 history_encode <- function(x, depth = 0L) {
   if (depth > 64L) {
     history_codec_abort()
@@ -84,7 +104,6 @@ history_encode <- function(x, depth = 0L) {
   }
   values <- unname(x)
   attributes(values) <- NULL
-  text <- function(value) if (is.na(value)) NULL else enc2utf8(value)
   node <- if (is.pairlist(x)) {
     # is.list() is also true of a pairlist; it keeps its own type.
     list(
@@ -110,7 +129,7 @@ history_encode <- function(x, depth = 0L) {
   } else if (is.double(x)) {
     list(t = "dbl", v = lapply(values, history_encode_double))
   } else if (is.character(x)) {
-    list(t = "chr", v = lapply(values, text))
+    list(t = "chr", v = lapply(values, history_encode_text))
   } else if (is.raw(x)) {
     list(t = "raw", v = list(gsub("\n", "", jsonlite::base64_enc(values))))
   } else if (is.complex(x)) {
@@ -126,7 +145,7 @@ history_encode <- function(x, depth = 0L) {
   # A names attribute is kept beside dimensions too. A one-dimensional
   # array's `names()` are its dimnames, which are saved as such.
   if ("names" %in% names(attributes(x))) {
-    node$n <- lapply(attr(x, "names", exact = TRUE), text)
+    node$n <- lapply(attr(x, "names", exact = TRUE), history_encode_text)
   }
   if (!is.null(dim(x))) {
     node$d <- lapply(dim(x), format, scientific = FALSE)
@@ -186,6 +205,24 @@ history_decode_number <- function(value, integer) {
 history_decode_text <- function(value) {
   if (is.null(value)) {
     return(NA_character_)
+  }
+  if (is.list(value) && !is.object(value)) {
+    # A string saved as its bytes, with its encoding mark.
+    if (
+      !identical(names(value), c("b", "e")) ||
+        !is.character(value$e) ||
+        length(value$e) != 1L ||
+        !value$e %in% c("bytes", "unknown", "UTF-8")
+    ) {
+      history_codec_abort()
+    }
+    bytes <- history_decode_raw(list(value$b))
+    if (!length(bytes) || any(bytes == as.raw(0L))) {
+      history_codec_abort()
+    }
+    text <- rawToChar(bytes)
+    Encoding(text) <- value$e
+    return(text)
   }
   if (!is.character(value) || length(value) != 1L || is.na(value)) {
     history_codec_abort()
@@ -776,11 +813,18 @@ subagent_history_restore <- function(state, values) {
   invisible(NULL)
 }
 
-subagent_history_restored <- function(state, transcript = TRUE) {
+subagent_history_restored <- function(
+  state,
+  transcript = TRUE,
+  delegation_id = NULL
+) {
   if (
     !is.logical(transcript) || length(transcript) != 1L || is.na(transcript)
   ) {
     cli::cli_abort("{.arg transcript} must be TRUE or FALSE.")
+  }
+  if (!is.null(delegation_id) && !is_nonempty_string(delegation_id)) {
+    cli::cli_abort("{.arg delegation_id} must be one delegation ID, or NULL.")
   }
   id <- subagent_history_active_id(state)
   if (
@@ -791,6 +835,14 @@ subagent_history_restored <- function(state, transcript = TRUE) {
     return(NULL)
   }
   history <- state$record$history
+  if (!is.null(delegation_id)) {
+    # One subagent is read and bounded on its own, so the others' transcripts
+    # can't push it over the disclosure bound.
+    history$children <- Filter(
+      function(view) identical(subagent_history_view_id(view), delegation_id),
+      history$children
+    )
+  }
   if (!transcript) {
     # Left out on request, as inspection marks it; a transcript the save
     # itself omitted stays marked "omitted".
@@ -969,9 +1021,17 @@ subagent_history_panel_views <- function(conversation, live, disclosure) {
 
 # Saved subagents are authorized on their own: a requester the disclosure
 # refuses them still sees the live ones, with no saved ones beside them.
-subagent_history_panel_saved <- function(conversation, transcript = TRUE) {
+subagent_history_panel_saved <- function(
+  conversation,
+  transcript = TRUE,
+  delegation_id = NULL
+) {
   tryCatch(
-    conversation$restored(transcript = transcript) %||% list(),
+    conversation$restored(
+      transcript = transcript,
+      delegation_id = delegation_id
+    ) %||%
+      list(),
     deputy_delegation_disclosure = function(error) list()
   )
 }
@@ -1036,7 +1096,7 @@ subagent_history_panel_child <- function(conversation, lead, live, id) {
   }
   Filter(
     function(view) identical(subagent_history_view_id(view), id),
-    subagent_history_panel_saved(conversation)
+    subagent_history_panel_saved(conversation, delegation_id = id)
   )
 }
 
@@ -1076,11 +1136,13 @@ subagent_history_panel_child <- function(conversation, lead, live, id) {
 #'   `delegation_disclosure`, keep their outcome without their conversation,
 #'   or are left out, and `status()` counts them. Defaults to 16 MiB.
 #' @return Invisibly, a list of functions:
-#'   * `restored(transcript = TRUE)`: the subagents saved with the open
-#'     conversation, as [delegation_history()] returns them, or `NULL`. With
-#'     `transcript = FALSE`, without their conversations, each marked
-#'     `retention$transcript = "not_requested"` (or `"omitted"` when it wasn't
-#'     saved).
+#'   * `restored(transcript = TRUE, delegation_id = NULL)`: the subagents
+#'     saved with the open conversation, as [delegation_history()] returns
+#'     them, or `NULL`. With `transcript = FALSE`, without their
+#'     conversations, each marked `retention$transcript = "not_requested"` (or
+#'     `"omitted"` when it wasn't saved). With `delegation_id`, only that
+#'     saved subagent, whose conversation is kept if it fits the disclosure's
+#'     `max_bytes` on its own.
 #'   * `status()`: the open conversation's ID, how many subagents its saved
 #'     record holds, how many were still running, saved without their
 #'     conversation (too large, or removed by the disclosure's `redact`) or
@@ -1136,8 +1198,8 @@ subagent_chat_history <- function(
     subagent_history_restore(state, values)
   })
   invisible(list(
-    restored = function(transcript = TRUE) {
-      subagent_history_restored(state, transcript)
+    restored = function(transcript = TRUE, delegation_id = NULL) {
+      subagent_history_restored(state, transcript, delegation_id)
     },
     status = function() subagent_history_status(state),
     conversation_id = function() subagent_history_active_id(state)
