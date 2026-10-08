@@ -1096,6 +1096,9 @@ Agent <- R6::R6Class(
         stream_type = type
       )
       reset_stream_controller(controller)
+      if (!is.null(private$.activity) && identical(stream, "content")) {
+        return(activity_stream(self, governed_run$stream, private$.activity))
+      }
       governed_run$stream
     },
 
@@ -1127,14 +1130,32 @@ Agent <- R6::R6Class(
     },
 
     #' @description Add a user turn and an assistant turn, as ellmer's
-    #' `$add_turn()` does.
-    #' @param user User turn or content.
-    #' @param assistant Assistant turn or content.
+    #' `$add_turn()` does. Subagent tool calls shown in them, as
+    #' `$get_turns()` returns them, stay in the conversation but are not sent
+    #' to the model.
+    #' @param user A user turn.
+    #' @param assistant An assistant turn.
     #' @param log_tokens Passed to ellmer's `$add_turn()`.
     #' @return The agent, invisibly.
     add_turn = function(user, assistant, log_tokens = TRUE) {
       check_conversation_lease(self, NULL)
-      private$.chat$add_turn(user, assistant, log_tokens = log_tokens)
+      # Subagent activity shown in the conversation never reaches the model,
+      # as in `$set_turns()`.
+      split <- activity_split(list(user, assistant))
+      offset <- length(private$.compacted_turns) +
+        length(private$.chat$get_turns())
+      private$.chat$add_turn(
+        split$turns[[1L]],
+        split$turns[[2L]],
+        log_tokens = log_tokens
+      )
+      private$.activity_overlay <- c(
+        private$.activity_overlay,
+        lapply(split$overlay, function(entry) {
+          entry$turn <- offset + entry$turn
+          entry
+        })
+      )
       invisible(self)
     },
 
@@ -1142,13 +1163,16 @@ Agent <- R6::R6Class(
     #'   does. Unlike `$get_context_turns()`, this includes turns that
     #'   compaction removed from the model context, and the original tool
     #'   results that `$microcompact()` cleared. Removed turns stay in memory
-    #'   until `$set_turns()` replaces the conversation.
+    #'   until `$set_turns()` replaces the conversation. When
+    #'   [subagent_chat_activity()] shows subagent tool calls in this
+    #'   conversation, they are included here too, after the contents of the
+    #'   reply that delegated them; the model never sees them.
     #' @param include_system_prompt Include the system prompt as a turn.
     #' @return A list of ellmer turns.
     get_turns = function(include_system_prompt = FALSE) {
-      turns <- restore_cleared_tool_results(
-        c(private$.compacted_turns, private$.chat$get_turns()),
-        private$.cleared_tool_results
+      turns <- activity_merge(
+        private$transcript_turns(),
+        private$.activity_overlay
       )
       if (isTRUE(include_system_prompt)) {
         context <- self$get_context_turns(include_system_prompt = TRUE)
@@ -1189,9 +1213,11 @@ Agent <- R6::R6Class(
       previous_turns <- private$.chat$get_turns()
       prompt <- private$.chat$get_system_prompt()
       prompt_without_compaction <- private$system_prompt_without_compaction()
+      # Subagent activity shown in the conversation never reaches the model.
+      split <- activity_split(value)
       tryCatch(
         {
-          private$.chat$set_turns(value)
+          private$.chat$set_turns(split$turns)
           if (!identical(prompt, prompt_without_compaction)) {
             private$.chat$set_system_prompt(prompt_without_compaction)
           }
@@ -1203,6 +1229,8 @@ Agent <- R6::R6Class(
         }
       )
       preserve_run_usage(self, usage)
+      private$.activity_overlay <- split$overlay
+      activity_reset(self)
       private$.compaction_summary <- NULL
       private$.compacted_turns <- list()
       private$.cleared_tool_results <- list()
@@ -1462,7 +1490,8 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get the last turn in the conversation with a given role.
+    #' Get the last turn in the conversation with a given role. Subagent tool
+    #' calls shown in it are included, as `$get_turns()` includes them.
     #'
     #' @param role `"assistant"`, `"user"` or `"system"`.
     #' @return An ellmer turn, or `NULL`.
@@ -1483,11 +1512,12 @@ Agent <- R6::R6Class(
         } else {
           NA_integer_
         }
-        return(restore_cleared_tool_results(
+        turn <- restore_cleared_tool_results(
           list(current),
           private$.cleared_tool_results,
           positions = position
-        )[[1L]])
+        )[[1L]]
+        return(activity_merge_turn(turn, position, private$.activity_overlay))
       }
       turns <- Filter(
         function(turn) identical(turn@role, role),
@@ -1499,11 +1529,13 @@ Agent <- R6::R6Class(
           function(turn) turn@role,
           character(1)
         )
-        restore_cleared_tool_results(
+        position <- max(which(roles == role))
+        turn <- restore_cleared_tool_results(
           tail(turns, 1L),
           private$.cleared_tool_results,
-          positions = max(which(roles == role))
+          positions = position
         )[[1L]]
+        activity_merge_turn(turn, position, private$.activity_overlay)
       } else {
         NULL
       }
@@ -1655,7 +1687,7 @@ Agent <- R6::R6Class(
       conversation_usage_snapshot(
         private$.chat,
         private$.compacted_turns,
-        tool_calls = count_tool_requests(self$get_turns())
+        tool_calls = count_tool_requests(private$transcript_turns())
       )
     },
 
@@ -1697,7 +1729,9 @@ Agent <- R6::R6Class(
     #' The file holds the conversation (including turns removed by compaction),
     #' the system prompt and any compaction summary, copies of large tool
     #' results, the run context, file checkpoint state (when enabled) and some
-    #' metadata, such as the time, Deputy version and provider. It doesn't hold
+    #' metadata, such as the time, Deputy version and provider. Subagent tool
+    #' calls shown by [subagent_chat_activity()] are kept beside the
+    #' conversation, never among the turns the model reads. It doesn't hold
     #' tools, permissions, hooks or the Chat itself.
     save_session = function(path) {
       tryCatch(
@@ -1732,7 +1766,9 @@ Agent <- R6::R6Class(
     #' the agent's, and loading fails if they disagree on an ID field. Saved
     #' tool results and compaction summaries are restored under this agent's
     #' session ID. Files saved by early development versions of Deputy can't be
-    #' loaded. Loading errors while a run is active.
+    #' loaded. Loading errors while a run is active. Subagent tool calls shown
+    #' by [subagent_chat_activity()] come back with the conversation they were
+    #' saved with; those shown for the previous conversation are dropped.
     load_session = function(path) {
       check_conversation_lease(self, NULL)
       if (isTRUE(private$run_active)) {
@@ -2719,6 +2755,13 @@ Agent <- R6::R6Class(
       .last_compaction = NULL,
       .compaction_summary = NULL,
       .compacted_turns = list(),
+      # Subagent tool calls shown in this conversation, by transcript turn;
+      # never part of the model context (R/delegation-activity.R).
+      .activity_overlay = list(),
+      .activity = NULL,
+      # What the presenter had queued when it stopped, for the reply then
+      # streaming.
+      .activity_leftover = NULL,
       # Leading context turns whose reported usage describes a different
       # context (before compaction), which local estimates must not reuse.
       .usage_stale_turns = 0L,
@@ -2737,6 +2780,15 @@ Agent <- R6::R6Class(
       .tool_observer_removers = list(),
       .r6_clone = NULL,
       current_run_checkpoint_id = NULL,
+
+      # The selected conversation without subagent activity: what the model
+      # was given before compaction, with cleared tool results restored.
+      transcript_turns = function() {
+        restore_cleared_tool_results(
+          c(private$.compacted_turns, private$.chat$get_turns()),
+          private$.cleared_tool_results
+        )
+      },
 
       interrupt_run = function(reason, conversation_token = NULL) {
         check_conversation_access(self, conversation_token)
@@ -2772,6 +2824,9 @@ Agent <- R6::R6Class(
         cloned$.__enclos_env__$private$active_owned_tools <- list()
         cloned$.__enclos_env__$private$rewire_chat_runtime()
         cloned$.__enclos_env__$private$.compaction_artifacts <- NULL
+        # A clone, such as shinychat's title generator, shows no activity.
+        cloned$.__enclos_env__$private$.activity <- NULL
+        cloned$.__enclos_env__$private$.activity_leftover <- NULL
         register_compaction_catalog_owner(
           private$.compaction_catalog_registry,
           cloned

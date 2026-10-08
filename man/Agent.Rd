@@ -1149,7 +1149,9 @@ compaction come back as text.
 \if{latex}{\out{\hypertarget{method-Agent-add_turn}{}}}
 \subsection{\code{Agent$add_turn()}}{
   Add a user turn and an assistant turn, as ellmer's
-\verb{$add_turn()} does.
+\verb{$add_turn()} does. Subagent tool calls shown in them, as
+\verb{$get_turns()} returns them, stay in the conversation but are not sent
+to the model.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$add_turn(user, assistant, log_tokens = TRUE)}
@@ -1158,8 +1160,8 @@ compaction come back as text.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{user}}{User turn or content.}
-      \item{\code{assistant}}{Assistant turn or content.}
+      \item{\code{user}}{A user turn.}
+      \item{\code{assistant}}{An assistant turn.}
       \item{\code{log_tokens}}{Passed to ellmer's \verb{$add_turn()}.}
     }
     \if{html}{\out{</div>}}
@@ -1177,7 +1179,10 @@ compaction come back as text.
 does. Unlike \verb{$get_context_turns()}, this includes turns that
 compaction removed from the model context, and the original tool
 results that \verb{$microcompact()} cleared. Removed turns stay in memory
-until \verb{$set_turns()} replaces the conversation.
+until \verb{$set_turns()} replaces the conversation. When
+\code{\link[=subagent_chat_activity]{subagent_chat_activity()}} shows subagent tool calls in this
+conversation, they are included here too, after the contents of the
+reply that delegated them; the model never sees them.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$get_turns(include_system_prompt = FALSE)}
@@ -1687,7 +1692,8 @@ same as \verb{$get_turns()}.
 \if{html}{\out{<a id="method-Agent-last_turn"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-last_turn}{}}}
 \subsection{\code{Agent$last_turn()}}{
-  Get the last turn in the conversation with a given role.
+  Get the last turn in the conversation with a given role. Subagent tool
+calls shown in it are included, as \verb{$get_turns()} includes them.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$last_turn(role = c("assistant", "user", "system"))}
@@ -1869,7 +1875,9 @@ restore.
     The file holds the conversation (including turns removed by compaction),
 the system prompt and any compaction summary, copies of large tool
 results, the run context, file checkpoint state (when enabled) and some
-metadata, such as the time, Deputy version and provider. It doesn't hold
+metadata, such as the time, Deputy version and provider. Subagent tool
+calls shown by \code{\link[=subagent_chat_activity]{subagent_chat_activity()}} are kept beside the
+conversation, never among the turns the model reads. It doesn't hold
 tools, permissions, hooks or the Chat itself.
   }
   \subsection{Returns}{
@@ -1900,7 +1908,9 @@ you load into, not from the file. The saved \code{run_context} is merged into
 the agent's, and loading fails if they disagree on an ID field. Saved
 tool results and compaction summaries are restored under this agent's
 session ID. Files saved by early development versions of Deputy can't be
-loaded. Loading errors while a run is active.
+loaded. Loading errors while a run is active. Subagent tool calls shown
+by \code{\link[=subagent_chat_activity]{subagent_chat_activity()}} come back with the conversation they were
+saved with; those shown for the previous conversation are dropped.
   }
   \subsection{Returns}{
     The agent, invisibly.

@@ -21,10 +21,13 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       records <- private$tool_call_records
       index <- NULL
       if (!is.null(provider_tool_call_id)) {
+        # Some providers number calls per response, so a later turn can reuse
+        # an ID. A finished call never takes a new call's phases.
         matches <- which(vapply(
           records,
           function(record) {
-            identical(record$provider_tool_call_id, provider_tool_call_id)
+            identical(record$provider_tool_call_id, provider_tool_call_id) &&
+              !isTRUE(record$end_seen)
           },
           logical(1)
         ))
@@ -164,7 +167,7 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
       if (!is_nonempty_string(tool_call_id)) {
         return(NULL)
       }
-      for (record in private$tool_call_records) {
+      for (record in rev(private$tool_call_records)) {
         if (identical(record$tool_call_id, tool_call_id)) {
           return(record$write_root)
         }

@@ -74,11 +74,23 @@ lead_bind_delegation <- function(lead, id, child, manifest = NULL) {
   record$manifest <- manifest
   record$agent_id <- child$agent_id
   record$session_id <- child$session_id()
+  # A retained specialist already has history; this delegation's own turns
+  # start after it.
+  record$turns_before <- length(tryCatch(child$turns(), error = function(e) {
+    list()
+  }))
   record$run_context <- child$run_context
   record$artifact_routing <- lead_child_artifact_routing(child)
   private$subagent_runs[[id]] <- record
   lead_observe_status(lead, id, "prepared")
   invisible(NULL)
+}
+
+# A child's conversation as its model has it. Subagent activity its own chat
+# shows (from its own subagents, for its own viewer) isn't part of it, so the
+# lead's views of the child never carry it.
+lead_child_turns <- function(child) {
+  activity_strip(child$turns())
 }
 
 lead_delegation_records <- function(lead, messages = FALSE, usage = FALSE) {
@@ -94,7 +106,7 @@ lead_delegation_records <- function(lead, messages = FALSE, usage = FALSE) {
         ref
       })
       if (messages) {
-        record$turns <- child$turns()
+        record$turns <- lead_child_turns(child)
       }
       if (usage) {
         record$usage <- child$.__enclos_env__$private$current_run_usage()
@@ -156,7 +168,7 @@ lead_settle_delegation <- function(
     record$artifact_routing <- lead_child_artifact_routing(child)
   }
   record$turns <- if (!is.null(child)) {
-    tryCatch(child$turns(), error = function(e) list())
+    tryCatch(lead_child_turns(child), error = function(e) list())
   } else {
     list()
   }

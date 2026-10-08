@@ -103,6 +103,7 @@ Collate:
     'context-estimation.R'
     'context-fork.R'
     'context-policy.R'
+    'delegation-activity.R'
     'delegation-graph.R'
     'delegation-lifecycle.R'
     'delegation-tree-budget.R'

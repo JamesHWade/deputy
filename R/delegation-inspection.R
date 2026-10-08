@@ -888,61 +888,72 @@ lead_inspection_records <- function(lead, delegation_id, transcript) {
     )
   }
   lapply(records, function(record) {
-    outcome <- delegation_outcome(record)
-    references <- lapply(outcome$references, function(ref) {
-      storage <- lead_artifact_storage(lead, record, ref)
-      available <- tryCatch(
-        {
-          read_tool_result_manifest(
-            ref$reference,
-            storage$policy,
-            storage$session_id
-          )
-          TRUE
-        },
-        error = function(e) FALSE
-      )
-      c(ref, list(availability = if (available) "available" else "missing"))
-    })
-    outcome <- DelegationOutcome(
-      outcome$runtime,
-      outcome$answer,
-      references,
-      outcome$claims
-    )
-    list(
-      task = record$task,
-      outcome = S7::props(outcome),
-      manifest = if (!is.null(record$manifest)) S7::props(record$manifest),
-      usage = if (!is.null(record$usage)) S7::props(record$usage),
-      cumulative_usage = if (
-        !is.null(record$cumulative_usage %||% record$usage)
-      ) {
-        S7::props(record$cumulative_usage %||% record$usage)
-      },
-      errors = record[c(
-        "error",
-        "hook_error",
-        "cleanup_error",
-        "outcome_error",
-        "observation_error"
-      )],
-      transcript = if (transcript) {
-        lapply(record$turns, inspection_record_turn)
-      } else {
-        NULL
-      },
-      retention = list(
-        transcript = if (transcript) "included" else "not_requested",
-        execution = "read_only",
-        continuation = if (is.null(record$conversation_handle)) {
-          "unsupported"
-        } else {
-          "explicit_owner_call"
-        }
-      )
-    )
+    lead_inspection_view(lead, record, transcript)
   })
+}
+
+# One delegation as a disclosure view. `turns` lets a reader record only part
+# of the transcript, such as the turns one continuation added.
+lead_inspection_view <- function(
+  lead,
+  record,
+  transcript,
+  turns = record$turns
+) {
+  outcome <- delegation_outcome(record)
+  references <- lapply(outcome$references, function(ref) {
+    storage <- lead_artifact_storage(lead, record, ref)
+    available <- tryCatch(
+      {
+        read_tool_result_manifest(
+          ref$reference,
+          storage$policy,
+          storage$session_id
+        )
+        TRUE
+      },
+      error = function(e) FALSE
+    )
+    c(ref, list(availability = if (available) "available" else "missing"))
+  })
+  outcome <- DelegationOutcome(
+    outcome$runtime,
+    outcome$answer,
+    references,
+    outcome$claims
+  )
+  list(
+    task = record$task,
+    outcome = S7::props(outcome),
+    manifest = if (!is.null(record$manifest)) S7::props(record$manifest),
+    usage = if (!is.null(record$usage)) S7::props(record$usage),
+    cumulative_usage = if (
+      !is.null(record$cumulative_usage %||% record$usage)
+    ) {
+      S7::props(record$cumulative_usage %||% record$usage)
+    },
+    errors = record[c(
+      "error",
+      "hook_error",
+      "cleanup_error",
+      "outcome_error",
+      "observation_error"
+    )],
+    transcript = if (transcript) {
+      lapply(turns, inspection_record_turn)
+    } else {
+      NULL
+    },
+    retention = list(
+      transcript = if (transcript) "included" else "not_requested",
+      execution = "read_only",
+      continuation = if (is.null(record$conversation_handle)) {
+        "unsupported"
+      } else {
+        "explicit_owner_call"
+      }
+    )
+  )
 }
 
 lead_inspect_subagents <- function(

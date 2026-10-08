@@ -1,5 +1,23 @@
 # deputy (development version)
 
+* New `subagent_chat_activity()` shows the tool calls a lead's subagents make,
+  with their results, in the lead's shinychat conversation as they happen.
+  Each call is a tool card in the reply that delegated it, labelled with the
+  subagent's name, and looks as it did in the subagent's chat. The cards are
+  saved with the conversation and shown again when it is reopened, without
+  running anything; the lead's model still sees only each subagent's summary.
+  `$get_turns()` includes the cards, `$get_context_turns()` doesn't, and
+  `$set_turns()` and `$add_turn()` separate them again. `$save_session()` keeps
+  them beside the conversation and `$load_session()` brings them back (#238).
+
+* A tool call whose provider ID repeats an earlier call's in the same run, as
+  with providers that number calls per response, now gets its own
+  `"tool_start"` event, and a delegation tool called that way runs. Before, the
+  later call was matched to the finished one: its start event was dropped and
+  a delegation failed with "Delegation tools require their owner's active
+  governed run". Agents with an `approval_dir` still refuse a repeated ID
+  within one run, since their saved effects are kept by tool-call ID (#238).
+
 * Subagent tool results keep the card they showed in shinychat. Inspection,
   `$observe_subagents()`, `$export_subagents()` and `delegation_history()`
   used to drop everything stored with a tool result, so a Commons table, plot

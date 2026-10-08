@@ -3,7 +3,7 @@
 deputy_agent_session_methods <- function(self = NULL, private = NULL) {
   list(
     build_session_payload = function() {
-      list(
+      session <- list(
         schema_version = 3L,
         turns = portable_session_turns(private$.chat$get_turns()),
         compacted_turns = portable_session_turns(private$.compacted_turns),
@@ -34,6 +34,10 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
           agent_name = private$.agent_name
         )
       )
+      # Subagent tool calls shown in the conversation, beside the turns the
+      # model reads; a conversation that showed none has no field.
+      session$activity <- activity_saved_entries(self)
+      session
     },
 
     restore_session_payload = function(session, source = NULL) {
@@ -203,6 +207,8 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
           )
         }
       )
+      # Checked against the turns being restored, before anything changes.
+      restored_activity <- activity_session_overlay(session, source)
       # Validate recoverable filesystem state before mutating any conversation
       # state so a rejected cross-root or oversized journal leaves the receiver
       # unchanged.
@@ -277,6 +283,10 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       # rewrite, none of which a load restores, so none of it is reused.
       private$.usage_stale_turns <- length(private$.chat$get_turns())
       private$reset_frame_snapshots()
+      # Activity shown for the previous conversation doesn't belong to this
+      # one.
+      private$.activity_overlay <- restored_activity
+      activity_reset(self)
     }
   )
 }

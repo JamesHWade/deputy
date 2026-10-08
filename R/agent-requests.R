@@ -432,9 +432,15 @@ replace_agent_chat <- function(agent, chat) {
     try(chat$set_system_prompt(destination_prompt), silent = TRUE)
     rlang::cnd_signal(moved)
   }
-  # Microcompacted results are keyed by position; dropped turns shift them.
+  # Microcompacted results and shown activity are keyed by position; dropped
+  # turns shift them.
   private$.cleared_tool_results <- remap_cleared_tool_results(
     private$.cleared_tool_results,
+    kept,
+    offset = length(private$.compacted_turns)
+  )
+  private$.activity_overlay <- activity_remap(
+    private$.activity_overlay,
     kept,
     offset = length(private$.compacted_turns)
   )
