@@ -317,6 +317,10 @@ test_that("add_turn keeps shown activity out of the model context", {
   expect_length(context[[4L]]@contents, 1L)
   expect_identical(agent$get_turns(), c(first, list(user, assistant)))
   expect_identical(agent$last_turn(), assistant)
+  # Content that isn't a turn is refused, as ellmer refuses it, and adds
+  # nothing for the model to see.
+  expect_error(agent$add_turn(user, list(shown), log_tokens = FALSE))
+  expect_identical(agent$get_context_turns(), context)
 })
 
 test_that("last_turn() includes the activity shown in it", {

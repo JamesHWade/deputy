@@ -1175,8 +1175,8 @@ to the model.
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{user}}{User turn or content.}
-      \item{\code{assistant}}{Assistant turn or content.}
+      \item{\code{user}}{A user turn.}
+      \item{\code{assistant}}{An assistant turn.}
       \item{\code{log_tokens}}{Passed to ellmer's \verb{$add_turn()}.}
     }
     \if{html}{\out{</div>}}

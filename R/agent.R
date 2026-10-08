@@ -1141,8 +1141,8 @@ Agent <- R6::R6Class(
     #' `$add_turn()` does. Subagent tool calls shown in them, as
     #' `$get_turns()` returns them, stay in the conversation but are not sent
     #' to the model.
-    #' @param user User turn or content.
-    #' @param assistant Assistant turn or content.
+    #' @param user A user turn.
+    #' @param assistant An assistant turn.
     #' @param log_tokens Passed to ellmer's `$add_turn()`.
     #' @return The agent, invisibly.
     add_turn = function(user, assistant, log_tokens = TRUE) {
