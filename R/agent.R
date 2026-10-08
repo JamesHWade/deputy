@@ -620,7 +620,10 @@ Agent <- R6::R6Class(
     #'   empty list.
     #' @param transcript If `TRUE`, also include the conversation, as
     #'   `transcript` records and as ellmer `turns`. Hidden reasoning and raw
-    #'   provider data are left out.
+    #'   provider data are left out. A tool result keeps the card it showed in
+    #'   shinychat (its `display`, such as a Commons table or plot) and the
+    #'   Commons provenance tag, within fixed sizes; anything else stored with
+    #'   the result is left out, and the transcript record names what was.
     #' @return A list of views, one per delegation. Changing them doesn't
     #'   affect any agent.
     inspect_subagents = function(

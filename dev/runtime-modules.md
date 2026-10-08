@@ -94,6 +94,9 @@ with the reason, as for `R/agent.R`. Count with `wc -l R/*.R | sort -n`.
 `R/delegation-inspection.R` owns compact outcomes, authorized disclosure and
 settled public-content replay. It reuses ContextPolicy artifacts and ellmer
 record/replay; it does not execute children or implement a UI renderer.
+`R/tool-display-evidence.R` owns the versioned display/provenance projection
+that those records carry (ADR-0032), and `R/subagent-display.R` owns the
+adapter's inert rebuild of display HTML, so neither grows the files above.
 
 `R/delegation-observation.R` owns bounded event envelopes and authorized cursor
 readers. The Agent event kernel appends data; subscribers never consume child

@@ -690,7 +690,10 @@ values that came from a model.}
 empty list.}
       \item{\code{transcript}}{If \code{TRUE}, also include the conversation, as
 \code{transcript} records and as ellmer \code{turns}. Hidden reasoning and raw
-provider data are left out.}
+provider data are left out. A tool result keeps the card it showed in
+shinychat (its \code{display}, such as a Commons table or plot) and the
+Commons provenance tag, within fixed sizes; anything else stored with
+the result is left out, and the transcript record names what was.}
     }
     \if{html}{\out{</div>}}
   }

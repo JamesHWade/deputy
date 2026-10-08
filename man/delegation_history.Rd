@@ -26,5 +26,8 @@ since the saved status may be stale.
 Turns a snapshot from \verb{$export_subagents()} back into ellmer turns for
 display, for example in \code{\link[=subagent_chat_server]{subagent_chat_server()}}. Replaying never runs
 tools, calls a model or restores a chat. Access is checked again with
-\code{disclosure}; the IDs and scope stored in \code{history} grant nothing.
+\code{disclosure}; the IDs and scope stored in \code{history} grant nothing. Tool
+results get back the card they showed, after a check that the saved card
+holds only the fields and sizes an export can contain; a snapshot that
+fails the check is an error.
 }
