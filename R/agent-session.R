@@ -3,7 +3,7 @@
 deputy_agent_session_methods <- function(self = NULL, private = NULL) {
   list(
     build_session_payload = function() {
-      list(
+      session <- list(
         schema_version = 3L,
         turns = portable_session_turns(private$.chat$get_turns()),
         compacted_turns = portable_session_turns(private$.compacted_turns),
@@ -12,9 +12,6 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
         cleared_tool_results = cleared_tool_results_turns(
           private$.cleared_tool_results
         ),
-        # Subagent tool calls shown in the conversation, beside the turns the
-        # model reads.
-        activity = activity_saved_entries(self),
         system_prompt = private$.chat$get_system_prompt(),
         compaction_summary = private$.compaction_summary,
         tool_result_envelopes = collect_tool_result_envelopes(
@@ -37,6 +34,10 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
           agent_name = private$.agent_name
         )
       )
+      # Subagent tool calls shown in the conversation, beside the turns the
+      # model reads; a conversation that showed none has no field.
+      session$activity <- activity_saved_entries(self)
+      session
     },
 
     restore_session_payload = function(session, source = NULL) {
