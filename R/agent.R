@@ -1747,9 +1747,6 @@ Agent <- R6::R6Class(
       tryCatch(
         {
           session <- private$build_session_payload()
-          session$activity <- activity_session_entries(
-            private$.activity_overlay
-          )
           saveRDS(session, path)
           cli_alert_success("Session saved to {.path {path}}")
           invisible(path)
@@ -1813,16 +1810,10 @@ Agent <- R6::R6Class(
         }
       )
 
-      # Checked before anything is restored, against the turns being loaded.
-      overlay <- activity_session_overlay(session, path)
       private$restore_session_payload(
         session,
         source = path
       )
-      # Activity shown for the previous conversation doesn't belong to this
-      # one; a failed load above leaves it in place.
-      private$.activity_overlay <- overlay
-      activity_reset(self)
       cli_alert_success("Session loaded from {.path {path}}")
       invisible(self)
     },
@@ -3149,8 +3140,18 @@ Agent <- R6::R6Class(
           require_source = isTRUE(private$.trusted_tree_member),
           admit_route = trusted_route_admission(self, tools)
         )
-        # Names a retained agent's own policy designates stay that tool here.
-        for (entry in private$owned_conversations) {
+        # Names a retained agent's own policy designates stay that tool here:
+        # those this agent retained, and for a retained agent or graph
+        # member, those its policy root retained too, siblings included.
+        entries <- private$owned_conversations
+        root <- trusted_policy_root(self)
+        if (!is.null(root) && !identical(root, self)) {
+          entries <- c(
+            entries,
+            root$.__enclos_env__$private$owned_conversations
+          )
+        }
+        for (entry in entries) {
           if (!is.null(entry$trusted)) {
             trusted_check_names(
               trusted_policy_sources(entry$trusted$policy),

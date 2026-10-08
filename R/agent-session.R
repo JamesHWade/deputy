@@ -12,6 +12,9 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
         cleared_tool_results = cleared_tool_results_turns(
           private$.cleared_tool_results
         ),
+        # Subagent tool calls shown in the conversation, beside the turns the
+        # model reads.
+        activity = activity_saved_entries(self),
         system_prompt = private$.chat$get_system_prompt(),
         compaction_summary = private$.compaction_summary,
         tool_result_envelopes = collect_tool_result_envelopes(
@@ -203,6 +206,8 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
           )
         }
       )
+      # Checked against the turns being restored, before anything changes.
+      restored_activity <- activity_session_overlay(session, source)
       # Validate recoverable filesystem state before mutating any conversation
       # state so a rejected cross-root or oversized journal leaves the receiver
       # unchanged.
@@ -277,6 +282,10 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       # rewrite, none of which a load restores, so none of it is reused.
       private$.usage_stale_turns <- length(private$.chat$get_turns())
       private$reset_frame_snapshots()
+      # Activity shown for the previous conversation doesn't belong to this
+      # one.
+      private$.activity_overlay <- restored_activity
+      activity_reset(self)
     }
   )
 }

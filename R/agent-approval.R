@@ -51,6 +51,7 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
           session$cleared_tool_results$turns
         )
       }
+      session$activity <- approval_record_activity(session$activity)
       session$metadata$saved_at <- as.numeric(session$metadata$saved_at)
       policy <- approval_policy_record(self$permissions)
       record <- list(
@@ -515,6 +516,7 @@ approval_resume <- function(
       tools = list()
     )
   }
+  session$activity <- approval_replay_activity(session$activity)
   private$restore_session_payload(session, source = path)
   record$status <- "resuming"
   approval_store_write(path, record, lock)
