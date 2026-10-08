@@ -975,6 +975,35 @@ test_that("records stay within max_bytes and count what was left out", {
   }
 })
 
+test_that("a child the record's bookkeeping pushes over keeps its outcome", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  state <- history_state(lead, "conv-a")
+  full <- subagent_history_record(state, "conv-a")
+  view <- full$history$children[[1L]]
+  stripped <- full
+  stripped$history$children[[1L]] <- subagent_history_without_transcript(view)
+  stripped$omitted$transcripts <- 1L
+  # The child alone fits, and so does the record without its transcript, but
+  # not the record with it.
+  state$max_bytes <- max(
+    nchar(history_json(view), type = "bytes"),
+    subagent_history_record_size(stripped)
+  )
+  expect_lt(state$max_bytes, subagent_history_record_size(full))
+  record <- subagent_history_record(state, "conv-a")
+  expect_length(record$history$children, 1L)
+  expect_null(record$history$children[[1L]]$transcript)
+  expect_identical(
+    record$history$children[[1L]]$retention$transcript,
+    "omitted"
+  )
+  expect_identical(record$omitted$transcripts, 1L)
+  expect_identical(record$omitted$children, 0L)
+  expect_lte(subagent_history_record_size(record), state$max_bytes)
+})
+
 test_that("saved records stay within what the lead's disclosure can replay", {
   counter <- new.env()
   counter$calls <- 0L
