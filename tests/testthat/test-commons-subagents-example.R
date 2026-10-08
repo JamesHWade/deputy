@@ -92,6 +92,7 @@ commons_results_by_label <- function(cards) {
 
 test_that("concurrent Commons specialists, a grandchild and a failure share one conversation", {
   commons_example_skip()
+  skip_if_not_installed("xml2")
   local <- commons_example_local()
   workflow <- local$workflow
   root <- workflow$root
@@ -251,6 +252,8 @@ test_that("a reopened conversation shows the same cards and records and runs not
   skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   skip_if_not_installed("bslib")
+  skip_if_not_installed("commonmark")
+  skip_if_not_installed("xml2")
   example <- commons_example_environment()
   fixture <- example$commons_local_fixture(delay = 0.01)
   withr::defer(fixture$close())
