@@ -1689,7 +1689,7 @@ test_that("a saved session keeps the subagent activity shown in it", {
   other <- Agent$new(chat$clone())
   for (file in list(
     bad(function(entries) {
-      entries[[1L]]$turn <- 1L
+      entries[[1L]]$turn <- 1.5
       entries
     }),
     bad(function(entries) {
@@ -1704,6 +1704,44 @@ test_that("a saved session keeps the subagent activity shown in it", {
     expect_error(other$load_session(file), class = "deputy_session_load")
     expect_length(other$get_turns(), 0L)
   }
+})
+
+test_that("activity a host puts in a user turn is saved and loaded too", {
+  chat <- ellmer::chat_openai(model = "test", credentials = function() "x")
+  marker <- list(
+    format = "deputy_subagent_activity",
+    version = 1L,
+    activity_id = "deputy_activity_abc_1",
+    label = "sales"
+  )
+  card <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  answer <- ellmer::ContentToolResult(
+    "60",
+    request = card,
+    extra = list(deputy_activity = marker)
+  )
+  turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("Go"), answer)),
+    ellmer::AssistantTurn(list(ellmer::ContentText("Done."), card))
+  )
+  path <- withr::local_tempfile(fileext = ".rds")
+  round_trip <- function(agent) {
+    suppressMessages(agent$save_session(path))
+    loaded <- Agent$new(chat$clone())
+    suppressMessages(loaded$load_session(path))
+    loaded$get_turns()
+  }
+  set <- Agent$new(chat$clone())
+  set$set_turns(turns)
+  expect_identical(round_trip(set), turns)
+  added <- Agent$new(chat$clone())
+  added$add_turn(turns[[1L]], turns[[2L]], log_tokens = FALSE)
+  expect_identical(round_trip(added), turns)
 })
 
 test_that("a saved session gives a card still waiting a result", {
