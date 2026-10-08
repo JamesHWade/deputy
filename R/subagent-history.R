@@ -803,7 +803,7 @@ subagent_history_restored <- function(state, transcript = TRUE) {
       subagent_history_scope(state$lead, id)
     )
   }
-  tryCatch(replay(history), deputy_disclosure_bound = function(error) {
+  views <- tryCatch(replay(history), deputy_disclosure_bound = function(error) {
     # Saved under a larger bound than the lead's disclosure now allows: the
     # outcomes are still shown, without their transcripts, as many as fit.
     # Only transcripts still there are dropped; a child listed without its
@@ -842,6 +842,17 @@ subagent_history_restored <- function(state, transcript = TRUE) {
       }
     }
     shown
+  })
+  # A transcript the current redactor removes is marked as the save marks
+  # one: left out, not included.
+  lapply(views, function(view) {
+    if (
+      is.null(view$transcript) &&
+        identical(view$retention$transcript, "included")
+    ) {
+      view$retention$transcript <- "omitted"
+    }
+    view
   })
 }
 
