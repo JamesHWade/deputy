@@ -44,7 +44,8 @@ into an earlier message.
   card still waiting a "Not completed" result, since nothing settles it after
   a load; the live conversation keeps waiting for the call. `load_session()`
   and a resumed approval restore the cards after checking each is a marked
-  card in one of the restored assistant turns; a malformed entry fails the
+  card in one of the restored turns (an assistant turn, unless a host put it
+  in another through `set_turns()` or `add_turn()`); a malformed entry fails the
   restore before anything changes. `set_chat()` keeps
   each card with its turn when moving drops an assistant turn that held only
   reasoning. Replacing the
