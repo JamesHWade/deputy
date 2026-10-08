@@ -211,8 +211,9 @@ activity_session_entries <- function(overlay) {
 }
 
 # The shown activity of a saved session, checked against the turns it is
-# loaded with: each entry a marked card in one of the conversation's
-# assistant turns.
+# loaded with: each entry a marked card in one of the conversation's turns.
+# Cards are shown in assistant turns, but `$set_turns()` and `$add_turn()`
+# keep a card from any turn, so a load takes back what a save wrote.
 activity_session_overlay <- function(session, path = NULL) {
   entries <- if (is.list(session)) session$activity
   if (is.null(entries)) {
@@ -232,7 +233,7 @@ activity_session_overlay <- function(session, path = NULL) {
       turn >= 1 &&
       turn <= length(turns) &&
       turn == round(turn) &&
-      inherits(turns[[turn]], "ellmer::AssistantTurn") &&
+      inherits(turns[[turn]], "ellmer::Turn") &&
       is_activity_content(entry$content)
   }
   if (
