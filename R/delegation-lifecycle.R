@@ -48,6 +48,9 @@ lead_admit_delegation <- function(lead, definition, task, correlation) {
     parent_run_id = correlation$parent_run_id,
     delegation_id = id,
     tool_call_id = correlation$tool_call_id,
+    # The host conversation the lifecycle owner was answering in, so a host
+    # can save the delegation with that conversation.
+    host_conversation_id = private$.conversation_id,
     run_context = correlation$run_context,
     admitted_at = Sys.time(),
     started_at = as.POSIXct(NA_real_, origin = "1970-01-01", tz = "UTC"),

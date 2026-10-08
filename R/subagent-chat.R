@@ -140,6 +140,10 @@ subagent_chat_ui <- function(id, height = "420px") {
 #'   button.
 #' @param poll_interval How often to check for updates, in milliseconds. At
 #'   least 100; defaults to 250.
+#' @param conversation Optional value returned by [subagent_chat_history()]
+#'   for the lead's chat. The panel then shows the subagents of the
+#'   conversation open in that chat: those that ran in it, live, and those
+#'   saved with it, read-only.
 #' @return `subagent_chat_server()` returns a list of reactives: `selected`
 #'   (the selected delegation ID), `views`, `notice` and `closed`.
 #' @export
@@ -151,13 +155,56 @@ subagent_chat_server <- function(
   disclosure = NULL,
   scope = NULL,
   on_cancel = NULL,
-  poll_interval = 250L
+  poll_interval = 250L,
+  conversation = NULL
 ) {
   subagent_chat_dependencies()
   if (
     !is.function(requester) || (!is.null(on_cancel) && !is.function(on_cancel))
   ) {
     cli::cli_abort("requester and any on_cancel callback must be functions.")
+  }
+  if (
+    !is.null(conversation) &&
+      (!is.list(conversation) ||
+        !is.function(conversation$restored) ||
+        !is.function(conversation$conversation_id))
+  ) {
+    cli::cli_abort(
+      "{.arg conversation} must be the value returned by {.fn subagent_chat_history}."
+    )
+  }
+  # The open conversation's live subagents and the saved ones not live.
+  conversation_views <- function(lead, live) {
+    subagent_history_panel_views(
+      conversation,
+      live,
+      lead$.__enclos_env__$private$.delegation_disclosure
+    )
+  }
+  # With a conversation, only its own live subagents are read, so other
+  # conversations' subagents can't make its list too large to show.
+  live_views <- function(lead, requester) {
+    if (is.null(conversation)) {
+      return(lead$inspect_subagents(requester))
+    }
+    subagent_history_live_views(conversation, lead, requester)
+  }
+  # Saved subagents are authorized on their own, so with a conversation a
+  # requester who may not see the lead's live subagents still sees them.
+  live_access <- function(lead, requester) {
+    is.null(conversation) ||
+      isTRUE(tryCatch(
+        {
+          inspection_authorize(
+            lead$.__enclos_env__$private$.delegation_disclosure,
+            requester,
+            inspection_scope(lead)
+          )
+          TRUE
+        },
+        deputy_delegation_disclosure = function(error) FALSE
+      ))
   }
   poll_interval <- context_policy_whole_number(poll_interval, "poll_interval")
   if (is.null(poll_interval) || poll_interval < 100L) {
@@ -205,7 +252,16 @@ subagent_chat_server <- function(
       }
       saved <- value(history)
       current <- if (is.null(saved)) {
-        value(lead)$inspect_subagents(requester(), id, transcript = TRUE)
+        current_lead <- value(lead)
+        live <- if (live_access(current_lead, requester())) {
+          current_lead$inspect_subagents(requester(), id, transcript = TRUE)
+        }
+        subagent_history_panel_child(
+          conversation,
+          current_lead,
+          live %||% list(),
+          id
+        )
       } else {
         Filter(
           function(view) identical(view$outcome$runtime$delegation_id, id),
@@ -239,9 +295,15 @@ subagent_chat_server <- function(
       }
       clear()
       state$rendered <- view
-      if (!is.null(state$reader)) {
-        state$partial_cursor <- previous_cursor %||%
+      if (!is.null(state$reader) && is.null(previous_cursor)) {
+        previous_cursor <- if (is.null(conversation)) {
           state$reader$snapshot()$cursor
+        } else {
+          subagent_history_cursor(value(lead), requester())
+        }
+      }
+      if (!is.null(state$reader)) {
+        state$partial_cursor <- previous_cursor
       }
       for (message in subagent_chat_messages(view$turns)) {
         shinychat::chat_append_message(
@@ -351,10 +413,22 @@ subagent_chat_server <- function(
           if (!inherits(current_lead, "Agent")) {
             cli::cli_abort("No live lead is available.")
           }
+          if (!live_access(current_lead, current_requester)) {
+            # Only the open conversation's saved subagents, with no live
+            # reader.
+            detach()
+            current <- filter_views(conversation_views(current_lead, list()))
+            if (!identical(current, views())) {
+              update_views(current)
+            }
+            render_child()
+            return()
+          }
           if (closed()) {
             detach()
-            current <- filter_views(current_lead$inspect_subagents(
-              current_requester
+            current <- filter_views(conversation_views(
+              current_lead,
+              live_views(current_lead, current_requester)
             ))
             if (!identical(current, views())) {
               update_views(current)
@@ -369,12 +443,28 @@ subagent_chat_server <- function(
             clear()
             state$lead <- current_lead
             state$reader <- current_lead$observe_subagents(current_requester)
-            update_views(state$reader$snapshot()$children)
+            update_views(conversation_views(
+              current_lead,
+              if (is.null(conversation)) {
+                state$reader$snapshot()$children
+              } else {
+                live_views(current_lead, current_requester)
+              }
+            ))
             render_child()
           }
-          update <- state$reader$poll()
-          fresh_views <- filter_views(current_lead$inspect_subagents(
-            current_requester
+          # With a conversation, only its own subagents are read: their views
+          # on each tick, and the selected child's events below. The lead-wide
+          # events are left unread, since other conversations' events could
+          # take them over the disclosure bound.
+          update <- if (is.null(conversation)) {
+            state$reader$poll()
+          } else {
+            list(events = list(), gaps = list(), cursor = NULL)
+          }
+          fresh_views <- filter_views(conversation_views(
+            current_lead,
+            live_views(current_lead, current_requester)
           ))
           disclosure_changed <- !identical(fresh_views, views())
           if (
@@ -392,7 +482,8 @@ subagent_chat_server <- function(
           }
           if (!is.null(selected()) && !closed()) {
             if (is.null(state$partial_cursor)) {
-              state$partial_cursor <- update$cursor
+              state$partial_cursor <- update$cursor %||%
+                subagent_history_cursor(current_lead, current_requester)
             } else {
               # Re-read the bounded retained event suffix to reapply redaction
               # to cached streamed text as well as newly arriving text.

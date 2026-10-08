@@ -2506,6 +2506,19 @@ Agent <- R6::R6Class(
       )
     },
 
+    #' @field conversation_id The host conversation the agent is answering
+    #'   in, or `NULL`. shinychat's `chat_server()` sets it before each reply;
+    #'   set it yourself before starting a run outside a reply. Each delegation
+    #'   keeps the value it had when the delegation started, so
+    #'   [subagent_chat_history()] can save a conversation's subagents with it.
+    #'   It isn't sent to the model.
+    conversation_id = function(value) {
+      if (missing(value)) {
+        return(private$.conversation_id)
+      }
+      private$.conversation_id <- host_conversation_id(value)
+    },
+
     #' @field run_context The `run_context` attached to every run. Read-only.
     run_context = function(value) {
       if (missing(value)) {
@@ -2762,6 +2775,9 @@ Agent <- R6::R6Class(
       # What the presenter had queued when it stopped, for the reply then
       # streaming.
       .activity_leftover = NULL,
+      # The host conversation the agent is answering in; delegations record
+      # it (R/delegation-lifecycle.R).
+      .conversation_id = NULL,
       # Leading context turns whose reported usage describes a different
       # context (before compaction), which local estimates must not reuse.
       .usage_stale_turns = 0L,

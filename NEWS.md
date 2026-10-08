@@ -1,5 +1,18 @@
 # deputy (development version)
 
+* New `subagent_chat_history()` saves the subagents of each conversation in a
+  shinychat chat with that conversation, through shinychat's history, and
+  brings them back read-only when it is reopened: tasks, outcomes,
+  conversations with their tool results and cards, usage and which subagent ran
+  for which. Nothing runs again and no subagent resumes.
+  `subagent_chat_server()` gains `conversation`, which shows the open
+  conversation's subagents, live or saved (#238).
+
+* `Agent$conversation_id` holds the host conversation an agent is answering in;
+  shinychat's `chat_server()` sets it before each reply. Delegations record it,
+  and `$inspect_subagents()` reports it as `host_conversation_id`; the summary
+  a lead's model reads leaves it out (#238).
+
 * New `subagent_chat_activity()` shows the tool calls a lead's subagents make,
   with their results, in the lead's shinychat conversation as they happen.
   Each call is a tool card in the reply that delegated it, labelled with the

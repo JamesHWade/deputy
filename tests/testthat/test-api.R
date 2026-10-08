@@ -32,6 +32,7 @@ test_that("public API is deliberate", {
     "subagent_chat_ui",
     "subagent_chat_server",
     "subagent_chat_activity",
+    "subagent_chat_history",
     "delegation_history",
     "adopt_chat",
     "delegation_tool",

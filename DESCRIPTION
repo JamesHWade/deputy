@@ -37,7 +37,7 @@ Suggests:
     rmarkdown,
     rvest,
     shiny,
-    shinychat,
+    shinychat (>= 0.5.0),
     testthat (>= 3.2.2),
     withr,
     xml2,
@@ -137,6 +137,7 @@ Collate:
     'structured-run.R'
     'subagent-chat.R'
     'subagent-display.R'
+    'subagent-history.R'
     'subprocess-env.R'
     'tool-display-evidence.R'
     'tool-input-review.R'

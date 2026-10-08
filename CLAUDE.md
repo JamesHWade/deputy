@@ -54,6 +54,7 @@ deputy/
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── subagent-chat.R    # Optional authorized child activity and transcript UI
 │   ├── subagent-display.R # Inert HTML for tool displays shown by the Shiny adapter
+│   ├── subagent-history.R # Subagent records saved with a shinychat conversation
 │   ├── tool-display-evidence.R # Approved, bounded tool display/provenance projection
 │   ├── agent-run-state.R   # Shared model-run and batch initialization
 │   ├── compaction-run.R    # Governed asynchronous summary attempts and recovery
@@ -519,6 +520,17 @@ redacted view, and a view over `max_bytes` shows one note card. `stream_async()`
 cards only while a presenter is enabled, reading records through disclosure
 on the consumer side; it never runs tools. Tool-call correlation no longer
 lets a finished call claim a later call that reuses its provider ID.
+
+`subagent_chat_history(chat, lead, requester)` saves each conversation's
+settled subagent records with it through `chat$history$on_save()` and restores
+them read-only in `on_restore()` (ADR-0034, `R/subagent-history.R`).
+`Agent$conversation_id`, set by shinychat before each reply, is stamped on
+delegation records as `host_conversation_id` (dropped from the compact
+model-facing outcome). Records are one JSON string in a typed codec that never
+unserializes; restore checks envelope, scope (`delegation_scope` plus
+`chat_conversation_id`), settled status and every transcript, and creates no
+records or agents. `subagent_chat_server(conversation = )` follows the open
+conversation.
 
 ### Optional child chat panel
 

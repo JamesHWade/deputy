@@ -143,7 +143,8 @@ inspection_bound <- function(x, disclosure) {
   }
   if (length(serialize(payload(x), NULL, version = 3)) > disclosure$max_bytes) {
     cli::cli_abort(
-      "Delegation disclosure exceeds max_bytes; narrow the selection."
+      "Delegation disclosure exceeds max_bytes; narrow the selection.",
+      class = "deputy_disclosure_bound"
     )
   }
   x
@@ -509,6 +510,7 @@ delegation_outcome <- function(record, compact = FALSE) {
     "tool_call_id",
     "conversation_handle",
     "previous_delegation_id",
+    "host_conversation_id",
     "status",
     "stop_reason"
   )
@@ -532,6 +534,8 @@ delegation_outcome <- function(record, compact = FALSE) {
   if (compact) {
     # Display labels may be shortened; opaque correlations must stay exact.
     runtime$agent_name <- inspection_text(runtime$agent_name, 512L)
+    # The host's conversation identity is not model context.
+    runtime$host_conversation_id <- NULL
     runtime <- compact_fields(runtime)
   }
   DelegationOutcome(
@@ -1038,12 +1042,7 @@ delegation_history <- function(history, requester, disclosure, scope) {
     ) {
       cli::cli_abort("Only settled child history can be replayed.")
     }
-    if (!is.null(view$outcome$references)) {
-      view$outcome$references <- lapply(view$outcome$references, function(ref) {
-        ref$availability <- "unresolved"
-        ref
-      })
-    }
+    view <- inspection_unresolved_references(view)
     view <- disclosure$redact(view, requester)
     inspection_portable(view)
     if (!is.list(view)) {
@@ -1054,4 +1053,16 @@ delegation_history <- function(history, requester, disclosure, scope) {
     view
   })
   inspection_bound(views, disclosure)
+}
+
+# A saved artifact's availability may be stale, so replay marks every
+# reference "unresolved".
+inspection_unresolved_references <- function(view) {
+  if (!is.null(view$outcome$references)) {
+    view$outcome$references <- lapply(view$outcome$references, function(ref) {
+      ref$availability <- "unresolved"
+      ref
+    })
+  }
+  view
 }
