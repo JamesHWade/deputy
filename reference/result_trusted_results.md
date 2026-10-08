@@ -23,8 +23,11 @@ result_trusted_results(result, type = NULL)
 
 A list of `"trusted_result"`
 [AgentEvent](https://jameshwade.github.io/deputy/reference/AgentEvent.md)s.
-Each has `result_id`, `result_type`, `tool_name`, `tool_call_id`,
-`arguments`, the tool's unchanged `value`, and the run's IDs.
+Each has `result_id`, `result_type`, `tool_name`, `tool_fingerprint` (a
+SHA-256 digest of the producing tool's code, argument schema and
+metadata: the same for every call, whatever its inputs), `tool_call_id`,
+`arguments`, the tool's unchanged `value`, and the IDs of the run and
+agent that produced it.
 
 ## See also
 

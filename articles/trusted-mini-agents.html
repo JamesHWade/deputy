@@ -427,11 +427,85 @@ the same tool object everywhere, declared in the definition’s
 <code>tools</code> or in a <code>Skill</code> value. A child’s trusted
 result reaches the lead’s <code>on_result</code>, tagged with the
 child’s delegation ID. Children cannot delegate further.</p>
-<p>Delegated children cannot pause for durable approval. To review a
-trusted tool’s inputs before it runs, let the lead or a child propose
-the inputs, then run the trusted tool in a separate executor agent that
-uses the review flow above. The <code>trusted-mini-agent</code> example
-does this.</p>
+<div class="section level3">
+<h3 id="retained-agents-and-delegation-graphs">Retained agents and delegation graphs<a class="anchor" aria-label="anchor" href="#retained-agents-and-delegation-graphs"></a>
+</h3>
+<p>An agent with a policy can also keep specialists, with
+<code>$retain_agent()</code>, <code><a href="../reference/adopt_chat.html">adopt_chat()</a></code> or
+<code>$retain_agent_graph()</code>, and call them through
+<code><a href="../reference/delegation_tool.html">delegation_tool()</a></code> or graph routes. Give the policy the
+trusted tool itself rather than its name, so that only that exact tool
+object counts as the producer, wherever it is registered:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">root</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>  trusted_results <span class="op">=</span> <span class="fu"><a href="../reference/TrustedResults.html">TrustedResults</a></span><span class="op">(</span></span>
+<span>    forecast <span class="op">=</span> <span class="va">get_forecast</span>,</span>
+<span>    on_result <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">event</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">event</span><span class="op">$</span><span class="va">value</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">forecaster</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">get_forecast</span>, <span class="va">list_cities</span><span class="op">)</span>,</span>
+<span>  agent_name <span class="op">=</span> <span class="st">"forecaster"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">handle</span> <span class="op">&lt;-</span> <span class="va">root</span><span class="op">$</span><span class="fu">retain_agent</span><span class="op">(</span><span class="va">forecaster</span>, <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">10</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">root</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/delegation_tool.html">delegation_tool</a></span><span class="op">(</span></span>
+<span>  <span class="va">root</span>,</span>
+<span>  <span class="va">handle</span>,</span>
+<span>  <span class="st">"ask_forecaster"</span>,</span>
+<span>  <span class="st">"Ask the forecaster for a forecast."</span>,</span>
+<span>  <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
+<span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>Retaining an agent checks all its tools against the policy first, and
+fails if any could get around the trusted tool: code execution,
+delegation, anything that may write or reach the open world, or another
+tool under the trusted tool’s name. While retained, the agent can’t
+change its tools, and the check runs again before each task. A route
+tool is accepted only when Deputy made it for this agent and its target
+passed the check, so other tools that delegate are still rejected. A
+graph is checked the same way, member by member, before any route is
+added.</p>
+<p>Each trusted result from a retained agent, or from any agent in the
+graph, reaches the root’s <code>on_result</code> exactly once, as soon
+as the tool returns and before that agent’s model sees anything. The
+event carries the producing agent’s <code>agent_id</code>,
+<code>session_id</code>, <code>run_id</code>, <code>delegation_id</code>
+and <code>tool_call_id</code>, the <code>parent_agent_id</code> that
+delegated to it, and a <code>tool_fingerprint</code> identifying the
+trusted tool’s code, argument schema and metadata (it is the same for
+every call, whatever the inputs). With
+<code>model_receipt = TRUE</code>, the retained agent’s model gets the
+receipt instead of the value.</p>
+<p>A retained agent may have a policy of its own. Both apply while it is
+retained: its results reach its own <code>on_result</code> too, a tool
+is exempt only if both policies exempt it, and a receipt is used if
+either policy asks for one. The two can’t name different tools for the
+same kind of result, and neither can two retained agents. In a graph, a
+member’s own policy also covers the members it asks through its routes,
+for as long as each task it gives them runs. Releasing the agent gives
+it back its own policy and removes the tools you made for it with
+<code><a href="../reference/delegation_tool.html">delegation_tool()</a></code>.</p>
+<p>Commons chats can be retained this way, but not as they come. Their
+<code>run_sql</code> and <code>run_r</code> tools compute anything the
+model asks for, so they would get around a trusted measure; remove them.
+Commons doesn’t mark its other tools as closed-world, so set
+<code>open_world_hint = FALSE</code> on the ones you keep after checking
+that they don’t reach outside the data you gave Commons, and name
+<code>call_measure</code> as the trusted tool. Each Commons chat makes
+its own <code>call_measure</code>, so for one producer across several
+specialists, take the tools from one Commons chat and give the same list
+to each with <code>$set_tools()</code>. The
+<code>commons-subagents</code> example, in
+<code>system.file("examples/commons-subagents", package = "deputy")</code>,
+sets this up for three specialists in a Shiny app.</p>
+<p>Delegated children cannot pause for durable approval, whether they
+come from a definition, a retained agent or a graph. To review a trusted
+tool’s inputs before it runs, let the lead or a child propose the
+inputs, then run the trusted tool in a separate executor agent that uses
+the review flow above. The <code>trusted-mini-agent</code> example does
+this.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="what-this-does-not-guarantee">What this does not guarantee<a class="anchor" aria-label="anchor" href="#what-this-does-not-guarantee"></a>

@@ -236,6 +236,10 @@ Delegate parts of a task from a lead agent to specialists.
 - [`subagent_chat_ui()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md)
   [`subagent_chat_server()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md)
   : Show subagent conversations in a Shiny panel
+- [`subagent_chat_activity()`](https://jameshwade.github.io/deputy/reference/subagent_chat_activity.md)
+  : Show subagent tool calls in the main chat
+- [`subagent_chat_history()`](https://jameshwade.github.io/deputy/reference/subagent_chat_history.md)
+  : Save subagent records with a shinychat conversation
 
 ## Retained specialists
 

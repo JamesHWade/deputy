@@ -115,6 +115,15 @@ exceed the checkpoint size limits is refused.</p>
 <dd><p>The agent's name, or <code>NULL</code>. Read-only.</p></dd>
 
 
+    <dt><code>conversation_id</code></dt>
+<dd><p>The host conversation the agent is answering
+in, or <code>NULL</code>. shinychat's <code>chat_server()</code> sets it before each reply;
+set it yourself before starting a run outside a reply. Each delegation
+keeps the value it had when the delegation started, so
+<code><a href="subagent_chat_history.html">subagent_chat_history()</a></code> can save a conversation's subagents with it.
+It isn't sent to the model.</p></dd>
+
+
     <dt><code>run_context</code></dt>
 <dd><p>The <code>run_context</code> attached to every run. Read-only.</p></dd>
 
@@ -365,7 +374,10 @@ tasks.</p>
 directly, and its conversation, prompt, model, tools, hooks and tool
 observers can't be changed (observers it already has keep working). An
 agent can retain up to 32 others at a time. See
-<code><a href="../articles/retained-agents.html">vignette("retained-agents", package = "deputy")</a></code>.</p><div class="section">
+<code><a href="../articles/retained-agents.html">vignette("retained-agents", package = "deputy")</a></code>.</p>
+<p>If this agent has a <a href="TrustedResults.html">TrustedResults</a> policy, <code>agent</code>'s tools must pass
+it, and its trusted results reach this agent's <code>on_result</code>; see
+<a href="TrustedResults.html">TrustedResults</a> for the rules.</p><div class="section">
 <h4 id="usage-1">Usage<a class="anchor" aria-label="anchor" href="#usage-1"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">retain_agent</span><span class="op">(</span><span class="va">agent</span>, <span class="va">usage_limits</span>, max_runs <span class="op">=</span> <span class="fl">32L</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
@@ -402,7 +414,9 @@ running fails. An agent waiting on its own delegate still counts toward
 <p>Each agent keeps its own permissions, and each of its tool calls is also
 checked against the current permissions of every agent above it, so an
 agent in read-only or plan mode can use its route tools and its
-delegates are held to that mode too.</p><div class="section">
+delegates are held to that mode too. With a <a href="TrustedResults.html">TrustedResults</a> policy on
+this agent, every agent in the graph must pass it before any route is
+added, and their trusted results reach this agent's <code>on_result</code>.</p><div class="section">
 <h4 id="usage-2">Usage<a class="anchor" aria-label="anchor" href="#usage-2"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">retain_agent_graph</span><span class="op">(</span></span>
 <span>  <span class="va">agents</span>,</span>
@@ -563,10 +577,12 @@ was idle.</p>
 <h3 id="agent-release-agent-"><code>Agent$release_agent()</code><a class="anchor" aria-label="anchor" href="#agent-release-agent-"></a></h3>
 <p>Stop retaining an agent so it can be used on its own again. This also
 discards its delegation records, so save them first with
-<code>$export_subagents()</code> if you need them. Its tools and connections stay
-open. Errors while the agent is running: cancel it with <code>$cancel_agent()</code>
-and wait for the task to end first. Agents in a graph are released with
-<code>$release_agent_graph()</code>. Handles don't survive an R restart.</p><div class="section">
+<code>$export_subagents()</code> if you need them, and removes the tools made for
+it with <code><a href="delegation_tool.html">delegation_tool()</a></code> from this agent. Its own tools and
+connections stay open. Errors while the agent is running: cancel it with
+<code>$cancel_agent()</code> and wait for the task to end first. Agents in a graph
+are released with <code>$release_agent_graph()</code>. Handles don't survive an R
+restart.</p><div class="section">
 <h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">release_agent</span><span class="op">(</span><span class="va">handle</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
@@ -769,7 +785,10 @@ empty list.</p></dd>
       <dt><code>transcript</code></dt>
 <dd><p>If <code>TRUE</code>, also include the conversation, as
 <code>transcript</code> records and as ellmer <code>turns</code>. Hidden reasoning and raw
-provider data are left out.</p></dd>
+provider data are left out. A tool result keeps the card it showed in
+shinychat (its <code>display</code>, such as a Commons table or plot) and the
+Commons provenance tag, within fixed sizes; anything else stored with
+the result is left out, and the transcript record names what was.</p></dd>
 
 
 </dl><p></p></div>
@@ -1262,16 +1281,18 @@ compaction come back as text.</p>
 <p></p><hr><a id="method-Agent-add_turn"></a><div class="section">
 <h3 id="agent-add-turn-"><code>Agent$add_turn()</code><a class="anchor" aria-label="anchor" href="#agent-add-turn-"></a></h3>
 <p>Add a user turn and an assistant turn, as ellmer's
-<code>$add_turn()</code> does.</p><div class="section">
+<code>$add_turn()</code> does. Subagent tool calls shown in them, as
+<code>$get_turns()</code> returns them, stay in the conversation but are not sent
+to the model.</p><div class="section">
 <h4 id="usage-29">Usage<a class="anchor" aria-label="anchor" href="#usage-29"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">add_turn</span><span class="op">(</span><span class="va">user</span>, <span class="va">assistant</span>, log_tokens <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-24">Arguments<a class="anchor" aria-label="anchor" href="#arguments-24"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>user</code></dt>
-<dd><p>User turn or content.</p></dd>
+<dd><p>A user turn.</p></dd>
 
       <dt><code>assistant</code></dt>
-<dd><p>Assistant turn or content.</p></dd>
+<dd><p>An assistant turn.</p></dd>
 
       <dt><code>log_tokens</code></dt>
 <dd><p>Passed to ellmer's <code>$add_turn()</code>.</p></dd>
@@ -1291,7 +1312,12 @@ compaction come back as text.</p>
 does. Unlike <code>$get_context_turns()</code>, this includes turns that
 compaction removed from the model context, and the original tool
 results that <code>$microcompact()</code> cleared. Removed turns stay in memory
-until <code>$set_turns()</code> replaces the conversation.</p><div class="section">
+until <code>$set_turns()</code> replaces the conversation. When
+<code><a href="subagent_chat_activity.html">subagent_chat_activity()</a></code> shows subagent tool calls in this
+conversation, they are included here too, after the contents of the
+reply that delegated them; the model never sees them. A tool error is
+returned as a plain condition with the same message, so the
+conversation can be saved and read back by shinychat's history.</p><div class="section">
 <h4 id="usage-30">Usage<a class="anchor" aria-label="anchor" href="#usage-30"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">get_turns</span><span class="op">(</span>include_system_prompt <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
@@ -1738,7 +1764,8 @@ same as <code>$get_turns()</code>.</p><div class="section">
 
 <p></p><hr><a id="method-Agent-last_turn"></a><div class="section">
 <h3 id="agent-last-turn-"><code>Agent$last_turn()</code><a class="anchor" aria-label="anchor" href="#agent-last-turn-"></a></h3>
-<p>Get the last turn in the conversation with a given role.</p><div class="section">
+<p>Get the last turn in the conversation with a given role. Subagent tool
+calls shown in it are included, as <code>$get_turns()</code> includes them.</p><div class="section">
 <h4 id="usage-52">Usage<a class="anchor" aria-label="anchor" href="#usage-52"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">last_turn</span><span class="op">(</span>role <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"assistant"</span>, <span class="st">"user"</span>, <span class="st">"system"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
@@ -1893,7 +1920,9 @@ restore.</p><div class="section">
 <p>The file holds the conversation (including turns removed by compaction),
 the system prompt and any compaction summary, copies of large tool
 results, the run context, file checkpoint state (when enabled) and some
-metadata, such as the time, Deputy version and provider. It doesn't hold
+metadata, such as the time, Deputy version and provider. Subagent tool
+calls shown by <code><a href="subagent_chat_activity.html">subagent_chat_activity()</a></code> are kept beside the
+conversation, never among the turns the model reads. It doesn't hold
 tools, permissions, hooks or the Chat itself.</p>
 </div><p></p><div class="section">
 <h4 id="returns-60">Returns<a class="anchor" aria-label="anchor" href="#returns-60"></a></h4>
@@ -1921,7 +1950,9 @@ you load into, not from the file. The saved <code>run_context</code> is merged i
 the agent's, and loading fails if they disagree on an ID field. Saved
 tool results and compaction summaries are restored under this agent's
 session ID. Files saved by early development versions of Deputy can't be
-loaded. Loading errors while a run is active.</p>
+loaded. Loading errors while a run is active. Subagent tool calls shown
+by <code><a href="subagent_chat_activity.html">subagent_chat_activity()</a></code> come back with the conversation they were
+saved with; those shown for the previous conversation are dropped.</p>
 </div><p></p><div class="section">
 <h4 id="returns-61">Returns<a class="anchor" aria-label="anchor" href="#returns-61"></a></h4>
 <p>The agent, invisibly.</p>

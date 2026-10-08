@@ -5,7 +5,9 @@ display, for example in
 [`subagent_chat_server()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md).
 Replaying never runs tools, calls a model or restores a chat. Access is
 checked again with `disclosure`; the IDs and scope stored in `history`
-grant nothing.
+grant nothing. Tool results get back the card they showed, after a check
+that the saved card holds only the fields and sizes an export can
+contain; a snapshot that fails the check is an error.
 
 ## Usage
 

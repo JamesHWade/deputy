@@ -394,6 +394,62 @@ failure, cancellation, revoked access and replayed history:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples"</span>, <span class="st">"subagent-chats"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
+<div class="section level2">
+<h2 id="subagent-tool-calls-in-the-main-chat">Subagent tool calls in the main chat<a class="anchor" aria-label="anchor" href="#subagent-tool-calls-in-the-main-chat"></a>
+</h2>
+<p><code><a href="../reference/subagent_chat_activity.html">subagent_chat_activity()</a></code> shows the tool calls a lead’s
+subagents make, with their results, in the lead’s own shinychat
+conversation. Each call appears as a tool card in the reply that
+delegated it, labelled with the subagent’s name, as it happens. A card
+looks as it did in the subagent’s chat, so a Commons table or plot still
+reads “Ran a trusted calculation”.</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">shinychat</span><span class="fu">::</span><span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server</a></span><span class="op">(</span><span class="st">"chat"</span>, <span class="va">lead</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="../reference/subagent_chat_activity.html">subagent_chat_activity</a></span><span class="op">(</span><span class="va">chat</span>, <span class="va">lead</span>, requester <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="fu">current_user</span><span class="op">(</span><span class="va">session</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p>The lead’s model still gets only each subagent’s summary; the cards
+are for the person reading the chat. They are part of the conversation
+shinychat saves, so reopening it shows them again, and nothing runs when
+it does. The same <code>delegation_disclosure</code> decides who sees
+them. A second delegation to the same subagent is numbered (“analyst
+#2”), and a subagent’s own subagents say whom they ran for (“reviewer
+(via analyst)”).</p>
+</div>
+<div class="section level2">
+<h2 id="saving-subagents-with-the-conversation">Saving subagents with the conversation<a class="anchor" aria-label="anchor" href="#saving-subagents-with-the-conversation"></a>
+</h2>
+<p><code><a href="../reference/subagent_chat_history.html">subagent_chat_history()</a></code> saves each conversation’s
+subagents with that conversation in shinychat’s history: their tasks,
+outcomes, conversations with tool results and cards, usage, and which
+subagent ran for which. Reopening the conversation, after a reload or in
+a new session, brings them back read-only. Nothing runs again, no
+subagent resumes, and the lead’s model doesn’t see them. Pass the result
+to <code><a href="../reference/subagent_chat_ui.html">subagent_chat_server()</a></code> as <code>conversation</code> and
+the panel shows the subagents of the conversation that is open, saved or
+live:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">user</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="fu">current_user</span><span class="op">(</span><span class="va">session</span><span class="op">)</span></span>
+<span>  <span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">shinychat</span><span class="fu">::</span><span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server</a></span><span class="op">(</span><span class="st">"chat"</span>, <span class="va">lead</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="../reference/subagent_chat_activity.html">subagent_chat_activity</a></span><span class="op">(</span><span class="va">chat</span>, <span class="va">lead</span>, requester <span class="op">=</span> <span class="va">user</span><span class="op">)</span></span>
+<span>  <span class="va">saved</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/subagent_chat_history.html">subagent_chat_history</a></span><span class="op">(</span><span class="va">chat</span>, <span class="va">lead</span>, requester <span class="op">=</span> <span class="va">user</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="../reference/subagent_chat_ui.html">subagent_chat_server</a></span><span class="op">(</span><span class="st">"subagents"</span>, <span class="va">lead</span>, requester <span class="op">=</span> <span class="va">user</span>, conversation <span class="op">=</span> <span class="va">saved</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p>Each conversation’s subagents are saved as one piece of JSON text, up
+to <code>max_bytes</code> (16 MiB by default) and within what your
+<code>delegation_disclosure</code> lets one reader see. A subagent that
+doesn’t fit is saved without its conversation, or not at all, and
+<code>saved$status()</code> says how many. Your
+<code>delegation_disclosure</code> is checked when records are saved and
+whenever they are read back; reading back, <code>authorize</code> gets a
+<code>scope</code> with the lead’s <code>delegation_scope</code> and the
+conversation’s ID as <code>chat_conversation_id</code>. Large results a
+subagent saved to disk are kept only as references, which may no longer
+resolve. Deputy learns which conversation a reply belongs to from
+<code>lead$conversation_id</code>, which shinychat sets before each
+reply; set it yourself if you start a subagent outside a reply.</p>
+</div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>

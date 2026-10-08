@@ -51,4 +51,7 @@ on another agent, is an error.
 The retained agent keeps its own permissions, and each of its tool calls
 is also checked against the owner's current permissions. An owner in
 read-only or plan mode can use the tool, and the retained agent is then
-held to that mode too.
+held to that mode too. An owner with a
+[TrustedResults](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+policy accepts the tool because the retained agent passed that policy
+when it was retained.

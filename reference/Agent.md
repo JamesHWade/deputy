@@ -35,6 +35,16 @@ would exceed the checkpoint size limits is refused.
 
   The agent's name, or `NULL`. Read-only.
 
+- `conversation_id`:
+
+  The host conversation the agent is answering in, or `NULL`.
+  shinychat's `chat_server()` sets it before each reply; set it yourself
+  before starting a run outside a reply. Each delegation keeps the value
+  it had when the delegation started, so
+  [`subagent_chat_history()`](https://jameshwade.github.io/deputy/reference/subagent_chat_history.md)
+  can save a conversation's subagents with it. It isn't sent to the
+  model.
+
 - `run_context`:
 
   The `run_context` attached to every run. Read-only.
@@ -410,6 +420,13 @@ observers can't be changed (observers it already has keep working). An
 agent can retain up to 32 others at a time. See
 [`vignette("retained-agents", package = "deputy")`](https://jameshwade.github.io/deputy/articles/retained-agents.md).
 
+If this agent has a
+[TrustedResults](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+policy, `agent`'s tools must pass it, and its trusted results reach this
+agent's `on_result`; see
+[TrustedResults](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+for the rules.
+
 #### Usage
 
     Agent$retain_agent(agent, usage_limits, max_runs = 32L)
@@ -451,7 +468,11 @@ running fails. An agent waiting on its own delegate still counts toward
 Each agent keeps its own permissions, and each of its tool calls is also
 checked against the current permissions of every agent above it, so an
 agent in read-only or plan mode can use its route tools and its
-delegates are held to that mode too.
+delegates are held to that mode too. With a
+[TrustedResults](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+policy on this agent, every agent in the graph must pass it before any
+route is added, and their trusted results reach this agent's
+`on_result`.
 
 #### Usage
 
@@ -632,11 +653,13 @@ idle.
 
 Stop retaining an agent so it can be used on its own again. This also
 discards its delegation records, so save them first with
-`$export_subagents()` if you need them. Its tools and connections stay
-open. Errors while the agent is running: cancel it with
-`$cancel_agent()` and wait for the task to end first. Agents in a graph
-are released with `$release_agent_graph()`. Handles don't survive an R
-restart.
+`$export_subagents()` if you need them, and removes the tools made for
+it with
+[`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
+from this agent. Its own tools and connections stay open. Errors while
+the agent is running: cancel it with `$cancel_agent()` and wait for the
+task to end first. Agents in a graph are released with
+`$release_agent_graph()`. Handles don't survive an R restart.
 
 #### Usage
 
@@ -863,7 +886,10 @@ the `delegation_disclosure` policy, which may redact it. Errors if
 
   If `TRUE`, also include the conversation, as `transcript` records and
   as ellmer `turns`. Hidden reasoning and raw provider data are left
-  out.
+  out. A tool result keeps the card it showed in shinychat (its
+  `display`, such as a Commons table or plot) and the Commons provenance
+  tag, within fixed sizes; anything else stored with the result is left
+  out, and the transcript record names what was.
 
 #### Returns
 
@@ -1420,6 +1446,8 @@ back as text.
 ### `Agent$add_turn()`
 
 Add a user turn and an assistant turn, as ellmer's `$add_turn()` does.
+Subagent tool calls shown in them, as `$get_turns()` returns them, stay
+in the conversation but are not sent to the model.
 
 #### Usage
 
@@ -1429,11 +1457,11 @@ Add a user turn and an assistant turn, as ellmer's `$add_turn()` does.
 
 - `user`:
 
-  User turn or content.
+  A user turn.
 
 - `assistant`:
 
-  Assistant turn or content.
+  An assistant turn.
 
 - `log_tokens`:
 
@@ -1451,7 +1479,13 @@ Get the whole conversation, as ellmer's `$get_turns()` does. Unlike
 `$get_context_turns()`, this includes turns that compaction removed from
 the model context, and the original tool results that `$microcompact()`
 cleared. Removed turns stay in memory until `$set_turns()` replaces the
-conversation.
+conversation. When
+[`subagent_chat_activity()`](https://jameshwade.github.io/deputy/reference/subagent_chat_activity.md)
+shows subagent tool calls in this conversation, they are included here
+too, after the contents of the reply that delegated them; the model
+never sees them. A tool error is returned as a plain condition with the
+same message, so the conversation can be saved and read back by
+shinychat's history.
 
 #### Usage
 
@@ -1940,7 +1974,8 @@ A list of ellmer turns.
 
 ### `Agent$last_turn()`
 
-Get the last turn in the conversation with a given role.
+Get the last turn in the conversation with a given role. Subagent tool
+calls shown in it are included, as `$get_turns()` includes them.
 
 #### Usage
 
@@ -2113,8 +2148,11 @@ restore.
 The file holds the conversation (including turns removed by compaction),
 the system prompt and any compaction summary, copies of large tool
 results, the run context, file checkpoint state (when enabled) and some
-metadata, such as the time, Deputy version and provider. It doesn't hold
-tools, permissions, hooks or the Chat itself.
+metadata, such as the time, Deputy version and provider. Subagent tool
+calls shown by
+[`subagent_chat_activity()`](https://jameshwade.github.io/deputy/reference/subagent_chat_activity.md)
+are kept beside the conversation, never among the turns the model reads.
+It doesn't hold tools, permissions, hooks or the Chat itself.
 
 #### Returns
 
@@ -2143,7 +2181,11 @@ you load into, not from the file. The saved `run_context` is merged into
 the agent's, and loading fails if they disagree on an ID field. Saved
 tool results and compaction summaries are restored under this agent's
 session ID. Files saved by early development versions of Deputy can't be
-loaded. Loading errors while a run is active.
+loaded. Loading errors while a run is active. Subagent tool calls shown
+by
+[`subagent_chat_activity()`](https://jameshwade.github.io/deputy/reference/subagent_chat_activity.md)
+come back with the conversation they were saved with; those shown for
+the previous conversation are dropped.
 
 #### Returns
 

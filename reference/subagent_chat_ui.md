@@ -2,9 +2,11 @@
 
 A read-only Shiny module to place next to your main chat. Cards list the
 agent's subagents; selecting one shows its conversation, with tool calls
-and attachments, and streams its current output. The panel has no input
-box and can't start, resume or approve work. It needs shiny, bslib,
-commonmark, xml2 and shinychat (\>= 0.5.0).
+and attachments, and streams its current output. A tool's card looks as
+it did in the subagent's own chat, with scripts, event handlers, forms
+and external resources removed from its HTML and its content kept inside
+the card. The panel has no input box and can't start, resume or approve
+work. It needs shiny, bslib, commonmark, xml2 and shinychat (\>= 0.5.0).
 
 ## Usage
 
@@ -19,7 +21,8 @@ subagent_chat_server(
   disclosure = NULL,
   scope = NULL,
   on_cancel = NULL,
-  poll_interval = 250L
+  poll_interval = 250L,
+  conversation = NULL
 )
 ```
 
@@ -71,6 +74,14 @@ subagent_chat_server(
 
   How often to check for updates, in milliseconds. At least 100;
   defaults to 250.
+
+- conversation:
+
+  Optional value returned by
+  [`subagent_chat_history()`](https://jameshwade.github.io/deputy/reference/subagent_chat_history.md)
+  for the lead's chat. The panel then shows the subagents of the
+  conversation open in that chat: those that ran in it, live, and those
+  saved with it, read-only.
 
 ## Value
 

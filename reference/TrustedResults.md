@@ -18,14 +18,18 @@ construction, in `$set_tools()` and `$register_tools()`, and when
 loading skills or MCP tools. The change errors, and the previous tools
 stay in place, if:
 
-- a trusted tool is missing;
+- a trusted tool given by name is missing, or a tool registered under a
+  trusted tool's name isn't the tool object given to the policy. A
+  trusted tool given as the tool object may be missing here, since it
+  can be registered in an agent this one retains instead;
 
 - a trusted tool is not a local function tool (for example, it is an MCP
   or provider tool), runs code, or delegates to another agent;
 
 - another tool runs model-supplied code or delegates (`run_r_code`,
-  `run_bash`, `install_package`, R session tools, delegation and graph
-  route tools), since it could produce any result;
+  `run_bash`, `install_package`, R session tools, and delegation and
+  graph route tools other than those described below), since it could
+  produce any result;
 
 - another tool isn't annotated with both `read_only_hint = TRUE` and
   `open_world_hint = FALSE`, or is annotated `destructive_hint = TRUE`,
@@ -51,8 +55,23 @@ trusted tool must be listed in its definition's `tools` or in
 [Skill](https://jameshwade.github.io/deputy/reference/Skill.md) values,
 not loaded from a skill directory. Subagent trusted results are recorded
 in the lead's run and passed to its `on_result`, with the subagent's
-IDs. Graph routes and other tools that compose agents are still
-rejected.
+IDs.
+
+An agent with a policy can also retain agents (`$retain_agent()`,
+[`adopt_chat()`](https://jameshwade.github.io/deputy/reference/adopt_chat.md),
+`$retain_agent_graph()`) and call them through
+[`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
+or graph routes. Each result type must then be given as the tool itself,
+so that only that tool object counts as its producer. A retained agent's
+tools are checked against the policy when it is retained and before each
+task, and must not change while it is retained; route tools are accepted
+only for agents that passed. Every trusted result from a retained agent
+or graph member reaches this agent's `on_result` once, with the
+producing agent's IDs. A retained agent's own policy still applies
+alongside: its results also reach its own `on_result`, a tool is exempt
+only if both policies exempt it, and a receipt is used if either asks
+for one. Releasing the agent restores its own policy. Delegated agents
+can't wait for durable approval.
 
 ## Usage
 
@@ -69,10 +88,13 @@ TrustedResults(
 
 - ...:
 
-  Named pairs `result_type = "tool_name"`. Result types must be unique,
-  start with a letter or number, and contain only letters, numbers,
-  dots, underscores and hyphens. Each tool may produce only one result
-  type.
+  Named pairs `result_type = "tool_name"`, or `result_type = tool` with
+  the ellmer tool itself, which then is the only tool object that may
+  produce that type. A tool given this way doesn't have to be registered
+  with the agent that has the policy; an agent it retains can hold it
+  instead. Result types must be unique, start with a letter or number,
+  and contain only letters, numbers, dots, underscores and hyphens. Each
+  tool may produce only one result type.
 
 - on_result:
 
@@ -114,6 +136,10 @@ A `TrustedResults` object. It is read-only; read fields with `$`.
 - `@results`:
 
   Named character vector mapping result types to tool names.
+
+- `@producers`:
+
+  Named list of the tools given for result types, by type.
 
 ## Examples
 

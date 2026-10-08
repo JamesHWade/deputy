@@ -2,6 +2,111 @@
 
 ## deputy (development version)
 
+- A conversation saved with shinychat’s history now reopens with every
+  turn. A failed tool call inside a Shiny session carries Shiny’s call
+  stacks, which shinychat’s file store can’t read back, so the turn
+  holding it was dropped when the conversation was reopened.
+  `$get_turns()` now returns tool errors as plain conditions with the
+  same message; the model still sees the error as it was raised
+  ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
+- New example `commons-subagents`: a Shiny app in which a root agent
+  asks Commons specialists concurrently, one of them asks another, their
+  tool calls and trusted measures appear in one conversation, and a
+  reopened conversation shows them again without running anything. It
+  runs against a local test server, with no API keys
+  ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
+- [`TrustedResults()`](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+  accepts the trusted tool itself, as in
+  `TrustedResults(forecast = get_forecast)`; only that tool object may
+  then produce the result, wherever it is registered. Each
+  `"trusted_result"` event now also carries `tool_fingerprint`, a digest
+  of the producing tool’s code, argument schema and metadata, not of a
+  call’s inputs
+  ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
+- An agent with a
+  [`TrustedResults()`](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+  policy can now retain agents (`$retain_agent()`,
+  [`adopt_chat()`](https://jameshwade.github.io/deputy/reference/adopt_chat.md),
+  `$retain_agent_graph()`) and call them through
+  [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
+  or graph routes. Each retained agent’s tools are checked against the
+  policy when it is retained and before every task, other tools that
+  delegate are still refused, and every trusted result from a retained
+  agent or graph member reaches the root’s `on_result` once, with the
+  producing agent’s IDs. A retained agent’s own policy applies
+  alongside, without weakening either, also to the graph members it asks
+  through its routes, and two retained agents can’t give one result type
+  different tools. The policy must give its trusted tools as tool
+  objects ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
+- `$release_agent()` now also removes the owner’s
+  [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
+  tools for the released agent, which could only fail once it was
+  released ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
+- New
+  [`subagent_chat_history()`](https://jameshwade.github.io/deputy/reference/subagent_chat_history.md)
+  saves the subagents of each conversation in a shinychat chat with that
+  conversation, through shinychat’s history, and brings them back
+  read-only when it is reopened: tasks, outcomes, conversations with
+  their tool results and cards, usage and which subagent ran for which.
+  Nothing runs again and no subagent resumes.
+  [`subagent_chat_server()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md)
+  gains `conversation`, which shows the open conversation’s subagents,
+  live or saved
+  ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
+- `Agent$conversation_id` holds the host conversation an agent is
+  answering in; shinychat’s
+  [`chat_server()`](https://posit-dev.github.io/shinychat/r/reference/chat_app.html)
+  sets it before each reply. Delegations record it, and
+  `$inspect_subagents()` reports it as `host_conversation_id`; the
+  summary a lead’s model reads leaves it out
+  ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
+- New
+  [`subagent_chat_activity()`](https://jameshwade.github.io/deputy/reference/subagent_chat_activity.md)
+  shows the tool calls a lead’s subagents make, with their results, in
+  the lead’s shinychat conversation as they happen. Each call is a tool
+  card in the reply that delegated it, labelled with the subagent’s
+  name, and looks as it did in the subagent’s chat. The cards are saved
+  with the conversation and shown again when it is reopened, without
+  running anything; the lead’s model still sees only each subagent’s
+  summary. `$get_turns()` includes the cards, `$get_context_turns()`
+  doesn’t, and `$set_turns()` and `$add_turn()` separate them again.
+  `$save_session()` keeps them beside the conversation and
+  `$load_session()` brings them back
+  ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
+- A tool call whose provider ID repeats an earlier call’s in the same
+  run, as with providers that number calls per response, now gets its
+  own `"tool_start"` event, and a delegation tool called that way runs.
+  Before, the later call was matched to the finished one: its start
+  event was dropped and a delegation failed with “Delegation tools
+  require their owner’s active governed run”. Agents with an
+  `approval_dir` still refuse a repeated ID within one run, since their
+  saved effects are kept by tool-call ID
+  ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
+- Subagent tool results keep the card they showed in shinychat.
+  Inspection, `$observe_subagents()`, `$export_subagents()` and
+  [`delegation_history()`](https://jameshwade.github.io/deputy/reference/delegation_history.md)
+  used to drop everything stored with a tool result, so a Commons table,
+  plot or “Ran a trusted calculation” card, and its provenance tag,
+  disappeared from the child panel and from saved history. They now keep
+  the result’s `display` fields and Commons’ `commons_tag`, within fixed
+  sizes; other stored data is still left out and named in the record.
+  [`delegation_history()`](https://jameshwade.github.io/deputy/reference/delegation_history.md)
+  checks a saved card before showing it, and
+  [`subagent_chat_server()`](https://jameshwade.github.io/deputy/reference/subagent_chat_ui.md)
+  removes scripts, event handlers, forms, external resources and
+  `data-*` attributes from a card’s HTML and Markdown and keeps what is
+  left inside the card
+  ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
 - Tools with an
   [`ellmer::type_ignore()`](https://ellmer.tidyverse.org/reference/type_boolean.html)
   argument can be registered on an agent. Registration used to fail with

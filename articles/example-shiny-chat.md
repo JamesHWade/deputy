@@ -132,6 +132,12 @@ The package includes the app with the compaction notice:
 shiny::runApp(system.file("examples", "shiny-chat", package = "deputy"))
 ```
 
-For apps that show subagent conversations beside the main chat, see
-[Briefing and inspecting
-subagents](https://jameshwade.github.io/deputy/articles/delegation.html#a-subagent-panel-for-shiny).
+To show the tool calls a lead’s subagents make in the main chat, as they
+happen, see [Subagent tool calls in the main
+chat](https://jameshwade.github.io/deputy/articles/delegation.html#subagent-tool-calls-in-the-main-chat),
+and to keep each conversation’s subagents with it, so they come back
+when it is reopened, see [Saving subagents with the
+conversation](https://jameshwade.github.io/deputy/articles/delegation.html#saving-subagents-with-the-conversation).
+For a panel of subagent conversations beside the chat, see [A subagent
+panel for
+Shiny](https://jameshwade.github.io/deputy/articles/delegation.html#a-subagent-panel-for-shiny).

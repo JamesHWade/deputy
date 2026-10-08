@@ -333,10 +333,88 @@ in a `Skill` value. A child’s trusted result reaches the lead’s
 `on_result`, tagged with the child’s delegation ID. Children cannot
 delegate further.
 
-Delegated children cannot pause for durable approval. To review a
-trusted tool’s inputs before it runs, let the lead or a child propose
-the inputs, then run the trusted tool in a separate executor agent that
-uses the review flow above. The `trusted-mini-agent` example does this.
+### Retained agents and delegation graphs
+
+An agent with a policy can also keep specialists, with
+`$retain_agent()`,
+[`adopt_chat()`](https://jameshwade.github.io/deputy/reference/adopt_chat.md)
+or `$retain_agent_graph()`, and call them through
+[`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
+or graph routes. Give the policy the trusted tool itself rather than its
+name, so that only that exact tool object counts as the producer,
+wherever it is registered:
+
+``` r
+
+root <- Agent$new(
+  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  trusted_results = TrustedResults(
+    forecast = get_forecast,
+    on_result = function(event) print(event$value)
+  )
+)
+forecaster <- Agent$new(
+  ellmer::chat("openai/gpt-6-luna"),
+  tools = list(get_forecast, list_cities),
+  agent_name = "forecaster"
+)
+handle <- root$retain_agent(forecaster, UsageLimits(max_requests = 10))
+root$register_tool(delegation_tool(
+  root,
+  handle,
+  "ask_forecaster",
+  "Ask the forecaster for a forecast.",
+  UsageLimits(max_requests = 4)
+))
+```
+
+Retaining an agent checks all its tools against the policy first, and
+fails if any could get around the trusted tool: code execution,
+delegation, anything that may write or reach the open world, or another
+tool under the trusted tool’s name. While retained, the agent can’t
+change its tools, and the check runs again before each task. A route
+tool is accepted only when Deputy made it for this agent and its target
+passed the check, so other tools that delegate are still rejected. A
+graph is checked the same way, member by member, before any route is
+added.
+
+Each trusted result from a retained agent, or from any agent in the
+graph, reaches the root’s `on_result` exactly once, as soon as the tool
+returns and before that agent’s model sees anything. The event carries
+the producing agent’s `agent_id`, `session_id`, `run_id`,
+`delegation_id` and `tool_call_id`, the `parent_agent_id` that delegated
+to it, and a `tool_fingerprint` identifying the trusted tool’s code,
+argument schema and metadata (it is the same for every call, whatever
+the inputs). With `model_receipt = TRUE`, the retained agent’s model
+gets the receipt instead of the value.
+
+A retained agent may have a policy of its own. Both apply while it is
+retained: its results reach its own `on_result` too, a tool is exempt
+only if both policies exempt it, and a receipt is used if either policy
+asks for one. The two can’t name different tools for the same kind of
+result, and neither can two retained agents. In a graph, a member’s own
+policy also covers the members it asks through its routes, for as long
+as each task it gives them runs. Releasing the agent gives it back its
+own policy and removes the tools you made for it with
+[`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md).
+
+Commons chats can be retained this way, but not as they come. Their
+`run_sql` and `run_r` tools compute anything the model asks for, so they
+would get around a trusted measure; remove them. Commons doesn’t mark
+its other tools as closed-world, so set `open_world_hint = FALSE` on the
+ones you keep after checking that they don’t reach outside the data you
+gave Commons, and name `call_measure` as the trusted tool. Each Commons
+chat makes its own `call_measure`, so for one producer across several
+specialists, take the tools from one Commons chat and give the same list
+to each with `$set_tools()`. The `commons-subagents` example, in
+`system.file("examples/commons-subagents", package = "deputy")`, sets
+this up for three specialists in a Shiny app.
+
+Delegated children cannot pause for durable approval, whether they come
+from a definition, a retained agent or a graph. To review a trusted
+tool’s inputs before it runs, let the lead or a child propose the
+inputs, then run the trusted tool in a separate executor agent that uses
+the review flow above. The `trusted-mini-agent` example does this.
 
 ## What this does not guarantee
 
