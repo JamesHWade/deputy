@@ -174,8 +174,19 @@ activity_remap <- function(overlay, kept, offset) {
 # one saying so in the payload, since nothing settles it once the payload is
 # loaded; the live conversation keeps waiting for the call.
 activity_saved_entries <- function(agent) {
-  activity_poll(agent, final = TRUE)
-  overlay <- agent$.__enclos_env__$private$.activity_overlay
+  private <- agent$.__enclos_env__$private
+  state <- private$.activity
+  # Only the reply this presenter is streaming is read again. After
+  # `run_sync()`, a text stream or a finished reply, the run's calls were
+  # never shown here.
+  if (
+    !is.null(state) &&
+      isTRUE(private$run_active) &&
+      identical(state$stream_run, private$current_run_id)
+  ) {
+    activity_poll(agent, final = TRUE, presenter = state)
+  }
+  overlay <- private$.activity_overlay
   for (open in activity_open_entries(agent)) {
     overlay[[length(overlay) + 1L]] <- list(
       turn = open$turn,
@@ -246,6 +257,8 @@ new_activity_presenter <- function(requester, interval) {
   state$queue <- list()
   state$delegations <- list()
   state$run_id <- NULL
+  # The run of the reply this presenter streams.
+  state$stream_run <- NULL
   state$calls <- 0L
   state$limited <- FALSE
   state$error <- NULL
@@ -1234,6 +1247,8 @@ activity_stream <- coro::async_generator(function(agent, inner, presenter) {
         inner(),
         error = function(error) promises::promise_reject(error)
       )
+      # The reply has started its run by now.
+      presenter$stream_run <- agent$.__enclos_env__$private$current_run_id
       activity_watch(slot, next_value)
       waiting <- TRUE
     }
