@@ -742,6 +742,7 @@ subagent_history_save <- function(state, values) {
       state$kept <- NULL
       state$conversation_id <- id
       state$error <- NULL
+      state$error_scope <- NULL
       envelope
     },
     error = function(error) {
@@ -756,6 +757,12 @@ subagent_history_save <- function(state, values) {
         state$kept <- NULL
       }
       state$error <- inspection_text(conditionMessage(error), 1024L)
+      # The message may hold a redactor's own text, so it is reported only
+      # under the scope it was made in.
+      state$error_scope <- tryCatch(
+        subagent_history_scope(state$lead, id),
+        error = function(error) NULL
+      )
       previous
     }
   )
@@ -783,10 +790,12 @@ subagent_history_restore <- function(state, values) {
   state$envelope <- NULL
   state$kept <- NULL
   state$error <- NULL
+  state$error_scope <- NULL
   saved <- values$deputy_subagents
   if (is.null(saved) || is.null(id)) {
     return(invisible(NULL))
   }
+  state$error_scope <- subagent_history_scope(state$lead, id)
   if (subagent_history_newer(saved)) {
     state$kept <- saved
     state$error <- paste(
@@ -952,7 +961,9 @@ subagent_history_status <- function(state) {
     ),
     error = if (!allowed) {
       "This conversation's saved subagents are not available to this user."
-    } else if (current) {
+    } else if (current && identical(state$error_scope, scope)) {
+      # A problem met under another scope (the lead has moved since) isn't
+      # this one's to report.
       state$error
     }
   )
@@ -1197,6 +1208,7 @@ subagent_chat_history <- function(
   state$envelope <- NULL
   state$kept <- NULL
   state$error <- NULL
+  state$error_scope <- NULL
   chat$history$on_save(function(values) subagent_history_save(state, values))
   chat$history$on_restore(function(values) {
     subagent_history_restore(state, values)

@@ -1185,6 +1185,23 @@ test_that("a saved child is chosen without reading live records", {
   expect_identical(subagent_history_view_id(shown[[1L]]), id)
 })
 
+test_that("a save error is reported only under the scope it was met in", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  private <- lead$.__enclos_env__$private
+  private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    redact = function(view, requester) stop("old scope detail")
+  )
+  state <- history_state(lead, "conv-a")
+  subagent_history_save(state, list())
+  expect_match(subagent_history_status(state)$error, "old scope detail")
+  # The lead moves to another scope before the next save.
+  private$delegation_scope <- list(owner_id = "u2")
+  expect_null(subagent_history_status(state)$error)
+})
+
 test_that("a tightened bound is searched, not tried one child at a time", {
   counter <- new.env()
   counter$calls <- 0L
