@@ -133,6 +133,8 @@ history_session <- function(lead, store, body, panel = FALSE) {
   skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   skip_if_not_installed("bslib")
+  skip_if_not_installed("commonmark")
+  skip_if_not_installed("xml2")
   shiny::testServer(
     function(input, output, session) {
       chat <- shinychat::chat_server(
@@ -1693,6 +1695,8 @@ test_that("subagent_chat_history() checks its arguments", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   skip_if_not_installed("bslib")
+  skip_if_not_installed("commonmark")
+  skip_if_not_installed("xml2")
   lead <- Agent$new(
     ellmer::chat_openai(credentials = function() "x", echo = "none"),
     delegation_disclosure = history_disclosure()
