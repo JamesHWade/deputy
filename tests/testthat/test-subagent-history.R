@@ -1541,6 +1541,26 @@ test_that("a resave redacts saved references as replay marks them", {
   expect_null(reference$locator)
 })
 
+test_that("a transcript the current redactor removes is marked on restore", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  state <- history_state(lead, "conv-a")
+  subagent_history_save(state, list())
+  # The policy changes after the save: transcripts are no longer shown.
+  lead$.__enclos_env__$private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    redact = function(view, requester) {
+      view$transcript <- NULL
+      view
+    }
+  )
+  views <- subagent_history_restored(state)
+  expect_length(views, 1L)
+  expect_length(views[[1L]]$turns, 0L)
+  expect_identical(views[[1L]]$retention$transcript, "omitted")
+})
+
 test_that("a save without live access doesn't depend on live subagents", {
   counter <- new.env()
   counter$calls <- 0L
