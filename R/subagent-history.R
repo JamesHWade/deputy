@@ -59,7 +59,14 @@ history_encode_double <- function(value) {
   if (is.infinite(value)) {
     return(if (value > 0) "Inf" else "-Inf")
   }
-  sprintf("%.17g", value)
+  # The C library writes the decimal point of LC_NUMERIC, which a host may
+  # have changed; saved records always use ".". `%g` adds no grouping.
+  text <- sprintf("%.17g", value)
+  point <- Sys.localeconv()[["decimal_point"]]
+  if (nzchar(point) && !identical(point, ".")) {
+    text <- sub(point, ".", text, fixed = TRUE)
+  }
+  text
 }
 
 history_encode <- function(x, depth = 0L) {
