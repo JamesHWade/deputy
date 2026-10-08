@@ -245,6 +245,21 @@ test_that("saved records round-trip exactly through JSON stores", {
   expect_identical(history_parse(back$data), x)
 })
 
+test_that("saved numbers read back under a comma decimal locale", {
+  old <- Sys.getlocale("LC_NUMERIC")
+  withr::defer(suppressWarnings(Sys.setlocale("LC_NUMERIC", old)))
+  set <- suppressWarnings(Sys.setlocale("LC_NUMERIC", "de_DE.UTF-8"))
+  skip_if_not(nzchar(set), "No German locale is installed.")
+  skip_if_not(identical(sprintf("%.1f", 1.5), "1,5"), "printf ignores it.")
+  x <- list(
+    b = c(1.5, 0.1, -2.25e-300, 1e300, 123456789.125),
+    z = complex(real = 0.5, imaginary = -1.25)
+  )
+  text <- history_json(x)
+  expect_no_match(text, ",5\"", fixed = TRUE)
+  expect_identical(history_parse(text), x)
+})
+
 test_that("decoding builds only portable data", {
   bad <- c(
     '{"t":"closure","v":[]}',

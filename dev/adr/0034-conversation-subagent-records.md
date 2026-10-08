@@ -54,7 +54,8 @@ back from storage Deputy doesn't control.
   `conversation_id`, `data`). The codec covers exactly the portable data
   inspection allows (NULL, logical, integer, double, complex, character, raw,
   lists, pairlists, and names/dim/dimnames), with doubles (and each part of a
-  complex number) as `%.17g` text, NA, NaN and infinities spelled out, and raw
+  complex number) as `%.17g` text with a `.` decimal point whatever
+  `LC_NUMERIC` is, NA, NaN and infinities spelled out, and raw
   vectors as base64, so a round trip is exact. Decoding builds only those
   types; it never uses `unserialize()` or `jsonlite::unserializeJSON()`, which
   can load namespaces or construct closures from stored text.
