@@ -261,9 +261,14 @@ test_that("saved numbers read back under a comma decimal locale", {
 })
 
 test_that("finite doubles are saved as their bits", {
+  # Literals like 1e300 parse to different bits on arm64, so the bits checked
+  # are of values every platform reads exactly.
+  expect_identical(
+    history_json(list(b = c(1.5, -2))),
+    '{"t":"list","v":[{"t":"dbl","v":["0x3ff8000000000000","0xc000000000000000"]}],"n":["b"]}'
+  )
   x <- list(b = c(1e300, 0.1, -2.25e-300, 5e-324))
   text <- history_json(x)
-  expect_match(text, "\"0x7e37e43c8800759c\"", fixed = TRUE)
   expect_no_match(text, "e+300", fixed = TRUE)
   expect_identical(history_parse(text), x)
   # Version 1 records saved decimal text, which still reads.
