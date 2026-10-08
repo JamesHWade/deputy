@@ -1739,7 +1739,49 @@ test_that("a saved session gives a card still waiting a result", {
   expect_match(contents[[3L]]@value, "saved before this call returned")
 })
 
-test_that("a save takes the results a reply hasn't shown yet", {
+test_that("a save during a reply takes the results it hasn't shown yet", {
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  path <- withr::local_tempfile(fileext = ".rds")
+  # Saved once the subagent has finished, before the reply shows its result.
+  root$add_hook(HookMatcher("PostToolUse", function(tool_name, ...) {
+    if (identical(tool_name, "ask_sales")) {
+      suppressMessages(root$save_session(path))
+    }
+    HookResultPostToolUse()
+  }))
+  # Too long an interval for the reply to look for calls while it waits.
+  activity_enable(root, function() "viewer", 30)
+  seen <- activity_collect(root, "Sales?")
+  saved <- Filter(
+    function(entry) inherits(entry$content, "ellmer::ContentToolResult"),
+    readRDS(path)$activity
+  )
+  expect_length(saved, 1L)
+  expect_identical(saved[[1L]]$content@request@name, "call_measure")
+  expect_null(saved[[1L]]$content@error)
+  expect_no_match(
+    paste(format(saved[[1L]]$content@value), collapse = "\n"),
+    "Not completed"
+  )
+  # The reply shows the same result.
+  shown <- Filter(
+    function(content) inherits(content, "ellmer::ContentToolResult"),
+    activity_items(seen)
+  )
+  expect_length(shown, 1L)
+  expect_identical(shown[[1L]], saved[[1L]]$content)
+})
+
+test_that("a save doesn't show calls from a reply the presenter didn't stream", {
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
     runtime_reply("Lead done.")
@@ -1751,37 +1793,14 @@ test_that("a save takes the results a reply hasn't shown yet", {
   sales <- activity_specialist("sales", "60")
   activity_retain(root, sales$agent, "ask_sales")
   root$run_sync("Sales?")
-  private <- root$.__enclos_env__$private
-  id <- names(private$subagent_runs)[[1L]]
-  turns <- private$subagent_runs[[id]]$turns
-  completed_at <- private$subagent_runs[[id]]$completed_at
-  # Shown while the call was running.
-  private$subagent_runs[[id]]$turns <- turns[-3L]
-  private$subagent_runs[[id]]$completed_at <- as.POSIXct(NA_real_, tz = "UTC")
-  activity_enable(root, function() "viewer")
-  activity_poll(root)
-  shown <- activity_take(root)
-  expect_length(shown, 1L)
-  # The call returns, and the subagent finishes, before the next poll.
-  private$subagent_runs[[id]]$turns <- turns
-  private$subagent_runs[[id]]$completed_at <- completed_at
+  # Shown in a chat only after that reply finished.
+  activity_enable(root, function() "viewer", 0.05)
   path <- withr::local_tempfile(fileext = ".rds")
   suppressMessages(root$save_session(path))
-  saved <- Filter(
-    function(entry) inherits(entry$content, "ellmer::ContentToolResult"),
-    readRDS(path)$activity
-  )
-  expect_length(saved, 1L)
-  expect_identical(saved[[1L]]$content@request@id, shown[[1L]]@id)
-  expect_null(saved[[1L]]$content@error)
-  expect_no_match(
-    paste(format(saved[[1L]]$content@value), collapse = "\n"),
-    "Not completed"
-  )
-  # The reply streaming now shows the same result.
-  live <- activity_take(root)
-  expect_length(live, 1L)
-  expect_identical(live[[1L]], saved[[1L]]$content)
+  expect_null(readRDS(path)$activity)
+  expect_length(root$.__enclos_env__$private$.activity_overlay, 0L)
+  # So the next reply has none of them to show.
+  expect_length(activity_take(root), 0L)
 })
 
 test_that("shown activity is kept across a durable approval", {
