@@ -53,12 +53,15 @@ back from storage Deputy doesn't control.
   string inside a versioned envelope (`format`, `version`, `codec`,
   `conversation_id`, `data`). The codec covers exactly the portable data
   inspection allows (NULL, logical, integer, double, complex, character, raw,
-  lists, pairlists, and names/dim/dimnames), with doubles (and each part of a
-  complex number) as `%.17g` text with a `.` decimal point whatever
-  `LC_NUMERIC` is, NA, NaN and infinities spelled out, strings that aren't
+  lists, pairlists, and names/dim/dimnames), with finite doubles (and each
+  part of a complex number) as their IEEE 754 bits in hex, NA, NaN and
+  infinities spelled out, strings that aren't
   valid UTF-8 (marked "bytes", or invalid bytes under another mark) as
   base64 of their bytes with their mark, and raw vectors as base64, so a
-  round trip is exact. Decoding builds only those
+  round trip is exact. Version 1 saved finite doubles as `%.17g` decimal
+  text, which reads back exactly only where R parses numbers with extended
+  precision: on arm64 macOS, 1e300 came back a different number. Version 2
+  saves the bits and still reads version 1. Decoding builds only those
   types; it never uses `unserialize()` or `jsonlite::unserializeJSON()`, which
   can load namespaces or construct closures from stored text.
 - **Restore validates everything and runs nothing.** The envelope, the decoded

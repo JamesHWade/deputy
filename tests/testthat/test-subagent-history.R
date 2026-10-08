@@ -260,6 +260,29 @@ test_that("saved numbers read back under a comma decimal locale", {
   expect_identical(history_parse(text), x)
 })
 
+test_that("finite doubles are saved as their bits", {
+  # Literals like 1e300 parse to different bits on arm64, so the bits checked
+  # are of values every platform reads exactly.
+  expect_identical(
+    history_json(list(b = c(1.5, -2))),
+    '{"t":"list","v":[{"t":"dbl","v":["0x3ff8000000000000","0xc000000000000000"]}],"n":["b"]}'
+  )
+  x <- list(b = c(1e300, 0.1, -2.25e-300, 5e-324))
+  text <- history_json(x)
+  expect_no_match(text, "e+300", fixed = TRUE)
+  expect_identical(history_parse(text), x)
+  # Version 1 records saved decimal text, which still reads.
+  decimal <- '{"t":"list","v":[{"t":"dbl","v":["1.5","-0.25","1000"]}],"n":["b"]}'
+  expect_identical(history_parse(decimal), list(b = c(1.5, -0.25, 1000)))
+  # Bits saved for a finite value must be one.
+  for (bits in c("0x7ff0000000000000", "0x7ff8000000000000", "0x7FF0")) {
+    expect_error(
+      history_parse(sprintf('{"t":"dbl","v":["%s"]}', bits)),
+      "not in a readable form"
+    )
+  }
+})
+
 test_that("strings that aren't UTF-8 keep their bytes and mark", {
   bytes <- rawToChar(as.raw(c(0x61, 0xff, 0x62)))
   Encoding(bytes) <- "bytes"
@@ -365,7 +388,7 @@ test_that("subagent records are saved with the conversation and restored read-on
   expect_identical(counter$calls, 1L)
   saved <- store$saved[[conversation]]$values$deputy_subagents
   expect_identical(saved$format, "deputy_conversation_subagents")
-  expect_identical(saved$version, 1L)
+  expect_identical(saved$version, 2L)
   expect_identical(saved$conversation_id, conversation)
   expect_type(saved$data, "character")
 
@@ -845,6 +868,11 @@ test_that("saved records that fail their checks are not read", {
     fresh
   }
   expect_length(reread(saved)$record$history$children, 1L)
+  # Records saved as version 1 still read.
+  expect_length(
+    reread(within(saved, version <- 1L))$record$history$children,
+    1L
+  )
 
   tampered <- function(change) {
     copy <- record
@@ -869,6 +897,7 @@ test_that("saved records that fail their checks are not read", {
     })),
     text = reread(within(saved, data <- "not json")),
     codec = reread(within(saved, codec <- "rds")),
+    version = reread(within(saved, version <- 0L)),
     keys = reread(tampered(function(x) {
       x$keys <- c(x$keys, x$keys)
       x
@@ -899,7 +928,7 @@ test_that("records from a newer format are kept unchanged", {
   state <- history_state(lead, "conv-a")
   newer <- list(
     format = "deputy_conversation_subagents",
-    version = 2L,
+    version = subagent_history_version + 1L,
     data = "{}"
   )
   subagent_history_restore(state, list(deputy_subagents = newer))

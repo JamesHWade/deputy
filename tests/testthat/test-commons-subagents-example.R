@@ -20,7 +20,7 @@ commons_example_environment <- function() {
 }
 
 commons_example_skip <- function() {
-  skip_if_not_installed("commons")
+  skip_if_commons_refuses()
   skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")
   skip_if_not(capabilities("png"), "PNG graphics are unavailable")

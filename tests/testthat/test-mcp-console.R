@@ -356,23 +356,28 @@ test_that("timeout_ms is capped and long work is polled, not resubmitted", {
   )
   expect_identical(timeouts, c("2500", "2500", "100"))
 
+  # The cap answers after 2.5 s; waiting for the work would take 8. The bound
+  # leaves room for a loaded runner, which has taken 3.9 s to answer.
   started <- Sys.time()
   expect_console(
-    mcp_test_await(send(r = "work 4"), timeout = 30),
+    mcp_test_await(send(r = "work 8"), timeout = 30),
     "[running; poll with an empty send]",
     fixed = TRUE
   )
-  expect_lt(as.numeric(difftime(Sys.time(), started, units = "secs")), 3.5)
-  expect_console(
-    mcp_test_await(send(), timeout = 30),
-    "work finished\n[done]",
-    fixed = TRUE
-  )
+  expect_lt(as.numeric(difftime(Sys.time(), started, units = "secs")), 6)
+  calls <- length(mcp_console_log(fixture, "call "))
+  for (poll in 1:10) {
+    polled <- mcp_test_await(send(), timeout = 30)
+    if (!grepl("[running; poll with an empty send]", polled, fixed = TRUE)) {
+      break
+    }
+  }
+  expect_console(polled, "work finished\n[done]", fixed = TRUE)
   expect_identical(connection$status()$state, "idle")
-  expect_console(
-    tail(mcp_console_log(fixture, "call "), 1L),
-    "\\{\"timeout_ms\":2500\\}$"
-  )
+  # Every poll is an empty send at the cap; the cell is not sent again.
+  polls <- utils::tail(mcp_console_log(fixture, "call "), -calls)
+  expect_gte(length(polls), 1L)
+  expect_match(polls, "\\{\"timeout_ms\":2500\\}$")
 })
 
 test_that("interrupt and restart map onto send control", {
@@ -429,7 +434,9 @@ test_that("a restart that outlasts the response window is reported, not hidden",
   connection <- mcp_console_connection(
     agent,
     fixture$command,
-    env = c(console_bare, DEPUTY_CONSOLE_FIXTURE_RESTART = "6")
+    # mcptools waits for 20 polls 0.2 s apart, which a loaded runner has
+    # stretched past 6 s; a 15 s restart stays outside that window.
+    env = c(console_bare, DEPUTY_CONSOLE_FIXTURE_RESTART = "15")
   )
   withr::defer(connection$close())
   send <- connection$tools()$send

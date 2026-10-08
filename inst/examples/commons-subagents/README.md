@@ -19,6 +19,11 @@ commonmark and xml2. A local OpenAI-compatible test server runs in a separate R
 process and gives scripted replies, so there are no API keys or paid requests.
 Conversations are saved in R's temporary directory and last until R restarts.
 
+commons builds a chat only where it can sandbox its R tool: macOS, or Linux
+with seccomp and either Landlock or unprivileged user namespaces. Elsewhere,
+Windows included, commons stops with an error when the app starts, even though
+the app's specialists don't keep that tool.
+
 ## What to try
 
 * "Report revenue by region and on-time delivery." The root asks sales and
