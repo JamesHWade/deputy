@@ -104,7 +104,7 @@ runtime_wrap_tool <- function(
     fun = wrapper,
     name = source_tool@name,
     description = source_tool@description,
-    arguments = source_tool@arguments@properties,
+    arguments = runtime_tool_arguments(source_tool),
     convert = source_tool@convert,
     annotations = source_tool@annotations
   )
@@ -115,6 +115,16 @@ runtime_wrap_tool <- function(
     attr(wrapped, "deputy_internal_tool") <- internal_tool
   }
   wrapped
+}
+
+# ellmer drops `type_ignore()` arguments from a tool's schema, but the wrapper
+# keeps the source function's formals. Declare those formals ignored again so
+# the rebuilt tool has the same schema and the model still never supplies them.
+runtime_tool_arguments <- function(tool) {
+  arguments <- tool@arguments@properties
+  ignored <- setdiff(names(formals(tool)), c(names(arguments), "..."))
+  arguments[ignored] <- rep(list(ellmer::type_ignore()), length(ignored))
+  arguments
 }
 
 resolve_runtime_tool_arguments <- function(tool_name, arguments, working_dir) {

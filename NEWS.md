@@ -1,5 +1,11 @@
 # deputy (development version)
 
+* Tools with an `ellmer::type_ignore()` argument can be registered on an
+  agent. Registration used to fail with "Names of `arguments` must match
+  formals of `fun`", which stopped `adopt_chat()` from adopting a Commons chat
+  with a single data source. The argument still isn't offered to the model,
+  and the tool receives its default (#238).
+
 * `ContextPolicy()` gains `estimator`. With the default `"auto"`, automatic
   compaction now runs when the provider cannot count tokens: it adds a
   conservative estimate of later content to the usage reported for the latest
