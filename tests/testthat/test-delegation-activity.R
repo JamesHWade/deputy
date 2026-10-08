@@ -393,6 +393,7 @@ test_that("moving to another Chat keeps shown activity on its own turn", {
 })
 
 test_that("concurrent specialists stream attributed activity with unique IDs", {
+  skip_if_not_installed("xml2")
   fixture <- activity_concurrent_root()
   root <- fixture$root
   counter <- new.env(parent = emptyenv())
@@ -874,6 +875,7 @@ test_that("viewers who may not see subagents get no activity", {
 
 test_that("activity renders as native shinychat tool cards", {
   skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("xml2")
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
     runtime_reply("Lead done.")
@@ -1802,6 +1804,8 @@ test_that("subagent_chat_activity() binds to the chat's own client", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
   skip_if_not_installed("bslib")
+  skip_if_not_installed("commonmark")
+  skip_if_not_installed("xml2")
   lead <- Agent$new(
     ellmer::chat_openai(credentials = function() "x", echo = "none"),
     delegation_disclosure = activity_disclosure()
