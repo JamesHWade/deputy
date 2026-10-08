@@ -44,7 +44,8 @@ producer's own label, not proof.
   everywhere: a tool of that name in the owner's registry, a LeadAgent
   owner's definitions or another retained agent's registry must be the same
   object, checked when the agent is retained and whenever the owner's
-  registry or definitions change while it is retained. Exemptions are
+  registry or definitions, or another retained agent's registry (a graph
+  member's routes included), change while it is retained. Exemptions are
   the intersection; a receipt applies if either
   asks. The combined policy is installed on the retained agent until release,
   which restores its own policy and removes the owner's `delegation_tool()`

@@ -1061,6 +1061,58 @@ test_that("a name designated along one chain is still checked along another", {
   expect_length(root$.__enclos_env__$private$owned_conversations, 0L)
 })
 
+test_that("a member's route can't take a name another member designates", {
+  measure <- routes_measure_tool()
+  audit <- ellmer::tool(
+    function() "audited",
+    name = "run_audit",
+    description = "Run the audit.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  route <- function(target) {
+    list(
+      target = target,
+      description = paste("Ask", target),
+      usage_limits = UsageLimits(max_requests = 1)
+    )
+  }
+  root <- routes_root(routes_offline_chat(), measure, routes_deliveries())
+  before <- names(root$get_tools())
+  sales <- Agent$new(routes_offline_chat(), tools = list(measure))
+  agents <- list(
+    auditor = Agent$new(
+      routes_offline_chat(),
+      tools = list(measure, audit),
+      trusted_results = TrustedResults(audit = audit)
+    ),
+    sales = sales,
+    helper = Agent$new(routes_offline_chat(), tools = list(measure))
+  )
+  expect_error(
+    root$retain_agent_graph(
+      agents = agents,
+      routes = list(
+        root = list(
+          ask_auditor = route("auditor"),
+          ask_sales = route("sales")
+        ),
+        sales = list(run_audit = route("helper"))
+      ),
+      usage_limits = UsageLimits(max_requests = 6),
+      max_depth = 2L,
+      max_delegations = 3L,
+      max_concurrency = 1L
+    ),
+    "same tool everywhere"
+  )
+  expect_identical(names(root$get_tools()), before)
+  expect_length(root$.__enclos_env__$private$owned_conversations, 0L)
+  expect_false("run_audit" %in% names(sales$get_tools()))
+})
+
 test_that("a member's route runs its target under the member's result types", {
   deliveries <- routes_deliveries()
   own <- list()
