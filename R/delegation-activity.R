@@ -729,6 +729,28 @@ activity_note <- function(agent, state, entry, runtime, root_call, kind, text) {
   )
 }
 
+# Once per reply, the note that more calls ran than are shown.
+activity_limit_note <- function(agent, state, entry, runtime, root_call) {
+  if (isTRUE(state$limited)) {
+    return(invisible(NULL))
+  }
+  activity_note(
+    agent,
+    state,
+    entry,
+    runtime,
+    root_call,
+    "limit",
+    paste0(
+      "More subagent tool calls ran in this reply than the ",
+      activity_max_calls,
+      " shown here. Their full history is in the subagent records."
+    )
+  )
+  state$limited <- TRUE
+  invisible(NULL)
+}
+
 # Bring the lead's view of its subagents' tool calls up to date. `final`
 # rereads every open delegation and settles calls that won't return once their
 # delegation has settled; `closing` does so for every open call, because the
@@ -931,19 +953,26 @@ activity_refresh <- function(
           state = state
         )
       }
-      activity_note(
-        agent,
-        state,
-        entry,
-        list(),
-        root_call,
-        "oversized",
-        paste(
-          "More tool calls of this subagent aren't shown here: its record is",
-          "over the size the viewer may see. Its history is in the subagent",
-          "records."
+      # The note is a card like any other, so it counts toward the reply's
+      # limit.
+      if (state$calls >= activity_max_calls) {
+        activity_limit_note(agent, state, entry, list(), root_call)
+      } else {
+        activity_note(
+          agent,
+          state,
+          entry,
+          list(),
+          root_call,
+          "oversized",
+          paste(
+            "More tool calls of this subagent aren't shown here: its record is",
+            "over the size the viewer may see. Its history is in the subagent",
+            "records."
+          )
         )
-      )
+        state$calls <- state$calls + 1L
+      }
       entry$done <- TRUE
       state$delegations[[id]] <- entry
       next
@@ -1036,22 +1065,7 @@ activity_refresh <- function(
       request <- activity_request_content(call$request, marker)
       if (!"request" %in% emitted) {
         if (state$calls >= activity_max_calls) {
-          if (!isTRUE(state$limited)) {
-            activity_note(
-              agent,
-              state,
-              entry,
-              runtime,
-              root_call,
-              "limit",
-              paste0(
-                "More subagent tool calls ran in this reply than the ",
-                activity_max_calls,
-                " shown here. Their full history is in the subagent records."
-              )
-            )
-            state$limited <- TRUE
-          }
+          activity_limit_note(agent, state, entry, runtime, root_call)
           break
         }
         activity_emit(agent, state, entry$anchor_turn, request)
