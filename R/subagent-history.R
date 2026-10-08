@@ -21,7 +21,7 @@ NULL
 # anything, and checked like any other saved history.
 
 subagent_history_format <- "deputy_conversation_subagents"
-subagent_history_version <- 1L
+subagent_history_version <- 2L
 subagent_history_codec <- "deputy_portable_json"
 
 host_conversation_id <- function(value) {
@@ -59,14 +59,11 @@ history_encode_double <- function(value) {
   if (is.infinite(value)) {
     return(if (value > 0) "Inf" else "-Inf")
   }
-  # The C library writes the decimal point of LC_NUMERIC, which a host may
-  # have changed; saved records always use ".". `%g` adds no grouping.
-  text <- sprintf("%.17g", value)
-  point <- Sys.localeconv()[["decimal_point"]]
-  if (nzchar(point) && !identical(point, ".")) {
-    text <- sub(point, ".", text, fixed = TRUE)
-  }
-  text
+  # A finite value is saved as its IEEE 754 bits. Decimal text reads back
+  # exactly only where R parses it with extended precision, which arm64 lacks,
+  # and the C library writes it with the decimal point of LC_NUMERIC.
+  bytes <- writeBin(value, raw(), size = 8L, endian = "big")
+  paste0("0x", paste(as.character(bytes), collapse = ""))
 }
 
 # JSON holds only UTF-8 text. A string that isn't valid UTF-8 once converted
@@ -191,6 +188,18 @@ history_decode_number <- function(value, integer) {
   if (identical(value, "-Inf")) {
     return(-Inf)
   }
+  if (grepl("^0x[0-9a-f]{16}$", value)) {
+    bytes <- as.raw(strtoi(
+      substring(value, seq(3L, 17L, 2L), seq(4L, 18L, 2L)),
+      16L
+    ))
+    number <- readBin(bytes, "double", size = 8L, endian = "big")
+    if (!is.finite(number)) {
+      history_codec_abort()
+    }
+    return(number)
+  }
+  # Version 1 records saved finite values as decimal text.
   if (
     !grepl(
       "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][-+]?[0-9]{1,3})?$",
@@ -675,7 +684,7 @@ subagent_history_read <- function(saved, lead, conversation_id, max_bytes) {
     !identical(scalar(saved$format), subagent_history_format) ||
       !is.numeric(version) ||
       length(version) != 1L ||
-      !isTRUE(version == subagent_history_version) ||
+      !isTRUE(version %in% c(1, subagent_history_version)) ||
       !identical(scalar(saved$codec), subagent_history_codec) ||
       !identical(scalar(saved$conversation_id), conversation_id) ||
       !text(saved$data) ||

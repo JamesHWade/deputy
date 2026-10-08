@@ -657,7 +657,7 @@ test_that("classed objects in a display never run their methods", {
 })
 
 test_that("a Commons display and tag survive retained inspection", {
-  skip_if_not_installed("commons")
+  skip_if_commons_refuses()
   skip_if_not_installed("shinychat")
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Revenue?")),

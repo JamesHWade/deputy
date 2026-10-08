@@ -1259,7 +1259,7 @@ test_that("members sharing one callback function each get their delivery", {
 })
 
 test_that("Commons specialists qualify only when constrained", {
-  skip_if_not_installed("commons")
+  skip_if_commons_refuses()
   sales <- data.frame(region = c("north", "south"), revenue = c(25, 35))
   commons_chat <- function(server) {
     commons::commons(
