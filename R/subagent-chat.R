@@ -681,7 +681,10 @@ subagent_chat_server <- function(
 #' external resources removed from its HTML.
 #'
 #' The cards are part of the conversation shinychat saves, so a restored
-#' conversation shows them again without running anything. The lead's model
+#' conversation shows them again without running anything. `$save_session()`
+#' and durable approvals keep them too; a call still running when the
+#' conversation is saved shows as not completed once it is loaded or resumed.
+#' The lead's model
 #' never sees them: it gets each subagent's summary, as before. `$get_turns()`
 #' on the lead includes the cards, while `$get_context_turns()` and requests
 #' to the provider don't, and `$set_turns()` and `$add_turn()` separate them

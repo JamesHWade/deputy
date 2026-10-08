@@ -272,6 +272,35 @@ approval_replay_turns <- function(records, tools) {
   lapply(records, ellmer::contents_replay, tools = tools)
 }
 
+# Subagent tool calls shown in the conversation, kept beside its turns as the
+# same portable records.
+approval_record_activity <- function(entries) {
+  if (!length(entries)) {
+    return(NULL)
+  }
+  lapply(entries, function(entry) {
+    list(turn = entry$turn, content = approval_record_content(entry$content))
+  })
+}
+
+approval_replay_activity <- function(entries) {
+  if (!length(entries)) {
+    return(NULL)
+  }
+  lapply(entries, function(entry) {
+    if (!is.list(entry) || is.object(entry)) {
+      return(entry)
+    }
+    list(
+      turn = entry$turn,
+      content = tryCatch(
+        ellmer::contents_replay(entry$content, tools = list()),
+        error = function(error) entry$content
+      )
+    )
+  })
+}
+
 approval_result_content <- function(request, value = NULL, error = NULL) {
   approval_check_content_value(value)
   if (inherits(error, "condition")) {

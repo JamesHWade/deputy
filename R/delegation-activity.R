@@ -168,6 +168,26 @@ activity_remap <- function(overlay, kept, offset) {
   Filter(function(entry) !is.na(entry$turn), overlay)
 }
 
+# The agent's shown activity as a session payload keeps it. A save made
+# mid-reply first reads what the reply hasn't shown yet, so a call that has
+# returned is saved with its result. A card still waiting for its result gets
+# one saying so in the payload, since nothing settles it once the payload is
+# loaded; the live conversation keeps waiting for the call.
+activity_saved_entries <- function(agent) {
+  activity_poll(agent, final = TRUE)
+  overlay <- agent$.__enclos_env__$private$.activity_overlay
+  for (open in activity_open_entries(agent)) {
+    overlay[[length(overlay) + 1L]] <- list(
+      turn = open$turn,
+      content = activity_settled_result(
+        open,
+        "Not completed: the conversation was saved before this call returned."
+      )
+    )
+  }
+  activity_session_entries(overlay)
+}
+
 # Shown activity as a saved session keeps it: each card with the index of the
 # turn it was shown in, beside the turns the model reads.
 activity_session_entries <- function(overlay) {
@@ -643,10 +663,10 @@ activity_open_entries <- function(agent, key = NULL) {
   requests[setdiff(names(requests), answered)]
 }
 
-# Give a shown request a result that says why it has none of its own.
-activity_settle <- function(agent, entry, text, state = NULL) {
+# A result for a shown request that says why it has none of its own.
+activity_settled_result <- function(entry, text) {
   marker <- entry$content@extra$deputy_activity
-  result <- ellmer::ContentToolResult(
+  ellmer::ContentToolResult(
     value = text,
     request = entry$content,
     extra = list(
@@ -654,6 +674,11 @@ activity_settle <- function(agent, entry, text, state = NULL) {
       deputy_activity = marker
     )
   )
+}
+
+# Give a shown request a result that says why it has none of its own.
+activity_settle <- function(agent, entry, text, state = NULL) {
+  result <- activity_settled_result(entry, text)
   if (is.null(state)) {
     private <- agent$.__enclos_env__$private
     private$.activity_overlay[[length(private$.activity_overlay) + 1L]] <-

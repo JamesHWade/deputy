@@ -38,7 +38,10 @@ external resources removed from its HTML.
 }
 \details{
 The cards are part of the conversation shinychat saves, so a restored
-conversation shows them again without running anything. The lead's model
+conversation shows them again without running anything. \verb{$save_session()}
+and durable approvals keep them too; a call still running when the
+conversation is saved shows as not completed once it is loaded or resumed.
+The lead's model
 never sees them: it gets each subagent's summary, as before. \verb{$get_turns()}
 on the lead includes the cards, while \verb{$get_context_turns()} and requests
 to the provider don't, and \verb{$set_turns()} and \verb{$add_turn()} separate them
