@@ -55,8 +55,10 @@ back from storage Deputy doesn't control.
   inspection allows (NULL, logical, integer, double, complex, character, raw,
   lists, pairlists, and names/dim/dimnames), with doubles (and each part of a
   complex number) as `%.17g` text with a `.` decimal point whatever
-  `LC_NUMERIC` is, NA, NaN and infinities spelled out, and raw
-  vectors as base64, so a round trip is exact. Decoding builds only those
+  `LC_NUMERIC` is, NA, NaN and infinities spelled out, strings that aren't
+  valid UTF-8 (marked "bytes", or invalid bytes under another mark) as
+  base64 of their bytes with their mark, and raw vectors as base64, so a
+  round trip is exact. Decoding builds only those
   types; it never uses `unserialize()` or `jsonlite::unserializeJSON()`, which
   can load namespaces or construct closures from stored text.
 - **Restore validates everything and runs nothing.** The envelope, the decoded
@@ -126,7 +128,9 @@ back from storage Deputy doesn't control.
   conversation (by `host_conversation_id`, read before redaction, so a
   redactor may leave it out of the views) and saved children that aren't
   live, listing saved ones without
-  transcripts and replaying a transcript only when that child is selected. It
+  transcripts and replaying a transcript only when that child is selected,
+  reading and bounding that child alone (`restored(delegation_id = )`), so
+  the others' transcripts can't push it over a bound tighter than the save's. It
   reads and bounds only the open conversation's live records, so other
   conversations' children can't push its list over the disclosure bound, and
   it doesn't read the lead-wide event stream, whose other conversations'
