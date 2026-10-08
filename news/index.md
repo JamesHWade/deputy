@@ -2,6 +2,15 @@
 
 ## deputy (development version)
 
+- Tools with an
+  [`ellmer::type_ignore()`](https://ellmer.tidyverse.org/reference/type_boolean.html)
+  argument can be registered on an agent. Registration used to fail with
+  “Names of `arguments` must match formals of `fun`”, which stopped
+  [`adopt_chat()`](https://jameshwade.github.io/deputy/reference/adopt_chat.md)
+  from adopting a Commons chat with a single data source. The argument
+  still isn’t offered to the model, and the tool receives its default
+  ([\#238](https://github.com/JamesHWade/deputy/issues/238)).
+
 - [`ContextPolicy()`](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
   gains `estimator`. With the default `"auto"`, automatic compaction now
   runs when the provider cannot count tokens: it adds a conservative
