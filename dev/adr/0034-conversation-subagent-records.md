@@ -77,9 +77,9 @@ back from storage Deputy doesn't control.
   `delegation_history()` replay (each view as replay projects it, with every
   artifact reference marked `"unresolved"`, and its transcript again as
   replayed turns). Children are kept in order; one that doesn't fit is kept
-  without its transcript (`retention$transcript = "omitted"`) or left out,
-  newest first if the whole record is still too large, and the record counts
-  both; a child whose outcome alone is over the disclosure bound is left out
+  without its transcript (`retention$transcript = "omitted"`) or left out;
+  if the whole record is still too large, the newest child loses its
+  transcript, then is left out, and so on, and the record counts both; a child whose outcome alone is over the disclosure bound is left out
   and counted. A transcript the redactor removes, from a live child or a
   saved one, is marked and counted as omitted the same way, and `restored()`
   marks one the current redactor removes on read as omitted too, so

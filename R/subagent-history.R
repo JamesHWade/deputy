@@ -619,14 +619,22 @@ subagent_history_record <- function(state, conversation_id) {
       )
     )
   }
-  # The scope, keys and counts count too: drop the newest children until the
-  # whole record fits.
+  # The scope, keys and counts count too: until the whole record fits, the
+  # newest child loses its transcript, and if that isn't enough, is dropped.
   record <- build(kept)
   while (
     length(kept) && subagent_history_record_size(record) > state$max_bytes
   ) {
-    omitted <- left_out(omitted, kept[[length(kept)]])
-    kept[[length(kept)]] <- NULL
+    last <- length(kept)
+    if (!is.null(kept[[last]]$view$transcript)) {
+      kept[[last]]$view <- subagent_history_without_transcript(
+        kept[[last]]$view
+      )
+      kept[[last]]$transcript <- FALSE
+    } else {
+      omitted <- left_out(omitted, kept[[last]])
+      kept[[last]] <- NULL
+    }
     record <- build(kept)
   }
   # A record that can't fit without children would not read back.
