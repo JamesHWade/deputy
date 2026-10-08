@@ -37,8 +37,10 @@ into an earlier message.
   that `save_session()` and a durable approval's pause both write keeps the
   shown cards beside the turns (`activity`: each card with the index of its
   turn), never among them; the approval store keeps them as portable records
-  and its resume replays them. A save made mid-reply first polls, so a call
-  that has returned is saved with its result, and the saved copy gives a
+  and its resume replays them. A save made while the presenter streams a reply
+  first polls that reply, so a call that has returned is saved with its
+  result (a save after `run_sync()`, a text stream or a finished reply polls
+  nothing, since those calls were never shown), and the saved copy gives a
   card still waiting a "Not completed" result, since nothing settles it after
   a load; the live conversation keeps waiting for the call. `load_session()`
   and a resumed approval restore the cards after checking each is a marked
