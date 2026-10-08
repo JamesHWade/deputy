@@ -260,6 +260,30 @@ test_that("saved numbers read back under a comma decimal locale", {
   expect_identical(history_parse(text), x)
 })
 
+test_that("strings that aren't UTF-8 keep their bytes and mark", {
+  bytes <- rawToChar(as.raw(c(0x61, 0xff, 0x62)))
+  Encoding(bytes) <- "bytes"
+  native <- rawToChar(as.raw(c(0x63, 0xfe)))
+  marked <- rawToChar(as.raw(c(0x64, 0xc3)))
+  Encoding(marked) <- "UTF-8"
+  x <- list(
+    v = c(bytes, native, marked, "é", NA),
+    n = stats::setNames(1:2, c(bytes, "ok"))
+  )
+  text <- history_json(x)
+  expect_true(validUTF8(text))
+  back <- history_parse(text)
+  expect_identical(back, x)
+  expect_identical(Encoding(back$v[1:3]), c("bytes", "unknown", "UTF-8"))
+  for (bad in c(
+    '{"t":"chr","v":[{"b":"YQ==","e":"latin1"}]}',
+    '{"t":"chr","v":[{"b":"AA==","e":"bytes"}]}',
+    '{"t":"chr","v":[{"e":"bytes","b":"YQ=="}]}'
+  )) {
+    expect_error(history_parse(bad), "not in a readable form")
+  }
+})
+
 test_that("decoding builds only portable data", {
   bad <- c(
     '{"t":"closure","v":[]}',
@@ -1084,6 +1108,58 @@ test_that("the replay budget counts references as replay marks them", {
     )
     expect_identical(unname(shown), unname(kept))
   }
+})
+
+test_that("a selected saved subagent is bounded on its own", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  state <- history_state(lead, "conv-a")
+  record <- subagent_history_record(state, "conv-a")
+  child <- record$history$children[[1L]]
+  other <- child
+  other$outcome$runtime$delegation_id <- "deleg_other"
+  record$history$children <- list(child, other)
+  state$record <- record
+  state$conversation_id <- "conv-a"
+  id <- child$outcome$runtime$delegation_id
+  # As the disclosure bound measures replayed views.
+  size <- function(views) {
+    payload <- function(value) {
+      if (inherits(value, "ellmer::Turn")) {
+        return(inspection_record_turn(value))
+      }
+      if (is.list(value)) lapply(value, payload) else value
+    }
+    length(serialize(payload(views), NULL, version = 3))
+  }
+  two <- size(subagent_history_restored(state))
+  state$record$history$children <- list(child)
+  one <- size(subagent_history_restored(state))
+  state$record <- record
+  # Now one transcript fits the bound, and two don't.
+  lead$.__enclos_env__$private$.delegation_disclosure <- DelegationDisclosure(
+    authorize = function(requester, scope) identical(requester, "viewer"),
+    max_bytes = (one + two) %/% 2
+  )
+  turns <- function(views) {
+    vapply(views, function(view) length(view$turns), integer(1))
+  }
+  expect_identical(turns(subagent_history_restored(state)), c(0L, 0L))
+  # The panel shows the selected child with its conversation.
+  conversation <- list(
+    restored = function(transcript = TRUE, ...) {
+      subagent_history_restored(state, transcript, ...)
+    },
+    conversation_id = function() "conv-a"
+  )
+  shown <- subagent_history_panel_child(conversation, lead, list(), id)
+  expect_length(shown, 1L)
+  expect_gt(turns(shown), 0L)
+  selected <- subagent_history_restored(state, delegation_id = id)
+  expect_length(selected, 1L)
+  expect_identical(subagent_history_view_id(selected[[1L]]), id)
+  expect_gt(turns(selected), 0L)
 })
 
 test_that("a tightened bound is searched, not tried one child at a time", {
