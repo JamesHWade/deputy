@@ -1162,6 +1162,29 @@ test_that("a selected saved subagent is bounded on its own", {
   expect_gt(turns(selected), 0L)
 })
 
+test_that("a saved child is chosen without reading live records", {
+  counter <- new.env()
+  counter$calls <- 0L
+  lead <- history_settled_lead("conv-a", counter)
+  state <- history_state(lead, "conv-a")
+  state$record <- subagent_history_record(state, "conv-a")
+  state$conversation_id <- "conv-a"
+  id <- state$record$history$children[[1L]]$outcome$runtime$delegation_id
+  conversation <- list(
+    restored = function(transcript = TRUE, ...) {
+      subagent_history_restored(state, transcript, ...)
+    },
+    conversation_id = function() "conv-a"
+  )
+  # No live view was allowed, so the lead's records aren't consulted.
+  local_mocked_bindings(
+    subagent_history_records = function(...) stop("live records read")
+  )
+  shown <- subagent_history_panel_child(conversation, lead, list(), id)
+  expect_length(shown, 1L)
+  expect_identical(subagent_history_view_id(shown[[1L]]), id)
+})
+
 test_that("a tightened bound is searched, not tried one child at a time", {
   counter <- new.env()
   counter$calls <- 0L

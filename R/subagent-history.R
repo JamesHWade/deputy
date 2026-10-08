@@ -1083,16 +1083,20 @@ subagent_history_panel_child <- function(conversation, lead, live, id) {
   if (is.null(conversation)) {
     return(live)
   }
-  open <- conversation$conversation_id()
-  ran_here <- !is.null(open) &&
-    id %in%
-      vapply(
-        subagent_history_records(lead, open),
-        function(record) record$delegation_id,
-        character(1)
-      )
-  if (ran_here && length(live)) {
-    return(live)
+  # The lead's records are read only behind a live view the requester was
+  # allowed; without one, only the saved child can be shown.
+  if (length(live)) {
+    open <- conversation$conversation_id()
+    ran_here <- !is.null(open) &&
+      id %in%
+        vapply(
+          subagent_history_records(lead, open),
+          function(record) record$delegation_id,
+          character(1)
+        )
+    if (ran_here) {
+      return(live)
+    }
   }
   Filter(
     function(view) identical(subagent_history_view_id(view), id),
