@@ -436,6 +436,7 @@ graph_restore_after_failure <- function(
           child_private <- graph_agent_private(entry$agent)
           child_private$.conversation_owner <- NULL
           child_private$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
+          trusted_release_conversation(entry)
           attr(child_private$.chat, "deputy_conversation_owner") <- NULL
           root_private$owned_conversations[[handle]] <- NULL
         }
@@ -546,6 +547,13 @@ retain_agent_graph <- function(
         routes[[source_name]][[route_name]]
       )
     }
+  }
+  # Each route was checked against the routes installed before it. Check every
+  # source again with all of them in place, so each chain of routes is judged
+  # whole and a failure still sets up nothing.
+  for (source_name in names(routes)) {
+    source <- graph_route_source(tree, source_name)
+    graph_agent_private(source)$check_trusted_tools(source$get_tools())
   }
 
   root_private <- graph_agent_private(owner)

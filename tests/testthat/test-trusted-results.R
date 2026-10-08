@@ -373,7 +373,7 @@ test_that("reviewed inputs reach the trusted tool through durable approval", {
   expect_identical(delivered[[1L]]$tool_call_id, pending$request$tool_call_id)
 })
 
-test_that("graph routes cannot join trusted agents", {
+test_that("graph routes from trusted agents need explicit producers", {
   trusted <- Agent$new(
     trusted_test_chat(),
     tools = list(trusted_forecast_tool()),
@@ -398,7 +398,7 @@ test_that("graph routes cannot join trusted agents", {
       max_delegations = 1L,
       max_concurrency = 1L
     ),
-    "delegates to another Agent"
+    "need explicit producers"
   )
   expect_identical(names(trusted$get_tools()), before)
 })

@@ -81,7 +81,8 @@ adopt_chat <- function(
 #' The retained agent keeps its own permissions, and each of its tool calls is
 #' also checked against the owner's current permissions. An owner in
 #' read-only or plan mode can use the tool, and the retained agent is then
-#' held to that mode too.
+#' held to that mode too. An owner with a [TrustedResults] policy accepts the
+#' tool because the retained agent passed that policy when it was retained.
 #'
 #' @param owner The [Agent] that owns the retained agent. Register the tool on
 #'   this agent only.
@@ -176,6 +177,7 @@ make_delegation_tool <- function(
     )
   )
   attr(tool, "deputy_composition_owner") <- caller
+  attr(tool, "deputy_composition_handle") <- handle
   attr(tool, "deputy_composition_invoke") <- invoke
   attr(tool, "deputy_internal_tool") <- deputy_composition_tool_marker
   tool

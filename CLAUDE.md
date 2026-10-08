@@ -674,6 +674,21 @@ forwarded to the lead. `context$tool_arguments` and `tool_input_review()`
 support typed input review; `approval_review_ui()`/`_server()` is the Shiny
 review module. `inst/examples/trusted-results/` is the three-area app.
 
+`TrustedResults(type = tool)` names an explicit producer (`producers`); events
+carry its `tool_fingerprint`. An owner with a policy admits retained agents in
+`retain_conversation()` (`trusted_admit_conversation()`): explicit producers
+required, the agent's registry checked as a tree member against the combined
+policy (own types added, exemptions intersected, receipt if either; producers
+also checked against the root's other retained agents), which is installed
+until release. `release_agent()` removes the owner's routes to the handle. `check_trusted_registry(admit_route = )` accepts only
+Deputy routes owned by the registering agent to handles its policy root
+retained under the policy (graph members reach the root through a weak
+`.trusted_root`). Delivery forwards straight to the root once; continuation
+rechecks the installed policy and `execute_tool()` the pinned producer. A
+member's route runs its target under the caller's combined policy for that
+call (`trusted_routed_policy()`). See
+ADR-0035 and `tests/testthat/test-trusted-results-routes.R`.
+
 ### Human Input
 
 Concurrent and hosted Agents bind their own handler with

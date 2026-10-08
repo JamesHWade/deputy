@@ -130,6 +130,8 @@ retain_conversation <- function(
     normalize_usage_limits(usage_limits),
     agent$usage_limits
   )
+  # A root with a trusted-results policy admits only agents that satisfy it.
+  trusted <- trusted_admit_conversation(owner, agent)
   previous_turns <- cp$.chat$get_turns()
   committed <- FALSE
   on.exit(
@@ -159,6 +161,8 @@ retain_conversation <- function(
   entry$authorize <- authorize
   entry$authorization <- authorization
   entry$manifest <- manifest
+  entry$trusted <- trusted
+  trusted_install_conversation(owner, agent, trusted)
   handle <- new_deputy_id("conversation_")
   if (is.environment(cp$.chat)) {
     attr(cp$.chat, "deputy_conversation_owner") <- entry$token
@@ -221,6 +225,8 @@ continue_conversation <- function(
   if (entry$busy || isTRUE(cp$run_active)) {
     conversation_abort("The conversation is busy.")
   }
+  # After the busy check: a route's call runs under its own policy while busy.
+  trusted_recheck_conversation(entry)
   if (length(entry$ids) >= entry$max_runs) {
     conversation_abort("The conversation has reached max_runs; release it.")
   }
@@ -259,6 +265,21 @@ continue_conversation <- function(
       run_context = caller_private$effective_run_context()
     )
   tree_admission <- NULL
+  # A graph member's route runs its target under the policy that admitted the
+  # route, the member's combined with the target's, so the member's own
+  # result types are published wherever its routes lead.
+  routed <- NULL
+  if (
+    !identical(caller, owner) &&
+      !is.null(entry$trusted) &&
+      !is.null(caller_private$.trusted_results)
+  ) {
+    routed <- trusted_routed_policy(
+      owner,
+      caller_private$.trusted_results,
+      entry$trusted$policy
+    )
+  }
   if (!is.null(tree)) {
     if (!handle %in% tree$handles) {
       conversation_abort("This handle is not part of the configured graph.")
@@ -298,6 +319,8 @@ continue_conversation <- function(
       cp$.delegation_binding <- old$binding
       cp$.hooks <- old$hooks
       cp$.delegation_ancestors <- old$ancestors
+      cp$.trusted_results <- old$trusted_results
+      cp$.trusted_sources <- old$trusted_sources
     }
     entry$busy <- FALSE
     entry$configuration <- conversation_configuration(child)
@@ -334,8 +357,15 @@ continue_conversation <- function(
     observe = cp$.delegation_observe,
     binding = cp$.delegation_binding,
     hooks = cp$.hooks,
-    ancestors = cp$.delegation_ancestors
+    ancestors = cp$.delegation_ancestors,
+    trusted_results = cp$.trusted_results,
+    trusted_sources = cp$.trusted_sources
   )
+  if (!is.null(routed)) {
+    cp$.trusted_results <- routed
+    cp$.trusted_sources <- trusted_policy_sources(routed)
+    cp$check_trusted_tools(child$get_tools())
+  }
   cp$current_run_id <- NULL
   cp$last_run_usage <- AgentUsage()
   cp$.last_run_result <- NULL
@@ -464,9 +494,36 @@ release_conversation <- function(owner, handle) {
   }
   cp$.conversation_owner <- NULL
   cp$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
+  trusted_release_conversation(entry)
   op$owned_conversations[[handle]] <- NULL
+  conversation_remove_routes(owner, handle)
   # Release snapshots too; hosts can explicitly export them beforehand.
   op$subagent_runs[entry$ids] <- NULL
+  invisible(NULL)
+}
+
+# Routes to a released agent can only fail, so they leave the owner's tools:
+# the model no longer sees them, and later registry checks don't trip on them.
+conversation_remove_routes <- function(owner, handle) {
+  op <- owner$.__enclos_env__$private
+  tools <- op$.chat$get_tools()
+  dead <- vapply(
+    tools,
+    function(tool) {
+      identical(
+        attr(
+          trusted_tool_source(tool),
+          "deputy_composition_handle",
+          exact = TRUE
+        ),
+        handle
+      )
+    },
+    logical(1)
+  )
+  if (any(dead)) {
+    op$.chat$set_tools(tools[!dead])
+  }
   invisible(NULL)
 }
 
@@ -534,6 +591,7 @@ finalize_owned_conversations <- function(owner) {
     if (identical(child$.conversation_owner, entry$token)) {
       child$.conversation_owner <- NULL
       child$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
+      trusted_release_conversation(entry)
     }
     if (
       identical(attr(child$.chat, "deputy_conversation_owner"), entry$token)

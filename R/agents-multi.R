@@ -796,15 +796,10 @@ LeadAgent <- R6::R6Class(
 
     # The whole delegation tree obeys one no-bypass rule: the lead may keep its
     # own delegate tool only because every child inherits the policy.
-    check_trusted_tools = function(tools) {
-      policy <- private$.trusted_results
-      if (is.null(policy)) {
-        return(invisible(NULL))
-      }
-      # Designated producers must be declared statically, in tools or Skill
-      # values. Skills named by path load fresh objects when each child is
-      # built, so they may add other checked tools but never a producer.
-      definitions <- lapply(private$.sub_agent_defs, function(def) {
+    # Each definition's checked registry: its tools and Skill values, less its
+    # denylist.
+    trusted_definition_tools = function() {
+      lapply(private$.sub_agent_defs, function(def) {
         skill_tools <- unlist(
           lapply(def$skills, function(skill) {
             if (S7::S7_inherits(skill, Skill)) skill$tools else list()
@@ -816,6 +811,17 @@ LeadAgent <- R6::R6Class(
           def$disallowed_tools
         ))
       })
+    },
+
+    check_trusted_tools = function(tools) {
+      policy <- private$.trusted_results
+      if (is.null(policy)) {
+        return(invisible(NULL))
+      }
+      # Designated producers must be declared statically, in tools or Skill
+      # values. Skills named by path load fresh objects when each child is
+      # built, so they may add other checked tools but never a producer.
+      definitions <- private$trusted_definition_tools()
       sources <- trusted_tree_sources(policy, c(list(tools), definitions))
       check_trusted_registry(
         policy,
@@ -825,7 +831,8 @@ LeadAgent <- R6::R6Class(
           unlist(lapply(definitions, names), use.names = FALSE)
         )),
         allow_delegation = TRUE,
-        sources = sources
+        sources = sources,
+        admit_route = trusted_route_admission(self, tools)
       )
       for (name in names(definitions)) {
         withCallingHandlers(
@@ -851,6 +858,16 @@ LeadAgent <- R6::R6Class(
           }
         )
       }
+      # Names a retained agent's own policy designates stay that tool in the
+      # lead's registry and in every definition.
+      for (entry in private$owned_conversations) {
+        if (!is.null(entry$trusted)) {
+          trusted_check_names(
+            trusted_policy_sources(entry$trusted$policy),
+            c(list(tools), definitions)
+          )
+        }
+      }
       invisible(sources)
     },
 
@@ -871,17 +888,7 @@ LeadAgent <- R6::R6Class(
         invisible(NULL)
       }
       child_private <- child$.__enclos_env__$private
-      child_private$.trusted_results <- do.call(
-        TrustedResults,
-        c(
-          as.list(policy@results),
-          list(
-            on_result = forward,
-            exempt_tools = policy@exempt_tools,
-            model_receipt = policy@model_receipt
-          )
-        )
-      )
+      child_private$.trusted_results <- trusted_policy_copy(policy, forward)
       child_private$.trusted_tree_member <- TRUE
       child_private$.trusted_sources <- sources
       child_private$check_trusted_tools(child$get_tools())

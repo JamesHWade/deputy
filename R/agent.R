@@ -276,6 +276,10 @@ Agent <- R6::R6Class(
     #' observers can't be changed (observers it already has keep working). An
     #' agent can retain up to 32 others at a time. See
     #' `vignette("retained-agents", package = "deputy")`.
+    #'
+    #' If this agent has a [TrustedResults] policy, `agent`'s tools must pass
+    #' it, and its trusted results reach this agent's `on_result`; see
+    #' [TrustedResults] for the rules.
     #' @param agent Another `Agent` (not a `LeadAgent`) with its own Chat and no
     #'   `approval_dir`, `fallback_chats` or provider-native tools.
     #' @param usage_limits [UsageLimits] for all of its tasks combined, also
@@ -299,7 +303,9 @@ Agent <- R6::R6Class(
     #' Each agent keeps its own permissions, and each of its tool calls is also
     #' checked against the current permissions of every agent above it, so an
     #' agent in read-only or plan mode can use its route tools and its
-    #' delegates are held to that mode too.
+    #' delegates are held to that mode too. With a [TrustedResults] policy on
+    #' this agent, every agent in the graph must pass it before any route is
+    #' added, and their trusted results reach this agent's `on_result`.
     #' @param agents Named list of distinct agents, each meeting the conditions
     #'   in `$retain_agent()`. The name `root` is reserved for this agent.
     #' @param routes Named list keyed by `root` or an agent name. Each element is
@@ -405,10 +411,12 @@ Agent <- R6::R6Class(
     #' @description
     #' Stop retaining an agent so it can be used on its own again. This also
     #' discards its delegation records, so save them first with
-    #' `$export_subagents()` if you need them. Its tools and connections stay
-    #' open. Errors while the agent is running: cancel it with `$cancel_agent()`
-    #' and wait for the task to end first. Agents in a graph are released with
-    #' `$release_agent_graph()`. Handles don't survive an R restart.
+    #' `$export_subagents()` if you need them, and removes the tools made for
+    #' it with [delegation_tool()] from this agent. Its own tools and
+    #' connections stay open. Errors while the agent is running: cancel it with
+    #' `$cancel_agent()` and wait for the task to end first. Agents in a graph
+    #' are released with `$release_agent_graph()`. Handles don't survive an R
+    #' restart.
     #' @param handle A handle from `$retain_agent()`.
     #' @return `NULL`, invisibly.
     release_agent = function(handle) release_conversation(self, handle),
@@ -2714,6 +2722,8 @@ Agent <- R6::R6Class(
       # live elsewhere in the tree but must be the same executables.
       .trusted_tree_member = FALSE,
       .trusted_sources = NULL,
+      # The agent whose policy this retained agent answers to (weak).
+      .trusted_root = NULL,
       .usage_limits = NULL,
       .context_policy = NULL,
       .working_dir = NULL,
@@ -3023,7 +3033,13 @@ Agent <- R6::R6Class(
         if (
           !is.null(trusted_result_type(private$.trusted_results, tool@name))
         ) {
-          if (!is_nonempty_string(execution_id)) {
+          # The producer must still be the tool the policy or tree pinned.
+          pinned <- private$.trusted_sources[[tool@name]] %||%
+            trusted_policy_sources(private$.trusted_results)[[tool@name]]
+          if (
+            !is_nonempty_string(execution_id) ||
+              (!is.null(pinned) && !identical(pinned, tool))
+          ) {
             trusted_invocation_abort(tool@name)
           }
           private$trusted_arguments[[execution_id]] <- arguments
@@ -3119,8 +3135,28 @@ Agent <- R6::R6Class(
             names(tools)
           },
           sources = private$.trusted_sources,
-          require_source = isTRUE(private$.trusted_tree_member)
+          require_source = isTRUE(private$.trusted_tree_member),
+          admit_route = trusted_route_admission(self, tools)
         )
+        # Names a retained agent's own policy designates stay that tool here:
+        # those this agent retained, and for a retained agent or graph
+        # member, those its policy root retained too, siblings included.
+        entries <- private$owned_conversations
+        root <- trusted_policy_root(self)
+        if (!is.null(root) && !identical(root, self)) {
+          entries <- c(
+            entries,
+            root$.__enclos_env__$private$owned_conversations
+          )
+        }
+        for (entry in entries) {
+          if (!is.null(entry$trusted)) {
+            trusted_check_names(
+              trusted_policy_sources(entry$trusted$policy),
+              list(tools)
+            )
+          }
+        }
       },
 
       process_tool_result = function(tool_name, value, execution_id = NULL) {
@@ -3151,11 +3187,15 @@ Agent <- R6::R6Class(
         }
         policy <- private$.trusted_results
         result_id <- new_deputy_id("result_")
+        producer <- private$.trusted_sources[[tool_name]] %||%
+          trusted_policy_sources(policy)[[tool_name]] %||%
+          trusted_tool_source(private$.chat$get_tools()[[tool_name]])
         event <- private$agent_event(
           "trusted_result",
           result_id = result_id,
           result_type = type,
           tool_name = tool_name,
+          tool_fingerprint = trusted_producer_fingerprint(producer),
           tool_call_id = execution_id,
           arguments = arguments,
           value = value

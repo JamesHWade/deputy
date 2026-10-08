@@ -1,5 +1,25 @@
 # deputy (development version)
 
+* `TrustedResults()` accepts the trusted tool itself, as in
+  `TrustedResults(forecast = get_forecast)`; only that tool object may then
+  produce the result, wherever it is registered. Each `"trusted_result"` event
+  now also carries `tool_fingerprint`, a digest of the producing tool's code,
+  argument schema and metadata, not of a call's inputs (#238).
+
+* An agent with a `TrustedResults()` policy can now retain agents
+  (`$retain_agent()`, `adopt_chat()`, `$retain_agent_graph()`) and call them
+  through `delegation_tool()` or graph routes. Each retained agent's tools are
+  checked against the policy when it is retained and before every task, other
+  tools that delegate are still refused, and every trusted result from a
+  retained agent or graph member reaches the root's `on_result` once, with the
+  producing agent's IDs. A retained agent's own policy applies alongside,
+  without weakening either, also to the graph members it asks through its
+  routes, and two retained agents can't give one result type different tools.
+  The policy must give its trusted tools as tool objects (#238).
+
+* `$release_agent()` now also removes the owner's `delegation_tool()` tools for
+  the released agent, which could only fail once it was released (#238).
+
 * New `subagent_chat_history()` saves the subagents of each conversation in a
   shinychat chat with that conversation, through shinychat's history, and
   brings them back read-only when it is reopened: tasks, outcomes,
