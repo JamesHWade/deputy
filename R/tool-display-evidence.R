@@ -9,7 +9,9 @@
 # never carried. Replay rebuilds `extra` from a validated projection only.
 
 tool_display_format <- "deputy_tool_display"
-tool_display_version <- 1L
+# Version 2 added `sql` and `bindings` provenance. A record without them is
+# still written as version 1, so a reader that knows only version 1 keeps it.
+tool_display_version <- 2L
 
 # Field limits in bytes. HTML can hold an inline plot, so it gets the most room;
 # labels and previews are one-line activity-row text.
@@ -33,10 +35,15 @@ tool_display_fields <- c(
   "open_style"
 )
 
-# Provenance a producer attaches beside its display. Each value is one short
-# token: a label, never evidence of trust on its own.
-tool_display_provenance_fields <- "commons_tag"
+# Provenance a producer attaches beside its display: Commons' tag, one short
+# token (a label, never evidence of trust on its own), and for its metrics and
+# calculations the SQL that ran and the values bound into its placeholders.
+tool_display_provenance_fields <- c("commons_tag", "sql", "bindings")
+tool_display_provenance_v1 <- "commons_tag"
 tool_display_provenance_pattern <- "^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$"
+tool_display_sql_bytes <- 65536
+tool_display_binding_count <- 64L
+tool_display_binding_bytes <- 4096
 
 tool_display_marker_names <- function(names, limit = 16L) {
   names <- unique(as.character(names))
@@ -321,6 +328,56 @@ tool_display_flag <- function(value) {
   is.logical(value) && !is.object(value) && length(value) == 1L && !is.na(value)
 }
 
+# A provenance value as it is recorded, or NULL when it can't be.
+tool_display_provenance_value <- function(field, value) {
+  switch(
+    field,
+    commons_tag = if (
+      tool_display_string(value) &&
+        grepl(tool_display_provenance_pattern, value)
+    ) {
+      as.character(value)
+    },
+    sql = if (
+      tool_display_string(value) &&
+        nchar(value, type = "bytes") <= tool_display_sql_bytes
+    ) {
+      enc2utf8(as.character(value))
+    },
+    bindings = tool_display_bindings(value)
+  )
+}
+
+# Commons binds one plain value per placeholder: text, a number or a flag, in
+# an unnamed list. Attributes are checked first, so no method of a classed
+# value runs.
+tool_display_bindings <- function(value) {
+  if (
+    !is.list(value) ||
+      !is.null(attributes(value)) ||
+      length(value) > tool_display_binding_count
+  ) {
+    return(NULL)
+  }
+  for (item in value) {
+    plain <- is.null(attributes(item)) &&
+      (is.character(item) ||
+        is.double(item) ||
+        is.integer(item) ||
+        is.logical(item)) &&
+      length(item) == 1L &&
+      !is.na(item)
+    if (
+      !plain ||
+        (is.character(item) &&
+          nchar(item, type = "bytes") > tool_display_binding_bytes)
+    ) {
+      return(NULL)
+    }
+  }
+  lapply(value, function(item) if (is.character(item)) enc2utf8(item) else item)
+}
+
 # Render one HTML-capable display field to text, recording dependencies by name
 # rather than carrying their file paths. A tag tree that would render to more
 # than `limit` bytes is not rendered, since rendering copies and escapes it all.
@@ -420,13 +477,11 @@ tool_display_projection <- function(content) {
     if (is.null(value)) {
       next
     }
-    if (
-      tool_display_string(value) &&
-        grepl(tool_display_provenance_pattern, value)
-    ) {
-      provenance[[field]] <- as.character(value)
-    } else {
+    recorded <- tool_display_provenance_value(field, value)
+    if (is.null(recorded)) {
       omitted$provenance <- c(omitted$provenance, field)
+    } else {
+      provenance[field] <- list(recorded)
     }
   }
 
@@ -478,7 +533,11 @@ tool_display_projection <- function(content) {
   }
   list(
     format = tool_display_format,
-    version = tool_display_version,
+    version = if (all(names(provenance) %in% tool_display_provenance_v1)) {
+      1L
+    } else {
+      tool_display_version
+    },
     display = display,
     provenance = provenance,
     omitted = omitted
@@ -575,20 +634,20 @@ tool_display_validate <- function(record) {
   }
   if (length(provenance)) {
     fields <- names(provenance)
+    allowed <- if (version < 2) {
+      tool_display_provenance_v1
+    } else {
+      tool_display_provenance_fields
+    }
     if (
       is.null(fields) ||
         anyDuplicated(fields) ||
-        !all(fields %in% tool_display_provenance_fields)
+        !all(fields %in% allowed)
     ) {
       tool_display_invalid()
     }
-    for (value in provenance) {
-      if (
-        !is.character(value) ||
-          length(value) != 1L ||
-          is.na(value) ||
-          !grepl(tool_display_provenance_pattern, value)
-      ) {
+    for (field in fields) {
+      if (is.null(tool_display_provenance_value(field, provenance[[field]]))) {
         tool_display_invalid()
       }
     }

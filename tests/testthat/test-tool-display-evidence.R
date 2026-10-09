@@ -169,7 +169,7 @@ test_that("display projection bounds sizes and refuses executable objects", {
 test_that("saved display records are validated before replay", {
   projection <- tool_display_projection(display_tool_result())
   future <- projection
-  future$version <- 2L
+  future$version <- tool_display_version + 1L
   expect_null(tool_display_validate(future))
   tampered <- list(
     function(x) {
@@ -211,6 +211,165 @@ test_that("saved display records are validated before replay", {
       "Invalid tool display"
     )
   }
+})
+
+query_tool_result <- function(...) {
+  ellmer::ContentToolResult(
+    value = "60",
+    extra = list(
+      display = list(title = "Ran a trusted calculation"),
+      commons_tag = "A",
+      sql = "SELECT SUM(revenue) AS value FROM sales WHERE region = ?",
+      bindings = list("north", 2L, 1.5, TRUE),
+      ...
+    )
+  )
+}
+
+test_that("Commons query provenance is recorded in a version 2 record", {
+  projection <- tool_display_projection(query_tool_result())
+  expect_identical(projection$version, 2L)
+  expect_identical(
+    projection$provenance,
+    list(
+      commons_tag = "A",
+      sql = "SELECT SUM(revenue) AS value FROM sales WHERE region = ?",
+      bindings = list("north", 2L, 1.5, TRUE)
+    )
+  )
+  expect_identical(tool_display_validate(projection), projection)
+  expect_identical(
+    tool_display_extra(projection),
+    c(list(display = projection$display), projection$provenance)
+  )
+  expect_identical(
+    tool_display_validate(history_parse(history_json(projection))),
+    projection
+  )
+
+  old <- projection
+  old$version <- 1L
+  expect_error(tool_display_validate(old), "Invalid tool display")
+  tag_only <- tool_display_projection(display_tool_result())
+  expect_identical(tag_only$version, 1L)
+})
+
+test_that("query provenance that isn't plain text and values is left out", {
+  for (bindings in list(
+    list(c(1, 2)),
+    list(NA),
+    list(NaN),
+    list(list("north")),
+    list(as.Date("2026-01-01")),
+    list(region = "north"),
+    as.list(seq_len(65)),
+    list(strrep("x", 4097)),
+    c("north", "south"),
+    structure(list("north"), class = "bindings")
+  )) {
+    projection <- tool_display_projection(ellmer::ContentToolResult(
+      "x",
+      extra = list(sql = "SELECT 1", bindings = bindings)
+    ))
+    expect_identical(projection$provenance, list(sql = "SELECT 1"))
+    expect_identical(projection$omitted$provenance, "bindings")
+    expect_identical(projection$version, 2L)
+  }
+  for (sql in list(
+    strrep("x", 65537),
+    c("SELECT 1", "SELECT 2"),
+    NA_character_,
+    htmltools::HTML("SELECT 1"),
+    1
+  )) {
+    projection <- tool_display_projection(ellmer::ContentToolResult(
+      "x",
+      extra = list(commons_tag = "B", sql = sql)
+    ))
+    expect_identical(projection$provenance, list(commons_tag = "B"))
+    expect_identical(projection$omitted$provenance, "sql")
+    expect_identical(projection$version, 1L)
+  }
+
+  projection <- tool_display_projection(query_tool_result())
+  tampered <- list(
+    function(x) {
+      x$provenance$sql <- 1
+      x
+    },
+    function(x) {
+      x$provenance$sql <- strrep("x", 65537)
+      x
+    },
+    function(x) {
+      x$provenance$bindings <- list(list("north"))
+      x
+    },
+    function(x) {
+      x$provenance$bindings <- as.list(seq_len(65))
+      x
+    },
+    function(x) {
+      x$provenance$bindings <- list(region = "north")
+      x
+    }
+  )
+  for (change in tampered) {
+    expect_error(
+      tool_display_validate(change(projection)),
+      "Invalid tool display"
+    )
+  }
+})
+
+test_that("query provenance survives inspection, export and replay", {
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "delegate_to_agent",
+      arguments = list(agent_name = "analyst", task = "Revenue?")
+    ),
+    runtime_reply(tool = "call_measure"),
+    runtime_reply("Revenue is 60."),
+    runtime_reply("Lead: 60.")
+  ))
+  tool <- ellmer::tool(
+    function() query_tool_result(),
+    name = "call_measure",
+    description = "Run a registered measure.",
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  lead <- LeadAgent$new(
+    runtime_chat(server),
+    sub_agents = list(agent_definition(
+      "analyst",
+      "Runs measures",
+      "ANALYST",
+      tools = list(tool)
+    )),
+    delegation_disclosure = display_policy()
+  )
+  lead$run_sync("Revenue?")
+
+  view <- lead$inspect_subagents("owner", transcript = TRUE)[[1L]]
+  result <- display_results(view$turns)[[1L]]
+  expect_identical(
+    result@extra[c("commons_tag", "sql", "bindings")],
+    query_tool_result()@extra[c("commons_tag", "sql", "bindings")]
+  )
+  history <- unserialize(serialize(lead$export_subagents("owner"), NULL))
+  replayed <- delegation_history(
+    history,
+    "owner",
+    display_policy(),
+    history$scope
+  )
+  expect_identical(
+    display_results(replayed[[1L]]$turns)[[1L]]@extra,
+    result@extra
+  )
 })
 
 test_that("child tool displays survive inspection, export and replay", {
