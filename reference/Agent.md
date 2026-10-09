@@ -887,9 +887,11 @@ the `delegation_disclosure` policy, which may redact it. Errors if
   If `TRUE`, also include the conversation, as `transcript` records and
   as ellmer `turns`. Hidden reasoning and raw provider data are left
   out. A tool result keeps the card it showed in shinychat (its
-  `display`, such as a Commons table or plot) and the Commons provenance
-  tag, within fixed sizes; anything else stored with the result is left
-  out, and the transcript record names what was.
+  `display`, such as a Commons table or plot) and what Commons records
+  about where it came from: its trust tag and, for a query, the SQL that
+  ran and the values bound into it. Each is kept within fixed sizes;
+  anything else stored with the result is left out, and the transcript
+  record names what was.
 
 #### Returns
 

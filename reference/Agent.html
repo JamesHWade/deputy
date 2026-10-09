@@ -786,9 +786,11 @@ empty list.</p></dd>
 <dd><p>If <code>TRUE</code>, also include the conversation, as
 <code>transcript</code> records and as ellmer <code>turns</code>. Hidden reasoning and raw
 provider data are left out. A tool result keeps the card it showed in
-shinychat (its <code>display</code>, such as a Commons table or plot) and the
-Commons provenance tag, within fixed sizes; anything else stored with
-the result is left out, and the transcript record names what was.</p></dd>
+shinychat (its <code>display</code>, such as a Commons table or plot) and what
+Commons records about where it came from: its trust tag and, for a
+query, the SQL that ran and the values bound into it. Each is kept
+within fixed sizes; anything else stored with the result is left out,
+and the transcript record names what was.</p></dd>
 
 
 </dl><p></p></div>
