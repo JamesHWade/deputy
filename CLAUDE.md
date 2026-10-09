@@ -514,7 +514,8 @@ verifying model claims. Settled records remain authoritative during stop hooks.
 `delegation_history()` replays allowlisted public ellmer records as read-only
 history, never active execution. See ADR-0020 and `R/delegation-inspection.R`.
 Tool results keep a versioned `deputy_display` projection beside their ellmer
-props: shinychat display fields and Commons' `commons_tag`, bounded, with
+props: shinychat display fields and Commons' `commons_tag`, `sql` and
+`bindings` (version 2, written only when a query is present), bounded, with
 omissions named; replay validates it before rebuilding `extra` (ADR-0032,
 `R/tool-display-evidence.R`). The Shiny adapter rebuilds display HTML inert in
 `R/subagent-display.R`; core records keep the tool's own HTML.

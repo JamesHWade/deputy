@@ -1,6 +1,7 @@
 # ADR-0032: Approved tool display and provenance evidence
 
 Status: accepted for implementation in #238. Amends ADR-0020 and ADR-0022.
+Version 2 of the record adds Commons' query provenance (see the last section).
 
 ## Context
 
@@ -114,3 +115,33 @@ the obstacle to subagent workflows.
 - Tag provenance is a label recorded by the producer, not proof of trust.
   Trusted results remain the job of `TrustedResults` (ADR-0030).
 - Durable widget artifacts with their dependency bundles remain #144.
+
+## Version 2: query provenance
+
+posit-dev/commons#404 records, on each `call_metrics` and `call_calculation`
+result, the SQL that ran (`extra$sql`) and the values bound into its
+placeholders (`extra$bindings`), so a document built from the result can say
+where each number came from. Version 1 named both as unknown and dropped them,
+so a child's query was lost from inspection, export and saved history even
+though its result and tag were kept.
+
+- **Two more provenance fields.** `sql` is kept when it is one plain string of
+  at most 64 KiB. `bindings` is kept when it is an unnamed, attribute-free list
+  of at most 64 values, each one plain non-missing string (at most 4 KiB),
+  number or flag, which is what Commons binds. Attributes are checked before
+  anything else is read, so a classed value (a `Date`, say) is refused without
+  running its methods. A value that fails is dropped and named in
+  `omitted$provenance`, as a malformed tag already was.
+- **The version follows the fields.** A record holding either field is version
+  2; a record without them is still written as version 1. A reader that knows
+  only version 1 ignores a version 2 record, as it ignores any newer version, so
+  only the records that carry a query lose their card in an older reader.
+- **Validation is per version.** A version 1 record that carries `sql` or
+  `bindings` is invalid; a version 2 record's fields are checked by the same
+  rules as projection.
+- **Not shown in the shared conversation.** Activity cards (ADR-0033) carry the
+  display and tag only. The query lives in the subagent records: inspection,
+  observation, export, `delegation_history()` and saved conversation records.
+- **Disclosure applies as before.** The SQL names tables and columns, and the
+  bindings can hold values a user typed. Both reach only an authorized
+  requester, and a `DelegationDisclosure` redactor can remove them.

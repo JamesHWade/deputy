@@ -1,5 +1,13 @@
 # deputy (development version)
 
+* Subagent records keep the SQL behind a Commons query. Where Commons stores the
+  SQL a metric or calculation ran, and the values bound into it, with the
+  result, `$inspect_subagents()`, `$observe_subagents()`, `$export_subagents()`,
+  `delegation_history()` and saved conversations now keep them beside its card
+  and tag, within fixed sizes. Saved records that carry them use a new format
+  version, which earlier deputy versions ignore; records without them are saved
+  as before (#238).
+
 * A conversation saved with shinychat's history now reopens with every turn.
   A failed tool call inside a Shiny session carries Shiny's call stacks, which
   shinychat's file store can't read back, so the turn holding it was dropped
