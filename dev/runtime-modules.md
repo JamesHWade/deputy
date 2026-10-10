@@ -71,6 +71,7 @@ plan is rejected without keeping a replaced Chat alive; the check runs before
 any catalog or artifact is written. Re-initializing an Agent with a different
 Chat starts a new `ConversationState` and clears the previous conversation's
 activity overlay through its existing owner, which also resets the presenter.
+Context estimates then trust the new Chat's reported usage, as for a new Agent.
 Re-initializing with the same Chat preserves both conversation and activity.
 This keeps reconstruction consistent after cloning, fallback, and explicit Chat
 replacement. Agent-owned prompt writes pass through the same module, with

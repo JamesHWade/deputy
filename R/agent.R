@@ -197,6 +197,8 @@ Agent <- R6::R6Class(
       if (!is.null(previous_chat) && !identical(previous_chat, chat)) {
         private$.activity_overlay <- list()
         activity_reset(self)
+        # Usage the new Chat's turns report is its own, as for a new Agent.
+        private$.usage_stale_turns <- 0L
         unmark_chat_owner(previous_chat, self)
         mark_chat_owner(chat, self)
       }
