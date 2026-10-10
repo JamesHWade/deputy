@@ -72,6 +72,8 @@ any catalog or artifact is written. Re-initializing an Agent with a different
 Chat starts a new `ConversationState` and clears the previous conversation's
 activity overlay through its existing owner, which also resets the presenter.
 Context estimates then trust the new Chat's reported usage, as for a new Agent.
+Arguments and tool batches are checked before the switch; if a later step
+fails, the Agent returns to the previous Chat, its ownership and conversation.
 Re-initializing with the same Chat preserves both conversation and activity.
 This keeps reconstruction consistent after cloning, fallback, and explicit Chat
 replacement. Agent-owned prompt writes pass through the same module, with

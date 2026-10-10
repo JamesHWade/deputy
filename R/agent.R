@@ -214,61 +214,84 @@ Agent <- R6::R6Class(
       tools <- validate_tool_batch(tools, existing = backend_tools)
 
       # Set only when $initialize() is called again on an existing Agent.
-      # Its ownership moves with the Chat now, so a later failure here
-      # doesn't leave the Agent on a Chat it doesn't hold.
       previous_chat <- private$.chat
-      private$.chat <- chat
+      switching <- !is.null(previous_chat) && !identical(previous_chat, chat)
       # A different Chat is a different conversation: its retained turns,
-      # cleared results and summary don't carry over.
-      if (
-        is.null(private$.conversation_state) ||
-          (!is.null(previous_chat) && !identical(previous_chat, chat))
-      ) {
+      # cleared results, summary and shown activity don't carry over. If a
+      # later step fails, the Agent goes back to the previous Chat and its
+      # conversation, so the Agent always holds the Chat it is on.
+      if (switching) {
+        previous_state <- private$.conversation_state
+        previous_overlay <- private$.activity_overlay
+        previous_stale <- private$.usage_stale_turns
+        incoming_prompt <- chat$get_system_prompt()
+      }
+      private$.chat <- chat
+      if (is.null(private$.conversation_state) || switching) {
         private$.conversation_state <- ConversationState$new()
       }
-      if (!is.null(previous_chat) && !identical(previous_chat, chat)) {
+      if (switching) {
         private$.activity_overlay <- list()
-        activity_reset(self)
         # Usage the new Chat's turns report is its own, as for a new Agent.
         private$.usage_stale_turns <- 0L
         unmark_chat_owner(previous_chat, self)
         mark_chat_owner(chat, self)
       }
-      private$.permissions <- permissions
-      private$.trusted_results <- trusted_results
-      private$.usage_limits <- usage_limits
-      private$.context_policy <- context_policy
-      private$.working_dir <- working_dir
-      if (!is.null(approval_dir)) {
-        private$.approval_dir <- approval_dir
-      }
-      private$.hooks <- HookRegistry$new()
-      private$.run_context <- run_context
-      private$.agent_id <- agent_id
-      private$.agent_name <- agent_name
-      private$.session_id <- session_id
-      private$.file_checkpoint_config <- file_checkpoint_config
-      if (isTRUE(enable_file_checkpointing)) {
-        private$.file_checkpoints <- private$new_file_checkpoint_store()
-      }
+      tryCatch(
+        {
+          private$.permissions <- permissions
+          private$.trusted_results <- trusted_results
+          private$.usage_limits <- usage_limits
+          private$.context_policy <- context_policy
+          private$.working_dir <- working_dir
+          if (!is.null(approval_dir)) {
+            private$.approval_dir <- approval_dir
+          }
+          private$.hooks <- HookRegistry$new()
+          private$.run_context <- run_context
+          private$.agent_id <- agent_id
+          private$.agent_name <- agent_name
+          private$.session_id <- session_id
+          private$.file_checkpoint_config <- file_checkpoint_config
+          if (isTRUE(enable_file_checkpointing)) {
+            private$.file_checkpoints <- private$new_file_checkpoint_store()
+          }
 
-      # Override system prompt if provided
-      if (!is.null(system_prompt)) {
-        private$.conversation_state$set_prompt(
-          private$.chat,
-          system_prompt
-        )
+          # Override system prompt if provided
+          if (!is.null(system_prompt)) {
+            private$.conversation_state$set_prompt(
+              private$.chat,
+              system_prompt
+            )
+          }
+
+          # Rebind all tools to this Agent's runtime authority, including tools
+          # configured on the supplied Chat before Agent construction.
+          private$check_trusted_tools(c(backend_tools, tools))
+          wrapped <- lapply(c(backend_tools, tools), private$adapt_tool)
+          private$.chat$set_tools(wrapped)
+
+          # Wire up ellmer's callbacks for permission/hook enforcement
+          private$.chat$on_tool_request(private$handle_tool_request)
+          private$.chat$on_tool_result(private$handle_tool_result)
+        },
+        error = function(error) {
+          if (switching) {
+            unmark_chat_owner(chat, self)
+            mark_chat_owner(previous_chat, self)
+            try(chat$set_system_prompt(incoming_prompt), silent = TRUE)
+            private$.chat <- previous_chat
+            private$.conversation_state <- previous_state
+            private$.activity_overlay <- previous_overlay
+            private$.usage_stale_turns <- previous_stale
+          }
+          rlang::cnd_signal(error)
+        }
+      )
+      if (switching) {
+        # Only once the switch is certain: this also settles the presenter.
+        activity_reset(self)
       }
-
-      # Rebind all tools to this Agent's runtime authority, including tools
-      # configured on the supplied Chat before Agent construction.
-      private$check_trusted_tools(c(backend_tools, tools))
-      wrapped <- lapply(c(backend_tools, tools), private$adapt_tool)
-      private$.chat$set_tools(wrapped)
-
-      # Wire up ellmer's callbacks for permission/hook enforcement
-      private$.chat$on_tool_request(private$handle_tool_request)
-      private$.chat$on_tool_result(private$handle_tool_result)
 
       # shinychat uses the ellmer Chat protocol structurally. Agent supplies
       # that protocol while retaining ownership of the wrapped backend.

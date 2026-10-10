@@ -357,6 +357,16 @@ test_that("a bad argument to initialize() keeps the previous conversation", {
     agent$initialize(other, tools = list("not a tool")),
     class = "deputy_tool_registration"
   )
+  # A trusted-results policy is checked against the registry after the
+  # switch; its failure switches back.
+  expect_error(
+    agent$initialize(
+      other,
+      tools = list(tool_run_r_code),
+      trusted_results = TrustedResults(forecast = "get_forecast")
+    ),
+    "must remain registered"
+  )
 
   expect_identical(
     lapply(agent$get_turns(), ellmer::contents_record),
@@ -364,4 +374,26 @@ test_that("a bad argument to initialize() keeps the previous conversation", {
   )
   expect_identical(agent$get_system_prompt(), before_prompt)
   expect_length(agent$get_context_turns(), 2L)
+})
+
+test_that("a failed switch to another Chat keeps ownership of the first", {
+  first <- ellmer::chat_openai(credentials = function() "unused", echo = "none")
+  second <- ellmer::chat_openai(
+    credentials = function() "unused",
+    echo = "none"
+  )
+  agent <- Agent$new(first)
+
+  expect_error(
+    agent$initialize(
+      second,
+      tools = list(tool_run_r_code),
+      trusted_results = TrustedResults(forecast = "get_forecast")
+    ),
+    "must remain registered"
+  )
+
+  expect_length(chat_owners(second), 0L)
+  expect_length(chat_owners(first), 1L)
+  expect_identical(chat_owners(first)[[1L]], agent)
 })
