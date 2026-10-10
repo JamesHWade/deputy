@@ -22,3 +22,4 @@
     Condition
       Error in `conversation_abort()`:
       ! Adoption requires callbacks = 'replace'.
+

@@ -108,3 +108,4 @@
     Condition
       Error in `x$workflow$propose()`:
       ! The study was cancelled.
+

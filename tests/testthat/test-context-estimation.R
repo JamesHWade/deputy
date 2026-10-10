@@ -124,6 +124,33 @@ test_that("the auto estimate adds later content to the last reported usage", {
   expect_null(estimate_context(provider_only, list("Continue")))
 })
 
+test_that("reinitializing with another Chat uses that Chat's reported usage", {
+  local_ellmer_observations()
+  withr::local_options(ellmer_max_tries = 1)
+  server <- local_runtime_server(list(not_found_response()))
+  turns <- c(
+    list(create_mock_user_turn("Q1")),
+    tool_round(input = 5000, output = 200, result = strrep("x", 3000))
+  )
+  old_chat <- gateway_chat(server)
+  old_chat$set_turns(turns)
+  agent <- Agent$new(chat = old_chat)
+  # Clearing results marks the old Chat's reported usage as stale.
+  expect_identical(agent$microcompact(keep_last = 0L)$cleared, 1L)
+
+  new_chat <- gateway_chat(server)
+  new_chat$set_turns(turns)
+  agent$initialize(new_chat)
+  fresh_chat <- gateway_chat(server)
+  fresh_chat$set_turns(turns)
+  fresh <- Agent$new(chat = fresh_chat)
+
+  estimate <- estimate_context(agent, list("Continue"))
+  expect_identical(estimate$source, "estimate")
+  expect_gte(estimate$tokens, 5200)
+  expect_identical(estimate, estimate_context(fresh, list("Continue")))
+})
+
 test_that("auto compaction triggers from reported usage and pending content", {
   run_with <- function(max_tokens, estimator = "auto") {
     chat <- create_mock_chat(list("done"))

@@ -37,3 +37,4 @@
       ! Sub-agent permission mode cannot change under the lead policy
       x Lead mode readonly cannot delegate with mode full.
       i Use mode readonly, then tighten the child with disallowed_tools or max_requests.
+

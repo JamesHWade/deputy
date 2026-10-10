@@ -77,3 +77,4 @@
     Condition
       Error in `lead$register_sub_agent()`:
       ! `definition` must be an AgentDefinition object
+

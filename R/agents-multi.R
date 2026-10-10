@@ -308,10 +308,14 @@ LeadAgent <- R6::R6Class(
       tryCatch(
         {
           private$check_trusted_tools(private$.chat$get_tools())
-          private$.chat$set_system_prompt(private$replace_lead_prompt(
-            current_prompt,
-            private$.sub_agent_defs
-          ))
+          private$.conversation_state$set_prompt(
+            private$.chat,
+            private$replace_lead_prompt(
+              current_prompt,
+              private$.sub_agent_defs
+            ),
+            reconcile = FALSE
+          )
         },
         error = function(error) {
           if (is.null(previous)) {
@@ -319,7 +323,14 @@ LeadAgent <- R6::R6Class(
           } else {
             private$.sub_agent_defs[[name]] <- previous
           }
-          try(private$.chat$set_system_prompt(current_prompt), silent = TRUE)
+          try(
+            private$.conversation_state$set_prompt(
+              private$.chat,
+              current_prompt,
+              reconcile = FALSE
+            ),
+            silent = TRUE
+          )
           rlang::cnd_signal(error)
         }
       )

@@ -846,7 +846,7 @@ validate_fork_candidate <- function(parent, agent) {
     )
   }
   turns <- child_private$.chat$get_turns()
-  compacted <- child_private$.compacted_turns
+  compacted <- child_private$.conversation_state$retained_turns()
   if (length(turns) || length(compacted)) {
     context_fork_abort(
       "invalid",

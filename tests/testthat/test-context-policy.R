@@ -915,10 +915,10 @@ test_that("set_turns clears compacted history but preserves prompt additions", {
   agent$set_turns(list())
 
   expect_length(agent$get_turns(), 0L)
+  expect_length(agent$get_context_turns(), 0L)
   expect_match(agent$get_system_prompt(), "Base prompt", fixed = TRUE)
   expect_match(agent$get_system_prompt(), "Keep this context", fixed = TRUE)
   expect_no_match(agent$get_system_prompt(), "History to clear", fixed = TRUE)
-  expect_null(agent$.__enclos_env__$private$.compaction_summary)
 })
 
 test_that("set_turns preserves user-authored summary headings", {
@@ -966,9 +966,10 @@ test_that("compaction summary delimiters cannot terminate their own block", {
     "Retain text after the embedded delimiter.",
     fixed = TRUE
   )
-  expect_identical(
-    agent$.__enclos_env__$private$.compaction_summary,
-    collision_summary
+  expect_match(
+    agent$get_system_prompt(),
+    "Retain the first part.",
+    fixed = TRUE
   )
 
   chat$set_turns(list(
