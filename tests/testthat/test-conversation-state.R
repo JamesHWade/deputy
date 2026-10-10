@@ -397,3 +397,60 @@ test_that("a failed switch to another Chat keeps ownership of the first", {
   expect_length(chat_owners(first), 1L)
   expect_identical(chat_owners(first)[[1L]], agent)
 })
+
+test_that("a failed reinitialization keeps the Agent's settings", {
+  chat <- ellmer::chat_openai(credentials = function() "unused", echo = "none")
+  agent <- Agent$new(chat, permissions = permissions_readonly())
+  agent$add_hook(HookMatcher(event = "Stop", callback = function(...) NULL))
+  permissions <- agent$permissions
+  hooks <- agent$hooks
+  agent_id <- agent$agent_id
+
+  # The same Chat and a different one: the trusted-results check runs last.
+  for (target in list(
+    chat,
+    ellmer::chat_openai(
+      credentials = function() "unused",
+      echo = "none"
+    )
+  )) {
+    expect_error(
+      agent$initialize(
+        target,
+        tools = list(tool_run_r_code),
+        permissions = permissions_full(),
+        agent_id = "agent_other",
+        trusted_results = TrustedResults(forecast = "get_forecast")
+      ),
+      "must remain registered"
+    )
+    expect_identical(agent$permissions, permissions)
+    expect_identical(agent$hooks, hooks)
+    expect_identical(agent$agent_id, agent_id)
+    expect_null(agent$trusted_results)
+  }
+})
+
+test_that("a rejected Chat keeps none of the Agent's tools or callbacks", {
+  first <- ellmer::chat_openai(credentials = function() "unused", echo = "none")
+  second <- ellmer::chat_openai(
+    credentials = function() "unused",
+    echo = "none"
+  )
+  agent <- Agent$new(first)
+  unlockBinding("on_tool_result", second)
+  second$on_tool_result <- function(...) cli::cli_abort("Injected failure")
+  lockBinding("on_tool_result", second)
+
+  expect_error(
+    agent$initialize(second, tools = list(tool_read_file)),
+    "Injected failure"
+  )
+
+  callbacks <- second$.__enclos_env__$private$callback_on_tool_request
+  expect_identical(callbacks$count(), 0L)
+  expect_length(second$get_tools(), 0L)
+  expect_length(chat_owners(second), 0L)
+  expect_identical(chat_owners(first)[[1L]], agent)
+  expect_false("read_file" %in% names(first$get_tools()))
+})

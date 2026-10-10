@@ -134,6 +134,26 @@ Agent <- R6::R6Class(
       if (!is.null(private$.chat)) {
         check_conversation_initialization(self)
       }
+      # A failed re-initialize leaves the Agent as it was: its settings,
+      # Chat, prompt and conversation.
+      reinit <- NULL
+      if (!is.null(private$.chat)) {
+        reinit <- list(
+          private = agent_private_snapshot(private),
+          state = private$.conversation_state$clone(),
+          chat = private$.chat,
+          prompt = private$.chat$get_system_prompt()
+        )
+      }
+      completed <- FALSE
+      on.exit(
+        if (!completed && !is.null(reinit)) {
+          agent_private_restore(private, reinit$private)
+          private$.conversation_state <- reinit$state
+          try(reinit$chat$set_system_prompt(reinit$prompt), silent = TRUE)
+        },
+        add = TRUE
+      )
       check_incoming_conversation(chat)
       if (
         !S7::S7_inherits(delegation_disclosure, DelegationDisclosure) ||
@@ -221,10 +241,9 @@ Agent <- R6::R6Class(
       # later step fails, the Agent goes back to the previous Chat and its
       # conversation, so the Agent always holds the Chat it is on.
       if (switching) {
-        previous_state <- private$.conversation_state
-        previous_overlay <- private$.activity_overlay
-        previous_stale <- private$.usage_stale_turns
         incoming_prompt <- chat$get_system_prompt()
+        incoming_tools <- chat$get_tools()
+        unregister <- list()
       }
       private$.chat <- chat
       if (is.null(private$.conversation_state) || switching) {
@@ -272,18 +291,25 @@ Agent <- R6::R6Class(
           private$.chat$set_tools(wrapped)
 
           # Wire up ellmer's callbacks for permission/hook enforcement
-          private$.chat$on_tool_request(private$handle_tool_request)
-          private$.chat$on_tool_result(private$handle_tool_result)
+          unregister <- list(
+            private$.chat$on_tool_request(private$handle_tool_request)
+          )
+          unregister <- c(
+            unregister,
+            private$.chat$on_tool_result(private$handle_tool_result)
+          )
         },
         error = function(error) {
           if (switching) {
+            # The rejected Chat keeps nothing of this Agent. The on.exit()
+            # above restores the Agent's own fields.
+            for (remove in unregister) {
+              try(remove(), silent = TRUE)
+            }
+            try(chat$set_tools(incoming_tools), silent = TRUE)
+            try(chat$set_system_prompt(incoming_prompt), silent = TRUE)
             unmark_chat_owner(chat, self)
             mark_chat_owner(previous_chat, self)
-            try(chat$set_system_prompt(incoming_prompt), silent = TRUE)
-            private$.chat <- previous_chat
-            private$.conversation_state <- previous_state
-            private$.activity_overlay <- previous_overlay
-            private$.usage_stale_turns <- previous_stale
           }
           rlang::cnd_signal(error)
         }
@@ -311,6 +337,7 @@ Agent <- R6::R6Class(
       # Marked only once construction succeeded, so a failed Agent$new() never
       # claims the Chat.
       mark_chat_owner(chat, self)
+      completed <- TRUE
       invisible(self)
     },
 
@@ -3569,3 +3596,19 @@ Agent <- R6::R6Class(
     deputy_agent_tool_records_methods()
   )
 )
+
+# Every non-function private field, so a failed $initialize() can put back
+# what it changed. Methods are skipped: they never change.
+agent_private_snapshot <- function(private) {
+  values <- mget(ls(private, all.names = TRUE), envir = private)
+  values[!vapply(values, is.function, logical(1))]
+}
+
+agent_private_restore <- function(private, snapshot) {
+  for (name in names(snapshot)) {
+    if (!identical(get(name, envir = private), snapshot[[name]])) {
+      assign(name, snapshot[[name]], envir = private)
+    }
+  }
+  invisible(NULL)
+}
