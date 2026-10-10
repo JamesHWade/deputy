@@ -491,6 +491,19 @@ test_that("tool_run_bash keeps stderr from a successful command", {
   )
 })
 
+test_that("the R and shell tools' processes don't load deputy", {
+  expect_match(
+    run_r_code_impl("isNamespaceLoaded('deputy')"),
+    "[1] FALSE",
+    fixed = TRUE
+  )
+  skip_on_os("windows")
+  expect_identical(
+    run_bash_impl("echo ready"),
+    "ready"
+  )
+})
+
 test_that("tool_run_r_code requires callr for process isolation", {
   check_installed <- rlang::check_installed
   local_mocked_bindings(is_interactive = function() FALSE, .package = "rlang")

@@ -422,3 +422,18 @@ test_that("validate_path_at_operation keeps the directory the policy resolved", 
   expect_false(ran)
   expect_false(file.exists(file.path(outside, "file.txt")))
 })
+
+test_that("functions sent to a child process keep no source references", {
+  fun <- eval(parse(
+    text = "function() tryCatch(stop('x'), error = function(e) 'handled')",
+    keep.source = TRUE
+  ))
+  expect_s3_class(body(fun)[[3L]][[4L]], "srcref")
+
+  sent <- child_function(fun)
+  expect_null(attr(sent, "srcref"))
+  expect_null(body(sent)[[3L]][[4L]])
+  expect_identical(environment(sent), baseenv())
+  expect_identical(sent(), "handled")
+  expect_identical(environment(child_function(fun, globalenv())), globalenv())
+})

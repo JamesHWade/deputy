@@ -818,7 +818,7 @@ check_interrupted_approval <- function(abrupt = FALSE) {
     libpath = .libPaths()
   )
   withr::defer(child$kill())
-  child$wait(timeout = 10000)
+  child$wait(timeout = child_load_allowance(10) * 1000)
   expect_false(child$is_alive())
   if (!child$get_exit_status() %in% c(0L, -9L)) {
     child$get_result()

@@ -550,7 +550,7 @@ test_that("both gates accept exactly the shared list of qualified releases", {
   # baseenv() in the callr worker; it must reject an unlisted installation.
   installed <- as.character(utils::packageVersion("mcptools"))
   expect_error(
-    mcp_worker_function(mcp_worker_start)(
+    child_function(mcp_worker_start)(
       config = list(),
       server = "unused",
       working_dir = tempdir(),

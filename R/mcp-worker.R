@@ -3,11 +3,6 @@
 # connection registry; mcptools still owns transport, authentication, IDs,
 # conversion and shutdown. No interpreter runs in this R worker.
 
-mcp_worker_function <- function(fun) {
-  environment(fun) <- baseenv()
-  fun
-}
-
 # callr can deliver conditions and progress before the terminal result.
 # Keep the operation pending until its completion or worker termination event.
 mcp_worker_read_result <- function(worker) {

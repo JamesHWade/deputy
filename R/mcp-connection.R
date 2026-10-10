@@ -123,7 +123,7 @@ McpConnection <- R6::R6Class(
         }
       }
       private$worker$call(
-        mcp_worker_function(mcp_worker_start),
+        child_function(mcp_worker_start),
         list(
           config = selected,
           server = server,
@@ -405,7 +405,7 @@ McpConnection <- R6::R6Class(
             grace <- attr(self, "deputy_mcp_adapter", exact = TRUE)$close_grace
             grace <- if (is.null(grace)) 0 else grace
             private$worker$call(
-              mcp_worker_function(mcp_worker_request),
+              child_function(mcp_worker_request),
               list(operation = "close", arguments = list(grace = grace))
             )
             deadline <- Sys.time() + min(private$timeout, 2) + grace
@@ -519,7 +519,7 @@ McpConnection <- R6::R6Class(
         private$pending_reject <- reject
         tryCatch(
           private$worker$call(
-            mcp_worker_function(mcp_worker_request),
+            child_function(mcp_worker_request),
             list(operation = operation, arguments = arguments)
           ),
           error = function(e) {

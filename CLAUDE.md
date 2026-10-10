@@ -1036,6 +1036,11 @@ instrumentation does not delay PR feedback. A newer commit cancels obsolete PR
 validation runs; main-branch validations are retained. For local debugging, set
 `TESTTHAT_PARALLEL=false` to run tests sequentially. See `dev/ci-performance.md`
 for measured timings and the remaining gap to the two-minute target.
+Send any function a child R process runs through `child_function()`
+(`R/utils.R`), which drops its source references: under covr a nested one made
+the child load the instrumented deputy, over ten seconds that also wrote to its
+stderr. A test whose child loads deputy on purpose allows extra time with
+`child_load_allowance()` (`tests/testthat/helper-processes.R`).
 
 `claude-code-review.yml` follows Anthropic's documented setup: the official
 `anthropics/claude-code-action@v1` runs the `code-review` plugin with
