@@ -282,7 +282,11 @@ try_chat_fallback <- function(agent, condition) {
   }
   selected <- state$fallback_index + 1L
   replacement <- clone_governed_chat(private$.fallback_chats[[selected]])
-  replacement$set_system_prompt(private$.chat$get_system_prompt())
+  private$.conversation_state$set_prompt(
+    replacement,
+    private$.chat$get_system_prompt(),
+    reconcile = FALSE
+  )
   replacement$set_turns(state$dispatch_turns)
   # Adapt the current registry again to retain the same authority and working
   # directory. The replacement never imports executable tools from a template.
@@ -411,7 +415,11 @@ replace_agent_chat <- function(agent, chat) {
   reader_registered <- private$.tool_result_reader_registered
   moved <- tryCatch(
     {
-      chat$set_system_prompt(old$get_system_prompt())
+      private$.conversation_state$set_prompt(
+        chat,
+        old$get_system_prompt(),
+        reconcile = FALSE
+      )
       chat$set_turns(moved_turns)
       chat$set_tools(tools)
       private$.chat <- chat
@@ -429,20 +437,23 @@ replace_agent_chat <- function(agent, chat) {
     try(clear_chat_tool_callbacks(chat), silent = TRUE)
     try(chat$set_tools(list()), silent = TRUE)
     try(chat$set_turns(list()), silent = TRUE)
-    try(chat$set_system_prompt(destination_prompt), silent = TRUE)
+    try(
+      private$.conversation_state$set_prompt(
+        chat,
+        destination_prompt,
+        reconcile = FALSE
+      ),
+      silent = TRUE
+    )
     rlang::cnd_signal(moved)
   }
-  # Microcompacted results and shown activity are keyed by position; dropped
-  # turns shift them.
-  private$.cleared_tool_results <- remap_cleared_tool_results(
-    private$.cleared_tool_results,
-    kept,
-    offset = length(private$.compacted_turns)
-  )
+  # Microcompacted results are keyed by position; dropped turns shift them.
+  # Remap the state only after the destination Chat has been rewired.
+  private$.conversation_state$remap_context(kept)
   private$.activity_overlay <- activity_remap(
     private$.activity_overlay,
     kept,
-    offset = length(private$.compacted_turns)
+    offset = length(private$.conversation_state$retained_turns())
   )
   unmark_chat_owner(old, agent)
   mark_chat_owner(chat, agent)
@@ -498,25 +509,6 @@ portable_turns <- function(turns) {
   })
   kept <- which(!vapply(turns, is.null, logical(1)))
   structure(turns[kept], kept = kept)
-}
-
-# Microcompacted tool results are keyed "turn:content" by position in the
-# complete conversation: the compacted prefix (`offset` turns), then the
-# context. Moves the context keys to where the kept turns now sit.
-remap_cleared_tool_results <- function(originals, kept, offset) {
-  if (length(originals) == 0L) {
-    return(originals)
-  }
-  parts <- strsplit(names(originals), ":", fixed = TRUE)
-  turn <- as.integer(vapply(parts, `[[`, character(1), 1L))
-  content <- vapply(parts, `[[`, character(1), 2L)
-  context <- turn > offset
-  moved <- match(turn[context] - offset, kept)
-  turn[context] <- offset + moved
-  keep <- !is.na(turn)
-  originals <- originals[keep]
-  names(originals) <- cleared_result_key(turn[keep], content[keep])
-  originals
 }
 
 # ellmer resets a cancelled controller when a stream starts. A governed stream

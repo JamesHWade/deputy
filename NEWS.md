@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* `Agent$initialize()` with a different Chat drops the previous conversation's
+  subagent tool cards and pending activity, so they cannot appear in the new
+  conversation or its saved session. Reinitializing with the same Chat keeps
+  its activity (#249).
+
 * Subagent records keep the SQL behind a Commons query. Where Commons stores the
   SQL a metric or calculation ran, and the values bound into it, with the
   result, `$inspect_subagents()`, `$observe_subagents()`, `$export_subagents()`,

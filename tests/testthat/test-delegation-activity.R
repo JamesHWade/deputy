@@ -348,6 +348,133 @@ test_that("last_turn() includes the activity shown in it", {
   expect_length(agent$get_context_turns()[[2L]]@contents, 1L)
 })
 
+test_that("reinitializing with another Chat drops its old activity", {
+  marker <- list(
+    format = "deputy_subagent_activity",
+    version = 1L,
+    activity_id = "deputy_activity_abc_1",
+    label = "sales"
+  )
+  shown <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  answer <- ellmer::ContentToolResult(
+    "60",
+    request = shown,
+    extra = list(deputy_activity = marker)
+  )
+  old_turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("Old question"))),
+    ellmer::AssistantTurn(list(
+      ellmer::ContentText("Old answer"),
+      shown,
+      answer
+    ))
+  )
+  old_chat <- ellmer::chat_openai(
+    credentials = function() "unused",
+    echo = "none"
+  )
+  agent <- Agent$new(old_chat)
+  agent$set_turns(old_turns)
+  presenter <- activity_enable(agent, function() "viewer")
+  presenter$queue <- list(shown)
+  private <- agent$.__enclos_env__$private
+  private$.activity_leftover <- list(
+    run_id = private$current_run_id,
+    presenter = presenter,
+    queue = list(answer)
+  )
+
+  new_turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("New question"))),
+    ellmer::AssistantTurn(list(ellmer::ContentText("New answer")))
+  )
+  new_chat <- ellmer::chat_openai(
+    credentials = function() "unused",
+    echo = "none"
+  )
+  new_chat$set_turns(new_turns)
+  agent$initialize(new_chat)
+
+  expect_length(activity_take(agent), 0L)
+  expect_identical(agent$get_context_turns(), new_turns)
+  expect_identical(agent$get_turns(), new_turns)
+  expect_identical(agent$last_turn(), new_turns[[2L]])
+  expect_identical(agent$last_turn("user"), new_turns[[1L]])
+
+  path <- withr::local_tempfile(fileext = ".rds")
+  suppressMessages(agent$save_session(path))
+  session <- readRDS(path)
+  expect_null(session$activity)
+
+  loaded <- Agent$new(ellmer::chat_openai(
+    credentials = function() "unused",
+    echo = "none"
+  ))
+  suppressMessages(loaded$load_session(path))
+  expect_identical(loaded$get_context_turns(), new_turns)
+  expect_identical(loaded$get_turns(), new_turns)
+  expect_identical(loaded$last_turn(), new_turns[[2L]])
+})
+
+test_that("reinitializing with the same Chat keeps its shown activity", {
+  marker <- list(
+    format = "deputy_subagent_activity",
+    version = 1L,
+    activity_id = "deputy_activity_abc_1",
+    label = "sales"
+  )
+  shown <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  answer <- ellmer::ContentToolResult(
+    "60",
+    request = shown,
+    extra = list(deputy_activity = marker)
+  )
+  turns <- list(
+    ellmer::UserTurn(list(ellmer::ContentText("Question"))),
+    ellmer::AssistantTurn(list(
+      ellmer::ContentText("Answer"),
+      shown,
+      answer
+    ))
+  )
+  chat <- ellmer::chat_openai(
+    credentials = function() "unused",
+    echo = "none"
+  )
+  agent <- Agent$new(chat)
+  agent$set_turns(turns)
+  presenter <- activity_enable(agent, function() "viewer")
+  presenter$queue <- list(shown)
+  private <- agent$.__enclos_env__$private
+  private$.activity_leftover <- list(
+    run_id = private$current_run_id,
+    presenter = presenter,
+    queue = list(answer)
+  )
+  agent$initialize(chat)
+
+  expect_identical(activity_take(agent), list(answer, shown))
+  expect_identical(agent$get_turns(), turns)
+  expect_identical(agent$last_turn(), turns[[2L]])
+  expect_identical(
+    agent$get_context_turns(),
+    list(
+      ellmer::UserTurn(list(ellmer::ContentText("Question"))),
+      ellmer::AssistantTurn(list(ellmer::ContentText("Answer")))
+    )
+  )
+})
+
 test_that("moving to another Chat keeps shown activity on its own turn", {
   marker <- list(
     format = "deputy_subagent_activity",

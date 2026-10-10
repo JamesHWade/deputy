@@ -61,3 +61,4 @@
     Condition
       Error in `history_validate_protocols()`:
       ! protocols must contain distinct values from baseline and budget-aware.
+

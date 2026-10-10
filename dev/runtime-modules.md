@@ -1,9 +1,9 @@
 # Runtime module boundaries
 
-The ellmer integration is a semantic change; the following file moves are a
-separate mechanical commit. Public method signatures, method bodies (excluding
-source positions), permission authority, R6 fields, and session/checkpoint
-formats remain unchanged by the moves.
+The initial extraction separated internal source organization from the ellmer
+integration. The table below describes the current owners of runtime behavior.
+Public Agent signatures, permission authority, and session/checkpoint formats
+remain stable as these internal modules evolve.
 
 | Responsibility | Source |
 | --- | --- |
@@ -29,7 +29,8 @@ formats remain unchanged by the moves.
 | Durable host-scheduled job records and recovery transitions | `R/agent-job.R` |
 | Job manifests, graph snapshots and governed runtime checkpoints | `R/agent-job-runtime.R` |
 | Session payload construction and restoration | `R/agent-session.R` |
-| Context estimation and compaction | `R/agent-context.R` |
+| Context estimation and compaction orchestration | `R/agent-context.R` |
+| Selected conversation reconstruction, prompt framing and atomic state transitions | `R/conversation-state.R` |
 | Governed asynchronous compaction requests and recovery | `R/compaction-run.R` |
 | Permission/hook callbacks and upstream tool content extraction | `R/agent-tool-callbacks.R` |
 | Tool call records and delegation correlation | `R/agent-tool-records.R` |
@@ -61,6 +62,32 @@ methods to the same `self` and `private` environments. Explicit roxygen
 `@include` directives generate `DESCRIPTION`'s collation order; no alphabetical
 load-order assumptions, dynamic source loading, or new public facade are added.
 The factories are not alternate runtimes or provider adapters.
+
+`ConversationState` owns retained turns, the originals of microcompacted tool
+results, and the installed summary. Its operations receive the current Chat;
+the owner never caches a Chat or an Agent callback. A compaction plan holds
+only a weak reference to the Chat it was prepared from, so a stale automatic
+plan is rejected without keeping a replaced Chat alive; the check runs before
+any catalog or artifact is written. Re-initializing an Agent with a different
+Chat starts a new `ConversationState` and clears the previous conversation's
+activity overlay through its existing owner, which also resets the presenter.
+Context estimates then trust the new Chat's reported usage, as for a new Agent.
+Arguments and tool batches are checked before the switch; if a later step
+fails, the Agent returns to the previous Chat, its ownership and conversation.
+Re-initializing with the same Chat preserves both conversation and activity.
+This keeps reconstruction consistent after cloning, fallback, and explicit Chat
+replacement. Agent-owned prompt writes pass through the same module, with
+explicit prompt replacement reconciling summary identity and internal appends
+preserving it.
+
+Conversation installation rolls back the Chat when a setter or synchronous
+installation callback fails, and commits its owned state only after that
+callback succeeds. Compaction and session restoration use this seam to register
+artifact readers before accepting the conversation. Artifact transactions,
+provider selection, approval authority, activity projection, and run accounting
+retain their existing owners. Snapshot traversal centralizes the turn-bearing
+fields without changing schema 3. Tests exercise these transitions through the
+public Agent interface.
 
 ## Size exception
 

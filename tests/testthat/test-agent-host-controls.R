@@ -450,13 +450,16 @@ test_that("set_chat() keeps microcompacted results after dropping a turn", {
 })
 
 test_that("a failed reinitialization leaves the Agent owning its Chat", {
-  agent <- Agent$new(create_mock_chat())
+  first <- create_mock_chat()
+  agent <- Agent$new(first)
   chat <- create_mock_chat()
   expect_error(agent$initialize(chat, context_policy = "not a policy"))
 
-  expect_identical(chat_owners(chat), list(agent))
+  # The Agent stays on the Chat it already held.
+  expect_identical(chat_owners(first), list(agent))
+  expect_length(chat_owners(chat), 0L)
   expect_error(
-    Agent$new(create_mock_chat())$set_chat(chat),
+    Agent$new(create_mock_chat())$set_chat(first),
     "already belongs to another Agent"
   )
 })

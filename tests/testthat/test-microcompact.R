@@ -180,16 +180,26 @@ test_that("saved sessions keep cleared originals and set_turns() drops them", {
   expect_identical(result_values(restored$get_turns()), "[cleared]")
 })
 
-test_that("last_turn() and results without a call id keep their values", {
-  # The last user turn holds a cleared result; last_turn() shows the original.
+test_that("last_turn preserves Chat selection with trailing tool results", {
+  # Agent$last_turn() keeps the Chat backend's selection. Capture it before
+  # microcompaction because a backend may select an earlier user turn when the
+  # final user turn contains only a tool result.
   chat <- ellmer::chat_openai(credentials = function() "unused", echo = "none")
   chat$set_turns(microcompact_turns())
+  expected <- chat$last_turn("user")
   agent <- Agent$new(chat = chat)
   agent$microcompact(keep_last = 0L, marker = "[cleared]")
+  # The selection holds a tool result, so the restoration is checked too.
+  expect_identical(result_values(list(expected)), "the latest search result")
+  expect_identical(
+    ellmer::contents_record(agent$last_turn("user")),
+    ellmer::contents_record(expected)
+  )
   expect_identical(
     result_values(list(agent$last_turn("user"))),
     "the latest search result"
   )
+  expect_true("[cleared]" %in% result_values(agent$get_context_turns()))
 
   # Results are tracked by position, so a result without a call id is
   # cleared from context and still restored in the conversation view.
@@ -278,21 +288,31 @@ test_that("originals survive a later compaction into the retained prefix", {
   )
 })
 
-test_that("last_turn() restores a trailing tool-result turn", {
-  chat <- ellmer::chat_openai(credentials = function() "unused", echo = "none")
-  # History that ends with a user turn holding a tool result.
+test_that("last_turn restores an original trailing tool-result turn", {
+  chat <- create_compaction_mock_chat()
+  # This fixture deliberately returns the trailing user turn so the test can
+  # exercise result restoration independently of backend turn selection.
   chat$set_turns(microcompact_turns()[1:3])
+  expected <- chat$get_turns()[[3L]]
+  original_last_turn <- chat$last_turn
+  chat$last_turn <- function(role = "assistant") {
+    if (identical(role, "user")) {
+      return(chat$get_turns()[[3L]])
+    }
+    original_last_turn(role)
+  }
+  expect_identical(
+    ellmer::contents_record(chat$last_turn("user")),
+    ellmer::contents_record(expected)
+  )
   agent <- Agent$new(chat = chat)
   agent$microcompact(keep_last = 0L, marker = "[cleared]")
   returned <- agent$last_turn("user")
-  expected <- restore_cleared_tool_results(
-    agent$get_context_turns(),
-    agent$.__enclos_env__$private$.cleared_tool_results
+  expect_identical(
+    ellmer::contents_record(returned),
+    ellmer::contents_record(expected)
   )
-  expect_true(any(vapply(
-    expected,
-    function(turn) identical(turn, returned),
-    logical(1)
-  )))
+  expect_identical(result_values(list(returned)), "a long search result")
+  expect_identical(result_values(agent$get_context_turns()), "[cleared]")
   expect_false("[cleared]" %in% result_values(list(returned)))
 })

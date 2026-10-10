@@ -36,6 +36,21 @@ _Avoid_: execution, invocation, call
 A single exchange within a run — one model response and any tool calls it requested.
 _Avoid_: step, iteration, round
 
+**Selected conversation**:
+The complete path of turns currently chosen by the host, including material
+removed from model context and subagent activity shown with those turns.
+_Avoid_: model context, conversation snapshot
+
+**Model context**:
+The instructions and turns currently supplied to the model. It may contain
+summaries or result markers in place of material in the selected conversation.
+_Avoid_: selected conversation, transcript
+
+**Conversation state**:
+Retained turns, originals of tool results cleared from model context, and the
+installed summary used to reconstruct the selected conversation from the current
+Chat. Its transitions keep those records consistent with changes to model context.
+
 **Conversation snapshot**:
 The serialized contents of an Agent's selected conversation and model context,
 written to and read from disk by `save_session()` and `load_session()`. Concerns
