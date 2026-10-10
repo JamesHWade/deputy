@@ -353,6 +353,10 @@ test_that("a bad argument to initialize() keeps the previous conversation", {
     agent$initialize(other, context_policy = "not a policy"),
     "ContextPolicy"
   )
+  expect_error(
+    agent$initialize(other, tools = list("not a tool")),
+    class = "deputy_tool_registration"
+  )
 
   expect_identical(
     lapply(agent$get_turns(), ellmer::contents_record),

@@ -181,8 +181,8 @@ Agent <- R6::R6Class(
       if (!S7::S7_inherits(permissions, Permissions)) {
         cli_abort("{.arg permissions} must be a Permissions object")
       }
-      # Check every remaining argument before the Chat changes, so a bad one
-      # leaves an existing Agent on its previous conversation.
+      # Check every remaining argument and tool before the Chat changes, so a
+      # bad one leaves an existing Agent on its previous conversation.
       trusted_results <- normalize_trusted_results(trusted_results)
       usage_limits <- normalize_usage_limits(usage_limits)
       context_policy <- normalize_context_policy(context_policy)
@@ -207,6 +207,11 @@ Agent <- R6::R6Class(
       ) {
         cli_abort("{.arg enable_file_checkpointing} must be TRUE or FALSE")
       }
+      backend_tools <- validate_tool_batch(
+        chat$get_tools(),
+        preserve_reader = TRUE
+      )
+      tools <- validate_tool_batch(tools, existing = backend_tools)
 
       # Set only when $initialize() is called again on an existing Agent.
       # Its ownership moves with the Chat now, so a later failure here
@@ -257,12 +262,6 @@ Agent <- R6::R6Class(
 
       # Rebind all tools to this Agent's runtime authority, including tools
       # configured on the supplied Chat before Agent construction.
-      backend_tools <- private$.chat$get_tools()
-      backend_tools <- validate_tool_batch(
-        backend_tools,
-        preserve_reader = TRUE
-      )
-      tools <- validate_tool_batch(tools, existing = backend_tools)
       private$check_trusted_tools(c(backend_tools, tools))
       wrapped <- lapply(c(backend_tools, tools), private$adapt_tool)
       private$.chat$set_tools(wrapped)
