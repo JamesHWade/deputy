@@ -240,11 +240,10 @@ Agent <- R6::R6Class(
       # cleared results, summary and shown activity don't carry over. If a
       # later step fails, the Agent goes back to the previous Chat and its
       # conversation, so the Agent always holds the Chat it is on.
-      if (switching) {
-        incoming_prompt <- chat$get_system_prompt()
-        incoming_tools <- chat$get_tools()
-        unregister <- list()
-      }
+      # The Chat as it came, so a failure below can undo what was done to it.
+      incoming_prompt <- chat$get_system_prompt()
+      incoming_tools <- chat$get_tools()
+      unregister <- list()
       private$.chat <- chat
       if (is.null(private$.conversation_state) || switching) {
         private$.conversation_state <- ConversationState$new()
@@ -300,14 +299,14 @@ Agent <- R6::R6Class(
           )
         },
         error = function(error) {
+          # The Chat keeps nothing this attempt installed. The on.exit()
+          # above restores the Agent's own fields.
+          for (remove in unregister) {
+            try(remove(), silent = TRUE)
+          }
+          try(chat$set_tools(incoming_tools), silent = TRUE)
+          try(chat$set_system_prompt(incoming_prompt), silent = TRUE)
           if (switching) {
-            # The rejected Chat keeps nothing of this Agent. The on.exit()
-            # above restores the Agent's own fields.
-            for (remove in unregister) {
-              try(remove(), silent = TRUE)
-            }
-            try(chat$set_tools(incoming_tools), silent = TRUE)
-            try(chat$set_system_prompt(incoming_prompt), silent = TRUE)
             unmark_chat_owner(chat, self)
             mark_chat_owner(previous_chat, self)
           }

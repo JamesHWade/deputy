@@ -454,3 +454,29 @@ test_that("a rejected Chat keeps none of the Agent's tools or callbacks", {
   expect_identical(chat_owners(first)[[1L]], agent)
   expect_false("read_file" %in% names(first$get_tools()))
 })
+
+test_that("a failed same-Chat reinitialization leaves its tools and callbacks", {
+  chat <- ellmer::chat_openai(credentials = function() "unused", echo = "none")
+  agent <- Agent$new(chat, tools = list(tool_read_file))
+  tools <- chat$get_tools()
+  callbacks <- chat$.__enclos_env__$private$callback_on_tool_request
+  count <- callbacks$count()
+  unlockBinding("on_tool_result", chat)
+  original <- chat$on_tool_result
+  chat$on_tool_result <- function(...) cli::cli_abort("Injected failure")
+  lockBinding("on_tool_result", chat)
+  withr::defer({
+    unlockBinding("on_tool_result", chat)
+    chat$on_tool_result <- original
+    lockBinding("on_tool_result", chat)
+  })
+
+  expect_error(
+    agent$initialize(chat, tools = list(tool_list_files)),
+    "Injected failure"
+  )
+
+  expect_identical(callbacks$count(), count)
+  expect_identical(names(chat$get_tools()), names(tools))
+  expect_identical(chat_owners(chat)[[1L]], agent)
+})
