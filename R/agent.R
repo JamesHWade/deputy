@@ -181,6 +181,33 @@ Agent <- R6::R6Class(
       if (!S7::S7_inherits(permissions, Permissions)) {
         cli_abort("{.arg permissions} must be a Permissions object")
       }
+      # Check every remaining argument before the Chat changes, so a bad one
+      # leaves an existing Agent on its previous conversation.
+      trusted_results <- normalize_trusted_results(trusted_results)
+      usage_limits <- normalize_usage_limits(usage_limits)
+      context_policy <- normalize_context_policy(context_policy)
+      if (!is.null(approval_dir)) {
+        approval_dir <- approval_store_path(approval_dir)
+      }
+      run_context <- normalize_run_context(run_context)
+      file_checkpoint_config <- list(
+        max_file_bytes = file_checkpoint_byte_limit(
+          file_checkpoint_max_file_bytes,
+          "file_checkpoint_max_file_bytes"
+        ),
+        max_journal_bytes = file_checkpoint_byte_limit(
+          file_checkpoint_max_journal_bytes,
+          "file_checkpoint_max_journal_bytes"
+        )
+      )
+      if (
+        !is.logical(enable_file_checkpointing) ||
+          length(enable_file_checkpointing) != 1L ||
+          is.na(enable_file_checkpointing)
+      ) {
+        cli_abort("{.arg enable_file_checkpointing} must be TRUE or FALSE")
+      }
+
       # Set only when $initialize() is called again on an existing Agent.
       # Its ownership moves with the Chat now, so a later failure here
       # doesn't leave the Agent on a Chat it doesn't hold.
@@ -203,35 +230,19 @@ Agent <- R6::R6Class(
         mark_chat_owner(chat, self)
       }
       private$.permissions <- permissions
-      private$.trusted_results <- normalize_trusted_results(trusted_results)
-      private$.usage_limits <- normalize_usage_limits(usage_limits)
-      private$.context_policy <- normalize_context_policy(context_policy)
+      private$.trusted_results <- trusted_results
+      private$.usage_limits <- usage_limits
+      private$.context_policy <- context_policy
       private$.working_dir <- working_dir
       if (!is.null(approval_dir)) {
-        private$.approval_dir <- approval_store_path(approval_dir)
+        private$.approval_dir <- approval_dir
       }
       private$.hooks <- HookRegistry$new()
-      private$.run_context <- normalize_run_context(run_context)
+      private$.run_context <- run_context
       private$.agent_id <- agent_id
       private$.agent_name <- agent_name
       private$.session_id <- session_id
-      private$.file_checkpoint_config <- list(
-        max_file_bytes = file_checkpoint_byte_limit(
-          file_checkpoint_max_file_bytes,
-          "file_checkpoint_max_file_bytes"
-        ),
-        max_journal_bytes = file_checkpoint_byte_limit(
-          file_checkpoint_max_journal_bytes,
-          "file_checkpoint_max_journal_bytes"
-        )
-      )
-      if (
-        !is.logical(enable_file_checkpointing) ||
-          length(enable_file_checkpointing) != 1L ||
-          is.na(enable_file_checkpointing)
-      ) {
-        cli_abort("{.arg enable_file_checkpointing} must be TRUE or FALSE")
-      }
+      private$.file_checkpoint_config <- file_checkpoint_config
       if (isTRUE(enable_file_checkpointing)) {
         private$.file_checkpoints <- private$new_file_checkpoint_store()
       }

@@ -339,3 +339,25 @@ test_that("re-initializing with a different Chat starts a new conversation", {
   expect_identical(agent$get_context_turns(), agent$get_turns())
   expect_no_match(agent$get_system_prompt(), "First summary", fixed = TRUE)
 })
+
+test_that("a bad argument to initialize() keeps the previous conversation", {
+  chat <- create_compaction_mock_chat()
+  chat$set_turns(conversation_state_turns())
+  agent <- Agent$new(chat = chat, system_prompt = "First prompt")
+  agent$compact(keep_last = 2L, summary = "First summary")
+  before_turns <- lapply(agent$get_turns(), ellmer::contents_record)
+  before_prompt <- agent$get_system_prompt()
+
+  other <- create_compaction_mock_chat()
+  expect_error(
+    agent$initialize(other, context_policy = "not a policy"),
+    "ContextPolicy"
+  )
+
+  expect_identical(
+    lapply(agent$get_turns(), ellmer::contents_record),
+    before_turns
+  )
+  expect_identical(agent$get_system_prompt(), before_prompt)
+  expect_length(agent$get_context_turns(), 2L)
+})
