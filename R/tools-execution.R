@@ -1,5 +1,37 @@
 # Trusted one-shot R and shell tools.
 
+# What each tool's child process runs, sent with `child_function()`.
+run_r_code_child <- function(code_string) {
+  output <- utils::capture.output({
+    result <- tryCatch(
+      base::eval(base::parse(text = code_string)),
+      error = function(e) list(.deputy_error = e$message)
+    )
+  })
+  list(
+    output = paste(output, collapse = "\n"),
+    result = if (is.list(result) && ".deputy_error" %in% names(result)) {
+      paste("Error:", result$.deputy_error)
+    } else {
+      utils::capture.output(print(result))
+    }
+  )
+}
+
+run_bash_child <- function(cmd) {
+  # system(intern = TRUE) errors on status 127 (command not found); the shell
+  # has already written its message to stderr.
+  output <- tryCatch(
+    suppressWarnings(system(cmd, intern = TRUE)),
+    error = function(e) structure(character(), status = 127L)
+  )
+  status <- attr(output, "status")
+  list(
+    output = as.character(output),
+    status = if (is.null(status)) 0L else as.integer(status)
+  )
+}
+
 run_r_code_impl <- function(
   code,
   timeout = 30,
@@ -10,22 +42,8 @@ run_r_code_impl <- function(
 
   result <- tryCatch(
     callr::r(
-      function(code_string) {
-        output <- utils::capture.output({
-          result <- tryCatch(
-            base::eval(base::parse(text = code_string)),
-            error = function(e) list(.deputy_error = e$message)
-          )
-        })
-        list(
-          output = paste(output, collapse = "\n"),
-          result = if (is.list(result) && ".deputy_error" %in% names(result)) {
-            paste("Error:", result$.deputy_error)
-          } else {
-            utils::capture.output(print(result))
-          }
-        )
-      },
+      # The code sees the child's attached packages, as at an R prompt.
+      child_function(run_r_code_child, globalenv()),
       args = list(code_string = code),
       timeout = timeout,
       wd = working_dir,
@@ -157,19 +175,7 @@ run_bash_impl <- function(
     on.exit(unlink(stderr_file), add = TRUE)
     result <- tryCatch(
       callr::r(
-        function(cmd) {
-          # system(intern = TRUE) errors on status 127 (command not found);
-          # the shell has already written its message to stderr.
-          output <- tryCatch(
-            suppressWarnings(system(cmd, intern = TRUE)),
-            error = function(e) structure(character(), status = 127L)
-          )
-          status <- attr(output, "status")
-          list(
-            output = as.character(output),
-            status = if (is.null(status)) 0L else as.integer(status)
-          )
-        },
+        child_function(run_bash_child),
         args = list(cmd = command),
         timeout = timeout,
         wd = working_dir,

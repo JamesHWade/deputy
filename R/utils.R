@@ -604,3 +604,16 @@ parse_markdown_frontmatter <- function(path) {
     body = paste(body_lines, collapse = "\n")
   )
 }
+
+# A function deputy runs in a child R process (callr, or an R session worker),
+# ready to send. callr serializes it with every source reference in it but
+# its own. When deputy is installed with its source kept, as covr installs it,
+# each nested function's reference holds the whole package source, and reading
+# covr's copy back made the child load deputy, more than ten seconds of
+# instrumentation that also printed to the child's stderr. The child needs
+# only base R, or the global environment where code expects attached packages.
+child_function <- function(fun, env = baseenv()) {
+  fun <- utils::removeSource(fun)
+  environment(fun) <- env
+  fun
+}

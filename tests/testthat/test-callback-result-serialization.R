@@ -12,7 +12,7 @@ test_that("callback results survive RDS and timed hook subprocesses", {
   )
   saveRDS(list(values = values, output = output), path)
   restored <- callr::r(
-    function(path, package_path) {
+    function(path, package_path, hook_timeout) {
       if (file.exists(file.path(package_path, "R", "agent.R"))) {
         pkgload::load_all(package_path, quiet = TRUE)
       } else {
@@ -46,7 +46,7 @@ test_that("callback results survive RDS and timed hook subprocesses", {
       registry <- deputy:::HookRegistry$new()
       registry$add(HookMatcher(
         "PreToolUse",
-        timeout = 20,
+        timeout = hook_timeout,
         callback = local({
           package_path <- package_path
           function(...) {
@@ -89,7 +89,9 @@ test_that("callback results survive RDS and timed hook subprocesses", {
     },
     args = list(
       path = path,
-      package_path = getNamespaceInfo(asNamespace("deputy"), "path")
+      package_path = getNamespaceInfo(asNamespace("deputy"), "path"),
+      # The hook's process loads deputy too.
+      hook_timeout = child_load_allowance(20)
     )
   )
   expect_true(all(restored$classes))

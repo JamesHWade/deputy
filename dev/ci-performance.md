@@ -56,6 +56,25 @@ An eight-job sharding experiment was removed to keep the workflow standard and
 simple. The two-minute target is not yet achieved; do not trade away behavioral
 coverage merely to label the check fast.
 
+## Child processes under coverage
+
+covr installs deputy with its source kept and instruments the whole namespace
+every time a process loads it: more than ten seconds per load locally (11.5s
+on 2026-10-09), and ten lines of "Unknown language class: environment" on
+stderr. A child process that loads deputy pays that cost before doing anything.
+
+- Functions deputy sends to a child (the one-shot R and shell tools, timed
+  hooks, the R session and MCP workers) go through `child_function()`, which
+  drops their source references. callr keeps every reference but a function's
+  own, and a nested one made reading the function back load deputy in the
+  child. Without them the child loads only what the function uses.
+- Tests whose child loads deputy on purpose, to build or read deputy objects,
+  add `child_load_allowance()` to their limits; it adds two minutes only when
+  `R_COVR` is `"true"`, as covr sets it.
+
+Before this, coverage on main failed 20 tests: `run_bash` output carrying the
+instrumentation messages, and process tests that timed out waiting for a child.
+
 ## Validation and measurement
 
 Run `TESTTHAT_CPUS=4 Rscript -e 'devtools::test()'` for local testing, or ordinary

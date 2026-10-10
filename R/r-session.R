@@ -713,10 +713,8 @@ RSession <- R6::R6Class(
                 }
                 if (!dispatched) {
                   if (identical(worker$get_state(), "idle")) {
-                    fun <- r_session_evaluate
-                    environment(fun) <- baseenv()
                     worker$call(
-                      fun,
+                      child_function(r_session_evaluate),
                       list(
                         code = job$code,
                         working_dir = private$owner$working_dir,

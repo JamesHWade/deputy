@@ -325,7 +325,9 @@ HookRegistry <- R6::R6Class(
             # Call with timeout if callr is available
             if (hook@timeout > 0 && rlang::is_installed("callr")) {
               callr::r(
-                function(callback, args) do.call(callback, args),
+                child_function(function(callback, args) {
+                  do.call(callback, args)
+                }),
                 args = list(callback = hook@callback, args = args),
                 timeout = hook@timeout
               )
