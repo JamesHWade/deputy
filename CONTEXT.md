@@ -40,6 +40,20 @@ call
 **Turn**: A single exchange within a run — one model response and any
 tool calls it requested. *Avoid*: step, iteration, round
 
+**Selected conversation**: The complete path of turns currently chosen
+by the host, including material removed from model context and subagent
+activity shown with those turns. *Avoid*: model context, conversation
+snapshot
+
+**Model context**: The instructions and turns currently supplied to the
+model. It may contain summaries or result markers in place of material
+in the selected conversation. *Avoid*: selected conversation, transcript
+
+**Conversation state**: Retained turns, originals of tool results
+cleared from model context, and the installed summary used to
+reconstruct the selected conversation from the current Chat. Its
+transitions keep those records consistent with changes to model context.
+
 **Conversation snapshot**: The serialized contents of an Agent’s
 selected conversation and model context, written to and read from disk
 by `save_session()` and `load_session()`. Concerns what was said, not
